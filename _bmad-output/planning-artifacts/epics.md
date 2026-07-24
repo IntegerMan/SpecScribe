@@ -96,6 +96,20 @@ NFR3: Operation is local-first and privacy-preserving, requiring no remote telem
 NFR4: Architecture is extensible so new framework adapters can be added without core rewrites.
 NFR5: Source files are read with shared access and watch mode must not hold write locks on observed files.
 NFR6: Cross-surface accessibility semantics (keyboard drill behavior, labels, status text redundancy) are contractual behavior, not optional styling.
+
+<!-- ⚠️ NUMBERING COLLISION, surfaced 2026-07-24 (correct-course, SCP 2026-07-24) — recorded, NOT yet resolved.
+     This list and the PRD's § 8 list are numbered INDEPENDENTLY and disagree:
+       • PRD "NFR-5 (Progressive enhancement)" — the JS-optional / no-JS baseline requirement.
+       • epics.md "NFR5" (above) — shared-access file reads / watch-mode write locks. A DIFFERENT requirement.
+       • epics.md "NFR6" (this line) — cross-surface accessibility semantics.
+     Stories and ADRs across Epics 20/22/23/24 routinely cite "NFR6" when they mean the PRD's progressive-enhancement
+     NFR-5 (e.g. "NFR6 JS-optional baseline", "NFR6 no-JS baselines unchanged"). Those citations point at the wrong
+     entry in THIS list — the concept they mean lives only in the PRD, and this list has no progressive-enhancement
+     NFR at all. The collision predates this SCP and was found while amending the PRD's NFR-5 per ADR 0013.
+     ADR 0013 amends the PRD's NFR-5 ONLY. Nothing in this list changed. Resolving the collision (renumber, add the
+     missing NFR here, or adopt one canonical list) is deliberately NOT bundled into this change — it would touch
+     many stories' citations and deserves its own pass. Raised as an open item in SCP 2026-07-24. -->
+
 NFR7: Feature configurability parity is required across interactive menu flows and equivalent CLI parameters, with directory-scoped settings persistence.
 NFR8: Insight surfaces and guidance affordances (status vocabularies, next-step commands, glossary terms, empty-state hints, follow-up/debt artifact types) are framework-agnostic in shared rendering: framework-specific content flows through the adapter contract, and surfaces degrade gracefully — absent, not broken or misleadingly empty — when a methodology lacks the corresponding artifact.
 NFR9: Release builds are reproducible and produced by CI from a clean checkout; publishing to any distribution channel is gated on a passing build + test run.
@@ -198,7 +212,7 @@ FR34: Epic 16 - Release-facing documentation, changelog, and versioning policy.
 FR35: Epic 6 - Native VS Code host-integration surfaces (discoverability, commands, tree view/status bar, editor bridges, reactivity), seated from the VS Code Native-Integration Recommendations (docs/VSCodeIntegrationRecommendations.md).
 FR36: Epic 18 - BMad module/expansion coverage exploration and baseline via the shared adapter contract.
 FR37: Epic 19 - Directed work graph across epics, stories, quick-dev, deferred work, reviews, and code (queryable provenance).
-FR38: Epic 20 - Interactive project explorer (drill-in zoomable sunburst + related-work side pane) as a progressive enhancement over the static Story 10.7 sunburst.
+FR38: Epic 20 - Standardized Hierarchy Explorer component (Plotly-based sunburst + treemap over one datasource, one selector, explicit `navigate`|`select` activation mode) used site-wide, plus the related-work pane and the dashboard details pane. Revised 2026-07-24 (SCP 2026-07-24) — was "a progressive enhancement over the static Story 10.7 sunburst"; ADR 0013 retires server-rendered chart SVG, so the text twin (not a static sunburst) is the no-JS contract. Design-locked by ADR 0012 + ADR 0013.
 FR39: Epic 21 - Value & correlation insights (traceability coverage matrix, delivery cadence / cycle-time, planning↔code impact map) derived at generation time.
 FR40: Epic 24 - File-level change-coupling intelligence (directional confidence/support/lift + cross-boundary emphasis) rendered as an accessible ranked list AND interactive multi-form relationship graphs (force-directed network, chord/arc, adjacency-matrix heatmap) at per-file and whole-repo scopes, derived at generation time from git history.
 NFR10: Epic 17 - Pre-publication code hardening and security/privacy review for public + private codebase readiness.
@@ -282,8 +296,8 @@ Extend first-class BMad support beyond the BMM core to BMad's own module and exp
 Make the directed relationships among epics, stories, quick-dev, deferred work, retrospectives/code reviews, and code navigable as a queryable graph — so provenance chains, cycles, and "what stemmed from what" stop living only as breadcrumbs and reverse-link panels.
 **FRs covered:** FR37 (seat in PRD when convenient)
 
-### Epic 20: Interactive Project Explorer — Drill-In Sunburst with Related-Work Pane
-Turn the static remaining-work sunburst into a fluid, explorable map: click a wedge to zoom in and reveal nested children, breadcrumb back out, with a live related-work side pane. SpecScribe's first rich client-interactive surface; a progressive enhancement over the static Story 10.7 sunburst.
+### Epic 20: Interactive Project Explorer — Standardized Hierarchy Explorer on Plotly
+One **Hierarchy Explorer** component — sunburst + treemap over the same datasource behind one selector, built on **Plotly.js** — used everywhere a sunburst or treemap appears today, with an explicit `navigate` | `select` activation mode; on the dashboard, `select` drives a details pane (high-level details, recommended-prompt button, view-more link). Includes the related-work pane. Design-locked by [ADR 0012](../../docs/adrs/0012-plotly-hierarchy-chart-engine-and-standardized-explorer-component.md) + [ADR 0013](../../docs/adrs/0013-text-twin-is-the-no-js-contract.md); rewritten in place 2026-07-24 (SCP 2026-07-24).
 **FRs covered:** FR38 (seat in PRD when convenient)
 
 ### Epic 21: Value & Correlation Insights — Traceability, Cadence, and Planning↔Code
@@ -3053,11 +3067,36 @@ So that circular-looking reverse links and multi-hop provenance become inspectab
      enhancement over the static Story 10.7 sunburst (which stays the no-JS baseline and is in active dev). Consumes
      Epic 19's work-graph edges + the existing Charts.Sunburst/FollowUpGeometry weights. Spike-led. FR38. -->
 
-## Epic 20: Interactive Project Explorer — Drill-In Sunburst with Related-Work Pane
+## Epic 20: Interactive Project Explorer — Standardized Hierarchy Explorer on Plotly
 
-Turn the static remaining-work sunburst into a fluid, explorable map of the whole project: click a wedge to zoom into it in place, reveal its nested children, and breadcrumb back out — paired with a live side pane that shows the work-graph nodes related to whatever is selected. SpecScribe's first rich client-interactive surface; it degrades cleanly to the static Story 10.7 sunburst and Story 9.13 linked pages when JavaScript is unavailable (NFR8).
+Turn the project's hierarchy charts into one fluid, explorable, **standardized** surface: a single **Hierarchy Explorer** component — sunburst and treemap over the same datasource behind one selector — built on **Plotly.js**, used *everywhere* a sunburst or treemap appears today, with an explicit **`navigate` | `select` mode** governing what activating a node does. On the dashboard, `select` mode drives a details pane carrying high-level details, the recommended-prompt button, and a view-more link. Paired with the work-graph related-work pane that shows what is related to the current selection.
 
-**FRs covered:** FR38 (sync into PRD when convenient) · **NFRs:** NFR8 · **Depends on:** Epic 19 (work-graph edges) as its relationship source, the existing `Charts.Sunburst`/`EpicSunburst` + `FollowUpGeometry` weights as its hierarchy source, and Story 6.7 (SPA adapter) as prior art for a JS delivery surface. Story 10.7 is the static baseline this enhances — not retired.
+**FRs covered:** FR38 (sync into PRD when convenient) · **NFRs:** NFR8, NFR-5 (as amended by ADR 0013) · **UX-DRs:** UX-DR5, UX-DR6, UX-DR7 (this epic *restores* the originally-specified interactive-sunburst UX SpecScribe had approximated in pure CSS), UX-DR16, UX-DR17, UX-DR18, UX-DR21 · **Design-locked by:** [ADR 0012](../../docs/adrs/0012-plotly-hierarchy-chart-engine-and-standardized-explorer-component.md) (Plotly + the component + the mode contract) and [ADR 0013](../../docs/adrs/0013-text-twin-is-the-no-js-contract.md) (the text twin is the no-JS contract) · **Depends on:** Epic 19 (work-graph edges) as its relationship source, the existing `FollowUpGeometry` / sunburst weights as its hierarchy source, and Story 20.2's committed payload/id contract as the component's datasource shape.
+
+<!-- 2026-07-24 (correct-course, SCP 2026-07-24): Epic 20 REWRITTEN IN PLACE, owner-directed. The epic's original
+     framing — "a progressive enhancement over the static Story 10.7 sunburst, which stays the no-JS baseline" — no
+     longer holds: ADR 0013 retires server-rendered chart SVG entirely and makes the accessible TEXT TWIN the no-JS
+     contract, so there is no static sunburst underneath to enhance. Stories 20.1–20.3 are UNCHANGED and land as
+     seeded/shipped (20.2's payload/id contract is precisely what the new component consumes; 20.3's server-rendered
+     Related block becomes the text-twin pattern). Story 20.4 is REPLACED — "extract the shared arc math from three
+     hand-rolled renderers" is moot once Plotly owns arcs. New Stories 20.5–20.8 carry the component, the ADR 0013
+     audit gate, the site-wide rollout, and the home details pane. Root cause this addresses: ADR 0010 §6 already
+     required ONE shared engine and it did not hold — three arc renderers in specscribe.js, three DIVERGENT
+     Treemap|Sunburst toggles (Code Map and Impact Map order Treemap-first, Git Insights orders Sunburst-first),
+     and seven Charts.cs hierarchy entry points. A shared COMPONENT is far harder to accidentally reinvent than a
+     shared CONVENTION. -->
+
+**Rollout inventory (the surfaces Story 20.7 converts — verified in code 2026-07-24):**
+
+| Surface | Call site | Server-side entry points |
+|---|---|---|
+| Dashboard | `HtmlRenderAdapter.Dashboard.cs:54` | `Charts.Sunburst` + `SunburstCompanionList` |
+| Epics | `HtmlRenderAdapter.Epics.cs:32` | `Charts.Sunburst` + `SunburstCompanionList` |
+| Epic detail | `HtmlRenderAdapter.Epics.cs:208` | `Charts.EpicSunburst` |
+| Story detail | `HtmlRenderAdapter.Epics.cs:550` | `Charts.TaskSunburst` |
+| Code Map | `CodeMapTemplater.cs:152,158` | `Charts.CodeTreemap` + `CodeMapSunburst` |
+| Git Insights (ownership) | `GitInsightsTemplater.cs:173,178` | `Charts.CodeOwnershipSunburst` + `CodeOwnershipTreemap` |
+| Impact Map | `ImpactMapTemplater.cs:126` | client-rendered treemap/sunburst (Story 21.3) |
 
 <!-- Owner request logged 2026-07-22 (Story 7.11 design-feedback session, git-insights.html's Code Ownership
      sunburst): "click and drill into a directory and filter down to that level — at least in the sunburst. You
@@ -3072,6 +3111,14 @@ Turn the static remaining-work sunburst into a fluid, explorable map of the whol
      interaction model — a real charting-library dependency, which is a bigger departure than this codebase's
      current zero-dependency JS posture (ADR 0010) and would need its own dependency-budget decision at spike
      time, not an assumed yes. See Story 7.11's Change Log/Dev Agent Record for the full owner-feedback context. -->
+
+<!-- 2026-07-24 (correct-course, SCP 2026-07-24): Story 20.1's remaining open question — "the JS size and dependency
+     budget, and whether any framework is introduced" (AC #1) — is now ANSWERED BY ADR 0012, not by this spike: the
+     dependency is Plotly, vendored locally. AC #2's degrade contract is SUPERSEDED by ADR 0013 — the no-JS baseline
+     is no longer "the static Story 10.7 sunburst plus Story 9.13 linked pages" but the server-rendered TEXT TWIN.
+     The story is left as-shipped rather than rewritten (its zero-dep recommendation was correct for what was known
+     at the time, and Story 20.2 was built against it); read ADR 0012 + ADR 0013 as the current authority. Story 20.4
+     now carries the measurement work this spike deferred. -->
 
 ### Story 20.1: Interactive Explorer Architecture Spike
 
@@ -3131,33 +3178,139 @@ So that "what stemmed from what" is visible beside the map instead of buried in 
 **Then** an empty selection shows a designed empty state
 **And** with JS off the relationship data is still delivered as a server-rendered "Related" block, never JS-gated.
 
-<!-- Story 20.4 seated 2026-07-23 by the Epics 19+21 joint retrospective (owner-directed). ADR 0010 §6 requires ONE
-     shared client-charting engine across opt-in analytics surfaces, "not independently reinvented per story."
-     Verified violation at retro time: src/SpecScribe/assets/specscribe.js (1,961 lines) carries THREE independent
-     arc/radial renderers — initOwnershipSunburst (Story 7.11), renderSunburst/arcPath (Story 21.3), and
-     initSunburstExplorer/annular/fullRing (Story 20.2). Epic 24 (FR40) adds force-directed, chord/arc, and
-     adjacency-matrix views across 24.2–24.5; consolidating BEFORE 24.2 starts is the cheapest moment. Seated in
-     Epic 20 because Epic 20 owns the client-JS boundary (20.1's budget spike, ADR 0010 §5). -->
+<!-- Story 20.4 REPLACED 2026-07-24 (correct-course, SCP 2026-07-24, owner-directed). It was seated 2026-07-23 by the
+     Epics 19+21 joint retrospective as "extract the shared arc/radial math from the three hand-rolled renderers into
+     one module" — the remedy ADR 0010 §6 had already prescribed as a CONVENTION and that three concurrent sessions
+     defeated. With ADR 0012 adopting Plotly, there is no hand-rolled arc math left to extract: the three renderers
+     are DELETED by Story 20.7, not consolidated. 20.4 is re-tasked to the engine-adoption spike that ADR 0012's
+     "Spike validation" section names. The original consolidation intent is not lost — it is fulfilled more strongly
+     by Stories 20.5/20.7 (one component, not one math module). The sequencing constraint SURVIVES AND STRENGTHENS:
+     this must land before Story 24.2, or Epic 24 adds renderers 4/5/6 to a file whose existing 3 are about to be
+     deleted. -->
 
-### Story 20.4: Shared Client-Side Geometry Engine for Analytics Charts
+### Story 20.4: Plotly Engine-Adoption Spike — Vendoring, Budget, CSP, and Accessibility
 
-As a maintainer of SpecScribe's opt-in analytics surfaces,
-I want the arc/radial and layout math in `specscribe.js` extracted into one shared, tested module,
-So that ADR 0010 §6's one-engine rule actually holds before Epic 24 adds three more graph views to the same file.
+As a maintainer adopting SpecScribe's first third-party runtime dependency,
+I want Plotly's real cost and conformance measured against this codebase before the component is built on it,
+So that ADR 0012's ratified direction is validated by numbers — and its two named escalation triggers fire early if they are going to fire at all.
 
 **Acceptance Criteria:**
 
 1.
-**Given** the three independent arc/radial renderers shipped by Stories 7.11, 21.3, and 20.2
-**When** the shared geometry module is extracted
-**Then** every existing analytics surface renders through it with no visual regression (each surface's shipped output verified in a live browser, not only by test assertions)
-**And** the duplicated arc/annular-sector path math exists in exactly one place.
+**Given** ADR 0012's decision to vendor Plotly locally (never CDN, `file://`-safe)
+**When** the spike produces a custom build limited to the `sunburst` + `treemap` + `heatmap` traces
+**Then** it reports that build's size, and the **net output-size delta** against today's inline SVG across a real generated portal — including `code-map.html`, which has previously reached 82.5 MB
+**And** it confirms the vendored asset loads offline and from `file://`, and reports the packaging impact across all three channels (self-contained binary, npx Story 16.8, VSIX Story 16.5).
 
 2.
-**Given** Epic 24's planned force-directed / chord / matrix views (Stories 24.2–24.5)
-**When** the module's surface is defined
-**Then** it exposes the primitives those views need without each story re-deriving arc, layout, or hierarchy-grouping math
-**And** the JS size budget named by Story 20.1 is restated against the consolidated total (NFR6 no-JS baselines unchanged on every affected page).
+**Given** ADR 0012's two named escalation triggers
+**When** the spike evaluates the webview and accessibility
+**Then** it reports whether Plotly renders under the VS Code webview CSP (`script-src 'nonce-…'`, plus Plotly's runtime `<style>` injection) — a failure selects the ADR 0012 §5 text-twin fallback and does **not** reopen the engine choice
+**And** it reports **explicit pass/fail** conformance against UX-DR7 (Tab order, Enter/Space drill, Escape up), UX-DR16, UX-DR17, and UX-DR18 reduced-motion — a hard a11y failure Plotly cannot be configured around is the one finding that reopens ADR 0012, and must be reported as such rather than as a polish note.
+
+3.
+**Given** ADR 0012's requirement that presentation stays SpecScribe's
+**When** the spike renders a representative hierarchy
+**Then** it demonstrates the chart driven entirely by the existing `--status-*` and brand tokens with Plotly's default colorways disabled
+**And** its findings are recorded back onto ADR 0012 as an addendum (the ADR is already ratified — this validates, it does not gate).
+
+### Story 20.5: The Hierarchy Explorer Component — One Datasource, One Selector, One Mode Contract
+
+As a maintainer who wants site-wide chart changes to land in one place,
+I want a single standardized component that renders a sunburst and a treemap over the same datasource behind one selector, with an explicit activation mode,
+So that every hierarchy surface shares one implementation, one interaction grammar, and one place to add future features.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the node payload shape Story 20.2 committed (`id`, `parentId`, `label`, weight, `statusClass`, `href`, `kind`)
+**When** the component renders
+**Then** both shapes read that **same** embedded payload — switching shapes never re-derives geometry, never re-counts against `ProjectCounts`, and never issues a fetch (`file://`-safe)
+**And** it supplies one selector idiom, one Story 10.2 framing block (legend + analysis window + framing sentence), and one text twin, so no call site hand-writes any of them.
+
+2.
+**Given** ADR 0012's `navigate` | `select` mode contract
+**When** a node is activated in `navigate` mode
+**Then** it follows the node's `href` honoring the Story 9.13 destination contract (leaf → detail page, group → generated filtered list page)
+**And** in `select` mode it raises a selection event **without navigating**, the selected node's own destination remains reachable, and the selection is announced to assistive technology.
+
+3.
+**Given** Plotly drills in on click by default
+**When** the component wires activation
+**Then** drill-in is a **distinct affordance** from activation — a node never silently both drills and activates — and breadcrumb drill-up plus URL-hash deep-linking work per UX-DR5/UX-DR6
+**And** keyboard traversal, reduced-motion, and non-color status signalling all hold (UX-DR7, UX-DR17, UX-DR18), verified in a live browser.
+
+### Story 20.6: Text-Twin Audit and Golden-Fingerprint Replacement — the ADR 0013 Gate
+
+As a maintainer retiring server-rendered chart SVG,
+I want every affected surface's text twin audited complete and the chart regression net rebuilt before any SVG is deleted,
+So that ADR 0013's no-JS contract is proven rather than assumed, and chart regressions stay caught through the transition.
+
+**Acceptance Criteria:**
+
+1.
+**Given** ADR 0013's hard per-surface gate and the Epic 20 rollout inventory
+**When** each surface's text twin is audited
+**Then** every twin is server-rendered, complete (no fact exists only inside the chart), navigable (every link a chart node offers resolves), and non-color (UX-DR17/UX-DR19) — verified **in a live browser with JavaScript disabled**, not by test assertion alone (CLAUDE.md § Verification)
+**And** any surface whose twin is incomplete is fixed here, or keeps its server-rendered SVG until it is — the gate is per-surface and blocking.
+
+2.
+**Given** `GoldenContentFingerprint` currently derives most of its signal from chart SVG (measured at 69.3% of the dashboard body by the Story 23.1 spike)
+**When** charts become client-rendered
+**Then** the replacement assertions cover what is now server-rendered — the embedded payload, the component configuration, and the text twin — and land in this story, before the first SVG retirement
+**And** the regenerated fingerprint is confirmed stable across two repeated runs before being locked in, naming whose concurrent changes it sits on top of (CLAUDE.md § Concurrent work).
+
+### Story 20.7: Site-Wide Rollout — Every Sunburst and Treemap Through the Component
+
+As a maintainer eliminating the drift ADR 0010 §6 could not prevent,
+I want all seven hierarchy call sites converted to the component and the superseded renderers deleted,
+So that exactly one implementation of a hierarchy chart exists in the codebase.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the Epic 20 rollout inventory (dashboard, epics, epic detail, story detail, Code Map, Git Insights ownership, Impact Map)
+**When** the rollout completes
+**Then** every one of those surfaces renders through the Story 20.5 component with a single consistent selector ordering and idiom — ending the current divergence where Code Map and Impact Map order *Treemap, Sunburst* and Git Insights orders *Sunburst, Treemap*
+**And** each converted surface is verified in a live browser (CLAUDE.md § Verification), with its Story 20.6 twin audit passing before its SVG is retired.
+
+2.
+**Given** the superseded implementations
+**When** the rollout completes
+**Then** `Charts.cs`'s seven hierarchy entry points (`Sunburst`, `EpicSunburst`, `TaskSunburst`, `CodeMapSunburst`, `CodeOwnershipSunburst`, `CodeTreemap`, `CodeOwnershipTreemap`) and `specscribe.js`'s three arc renderers (`initOwnershipSunburst`, `renderSunburst`/`arcPath`, `initSunburstExplorer`) are removed
+**And** no remaining code path constructs a sunburst or treemap by any other route (verified by search, not assumed — a symbol's absence is confirmed, per the shared-main verification rule).
+
+3.
+**Given** the VS Code webview and the SPA adapter
+**When** the converted surfaces render on those hosts
+**Then** HTML/SPA/webview parity holds via the existing `RenderParity` harness
+**And** if the ADR 0012 §5 CSP amendment cannot deliver acceptable webview chart rendering, the webview presents the text twin as the documented accepted degradation.
+
+### Story 20.8: Dashboard Details Pane — `select` Mode in Practice
+
+As a visitor exploring the project from the home page,
+I want clicking a node in the explorer to populate a details pane beside it rather than navigating away,
+So that I can survey the project's structure and read about each part without losing my place.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the dashboard explorer configured in `select` mode
+**When** I activate a node
+**Then** a details pane beside the chart populates with that node's high-level details, its **recommended-prompt button** (reusing the existing `BmadCommands` next-step command surface — not a second command vocabulary), and a **view-more link** to the node's own detail page
+**And** the page does not navigate, and the selection is announced to assistive technology as a live region.
+
+2.
+**Given** ADR 0006's read-only helper constraint and the no-JS contract
+**When** the pane renders
+**Then** the recommended-prompt button remains a read-only helper that generates a prompt and never mutates planning artifacts (AD-6)
+**And** with JavaScript unavailable the same details and links remain reachable through the server-rendered text twin, so `select` mode never becomes the only path to the information (ADR 0013).
+
+3.
+**Given** no selection yet, or a node with no details to show (NFR8)
+**When** the pane would be empty
+**Then** it shows a designed empty state per UX-DR22 rather than an incidental blank region
+**And** the pane reuses Story 20.3's related-work groupings rather than introducing a second relationship vocabulary.
 
 <!-- Epic 21 added 2026-07-19 (SCP 2026-07-19, correct-course): value & correlation insights — cross-cutting displays
      that make product value legible and surface correlations across work items AND code. Distinct from Epic 7's
@@ -3231,7 +3384,7 @@ So that "what did this work change" becomes visible instead of inferred.
 
 ## Epic 22: Delivery Evolution — JSON IR + Incremental Event-Driven Generation
 
-Elevate the serialized JSON data-layer from an optional output adapter (Story 6.7) to the **canonical intermediate representation (IR)** of a SpecScribe project — the durable, serialized form of the AD-2 host-neutral view models plus pre-rendered SVG chart fragments. Static HTML, the SPA, and the VS Code webview become **co-equal projections** of that IR (static HTML stays the JS-optional NFR6 baseline — a projection, not a `<noscript>` afterthought). Generation moves to an **incremental, event-driven model** that recomputes only the changed scope (operationalizing AD-5) and emits IR deltas suitable for a future watch / client-server transport (AD-8). Does **not** port the C# analysis core (ADR 0006 stands); charts stay pre-rendered SVG *in* the IR.
+Elevate the serialized JSON data-layer from an optional output adapter (Story 6.7) to the **canonical intermediate representation (IR)** of a SpecScribe project — the durable, serialized form of the AD-2 host-neutral view models plus pre-rendered SVG chart fragments. Static HTML, the SPA, and the VS Code webview become **co-equal projections** of that IR (static HTML stays the JS-optional NFR6 baseline — a projection, not a `<noscript>` afterthought). Generation moves to an **incremental, event-driven model** that recomputes only the changed scope (operationalizing AD-5) and emits IR deltas suitable for a future watch / client-server transport (AD-8). Does **not** port the C# analysis core (ADR 0006 stands). ~~Charts stay pre-rendered SVG *in* the IR.~~ **Revised 2026-07-24 ([ADR 0013](../../docs/adrs/0013-text-twin-is-the-no-js-contract.md), SCP 2026-07-24):** server-rendered chart SVG is retired, so the IR carries **chart data + component configuration** (plus the server-rendered text twin), not pre-rendered SVG markup. This is a **simplification** of this epic — the IR becomes a data document rather than a data-plus-markup document.
 
 **Status:** backlog · unscheduled · design-locked by [ADR 0008](../../docs/adrs/0008-json-ir-canonical-and-incremental-generation.md) · **NFRs:** NFR4 (additive), NFR6 (accessibility baseline preserved), NFR9 (reproducible CI) · **Source:** SCP 2026-07-20.
 
@@ -3242,7 +3395,7 @@ Elevate the serialized JSON data-layer from an optional output adapter (Story 6.
 **Candidate stories (illustrative — finalized at kickoff, not committed here):**
 
 - **Story 22.1 — Spike: incremental recompute + IR-delta transport.** Measure changed-scope recompute correctness (incl. AD-5 topology-change invalidation) and delta latency against this repo; gates everything below.
-- **Story 22.2 — Canonical IR schema + versioning.** Serialize the AD-2 view models + pre-rendered SVG fragments into a versioned IR; generalize the `SectionViewModelSerializationTests` round-trip into an IR golden boundary. **Known constraint:** the existing SPA path has a **byte-blind chunker** (Story 6.6 at-scale measure: `pages-root.json` reached 112.9 MB at 1,461 pages; `code-map.html` 82.5 MB) — the IR schema must chunk by **bytes**, not page count, so large repos don't ship monolithic payloads.
+- **Story 22.2 — Canonical IR schema + versioning.** Serialize the AD-2 view models + chart data/component config (per ADR 0013 — *not* pre-rendered SVG) into a versioned IR; generalize the `SectionViewModelSerializationTests` round-trip into an IR golden boundary. **Known constraint:** the existing SPA path has a **byte-blind chunker** (Story 6.6 at-scale measure: `pages-root.json` reached 112.9 MB at 1,461 pages; `code-map.html` 82.5 MB) — the IR schema must chunk by **bytes**, not page count, so large repos don't ship monolithic payloads.
 - **Story 22.3 — Static HTML rendered from the IR.** Prove byte/behaviour parity with today's golden output when static HTML is a projection of the IR rather than a direct render.
 - **Story 22.4 — SPA + webview as IR consumers.** Fold the Story 6.7 SPA adapter and the webview onto the canonical IR; retire duplicate data paths.
 - **Story 22.5 — Incremental event-driven regeneration engine.** Operationalize AD-5 over the IR — recompute only changed scope, emit deltas.
@@ -3281,7 +3434,7 @@ So that Epic 22's implementation stories are scoped by real numbers rather than 
 ### Story 22.2: Canonical IR Schema + Versioning
 
 As a maintainer building surfaces on top of a stable data contract,
-I want the AD-2 view models and pre-rendered SVG chart fragments serialized into a versioned canonical IR,
+I want the AD-2 view models and chart data/component configuration serialized into a versioned canonical IR,
 So that static HTML, SPA, and webview can all project from one durable, chunked representation.
 
 **Acceptance Criteria:**
@@ -3290,7 +3443,7 @@ So that static HTML, SPA, and webview can all project from one durable, chunked 
 **Given** the existing AD-2 host-neutral view models
 **When** they are serialized to the canonical IR
 **Then** the IR includes a schema version
-**And** pre-rendered SVG chart fragments are embedded rather than regenerated per-surface.
+**And** chart **data + component configuration** (and the server-rendered text twin) are embedded rather than regenerated per-surface — per [ADR 0013](../../docs/adrs/0013-text-twin-is-the-no-js-contract.md) (2026-07-24), which retires pre-rendered SVG chart fragments; this AC previously required embedding those fragments.
 
 2.
 **Given** the Story 6.6 at-scale finding that `pages-root.json` reached 112.9 MB and `code-map.html` 82.5 MB at 1,461 pages
@@ -3398,7 +3551,7 @@ So that a future client/server model becomes possible without committing to it n
 
 ## Epic 23: Front-End Framework for the Projection Layer — Vue + Nuxt (SSR) over the IR
 
-Replace SpecScribe's C# presentation/templating layer (~4,691 LOC templaters; chart-SVG generation stays in C#) with a component-oriented **Vue + Nuxt 3 (universal/SSR)** front end that renders from the Epic 22 canonical IR. Motivation is **presentation-layer maintainability** — scoped, component-local CSS (ending the monolithic-stylesheet fragility class, e.g. the `*/`-comment silent-truncation incident), smaller and more modular files, and a **single renderer** (removing the C#-template↔framework drift hazard). This re-opens ADR 0006's **axis B (rendering language) only** — analysis and the IR production stay in C# (ADR 0006 axis C not reopened; charts stay pre-rendered SVG *in* the IR).
+Replace SpecScribe's C# presentation/templating layer (~4,691 LOC templaters) with a component-oriented **Vue + Nuxt 3 (universal/SSR)** front end that renders from the Epic 22 canonical IR. Motivation is **presentation-layer maintainability** — scoped, component-local CSS (ending the monolithic-stylesheet fragility class, e.g. the `*/`-comment silent-truncation incident), smaller and more modular files, and a **single renderer** (removing the C#-template↔framework drift hazard). This re-opens ADR 0006's **axis B (rendering language) only** — analysis and the IR production stay in C# (ADR 0006 axis C not reopened). ~~Charts stay pre-rendered SVG *in* the IR.~~ **Revised 2026-07-24 ([ADR 0013](../../docs/adrs/0013-text-twin-is-the-no-js-contract.md), SCP 2026-07-24):** chart SVG generation is retired from C# entirely — charts render client-side from IR data via the Epic 20 Hierarchy Explorer component. This **shrinks Story 23.4**, which no longer has to preserve a C# chart-SVG generator when retiring the `HtmlRenderAdapter`.
 
 **Status:** backlog · unscheduled · spike-first · design-locked by [ADR 0009](../../docs/adrs/0009-frontend-framework-for-projection-layer.md) · **Depends on:** Epic 22 (consumes the IR) · **NFRs:** NFR6 (baseline preserved by Nuxt prerender), NFR4.
 
@@ -3502,7 +3655,13 @@ So that SpecScribe has a single renderer and no drift hazard between two templat
 2.
 **Given** migration is complete
 **When** the C# `HtmlRenderAdapter` is retired for content rendering
-**Then** chart SVG generation remains in C#, per ADR 0009's non-goal, and continues to be embedded in the IR.
+**Then** charts render through the Epic 20 Hierarchy Explorer component from IR chart data, and the server-rendered text twin continues to be emitted per [ADR 0013](../../docs/adrs/0013-text-twin-is-the-no-js-contract.md).
+
+<!-- 2026-07-24 (correct-course, SCP 2026-07-24): AC #2 previously read "chart SVG generation remains in C#, per
+     ADR 0009's non-goal, and continues to be embedded in the IR." ADR 0013 retires server-rendered chart SVG, so
+     that non-goal no longer exists — this is a SCOPE REDUCTION for 23.4: there is no C# chart-SVG generator left to
+     carve out and preserve when the HtmlRenderAdapter is retired. The ADR 0005 CSP amendment 23.4 owes is now
+     SHARED with ADR 0012's webview amendment and must be landed ONCE, not twice. -->
 
 ### Story 23.5: Packaging Reconciliation
 
@@ -3526,7 +3685,24 @@ So that Epic 16's packaging/release story isn't broken by the presentation-layer
 
 Turn "what changes alongside this file" from a flat co-change list into a rigorous, richly visual relationship surface. Two threads: (1) upgrade the coupling **metric** from raw symmetric co-change counts to **directional coupling strength** — confidence(A→B) = shared-changes / A's-changes, plus a minimum-support floor and lift — with **cross-boundary "surprising coupling"** emphasis (a file coupled to one in a distant directory is an architectural smell) layered on the existing Code-vs-Process classifier; and (2) render those relationships as **polished, interactive graphs in three complementary forms** (force-directed network, chord/arc diagram, adjacency-matrix heatmap) at **two scopes** — a per-file **ego graph** on code pages and a **whole-repo coupling explorer** page. The upgraded ranked list survives as the accessible text-twin every graph shares. All metrics are computed at generation time from the single `--deep-git` numstat parse SpecScribe already runs (`GitMetrics` / `DeepGitPulse.CoChangePairs` + `FileInsight.ChangeCount`) — **no new git calls**. Every interactive graph is a progressive enhancement that degrades to static SVG + a readable table when JavaScript is unavailable (NFR8), and every chart carries a Story 10.2-compliant legend, analysis window, and framing sentence.
 
-**FRs covered:** FR40 (sync into PRD when convenient) · **UX-DRs:** UX-DR19 (rich hover/focus + non-color text equivalent of every metric), UX-DR20 (purposeful visual polish within perf/a11y limits), UX-DR21 (one primary representation per dataset, alternates behind a toggle; chart text-twins are contract) · **NFRs:** NFR8 · **Status:** backlog · unscheduled · **Source:** market research 2026-07-22 (git-activity file-level insights). · **Depends on:** the `--deep-git` numstat parse + `CoChangePairs` (Stories 3.2/3.8 — already built) as the data source; Stories 7.4/7.8 (per-file coupled-files list + static `Charts.ReferenceGraph`) as the surfaces it upgrades and evolves; **Epic 20's client-JS interactivity boundary (Story 20.1 spike)** and **ADR 0010's zero-dependency JS posture** as the foundation the interactive graphs (24.2–24.5) build on. Does not block Epic 20. Story 7.11 (Code Ownership & Bus-Factor) already shipped the "who changes this file" half — this epic is the "what changes alongside it" half, deliberately not re-doing ownership.
+**FRs covered:** FR40 (sync into PRD when convenient) · **UX-DRs:** UX-DR19 (rich hover/focus + non-color text equivalent of every metric), UX-DR20 (purposeful visual polish within perf/a11y limits), UX-DR21 (one primary representation per dataset, alternates behind a toggle; chart text-twins are contract) · **NFRs:** NFR8 · **Status:** backlog · unscheduled · **Source:** market research 2026-07-22 (git-activity file-level insights). · **Depends on:** the `--deep-git` numstat parse + `CoChangePairs` (Stories 3.2/3.8 — already built) as the data source; Stories 7.4/7.8 (per-file coupled-files list + static `Charts.ReferenceGraph`) as the surfaces it upgrades and evolves; **Epic 20's client-JS interactivity boundary** and, as revised 2026-07-24, **[ADR 0012](../../docs/adrs/0012-plotly-hierarchy-chart-engine-and-standardized-explorer-component.md) + [ADR 0013](../../docs/adrs/0013-text-twin-is-the-no-js-contract.md)** as the foundation the interactive graphs (24.2–24.5) build on. Does not block Epic 20.
+
+<!-- 2026-07-24 (correct-course, SCP 2026-07-24): TWO revisions to this epic's foundations, no AC rewrites needed
+     beyond the two noted at 24.2 and 24.5.
+     (1) ENGINE. ADR 0010's "zero-dependency JS posture" no longer describes the project: ADR 0012 adopts Plotly for
+     the HIERARCHY family. Plotly has NO force-directed layout and NO chord/ribbon trace, so it cannot serve 24.2,
+     24.3, or 24.4. ADR 0012 §4 therefore permits TWO engine families and names Epic 24's graph engine an EXPLICIT
+     OPEN QUESTION for this epic's own spike — it may be Plotly `scatter` with a hand-rolled layout, a second
+     library, or bespoke. Decide it on evidence; a THIRD family requires an ADR. Note ADR 0012 records ECharts as
+     "considered and deferred, not dismissed" (it covers hierarchy AND force-directed AND chord in one dependency) —
+     if this epic's spike selects it, SUPERSEDING ADR 0012 is the expected outcome, not a failure.
+     (2) GATE. Story 20.4's "must land before 24.2" sequencing constraint SURVIVES but its content changed: 20.4 is
+     now the Plotly engine-adoption spike, and the consolidation it was seated to perform is fulfilled by Stories
+     20.5/20.7 (one component, then delete the three arc renderers). 24.2 must not start before 20.7 lands, or Epic
+     24 adds renderers to a file whose existing renderers are about to be deleted.
+     (3) 24.5's adjacency matrix may ride Plotly's `heatmap` trace — the one Epic 24 view the hierarchy engine
+     already covers (ADR 0012 §4). -->
+ Story 7.11 (Code Ownership & Bus-Factor) already shipped the "who changes this file" half — this epic is the "what changes alongside it" half, deliberately not re-doing ownership.
 
 ### Story 24.1: Directional Coupling Metric Foundation (Confidence, Support, Lift, Cross-Boundary) + Upgraded List
 
@@ -3566,7 +3742,12 @@ So that the relationship reads as a picture I can explore — not a flat list �
 **Given** a code page for a file with coupling data and JavaScript available
 **When** the ego graph renders
 **Then** the focal file sits at the center with its coupled neighbors (bounded to a sensible degree, 1–2 hops) as a force-directed node-link graph, nodes sized by change frequency and edges weighted/colored by the Story 24.1 confidence (cross-boundary edges emphasized), with rich hover/focus tooltips (UX-DR19) and nodes linking to their own code pages
-**And** the graph reuses the Story 24.1 metric and the Epic 20 client-JS interactivity boundary rather than introducing a new engine or dependency (ADR 0010).
+**And** the graph reuses the Story 24.1 metric and routes through a component honoring the same mode / legend / text-twin contract as the Epic 20 Hierarchy Explorer — using **this epic's chosen graph engine** (ADR 0012 §4 names it an open question for Epic 24's own spike, since Plotly carries no force-directed layout), not a per-story reinvention.
+
+<!-- 2026-07-24 (SCP 2026-07-24): this AC previously read "rather than introducing a new engine or dependency
+     (ADR 0010)" — ADR 0012 supersedes that posture. The invariant is now the CONTRACT (one component, one mode
+     grammar, mandatory text twin), not the absence of a dependency. Blocked until Story 20.7 lands. -->
+
 
 2.
 **Given** a JavaScript-off, reduced-motion, or assistive-technology visitor (NFR8)

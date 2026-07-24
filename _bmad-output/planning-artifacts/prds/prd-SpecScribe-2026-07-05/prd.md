@@ -224,7 +224,27 @@ SpecScribe ships to the community through published distribution channels rather
 - **NFR-2 (Resilience):** Partial or malformed artifacts should degrade gracefully without crashing full-site generation.
 - **NFR-3 (Local-first privacy):** Repository and artifact analysis runs locally by default; no remote telemetry is required for core operation.
 - **NFR-4 (Extensibility):** Adapter architecture supports adding frameworks without core rewrites.
-- **NFR-5 (Progressive enhancement):** The generated portal's core content and navigation must function without JavaScript. Insight surfaces may use JavaScript as a progressive enhancement only (for example, client-side sorting, filtering, or expand/collapse); disabling JavaScript must not remove information or break navigation, and the established accessibility conventions (text and non-color cues, reduced-motion support) still apply.
+- **NFR-5 (Progressive enhancement):** The generated portal's core content and navigation must function without JavaScript. Disabling JavaScript must never remove **information** or break **navigation**. Data **visualizations** may require JavaScript, provided the information they present remains fully available without it through a **server-rendered text equivalent** — complete (no fact exists only inside the chart), navigable (every link a chart node offers resolves), and non-color. The established accessibility conventions (text and non-color cues, reduced-motion support) still apply.
+
+  <!-- AMENDED 2026-07-24 (correct-course, SCP 2026-07-24; ratified by ADR 0013). Previous wording: "The generated
+       portal's core content and navigation must function without JavaScript. Insight surfaces may use JavaScript as
+       a progressive enhancement only (for example, client-side sorting, filtering, or expand/collapse); disabling
+       JavaScript must not remove information or break navigation, and the established accessibility conventions
+       (text and non-color cues, reduced-motion support) still apply."
+       WHY: ADR 0012 adopts Plotly.js as the hierarchy-chart engine, and Plotly renders CLIENT-SIDE ONLY. The old
+       wording was satisfiable only by keeping SpecScribe's C# server-rendered SVG charts alongside Plotly — two
+       complete chart implementations, in two languages, that must never disagree. That is the exact drift class
+       ADR 0012 exists to end, recreated at larger scale. The owner chose to retire the server-rendered SVG instead.
+       WHAT ACTUALLY CHANGED: the line moved from "JS-off must lose nothing" to "JS-off must lose no INFORMATION or
+       NAVIGATION — it may lose the VISUALIZATION." This is a real product concession (a JS-off visitor no longer
+       sees SpecScribe's signature charts, including on the home page) and is recorded as such rather than framed as
+       a reinterpretation. It is NOT a relaxation of accessibility: ADR 0013 promotes the chart text twin from house
+       convention to hard contract, with a per-surface gate requiring live-browser JS-off verification before any
+       chart's SVG may be retired. See ADR 0013 for the full options analysis. -->
+
+  <!-- Downstream: ADR 0010 §2's "a real, useful default-mode chart must render with JS off" is SUPERSEDED by this
+       amendment. UX-DR21's "chart text-twin tables are accessibility contract and are never removed" is unchanged
+       and now load-bearing. Epic 20 Story 20.6 is the audit gate that proves this NFR holds surface by surface. -->
 
 ## 9. Open Questions
 - How should coverage tiers be communicated (fully rendered, summarized, unsupported) so users understand exactly what is and is not interpreted?

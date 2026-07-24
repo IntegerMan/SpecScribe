@@ -7,6 +7,18 @@ using Spectre.Console.Cli;
 
 namespace SpecScribe;
 
+/// <summary>The result of one full generation pass: the live generator (watch reuses it for the incremental loop)
+/// plus the pass's outcome tally, so a caller can decide an exit code without re-walking the events. Returning a
+/// pair rather than just the generator is what lets <see cref="GenerateCommand.Execute"/> fail a CI build while
+/// <see cref="WatchCommand"/> keeps running on the same shared code path. [Story 5.1 AC #4]</summary>
+public sealed record GenerationRun(SiteGenerator Generator, GenerationCounts Counts)
+{
+    /// <summary>Non-zero when any page errored. [AC #4]</summary>
+    public int ExitCode => GenerationSummary.ExitCode(Counts);
+
+    public bool HadErrors => Counts.HasErrors;
+}
+
 /// <summary>`specscribe generate` — build the site once and exit.</summary>
 public sealed class GenerateCommand : Command<SiteSettings>
 {
@@ -15,12 +27,14 @@ public sealed class GenerateCommand : Command<SiteSettings>
         var options = settings.Resolve();
         ConsoleUi.PrintLogo();
         ConsoleUi.PrintPaths(options);
-        RunGeneration(options);
-        return 0;
+        // A page that failed to render makes the whole site untrustworthy, so `generate` — the one-shot, CI-facing
+        // command — reports it as a non-zero exit. The failing paths themselves were already printed by
+        // PrintInitialSummary. [AC #4]
+        return RunGeneration(options).ExitCode;
     }
 
     /// <summary>Full generation pass with per-phase progress and a summary; shared with watch/interactive runs.</summary>
-    public static SiteGenerator RunGeneration(ForgeOptions options)
+    public static GenerationRun RunGeneration(ForgeOptions options)
     {
         var generator = new SiteGenerator(options);
         var sw = Stopwatch.StartNew();
@@ -28,7 +42,7 @@ public sealed class GenerateCommand : Command<SiteSettings>
         sw.Stop();
         ConsoleUi.PrintInitialSummary(events, sw.Elapsed);
         ConsoleUi.PrintOutputLink(options);
-        return generator;
+        return new GenerationRun(generator, GenerationSummary.Count(events));
     }
 }
 
@@ -397,8 +411,14 @@ public sealed class WatchCommand : Command<SiteSettings>
         var options = settings.Resolve();
         ConsoleUi.PrintLogo();
         ConsoleUi.PrintPaths(options);
-        var generator = GenerateCommand.RunGeneration(options);
-        return RunWatchLoop(options, generator);
+        var run = GenerateCommand.RunGeneration(options);
+        // Deliberate asymmetry with `generate`: an initial-build error is SURFACED (PrintInitialSummary already
+        // listed every failing path, and the machine summary line carries errors=N) but does NOT fail-fast the
+        // watch loop. `watch` is a live-edit loop whose whole purpose is to be running while the author fixes the
+        // very artifact that failed — exiting on the first bad page would make it useless exactly when it is most
+        // needed. Only the one-shot, CI-facing `generate` maps errors onto a non-zero exit; watch's return code is
+        // governed by its lifecycle (Ctrl+C -> 0). [Story 5.1 AC #4]
+        return RunWatchLoop(options, run.Generator);
     }
 
     /// <summary>Blocks watching for changes until Ctrl+C (or process exit); shared with interactive runs.</summary>
@@ -471,8 +491,8 @@ public sealed class InteractiveCommand : Command<SiteSettings>
                 {
                     if (TryResolve(settings) is not { } options) break;
                     ConsoleUi.PrintPaths(options);
-                    var generator = GenerateCommand.RunGeneration(options);
-                    return WatchCommand.RunWatchLoop(options, generator);
+                    var run = GenerateCommand.RunGeneration(options);
+                    return WatchCommand.RunWatchLoop(options, run.Generator);
                 }
                 case "Configure paths":
                     ConfigurePaths(settings);

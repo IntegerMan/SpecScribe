@@ -103,9 +103,23 @@ public static class ConsoleUi
         AnsiConsole.WriteLine();
     }
 
-    /// <summary>Runs a full generation pass with a live per-phase progress display.</summary>
+    /// <summary>True when there is a real terminal to paint — the single TTY signal the whole CLI branches on
+    /// (also used by <c>Program.cs</c>'s menu fallback and <see cref="InteractiveCommand"/>). Wrapped here so the
+    /// interactive/non-interactive decision has one name rather than a repeated property chain. [Story 5.1 AC #3]</summary>
+    private static bool IsInteractive => AnsiConsole.Profile.Capabilities.Interactive;
+
+    /// <summary>Runs a full generation pass, with a live per-phase progress display when a terminal can animate one.
+    /// <para>The non-interactive branch (CI, piped or redirected stdout) is EXPLICIT rather than leaning on Spectre's
+    /// own degradation of <see cref="AnsiConsole.Progress"/>: nothing about the run should depend on cursor control,
+    /// and a live display that silently becomes a no-op is a behavior we would not notice regressing. [AC #3]</para></summary>
     public static IReadOnlyList<GenerationEvent> RunWithProgress(SiteGenerator generator)
     {
+        if (!IsInteractive)
+        {
+            // No reporter at all — GenerateAll null-checks every phase callback, so this is the silent path.
+            return generator.GenerateAll();
+        }
+
         IReadOnlyList<GenerationEvent> events = Array.Empty<GenerationEvent>();
         AnsiConsole.Progress()
             .AutoClear(false)
@@ -117,35 +131,59 @@ public static class ConsoleUi
         return events;
     }
 
+    /// <summary>Prints the end-of-build feedback: the rounded counts table for humans, every failing path either
+    /// way, and — always, in both modes — the machine-parseable summary line. [AC #1, #3, #4]</summary>
     public static void PrintInitialSummary(IReadOnlyList<GenerationEvent> events, TimeSpan total)
     {
-        var generated = events.Count(e => e.Outcome is GenerationOutcome.Generated or GenerationOutcome.Updated);
-        var skipped = events.Count(e => e.Outcome == GenerationOutcome.Skipped);
+        var counts = GenerationSummary.Count(events);
         var errors = events.Where(e => e.Outcome == GenerationOutcome.Error).ToList();
 
-        var table = new Table().Border(TableBorder.Rounded).BorderColor(Color.Grey37);
-        table.AddColumn("Outcome");
-        table.AddColumn(new TableColumn("Count").RightAligned());
-        table.AddRow("[green]Generated[/]", generated.ToString());
-        if (skipped > 0)
+        if (IsInteractive)
         {
-            table.AddRow("[grey]Skipped[/]", skipped.ToString());
-        }
-        if (errors.Count > 0)
-        {
-            table.AddRow("[red]Errors[/]", errors.Count.ToString());
+            var table = new Table().Border(TableBorder.Rounded).BorderColor(Color.Grey37);
+            table.AddColumn("Outcome");
+            table.AddColumn(new TableColumn("Count").RightAligned());
+            table.AddRow("[green]Generated[/]", counts.Written.ToString());
+            if (counts.Skipped > 0)
+            {
+                table.AddRow("[grey]Skipped[/]", counts.Skipped.ToString());
+            }
+            if (counts.Errors > 0)
+            {
+                table.AddRow("[red]Errors[/]", counts.Errors.ToString());
+            }
+
+            AnsiConsole.Write(table);
         }
 
-        AnsiConsole.Write(table);
-
+        // Failing paths are surfaced in BOTH modes — swallowing them would leave a non-zero exit code with no way
+        // to tell WHICH page failed, which is exactly what CI needs. [AC #4]
         foreach (var err in errors)
         {
             AnsiConsole.MarkupLine($"  [red]x[/] {Markup.Escape(err.RelativePath)} - {Markup.Escape(err.Message ?? "unknown error")}");
         }
 
-        AnsiConsole.MarkupLine($"[grey]Initial build: {generated} page(s) in {total.TotalMilliseconds:0}ms[/]");
-        AnsiConsole.WriteLine();
+        // Prose counts in BOTH modes — plain text, no cursor control, so it degrades cleanly. The rounded table is
+        // the part that is suppressed when non-interactive, not the numbers themselves. [AC #3]
+        AnsiConsole.MarkupLine($"[grey]Initial build: {counts.Written} page(s) in {total.TotalMilliseconds:0}ms[/]");
+
+        PrintMachineSummary(counts, total);
+
+        if (IsInteractive)
+        {
+            AnsiConsole.WriteLine();
+        }
     }
+
+    /// <summary>Emits the one-line machine-parseable summary (UX-DR15). Written straight to
+    /// <see cref="Console.Out"/>, NOT through <see cref="AnsiConsole"/>: Spectre word-wraps at the profile width
+    /// (80 columns once output is redirected), which would split the very line CI is meant to grep as a unit.
+    /// Bypassing the markup pipeline also guarantees no escape sequences and no accidental markup interpretation.
+    /// <para>Printed on every run, interactive or not — the pretty table is for humans and this is for machines;
+    /// neither substitutes for the other. Kept as one helper so Story 5.3's per-rebuild watch summary can reuse the
+    /// identical shape rather than growing a second, drifting format.</para></summary>
+    private static void PrintMachineSummary(GenerationCounts counts, TimeSpan total)
+        => Console.Out.WriteLine(GenerationSummary.FormatLine(counts, total));
 
     public static void LogEvent(GenerationEvent ev)
     {

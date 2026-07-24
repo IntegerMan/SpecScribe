@@ -1,6 +1,10 @@
+---
+baseline_commit: 0f0af50f74702aab7c93c7d8928dd9cb24c42e53
+---
+
 # Story 5.1: CLI Generate and Watch Modes with Smart Defaults
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -37,31 +41,31 @@ so that I can produce and refresh docs quickly in real projects — including fr
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Non-interactive feedback + machine-parseable summary (AC: #1, #3)**
-  - [ ] In `ConsoleUi.RunWithProgress`, branch on `AnsiConsole.Profile.Capabilities.Interactive`: keep the live `AnsiConsole.Progress()` display for interactive terminals; for non-interactive, run `generator.GenerateAll(...)` with a no-op/plain reporter (no live progress task tree) so nothing depends on cursor control. (Spectre already degrades `Progress()` when non-interactive, but do not rely on that implicitly — make the branch explicit and covered by intent.)
-  - [ ] Add a machine-parseable one-line summary emitted on every `generate`/`watch` initial build. Recommended stable, greppable shape (single line, no markup): `SpecScribe: generated=<n> updated=<n> skipped=<n> errors=<n> elapsed_ms=<n>`. Emit it in addition to the existing human `PrintInitialSummary` table so interactive users still get the pretty table and CI gets a parseable line. In non-interactive mode the pretty table may be suppressed, but the summary line MUST always print.
-  - [ ] Keep the existing warning/error line conventions (`⚠`/`✗`-style, currently `!`/`x`) intact; ensure they still render as plain text without color when non-interactive.
-  - [ ] Route the summary through a single helper so `watch` per-rebuild feedback (Story 5.3's area) can reuse it later without duplication — but do NOT implement 5.3's per-rebuild summary here.
+- [x] **Task 1 — Non-interactive feedback + machine-parseable summary (AC: #1, #3)**
+  - [x] In `ConsoleUi.RunWithProgress`, branch on `AnsiConsole.Profile.Capabilities.Interactive`: keep the live `AnsiConsole.Progress()` display for interactive terminals; for non-interactive, run `generator.GenerateAll(...)` with a no-op/plain reporter (no live progress task tree) so nothing depends on cursor control. (Spectre already degrades `Progress()` when non-interactive, but do not rely on that implicitly — make the branch explicit and covered by intent.)
+  - [x] Add a machine-parseable one-line summary emitted on every `generate`/`watch` initial build. Recommended stable, greppable shape (single line, no markup): `SpecScribe: generated=<n> updated=<n> skipped=<n> errors=<n> elapsed_ms=<n>`. Emit it in addition to the existing human `PrintInitialSummary` table so interactive users still get the pretty table and CI gets a parseable line. In non-interactive mode the pretty table may be suppressed, but the summary line MUST always print.
+  - [x] Keep the existing warning/error line conventions (`⚠`/`✗`-style, currently `!`/`x`) intact; ensure they still render as plain text without color when non-interactive.
+  - [x] Route the summary through a single helper so `watch` per-rebuild feedback (Story 5.3's area) can reuse it later without duplication — but do NOT implement 5.3's per-rebuild summary here.
 
-- [ ] **Task 2 — Exit codes reflect generation outcome (AC: #4)**
-  - [ ] `GenerateCommand.Execute` and `WatchCommand.Execute` currently `return 0` unconditionally. Change `GenerateCommand.RunGeneration` (or its callers) to surface whether any `Error` outcome occurred, and return a non-zero exit code (`1`) from `GenerateCommand.Execute` when the initial build had errors.
-  - [ ] For `watch`, the initial build's error state should still be reported, but the command's return code is governed by the watch loop lifecycle (Ctrl+C → `0`); do not fail-fast the watch loop on an initial-build error — surface it and keep watching (watch is a live-edit loop). Document this asymmetry in a code comment.
-  - [ ] Preserve the existing top-level `Program.cs` exception → exit-code behavior (parse errors fall to interactive menu when a human is present, `1` otherwise; `DirectoryNotFoundException` → `1`). Do not regress the "drop into menu on bad args when interactive" flow.
-  - [ ] Confirm `RunGeneration` returning the `SiteGenerator` still works for `watch` (it consumes the generator for the watch loop) — thread the error signal without breaking that return.
+- [x] **Task 2 — Exit codes reflect generation outcome (AC: #4)**
+  - [x] `GenerateCommand.Execute` and `WatchCommand.Execute` currently `return 0` unconditionally. Change `GenerateCommand.RunGeneration` (or its callers) to surface whether any `Error` outcome occurred, and return a non-zero exit code (`1`) from `GenerateCommand.Execute` when the initial build had errors.
+  - [x] For `watch`, the initial build's error state should still be reported, but the command's return code is governed by the watch loop lifecycle (Ctrl+C → `0`); do not fail-fast the watch loop on an initial-build error — surface it and keep watching (watch is a live-edit loop). Document this asymmetry in a code comment.
+  - [x] Preserve the existing top-level `Program.cs` exception → exit-code behavior (parse errors fall to interactive menu when a human is present, `1` otherwise; `DirectoryNotFoundException` → `1`). Do not regress the "drop into menu on bad args when interactive" flow.
+  - [x] Confirm `RunGeneration` returning the `SiteGenerator` still works for `watch` (it consumes the generator for the watch loop) — thread the error signal without breaking that return.
 
-- [ ] **Task 3 — Help output clarity + examples (AC: #2)**
-  - [ ] Verify every `SiteSettings` option (`--source`, `--adrs`, `--output`, `--project-name`, `--no-readme`) has an accurate, current `[Description]` (they do today — confirm wording still matches actual defaults, e.g. output default `SpecScribeOutput`, source default walk-up to `_bmad-output`).
-  - [ ] Add top-level command descriptions/examples in `Program.cs` `app.Configure` (e.g. `config.AddExample(["generate"])`, `config.AddExample(["generate", "--source", "./_bmad-output", "--output", "./site"])`, `config.AddExample(["watch"])`) so `specscribe --help` shows real, working invocations.
-  - [ ] Confirm `specscribe generate --help` and `specscribe watch --help` render the option table cleanly (Spectre auto-generates from `[CommandOption]`/`[Description]`).
+- [x] **Task 3 — Help output clarity + examples (AC: #2)**
+  - [x] Verify every `SiteSettings` option (`--source`, `--adrs`, `--output`, `--project-name`, `--no-readme`) has an accurate, current `[Description]` (they do today — confirm wording still matches actual defaults, e.g. output default `SpecScribeOutput`, source default walk-up to `_bmad-output`).
+  - [x] Add top-level command descriptions/examples in `Program.cs` `app.Configure` (e.g. `config.AddExample(["generate"])`, `config.AddExample(["generate", "--source", "./_bmad-output", "--output", "./site"])`, `config.AddExample(["watch"])`) so `specscribe --help` shows real, working invocations.
+  - [x] Confirm `specscribe generate --help` and `specscribe watch --help` render the option table cleanly (Spectre auto-generates from `[CommandOption]`/`[Description]`).
 
-- [ ] **Task 4 — Pin auto-discovery of BOTH source and output roots (AC: #1)**
-  - [ ] `ForgeOptions.Resolve` already walks up from cwd to find `_bmad-output` (source) and derives `OutputRoot = <repoRoot>/SpecScribeOutput`. Confirm both are treated as "auto-discovered" per AC1 and that `ConsoleUi.PrintPaths` clearly shows the resolved Source and Output before the run (it does). No behavior change expected — this task is verification + tests, not new discovery logic.
-  - [ ] Do NOT add new discovery heuristics (e.g. scanning for alternate source dir names) — that is Epic 4 (framework generalization) territory, out of scope here.
+- [x] **Task 4 — Pin auto-discovery of BOTH source and output roots (AC: #1)**
+  - [x] `ForgeOptions.Resolve` already walks up from cwd to find `_bmad-output` (source) and derives `OutputRoot = <repoRoot>/SpecScribeOutput`. Confirm both are treated as "auto-discovered" per AC1 and that `ConsoleUi.PrintPaths` clearly shows the resolved Source and Output before the run (it does). No behavior change expected — this task is verification + tests, not new discovery logic.
+  - [x] Do NOT add new discovery heuristics (e.g. scanning for alternate source dir names) — that is Epic 4 (framework generalization) territory, out of scope here.
 
-- [ ] **Task 5 — Tests (AC: #1–#4)**
-  - [ ] Extend `tests/SpecScribe.Tests/ForgeOptionsTests.cs` (or a new `CliFeedbackTests.cs`) to cover: (a) the machine-parseable summary line format is produced from a known set of `GenerationEvent`s; (b) exit-code logic returns non-zero when events contain an `Error` and `0` otherwise. Prefer testing the pure summary/exit-code helpers directly rather than driving Spectre's console.
-  - [ ] Keep console/Spectre out of the unit under test where possible — extract summary-string building and error→exit-code decision into small pure functions/helpers that are unit-testable without a live `AnsiConsole` (mirrors how `ForgeOptions.Resolve` is tested headlessly).
-  - [ ] Run the full suite: `dotnet test` from repo root; all existing tests must stay green.
+- [x] **Task 5 — Tests (AC: #1–#4)**
+  - [x] Extend `tests/SpecScribe.Tests/ForgeOptionsTests.cs` (or a new `CliFeedbackTests.cs`) to cover: (a) the machine-parseable summary line format is produced from a known set of `GenerationEvent`s; (b) exit-code logic returns non-zero when events contain an `Error` and `0` otherwise. Prefer testing the pure summary/exit-code helpers directly rather than driving Spectre's console.
+  - [x] Keep console/Spectre out of the unit under test where possible — extract summary-string building and error→exit-code decision into small pure functions/helpers that are unit-testable without a live `AnsiConsole` (mirrors how `ForgeOptions.Resolve` is tested headlessly).
+  - [x] Run the full suite: `dotnet test` from repo root; all existing tests must stay green.
 
 ## Dev Notes
 
@@ -147,13 +151,113 @@ From `EXPERIENCE.md` Voice & Tone (lines 61–71): active voice, numbers over ad
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+claude-opus-4-8 (Claude Opus 4.8)
 
 ### Debug Log References
 
+Live CLI verification (non-interactive, this repo, `dotnet run … -- generate` with stdout piped):
+
+```
+Initial build: 371 page(s) in 36172ms
+SpecScribe: generated=371 updated=0 skipped=4 errors=0 elapsed_ms=36172
+Open the site (Ctrl+Click): file:///C:/Dev/SpecScribe/SpecScribeOutput/index.html
+EXIT=0
+```
+
+No rounded table, no spinner, no ANSI cursor control; one greppable line. `specscribe --help`,
+`generate --help` and `watch --help` all render the examples + option table cleanly.
+
+`webview` stdout re-verified as pure JSON after the change (`grep -c "^SpecScribe:"` → `0`, payload
+still opens `{"siteTitle":"SpecScribe",…`) — the machine line must never reach that channel.
+
+Full suite: **2185 passed / 0 failed / 3 skipped** (`dotnet test SpecScribe.slnx`). Golden content
+fingerprint unchanged — this story touches no rendering code, and the pre-existing drift noted in
+22.1/23.1 was already resolved on `main` before `baseline_commit` (verified green before editing).
+
 ### Completion Notes List
 
+**Shape of the change.** A hardening pass, as framed — the CommandApp, parsing, and discovery are
+untouched. One new pure file (`GenerationSummary.cs`) plus guarded branches in the three CLI files.
+
+- **AC #1** — unchanged behavior, now covered. `ForgeOptions.Resolve`'s walk-up to `_bmad-output` and
+  derived `<repoRoot>/SpecScribeOutput` already satisfy "both roots auto-discovered", and `PrintPaths`
+  already shows them. Verified live (zero flags → correct Sources/Output rows, 371 pages).
+- **AC #2** — `--help` now carries four top-level examples and two per-command examples; every
+  `[Description]` re-read against actual defaults and found accurate (no wording changes needed).
+- **AC #3** — `RunWithProgress` branches explicitly on `Capabilities.Interactive`. Non-interactive
+  runs `GenerateAll()` with **no reporter at all**, and `PrintInitialSummary` suppresses the rounded
+  table while keeping the prose counts line, every failing path, and the machine line.
+- **AC #4** — `RunGeneration` now returns `GenerationRun(Generator, Counts)`; `generate` returns
+  `run.ExitCode` (1 when any `Error`), `watch` reads `run.Generator` and deliberately ignores the
+  code. `Program.cs`'s exception→exit-code + menu-fallback flow is untouched.
+
+**Decisions worth flagging to the owner (all reversible, all cheap):**
+
+1. **No `NullGenerationReporter` was added.** The story suggested "a trivial no-op reporter is fine",
+   but `GenerateAll` takes `IGenerationReporter?` and null-checks every callback — so `GenerateAll()`
+   with no argument already *is* the silent path. Adding a type that does nothing when `null` already
+   does nothing would be dead weight. `GenerationReporter.cs` carries a comment saying so, so the next
+   reader does not re-derive it.
+2. **`removed=` is not in the summary line.** The story's shape omits it and `GenerateAll` never emits
+   `Removed` (only the incremental watch route deletes pages), so the key would be a constant `0`.
+   `GenerationCounts` *does* carry the count so Story 5.3's per-rebuild line can surface it without
+   re-deriving the tally — documented on the record's `Removed` param.
+3. **`generated=` and `updated=` are literal, not merged.** The human table's "Generated" row keeps its
+   existing meaning (generated + updated, now `counts.Written`); the machine line reports them
+   separately per the spec'd shape. A CI script wanting "pages built" sums the two.
+4. **The machine line bypasses Spectre entirely** (`Console.Out.WriteLine`, not `AnsiConsole`). This is
+   load-bearing, not stylistic: Spectre word-wraps at the profile width, which defaults to 80 columns
+   once stdout is redirected — routing the line through `AnsiConsole` would split the very record CI is
+   meant to grep as a unit. A test asserts the line carries no control characters and no `[`.
+5. **The logo and paths banner still print in CI** (Open Question #2's stated default: keep human output
+   minimal but present). If you want CI to see *only* the machine line, that is a one-line gate on
+   `IsInteractive` in `GenerateCommand.Execute` — say the word.
+6. **`watch --project-name "My Project"` was rejected as an example.** Spectre renders an example by
+   joining its args with spaces, so a value containing a space prints unquoted and is not runnable as
+   shown. Swapped for `watch --adrs ./docs/decisions`; a comment records why.
+
+**Honest limits on verification.** The **non-interactive** path is verified end-to-end against this
+repo (output quoted above). The **interactive** path could not be exercised from this session — both
+tool harnesses capture stdout, so Spectre always reports `Interactive == false`. Its rendering code is
+byte-for-byte the code that shipped, now inside an `if`, and no test drives a live `AnsiConsole` (the
+story explicitly asked to keep Spectre out of the units). **Confirming the TTY session still shows the
+logo, live progress bars, rounded table, and clickable output link is the owner-verification step.**
+
+**Task 4 added no new test.** `ForgeOptionsTests.Resolve_WalksUpFromStartDirectoryToFindBmadOutput`
+already asserts both auto-discovered roots and `Resolve_ExplicitOverridesBeatDerivedDefaults` already
+covers AC #2's override path; a third test would have been a rename of one of them. Recorded rather
+than padded.
+
+**Scope held.** No `.specscribe`/settings-precedence work (5.2), no `FileWatcherService` or
+`Regenerate*` changes (5.3), no new discovery heuristics (Epic 4). No parity gap noticed in passing.
+
 ### File List
+
+- `src/SpecScribe/GenerationSummary.cs` — **new.** `ExitCodes`, `GenerationCounts`,
+  `GenerationSummary` (`Count` / `FormatLine` / `ExitCode`). Pure, Spectre-free, headlessly testable.
+- `src/SpecScribe/ConsoleUi.cs` — modified. `IsInteractive` seam; explicit non-interactive branch in
+  `RunWithProgress`; `PrintInitialSummary` restructured (table gated, errors + counts always, machine
+  line always); new `PrintMachineSummary`.
+- `src/SpecScribe/Commands.cs` — modified. New `GenerationRun` record; `RunGeneration` returns it;
+  `GenerateCommand.Execute` returns `run.ExitCode`; `WatchCommand.Execute` + `InteractiveCommand`
+  watch branch updated to `run.Generator`; watch's no-fail-fast asymmetry documented in a comment.
+- `src/SpecScribe/GenerationReporter.cs` — modified. Doc comment only: records why there is no
+  null-object reporter counterpart.
+- `src/SpecScribe/Program.cs` — modified. Four `config.AddExample`s, two `WithExample`s per command,
+  sharpened `generate`/`watch` descriptions.
+- `tests/SpecScribe.Tests/CliFeedbackTests.cs` — **new.** 11 tests over the summary shape (exact line,
+  single-line/no-markup, invariant culture, ms rounding, zeros on a clean run), the tally, and the
+  exit-code mapping (error → 1, skip → 0, empty → 0, `GenerationRun` surfacing).
+- `_bmad-output/implementation-artifacts/5-1-cli-generate-and-watch-modes-with-smart-defaults.md` —
+  this file (frontmatter `baseline_commit`, task checkboxes, Dev Agent Record, Change Log, Status).
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — story status `ready-for-dev` →
+  `in-progress` → `review`.
+
+## Change Log
+
+| Date | Change |
+| --- | --- |
+| 2026-07-23 | Story 5.1 implemented. Non-interactive CLI feedback branch + machine-parseable summary line (`SpecScribe: generated=… elapsed_ms=…`), generation errors mapped to a non-zero `generate` exit code (watch deliberately exempt), `--help` examples added. New `GenerationSummary.cs` pure helper + `CliFeedbackTests.cs` (11 tests). 2185 passed / 3 skipped; golden fingerprint unchanged. Status → review. |
 
 ## Open Questions (for the maintainer — non-blocking; sensible defaults chosen)
 

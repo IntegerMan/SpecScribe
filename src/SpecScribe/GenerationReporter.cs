@@ -14,7 +14,11 @@ public interface IGenerationReporter
     void EndPhase(GenerationPhase phase);
 }
 
-/// <summary>Maps generation phases onto Spectre.Console progress tasks.</summary>
+/// <summary>Maps generation phases onto Spectre.Console progress tasks.
+/// <para>There is deliberately no null-object counterpart for the non-interactive path:
+/// <see cref="SiteGenerator.GenerateAll"/> takes an <c>IGenerationReporter?</c> and null-checks every callback, so
+/// <c>GenerateAll()</c> with no reporter already IS the silent path. See
+/// <see cref="ConsoleUi.RunWithProgress"/>. [Story 5.1 AC #3]</para></summary>
 public sealed class SpectreGenerationReporter : IGenerationReporter
 {
     private static readonly IReadOnlyDictionary<GenerationPhase, string> Descriptions = new Dictionary<GenerationPhase, string>
