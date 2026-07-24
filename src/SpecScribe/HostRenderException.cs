@@ -46,6 +46,14 @@ public static class HostRenderExceptions
         // served page string carries no `mermaid.initialize` and the roadmap degrades to readable preformatted text
         // — the same accepted fallback as the webview. Full Mermaid-in-SPA (re-init across swaps) is a deferred
         // enhancement; the diagram source is present and readable meanwhile (progressive enhancement / NFR6).
+        new HostRenderException("webview", "data-island",
+            "Inline <script type=\"application/json\"> data islands (Story 20.2's sunburst-explorer payload, and any "
+            + "later one) are stripped from the webview content region. NOTE the reason is NOT CSP: a JSON data "
+            + "block is never executed, so script-src does not apply to it and the CSP would not have blocked it. "
+            + "The island is dropped because it is DEAD WEIGHT here — the webview deliberately ships no "
+            + "specscribe.js (see the asset.js exception above), so nothing on this surface can ever read it, and "
+            + "it is pure payload in a document the reader inlines. The static SVG chart and its Story 9.13 links "
+            + "are untouched, so no information is lost — this is an asset-weight divergence, not a content one."),
         new HostRenderException("spa", "mermaid",
             "The SPA swaps content regions via innerHTML, where an injected Mermaid init script never executes and "
             + "is not re-run across swaps, so the epics roadmap's <pre class=\"mermaid\"> degrades to readable "

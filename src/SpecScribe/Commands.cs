@@ -24,13 +24,23 @@ public sealed class GenerateCommand : Command<SiteSettings>
 {
     protected override int Execute(CommandContext context, SiteSettings settings, CancellationToken cancellationToken)
     {
-        var options = settings.Resolve();
+        // Routed through SettingsResolver rather than settings.Resolve() so a non-interactive `generate` inherits
+        // the directory-scoped `.specscribe` exactly as the menu does — before Story 5.2 this command never read
+        // that file, so configuring interactively and then running the CLI silently discarded every saved value.
+        // [Story 5.2 AC #1]
+        var resolved = SettingsResolver.Resolve(settings);
         ConsoleUi.PrintLogo();
-        ConsoleUi.PrintPaths(options);
+        ConsoleUi.PrintResolvedConfig(resolved);
+        if (settings.ShowConfig)
+        {
+            ConsoleUi.PrintConfigDiagnostics(resolved);
+            return ExitCodes.Success;
+        }
+
         // A page that failed to render makes the whole site untrustworthy, so `generate` — the one-shot, CI-facing
         // command — reports it as a non-zero exit. The failing paths themselves were already printed by
-        // PrintInitialSummary. [AC #4]
-        return RunGeneration(options).ExitCode;
+        // PrintInitialSummary. [Story 5.1 AC #4]
+        return RunGeneration(resolved.Options).ExitCode;
     }
 
     /// <summary>Full generation pass with per-phase progress and a summary; shared with watch/interactive runs.</summary>
@@ -408,9 +418,19 @@ public sealed class WatchCommand : Command<SiteSettings>
 {
     protected override int Execute(CommandContext context, SiteSettings settings, CancellationToken cancellationToken)
     {
-        var options = settings.Resolve();
+        // Same seam as `generate`: `watch` also never read `.specscribe` before Story 5.2, so a saved --output meant
+        // the watch loop rebuilt into a different folder than the menu would have. [Story 5.2 AC #1]
+        var resolved = SettingsResolver.Resolve(settings);
+        var options = resolved.Options;
         ConsoleUi.PrintLogo();
-        ConsoleUi.PrintPaths(options);
+        ConsoleUi.PrintResolvedConfig(resolved);
+        if (settings.ShowConfig)
+        {
+            // Report and exit without starting the loop — `--show-config` is a question, not a run.
+            ConsoleUi.PrintConfigDiagnostics(resolved);
+            return ExitCodes.Success;
+        }
+
         var run = GenerateCommand.RunGeneration(options);
         // Deliberate asymmetry with `generate`: an initial-build error is SURFACED (PrintInitialSummary already
         // listed every failing path, and the machine summary line carries errors=N) but does NOT fail-fast the
@@ -447,12 +467,24 @@ public sealed class InteractiveCommand : Command<SiteSettings>
 {
     protected override int Execute(CommandContext context, SiteSettings settings, CancellationToken cancellationToken)
     {
+        // `specscribe --show-config` with no subcommand answers the same question `generate --show-config` does, so
+        // it is honored here too rather than dropping into a menu the user did not ask for. A discovery failure
+        // surfaces as the usual fatal DirectoryNotFoundException via Program.cs. [Story 5.2 AC #2]
+        if (settings.ShowConfig)
+        {
+            var resolved = SettingsResolver.Resolve(settings);
+            ConsoleUi.PrintLogo();
+            ConsoleUi.PrintResolvedConfig(resolved);
+            ConsoleUi.PrintConfigDiagnostics(resolved);
+            return ExitCodes.Success;
+        }
+
         if (!AnsiConsole.Profile.Capabilities.Interactive)
         {
             // No terminal to prompt in (CI, redirected output) — show usage instead of hanging.
             ConsoleUi.PrintLogo();
             ConsoleUi.PrintUsage();
-            return 0;
+            return ExitCodes.Success;
         }
 
         return RunMenu(settings);
@@ -463,11 +495,14 @@ public sealed class InteractiveCommand : Command<SiteSettings>
         ConsoleUi.PrintLogo();
         ConsoleUi.PrintUsage();
 
-        // Restore any previously saved paths, letting explicit CLI options take precedence.
-        if (SettingsStore.TryLoad() is { } saved)
+        // Load ONCE at menu entry (restoring saved values under any explicit CLI options), then resolve once per
+        // action from that same load. Loading here rather than inside each action is what preserves the CLI/saved
+        // distinction: SettingsStore.ApplyTo fills nulls in place, so a per-action load would snapshot the already
+        // merged settings and misreport every restored value as a command-line override. [Story 5.2 Task 2]
+        var load = SettingsResolver.Load(settings);
+        if (load is { Saved: { } saved, Path: { } savedPath })
         {
-            SettingsStore.ApplyTo(saved, settings);
-            ConsoleUi.PrintSettingsLoaded(SettingsStore.ResolvePath(), saved);
+            ConsoleUi.PrintSettingsLoaded(savedPath, saved);
         }
 
         while (true)
@@ -482,20 +517,22 @@ public sealed class InteractiveCommand : Command<SiteSettings>
             {
                 case "Generate the site once":
                 {
-                    if (TryResolve(settings) is not { } options) break;
-                    ConsoleUi.PrintPaths(options);
-                    GenerateCommand.RunGeneration(options);
+                    if (TryResolve(load, settings) is not { } resolved) break;
+                    ConsoleUi.PrintPaths(resolved.Options, resolved.Provenance);
+                    GenerateCommand.RunGeneration(resolved.Options);
                     break;
                 }
                 case "Watch for changes":
                 {
-                    if (TryResolve(settings) is not { } options) break;
-                    ConsoleUi.PrintPaths(options);
-                    var run = GenerateCommand.RunGeneration(options);
-                    return WatchCommand.RunWatchLoop(options, run.Generator);
+                    if (TryResolve(load, settings) is not { } resolved) break;
+                    ConsoleUi.PrintPaths(resolved.Options, resolved.Provenance);
+                    var run = GenerateCommand.RunGeneration(resolved.Options);
+                    return WatchCommand.RunWatchLoop(resolved.Options, run.Generator);
                 }
                 case "Configure paths":
-                    ConfigurePaths(settings);
+                    // Re-base the load on what was just written: those values now come from `.specscribe`, and
+                    // provenance for the rest of the session should say so rather than reporting them as defaults.
+                    load = ConfigurePaths(load, settings);
                     break;
                 default:
                     return 0;
@@ -503,13 +540,15 @@ public sealed class InteractiveCommand : Command<SiteSettings>
         }
     }
 
-    /// <summary>Resolves settings, turning a discovery failure into a hint instead of a crash so the
-    /// user can fix things via "Configure paths" without restarting.</summary>
-    private static ForgeOptions? TryResolve(SiteSettings settings)
+    /// <summary>Resolves settings through the shared seam, turning a discovery failure into a hint instead of a
+    /// crash so the user can fix things via "Configure paths" without restarting. The same
+    /// <see cref="DirectoryNotFoundException"/> that is fatal for <c>generate</c>/<c>watch</c> is a soft prompt
+    /// here — the difference is the caller's, not the resolver's.</summary>
+    private static ResolvedConfig? TryResolve(SettingsLoad load, SiteSettings settings)
     {
         try
         {
-            return settings.Resolve();
+            return SettingsResolver.Resolve(load, settings);
         }
         catch (DirectoryNotFoundException ex)
         {
@@ -519,7 +558,11 @@ public sealed class InteractiveCommand : Command<SiteSettings>
         }
     }
 
-    private static void ConfigurePaths(SiteSettings settings)
+    /// <summary>The interactive half of every configurable setting (NFR7). Returns the load to use for the rest of
+    /// the session: on a successful save, one re-based on the settings just written, so subsequent provenance
+    /// attributes those values to <c>.specscribe</c> — which is where they now live — instead of to a default.
+    /// [Story 5.2 AC #4]</summary>
+    private static SettingsLoad ConfigurePaths(SettingsLoad load, SiteSettings settings)
     {
         var defaults = TryResolveSilently(settings);
 
@@ -531,6 +574,13 @@ public sealed class InteractiveCommand : Command<SiteSettings>
             new TextPrompt<string>("Project name:")
                 .DefaultValue(settings.ProjectName ?? defaults?.SiteTitle ?? ForgeOptions.DefaultSiteTitle));
         settings.ProjectName = name.Trim();
+
+        // README inclusion was the last CLI-only setting (--no-readme), which Story 5.1 flagged and deferred here.
+        // Asked positively so the prompt reads as the question it is, then mapped onto the negative flag; defaulted
+        // to the current value so re-running Configure paths never silently flips it, matching the --deep-git
+        // prompt below. [Story 5.2 AC #4]
+        settings.NoReadme = !AnsiConsole.Confirm(
+            "Include the repository README in the site?", defaultValue: !settings.NoReadme);
 
         // Deep git analytics is a configurable feature, so NFR7 (menu/CLI parity) requires it be reachable from
         // the interactive menu too, not just the --deep-git flag. Defaults to the current value so re-running
@@ -554,10 +604,16 @@ public sealed class InteractiveCommand : Command<SiteSettings>
         settings.CodeUrl = string.IsNullOrWhiteSpace(codeUrl) ? null : codeUrl.Trim();
 
         // Persist the choices so they're restored on the next run.
-        if (SettingsStore.TrySave(settings) is { } savedPath)
+        if (SettingsStore.TrySave(settings) is not { } savedPath)
         {
-            ConsoleUi.PrintSettingsSaved(savedPath);
+            return load;
         }
+
+        ConsoleUi.PrintSettingsSaved(savedPath);
+        // Capture (not re-read) what was just written — same projection TrySave used, so the in-memory view and the
+        // file cannot disagree. The CLI snapshot is carried over untouched: an explicit flag passed at launch is
+        // still a command-line override even after being written to disk.
+        return load with { Saved = SettingsStore.Capture(settings), Path = savedPath };
     }
 
     private static ForgeOptions? TryResolveSilently(SiteSettings settings)

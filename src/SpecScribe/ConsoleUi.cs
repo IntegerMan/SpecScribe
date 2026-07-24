@@ -36,6 +36,11 @@ public static class ConsoleUi
         AddSettingRow(grid, "ADRs", saved.Adrs);
         AddSettingRow(grid, "Output", saved.Output);
         AddSettingRow(grid, "Project", saved.ProjectName);
+        // The non-path preferences are restored too and materially change the run, so a CLI user who never opened
+        // the menu can see why the README vanished or why the deep-git pass is running. [Story 5.2 AC #4]
+        AddSettingRow(grid, "README", saved.IncludeReadme switch { true => "included", false => "excluded", null => null });
+        AddSettingRow(grid, "Deep git", saved.DeepGit == true ? "enabled" : null);
+        AddSettingRow(grid, "Code URL", saved.CodeUrl);
         AnsiConsole.Write(grid);
         AnsiConsole.WriteLine();
     }
@@ -54,15 +59,21 @@ public static class ConsoleUi
         AnsiConsole.MarkupLine($"[grey]Saved settings to[/] [green]{Markup.Escape(path)}[/]");
     }
 
-    public static void PrintPaths(ForgeOptions options)
+    /// <summary>The always-printed paths block. When <paramref name="provenance"/> is supplied (every CLI and menu
+    /// run since Story 5.2), each row carries a dim tag naming what supplied the value — the flag, the settings
+    /// file, or auto-discovery — so "which source won" is answerable at a glance on an ordinary run rather than
+    /// only under a diagnostic flag. Omitting it keeps the pre-5.2 unannotated rendering for any caller that has
+    /// only a bare <see cref="ForgeOptions"/>. [Story 5.2 AC #2]</summary>
+    public static void PrintPaths(ForgeOptions options, IReadOnlyList<ConfigProvenance>? provenance = null)
     {
+        var by = provenance?.ToDictionary(p => p.Field, StringComparer.Ordinal);
         var grid = new Grid();
         grid.AddColumn(new GridColumn().NoWrap().PadRight(2));
         grid.AddColumn();
-        grid.AddRow("[bold]Project[/]", $"[bold orange3]{Markup.Escape(options.SiteTitle)}[/]");
-        grid.AddRow("[bold]Sources[/]", $"[yellow]{Markup.Escape(options.SourceRoot)}[/]");
-        grid.AddRow("[bold]ADRs[/]", FormatAdrPath(options));
-        grid.AddRow("[bold]Output[/]", $"[green]{Markup.Escape(options.OutputRoot)}[/]");
+        grid.AddRow("[bold]Project[/]", $"[bold orange3]{Markup.Escape(options.SiteTitle)}[/]{Tag(by, SettingsResolver.Fields.Project)}");
+        grid.AddRow("[bold]Sources[/]", $"[yellow]{Markup.Escape(options.SourceRoot)}[/]{Tag(by, SettingsResolver.Fields.Source)}");
+        grid.AddRow("[bold]ADRs[/]", FormatAdrPath(options) + Tag(by, SettingsResolver.Fields.Adrs));
+        grid.AddRow("[bold]Output[/]", $"[green]{Markup.Escape(options.OutputRoot)}[/]{Tag(by, SettingsResolver.Fields.Output)}");
         AnsiConsole.Write(grid);
 
         // ADRs are optional, so a missing default folder is silent — but an explicitly pointed-at folder that
@@ -74,6 +85,41 @@ public static class ConsoleUi
         }
 
         AnsiConsole.WriteLine();
+    }
+
+    /// <summary>The standard "what am I about to build, and from where" preamble for a resolved run: what the
+    /// settings file restored (when one contributed) followed by the provenance-annotated paths block. One helper so
+    /// <c>generate</c>, <c>watch</c>, and the interactive menu cannot drift into showing different amounts of the
+    /// same information. [Story 5.2 AC #1]</summary>
+    public static void PrintResolvedConfig(ResolvedConfig resolved)
+    {
+        if (resolved.Saved is { } saved && resolved.SavedSettingsPath is { } path)
+        {
+            PrintSettingsLoaded(path, saved);
+        }
+
+        PrintPaths(resolved.Options, resolved.Provenance);
+    }
+
+    /// <summary>The dim provenance suffix for one row, or nothing when the run supplied no provenance. The tag text
+    /// itself comes from <see cref="SettingsResolver.DisplayTag"/> — this file paints, it does not decide.</summary>
+    private static string Tag(IReadOnlyDictionary<string, ConfigProvenance>? by, string field)
+        => by is not null && by.TryGetValue(field, out var entry)
+            ? $" [grey]({Markup.Escape(SettingsResolver.DisplayTag(entry))})[/]"
+            : string.Empty;
+
+    /// <summary>The <c>--show-config</c> surface: the effective configuration and its provenance as machine-parseable
+    /// lines, written straight to <see cref="Console.Out"/> rather than through <see cref="AnsiConsole"/> — Spectre
+    /// word-wraps at the profile width (80 columns once output is redirected) and would split lines carrying absolute
+    /// paths, which are exactly the ones long enough to wrap. Same reasoning, and the same channel discipline, as the
+    /// run summary line. The human-readable view is the annotated paths block; this is its <c>grep</c>-able twin, and
+    /// neither substitutes for the other. [Story 5.2 AC #2]</summary>
+    public static void PrintConfigDiagnostics(ResolvedConfig resolved)
+    {
+        foreach (var line in SettingsResolver.FormatConfigLines(resolved))
+        {
+            Console.Out.WriteLine(line);
+        }
     }
 
     /// <summary>Renders the ADR path, tagging a defaulted-and-absent folder as optional so the user knows the

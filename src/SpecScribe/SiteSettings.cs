@@ -38,6 +38,10 @@ public class SiteSettings : CommandSettings
     [Description("Base URL for source-file links (e.g. https://github.com/owner/repo/blob/main). Adds a 'view source online' link to each in-portal code page (the pages are always generated). Default: unset, and auto-detected from the git remote or GitHub Pages context when available.")]
     public string? CodeUrl { get; set; }
 
+    [CommandOption("--show-config")]
+    [Description("Print the effective configuration and where each value came from (command line, .specscribe, or auto-discovery), then exit without generating. Default: off.")]
+    public bool ShowConfig { get; set; }
+
     [CommandOption("--serve")]
     [Description("`webview` only: stay resident and stream one JSON payload per line (NDJSON) on stdout after every incremental regen, instead of rendering once and exiting. Reuses the same debounced file-watch/incremental-regen path as `specscribe watch`, so a live-push no longer reruns a full generation from scratch. Default: off (render once and exit).")]
     public bool Serve { get; set; }
@@ -45,8 +49,10 @@ public class SiteSettings : CommandSettings
     /// <summary>Resolves these settings into absolute paths. Throws <see cref="DirectoryNotFoundException"/>
     /// with an actionable message when auto-discovery fails. This is the CLI entry path, so it opts into git-remote /
     /// CI auto-detection of the external source base when <c>--code-url</c> is not given (library/test callers use
-    /// <see cref="ForgeOptions.Resolve"/> directly, which leaves detection off for deterministic output).</summary>
-    public ForgeOptions Resolve() => ForgeOptions.Resolve(Source, Adrs, Output, ProjectName, includeReadme: !NoReadme, deepGitAnalytics: DeepGit, emitSpa: Spa, codeSourceBaseUrl: CodeUrl, autoDetectCodeUrl: true);
+    /// <see cref="ForgeOptions.Resolve"/> directly, which leaves detection off for deterministic output).
+    /// <para><paramref name="startDirectory"/> is the walk-up origin for auto-discovery, defaulting to the process
+    /// working directory. Injected only for headless testing — production callers omit it. [Story 5.2]</para></summary>
+    public ForgeOptions Resolve(string? startDirectory = null) => ForgeOptions.Resolve(Source, Adrs, Output, ProjectName, startDirectory: startDirectory, includeReadme: !NoReadme, deepGitAnalytics: DeepGit, emitSpa: Spa, codeSourceBaseUrl: CodeUrl, autoDetectCodeUrl: true);
 
     /// <summary>Like <see cref="Resolve"/>, but does NOT throw when no <c>_bmad-output</c> marker is found up-tree —
     /// it falls back to the current directory as the repo root with a (possibly absent) conventional source root.

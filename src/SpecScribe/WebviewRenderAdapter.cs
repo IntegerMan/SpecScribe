@@ -65,10 +65,13 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
         var sb = new StringBuilder();
         sb.Append(HtmlRenderAdapter.Shared.RenderNavMarkup(page.Nav));
         sb.Append(HtmlRenderAdapter.Shared.RenderWayfinding(page.OutputRelativePath, page.Breadcrumb, page.Pager));
-        // Drop any inline JSON data island (e.g. the Story 20.2 sunburst-explorer payload): the webview CSP forbids
-        // scripts and the always-shipped specscribe.js that would read it never loads here, so the island is dead
-        // data — the same class of CSP-driven omission as the nav's stripped inline toggle script (registered in
-        // HostRenderExceptions). The body's static SVG chart + its Story 9.13 links remain fully intact. [Story 20.2]
+        // Drop any inline JSON data island (e.g. the Story 20.2 sunburst-explorer payload). NOT a CSP matter: a
+        // <script type="application/json"> block is data, never executed, so script-src does not apply and the CSP
+        // would not have blocked it. It is dropped because it is dead weight HERE — this surface deliberately ships
+        // no specscribe.js (the `asset.js` host exception), so nothing can ever read the island, and the webview
+        // inlines its document. Registered as the `data-island` webview exception in HostRenderExceptions — an
+        // unregistered divergence is a bug. The static SVG chart + its Story 9.13 links stay fully intact.
+        // [Story 20.2; rationale corrected + registered by the 20.2 review]
         sb.Append(JsonDataIsland.Replace(page.BodyHtml, string.Empty));
         return sb.ToString();
     }

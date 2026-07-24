@@ -158,8 +158,12 @@ public class SiteGeneratorSpaTests : IDisposable
     public void SunburstExplorerIsland_SurvivesSpaContentRegionCapture()
     {
         // Story 20.2 AC #2 / parity: the dashboard's explorer root marker + inline JSON island are mounted INSIDE
-        // <main id="main-content">, so the SPA content-region slice must carry them byte-for-byte — the client
-        // drill-in enhances the SAME markup through both the static HTML and the SPA surface.
+        // <main id="main-content">, so the SPA content-region slice must carry them byte-for-byte.
+        // SCOPE OF THIS TEST: it pins the MARKUP surviving the capture — nothing more. Whether the client actually
+        // re-enhances that markup after an innerHTML swap is a runtime concern this SSR test cannot observe; the
+        // swap fires `specscribe:content-swapped` and specscribe.js re-runs `initSunburstExplorers` against the
+        // fresh region (guarded by `data-explorer-ready`). Do not read a green here as proof of live SPA parity.
+        // [comment corrected by the Story 20.2 review — it previously claimed the behavior this cannot test]
         var gen = GeneratedSite();
 
         var staticIndex = File.ReadAllText(Path.Combine(Site, "index.html"));

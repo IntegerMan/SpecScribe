@@ -7,8 +7,11 @@ namespace SpecScribe;
 /// carries (so the client joins DOM ↔ payload with no ambiguity, and Story 20.3's edges join by the same grain);
 /// <see cref="Weight"/> is the SAME number <see cref="Charts.Sunburst"/> used to size the wedge (never a re-count —
 /// see <see cref="Charts.SunburstEpicWeight"/>/<see cref="Charts.SunburstStoryWeight"/>); <see cref="Kind"/> drives
-/// the ring the wedge lives on and the zoom-vs-open rule (a wedge with <c>story</c> children drills, a leaf opens
-/// its <see cref="Href"/> — the Story 9.13 destination already on the wedge's <c>&lt;a&gt;</c>). [Story 20.2]</summary>
+/// the zoom-vs-open rule (a wedge with <c>story</c> children drills, a leaf opens its <see cref="Href"/> — the Story
+/// 9.13 destination already on the wedge's <c>&lt;a&gt;</c>); <see cref="Ring"/> states which radial band the SVG
+/// actually drew it on. <see cref="Kind"/> and <see cref="Ring"/> are deliberately SEPARATE facts: an epic's
+/// open/done aggregates are drawn on the aggregate band, but the orphan and unplanned roots' aggregates are drawn on
+/// the STORY band, so inferring the ring from the kind is wrong for those. [Story 20.2; Ring added by 20.2 review]</summary>
 public sealed record SunburstExplorerNode(
     string Id,
     string? ParentId,
@@ -16,7 +19,8 @@ public sealed record SunburstExplorerNode(
     string Label,
     string StatusClass,
     string? Href,
-    string Kind);
+    string Kind,
+    string Ring);
 
 /// <summary>The presentation geometry the client re-layout needs to land zoomed arcs on the SAME rings the static
 /// chart drew — projected from the same factors <see cref="Charts.Sunburst"/> uses, NOT a second geometry of
@@ -66,16 +70,26 @@ public static partial class Charts
         var unplannedGeo = unplanned ?? UnplannedWorkGeometry.Empty;
         var knownEpics = epics.Select(e => e.Number).ToHashSet();
 
+        // Node ids come from author-controlled markdown (story ids are `### Story N.M:` headings, which nothing
+        // dedupes), so a repeated heading would otherwise emit the same id twice — giving the client two payload
+        // entries for one logical wedge and double-counting its weight when a ring is re-laid. Keep the FIRST, which
+        // matches the draw order the SVG itself used. [Story 20.2 review]
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        void Add(SunburstExplorerNode node)
+        {
+            if (seen.Add(node.Id)) nodes.Add(node);
+        }
+
         foreach (var epic in epics)
         {
             var epicId = $"epic-{epic.Number}";
             var epicClass = StatusStyles.ForEpicWithRetrospective(epic);
             var epicTitle = PathUtil.StripHtmlTags(epic.Title);
-            var (openCount, doneCount) = CountEpicFollowUpAggregates(epic, geometry, unplannedGeo);
+            var (openCount, doneCount) = SunburstEpicAggregates(epic, geometry, unplannedGeo);
 
-            nodes.Add(new SunburstExplorerNode(
+            Add(new SunburstExplorerNode(
                 epicId, null, SunburstEpicWeight(geometry, unplannedGeo, epic),
-                $"Epic {epic.Number}: {epicTitle}", epicClass, $"epics/epic-{epic.Number}.html", "epic"));
+                $"Epic {epic.Number}: {epicTitle}", epicClass, $"epics/epic-{epic.Number}.html", "epic", "epic"));
 
             var storyWeightSum = epic.Stories.Sum(s => SunburstStoryWeight(geometry, epic.Number, s));
             if (storyWeightSum > 0)
@@ -85,10 +99,10 @@ public static partial class Charts
                     // Preserve the server's drawn collapse: a dense epic shows ONE summary wedge, so the payload
                     // carries one summary node (no per-story wedges the static chart never drew). The absence of any
                     // `story`-kind child is exactly what makes the epic non-drillable client-side (it opens instead).
-                    nodes.Add(new SunburstExplorerNode(
+                    Add(new SunburstExplorerNode(
                         $"{epicId}~summary", epicId, storyWeightSum,
                         $"Epic {epic.Number}: {epic.Stories.Count} {Plural(epic.Stories.Count, "story", "stories")}",
-                        epicClass, $"epics/epic-{epic.Number}.html", "story-summary"));
+                        epicClass, $"epics/epic-{epic.Number}.html", "story-summary", "story"));
                 }
                 else
                 {
@@ -97,67 +111,73 @@ public static partial class Charts
                         var noPlan = story.TasksTotal == 0;
                         var storyClass = noPlan ? "noplan" : StatusStyles.ForStory(story);
                         var storyHref = story.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(story.Id);
-                        nodes.Add(new SunburstExplorerNode(
+                        Add(new SunburstExplorerNode(
                             story.Id, epicId, SunburstStoryWeight(geometry, epic.Number, story),
-                            $"Story {story.Id}: {PathUtil.StripHtmlTags(story.Title)}", storyClass, storyHref, "story"));
+                            $"Story {story.Id}: {PathUtil.StripHtmlTags(story.Title)}", storyClass, storyHref, "story", "story"));
                     }
                 }
             }
 
+            // An EPIC's aggregates are drawn on the aggregate band (Charts.Sunburst passes aggregateInner/Outer).
             var aggregateHref = geometry.LinkPrefix + FollowUpGroupPages.EpicPath(epic.Number);
             if (openCount > 0)
-                nodes.Add(new SunburstExplorerNode(
+                Add(new SunburstExplorerNode(
                     $"{epicId}~open", epicId, openCount,
                     $"Epic {epic.Number}: {openCount} open {Plural(openCount, "follow-up", "follow-ups")}",
-                    "followup-open", aggregateHref, "aggregate"));
+                    "followup-open", aggregateHref, "aggregate", "aggregate"));
             if (doneCount > 0)
-                nodes.Add(new SunburstExplorerNode(
+                Add(new SunburstExplorerNode(
                     $"{epicId}~done", epicId, doneCount,
                     $"Epic {epic.Number}: {doneCount} done {Plural(doneCount, "follow-up", "follow-ups")}",
-                    "followup-done", aggregateHref, "aggregate"));
+                    "followup-done", aggregateHref, "aggregate", "aggregate"));
         }
 
         var unattributed = geometry.OrphanActionItems(knownEpics);
         if (unattributed.Count > 0)
         {
-            var openOrphans = unattributed.Count(a => !FollowUpGeometry.IsDone(a));
-            var doneOrphans = unattributed.Count - openOrphans;
+            var (openOrphans, doneOrphans) = SunburstOrphanAggregates(unattributed);
             var orphanClass = openOrphans > 0 ? "followup-open" : "followup-done";
             var orphanHref = geometry.FollowUpsGroupHref;
-            nodes.Add(new SunburstExplorerNode(
-                "orphan", null, Math.Max(1, unattributed.Count),
-                $"Follow-ups: {unattributed.Count} unattributed {Plural(unattributed.Count, "item", "items")}",
-                orphanClass, orphanHref, "follow-up"));
+            // Mirror the SVG's own all-done phrasing (Charts.Sunburst's orphanAria) — this label is user-visible in
+            // the explorer breadcrumb, so a drift here reads as two different names for one wedge.
+            var orphanLabel = openOrphans > 0
+                ? $"Follow-ups: {unattributed.Count} unattributed {Plural(unattributed.Count, "item", "items")}"
+                : $"Follow-ups: {unattributed.Count} completed unattributed {Plural(unattributed.Count, "item", "items")}";
+            Add(new SunburstExplorerNode(
+                "orphan", null, Math.Max(1, unattributed.Count), orphanLabel,
+                orphanClass, orphanHref, "follow-up", "epic"));
+            // NB the orphan/unplanned aggregates are drawn on the STORY band, not the aggregate band — Charts.Sunburst
+            // passes storyInner/storyOuter for these two roots. Hence the explicit Ring. [Story 20.2 review]
             if (openOrphans > 0)
-                nodes.Add(new SunburstExplorerNode("orphan~open", "orphan", openOrphans,
+                Add(new SunburstExplorerNode("orphan~open", "orphan", openOrphans,
                     $"Follow-ups: {openOrphans} open unattributed {Plural(openOrphans, "item", "items")}",
-                    "followup-open", orphanHref, "aggregate"));
+                    "followup-open", orphanHref, "aggregate", "story"));
             if (doneOrphans > 0)
-                nodes.Add(new SunburstExplorerNode("orphan~done", "orphan", doneOrphans,
+                Add(new SunburstExplorerNode("orphan~done", "orphan", doneOrphans,
                     $"Follow-ups: {doneOrphans} done unattributed {Plural(doneOrphans, "item", "items")}",
-                    "followup-done", orphanHref, "aggregate"));
+                    "followup-done", orphanHref, "aggregate", "story"));
         }
 
         var unplannedSlots = unplannedGeo.SunburstUnplannedWeight;
         if (unplannedSlots > 0)
         {
-            var openUnplanned = unplannedGeo.UnplannedQuickDev.Count(q => UnplannedWorkGeometry.IsOpenQuickDev(q.Entry.Status))
-                + unplannedGeo.UnattributableDeferred.Count(s => !s.Item.Resolved);
-            var doneUnplanned = Math.Max(0, unplannedSlots - openUnplanned);
+            var (openUnplanned, doneUnplanned) = SunburstUnplannedAggregates(unplannedGeo);
             var rootClass = openUnplanned > 0 ? "unplanned" : "followup-done";
             var rootHref = unplannedGeo.GroupRootHref ?? "#";
-            nodes.Add(new SunburstExplorerNode(
-                "unplanned", null, Math.Max(1, unplannedSlots),
-                $"Unplanned: {unplannedSlots} direct / one-off {Plural(unplannedSlots, "item", "items")}",
-                rootClass, rootHref, "unplanned"));
+            var rootLabel = openUnplanned > 0
+                ? $"Unplanned: {unplannedSlots} direct / one-off {Plural(unplannedSlots, "item", "items")}"
+                : $"Unplanned: {unplannedSlots} completed direct / one-off {Plural(unplannedSlots, "item", "items")}";
+            Add(new SunburstExplorerNode(
+                "unplanned", null, Math.Max(1, unplannedSlots), rootLabel,
+                rootClass, rootHref, "unplanned", "epic"));
             if (openUnplanned > 0)
-                nodes.Add(new SunburstExplorerNode("unplanned~open", "unplanned", openUnplanned,
+                Add(new SunburstExplorerNode("unplanned~open", "unplanned", openUnplanned,
                     $"Unplanned: {openUnplanned} open {Plural(openUnplanned, "item", "items")}",
-                    "unplanned", rootHref, "aggregate"));
+                    "unplanned", rootHref, "aggregate", "story"));
             if (doneUnplanned > 0)
-                nodes.Add(new SunburstExplorerNode("unplanned~done", "unplanned", doneUnplanned,
+                Add(new SunburstExplorerNode("unplanned~done", "unplanned", doneUnplanned,
                     $"Unplanned: {doneUnplanned} done {Plural(doneUnplanned, "item", "items")}",
-                    "followup-done", rootHref, "aggregate"));
+                    "followup-done", rootHref, "aggregate", "story"));
         }
 
         return nodes;
@@ -166,7 +186,7 @@ public static partial class Charts
     /// <summary>Builds the full explorer payload model (geometry meta + nodes + empty edges) for the given
     /// <paramref name="size"/> (the same size passed to <see cref="Sunburst"/>). [Story 20.2]</summary>
     public static SunburstExplorerModel SunburstExplorerData(
-        EpicsModel model, int size = 380,
+        EpicsModel model, int size = SunburstGlanceSize,
         FollowUpGeometry? followUps = null, UnplannedWorkGeometry? unplanned = null)
     {
         var meta = new SunburstExplorerMeta(
@@ -182,7 +202,7 @@ public static partial class Charts
     /// the empty-state chart ships no inert island. System.Text.Json's default encoder escapes <c>&lt; &gt; &amp;</c>,
     /// so the payload is safe to embed directly inside a <c>&lt;script&gt;</c>. [Story 20.2]</summary>
     public static string SunburstExplorerIsland(
-        EpicsModel model, int size = 380,
+        EpicsModel model, int size = SunburstGlanceSize,
         FollowUpGeometry? followUps = null, UnplannedWorkGeometry? unplanned = null)
     {
         if (model.Epics.Count == 0) return string.Empty;
@@ -211,6 +231,7 @@ public static partial class Charts
                 statusClass = n.StatusClass,
                 href = n.Href,
                 kind = n.Kind,
+                ring = n.Ring,
             }),
             edges = data.Edges,
         };

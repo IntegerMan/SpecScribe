@@ -453,10 +453,25 @@ public class StylesheetTests
     {
         // The no-new-JS contract for insight surfaces: legend emphasis is pure CSS, so the one sanctioned
         // script must carry none of it — no legend/emphasis handler smuggled in. [Story 3.5 Task 5]
+        // Story 20.2's drilled-legend filtering is deliberately built to KEEP this true: the explorer publishes
+        // state only (data-sb-scope / data-tok-*) and the stylesheet owns which swatches show, so the script still
+        // names no legend class and touches no legend node. See Stylesheet_HasDrilledLegendScopeRules.
         var js = ReadScript();
         Assert.DoesNotContain("emphasize", js);
         Assert.DoesNotContain("sunburst-legend", js);
         Assert.DoesNotContain("sb-legend-item", js);
+    }
+
+    [Fact]
+    public void Stylesheet_HasDrilledLegendScopeRules()
+    {
+        // The CSS half of the contract above: while the explorer is drilled, swatches for statuses the zoomed
+        // rings no longer draw are hidden by the stylesheet alone, driven by the state attributes the script
+        // publishes. Guards both directions — the blanket hide AND at least one per-status re-show. [Story 20.2]
+        var css = ReadStylesheet();
+        Assert.Contains("[data-explorer][data-sb-scope] .sunburst-legend .sb-legend-item { display: none; }", css);
+        Assert.Contains("[data-explorer][data-sb-scope][data-tok-done] .sunburst-legend .sb-done-item", css);
+        Assert.Contains("[data-explorer][data-sb-scope][data-tok-followup-open] .sunburst-legend .sb-followup-open-item", css);
     }
 
     // ---- Story 3.8 seams (Git Insights hub tables + the sanctioned sort/filter enhancer) ----------

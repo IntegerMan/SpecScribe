@@ -354,6 +354,36 @@ public static partial class Charts
     internal const double SbPad = 0.006;
     internal const double SbStartAngle = -Math.PI / 2;
 
+    /// <summary>The one project-glance sunburst size. <see cref="Sunburst"/> and the Story 20.2 explorer island MUST
+    /// agree on it — the client re-lays drilled arcs against the island's radii, so a size the SVG used but the
+    /// island did not would land every zoomed ring off the static one. Named here so the two call sites cannot
+    /// drift apart by each defaulting independently. [Story 20.2 review]</summary>
+    public const int SunburstGlanceSize = 380;
+
+    /// <summary>The open/done split of one epic's follow-up aggregate ring — the SINGLE source the SVG builder and
+    /// the explorer payload both read. [Story 20.2]</summary>
+    internal static (int Open, int Done) SunburstEpicAggregates(
+        EpicInfo epic, FollowUpGeometry geometry, UnplannedWorkGeometry unplannedGeo) =>
+        CountEpicFollowUpAggregates(epic, geometry, unplannedGeo);
+
+    /// <summary>The open/done split of the unattributed ("orphan") follow-up root. Extracted per Story 20.1's seam
+    /// note so the SVG and the explorer payload share the arithmetic rather than each copying it. [Story 20.2 review]</summary>
+    internal static (int Open, int Done) SunburstOrphanAggregates(IReadOnlyList<SprintActionItem> unattributed)
+    {
+        var open = unattributed.Count(a => !FollowUpGeometry.IsDone(a));
+        return (open, unattributed.Count - open);
+    }
+
+    /// <summary>The open/done split of the unplanned / direct-work root. Extracted alongside
+    /// <see cref="SunburstOrphanAggregates"/> for the same reason. [Story 20.2 review]</summary>
+    internal static (int Open, int Done) SunburstUnplannedAggregates(UnplannedWorkGeometry unplannedGeo)
+    {
+        var slots = unplannedGeo.SunburstUnplannedWeight;
+        var open = unplannedGeo.UnplannedQuickDev.Count(q => UnplannedWorkGeometry.IsOpenQuickDev(q.Entry.Status))
+            + unplannedGeo.UnattributableDeferred.Count(s => !s.Item.Resolved);
+        return (open, Math.Max(0, slots - open));
+    }
+
     /// <summary>The project-glance middle-ring weight of one story: tasks + nested story-child deferred (min 1).
     /// Extracted from the <see cref="Sunburst"/> local closure (per Story 20.1's contract) so the SVG builder and
     /// the Story 20.2 explorer payload emit the SAME number — no second geometry. [Story 20.2]</summary>
@@ -376,14 +406,19 @@ public static partial class Charts
     /// <see cref="StoryDensityCollapseThreshold"/>+ stories collapse to one summary wedge),
     /// outer = open vs done follow-up aggregates per epic (not every leaf). Per-item wedges live on
     /// <see cref="EpicSunburst"/>. Pure SVG — no JS. [spec-sunburst-remaining-work-hierarchy; Story 10.7]</summary>
+    /// <param name="nodeIds">Opt in to the Story 20.2 <c>data-node-id</c> join hooks. Only the surface that also
+    /// mounts the explorer island needs them (the dashboard); the epics index renders the same chart with no
+    /// explorer, so leaving this false keeps ~2.5 KB of attributes with no consumer off that page. [Story 20.2 review]</param>
     public static string Sunburst(
         EpicsModel model,
-        int size = 380,
+        int size = SunburstGlanceSize,
         FollowUpGeometry? followUps = null,
-        UnplannedWorkGeometry? unplanned = null)
+        UnplannedWorkGeometry? unplanned = null,
+        bool nodeIds = false)
     {
         var epics = model.Epics.OrderBy(e => e.Number).ToList();
         if (epics.Count == 0) return "<div class=\"chart-empty\">Nothing to chart yet.</div>";
+        string? NodeId(string id) => nodeIds ? id : null;
 
         var geometry = followUps ?? FollowUpGeometry.Empty;
         var unplannedGeo = unplanned ?? UnplannedWorkGeometry.Empty;
@@ -438,7 +473,7 @@ public static partial class Charts
                 : string.Empty;
             var epicAria = $"Epic {epic.Number}: {epicTitle} — {StatusStyles.EpicLabel(epicClass)}, {epic.Stories.Count} {Plural(epic.Stories.Count, "story", "stories")}{followNote}";
             sb.Append($"  <a href=\"epics/epic-{epic.Number}.html\" aria-label=\"{Html(epicAria)}\">\n");
-            sb.Append($"    <path class=\"sb-seg sb-{epicClass}\" data-node-id=\"epic-{epic.Number}\" d=\"{AnnularSector(c, epicInner, epicOuter, InsetStart(angle, sweep, pad), InsetEnd(angle, sweep, pad))}\">");
+            sb.Append($"    <path class=\"sb-seg sb-{epicClass}\"{NodeIdAttr(NodeId($"epic-{epic.Number}"))} d=\"{AnnularSector(c, epicInner, epicOuter, InsetStart(angle, sweep, pad), InsetEnd(angle, sweep, pad))}\">");
             sb.Append($"<title>Epic {epic.Number}: {Html(epicTitle)} — {Html(StatusStyles.EpicLabel(epicClass))}, {epic.Stories.Count} {Plural(epic.Stories.Count, "story", "stories")}{Html(followNote)}</title></path>\n");
             sb.Append("  </a>\n");
 
@@ -451,7 +486,7 @@ public static partial class Charts
                     var epicHasStoryChildDeferred = epic.Stories.Any(
                         s => geometry.StoryChildDeferred(epic.Number, s.Id).Count > 0);
                     AppendStorySummarySlot(sb, epic, epicClass, epicHasStoryChildDeferred,
-                        angle, sweep, pad, c, storyInner, storyOuter, nodeId: $"epic-{epic.Number}~summary");
+                        angle, sweep, pad, c, storyInner, storyOuter, nodeId: NodeId($"epic-{epic.Number}~summary"));
                 }
                 else
                 {
@@ -462,7 +497,7 @@ public static partial class Charts
                         if (story.TasksTotal == 0) hasVisibleNoPlan = true;
                         var sw = StoryWeight(epic, story) * anglePerUnitSlot;
                         AppendWeightedStorySlot(sb, story, geometry, slotAngle, sw, pad, c, storyInner, storyOuter,
-                            aggregateInner, aggregateOuter, nestStoryChildren: false, nodeId: story.Id);
+                            aggregateInner, aggregateOuter, nestStoryChildren: false, nodeId: NodeId(story.Id));
                         slotAngle += sw;
                     }
                 }
@@ -473,7 +508,7 @@ public static partial class Charts
                 aggregateInner, aggregateOuter, aggregateHref,
                 openLabel: $"Epic {epic.Number}: {openCount} open {Plural(openCount, "follow-up", "follow-ups")}",
                 doneLabel: $"Epic {epic.Number}: {doneCount} done {Plural(doneCount, "follow-up", "follow-ups")}",
-                openNodeId: $"epic-{epic.Number}~open", doneNodeId: $"epic-{epic.Number}~done");
+                openNodeId: NodeId($"epic-{epic.Number}~open"), doneNodeId: NodeId($"epic-{epic.Number}~done"));
 
             angle += sweep;
         }
@@ -483,8 +518,7 @@ public static partial class Charts
             hasAggregates = true;
             var orphanWeight = Math.Max(1, orphanSlots);
             var sweep = orphanWeight * anglePerUnit;
-            var openOrphans = unattributed.Count(a => !FollowUpGeometry.IsDone(a));
-            var doneOrphans = orphanSlots - openOrphans;
+            var (openOrphans, doneOrphans) = SunburstOrphanAggregates(unattributed);
             var orphanClass = openOrphans > 0 ? "followup-open" : "followup-done";
             var orphanHref = geometry.FollowUpsGroupHref;
             var orphanAria = openOrphans > 0
@@ -492,14 +526,14 @@ public static partial class Charts
                 : $"Follow-ups: {orphanSlots} completed unattributed {Plural(orphanSlots, "item", "items")}";
 
             sb.Append($"  <a href=\"{Html(orphanHref)}\" aria-label=\"{Html(orphanAria)}\">\n");
-            sb.Append($"    <path class=\"sb-seg sb-{orphanClass}\" data-node-id=\"orphan\" d=\"{AnnularSector(c, epicInner, epicOuter, InsetStart(angle, sweep, pad), InsetEnd(angle, sweep, pad))}\">");
+            sb.Append($"    <path class=\"sb-seg sb-{orphanClass}\"{NodeIdAttr(NodeId("orphan"))} d=\"{AnnularSector(c, epicInner, epicOuter, InsetStart(angle, sweep, pad), InsetEnd(angle, sweep, pad))}\">");
             sb.Append($"<title>{Html(orphanAria)}</title></path>\n  </a>\n");
 
             AppendOpenDoneAggregateRing(sb, openOrphans, doneOrphans, angle, sweep, pad, c,
                 storyInner, storyOuter, orphanHref,
                 openLabel: $"Follow-ups: {openOrphans} open unattributed {Plural(openOrphans, "item", "items")}",
                 doneLabel: $"Follow-ups: {doneOrphans} done unattributed {Plural(doneOrphans, "item", "items")}",
-                openNodeId: "orphan~open", doneNodeId: "orphan~done");
+                openNodeId: NodeId("orphan~open"), doneNodeId: NodeId("orphan~done"));
 
             angle += sweep;
         }
@@ -509,9 +543,7 @@ public static partial class Charts
             // Do not set hasAggregates — Unplanned uses hasUnplanned for legend/hint (avoid follow-up swatches).
             var unplannedWeight = Math.Max(1, unplannedSlots);
             var sweep = unplannedWeight * anglePerUnit;
-            var openUnplanned = unplannedGeo.UnplannedQuickDev.Count(q => UnplannedWorkGeometry.IsOpenQuickDev(q.Entry.Status))
-                + unplannedGeo.UnattributableDeferred.Count(s => !s.Item.Resolved);
-            var doneUnplanned = Math.Max(0, unplannedSlots - openUnplanned);
+            var (openUnplanned, doneUnplanned) = SunburstUnplannedAggregates(unplannedGeo);
             var rootClass = openUnplanned > 0 ? "unplanned" : "followup-done";
             var rootHref = unplannedGeo.GroupRootHref ?? "#";
             var rootAria = openUnplanned > 0
@@ -519,7 +551,7 @@ public static partial class Charts
                 : $"Unplanned: {unplannedSlots} completed direct / one-off {Plural(unplannedSlots, "item", "items")}";
 
             sb.Append($"  <a href=\"{Html(rootHref)}\" aria-label=\"{Html(rootAria)}\">\n");
-            sb.Append($"    <path class=\"sb-seg sb-{rootClass}\" data-node-id=\"unplanned\" d=\"{AnnularSector(c, epicInner, epicOuter, InsetStart(angle, sweep, pad), InsetEnd(angle, sweep, pad))}\">");
+            sb.Append($"    <path class=\"sb-seg sb-{rootClass}\"{NodeIdAttr(NodeId("unplanned"))} d=\"{AnnularSector(c, epicInner, epicOuter, InsetStart(angle, sweep, pad), InsetEnd(angle, sweep, pad))}\">");
             sb.Append($"<title>Unplanned / Direct work: {Html(rootAria)}</title></path>\n  </a>\n");
 
             AppendOpenDoneAggregateRing(sb, openUnplanned, doneUnplanned, angle, sweep, pad, c,
@@ -528,7 +560,7 @@ public static partial class Charts
                 doneLabel: $"Unplanned: {doneUnplanned} done {Plural(doneUnplanned, "item", "items")}",
                 openClass: "unplanned",
                 doneClass: "followup-done",
-                openNodeId: "unplanned~open", doneNodeId: "unplanned~done");
+                openNodeId: NodeId("unplanned~open"), doneNodeId: NodeId("unplanned~done"));
 
             angle += sweep;
         }

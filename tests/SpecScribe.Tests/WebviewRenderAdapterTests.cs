@@ -400,17 +400,20 @@ public class WebviewRenderAdapterTests
     // ----- Registry hygiene (AC #4: every entry justified, none blanket) --------------------------------------
 
     [Fact]
-    public void Registry_CarriesExactlyTheThreeJustifiedWebviewChromeExceptions()
+    public void Registry_CarriesExactlyTheJustifiedWebviewChromeExceptions()
     {
-        // Exactly the three ADR 0005 measured — all webview-scoped, all chrome/asset facts, each with a real
-        // reason. No html-surface entry (the HTML adapter still diverges on nothing) and no section.* entry
-        // (the body facts hold FULL parity — the content is byte-identical by construction). Story 6.7's SPA
-        // surface adds its own single (mermaid) entry, asserted separately in RenderSpaParityTests.
+        // The three ADR 0005 measured, plus Story 20.2's `data-island` — all webview-scoped, all chrome/asset
+        // facts, each with a real reason. No html-surface entry (the HTML adapter still diverges on nothing) and
+        // no section.* entry (the body facts hold FULL parity — the content is byte-identical by construction).
+        // Story 6.7's SPA surface adds its own single (mermaid) entry, asserted separately in RenderSpaParityTests.
+        // `data-island`: the webview strips inline JSON data islands. It is an ASSET-WEIGHT divergence — the island
+        // is unreadable here because this surface ships no specscribe.js (the asset.js entry), so no information is
+        // lost; the chart and its links render identically. [Story 20.2 review]
         var webview = HostRenderExceptions.Registry.Where(e => e.SurfaceId == "webview").ToList();
-        Assert.Equal(3, webview.Count);
+        Assert.Equal(4, webview.Count);
         Assert.All(webview, e => Assert.False(string.IsNullOrWhiteSpace(e.Reason)));
         Assert.Equal(
-            new[] { "asset.css", "asset.js", "mermaid" },
+            new[] { "asset.css", "asset.js", "data-island", "mermaid" },
             webview.Select(e => e.FactId).OrderBy(f => f, StringComparer.Ordinal).ToList());
         // Global hygiene across every surface: a section.* fact may never be excepted (a body divergence is
         // always a bug).

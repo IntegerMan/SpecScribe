@@ -207,14 +207,16 @@ public class WebviewThemingTests
         var page = EpicPage();
         var doc = WebviewRenderAdapter.Shared.Render(page).Content;
 
-        // The themed document still reproduces every semantic fact under only the three registered asset/mermaid
+        // The themed document still reproduces every semantic fact under only the registered asset/mermaid/data-island
         // exceptions — theming changed token VALUES, never nav targets / drill trail / status stage.
         var divergences = RenderParity.FindDivergences(page, doc, WebviewRenderAdapter.Shared.Id);
         Assert.True(divergences.Count == 0, "expected parity, got: " + string.Join(" | ", divergences));
 
-        // No section.* or theming exception was added: the WEBVIEW surface stays at exactly its three 6.4
-        // chrome/asset entries (theming is not a semantic divergence). Other surfaces' entries — e.g. Story 6.7's
-        // single spa mermaid exception — are out of scope here.
-        Assert.Equal(3, HostRenderExceptions.Registry.Count(e => e.SurfaceId == "webview"));
+        // No section.* or THEMING exception was added: the WEBVIEW surface stays at its three 6.4 chrome/asset
+        // entries plus Story 20.2's asset-weight `data-island` one (theming itself is not a semantic divergence).
+        // Other surfaces' entries — e.g. Story 6.7's single spa mermaid exception — are out of scope here.
+        Assert.Equal(4, HostRenderExceptions.Registry.Count(e => e.SurfaceId == "webview"));
+        Assert.DoesNotContain(HostRenderExceptions.Registry,
+            e => e.SurfaceId == "webview" && e.FactId.Contains("theme", StringComparison.OrdinalIgnoreCase));
     }
 }

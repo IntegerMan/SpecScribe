@@ -51,9 +51,13 @@ public sealed partial class HtmlRenderAdapter
             sb.Append("<div class=\"chart-panel sunburst-panel wm-panel wm-show-overview wm-show-track\" data-explorer>\n");
             sb.Append("<div class=\"chart-panel-header-row\"><h3>Project at a Glance</h3></div>\n");
             sb.Append("<div class=\"sb-explorer-drill\" hidden><ol class=\"sb-explorer-breadcrumb\" aria-label=\"Zoom scope\"></ol></div>\n");
-            sb.Append(Charts.Sunburst(epicsForSunburst, followUps: view.FollowUps, unplanned: view.UnplannedWork));
+            // Both calls take the SAME size const: the client re-lays drilled arcs against the island's radii, so the
+            // chart and its payload must never default independently. [Story 20.2 review]
+            sb.Append(Charts.Sunburst(epicsForSunburst, Charts.SunburstGlanceSize,
+                followUps: view.FollowUps, unplanned: view.UnplannedWork, nodeIds: true));
             sb.Append("<div class=\"sb-explorer-live sr-only\" aria-live=\"polite\"></div>\n");
-            sb.Append(Charts.SunburstExplorerIsland(epicsForSunburst, followUps: view.FollowUps, unplanned: view.UnplannedWork));
+            sb.Append(Charts.SunburstExplorerIsland(epicsForSunburst, Charts.SunburstGlanceSize,
+                followUps: view.FollowUps, unplanned: view.UnplannedWork));
             sb.Append("</div>\n\n");
 
             // Remaining Work by Epic — its own panel (Story 10.7 AC1 follow-up: owner asked for a distinct,

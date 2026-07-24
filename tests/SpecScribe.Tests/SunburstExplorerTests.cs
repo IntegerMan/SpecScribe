@@ -54,7 +54,7 @@ public class SunburstExplorerTests
             Epic(1, "Alpha", Story("1.1", "One", "in progress", 2, 5), Story("1.2", "Two", "done", 3, 3)),
             Epic(2, "Beta", Story("2.1", "Three", null, 0, 0)));
 
-        var svg = Charts.Sunburst(model);
+        var svg = Charts.Sunburst(model, nodeIds: true);
         var svgIds = SvgNodeIds(svg);
         var payloadIds = Charts.SunburstExplorerNodes(model).Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
 
@@ -95,7 +95,7 @@ public class SunburstExplorerTests
         var model = Model(Epic(1, "Dense", stories));
 
         var nodes = Charts.SunburstExplorerNodes(model);
-        var svgIds = SvgNodeIds(Charts.Sunburst(model));
+        var svgIds = SvgNodeIds(Charts.Sunburst(model, nodeIds: true));
 
         Assert.Contains(nodes, n => n.Id == "epic-1~summary" && n.Kind == "story-summary" && n.ParentId == "epic-1");
         Assert.DoesNotContain(nodes, n => n.Kind == "story"); // no per-story wedges drawn → none in the payload
@@ -117,11 +117,176 @@ public class SunburstExplorerTests
     }
 
     [Fact]
+    public void WebviewAdapter_StripsTheIsland_ButKeepsTheChartAndItsLinks()
+    {
+        // The webview ships no specscribe.js, so the island is unreadable weight there — dropped, and registered as
+        // the `data-island` host exception. What must NOT be dropped is the chart itself. [Story 20.2 review]
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: true, hasReadme: true);
+        var breadcrumb = BreadcrumbTrail.From(new (string, string?)[] { ("Home", null) });
+        var page = new PageView
+        {
+            Kind = PageKind.Home,
+            Title = "Dashboard",
+            OutputRelativePath = "index.html",
+            Nav = nav.ToNavigationView("index.html"),
+            Breadcrumb = breadcrumb,
+            Assets = new AssetManifest
+            {
+                StylesheetHref = ForgeOptions.StylesheetName,
+                ScriptHref = ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+            },
+            Interaction = new InteractionState
+            {
+                ParentTarget = breadcrumb.ParentTarget,
+                ChildTargets = Array.Empty<string>(),
+            },
+            BodyHtml = "<main id=\"main-content\"><div class=\"chart-panel\" data-explorer>"
+                + "<svg class=\"sunburst\"><a href=\"epics/epic-1.html\"><path class=\"sb-seg\" data-node-id=\"epic-1\"></path></a></svg>"
+                + "<script type=\"application/json\" id=\"sunburst-explorer-data\">{\"nodes\":[]}</script>\n"
+                + "</div></main>",
+        };
+
+        var rendered = new WebviewRenderAdapter().RenderContent(page);
+
+        Assert.DoesNotContain("application/json", rendered);
+        Assert.DoesNotContain("sunburst-explorer-data", rendered);
+        Assert.Contains("<svg class=\"sunburst\"", rendered);
+        Assert.Contains("epics/epic-1.html", rendered);
+        Assert.Contains(HostRenderExceptions.Registry, e => e.SurfaceId == "webview" && e.FactId == "data-island");
+    }
+
+    [Fact]
     public void Projector_EmptyModel_YieldsNoNodesAndNoIsland()
     {
         var empty = Model();
         Assert.Empty(Charts.SunburstExplorerNodes(empty));
         Assert.Equal(string.Empty, Charts.SunburstExplorerIsland(empty));
+    }
+
+    /// <summary>A geometry pair with BOTH an unattributed ("orphan") follow-up root and per-epic follow-up
+    /// aggregates — the branches the bare-model tests never reach. `EpicNumber: 99` is not in the model, so it lands
+    /// in the orphan slice exactly as an unknown epic number does in production. [Story 20.2 review]</summary>
+    private static (FollowUpGeometry FollowUps, UnplannedWorkGeometry Unplanned) GeometryWithOrphansAndAggregates(EpicsModel model)
+    {
+        var items = new[]
+        {
+            new SprintActionItem("Epic-attributed follow-up", "open", EpicNumber: 1, Owner: null),
+            new SprintActionItem("Epic-attributed, done", "done", EpicNumber: 1, Owner: null),
+            new SprintActionItem("Unknown epic debt", "open", EpicNumber: 99, Owner: null),
+            new SprintActionItem("Unscoped cleanup", "done", EpicNumber: null, Owner: null),
+        };
+        var work = new WorkInventory
+        {
+            QuickDev = Array.Empty<QuickDevEntry>(),
+            Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", OpenItemCount: 0),
+        };
+        // The counts ledger is the single source of the open tally (FollowUpGeometry.From asserts the two agree —
+        // the chart layer must never recount), so declare the 2 open items above rather than passing Empty.
+        var counts = ProjectCounts.Empty with { OpenActionItems = 2 };
+        var followUps = FollowUpGeometry.From(items, counts, work, epics: model);
+        return (followUps, UnplannedWorkGeometry.From(work, followUps, model));
+    }
+
+    [Fact]
+    public void Projector_NodeSet_MatchesTheSvg_WithFollowUpsAndUnplannedPresent()
+    {
+        // The anti-drift invariant is only worth anything if it runs over the branches that can actually drift.
+        // Every other test passes the model bare, so the epic open/done aggregate ring, the orphan root and its own
+        // aggregate ring — the hand-written arithmetic — were entirely unexercised. [Story 20.2 review]
+        var model = Model(
+            Epic(1, "Alpha", Story("1.1", "One", "in progress", 2, 5), Story("1.2", "Two", "done", 3, 3)),
+            Epic(2, "Beta", Story("2.1", "Three", null, 0, 0, epicNumber: 2)));
+        var (followUps, unplanned) = GeometryWithOrphansAndAggregates(model);
+
+        var svgIds = SvgNodeIds(Charts.Sunburst(model, followUps: followUps, unplanned: unplanned, nodeIds: true));
+        var nodes = Charts.SunburstExplorerNodes(model, followUps, unplanned);
+
+        Assert.Equal(svgIds, nodes.Select(n => n.Id).ToHashSet(StringComparer.Ordinal));
+        Assert.Contains(nodes, n => n.Id == "orphan");           // the branch the bare-model tests never reached
+        Assert.Contains(nodes, n => n.Id.EndsWith("~open", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Projector_OrphanAndUnplannedAggregates_DeclareTheStoryRing_NotTheAggregateRing()
+    {
+        // Charts.Sunburst draws an EPIC's open/done aggregates on the aggregate band but the orphan/unplanned roots'
+        // aggregates on the STORY band. `Kind` is identical for both, so the client cannot infer the ring from it —
+        // `Ring` is the fact that keeps a drilled re-layout on the radii the server actually used.
+        var model = Model(Epic(1, "Alpha", Story("1.1", "One", "in progress", 2, 5)));
+        var (followUps, unplanned) = GeometryWithOrphansAndAggregates(model);
+
+        var nodes = Charts.SunburstExplorerNodes(model, followUps, unplanned).ToDictionary(n => n.Id);
+
+        Assert.Equal("aggregate", nodes["orphan~open"].Kind);
+        Assert.Equal("story", nodes["orphan~open"].Ring);
+        Assert.Equal("epic", nodes["orphan"].Ring);
+        if (nodes.TryGetValue("epic-1~open", out var epicOpen))
+        {
+            Assert.Equal("aggregate", epicOpen.Kind);
+            Assert.Equal("aggregate", epicOpen.Ring); // an epic's own aggregates DO sit on the aggregate band
+        }
+    }
+
+    [Theory]
+    [InlineData(7)]   // one below the collapse threshold — per-story wedges, epic stays drillable
+    [InlineData(8)]   // exactly at it — collapses
+    [InlineData(9)]   // one above
+    public void Projector_NodeSet_MatchesTheSvg_AcrossTheCollapseBoundary(int storyCount)
+    {
+        // The gate is `>= StoryDensityCollapseThreshold`; testing only the exact threshold leaves an off-by-one in
+        // either direction free to ship. [Story 20.2 review]
+        var stories = Enumerable.Range(1, storyCount)
+            .Select(i => Story($"1.{i}", $"Story {i}", "in progress", 1, 2))
+            .ToArray();
+        var model = Model(Epic(1, "Boundary", stories));
+
+        var svgIds = SvgNodeIds(Charts.Sunburst(model, nodeIds: true));
+        var nodes = Charts.SunburstExplorerNodes(model);
+
+        Assert.Equal(svgIds, nodes.Select(n => n.Id).ToHashSet(StringComparer.Ordinal));
+        var collapsed = storyCount >= Charts.StoryDensityCollapseThreshold;
+        Assert.Equal(collapsed, nodes.Any(n => n.Kind == "story-summary"));
+        Assert.Equal(!collapsed, nodes.Any(n => n.Kind == "story"));
+    }
+
+    [Fact]
+    public void Projector_EpicWithNoStories_ClaimsNoWedgeTheChartDidNotDraw()
+    {
+        var model = Model(Epic(1, "Empty"));
+
+        var svgIds = SvgNodeIds(Charts.Sunburst(model, nodeIds: true));
+        var nodes = Charts.SunburstExplorerNodes(model);
+
+        Assert.Equal(svgIds, nodes.Select(n => n.Id).ToHashSet(StringComparer.Ordinal));
+        Assert.DoesNotContain(nodes, n => n.Kind == "story" || n.Kind == "story-summary");
+    }
+
+    [Fact]
+    public void Projector_DuplicateStoryIds_EmitOneNode()
+    {
+        // Story ids come from `### Story N.M:` headings and nothing dedupes them, so a repeated heading yields two
+        // wedges sharing one data-node-id. The payload must still describe ONE logical node, or a drilled ring
+        // double-counts its weight. [Story 20.2 review]
+        var model = Model(Epic(1, "Dupes",
+            Story("1.1", "First", "in progress", 1, 2),
+            Story("1.1", "Same id again", "done", 2, 2)));
+
+        var nodes = Charts.SunburstExplorerNodes(model);
+
+        Assert.Single(nodes, n => n.Id == "1.1");
+        Assert.Equal(nodes.Select(n => n.Id).Distinct(StringComparer.Ordinal).Count(), nodes.Count);
+    }
+
+    [Fact]
+    public void Sunburst_OmitsNodeIdHooks_UnlessTheSurfaceOptsIn()
+    {
+        // Only the surface that also mounts the explorer island needs the join hooks; the epics index renders the
+        // same chart with no explorer and should not carry ~2.5 KB of attributes nothing reads. [Story 20.2 review]
+        var model = Model(Epic(1, "Alpha", Story("1.1", "One", "in progress", 2, 5)));
+
+        Assert.DoesNotContain("data-node-id", Charts.Sunburst(model));
+        Assert.Contains("data-node-id", Charts.Sunburst(model, nodeIds: true));
     }
 
     [Fact]
@@ -146,6 +311,8 @@ public class SunburstExplorerTests
         var first = rootEl.GetProperty("nodes")[0];
         Assert.Equal("epic-1", first.GetProperty("id").GetString());
         Assert.Equal("epic", first.GetProperty("kind").GetString());
+        // `ring` is a separate fact from `kind` — the client reads it to place a drilled wedge on the right band.
+        Assert.Equal("epic", first.GetProperty("ring").GetString());
         Assert.True(first.GetProperty("weight").GetInt32() >= 1);
     }
 }

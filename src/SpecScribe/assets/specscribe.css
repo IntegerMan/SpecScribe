@@ -187,6 +187,23 @@ body {
 .sunburst.is-drilled .sunburst-center-num,
 .sunburst.is-drilled .sunburst-center-label { display: none; }
 
+/* While the explorer is drilled into a scope, the legend must describe what is ON SCREEN — a swatch for a status
+   the zoomed rings no longer draw is a phantom entry, and under ADR 0013 the text twin IS the contract, so this is
+   correctness rather than polish. Legend presentation stays PURE CSS (the Story 3.5 no-JS-legend contract): the
+   script only publishes `data-sb-scope` + one `data-tok-<status>` per status still drawn, and these rules do the
+   rest. Hidden swatches are display:none, so their tabindex="0" leaves the tab order for free. [Story 20.2 review] */
+[data-explorer][data-sb-scope] .sunburst-legend .sb-legend-item { display: none; }
+[data-explorer][data-sb-scope][data-tok-pending] .sunburst-legend .sb-pending-item,
+[data-explorer][data-sb-scope][data-tok-drafted] .sunburst-legend .sb-drafted-item,
+[data-explorer][data-sb-scope][data-tok-ready] .sunburst-legend .sb-ready-item,
+[data-explorer][data-sb-scope][data-tok-active] .sunburst-legend .sb-active-item,
+[data-explorer][data-sb-scope][data-tok-review] .sunburst-legend .sb-review-item,
+[data-explorer][data-sb-scope][data-tok-done] .sunburst-legend .sb-done-item,
+[data-explorer][data-sb-scope][data-tok-noplan] .sunburst-legend .sb-noplan-item,
+[data-explorer][data-sb-scope][data-tok-followup-open] .sunburst-legend .sb-followup-open-item,
+[data-explorer][data-sb-scope][data-tok-followup-done] .sunburst-legend .sb-followup-done-item,
+[data-explorer][data-sb-scope][data-tok-unplanned] .sunburst-legend .sb-unplanned-item { display: revert; }
+
 /* The drill "tween" (a brief token-timed fade on the re-laid wedges) rides the paired prefers-reduced-motion
    seams like every other insight entrance: declared in the @media (no-preference) block and explicitly cancelled
    in the @media (reduce) block near the end of this sheet. [Story 20.2, [[motion-token-system]]] */

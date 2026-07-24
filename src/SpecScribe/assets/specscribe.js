@@ -1695,20 +1695,41 @@
   // breadcrumb + center control to zoom back out. A LEAF wedge keeps its native link (opens the 9.13 destination the
   // server put on the <a> — never a parallel scheme). Zoom-out always restores each wedge's ORIGINAL server `d`, so
   // the un-drilled chart is byte-for-byte the static baseline. Presentation math only — no counts, no fetch. [Story 20.2]
-  Array.prototype.forEach.call(document.querySelectorAll("[data-explorer]"), function (root) {
-    try { initSunburstExplorer(root); } catch (err) { /* degrade: static sunburst + 9.13 links stand */ }
+  // Bootstrap is re-runnable: the SPA (specscribe-spa.js) replaces the content region with innerHTML, which both
+  // discards our listeners and never executes an injected <script> — so a once-at-parse pass would leave the
+  // explorer dead for the rest of an SPA session (the same class of defect HostRenderExceptions records for
+  // Mermaid). The SPA therefore fires `specscribe:content-swapped` after every swap and we re-enhance the fresh
+  // markup. `data-explorer-ready` keeps a root from being wired twice. [Story 20.2 review]
+  function initSunburstExplorers(scope) {
+    var host = scope && scope.querySelectorAll ? scope : document;
+    Array.prototype.forEach.call(host.querySelectorAll("[data-explorer]"), function (root) {
+      if (root.getAttribute("data-explorer-ready")) return;
+      root.setAttribute("data-explorer-ready", "1");
+      try { initSunburstExplorer(root); } catch (err) { /* degrade: static sunburst + 9.13 links stand */ }
+    });
+  }
+  initSunburstExplorers(document);
+  document.addEventListener("specscribe:content-swapped", function (e) {
+    initSunburstExplorers(e && e.detail ? e.detail.root : document);
   });
 
   function initSunburstExplorer(root) {
     var svg = root.querySelector("svg.sunburst");
-    var dataEl = root.querySelector('script[type="application/json"]');
+    // Select the island BY ID, not by first-match-on-type: Story 20.3 adds a second inline JSON island (the work-graph
+    // edges) inside this same panel, and document order must not decide which payload the explorer parses.
+    var dataEl = root.querySelector('script[type="application/json"]#sunburst-explorer-data')
+      || root.querySelector('script[type="application/json"]');
     if (!svg || !dataEl) return;
     var data;
     try { data = JSON.parse(dataEl.textContent); } catch (e) { return; }
     var meta = data && data.meta, nodes = (data && data.nodes) || [];
     if (!meta || !nodes.length) return;
 
-    var byId = {}, childrenOf = {};
+    // Prototype-less maps throughout: node ids are derived from author-controlled markdown (story ids come straight
+    // from `### Story N.M:` headings), so an id of "constructor" or "__proto__" would otherwise resolve to an
+    // inherited Object member and blow up the lookups below — reachable from a crafted `#sb=` hash. Same hardening
+    // the impact map already carries. [Story 20.2 review]
+    var byId = Object.create(null), childrenOf = Object.create(null);
     nodes.forEach(function (n) {
       byId[n.id] = n;
       if (n.parentId) { (childrenOf[n.parentId] = childrenOf[n.parentId] || []).push(n); }
@@ -1716,11 +1737,26 @@
 
     // Join each payload node to its wedge <path> + wrapping <a>, and CAPTURE the original `d` so zoom-out restores
     // the exact server geometry (keeping the un-drilled chart identical to the golden baseline).
-    var wedges = {};
+    // Ids are NOT guaranteed unique (a repeated story heading yields two wedges with the same data-node-id), and a
+    // last-write-wins map would leave the shadowed wedge permanently visible and un-restorable on drill. Keep EVERY
+    // colliding element under one entry so hide/re-lay/restore always act on all of them.
+    var wedges = Object.create(null);
     Array.prototype.forEach.call(svg.querySelectorAll(".sb-seg[data-node-id]"), function (p) {
       var id = p.getAttribute("data-node-id");
-      wedges[id] = { path: p, link: p.closest("a"), d0: p.getAttribute("d") };
+      var entry = { path: p, link: p.closest("a"), d0: p.getAttribute("d") };
+      if (wedges[id]) { wedges[id].dupes = (wedges[id].dupes || []).concat([entry]); }
+      else { wedges[id] = entry; }
     });
+    // Apply fn across a node id's primary wedge AND any duplicates sharing that id.
+    function eachWedge(id, fn) {
+      var w = wedges[id];
+      if (!w) return;
+      fn(w);
+      if (w.dupes) w.dupes.forEach(fn);
+    }
+    function eachWedgeAll(fn) {
+      for (var id in wedges) { if (Object.prototype.hasOwnProperty.call(wedges, id)) eachWedge(id, fn); }
+    }
 
     var TWO_PI = Math.PI * 2;
     var scope = null; // null = root (all epics)
@@ -1730,10 +1766,22 @@
     var crumbs = root.querySelector(".sb-explorer-breadcrumb");
     var centerBtn = null, animTimer = null;
 
-    function ring(kind) {
-      if (kind === "story" || kind === "story-summary") return [meta.storyInner, meta.storyOuter];
-      if (kind === "aggregate") return [meta.aggInner, meta.aggOuter];
-      return [meta.epicInner, meta.epicOuter]; // epic / follow-up / unplanned roots
+    // The ring a wedge sits on is stated by the payload (`node.ring`), never inferred from `kind`: the server draws
+    // an EPIC's open/done aggregates on the aggregate ring but the orphan/unplanned roots' aggregates on the STORY
+    // ring, so a kind→ring guess is wrong by ~55px for those four wedges. `kind` stays semantic (it drives the
+    // zoom-vs-open rule); `ring` is the presentation fact. Fallback keeps an older island shape working.
+    // [Story 20.2 review]
+    function bandFor(name) {
+      if (name === "story") return [meta.storyInner, meta.storyOuter];
+      if (name === "aggregate") return [meta.aggInner, meta.aggOuter];
+      return [meta.epicInner, meta.epicOuter];
+    }
+    function ring(node) {
+      if (node && node.ring) return bandFor(node.ring);
+      var kind = node && node.kind;
+      if (kind === "story" || kind === "story-summary") return bandFor("story");
+      if (kind === "aggregate") return bandFor("aggregate");
+      return bandFor("epic");
     }
     // A wedge zooms only if the chart actually DREW child stories under it (a dense-collapsed epic has just a
     // story-summary child and stays a leaf that opens its epic page — we never invent wedges the static chart hid).
@@ -1767,15 +1815,24 @@
     function insetStart(a, s, pad) { return a + Math.min(pad, Math.max(0, s) / 2); }
     function insetEnd(a, s, pad) { return a + s - Math.min(pad, Math.max(0, s) / 2); }
 
-    // Lay a set of sibling nodes across [a0, a0+total] on their ring, sized by weight (per-slot pad inset).
-    function layRing(kids, a0, total) {
+    // Lay a set of sibling nodes across [a0, a0+total] on their ring, sized by weight. `pad` is per-call because the
+    // server does NOT pad uniformly: AppendFollowUpSlot draws the open/done aggregate halves with pad:0 so they read
+    // as one continuous band, and insetting them here opened a seam the static chart never has. [Story 20.2 review]
+    function layRing(kids, a0, total, pad) {
+      var slotPad = pad === undefined ? meta.pad : pad;
       var sum = 0;
       kids.forEach(function (k) { sum += Math.max(0, k.weight) || 0; });
-      if (sum <= 0) return;
+      // No positive weight anywhere in this band: leaving the siblings at their un-drilled angles would paint a
+      // coherent-looking ring that belongs to the previous scope, so hide them instead of returning silently.
+      if (sum <= 0) {
+        kids.forEach(function (k) { eachWedge(k.id, function (w) { (w.link || w.path).style.display = "none"; }); });
+        return;
+      }
       var per = total / sum, ang = a0;
       kids.forEach(function (k) {
-        var sw = (Math.max(0, k.weight) || 0) * per, r = ring(k.kind), w = wedges[k.id];
-        if (w) w.path.setAttribute("d", annular(meta.cx, r[0], r[1], insetStart(ang, sw, meta.pad), insetEnd(ang, sw, meta.pad)));
+        var sw = (Math.max(0, k.weight) || 0) * per, r = ring(k);
+        var d = annular(meta.cx, r[0], r[1], insetStart(ang, sw, slotPad), insetEnd(ang, sw, slotPad));
+        eachWedge(k.id, function (w) { w.path.setAttribute("d", d); });
         ang += sw;
       });
     }
@@ -1797,29 +1854,88 @@
     function announce(msg) { if (live) live.textContent = msg; }
 
     function restoreAll() {
-      for (var id in wedges) {
-        if (!wedges.hasOwnProperty(id)) continue;
-        var w = wedges[id];
+      eachWedgeAll(function (w) {
         w.path.setAttribute("d", w.d0);
         (w.link || w.path).style.display = "";
-      }
+      });
     }
 
     function drawScope(id) {
-      var keep = {}; keep[id] = true;
+      var keep = Object.create(null); keep[id] = true;
       var kids = childrenOf[id] || [];
       kids.forEach(function (k) { keep[k.id] = true; });
       for (var wid in wedges) {
-        if (!wedges.hasOwnProperty(wid)) continue;
-        (wedges[wid].link || wedges[wid].path).style.display = keep[wid] ? "" : "none";
+        if (!Object.prototype.hasOwnProperty.call(wedges, wid)) continue;
+        var vis = keep[wid] ? "" : "none";
+        eachWedge(wid, function (w) { (w.link || w.path).style.display = vis; });
       }
-      var er = ring("epic"), ew = wedges[id];
-      if (ew) ew.path.setAttribute("d", fullRing(meta.cx, er[0], er[1]));
+      var er = bandFor("epic");
+      eachWedge(id, function (w) { w.path.setAttribute("d", fullRing(meta.cx, er[0], er[1])); });
       layRing(kids.filter(function (k) { return k.kind === "story" || k.kind === "story-summary"; }), meta.start, TWO_PI);
-      layRing(kids.filter(function (k) { return k.kind === "aggregate"; }), meta.start, TWO_PI);
+      // pad 0 mirrors AppendFollowUpSlot's own pad:0 — the open/done halves must meet with no seam.
+      layRing(kids.filter(function (k) { return k.kind === "aggregate"; }), meta.start, TWO_PI, 0);
     }
 
-    // The zoom-out control: a focusable center hit-area, present only while drilled. "center → zoom out" (AC #1).
+    // ---- Text twin: keep the legend, hint and accessible name describing what is ACTUALLY on screen ----------
+    // Under ADR 0013 the text equivalent IS the accessibility contract, so a drilled chart whose legend still
+    // advertises statuses with zero visible wedges (and whose aria-label still says "Project progress sunburst")
+    // is wrong, not merely untidy — the same phantom-entry class Story 10.7 and 21.1 each closed once.
+    // [Story 20.2 review]
+    var svgLabel0 = svg.getAttribute("aria-label") || "";
+    var hintEl = root.querySelector(".sunburst-hint");
+    var hint0 = hintEl ? hintEl.textContent : null;
+    var publishedTokens = [];
+
+    // Which status tokens the CURRENTLY VISIBLE wedges carry. Wedges are `sb-seg sb-<token>`; the same <token>
+    // names the matching legend swatch, which is how the stylesheet pairs the two.
+    function visibleTokens() {
+      var seen = Object.create(null);
+      Array.prototype.forEach.call(svg.querySelectorAll(".sb-seg[data-node-id]"), function (p) {
+        var a = p.closest("a");
+        if (a && a.style.display === "none") return;
+        Array.prototype.forEach.call(p.classList, function (c) {
+          if (c.indexOf("sb-") === 0 && c !== "sb-seg") seen[c.slice(3)] = true;
+        });
+      });
+      return seen;
+    }
+
+    // Keep the chart's TEXT TWIN describing what is actually on screen — under ADR 0013 the text equivalent IS the
+    // no-JS/accessibility contract, so a drilled chart still advertising statuses it no longer draws is wrong, not
+    // untidy (the phantom-entry class Story 10.7 and 21.1 each closed once).
+    //
+    // The script publishes STATE ONLY — `data-sb-scope` plus one `data-tok-<token>` per status still on screen — and
+    // the stylesheet decides which swatches show. Legend presentation stays pure CSS, which is the Story 3.5
+    // contract `StylesheetTests.Script_DoesNotImplementLegendEmphasis` pins: this block names no legend class and
+    // touches no legend node. [Story 20.2 review]
+    function syncTextTwin() {
+      svg.setAttribute("aria-label", scope && byId[scope]
+        ? svgLabel0 + " — zoomed into " + byId[scope].label
+        : svgLabel0);
+      if (hintEl && hint0 !== null) {
+        hintEl.textContent = scope && byId[scope]
+          ? "Zoomed into " + byId[scope].label + " — the rings now show only this epic. Use the breadcrumb above, or the centre of the chart, to zoom back out."
+          : hint0;
+      }
+      publishedTokens.forEach(function (t) { root.removeAttribute("data-tok-" + t); });
+      publishedTokens = [];
+      if (!scope) { root.removeAttribute("data-sb-scope"); return; }
+      root.setAttribute("data-sb-scope", scope);
+      var seen = visibleTokens();
+      for (var t in seen) {
+        // Attribute-name hygiene: only ever publish the known kebab-case status tokens.
+        if (Object.prototype.hasOwnProperty.call(seen, t) && /^[a-z][a-z0-9-]*$/.test(t)) {
+          root.setAttribute("data-tok-" + t, "");
+          publishedTokens.push(t);
+        }
+      }
+    }
+
+    // The zoom-out control: a POINTER-ONLY center hit-area, present only while drilled. "center → zoom out" (AC #1).
+    // Deliberately not focusable and not exposed to AT: the host <svg> carries role="img", whose descendants are
+    // presentational, so a role="button"/tabindex="0" circle in here is a focus stop that assistive tech may never
+    // name (WCAG 4.1.2). The keyboard/AT path to zoom out is the breadcrumb's real HTML "All epics" <button>, which
+    // lives outside the SVG and is announced properly. [Story 20.2 review]
     function ensureCenter(show) {
       if (show) {
         if (!centerBtn) {
@@ -1828,16 +1944,11 @@
           centerBtn.setAttribute("cx", f(meta.cx));
           centerBtn.setAttribute("cy", f(meta.cx));
           centerBtn.setAttribute("r", f(meta.epicInner));
-          centerBtn.setAttribute("role", "button");
-          centerBtn.setAttribute("tabindex", "0");
-          centerBtn.setAttribute("aria-label", "Zoom out to all epics");
+          centerBtn.setAttribute("aria-hidden", "true");
           var out = document.createElementNS("http://www.w3.org/2000/svg", "title");
           out.textContent = "Zoom out to all epics";
           centerBtn.appendChild(out);
           centerBtn.addEventListener("click", function () { zoomTo(null, true); focusScope(); });
-          centerBtn.addEventListener("keydown", function (e) {
-            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); zoomTo(null, true); focusScope(); }
-          });
           svg.appendChild(centerBtn);
         }
         centerBtn.style.display = "";
@@ -1895,18 +2006,35 @@
       return out;
     }
     function setRoving() {
+      // Clear EVERY wedge link before re-arming the current scope's. Unlike an HTML element, an SVG <a> carrying
+      // tabindex stays focusable at display:none, so a wedge hidden by a drill would otherwise keep the tabindex="0"
+      // it was given at root state — a phantom tab stop on an invisible wedge. Verified in-browser. [Story 20.2 review]
+      Array.prototype.forEach.call(svg.querySelectorAll(".sb-seg[data-node-id]"), function (p) {
+        var a = p.closest("a");
+        if (a) { a.setAttribute("tabindex", "-1"); a.removeAttribute("data-sb-rove"); }
+      });
       roveLinks().forEach(function (a, i) {
         a.setAttribute("tabindex", i === 0 ? "0" : "-1");
         a.setAttribute("data-sb-rove", "1");
       });
     }
     function focusScope() { var l = roveLinks(); if (l.length) l[0].focus(); }
+    // Activate a wedge the way Enter/Space should: drillable → zoom, leaf → follow its Story 9.13 destination.
+    // NB these are SVG <a> elements (SVGAElement), which — unlike HTMLElement — have NO .click() method, so the
+    // obvious `a.click()` throws and (because preventDefault ran first) silently eats the keypress. [Story 20.2 review]
+    function activateWedge(a) {
+      var p = a.querySelector(".sb-seg[data-node-id]");
+      var id = p ? p.getAttribute("data-node-id") : null;
+      if (id && drillable(id)) { zoomTo(id, true); return; }
+      var href = a.getAttribute("href");
+      if (href) location.href = href;
+    }
     root.addEventListener("keydown", function (e) {
       var a = e.target.closest ? e.target.closest("a[data-sb-rove]") : null;
       if (!a) return;
       if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); rove(a, 1); }
       else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); rove(a, -1); }
-      else if (e.key === " ") { e.preventDefault(); a.click(); } // links ignore Space by default
+      else if (e.key === " ") { e.preventDefault(); activateWedge(a); } // links ignore Space by default
     });
     function rove(a, d) {
       var l = roveLinks(), i = l.indexOf(a);
@@ -1923,37 +2051,75 @@
       else { svg.classList.remove("is-drilled"); ensureCenter(false); }
       renderCrumbs();
       setRoving();
+      syncTextTwin();
       if (animate) pulse();
+    }
+
+    // Rewrite location.hash's `sb=` pair WITHOUT destroying any other fragment the visitor arrived with — clearing
+    // the whole hash on zoom-out silently ate in-page anchors like #glance. [Story 20.2 review]
+    function hashWith(id) {
+      var raw = location.hash.replace(/^#/, "");
+      var parts = raw ? raw.split("&") : [];
+      var kept = [];
+      for (var i = 0; i < parts.length; i++) { if (parts[i].indexOf("sb=") !== 0 && parts[i]) kept.push(parts[i]); }
+      if (id) kept.unshift("sb=" + encodeURIComponent(id));
+      return kept.length ? "#" + kept.join("&") : location.pathname + location.search;
+    }
+    // Under the SPA the router owns history: a foreign state entry sends its popstate handler down the "unknown
+    // state" path, which re-swaps the content region and tears the explorer down mid-interaction. So in SPA mode we
+    // REPLACE rather than push — the drilled scope stays shareable/bookmarkable without minting entries the router
+    // will misread — and we carry the router's own {path, fragment} keys so the state is never foreign. In the
+    // static site nothing else owns history, so real pushState entries (and Back-to-zoom-out) are kept.
+    var spaHost = document.getElementById("spa-content");
+    function syncHistory() {
+      if (!window.history || !history.pushState) return;
+      var url = hashWith(scope);
+      if (spaHost) {
+        var path = spaHost.getAttribute("data-path") || "";
+        history.replaceState({ path: path, fragment: url.charAt(0) === "#" ? url.slice(1) : "", sb: scope || "" }, "", url);
+      } else {
+        history.pushState({ sb: scope || "" }, "", url);
+      }
     }
 
     function zoomTo(id, pushHash) {
       if (id && !byId[id]) id = null;
       if (id && !drillable(id)) return; // leaf: let the native <a> open its 9.13 destination
+      if ((id || null) === scope) return; // already here — don't mint a duplicate history entry for a no-op zoom
       scope = id || null;
       applyState(true);
       announce(scope ? ("Zoomed into " + (byId[scope] ? byId[scope].label : scope)) : "Showing all epics");
-      if (pushHash && window.history && history.pushState) {
-        if (scope) history.pushState({ sb: scope }, "", "#sb=" + encodeURIComponent(scope));
-        else history.pushState({ sb: "" }, "", location.pathname + location.search);
-      }
+      if (pushHash) syncHistory();
     }
 
     // Intercept activation on drillable wedges → zoom (Enter + click). Leaves keep their native link untouched.
     Array.prototype.forEach.call(svg.querySelectorAll(".sb-seg[data-node-id]"), function (p) {
       var id = p.getAttribute("data-node-id"), link = p.closest("a");
       if (!link || !drillable(id)) return;
-      link.addEventListener("click", function (e) { e.preventDefault(); zoomTo(id, true); });
+      link.addEventListener("click", function (e) {
+        // Respect explicit new-tab / new-window intents — a modified click still means "open the 9.13 destination",
+        // exactly as specscribe-spa.js guards its own delegated navigation. Without this, Ctrl+click zoomed instead.
+        if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        e.preventDefault();
+        zoomTo(id, true);
+      });
       link.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); zoomTo(id, true); } });
       var base = link.getAttribute("aria-label") || "";
-      link.setAttribute("aria-label", base + " — activate to zoom in");
+      link.setAttribute("aria-label", base + " — activate to zoom in, or press the arrow keys to move between wedges");
     });
 
     function applyHash() {
       var m = /[#&]sb=([^&]+)/.exec(location.hash);
-      var id = m ? decodeURIComponent(m[1]) : null;
+      var id = null;
+      // A malformed percent-escape (#sb=100%) makes decodeURIComponent throw; on the popstate path that escapes
+      // the init try/catch entirely. Treat an undecodable id as "no scope". [Story 20.2 review]
+      if (m) { try { id = decodeURIComponent(m[1]); } catch (e) { id = null; } }
       if (id && (!byId[id] || !drillable(id))) id = null;
+      var changed = (id || null) !== scope;
       scope = id;
       applyState(false); // snap on load / back-forward (no entrance animation)
+      // Back/Forward changes the view just as the crumb does, so it must announce just as the crumb does.
+      if (changed) announce(scope ? ("Zoomed into " + (byId[scope] ? byId[scope].label : scope)) : "Showing all epics");
     }
     window.addEventListener("popstate", applyHash);
     applyHash();

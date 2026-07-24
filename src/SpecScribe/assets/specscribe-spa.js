@@ -78,6 +78,15 @@
     location.href = basePrefix + path + (fragment ? "#" + fragment : "");
   }
 
+  // Tell the enhancement layer (specscribe.js) that the content region now holds different markup. Kept
+  // failure-tolerant: a browser without the CustomEvent constructor, or a listener that throws, must never break
+  // navigation itself — the swapped region is already complete, readable server truth. [Story 20.2 review]
+  function notifyContentSwapped() {
+    try {
+      document.dispatchEvent(new CustomEvent("specscribe:content-swapped", { detail: { root: content } }));
+    } catch (e) { /* enhancement is convenience-only (NFR6); navigation stands */ }
+  }
+
   // Swap the content region in place. Any miss (unknown page, chunk fetch failure) degrades to a real navigation
   // to the static page — never a blank surface.
   function navigate(path, fragment, push) {
@@ -90,6 +99,12 @@
       content.setAttribute("data-path", path);
       currentPath = path;
       if (info.title) document.title = info.title;
+      // An innerHTML swap discards every listener the enhancement layer attached and never executes an injected
+      // <script>, so any specscribe.js block that enhances page content must be re-run against the fresh markup —
+      // otherwise it works on the entry page and is silently dead for the rest of the session (the same failure
+      // mode HostRenderExceptions records for Mermaid). One generic signal, one listener per enhancement block;
+      // blocks guard their own idempotence. Currently consumed by the Story 20.2 sunburst explorer.
+      notifyContentSwapped();
       if (push) {
         history.pushState({ path: path, fragment: fragment || "" }, "",
           basePrefix + path + (fragment ? "#" + fragment : ""));
