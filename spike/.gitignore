@@ -5,3 +5,12 @@
 **/dist/
 **/node_modules/
 **/*.vsix
+
+# Story 23.1 Nuxt-over-IR spike (spike/nuxt-ir): Nuxt build state + the extracted proxy-IR bundle and the
+# copied shipped stylesheet — all regenerable via `npm run ir && npm run generate`.
+**/.nuxt/
+**/.output/
+**/ir-data/
+nuxt-ir/public/specscribe.css
+nuxt-ir/package-lock.json
+nuxt-ir/measurements/

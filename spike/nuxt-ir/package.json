@@ -1,0 +1,18 @@
+{
+  "name": "specscribe-nuxt-ir-spike",
+  "private": true,
+  "type": "module",
+  "description": "Story 23.1 throwaway feasibility probe: Nuxt 3 rendering SpecScribe surfaces from the proxy IR. Not shipped, not referenced by SpecScribe.slnx or the site build.",
+  "scripts": {
+    "ir": "node scripts/extract-ir.mjs",
+    "build": "nuxt build",
+    "generate": "nuxt generate",
+    "dev": "nuxt dev",
+    "measure": "node scripts/measure.mjs"
+  },
+  "devDependencies": {
+    "nuxt": "^3.14.0",
+    "vue": "^3.5.0",
+    "vue-router": "^4.4.0"
+  }
+}
