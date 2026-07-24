@@ -118,7 +118,7 @@ public sealed class BmadArtifactAdapter : IArtifactAdapter
         var files = sourceFiles.Where(f => !PathUtil.IsIgnoredSourceFile(f)).ToList();
         var diagnostics = new List<AdapterDiagnostic>();
         var consumed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var artifactMap = BuildArtifactMap(files);
+        var artifactMap = BuildArtifactMap(options, files, diagnostics);
         var epicsSourceFile = FindEpicsSourceFile(files);
         if (epicsSourceFile is null)
         {
@@ -308,8 +308,16 @@ public sealed class BmadArtifactAdapter : IArtifactAdapter
     /// <summary>Story id (e.g. "1.2") → full path of its detail artifact, discovered by BMad's
     /// <c>{epic}-{story}-*.md</c> filename convention under an <c>implementation-artifacts/</c> ancestor at
     /// ANY depth (location-tolerant since Story 4.2; the canonical direct child layout is unchanged as the
-    /// primary shape).</summary>
-    private static Dictionary<string, string> BuildArtifactMap(IEnumerable<string> files)
+    /// primary shape).
+    /// <para>The prefix convention is not unique: a story may sit beside a companion deliverable sharing its
+    /// <c>{epic}-{story}-</c> stem (spike reports are the standing case — <c>23-1-spike-report.md</c> next to
+    /// <c>23-1-spike-nuxt-over-ir-feasibility.md</c>). This used to be last-writer-wins over the file
+    /// enumeration, so the companion silently displaced the real story and every downstream surface read the
+    /// wrong file — no <c>Status:</c> and no task plan, rendering a done story as deferred/no-plan. Collisions
+    /// are now resolved by <see cref="ChooseStoryArtifact"/> and the loser is reported as
+    /// <see cref="AdapterDiagnosticCategory.Skipped"/> rather than vanishing.</para></summary>
+    private static Dictionary<string, string> BuildArtifactMap(
+        ForgeOptions options, IEnumerable<string> files, List<AdapterDiagnostic> diagnostics)
     {
         var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var path in files)
@@ -331,9 +339,54 @@ public sealed class BmadArtifactAdapter : IArtifactAdapter
                 !int.TryParse(m.Groups["story"].Value, out var storyNum)) continue;
 
             var key = $"{epicNum}.{storyNum}";
-            map[key] = path;
+            if (!map.TryGetValue(key, out var incumbent))
+            {
+                map[key] = path;
+                continue;
+            }
+
+            var (winner, loser) = ChooseStoryArtifact(incumbent, path);
+            map[key] = winner;
+            diagnostics.Add(new AdapterDiagnostic(
+                AdapterDiagnosticCategory.Skipped,
+                PathUtil.NormalizeSlashes(ToSourceRelative(options, loser)),
+                $"Story {key} matched more than one artifact filename; " +
+                $"'{Path.GetFileName(winner)}' was ingested as the story artifact."));
         }
         return map;
+    }
+
+    /// <summary>Picks which of two same-keyed artifacts IS the story, scoring each on the two things the
+    /// story surfaces actually consume (<see cref="ProgressCalculator"/>'s status + task tally) rather than
+    /// on filename shape, so a companion deliverable can be named anything. Ties fall back to an ordinal
+    /// filename compare — deterministic, and independent of the directory enumeration order that produced
+    /// the old silent overwrite.</summary>
+    private static (string Winner, string Loser) ChooseStoryArtifact(string a, string b)
+    {
+        var scoreA = StoryArtifactScore(a);
+        var scoreB = StoryArtifactScore(b);
+        if (scoreA != scoreB) return scoreA > scoreB ? (a, b) : (b, a);
+        return string.CompareOrdinal(Path.GetFileName(a), Path.GetFileName(b)) <= 0 ? (a, b) : (b, a);
+    }
+
+    /// <summary>How story-shaped a candidate artifact is: one point for a parseable line-start
+    /// <c>Status:</c>, one for at least one top-level task checkbox. Unreadable files score 0 — this runs
+    /// inside the adapter's NEVER-throws contract, and a file that can't be read can't be the better
+    /// candidate anyway.</summary>
+    private static int StoryArtifactScore(string fullPath)
+    {
+        try
+        {
+            var raw = MarkdownConverter.ReadAllTextShared(fullPath);
+            var score = 0;
+            if (EpicsParser.ExtractStatus(raw) is { Length: > 0 }) score++;
+            if (TaskListParser.Parse(raw).Count > 0) score++;
+            return score;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return 0;
+        }
     }
 
     private static string? FindEpicsSourceFile(IEnumerable<string> files) =>

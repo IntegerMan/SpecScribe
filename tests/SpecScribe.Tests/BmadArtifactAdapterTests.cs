@@ -380,6 +380,72 @@ public class BmadArtifactAdapterTests : IDisposable
         Assert.DoesNotContain(ingest.StoryArtifactsById.Values, v => v.Contains("overflow"));
     }
 
+    /// <summary>A companion deliverable sharing the story's <c>{epic}-{story}-</c> stem (the standing case is a
+    /// spike report beside its spike story) must NOT displace the real story artifact. This was last-writer-wins
+    /// over the directory enumeration, so the alphabetically later companion won and every story surface read a
+    /// file with no <c>Status:</c> and no task plan — a done story rendered "deferred, no task plan yet".</summary>
+    [Fact]
+    public void IngestEpics_CompanionArtifactSharesStoryPrefix_StoryWinsAndCompanionIsSkipped()
+    {
+        // Sorts AFTER "1-1-foundation.md", so plain last-writer-wins hands the key to the report.
+        var report = Path.Combine(Source, "implementation-artifacts", "1-1-spike-report.md");
+        File.WriteAllText(report, """
+            # Story 1.1 Spike Report
+
+            **Status:** Complete · **Date:** 2026-07-23
+
+            Findings live here. No line-start Status:, no task checkboxes.
+            """);
+
+        var ingest = new BmadArtifactAdapter().IngestEpics(Options(), SourceFiles(), Project);
+
+        Assert.Equal(
+            Path.Combine(Source, "implementation-artifacts", "1-1-foundation.md"),
+            ingest.StoryArtifactsById["1.1"]);
+
+        // The displaced candidate is reported, not silently dropped.
+        var diag = Assert.Single(ingest.Diagnostics);
+        Assert.Equal(AdapterDiagnosticCategory.Skipped, diag.Category);
+        Assert.Equal("implementation-artifacts/1-1-spike-report.md", diag.RelativePath);
+        Assert.Contains("1-1-foundation.md", diag.Message);
+    }
+
+    /// <summary>The real payload of the collision fix: the story's status and task tally reach the progress
+    /// model from the STORY file, not the companion. Guards the exact regression seen on Stories 22.1/23.1,
+    /// where <c>TasksTotal == 0</c> drove the sunburst's dashed <c>noplan</c> wedge.</summary>
+    [Fact]
+    public void IngestEpics_CompanionArtifactSharesStoryPrefix_ProgressReadsTheStoryNotTheCompanion()
+    {
+        File.WriteAllText(
+            Path.Combine(Source, "implementation-artifacts", "1-1-spike-report.md"),
+            "# Story 1.1 Spike Report\n\n**Status:** Complete\n\nNo tasks here.\n");
+
+        var ingest = new BmadArtifactAdapter().IngestEpics(Options(), SourceFiles(), Project);
+
+        var story = ingest.Epics!.Epics[0].Stories[0];
+        Assert.Equal("in-progress", story.Status);
+        Assert.Equal(1, story.TasksTotal);
+        Assert.Equal(1, story.TasksDone);
+    }
+
+    /// <summary>Two equally story-shaped candidates still resolve deterministically (ordinal filename compare),
+    /// so the map can never depend on the directory enumeration order that produced the original defect.</summary>
+    [Fact]
+    public void IngestEpics_TwoStoryShapedCandidates_ResolveDeterministicallyByFilename()
+    {
+        File.WriteAllText(
+            Path.Combine(Source, "implementation-artifacts", "1-1-alternate.md"), Story11Md);
+
+        var forward = new BmadArtifactAdapter().IngestEpics(Options(), SourceFiles(), Project);
+        var reversed = new BmadArtifactAdapter().IngestEpics(
+            Options(), SourceFiles().AsEnumerable().Reverse().ToList(), Project);
+
+        Assert.Equal(
+            Path.Combine(Source, "implementation-artifacts", "1-1-alternate.md"),
+            forward.StoryArtifactsById["1.1"]);
+        Assert.Equal(forward.StoryArtifactsById["1.1"], reversed.StoryArtifactsById["1.1"]);
+    }
+
     [Fact]
     public void Ingest_UnrecognizedStoryStatus_YieldsUnsupportedDiagnostic()
     {

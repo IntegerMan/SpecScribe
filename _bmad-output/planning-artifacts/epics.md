@@ -3131,6 +3131,34 @@ So that "what stemmed from what" is visible beside the map instead of buried in 
 **Then** an empty selection shows a designed empty state
 **And** with JS off the relationship data is still delivered as a server-rendered "Related" block, never JS-gated.
 
+<!-- Story 20.4 seated 2026-07-23 by the Epics 19+21 joint retrospective (owner-directed). ADR 0010 §6 requires ONE
+     shared client-charting engine across opt-in analytics surfaces, "not independently reinvented per story."
+     Verified violation at retro time: src/SpecScribe/assets/specscribe.js (1,961 lines) carries THREE independent
+     arc/radial renderers — initOwnershipSunburst (Story 7.11), renderSunburst/arcPath (Story 21.3), and
+     initSunburstExplorer/annular/fullRing (Story 20.2). Epic 24 (FR40) adds force-directed, chord/arc, and
+     adjacency-matrix views across 24.2–24.5; consolidating BEFORE 24.2 starts is the cheapest moment. Seated in
+     Epic 20 because Epic 20 owns the client-JS boundary (20.1's budget spike, ADR 0010 §5). -->
+
+### Story 20.4: Shared Client-Side Geometry Engine for Analytics Charts
+
+As a maintainer of SpecScribe's opt-in analytics surfaces,
+I want the arc/radial and layout math in `specscribe.js` extracted into one shared, tested module,
+So that ADR 0010 §6's one-engine rule actually holds before Epic 24 adds three more graph views to the same file.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the three independent arc/radial renderers shipped by Stories 7.11, 21.3, and 20.2
+**When** the shared geometry module is extracted
+**Then** every existing analytics surface renders through it with no visual regression (each surface's shipped output verified in a live browser, not only by test assertions)
+**And** the duplicated arc/annular-sector path math exists in exactly one place.
+
+2.
+**Given** Epic 24's planned force-directed / chord / matrix views (Stories 24.2–24.5)
+**When** the module's surface is defined
+**Then** it exposes the primitives those views need without each story re-deriving arc, layout, or hierarchy-grouping math
+**And** the JS size budget named by Story 20.1 is restated against the consolidated total (NFR6 no-JS baselines unchanged on every affected page).
+
 <!-- Epic 21 added 2026-07-19 (SCP 2026-07-19, correct-course): value & correlation insights — cross-cutting displays
      that make product value legible and surface correlations across work items AND code. Distinct from Epic 7's
      code-only signals (Stories 7.10–7.12) and from the graph/explorer surfaces (Epics 19/20). Seated as Epic 21
