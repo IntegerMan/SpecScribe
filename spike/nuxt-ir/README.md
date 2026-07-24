@@ -1,8 +1,13 @@
 # `spike/nuxt-ir` — Story 23.1 Nuxt-over-IR feasibility probe
 
 **Throwaway.** Nothing here ships. No `.slnx` references it, it is not part of `dotnet build src/SpecScribe`,
-`dotnet pack`, the site build, or the `extension/` bundle. The generated `specscribe` site is byte-identical
-with or without this folder. Deletable with the branch.
+`dotnet pack`, the site build, or the `extension/` bundle. Deletable with the branch.
+
+**The generated site is _not_ byte-identical with or without this folder** — and could not be for any spike in
+this repo, since SpecScribe documents its own repository: the folder adds 13 `code/spike/nuxt-ir/**` pages,
+exactly as `code/spike/vscode/**` and `code/spike/delivery/**` already do. What *is* true is that the
+generator's **rendering behaviour** is unchanged: no `src/` or `tests/` file was modified, and
+`SpecScribe.slnx` still contains exactly two projects.
 
 The durable output is
 [`_bmad-output/implementation-artifacts/23-1-spike-report.md`](../../_bmad-output/implementation-artifacts/23-1-spike-report.md).
@@ -30,8 +35,8 @@ The four surfaces are chosen so that between them they exercise all three AC #2 
 | --- | --- |
 | `ir/adapter.mjs` | **The only file that knows the IR's shape.** SpaDelivery → neutral `IrPage`. When Story 22.2 lands a real schema, this is what changes. |
 | `scripts/extract-ir.mjs` | Build step: pulls the chosen surfaces out of the ~82 MB proxy IR into `ir-data/ir.json`, and copies the shipped `specscribe.css` verbatim (never re-typed → no token drift, AD-7). |
-| `scripts/csp-probe.mjs` | Static server that replays the **VS Code webview's exact CSP** (`WebviewRenderAdapter.cs:102`) over the prerendered output, substituting `__NONCE__` per request the way the webview host does. |
-| `scripts/measure.mjs` | Regenerates every number in the report from the artifacts. |
+| `scripts/csp-probe.mjs` | Static server that replays the **VS Code webview's exact CSP** (`WebviewRenderAdapter.cs:113`) over the prerendered output, substituting `__NONCE__` per request the way the webview host does. Note it serves the policy as an HTTP **header**, while the webview ships it in a `<meta http-equiv>` — see the report's honesty boundary. |
+| `scripts/measure.mjs` | Regenerates the report's **per-surface** numbers from the artifacts (Axis 1 + Axis 2, incl. the `<main>` byte columns and Markdig renderer counts). Wall-clock timings, the CSP matrix and the full-site weight table are **not** produced here — see the report's Method note on which figures are harness-derived and which are session-measured. |
 | `server/plugins/csp-nonce.ts` | Stamps `nonce="__NONCE__"` onto every `<script>` Nuxt emits, via Nitro's `render:html` hook. |
 | `server/api/ir.get.ts` | Serves one `IrPage` at prerender time, keyed by route path. |
 | `pages/[...surface].vue` | Catch-all; the route table comes from the IR manifest, not from the filesystem. |
@@ -41,8 +46,11 @@ The four surfaces are chosen so that between them they exercise all three AC #2 
 ## Run it
 
 ```bash
-cd spike/nuxt-ir && npm install
+cd spike/nuxt-ir && npm ci
 ```
+
+(`npm ci` is what the report's 18.4 s install figure measures, and it requires the committed `package-lock.json`.
+Use `npm install` only to regenerate that lockfile — then commit it, or the numbers stop being reproducible.)
 
 ```bash
 dotnet run --project ../../src/SpecScribe -c Release -- generate --spa
@@ -65,11 +73,14 @@ inlines the hydration payload instead of emitting a sibling `_payload.json`.
 
 ## Headline findings (details in the report)
 
-1. **NFR6 holds.** Prerendered HTML is fully rendered; with every `<script>` removed the dashboard still carries
-   345 KB of content, 148 SVGs and 570 links, and each route is its own file on disk.
-2. **Parity is byte-identical where it counts.** `<main>` is byte-for-byte equal across golden → IR → Nuxt for
-   3 of 4 surfaces; `v-html` round-trips the IR string verbatim. The dashboard's 277-byte delta is introduced by
-   **SpaDelivery**, not by Nuxt.
+1. **NFR6 holds for _rendering_.** Prerendered HTML is fully rendered; with every `<script>` removed the
+   dashboard still carries 345 KB of content, 148 SVGs and 570 links, and each route is its own file on disk.
+   **Navigation is proven only for this spike's own index links** — the IR content's own hrefs (`code/…`,
+   `adrs/…`) do not resolve against the spike's route space, which is exactly why `crawlLinks` is off.
+2. **Parity is byte-identical where it counts — for content that travels as rendered HTML.** `<main>` is
+   byte-for-byte equal across golden → IR → Nuxt for 3 of 4 surfaces; `v-html` round-trips the IR string
+   verbatim. The dashboard's 277-byte delta is introduced by **SpaDelivery**, not by Nuxt. Note this measures
+   injection fidelity, not a Vue reimplementation of the surface.
 3. **The webview CSP blocks hydration today**, and the partial relaxation is worse than none — see the report's
    CSP matrix before touching `WebviewRenderAdapter`'s policy.
 4. **Node costs ~37 s and ~2.26× output weight** at full site scale. The weight is *entirely* hydration payload;

@@ -38,13 +38,27 @@ for (const surface of SURFACES) {
   pages[surface.route] = { ...extract(surface.irPath), probe: surface.probe };
 }
 
-// Scaling probe (AC #3 Node-in-pipeline cost): SPIKE_SCALE=N adds the first N pages of the real 914-page site as
-// routes, so prerender throughput can be measured at a realistic route count instead of extrapolated from four.
-const scale = Number(process.env.SPIKE_SCALE ?? 0);
+// Scaling probe (AC #3 Node-in-pipeline cost): SPIKE_SCALE=N adds N pages of the real 914-page site as routes,
+// so prerender throughput can be measured at a realistic route count instead of extrapolated from four.
+const rawScale = process.env.SPIKE_SCALE;
+const scale = rawScale === undefined || rawScale === '' ? 0 : Number(rawScale);
+if (!Number.isInteger(scale) || scale < 0) {
+  throw new Error(`SPIKE_SCALE must be a non-negative integer, got '${rawScale}'`);
+}
 if (scale > 0) {
-  const all = Object.keys(manifest.pages).sort();
-  for (const [i, irPath] of all.slice(0, scale).entries()) {
-    pages[`/p/${i}`] = { ...extract(irPath), probe: 'scale probe' };
+  // Exclude the four named surfaces: they are already routes above, and re-adding them as /p/N prerendered
+  // them TWICE, which is where the report's 918-vs-914 route-count discrepancy came from.
+  const named = new Set(SURFACES.map((s) => s.irPath));
+  const all = Object.keys(manifest.pages).sort().filter((p) => !named.has(p));
+  if (scale > all.length) {
+    console.warn(`SPIKE_SCALE=${scale} exceeds ${all.length} available pages — clamped to ${all.length}`);
+  }
+  // Stride-sample rather than slice(0, N): the keys are sorted, so a prefix slice draws an alphabetically
+  // biased subset (all of `adrs/…`, none of `planning-artifacts/…`) whose per-route cost is unrepresentative.
+  const take = Math.min(scale, all.length);
+  const stride = all.length / take;
+  for (let i = 0; i < take; i++) {
+    pages[`/p/${i}`] = { ...extract(all[Math.floor(i * stride)]), probe: 'scale probe' };
   }
 }
 

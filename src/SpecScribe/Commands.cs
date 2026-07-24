@@ -328,6 +328,15 @@ public sealed class WebviewCommand : Command<SiteSettings>
     /// before the process actually exits; a discarded local has no such root. [Review][Patch]</summary>
     private static FileStream? _scratchLock;
 
+    /// <summary>Releases the held scratch lock (test hygiene: keeps repeated <see cref="RedirectOutputToScratch"/>
+    /// calls in one test process from self-contending on the stable dir, and stops leaking file handles). No-op in
+    /// production, where the lock is meant to live for the whole process.</summary>
+    internal static void ReleaseScratchLockForTests()
+    {
+        _scratchLock?.Dispose();
+        _scratchLock = null;
+    }
+
     /// <summary>Clones the resolved options with the output root moved to a stable per-project temp scratch
     /// directory (keyed by <see cref="ScratchKey"/>, stable so sequential spawns for the same repo overwrite
     /// rather than accumulate). A same-repo spawn that finds the stable dir already exclusively locked by a
@@ -336,12 +345,19 @@ public sealed class WebviewCommand : Command<SiteSettings>
     /// concurrent spawn gets its own), which is fine since concurrency here is rare and each spawn's scratch
     /// output is read back once (via <see cref="SiteGenerator.RenderWebviewSurfaces"/>) and then abandoned.
     /// [Deferred item, Story 6.4 review]</summary>
-    private static ForgeOptions RedirectOutputToScratch(ForgeOptions options)
+    internal static ForgeOptions RedirectOutputToScratch(ForgeOptions options)
     {
         var key = ScratchKey(options.RepoRoot);
-        var stableRoot = Path.Combine(Path.GetTempPath(), "specscribe-webview", key);
-        Directory.CreateDirectory(stableRoot);
-        var outputRoot = stableRoot;
+        var keyRoot = Path.Combine(Path.GetTempPath(), "specscribe-webview", key);
+        Directory.CreateDirectory(keyRoot);
+        // The output root is a SUBDIRECTORY of the key root, and the `.lock` marker is a SIBLING of it (a direct
+        // child of the key root). This separation is load-bearing: SiteGenerator.GenerateAll wipes the whole output
+        // root recursively before a full rebuild, and the `.lock` is held open by THIS process with FileShare.None +
+        // DeleteOnClose. If the lock lived inside the output root (the original bug), that recursive delete would try
+        // to remove a file the same process holds exclusively locked and throw a sharing-violation IOException every
+        // single run — a deterministic self-deadlock. Keeping the marker outside the wiped tree fixes it while still
+        // detecting concurrent same-repo spawns. [Review][Patch]
+        var outputRoot = Path.Combine(keyRoot, "site");
         try
         {
             // Rooted in a static field (not discarded) so the GC can't finalize/close it early — the lock must
@@ -349,12 +365,15 @@ public sealed class WebviewCommand : Command<SiteSettings>
             // removes the lock marker itself on release, whether that's a clean process exit or an explicit
             // Dispose — no separate cleanup path needed. [Review][Patch]
             _scratchLock = new FileStream(
-                Path.Combine(stableRoot, ".lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None,
+                Path.Combine(keyRoot, ".lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None,
                 bufferSize: 1, FileOptions.DeleteOnClose);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            outputRoot = Path.Combine(Path.GetTempPath(), "specscribe-webview", $"{key}-{Environment.ProcessId}");
+            // A concurrent same-repo spawn already holds the stable lock: render into a private pid-suffixed sibling
+            // instead of racing (or wiping) its output. No lock is held on this dir, so its own GenerateAll wipe is
+            // safe. [Deferred item, Story 6.4 review]
+            outputRoot = Path.Combine(Path.GetTempPath(), "specscribe-webview", $"{key}-{Environment.ProcessId}", "site");
         }
         return new ForgeOptions
         {

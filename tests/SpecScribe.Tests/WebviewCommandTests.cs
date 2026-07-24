@@ -136,4 +136,49 @@ public class WebviewCommandTests
             Assert.NotEqual(WebviewCommand.ScratchKey(lower), WebviewCommand.ScratchKey(upper));
         }
     }
+
+    // ===== Regression: the scratch `.lock` must live OUTSIDE the wiped output root =================================
+
+    [Fact]
+    public void RedirectOutputToScratch_HeldLock_DoesNotBlockRecursiveWipeOfTheOutputRoot()
+    {
+        // The webview generation holds the scratch `.lock` open for the process's life (FileShare.None +
+        // DeleteOnClose), then SiteGenerator.GenerateAll wipes the output root recursively before every full
+        // rebuild. If the lock lived INSIDE the output root (the original bug) that wipe tried to delete a file the
+        // SAME process holds exclusively locked and threw a sharing-violation IOException on every single run — a
+        // deterministic self-deadlock the VS Code extension surfaced as "renderer exited 1: (no stderr)". This test
+        // reproduces the exact mechanism (hold the lock, then wipe the output root) and asserts it no longer throws.
+        var repoRoot = Path.Combine(Path.GetTempPath(), $"specscribe-scratch-wipe-{Guid.NewGuid():N}");
+        try
+        {
+            var options = new ForgeOptions
+            {
+                RepoRoot = repoRoot,
+                SourceRoot = Path.Combine(repoRoot, ForgeOptions.SourceDirName),
+                AdrSourceRoot = Path.Combine(repoRoot, "docs", "adrs"),
+                AdrSourceExplicit = false,
+                OutputRoot = Path.Combine(repoRoot, ForgeOptions.OutputDirName),
+                SiteTitle = "SpecScribe",
+                IncludeReadme = false,
+                DeepGitAnalytics = false,
+            };
+
+            var redirected = WebviewCommand.RedirectOutputToScratch(options);
+
+            // Simulate a rebuild's clean step against a populated output tree while the lock is still held.
+            Directory.CreateDirectory(redirected.OutputRoot);
+            File.WriteAllText(Path.Combine(redirected.OutputRoot, "index.html"), "<html></html>");
+
+            var ex = Record.Exception(() => Directory.Delete(redirected.OutputRoot, recursive: true));
+
+            Assert.Null(ex); // with the fix the lock is a sibling of OutputRoot, so the wipe never touches it
+        }
+        finally
+        {
+            WebviewCommand.ReleaseScratchLockForTests();
+            try { Directory.Delete(Path.Combine(Path.GetTempPath(), "specscribe-webview", WebviewCommand.ScratchKey(repoRoot)), recursive: true); }
+            catch (IOException) { /* best effort */ }
+            catch (UnauthorizedAccessException) { /* best effort */ }
+        }
+    }
 }

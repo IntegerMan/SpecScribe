@@ -12,5 +12,9 @@
 **/.output/
 **/ir-data/
 nuxt-ir/public/specscribe.css
-nuxt-ir/package-lock.json
-nuxt-ir/measurements/
+
+# NOTE (code review 2026-07-23): `package-lock.json` and `measurements/` were previously ignored. They are NOT
+# ignored any more and MUST be committed — a spike whose deliverable is a set of numbers has to land the
+# lockfile that pins the measured versions (the report cites `npm ci`, which cannot run without one) and the
+# machine-written `measurements/measurements.json` those numbers came from. The originals were lost with the
+# spike worktree; re-running `npm install && npm run ir && npm run generate && npm run measure` regenerates both.

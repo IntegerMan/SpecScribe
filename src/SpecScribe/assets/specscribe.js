@@ -305,6 +305,28 @@
     for (var i = 0; i < open.length; i++) open[i].removeAttribute("open");
   });
 
+  // ---- Code-page tabs: release the #L{n} deep-link lock on the first tab click ---------------
+  // The code page's tabs are pure-CSS radios, but a #L{n} deep link forces the Code panel forward through
+  // `.code-tabs:has(.code-tabpanel--source .code-line:target)` — rules deliberately authored to WIN the
+  // specificity tie against the :checked rules so the anchor survives the default tab. :target is sticky
+  // though: it keeps matching for as long as the hash sits in the URL. So after landing on
+  // code/<path>.html#L350, every later tab click flipped its radio and changed nothing on screen — the tab
+  // strip read as frozen. CSS can't tell a default :checked from a user-clicked one, so the tie itself can't
+  // be re-tuned; the override is gated on .code-tabs--released instead and we set that here, on the first
+  // activation. From then on the radios govern and the deep link has had its say.
+  //
+  // The hash is left alone on purpose: refresh and copy/paste keep working, the cited line stays highlighted
+  // when you tab back to Code, and dropping it wouldn't help anyway — browsers only recompute :target on real
+  // fragment navigation, so a replaceState that strips the hash leaves :target matching regardless.
+  // With JS off nothing changes: the deep link still lands and still pins the Code panel.
+  Array.prototype.forEach.call(document.querySelectorAll(".code-tabs"), function (tabs) {
+    tabs.addEventListener("change", function (e) {
+      if (e.target.classList && e.target.classList.contains("code-tab-input")) {
+        tabs.classList.add("code-tabs--released");
+      }
+    });
+  });
+
   // ---- Sortable / filterable tables (Git Insights hub) [Story 3.8] -------------------------
   // Progressive enhancement ONLY (NFR-5): every table.js-sortable arrives complete and server-sorted, so
   // with JS off the page already reads correctly and this block simply never runs. When it does run it

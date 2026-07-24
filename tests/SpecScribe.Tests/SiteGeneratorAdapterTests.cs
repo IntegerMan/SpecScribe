@@ -911,7 +911,12 @@ public class SiteGeneratorAdapterTests : IDisposable
         // behavior itself is JS and not exercised here. NOTE: the previous constant (b5bc230a…) was already stale
         // on main before this story (a pre-existing golden drift), so this value folds that in too. Verified stable
         // across 2 repeated runs. [Story 20.2; golden-diff-normalization-gotchas]
-        const string expected = "5816b3322b2c8cfe58ca9d0027580cc5eed6c4ad59be6174f70c4ff78c61b7cc";
+        // Regenerated for the code-page deep-link tab-lock fix: a #L{n} anchor left `.code-line:target` matching for
+        // the rest of the visit, so its Code-panel override outranked every later tab click and froze the tab strip.
+        // The override is now gated on `.code-tabs--released`, which specscribe.js sets on first tab activation.
+        // Shared-asset bytes only (specscribe.css + specscribe.js) — this fixture renders no code pages, and the
+        // release behavior is JS, so no page markup moved. Verified stable across 2 repeated runs.
+        const string expected = "aaef12dd23938c078a7c947f451f4b3f0eec359fb1c7e2c7645e9bc81102c0ec";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

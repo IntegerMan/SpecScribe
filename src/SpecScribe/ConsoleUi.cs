@@ -174,8 +174,16 @@ public static class ConsoleUi
         AnsiConsole.MarkupLine("[grey]Watching for changes - press [bold]Ctrl+C[/] to stop.[/]");
     }
 
+    /// <summary>A Spectre console bound to <see cref="Console.Error"/> so fatal errors land on stderr, never stdout.
+    /// The <c>webview</c> command's stdout is a machine-parsed JSON contract and the VS Code extension only surfaces
+    /// the renderer's stderr on a non-zero exit — writing fatal errors to stdout (the old behavior) both corrupted
+    /// that channel and left the extension reporting a useless "(no stderr)". Lazily created so we never touch the
+    /// stderr stream on the common no-error path.</summary>
+    private static readonly Lazy<IAnsiConsole> ErrorConsole = new(() =>
+        AnsiConsole.Create(new AnsiConsoleSettings { Out = new AnsiConsoleOutput(Console.Error) }));
+
     public static void PrintFatalError(Exception ex)
     {
-        AnsiConsole.MarkupLine($"[red bold]Fatal error:[/] {Markup.Escape(ex.Message)}");
+        ErrorConsole.Value.MarkupLine($"[red bold]Fatal error:[/] {Markup.Escape(ex.Message)}");
     }
 }

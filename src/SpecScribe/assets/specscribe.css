@@ -1289,8 +1289,10 @@ pre.code-file code[class*="language-"] {
 
 /* The checked tab reads as active — UNLESS a deep-link target has forced the code view (see the :target rules below),
    in which case the :not(:has()) gate switches this off so the source tab wins instead. Gating is deterministic and
-   avoids a specificity tie with the target override. */
-.code-tabs:not(:has(.code-tabpanel--source .code-line:target)) .code-tab:has(.code-tab-input:checked) {
+   avoids a specificity tie with the target override. The second selector re-arms the pill once the strip has been
+   released by a click (.code-tabs--released), because the deep link's :target keeps matching after that. */
+.code-tabs:not(:has(.code-tabpanel--source .code-line:target)) .code-tab:has(.code-tab-input:checked),
+.code-tabs--released .code-tab:has(.code-tab-input:checked) {
   background: var(--ink);
   color: var(--parchment);
 }
@@ -1316,16 +1318,24 @@ pre.code-file code[class*="language-"] {
    :target, force the code view forward and mark its tab active — so code/<path>.html#L42 still works with the insights
    tab defaulted, no JavaScript. The :has() argument is spelled with `.code-line:target` so these rules match the
    specificity of the :has(:checked) rules above AND follow them in source order — the tie-breaker that lets a live
-   deep link override the default checked tab. */
-.code-tabs:has(.code-tabpanel--source .code-line:target) .code-tabpanel {
+   deep link override the default checked tab.
+
+   The catch these rules have to answer for: they beat EVERY checked tab, not just the default one, and :target keeps
+   matching for as long as the hash sits in the URL. Ungated, they lock the whole tab strip for the rest of the visit
+   — every later click flips the radio and moves nothing on screen. CSS can't distinguish a default :checked from a
+   user-clicked one, so this is NOT fixable by re-tuning the tie; the override needs an off switch instead. That is
+   .code-tabs--released, which specscribe.js sets on the first tab activation and never removes. The hash stays in
+   the URL on purpose — refresh, copy/paste, and the line highlight all keep working — and replaceState is no use
+   here anyway, since browsers only recompute :target on real fragment navigation. Keep the two in step. */
+.code-tabs:not(.code-tabs--released):has(.code-tabpanel--source .code-line:target) .code-tabpanel {
   display: none;
 }
 
-.code-tabs:has(.code-tabpanel--source .code-line:target) .code-tabpanel--source {
+.code-tabs:not(.code-tabs--released):has(.code-tabpanel--source .code-line:target) .code-tabpanel--source {
   display: block;
 }
 
-.code-tabs:has(.code-tabpanel--source .code-line:target) .code-tab--source {
+.code-tabs:not(.code-tabs--released):has(.code-tabpanel--source .code-line:target) .code-tab--source {
   background: var(--ink);
   color: var(--parchment);
 }

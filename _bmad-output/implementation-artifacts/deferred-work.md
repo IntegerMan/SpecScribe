@@ -929,3 +929,15 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 - source_spec: `21-1-traceability-coverage-matrix.md`
   summary: The "dangling coverage" badge (`Charts.cs` ~4239-4258) only fires when NONE of a requirement's named epics resolve (`resolvable = req.CoverageEpicNumbers.Any(epicsByNumber.ContainsKey)`) — a requirement naming both a real epic and a phantom/typo'd one gets no caution badge at all, since at least one reference resolves.
   evidence: Edge Case Hunter, found incidentally while reviewing Story 21.3's diff (bundled into the same commit). [`src/SpecScribe/Charts.cs:4239-4258`]
+
+## Deferred from: code review of 23-1-spike-nuxt-over-ir-feasibility (2026-07-23)
+
+- source_spec: `23-1-spike-nuxt-over-ir-feasibility.md`
+  summary: SpaDelivery drops `code/*.html` links from the dashboard git-pulse panel — ROOT CAUSE identified during review (the 23.1 report names only the symptom). `SiteGenerator.cs:2979` (static site) passes `codeItemHref: CodeItemHref` into `HtmlTemplater.BuildIndexPage`; the SPA path (`:2806`) and the WEBVIEW path (`:2539`) both omit the argument, so `Charts.GitPulsePanel(pulse, null)` -> `CodeItemLink(path, null)` degrades the bar labels to plain text. Accounts for the entire 277-byte dashboard parity delta (golden `<main>` 553 anchors vs IR 548). Owner already folded the fix into Story 22.2; note that the webview surface is equally affected, which the report does not state. No repro test landed.
+  evidence: Acceptance Auditor, verified during triage. [`src/SpecScribe/SiteGenerator.cs:2806`, `:2539`, `:2979`]
+- source_spec: `23-1-spike-nuxt-over-ir-feasibility.md`
+  summary: Story frontmatter `baseline_commit: b8be08d` is knowingly stale — the spike actually branched off `9243de5`, with two intervening commits. The dev followed the dev-story "preserve frontmatter" rule and disclosed the gap in the Debug Log, but this repo's review convention scopes story diffs by `baseline_commit` + File List, so a tool or reviewer trusting the machine-readable field gets a diff spanning two unrelated stories. The BMad convention needs a way to record an actual-vs-declared baseline; this is not a defect in Story 23.1.
+  evidence: Blind Hunter, verified during triage. [`_bmad-output/implementation-artifacts/23-1-spike-nuxt-over-ir-feasibility.md:2`]
+- source_spec: `23-1-spike-nuxt-over-ir-feasibility.md`
+  summary: `GenerateAll_GoldenContentFingerprint_IsStableAfterNormalizingVolatileTokens` stale-constant drift (expects `5816b332…`, actual `1eaefe51…`). Pre-existing on `main`; the spike correctly reproduced it byte-identically on a clean detached worktree of `9243de5` with the spike folder absent. The test's own comments record the same drift recurring across Stories 20.2 and 21.3 — a repeat pattern worth addressing at the source rather than by constant-bumping each time.
+  evidence: Verified independently during triage. [`tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs:914`]

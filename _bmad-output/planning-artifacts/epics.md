@@ -3382,8 +3382,19 @@ Replace SpecScribe's C# presentation/templating layer (~4,691 LOC templaters; ch
 - **Story 23.1 — Spike: Nuxt-over-IR feasibility.** Prove Nuxt SSG/prerender NFR6 baseline, scoped-CSS migration of one representative surface, chart-SVG injection, webview-CSP survival under a hydration nonce, Markdig-prose fidelity, and the cost of adding Node to the generation pipeline (reconcile with the ADR 0005/0006 self-contained-binary distribution).
 - **Story 23.2 — Component library + design-token bridge.** Port the shared presentation tokens (status/motion families, AD-7) into scoped Vue components; establish the CSS module conventions.
 - **Story 23.3 — Migrate baseline surfaces (dashboard, epics) to Vue/Nuxt over the IR**, proving parity with the golden output.
-- **Story 23.4 — Migrate remaining surfaces + retire the C# `HtmlRenderAdapter` for content** (charts remain C#-SVG in the IR).
-- **Story 23.5 — Packaging reconciliation** — Node build step in distribution (Epic 16 touchpoint); resolve the self-contained-binary vs. Node-toolchain story.
+- **Story 23.5 — Packaging reconciliation** — Node build step in distribution (Epic 16 touchpoint); resolve the self-contained-binary vs. Node-toolchain story. **⚠️ RESEQUENCED AHEAD OF 23.4** by the Story 23.1 spike gate — see the note below.
+- **Story 23.4 — Migrate remaining surfaces + retire the C# `HtmlRenderAdapter` for content** (charts remain C#-SVG in the IR). **Blocked until 23.5 lands.**
+
+<!-- 2026-07-23 (Story 23.1 spike gate, owner-confirmed in code review): EXECUTION ORDER IS 23.2 → 23.3 → 23.5 → 23.4.
+     23.5 is promoted from an end-of-epic tidy-up to the epic's load-bearing unknown: prerendering is inherently
+     PER-PROJECT (routes come from the user's own IR), so "build Nuxt at CI time and ship pre-built assets" does not
+     cover rendering the user's project. Either the shipped artefact becomes a client-rendered SPA (forfeiting the
+     NFR6 baseline 23.1 proved) or `specscribe generate` needs Node at run time (forfeiting the self-contained
+     binary). 23.4 retires the C# renderer irreversibly and must not start before that is settled. 23.4 additionally
+     owns the webview CSP change as a two-knob ATOMIC edit ('strict-dynamic' + payloadExtraction:false) and must
+     PROPOSE AN ADR 0005 AMENDMENT — 'strict-dynamic' contradicts ADR 0005's "the body carries no scripts of its own".
+     Full reasoning and measurements: _bmad-output/implementation-artifacts/23-1-spike-report.md -->
+
 
 <!-- 2026-07-21: formal Story 23.1-23.5 sections added (bmad-create-epics-and-stories continuation run), same rationale as the Epic 22 note above. Epic stays backlog/unscheduled/spike-first, sequenced after Epic 22. -->
 
