@@ -199,6 +199,9 @@ public static class HtmlTemplater
                 StylesheetHref = ForgeOptions.StylesheetName,
                 ScriptHref = ForgeOptions.ScriptName,
                 MermaidNeeded = Mermaid.ContainsBlock(body),
+                // Same discipline as MermaidNeeded: derived from the rendered body, so the flag cannot claim a
+                // 1.2 MB engine a page does not host (nor omit one it does). [Story 20.5]
+                HierarchyEngineNeeded = HierarchyExplorer.ContainsHost(body),
             },
             Interaction = new InteractionState
             {

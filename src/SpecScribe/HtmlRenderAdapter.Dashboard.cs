@@ -57,20 +57,34 @@ public sealed partial class HtmlRenderAdapter
             // viewports, stacked below on narrow ones — owner layout). The rail is a sibling, not a child of the
             // chart panel, so the grid can place it. When there is no work-graph signal the rail HTML is "" and the
             // grid collapses to the chart alone. [Story 20.3]
+            // Story 20.5: the whole framed panel now comes from the Hierarchy Explorer component
+            // (HierarchyExplorer.Render, pre-built in DashboardViewBuilder — AD-2, so no adapter hand-builds a
+            // frame), replacing the bespoke `chart-panel-header-row` + <h3> this panel used to hand-write. The
+            // component contributes the Story 10.2 framing block, the shape selector, its own breadcrumb, the
+            // (initially hidden) chart host, the island and the text twin; the retained SVG, ITS breadcrumb
+            // scaffold and 20.2's island ride along INSIDE the same panel as the component's `fallbackHtml` and
+            // stay byte-identical (owner decision D1 — no chart retires in this story). The panel keeps
+            // `.sunburst-panel` (the Story 3.5 legend-emphasis CSS keys on it) and `data-explorer` (20.2's opt-in
+            // hook, and the root the component's takeover handshake sets `data-explorer-ready` on).
+            //
+            // The `else` branch below is the epics-model-present-but-EMPTY case: the component emits nothing (no
+            // island, no host, no inert selector — NFR8), while the panel still owes the visitor Charts.Sunburst's
+            // honest "Nothing to chart yet" empty state. Story 20.7 deletes that branch along with the SVG.
             var hasRail = view.RelatedWorkHtml.Length > 0;
-            sb.Append(hasRail ? "<div class=\"explorer-layout\">\n" : string.Empty);
+            var hasHierarchy = view.HierarchyExplorerHtml.Length > 0;
+            sb.Append(hasRail ? $"<div class=\"explorer-layout{(hasHierarchy ? " explorer-layout-labelled" : string.Empty)}\">\n" : string.Empty);
 
-            sb.Append("<div class=\"chart-panel sunburst-panel wm-panel wm-show-overview wm-show-track\" data-explorer>\n");
-            sb.Append("<div class=\"chart-panel-header-row\"><h3>Project at a Glance</h3></div>\n");
-            sb.Append("<div class=\"sb-explorer-drill\" hidden><ol class=\"sb-explorer-breadcrumb\" aria-label=\"Zoom scope\"></ol></div>\n");
-            // Both calls take the SAME size const: the client re-lays drilled arcs against the island's radii, so the
-            // chart and its payload must never default independently. [Story 20.2 review]
-            sb.Append(Charts.Sunburst(epicsForSunburst, Charts.SunburstGlanceSize,
-                followUps: view.FollowUps, unplanned: view.UnplannedWork, nodeIds: true));
-            sb.Append("<div class=\"sb-explorer-live sr-only\" aria-live=\"polite\"></div>\n");
-            sb.Append(Charts.SunburstExplorerIsland(epicsForSunburst, Charts.SunburstGlanceSize,
-                followUps: view.FollowUps, unplanned: view.UnplannedWork));
-            sb.Append("</div>\n\n");
+            if (hasHierarchy)
+            {
+                sb.Append(view.HierarchyExplorerHtml);
+            }
+            else
+            {
+                sb.Append("<div class=\"chart-panel sunburst-panel wm-panel wm-show-overview wm-show-track\" data-explorer>\n");
+                sb.Append("<div class=\"chart-panel-header-row\"><h3>Project at a Glance</h3></div>\n");
+                sb.Append(DashboardViewBuilder.RetainedSunburstHtml(epicsForSunburst, view.FollowUps, view.UnplannedWork));
+                sb.Append("</div>\n\n");
+            }
 
             // Related-work details rail (Story 20.3) — augments the current selection with a compact card. With JS
             // off every scope's card is server-rendered and its relationships expanded (AC #2 / NFR8); with JS on the

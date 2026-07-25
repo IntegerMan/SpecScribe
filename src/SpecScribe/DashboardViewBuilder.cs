@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace SpecScribe;
 
 /// <summary>Builds the host-neutral <see cref="DashboardView"/> from the already-projected domain models — the
@@ -98,8 +100,89 @@ public static class DashboardViewBuilder
             // payload uses, so the rail can never key on a wedge the chart didn't draw. [Story 20.3; Story 20.1 §1a]
             RelatedWorkHtml = BuildRelatedWorkHtml(
                 workGraph, epicsModel, commands, geometry, unplannedGeometry, ledger, nav.SiteTitle),
+            // Story 20.5's Hierarchy Explorer — the ONE standardized sunburst/treemap component (ADR 0012). Built
+            // here, not in the adapter, for the AD-2 reason its siblings above are. The server-rendered
+            // Charts.Sunburst SVG stays exactly where it is (owner decision D1): the component hides it only on a
+            // SUCCESSFUL mount, so the fallback is real rather than theoretical and Story 20.7's deletion becomes
+            // a clean subtraction. [Story 20.5]
+            HierarchyExplorerHtml = BuildHierarchyExplorerHtml(
+                epicsModel, geometry, unplannedGeometry, nav.SiteTitle),
         };
     }
+
+    /// <summary>The dashboard instance's Hierarchy Explorer configuration + payload, or "" when there are no epics.
+    ///
+    /// <para><b>Mode is <see cref="HierarchyMode.Select"/></b> (ADR 0012 §3: the dashboard drives a details pane).
+    /// Story 20.3's rail already renders cards only for <em>selectable scopes</em> (epics + the orphan/unplanned
+    /// roots), so activating a story leaf raises a selection with no card and the rail shows its designed empty
+    /// state — correct, already implemented, and exactly the "make story leaves selectable" narrowing 20.3's record
+    /// recommends for Story 20.8.</para>
+    ///
+    /// <para>The hash key stays <c>sb</c> so deep links already shared keep resolving; it is config-driven so
+    /// Story 20.7's other instances can differ. The size is well above <see cref="Charts.SunburstGlanceSize"/>
+    /// (380) because owner decision D3 chose the "Labelled explorer" direction — in-sector labels need radius —
+    /// and it is config-driven so no literal lands in the JS.</para></summary>
+    private static string BuildHierarchyExplorerHtml(
+        EpicsModel? epicsModel,
+        FollowUpGeometry geometry,
+        UnplannedWorkGeometry unplannedGeometry,
+        string siteTitle)
+    {
+        if (epicsModel is null || epicsModel.Epics.Count == 0) return string.Empty;
+
+        var config = new HierarchyExplorerConfig(
+            DomId: DashboardHierarchyDomId,
+            Shape: "sunburst",
+            Mode: HierarchyMode.Select,
+            HashKey: "sb",
+            Size: DashboardHierarchySize,
+            Labels: true,
+            Meta: new Charts.ChartMeta(
+                Title: "Project at a Glance",
+                Why: Charts.WhyText(Charts.ChartMetric.WorkHierarchy)));
+
+        var model = HierarchyExplorer.ProjectDashboard(
+            epicsModel, siteTitle, config, geometry, unplannedGeometry);
+        // `sunburst-panel` MUST survive: the Story 3.5 legend-emphasis CSS keys on
+        // `.sunburst-panel:has(.sb-<status>-item:hover)`, and dropping it silently kills the emphasis behaviour
+        // (and three StylesheetTests assertions). `data-explorer` is 20.2's opt-in hook and the root the
+        // component's takeover handshake writes `data-explorer-ready` to. [Story 20.5 Task 6.1]
+        return HierarchyExplorer.Render(
+            model,
+            panelClass: "chart-panel sunburst-panel wm-panel wm-show-overview wm-show-track",
+            panelAttributes: " data-explorer",
+            fallbackHtml: RetainedSunburstHtml(epicsModel, geometry, unplannedGeometry));
+    }
+
+    /// <summary>The Story 20.2 explorer scaffold exactly as it shipped — inert drill bar, the server-rendered
+    /// <see cref="Charts.Sunburst"/> with its <c>data-node-id</c> join hooks, the live region, and 20.2's island.
+    /// <b>Nothing here is new or changed.</b> It is lifted into one named helper only so the Hierarchy Explorer
+    /// can carry it as its <c>fallbackHtml</c> (owner decision D1) and Story 20.7 can delete one call rather than
+    /// unpick a block. Story 20.7 deletes this method. [Story 20.5]</summary>
+    internal static string RetainedSunburstHtml(
+        EpicsModel epicsModel, FollowUpGeometry geometry, UnplannedWorkGeometry unplannedGeometry)
+    {
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"sb-explorer-drill\" hidden><ol class=\"sb-explorer-breadcrumb\" aria-label=\"Zoom scope\"></ol></div>\n");
+        // Both calls take the SAME size const: the client re-lays drilled arcs against the island's radii, so the
+        // chart and its payload must never default independently. [Story 20.2 review]
+        sb.Append(Charts.Sunburst(epicsModel, Charts.SunburstGlanceSize,
+            followUps: geometry, unplanned: unplannedGeometry, nodeIds: true));
+        sb.Append("<div class=\"sb-explorer-live sr-only\" aria-live=\"polite\"></div>\n");
+        sb.Append(Charts.SunburstExplorerIsland(epicsModel, Charts.SunburstGlanceSize,
+            followUps: geometry, unplanned: unplannedGeometry));
+        return sb.ToString();
+    }
+
+    /// <summary>DOM id of the dashboard's Hierarchy Explorer instance. Deliberately NOT
+    /// <c>sunburst-explorer-data</c>'s id — Story 20.2's island is still live and still read by 20.2's JS block
+    /// until Story 20.7 retires it. [Story 20.5]</summary>
+    internal const string DashboardHierarchyDomId = "dashboard-hierarchy";
+
+    /// <summary>Chart size for the dashboard instance. Owner decision D3 ("Labelled explorer"): a larger radius so
+    /// Plotly's in-sector labels have room. Its accepted cost is competition with Story 20.3's card rail inside
+    /// <c>.explorer-layout</c> — the stacking breakpoint is raised for that panel rather than the labels shrunk.</summary>
+    internal const int DashboardHierarchySize = 560;
 
     /// <summary>Renders the Related-work details rail, or "" when there is nothing to relate. Kept here (not in the
     /// adapter) so every surface renders identical bytes from one path. The relationship half is a pure read of the

@@ -208,6 +208,89 @@ body {
    seams like every other insight entrance: declared in the @media (no-preference) block and explicitly cancelled
    in the @media (reduce) block near the end of this sheet. [Story 20.2, [[motion-token-system]]] */
 
+/* ---- Story 20.5: the Hierarchy Explorer component (ADR 0012) ----
+   ONE component renders every sunburst/treemap in the portal, so this is the ONE place their chrome is styled.
+   Its class family is `.ss-hierarchy*` and deliberately NOT 20.2's `.sb-explorer-*`: Story 20.7 deletes 20.2's
+   markup and CSS wholesale, and a shared class would make that a surgical edit instead of a deletion.
+
+   With JS off NOTHING here is visible except the text twin: the chart host is display:none (reserving a
+   chart-sized blank box for a chart that is never coming would be worse than no box at all), the shape selector
+   and the breadcrumb ship [hidden], and the server-rendered SVG below them is the whole chart. Under ADR 0013 the
+   TEXT TWIN is the no-JS contract — complete, navigable, non-color — so it is never hidden by script. */
+
+/* The host is revealed by the component only on a SUCCESSFUL mount, which sets its height from `config.size`.
+   Height is never a literal here or in the JS: an instance's size travels in its island. */
+.ss-hierarchy { display: none; }
+.ss-hierarchy[data-hierarchy-ready] { display: block; margin: 0 auto; max-width: 100%; }
+
+/* Plotly emits the hatch <path> inside every <pattern> with a `stroke` but NO `fill`, so SVG's initial black
+   paints beneath every hatched sector (21 occurrences measured on the real dashboard). There is no Plotly
+   attribute for this — the pattern element is generated, not configured — so this rule is the only fix, and it
+   took the foreign-color count 1 -> 0. Do not delete it because "the config already sets the colors". [Story 20.4] */
+.ss-hierarchy defs pattern > path { fill: none; }
+
+/* Focus ring on a sector. Plotly's <path>s carry the roving tabindex, so without this a keyboard visitor moving
+   through the chart gets no visible indication of where they are. */
+.ss-hierarchy g.slice path.surface:focus { outline: none; }
+.ss-hierarchy g.slice path.surface:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 1px;
+}
+
+.ss-hierarchy-controls { display: flex; justify-content: center; margin: 0 0 0.6rem; }
+#dashboard-hierarchy-shape-sunburst:checked ~ .board-tabbar label[for="dashboard-hierarchy-shape-sunburst"],
+#dashboard-hierarchy-shape-treemap:checked ~ .board-tabbar label[for="dashboard-hierarchy-shape-treemap"] {
+  background: var(--warm-white);
+  color: var(--ink);
+  box-shadow: 0 1px 3px var(--shadow);
+}
+#dashboard-hierarchy-shape-sunburst:focus-visible ~ .board-tabbar label[for="dashboard-hierarchy-shape-sunburst"],
+#dashboard-hierarchy-shape-treemap:focus-visible ~ .board-tabbar label[for="dashboard-hierarchy-shape-treemap"] {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+
+/* Breadcrumb: the drill scope, and the keyboard/AT route back up. Same visual language as 20.2's `.sb-crumb`
+   (which it will replace at 20.7), scoped to this component's own classes. */
+.ss-hierarchy-drill { margin: 0.4rem 0 0.2rem; }
+.ss-hierarchy-breadcrumb {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  font-size: 0.8rem;
+}
+.ss-hierarchy-breadcrumb li { display: flex; align-items: center; gap: 0.3rem; }
+.ss-hierarchy-breadcrumb li + li::before { content: "\203A"; color: var(--ink-faded); margin-right: 0.05rem; }
+.ss-hierarchy-crumb {
+  background: none;
+  border: 0;
+  color: var(--rust);
+  cursor: pointer;
+  padding: 0.1rem 0.2rem;
+  font: inherit;
+  border-radius: 3px;
+}
+.ss-hierarchy-crumb:hover { text-decoration: underline; }
+.ss-hierarchy-crumb:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.ss-hierarchy-crumb-current { color: var(--ink); font-weight: 600; }
+.ss-hierarchy-crumb-open { font-size: 0.72rem; color: var(--rust); text-decoration: underline; }
+.ss-hierarchy-crumb-open:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
+
+/* The text twin (ADR 0013 §2). Collapsed by default is explicitly acceptable — the contract is AVAILABILITY, not
+   on-screen duplication — and this story keeps the server SVG, so the twin is a second reading rather than the
+   only one. Never styled to hide, and never touched by script. */
+.ss-hierarchy-twin { margin-top: 0.8rem; font-size: 0.8rem; }
+.ss-hierarchy-twin > summary { cursor: pointer; color: var(--ink-light); }
+.ss-hierarchy-twin > summary:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
+.ss-hierarchy-twin-list { list-style: none; margin: 0.35rem 0 0; padding-left: 0.9rem; text-align: left; }
+.ss-hierarchy-twin-list .ss-hierarchy-twin-list { border-left: 1px solid var(--border); padding-left: 0.75rem; }
+.ss-hierarchy-twin-list li { margin: 0.15rem 0; }
+.ss-hierarchy-twin-meta { color: var(--ink-faded); font-size: 0.72rem; }
+
 /* ---- Story 20.3: related-work details rail (a card beside the explorer) ----
    The explorer chart and this rail sit side by side on wide viewports (rail to the RIGHT), stacking on narrow ones.
    Every card is server-rendered; the CSS at the end of this block collapses the JS-off "all cards + expanded
@@ -220,6 +303,15 @@ body {
 }
 @media (max-width: 900px) {
   .explorer-layout { grid-template-columns: 1fr; }
+}
+/* Story 20.5 / owner decision D3, and its accepted cost stated plainly: the "Labelled explorer" wants radius —
+   Plotly hides a label it cannot fit rather than shrinking it to illegibility (`uniformtext.mode: 'hide'`), so a
+   cramped chart does not degrade gracefully, it goes wordless. Below this width the rail therefore stacks BENEATH
+   the chart and the chart takes the full column, rather than the labels being sacrificed to keep the rail beside
+   it. The `-labelled` modifier scopes the raised breakpoint to panels that actually host the component, so a
+   surface still on the 20.2 explorer keeps the original 900px behaviour. */
+@media (max-width: 1100px) {
+  .explorer-layout-labelled { grid-template-columns: 1fr; }
 }
 .related-work-panel { text-align: left; align-self: stretch; }
 

@@ -41,6 +41,17 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
             sb.Append(Toc.ActiveSectionScript);
         }
         sb.Append(PathUtil.RenderFooter(PathUtil.RelativePrefix(page.OutputRelativePath)));
+        // The vendored plotly.js hierarchy engine (Story 20.5 / ADR 0012) rides the SAME chrome-level seam as the
+        // Mermaid init below — appended AFTER the opaque body, never inside it — so the webview's RenderContent and
+        // the SPA family (both of which use page.BodyHtml directly, not this Render output) never carry it. That is
+        // deliberate: WebviewRenderAdapter strips every JSON island, and whether the webview gets the component at
+        // all is Story 20.7's decision to make jointly with the ADR 0005 CSP amendment (owner D4). A local file
+        // reference, never a CDN (NFR-3).
+        if (page.Assets.HierarchyEngineNeeded)
+        {
+            var prefix = PathUtil.RelativePrefix(page.OutputRelativePath);
+            sb.Append($"<script src=\"{prefix}{ForgeOptions.HierarchyEngineScriptName}\"></script>\n");
+        }
         if (page.Assets.MermaidNeeded)
         {
             sb.Append(Mermaid.InitScript());

@@ -162,7 +162,7 @@ public static class HowToReadTemplater
         sb.Append($"<a href=\"{SiteNav.DiagnosticsOutputPath}\">Diagnostics</a>: Source root, ADR location, Output ");
         sb.Append("directory, README included, Deep-git analytics, and External source base. Save them per ");
         sb.Append("repository from the interactive menu's \"Configure paths\", which writes a <code>.specscribe</code> ");
-        sb.Append("file beside your project — one per checkout, so ignore it in version control if you'd rather not ");
+        sb.Append("folder beside your project — one per checkout, so ignore it in version control if you'd rather not ");
         sb.Append("share your local paths. A flag on the command line always wins over a saved value for that one ");
         sb.Append("run, and <code>specscribe generate --show-config</code> prints where each value came from without ");
         sb.Append("generating anything.</p>\n");

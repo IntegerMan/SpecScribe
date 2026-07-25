@@ -447,6 +447,9 @@ public sealed class SiteGenerator
 
             reporter?.BeginPhase(GenerationPhase.Index);
             WriteIndex(nav, workInventory);
+            // Conditional page assets discovered during the index write (Story 20.5's plotly bundle) report here —
+            // before diagnostics is written below, so a copy failure lands on the run's own notice page.
+            events.AddRange(DrainPendingAssetEvents());
             reporter?.EndPhase(GenerationPhase.Index);
 
             // Diagnostics + About are the whole-run reporting surface (Story 4.8): written LAST, after every
@@ -3186,7 +3189,55 @@ public sealed class SiteGenerator
         // related-work pane is a pure read over the already-computed model, never a second projection. [Story 20.3]
         var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, inventory, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts, followUps, unplanned, cadence: _cadence, workGraph: _workGraph, dateCutoff: _today);
         File.WriteAllText(indexPath, ApplyReferenceLinks(html, "index.html"));
+        EnsureHierarchyEngine(html);
     }
+
+    /// <summary>Pending asset-copy events, drained by <c>GenerateAll</c> after the Index phase. A conditional asset
+    /// is discovered mid-page-write, where the surrounding method has no event list of its own; parking the outcome
+    /// here keeps a failure visible on the diagnostics page instead of vanishing into a catch. Incremental/watch
+    /// regeneration paths do not drain it (they surface no phase events either) — the next full run does.</summary>
+    private readonly List<GenerationEvent> _pendingAssetEvents = new();
+
+    private List<GenerationEvent> DrainPendingAssetEvents()
+    {
+        var drained = _pendingAssetEvents.ToList();
+        _pendingAssetEvents.Clear();
+        return drained;
+    }
+
+    /// <summary>Copies the vendored plotly.js hierarchy bundle to the output root — but ONLY once the rendered page
+    /// proves it is needed, exactly as the Prism bundle ships only where in-portal code pages exist, "so a site
+    /// with no code pages stays byte-identical". The gate reads the FINISHED HTML rather than a caller's belief
+    /// about it, so it can never disagree with the page (the same rule <see cref="AssetManifest"/> follows).
+    ///
+    /// <para><b>Unconditional emission is not an option:</b> the bundle is 1.2 MB and would land in every fixture
+    /// and every code-free site. Guarded like every other per-file write — a missing or misconfigured embedded
+    /// resource degrades to a reported error rather than throwing out of the phase (NFR2). Idempotent, so Story
+    /// 20.7's other surfaces can each call it. [Story 20.5]</para></summary>
+    private void EnsureHierarchyEngine(string renderedHtml)
+    {
+        if (!HierarchyExplorer.ContainsHost(renderedHtml)) return;
+        // The flag alone is NOT sufficient, and the difference is a real defect rather than a tidiness point: a
+        // topology change during a watch session triggers a full rebuild that wipes and recreates the output root,
+        // which deletes an asset this generator instance has already "copied". Trusting the flag there leaves the
+        // freshly written index.html pointing at a 1.2 MB script that is no longer on disk — the chart silently
+        // vanishes mid-session and only a hard regenerate brings it back. So the flag is an optimization (skip a
+        // 1.2 MB write on every incremental pass) and the disk is the truth.
+        var dest = Path.Combine(_options.OutputRoot, ForgeOptions.HierarchyEngineScriptName);
+        if (_hierarchyEngineCopied && File.Exists(dest)) return;
+        try
+        {
+            CopyEmbeddedAsset("SpecScribe.assets.plotly-hierarchy.min.js", ForgeOptions.HierarchyEngineScriptName);
+            _hierarchyEngineCopied = true;
+        }
+        catch (Exception ex)
+        {
+            _pendingAssetEvents.Add(new GenerationEvent(
+                GenerationOutcome.Error, ForgeOptions.HierarchyEngineScriptName, TimeSpan.Zero, ex.Message));
+        }
+    }
+
+    private bool _hierarchyEngineCopied;
 
     /// <summary>The projection-side enrichment handed to the adapter (see <see cref="ProgressProjection"/>):
     /// task/story roll-ups plus the git pulse, computed on the freshly ingested epics model. Kept in the

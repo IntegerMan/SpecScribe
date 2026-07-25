@@ -2,63 +2,75 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "plotly-csp-webview",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["spike/plotly/scripts/csp-probe.mjs", "5411", "webview"],
-      "port": 5411
-    },
-    {
-      "name": "plotly-csp-unsafe-eval",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["spike/plotly/scripts/csp-probe.mjs", "5414", "unsafe-eval"],
-      "port": 5414
-    },
-    {
-      "name": "plotly-csp-off",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["spike/plotly/scripts/csp-probe.mjs", "5412", "off"],
-      "port": 5412
-    },
-    {
-      "name": "plotly-csp-no-inline-style",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["spike/plotly/scripts/csp-probe.mjs", "5413", "no-inline-style"],
-      "port": 5413
-    },
-    {
       "name": "specscribe-output",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8099", "--directory", "SpecScribeOutput"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8099",
+        "--directory",
+        "SpecScribeOutput"
+      ],
       "port": 8099
     },
     {
       "name": "related-work-20-3",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8094", "--directory", "SpecScribeOutput"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8094",
+        "--directory",
+        "SpecScribeOutput"
+      ],
       "port": 8094
     },
     {
       "name": "specscribe-output-review",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8097", "--directory", "SpecScribeOutput"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8097",
+        "--directory",
+        "SpecScribeOutput"
+      ],
       "port": 8097
     },
     {
       "name": "nib-preview",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8096", "--directory", "C:/Users/MattE/AppData/Local/Temp/claude/C--Dev-SpecScribe/cb469376-9b78-4b47-a655-84bc140bdd65/scratchpad/site-preview"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8096",
+        "--directory",
+        "C:/Users/MattE/AppData/Local/Temp/claude/C--Dev-SpecScribe/cb469376-9b78-4b47-a655-84bc140bdd65/scratchpad/site-preview"
+      ],
       "port": 8096
     },
     {
       "name": "spa-review-20-2",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8095", "--directory", "C:/Users/MattE/AppData/Local/Temp/claude/C--Dev-SpecScribe/0259e3d9-1ab5-42ae-8c46-02518e066277/scratchpad/spa-site"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8095",
+        "--directory",
+        "C:/Users/MattE/AppData/Local/Temp/claude/C--Dev-SpecScribe/0259e3d9-1ab5-42ae-8c46-02518e066277/scratchpad/spa-site"
+      ],
       "port": 8095
     },
     {
       "name": "verify-site",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8098", "--directory", "C:/Users/MattE/AppData/Local/Temp/claude/C--Dev-SpecScribe/87c0719e-0306-427a-84f0-695619c89683/scratchpad/verify-site"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8098",
+        "--directory",
+        "C:/Users/MattE/AppData/Local/Temp/claude/C--Dev-SpecScribe/87c0719e-0306-427a-84f0-695619c89683/scratchpad/verify-site"
+      ],
       "port": 8098
     }
   ]

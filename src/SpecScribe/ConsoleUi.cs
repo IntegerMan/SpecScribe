@@ -116,9 +116,18 @@ public static class ConsoleUi
     /// neither substitutes for the other. [Story 5.2 AC #2]</summary>
     public static void PrintConfigDiagnostics(ResolvedConfig resolved)
     {
-        foreach (var line in SettingsResolver.FormatConfigLines(resolved))
+        try
         {
-            Console.Out.WriteLine(line);
+            foreach (var line in SettingsResolver.FormatConfigLines(resolved))
+            {
+                Console.Out.WriteLine(line);
+            }
+        }
+        catch (IOException)
+        {
+            // Downstream reader gone (e.g. `specscribe generate --show-config | head`) — the run itself already
+            // succeeded, so this must not surface as a fatal error. Same guard, same reason, as PrintMachineSummary.
+            // [Review][Patch]
         }
     }
 

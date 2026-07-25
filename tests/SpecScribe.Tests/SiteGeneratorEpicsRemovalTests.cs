@@ -304,7 +304,14 @@ public class SiteGeneratorEpicsRemovalTests : IDisposable
 
         var converged = RelativeFileSet(Site);
         var expected = RelativeFileSet(truthRoot);
-        Assert.Equal(expected, converged);
+        // Report the symmetric difference by name. xUnit's set-differs message truncates both sides after a few
+        // entries, which on a ~40-file portal tells you nothing about WHICH file diverged. [Story 20.5]
+        var onlyConverged = converged.Except(expected, StringComparer.OrdinalIgnoreCase).ToList();
+        var onlyTruth = expected.Except(converged, StringComparer.OrdinalIgnoreCase).ToList();
+        Assert.True(onlyConverged.Count == 0 && onlyTruth.Count == 0,
+            $"Converged output diverged from a from-scratch run.\n"
+            + $"  only in the concurrent run: {string.Join(", ", onlyConverged)}\n"
+            + $"  only in the from-scratch run: {string.Join(", ", onlyTruth)}");
     }
 
     private static SortedSet<string> RelativeFileSet(string root) =>

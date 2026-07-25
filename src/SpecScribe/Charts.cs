@@ -33,6 +33,11 @@ public static partial class Charts
         /// <summary>Planning ↔ code impact: which code areas an epic's/story's commits actually touched, correlated
         /// best-effort from commit-message and merge-branch naming (Story 21.3).</summary>
         PlanningCodeImpact,
+        /// <summary>Work hierarchy: the shape of the plan itself — epics, their stories, and the follow-up work
+        /// hanging off both, each sized by how much work it represents. The Hierarchy Explorer's framing, so the
+        /// component inherits the Story 10.2 standard by construction instead of a call site typing a sentence
+        /// (Story 20.5).</summary>
+        WorkHierarchy,
     }
 
     /// <summary>The standard metadata every framed chart carries. Slots are optional so a chart uses only what
@@ -67,6 +72,8 @@ public static partial class Charts
             "How often stories reach done reveals the project's real delivery rhythm — steady drips and bursts both tell you something commit activity alone doesn't.",
         ChartMetric.PlanningCodeImpact =>
             "Seeing which code areas an epic's commits actually touched turns “what did this work change” from a guess into a fact — even a best-effort one.",
+        ChartMetric.WorkHierarchy =>
+            "Sizing each epic and story by the work it actually holds shows where the plan’s weight really sits — which is rarely where the story count suggests.",
         _ => throw new ArgumentOutOfRangeException(nameof(metric), metric, null),
     };
 
@@ -150,10 +157,15 @@ public static partial class Charts
     /// <summary>Wraps a chart body in the standard panel scaffold so title/window/ranking/note/why are
     /// metadata-consistent by construction. Optional slots omit their element entirely when null/empty. [Story
     /// 10.2 AC2; Note slot: Story 10.6]</summary>
-    public static string Framed(ChartMeta meta, string body, string panelClass = "chart-panel")
+    /// <param name="panelAttributes">Extra attributes for the panel element, already serialized and starting with
+    /// a space (e.g. <c> data-explorer</c>). Added for Story 20.5: the Hierarchy Explorer's framed panel IS the
+    /// dashboard's chart panel, and that panel carries the opt-in hooks the client blocks key on — so the
+    /// alternative was a call site hand-writing the frame, which is the thing this helper exists to prevent.
+    /// Defaults to nothing, so every existing caller's bytes are unchanged.</param>
+    public static string Framed(ChartMeta meta, string body, string panelClass = "chart-panel", string panelAttributes = "")
     {
         var sb = new StringBuilder();
-        sb.Append($"<div class=\"{Html(panelClass)}\">\n");
+        sb.Append($"<div class=\"{Html(panelClass)}\"{panelAttributes}>\n");
         sb.Append("  <div class=\"chart-frame-head\">\n");
         sb.Append($"    <h3>{Html(meta.Title)}</h3>\n");
         var window = FrameWindowSlot(meta.Window);
@@ -923,6 +935,22 @@ public static partial class Charts
     private static double InsetEnd(double angle, double sweep, double pad) =>
         angle + sweep - Math.Min(pad, Math.Max(0, sweep) / 2);
 
+    /// <summary>Prose label for the four CHART-LOCAL sunburst statuses — the ones with no lifecycle
+    /// <c>--status-*</c> token and therefore no <see cref="StatusStyles.EpicLabel"/>/<see cref="StatusStyles.StoryLabel"/>
+    /// entry. Returns null for anything else, so a caller falls through to the <see cref="StatusStyles"/> vocabulary
+    /// rather than inventing a second phrasing for a lifecycle stage.
+    /// <para>This is the ONE source: the sunburst legend below and the Story 20.5 Hierarchy Explorer's accessible
+    /// names + text twin all read it. Story 20.3's live-browser round caught exactly this class of drift ("EpicEpic 19"),
+    /// so a chart and its own legend disagreeing about what a colour means is a defect, not a nicety. [Story 20.5]</para></summary>
+    public static string? SunburstLocalStatusLabel(string cssClass) => cssClass switch
+    {
+        "noplan" => "No task plan",
+        "followup-open" => "Open follow-up",
+        "followup-done" => "Done follow-up",
+        "unplanned" => "Direct change",
+        _ => null,
+    };
+
     private static (string Status, string Label)[] BuildSunburstLegendItems(
         bool hasFollowUps, bool hasUnplanned = false, bool hasNoPlan = false)
     {
@@ -931,15 +959,16 @@ public static partial class Charts
             ("pending", "Pending"), ("drafted", "Drafted"), ("ready", "Ready for dev"),
             ("active", "In development"), ("review", "In review"), ("done", "Done"),
         };
+        // The four chart-local swatches take their wording from the shared map above, never a second literal.
         if (hasNoPlan)
-            items.Add(("noplan", "No task plan"));
+            items.Add(("noplan", SunburstLocalStatusLabel("noplan")!));
         if (hasFollowUps)
         {
-            items.Add(("followup-open", "Open follow-up"));
-            items.Add(("followup-done", "Done follow-up"));
+            items.Add(("followup-open", SunburstLocalStatusLabel("followup-open")!));
+            items.Add(("followup-done", SunburstLocalStatusLabel("followup-done")!));
         }
         if (hasUnplanned)
-            items.Add(("unplanned", "Direct change"));
+            items.Add(("unplanned", SunburstLocalStatusLabel("unplanned")!));
         return items.ToArray();
     }
 

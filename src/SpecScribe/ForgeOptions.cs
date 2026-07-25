@@ -70,6 +70,14 @@ public sealed class ForgeOptions
     public const string CodeHighlightScriptName = "prism.js";
     public const string CodeHighlightStyleName = "prism.css";
 
+    /// <summary>The vendored plotly.js custom bundle (Story 20.5) that renders the Hierarchy Explorer's sunburst
+    /// and treemap. An embedded resource like the ones above, copied to the output root ONLY when the site
+    /// rendered at least one hierarchy chart. <b>Never a CDN URL</b> — ADR 0012 §1 / NFR-3: the portal must render
+    /// offline, from <c>file://</c>, and under the webview's CSP. Built by hand from a pinned v3.7.0 clone; see
+    /// <c>tools/plotly-vendor/README.md</c>. With JS unavailable the component's server-rendered text twin is the
+    /// whole contract (ADR 0013).</summary>
+    public const string HierarchyEngineScriptName = "plotly-hierarchy.min.js";
+
     public const string DefaultSiteTitle = "BMad Live Docs";
     public const string SourceDirName = "_bmad-output";
 

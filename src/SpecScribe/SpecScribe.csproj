@@ -61,6 +61,10 @@
          to the output root ONLY when in-portal code pages are generated, so sites without code pages stay identical. -->
     <EmbeddedResource Include="assets\prism.js" />
     <EmbeddedResource Include="assets\prism.css" />
+    <!-- Vendored plotly.js hierarchy bundle (Story 20.5 / ADR 0012): the Hierarchy Explorer's chart engine. Built
+         by hand from a pinned clone (see tools/plotly-vendor) and copied to the output root ONLY when the site
+         rendered at least one hierarchy chart, so a site without one stays identical. Never a CDN (NFR-3). -->
+    <EmbeddedResource Include="assets\plotly-hierarchy.min.js" />
     <!-- JSON+SPA delivery client (Story 6.7): copied to the output root ONLY when the SPA flag is passed. Off by
          default, so it never lands in a normal generate and the static site stays byte-identical. -->
     <EmbeddedResource Include="assets\specscribe-spa.js" />

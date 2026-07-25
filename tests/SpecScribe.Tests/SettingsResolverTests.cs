@@ -183,6 +183,22 @@ public class SettingsResolverTests : IDisposable
         Assert.Equal(ConfigSource.Default, OriginOf(resolved, SettingsResolver.Fields.Readme));
     }
 
+    /// <summary>The remaining leaf of the README provenance matrix: an explicit persisted "include" (a hand-edited
+    /// `.specscribe`, since <see cref="SettingsStore.Capture"/> never writes `true`) with no CLI override must still
+    /// attribute to SavedSettings, not Default — only the "excluded" and "excluded + CLI override" cases were
+    /// covered before. [Review][Patch]</summary>
+    [Fact]
+    public void Resolve_AttributesAnExplicitPersistedReadmeInclusionToSavedSettings()
+    {
+        var repo = NewRepo();
+        WriteSettings(repo, """{ "IncludeReadme": true }""");
+
+        var resolved = SettingsResolver.Resolve(new SiteSettings(), repo);
+
+        Assert.True(resolved.Options.IncludeReadme);
+        Assert.Equal(ConfigSource.SavedSettings, OriginOf(resolved, SettingsResolver.Fields.Readme));
+    }
+
     [Fact]
     public void Resolve_RestoresAndAttributesAPersistedDeepGitOptIn()
     {
@@ -354,6 +370,24 @@ public class SettingsResolverTests : IDisposable
         Assert.Equal(Path.Combine(repo, ForgeOptions.OutputDirName), value);
     }
 
+    /// <summary>An embedded newline in a field's value (reachable via a hand-edited `.specscribe`) must not split
+    /// that field across extra, unprefixed lines — it would break the one-line-per-field contract CI scripts rely
+    /// on. [Review][Patch]</summary>
+    [Fact]
+    public void FormatConfigLines_EscapesAnEmbeddedNewlineInAValue()
+    {
+        var repo = NewRepo();
+        WriteSettings(repo, $$"""{ "ProjectName": {{Json("Line One\nLine Two\r\nLine Three")}} }""");
+
+        var lines = SettingsResolver.FormatConfigLines(SettingsResolver.Resolve(new SiteSettings(), repo));
+
+        var projectLines = lines.Where(l => l.StartsWith($"{SettingsResolver.LinePrefix} field=project ", StringComparison.Ordinal)).ToList();
+        var single = Assert.Single(projectLines);
+        Assert.DoesNotContain('\n', single);
+        Assert.DoesNotContain('\r', single);
+        Assert.Contains("Line One\\nLine Two\\nLine Three", single, StringComparison.Ordinal);
+    }
+
     /// <summary>The origin tokens are a published contract for CI scripts — pinned so an enum rename cannot change
     /// them silently.</summary>
     [Fact]
@@ -377,4 +411,24 @@ public class SettingsResolverTests : IDisposable
 
     /// <summary>JSON-encodes a path so Windows backslashes survive into the settings-file fixtures.</summary>
     private static string Json(string value) => System.Text.Json.JsonSerializer.Serialize(value);
+
+    // --- ADR 0014: resolution works the same through the folder-form settings location ---
+
+    /// <summary>End-to-end smoke test that the resolver — not just <see cref="SettingsStore"/> in isolation — reads
+    /// the current <c>.specscribe/config.json</c> folder form correctly (the rest of this suite's fixtures use the
+    /// legacy flat-file form on purpose, to keep exercising that read path).</summary>
+    [Fact]
+    public void Resolve_ReadsSavedSettingsFromTheFolderForm()
+    {
+        var repo = NewRepo();
+        var folder = Directory.CreateDirectory(Path.Combine(repo, SettingsStore.FileName)).FullName;
+        File.WriteAllText(
+            Path.Combine(folder, SettingsStore.ConfigFileName),
+            $$"""{ "ProjectName": "Saved" }""");
+
+        var resolved = SettingsResolver.Resolve(new SiteSettings(), repo);
+
+        Assert.Equal("Saved", resolved.Options.SiteTitle);
+        Assert.Equal(ConfigSource.SavedSettings, OriginOf(resolved, SettingsResolver.Fields.Project));
+    }
 }

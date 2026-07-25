@@ -41,12 +41,23 @@ public sealed class SavedSettings
         && DeepGit is null && CodeUrl is null && IncludeReadme is null && TodayPolicy is null;
 }
 
-/// <summary>Reads and writes the optional <c>.specscribe</c> settings file in the current directory. Persistence
-/// is best-effort: a missing or malformed file is treated as "no saved settings" rather than an error, since the
-/// interactive menu can always rediscover or re-enter paths.</summary>
+/// <summary>Reads and writes the optional <c>.specscribe</c> settings folder in the current directory. Persistence
+/// is best-effort: a missing or malformed settings file is treated as "no saved settings" rather than an error,
+/// since the interactive menu can always rediscover or re-enter paths.
+/// <para><c>.specscribe</c> is a FOLDER containing <see cref="ConfigFileName"/>, not a flat file — a container
+/// rather than a single document leaves room for future per-directory state (e.g. incremental-build caches, run
+/// history) to live alongside the config without a second dotfile or a breaking format change. [ADR 0014]
+/// A pre-existing flat-file <c>.specscribe</c> (written by any version before this) is still read directly — see
+/// <see cref="ReadConfigJson"/> — and is transparently migrated to the folder form the next time settings are
+/// saved from it; see <see cref="TrySave"/>.</para></summary>
 public static class SettingsStore
 {
+    /// <summary>The settings folder name — same name a pre-migration flat file used, so an existing entry in
+    /// <c>.gitignore</c> (which matches a file OR a folder of the same name) needs no change.</summary>
     public const string FileName = ".specscribe";
+
+    /// <summary>The config document inside the <see cref="FileName"/> folder.</summary>
+    public const string ConfigFileName = "config.json";
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -60,7 +71,7 @@ public static class SettingsStore
 
     /// <summary>The nearest existing <c>.specscribe</c> at or above <paramref name="startDirectory"/> (defaulting to
     /// the current working directory), or null when there is none. A git-style walk-up rather than raw-cwd anchoring:
-    /// a run started in a subdirectory must still see the settings file at the repo root, otherwise "directory-scoped"
+    /// a run started in a subdirectory must still see the settings folder at the repo root, otherwise "directory-scoped"
     /// silently means "cwd-scoped" and the same repo behaves differently depending on where you stood.
     /// <para>Deliberately independent of <see cref="ForgeOptions"/>'s <c>_bmad-output</c> walk-up: a saved
     /// <c>--source</c> can itself relocate the repo root, so anchoring the settings file at the discovered root would
@@ -73,7 +84,8 @@ public static class SettingsStore
             while (dir is not null)
             {
                 var candidate = Path.Combine(dir.FullName, FileName);
-                if (File.Exists(candidate)) return candidate;
+                // Either form counts as "found": the current folder format, or a not-yet-migrated flat file.
+                if (Directory.Exists(candidate) || File.Exists(candidate)) return candidate;
                 dir = dir.Parent;
             }
         }
@@ -85,22 +97,67 @@ public static class SettingsStore
         return null;
     }
 
-    /// <summary>Absolute path to the settings file governing <paramref name="startDirectory"/> (defaulting to the
-    /// current working directory): the nearest existing file up-tree, or — when none exists yet — the path a first
-    /// save would create in the start directory itself. Read and write therefore address the same file, so
-    /// configuring from a subdirectory updates the settings that subdirectory actually reads.</summary>
+    /// <summary>Absolute path to the settings folder governing <paramref name="startDirectory"/> (defaulting to the
+    /// current working directory): the nearest existing <c>.specscribe</c> up-tree, or — when none exists yet — the
+    /// path a first save would create in the start directory itself. Read and write therefore address the same
+    /// location, so configuring from a subdirectory updates the settings that subdirectory actually reads.</summary>
     public static string ResolvePath(string? startDirectory = null)
         => FindExisting(startDirectory) ?? Path.Combine(startDirectory ?? Directory.GetCurrentDirectory(), FileName);
 
-    /// <summary>Loads saved settings, or returns null when the file is absent, empty, or unreadable/malformed.</summary>
-    public static SavedSettings? TryLoad(string? startDirectory = null)
+    /// <summary>Loads saved settings, or returns null when no candidate up-tree exists, is empty, or every
+    /// candidate is unreadable/malformed.</summary>
+    public static SavedSettings? TryLoad(string? startDirectory = null) => TryLoad(startDirectory, out _);
+
+    /// <summary>Like <see cref="TryLoad(string?)"/>, but also reports <paramref name="loadedFrom"/> — the exact
+    /// location the settings came from, or null when nothing was loaded. Walks up from
+    /// <paramref name="startDirectory"/> exactly once (unlike a separate <see cref="FindExisting"/> +
+    /// <see cref="ReadConfigJson"/> pair, which would re-walk the same chain twice) and, unlike a single-shot
+    /// nearest-only read, a malformed or unreadable candidate does NOT end the search: the walk continues to the
+    /// next ancestor, so a broken subdirectory <c>.specscribe</c> cannot silently shadow a valid one further up.
+    /// [Review][Patch]</summary>
+    public static SavedSettings? TryLoad(string? startDirectory, out string? loadedFrom)
     {
-        var path = ResolvePath(startDirectory);
+        loadedFrom = null;
         try
         {
-            if (!File.Exists(path)) return null;
+            var dir = new DirectoryInfo(startDirectory ?? Directory.GetCurrentDirectory());
+            while (dir is not null)
+            {
+                var candidate = Path.Combine(dir.FullName, FileName);
+                if (Directory.Exists(candidate) || File.Exists(candidate))
+                {
+                    var saved = TryReadCandidate(candidate);
+                    if (saved is not null)
+                    {
+                        loadedFrom = candidate;
+                        return saved;
+                    }
+                }
 
-            var json = MarkdownConverter.ReadAllTextShared(path);
+                dir = dir.Parent;
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            // Best-effort discovery: an unreadable directory in the chain ends the walk with "no saved settings",
+            // never a crash (NFR2).
+        }
+
+        return null;
+    }
+
+    /// <summary>Reads and deserializes the config document at <paramref name="location"/> (a candidate from the
+    /// <see cref="TryLoad(string?, out string?)"/> walk-up), transparently supporting both the current folder form
+    /// (<c>location/config.json</c>) and a not-yet-migrated flat file at <paramref name="location"/> itself. Null
+    /// when the location has nothing, is empty, or fails to parse — the caller keeps walking rather than treating
+    /// this as fatal. [ADR 0014] [Review][Patch]</summary>
+    private static SavedSettings? TryReadCandidate(string location)
+    {
+        try
+        {
+            var json = ReadConfigJson(location);
+            if (json is null) return null;
+
             var saved = JsonSerializer.Deserialize<SavedSettings>(json, SerializerOptions);
             return saved is null or { IsEmpty: true } ? null : saved;
         }
@@ -108,6 +165,20 @@ public static class SettingsStore
         {
             return null;
         }
+    }
+
+    /// <summary>Reads the raw config text at <paramref name="location"/>, transparently supporting both the current
+    /// folder form (<c>location/config.json</c>) and a not-yet-migrated flat file at <paramref name="location"/>
+    /// itself. Null when neither exists. [ADR 0014]</summary>
+    private static string? ReadConfigJson(string location)
+    {
+        if (Directory.Exists(location))
+        {
+            var configPath = Path.Combine(location, ConfigFileName);
+            return File.Exists(configPath) ? MarkdownConverter.ReadAllTextShared(configPath) : null;
+        }
+
+        return File.Exists(location) ? MarkdownConverter.ReadAllTextShared(location) : null;
     }
 
     /// <summary>Projects the live settings into the persisted shape, without writing anything. Split out of
@@ -145,10 +216,12 @@ public static class SettingsStore
             ? policy
             : null;
 
-    /// <summary>Writes the configured path/name choices to <c>.specscribe</c>. Returns the file path on success,
-    /// or null when there was nothing worth saving or the write failed. Targets the same file
-    /// <see cref="TryLoad"/> would read (the nearest one up-tree, or a new one in the start directory), so a
-    /// configure-then-run round trip is symmetric from any depth. [Story 5.2 AC #1]</summary>
+    /// <summary>Writes the configured path/name choices to the <c>.specscribe</c> folder's <see cref="ConfigFileName"/>.
+    /// Returns the folder path on success, or null when there was nothing worth saving or the write failed. Targets
+    /// the same location <see cref="TryLoad"/> would read (the nearest one up-tree, or a new one in the start
+    /// directory), so a configure-then-run round trip is symmetric from any depth. [Story 5.2 AC #1]
+    /// <para>A not-yet-migrated flat file at that location is replaced by the folder form: the old file is removed
+    /// and a fresh <c>.specscribe/config.json</c> is written in its place. [ADR 0014]</para></summary>
     public static string? TrySave(SiteSettings settings, string? startDirectory = null)
     {
         var saved = Capture(settings);
@@ -158,7 +231,11 @@ public static class SettingsStore
         var path = ResolvePath(startDirectory);
         try
         {
-            File.WriteAllText(path, JsonSerializer.Serialize(saved, SerializerOptions));
+            // Migrate: a legacy flat file and the new folder can't coexist under the same name.
+            if (File.Exists(path)) File.Delete(path);
+
+            Directory.CreateDirectory(path);
+            File.WriteAllText(Path.Combine(path, ConfigFileName), JsonSerializer.Serialize(saved, SerializerOptions));
             return path;
         }
         catch (IOException)

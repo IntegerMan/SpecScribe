@@ -178,6 +178,51 @@ public class SiteGeneratorSpaTests : IDisposable
         // The island is INSIDE the captured <main> region (not stranded before it).
         var mainStart = spaIndex.IndexOf("<main id=\"main-content\"", StringComparison.Ordinal);
         Assert.True(mainStart >= 0 && spaIndex.IndexOf("id=\"sunburst-explorer-data\"", StringComparison.Ordinal) > mainStart);
+
+        // Story 20.5: the Hierarchy Explorer's own island and its TEXT TWIN ride the same capture. The twin
+        // matters more than the island here — under ADR 0013 it is the no-JS contract, and an SPA visitor whose
+        // scripting is blocked mid-session must get the same server-rendered truth as a static-site one.
+        // SAME SCOPE CAVEAT as above: this pins markup surviving the capture, never live SPA re-enhancement.
+        foreach (var html in new[] { staticIndex, spaIndex })
+        {
+            Assert.Contains("class=\"ss-hierarchy-data\"", html);
+            Assert.Contains("<details class=\"ss-hierarchy-twin\"", html);
+            Assert.Contains("data-hierarchy", html);
+        }
+        Assert.True(spaIndex.IndexOf("class=\"ss-hierarchy-data\"", StringComparison.Ordinal) > mainStart);
+        Assert.True(spaIndex.IndexOf("<details class=\"ss-hierarchy-twin\"", StringComparison.Ordinal) > mainStart);
+    }
+
+    [Fact]
+    public void HierarchyEngineBundle_ShipsOnlyWhereAHierarchyChartWasRendered()
+    {
+        // The vendored plotly bundle is 1.2 MB. It must land in the output ONLY because a page actually hosts a
+        // hierarchy chart — the same discipline that keeps prism.js off a site with no code pages — and the
+        // <script> tag must appear on exactly that page and nowhere else. Unconditional emission would put it into
+        // every fixture and every code-free site.
+        GeneratedSite();
+
+        var bundle = Path.Combine(Site, ForgeOptions.HierarchyEngineScriptName);
+        var index = File.ReadAllText(Path.Combine(Site, "index.html"));
+        var hostsChart = index.Contains("data-hierarchy", StringComparison.Ordinal);
+
+        Assert.Equal(hostsChart, File.Exists(bundle));
+
+        var tag = $"{ForgeOptions.HierarchyEngineScriptName}\"></script>";
+        var pagesWithTag = Directory.EnumerateFiles(Site, "*.html", SearchOption.AllDirectories)
+            .Where(p => File.ReadAllText(p).Contains(tag, StringComparison.Ordinal))
+            .Select(p => PathUtil.NormalizeSlashes(Path.GetRelativePath(Site, p)))
+            .ToList();
+
+        if (hostsChart)
+        {
+            // Exactly one mount in this story (owner decision D1); Story 20.7 converts the other six call sites.
+            Assert.Equal(new[] { "index.html" }, pagesWithTag);
+        }
+        else
+        {
+            Assert.Empty(pagesWithTag);
+        }
     }
 
     [Fact]

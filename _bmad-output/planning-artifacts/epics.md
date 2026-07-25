@@ -3345,6 +3345,36 @@ So that ADR 0013's no-JS contract is proven rather than assumed, and chart regre
 **Then** the replacement assertions cover what is now server-rendered — the embedded payload, the component configuration, and the text twin — and land in this story, before the first SVG retirement
 **And** the regenerated fingerprint is confirmed stable across two repeated runs before being locked in, naming whose concurrent changes it sits on top of (CLAUDE.md § Concurrent work).
 
+<!-- 2026-07-25 (create-story 20.6): four owner decisions elicited and locked. They constrain HOW the ACs above
+     are met; they do not amend them. Recorded here as well as in the story file because two are visible product
+     choices, not implementation detail. (D1) TWIN SHAPE = HYBRID — Story 20.5's HierarchyExplorer.TextTwinHtml is
+     THE standard twin and is adopted per-surface as 20.7 converts, but Code Map's per-variant file table and the
+     Impact Map's `<details open>` epic-grouped list are AUDITED AND KEPT: both are richer than the generic nested
+     list (per-file git metrics; epic grouping), and replacing them would re-litigate two shipped reviewed designs.
+     (D2) FIX SCOPE = audit all seven, fix ONE — this story fixes dashboard+epics only; the other five are recorded
+     as FAILING and KEEP THEIR SVG, which is AC#1's own escape valve ("or keeps its server-rendered SVG until it
+     is"). 20.7 fixes each twin as it converts that surface. A recorded FAIL is a deliverable here, not a defect.
+     (D3) TWIN VISIBILITY = collapsed `<details>`, closed by default — matches what 20.5 already emits and ADR 0013
+     §2 ("visually collapsed is explicitly acceptable — availability, not on-screen duplication"). (D4) DASHBOARD =
+     KEEP BOTH — Charts.SunburstCompanionList stays visible and unchanged (it is a designed navigation panel, not
+     an accessibility artifact) while the component twin goes `sr-only` there. This ANSWERS Story 20.5's Open
+     Question #4, which explicitly deferred the decision to this story. D3 and D4 together require a new
+     twin-presentation setting on HierarchyExplorerConfig, which does not exist yet.
+     PRE-AUDIT FINDINGS (code-verified 2026-07-25, hypotheses for the live JS-off audit to confirm): the seven
+     surfaces split roughly PASS/FAIL as Code Map + Impact Map probable-PASS, dashboard/epics PARTIAL, and epic
+     detail + story detail + Git Insights FAIL. Two are load-bearing. (a) SunburstCompanionList can NEVER be the
+     dashboard's twin: it is epic-level only — the sunburst's story ring and follow-up ring exist only inside the
+     chart — and Charts.cs:668 deliberately OMITS any done epic with zero open follow-ups, a fact the chart draws
+     and the grid does not state. That is what makes D4 correct rather than a compromise. (b) Git Insights has NO
+     twin at all: Story 7.11 deleted both the files-and-contributors master-detail table AND the ranked ownership
+     table, leaving only an aggregate aria-label sentence, while GitInsightsTemplater.cs:14-17 still states the
+     page's no-JS contract as ADR 0010 §2's "a real, useful default-mode chart renders with JS off" — the exact
+     clause ADR 0013 §4 SUPERSEDES. That surface's entire no-JS story rests on the SVG 20.7 wants to delete.
+     ALSO CLOSED: this ADR-0013 Context names "the ownership and FRESHNESS views" as separate surfaces; verified
+     that freshness is a COLORIZE DIMENSION of the Code Map (CodeMapTemplater.cs:204-205), not an eighth chart.
+     The verified inventory is seven surfaces — note that Code Map renders FOUR filter variants, so code-map.html
+     actually carries 8 charts and 4 tables through 20.7's conversion. -->
+
 ### Story 20.7: Site-Wide Rollout — Every Sunburst and Treemap Through the Component
 
 As a maintainer eliminating the drift ADR 0010 §6 could not prevent,
@@ -3992,6 +4022,19 @@ So that code-quality regressions surface automatically instead of being discover
 **Given** test coverage improves finding quality
 **When** the analysis runs
 **Then** the story records an explicit decision on coverage collection — collector, report format, upload path, and the measured effect on suite runtime for a ~2,350-test suite — either implementing it or recording why it is deferred, never leaving it unstated.
+
+4.
+**Given** the ~2,350-test suite has never executed outside the maintainer's Windows machine, and `GoldenContentFingerprint` is a byte-exact SHA-256 over all generated output
+**When** the workflow first runs green
+**Then** the story records which runner OS was chosen, the evidence for it (a full-suite pass with pass/fail/skip counts), and — if a non-Windows runner was attempted — every test that behaved differently there
+**And** any test changed to make CI pass is listed individually with its root cause, so a portability bug is never disguised as a CI tweak; regenerating `GoldenContentFingerprint` to make CI green is not an available remedy.
+
+<!-- AC #4 added 2026-07-25 (create-story 25.1). The three original ACs assumed the suite runs anywhere; it never
+     has. This repository has no `.gitattributes`, so a Windows and a Linux checkout of the same commit genuinely
+     differ in line endings, and the fingerprint constant was generated on Windows. Left implicit, the cheapest
+     way to a green first CI run would have been to regenerate the fingerprint — converting a real portability
+     finding into a silent maintenance edit on the exact constant CLAUDE.md § Verification warns about. This AC
+     also bounds the story's only sanctioned reason to touch `tests/**`; `src/**` stays out of scope entirely. -->
 
 ### Story 25.2: Quality Gate and Findings Triage into the Project Backlog
 

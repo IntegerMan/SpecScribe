@@ -213,6 +213,11 @@ public class SiteGeneratorAdapterTests : IDisposable
             "cadence.html",
             "implementation-artifacts/epic-1-retro-2026-07-06.html",
             "index.html",
+            // Story 20.5: the vendored plotly.js hierarchy engine. Present because this fixture HAS epics, so its
+            // dashboard hosts a Hierarchy Explorer — the conditional-emission guard is what keeps it out of a
+            // fixture without one (SiteGeneratorSpaTests.HierarchyEngineBundle_ShipsOnlyWhereAHierarchyChartWasRendered
+            // pins both directions).
+            "plotly-hierarchy.min.js",
             "requirements.html",
             "requirements/fr1.html",
             "requirements/nfr1.html",
@@ -981,7 +986,25 @@ public class SiteGeneratorAdapterTests : IDisposable
         // though the fixture renders no related-work rail. Verified stable across two repeated runs.
         // PROVENANCE (shared main): captured on a tree carrying only this story's own patch-round files.
         // [Story 20.3 code review; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
-        const string expected = "9288bf5595ffa883edb21eef021e86caaf5c6a2a06a30f23ca1a99ddb7343836";
+        // Regenerated for Story 20.5 (the Hierarchy Explorer component, 2026-07-25). Four distinct movers, all
+        // expected: the fixture has epics, so its dashboard panel is now the component's framed block (Story 10.2
+        // framing head replacing the bespoke `chart-panel-header-row`, plus the shape selector, breadcrumb, chart
+        // host and live region) and it GAINS the JSON island, the server-rendered text twin, and a
+        // `plotly-hierarchy.min.js` script tag; the output tree gains the vendored bundle itself; and both embedded
+        // assets moved (`specscribe.css` gained the `.ss-hierarchy*` family, `specscribe.js` gained the component).
+        // The retained Charts.Sunburst SVG and Story 20.2's island are byte-identical inside the new panel — owner
+        // decision D1 retires nothing here.
+        // NOTE for Story 20.6: the vendored bundle no longer enters this hash as CONTENT. FingerprintTree used to
+        // File.ReadAllText every emitted file, which would have pushed 1.2 MB of minified JavaScript through
+        // NormalizeVolatile's markup-shaped regexes; it now folds a vendored asset to a name/length/sha256 identity
+        // token instead (see IsVendoredAsset). The asset is still pinned — a re-vendored bundle flips the hash —
+        // without a minifier's output being pattern-matched by rules written for rendered HTML.
+        // PROVENANCE (shared main): captured on a tree that ALSO carries another session's staged Story 5.2 /
+        // ADR 0014 settings-folder work (`SettingsStore.cs`, `HowToReadTemplater.cs`, `docs/adrs/0014-*`). Those
+        // touch rendered output, so this constant sits on top of them, not only on this story's files. Verified
+        // stable across two repeated runs.
+        // [Story 20.5; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
+        const string expected = "9dad8c5b53148d883296fc68168635e565e8090db5284282a88060a5a3f844d2";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
@@ -1015,10 +1038,33 @@ public class SiteGeneratorAdapterTests : IDisposable
             .Select(p => PathUtil.NormalizeSlashes(Path.GetRelativePath(root, p)))
             .OrderBy(p => p, StringComparer.Ordinal))
         {
+            var full = Path.Combine(root, rel);
             sb.Append(FoldToday(rel)).Append('\n')
-              .Append(NormalizeVolatile(File.ReadAllText(Path.Combine(root, rel)))).Append("\n \n");
+              .Append(IsVendoredAsset(rel) ? VendoredAssetToken(full) : NormalizeVolatile(File.ReadAllText(full)))
+              .Append("\n \n");
         }
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString()))).ToLowerInvariant();
+    }
+
+    /// <summary>Third-party bundles SpecScribe vendors verbatim and never renders. Story 20.5's plotly bundle is
+    /// 1.2 MB of minified JavaScript, and folding it in whole was a bad trade twice over: every run pushed it
+    /// through <see cref="NormalizeVolatile"/>'s regexes (which are written for RENDERED markup and have no
+    /// business pattern-matching a minifier's output — a coincidental match there would move the golden constant
+    /// with no rendering change behind it), and a diff would point at an opaque blob rather than at anything a
+    /// reader could act on. The asset's IDENTITY is what the fingerprint actually needs to pin. [Story 20.5]</summary>
+    private static bool IsVendoredAsset(string relativePath) =>
+        relativePath is ForgeOptions.HierarchyEngineScriptName
+            or ForgeOptions.CodeHighlightScriptName
+            or ForgeOptions.CodeHighlightStyleName;
+
+    /// <summary>Identity token for a vendored asset: name, exact byte length, and a content hash — so a changed or
+    /// re-vendored bundle still flips the fingerprint (a length-only token would let a same-size rebuild through),
+    /// without the bytes themselves entering the normalization path.</summary>
+    private static string VendoredAssetToken(string fullPath)
+    {
+        var bytes = File.ReadAllBytes(fullPath);
+        var sha = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+        return $"<vendored asset: {Path.GetFileName(fullPath)}, {bytes.Length} bytes, sha256:{sha[..16]}>";
     }
 
     /// <summary>Folds today's date (the ISO filename/href form and the readable heading form) to stable

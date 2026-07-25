@@ -1685,6 +1685,598 @@
     apply(); // honor a restored (bfcache) selection on load
   }
 
+  // ---- The Hierarchy Explorer component [Story 20.5 / ADR 0012 / ADR 0013] -------------------
+  // ONE component renders every sunburst and treemap in the portal: one datasource, one selector, one explicit
+  // activation mode. ADR 0010 §6 already required one shared charting engine as a CONVENTION and it did not hold —
+  // three concurrent sessions produced three independent arc renderers in this very file. A shared component is
+  // much harder to accidentally reinvent than a shared rule, which is the whole point of this block existing.
+  //
+  // Progressive enhancement, and in this story deliberately conservative about it (owner decision D1): the server
+  // still emits the complete static sunburst SVG beneath the (hidden) chart host, and this block hides it ONLY
+  // once Plotly has actually mounted. So a missing bundle, a CSP block, or a throw anywhere below leaves the page
+  // exactly as the server rendered it. Nothing retires here; Story 20.7 does the deletions.
+  //
+  // THE TAKEOVER HANDSHAKE, and it must run before the Story 20.2 block below: on a successful mount we set
+  // `data-explorer-ready` on the panel root, which is already 20.2's own skip guard. Success -> the component owns
+  // the chart and 20.2's drill-in stands down with no new coordination code. Failure -> the flag is never set and
+  // 20.2's drill-in takes over the still-visible SVG unchanged. Any scheme that hid the SVG before the mount
+  // succeeded could leave a page with no chart at all, which is why this is the only mechanism used.
+  var hierarchyMounts = [];
+
+  function initHierarchyExplorers(scope) {
+    var host = scope && scope.querySelectorAll ? scope : document;
+    // Purge instances whose host left the document (the SPA swaps the content region via innerHTML, which detaches
+    // the graph div while `responsive: true` keeps a window listener alive — a naive re-init leaks one per swap).
+    for (var i = hierarchyMounts.length - 1; i >= 0; i--) {
+      if (!document.contains(hierarchyMounts[i])) {
+        try { if (window.Plotly && Plotly.purge) Plotly.purge(hierarchyMounts[i]); } catch (e) { /* already gone */ }
+        hierarchyMounts.splice(i, 1);
+      }
+    }
+    Array.prototype.forEach.call(host.querySelectorAll("[data-hierarchy]"), function (root) {
+      if (root.getAttribute("data-hierarchy-ready")) return;
+      try {
+        if (initHierarchyExplorer(root)) {
+          root.setAttribute("data-hierarchy-ready", "1");
+          hierarchyMounts.push(root);
+        }
+      } catch (err) {
+        // Degrade to the untouched server chart. Per root, so one bad instance cannot take the page down.
+      }
+    });
+  }
+
+  function initHierarchyExplorer(root) {
+    // No engine, no takeover. Checked first so a blocked or absent bundle costs nothing and changes nothing.
+    if (typeof Plotly === "undefined" || !Plotly.react || !Plotly.newPlot) return false;
+
+    var dataEl = document.getElementById(root.id + "-data");
+    if (!dataEl) return false;
+    var payload;
+    try { payload = JSON.parse(dataEl.textContent); } catch (e) { return false; }
+    var cfg = payload && payload.config;
+    var NODES = (payload && payload.nodes) || [];
+    if (!cfg || !NODES.length) return false;
+
+    var panel = root.closest("[data-explorer]") || root.parentNode;
+    var live = panel.querySelector(".ss-hierarchy-live");
+    var drillBar = panel.querySelector(".ss-hierarchy-drill");
+    var crumbList = panel.querySelector(".ss-hierarchy-breadcrumb");
+    var controls = panel.querySelector(".ss-hierarchy-controls");
+    var selectMode = cfg.mode === "select";
+
+    // Prototype-less maps: node ids come from author-controlled markdown (`### Story N.M:` headings, which nothing
+    // dedupes), so an id of "constructor" or "__proto__" would otherwise resolve to an inherited Object member and
+    // blow up every lookup below — reachable from a crafted hash. Same hardening the Story 20.2 block carries.
+    var byId = Object.create(null), childrenOf = Object.create(null), indexOf = Object.create(null), depthOf = Object.create(null);
+    NODES.forEach(function (n, i) {
+      if (byId[n.id] === undefined) { byId[n.id] = n; indexOf[n.id] = i; }
+      if (n.parentId) { (childrenOf[n.parentId] = childrenOf[n.parentId] || []).push(n); }
+    });
+    function depth(id) {
+      if (depthOf[id] !== undefined) return depthOf[id];
+      var d = 0, cur = byId[id], guard = 0;
+      while (cur && cur.parentId && byId[cur.parentId] && guard++ < 64) { d++; cur = byId[cur.parentId]; }
+      depthOf[id] = d;
+      return d;
+    }
+    function hasChildren(id) { return !!(childrenOf[id] && childrenOf[id].length); }
+    var ROOT_ID = NODES[0] && !NODES[0].parentId ? NODES[0].id : null;
+
+    /* --- Tokens: resolved from the SHIPPED cascade, never re-typed ------------------------------------------
+       Only the statusClass -> CSS class mapping is written here; every colour VALUE is read back out of
+       specscribe.css through a real element carrying the real class. A hard-coded hex would survive a token
+       change and quietly lie about it (AD-7). */
+    var STATUS_CLASS = {
+      done: "sb-done", active: "sb-active", review: "sb-review", ready: "sb-ready",
+      drafted: "sb-drafted", pending: "sb-pending", noplan: "sb-noplan",
+      "followup-open": "sb-followup-open", "followup-done": "sb-followup-done",
+      unplanned: "sb-unplanned", unrecognized: "sb-unrecognized"
+    };
+    // UX-DR17: the shipped SVG distinguishes follow-up and no-plan wedges by a DASHED STROKE as well as fill.
+    // Plotly's marker.line has no `dash`, so per-sector hatching replaces that channel — a stronger one, and the
+    // reason no state here is signalled by colour alone.
+    var PATTERN_SHAPE = {
+      "sb-followup-open": "/", "sb-followup-done": "\\", "sb-noplan": ".", "sb-unplanned": "x"
+    };
+
+    var probeHost = document.createElement("div");
+    probeHost.setAttribute("aria-hidden", "true");
+    probeHost.style.cssText = "position:absolute;left:-9999px;width:0;height:0;overflow:hidden";
+    document.body.appendChild(probeHost);
+    var tokenCache = Object.create(null);
+    function tokenFor(cls) {
+      if (tokenCache[cls]) return tokenCache[cls];
+      var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("class", "sunburst");
+      var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("class", "sb-seg " + cls);
+      svg.appendChild(path);
+      probeHost.appendChild(svg);
+      var cs = getComputedStyle(path);
+      tokenCache[cls] = { fill: cs.fill, stroke: cs.stroke };
+      return tokenCache[cls];
+    }
+    function fillFor(statusClass) {
+      var t = tokenFor(STATUS_CLASS[statusClass] || "sb-unrecognized");
+      var f = t.fill;
+      // `.sb-noplan` is fill:transparent in the shipped chart, and Plotly needs a real paint per sector — so fall
+      // back to the token that rule uses for its STROKE. Still a shipped token, still no literal.
+      if (!f || f === "none" || f === "transparent" || f === "rgba(0, 0, 0, 0)") return t.stroke;
+      return f;
+    }
+    function patternFor(statusClass) { return PATTERN_SHAPE[STATUS_CLASS[statusClass]] || ""; }
+    var inkColor = tokenFor("sb-unrecognized").fill;
+    var edgeColor = tokenFor("sb-done").stroke || inkColor;
+
+    /* --- State --------------------------------------------------------------------------------------------- */
+    var state = { shape: cfg.shape === "treemap" ? "treemap" : "sunburst", level: null, focusIndex: 0 };
+
+    function buildTrace() {
+      var t = {
+        type: state.shape,
+        ids: NODES.map(function (n) { return n.id; }),
+        parents: NODES.map(function (n) { return n.parentId || ""; }),
+        // The SHORT label is what gets drawn in a sector; the full one rides in customdata for the hover card.
+        // uniformtext sizes every label alike and hides what will not fit, so one long title silences the chart.
+        labels: NODES.map(function (n) { return n.shortLabel || n.label; }),
+        customdata: NODES.map(function (n) { return n.label; }),
+        // Every value is a NUMBER. A single null anywhere in `values` collapses calcdata to one point and renders
+        // nothing — no error, no console warning. The emitter guarantees it; this never re-derives it.
+        values: NODES.map(function (n) { return n.value; }),
+        // Emitted by the server alongside the payload, because a payload/branchvalues mismatch draws a blank or
+        // wrong chart with only a console warning. The two must be decided together, so they travel together.
+        branchvalues: cfg.branchvalues || "total",
+        marker: {
+          colors: NODES.map(function (n) { return fillFor(n.statusClass); }),
+          line: { color: edgeColor, width: 1 },
+          pattern: {
+            shape: NODES.map(function (n) { return patternFor(n.statusClass); }),
+            fillmode: "overlay",
+            // MUST be per-sector and explicit: left unset, Plotly paints the pattern's backing rect BLACK (67
+            // occurrences measured), which is a default colour reaching the output.
+            bgcolor: NODES.map(function (n) { return fillFor(n.statusClass); }),
+            fgcolor: NODES.map(function () { return inkColor; }),
+            size: 6,
+            solidity: 0.28
+          }
+        },
+        // Status as TEXT in the hover card, so nothing is signalled by colour alone even to a viewer who cannot
+        // distinguish fill or hatch at all. Prose, never the CSS class.
+        text: NODES.map(function (n) { return n.statusLabel; }),
+        hovertemplate: "<b>%{customdata}</b><br>%{text}<br>weight: %{value}<extra></extra>",
+        // Draw order stays the emitter's order, which is the SVG's draw order.
+        sort: false,
+        // Both font slots plus layout.font below. With only `insidetextfont` set, the ROOT label alone took
+        // Plotly's default rgb(68,68,68) — one element out of 119, exactly the kind of miss a config-level
+        // assertion never catches.
+        insidetextfont: { color: inkColor },
+        outsidetextfont: { color: inkColor }
+      };
+      if (state.shape === "sunburst") {
+        t.leaf = { opacity: 1 };
+        t.textinfo = cfg.labels ? "label" : "none";
+        t.insidetextorientation = "radial";
+      } else {
+        t.textinfo = cfg.labels ? "label+value" : "none";
+      }
+      if (state.level) t.level = state.level;
+      return t;
+    }
+
+    function layout() {
+      return {
+        margin: { l: 0, r: 0, t: 0, b: 0 },
+        // Belt and braces. The per-sector colour array above does the real work; these make a MISS impossible
+        // rather than merely unlikely, so Plotly's own palette can never reach the page.
+        colorway: [inkColor],
+        sunburstcolorway: [inkColor],
+        extendsunburstcolors: false,
+        treemapcolorway: [inkColor],
+        extendtreemapcolors: false,
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(0,0,0,0)",
+        font: { family: getComputedStyle(document.body).fontFamily, color: inkColor },
+        transition: { duration: 0 },
+        // `hide`, not shrink: a label Plotly cannot fit is dropped rather than scaled down to illegibility.
+        uniformtext: { mode: "hide", minsize: 9 }
+      };
+    }
+
+    // Privacy and offline are SETTINGS here, not defaults. `displayModeBar:false` is load-bearing rather than
+    // cosmetic: plotly.js 3.7.0 changed the modebar's cloud button to upload the chart to Plotly Cloud, and a
+    // local-first generator must never ship that control. The empty URLs remove every remote origin the bundle
+    // could otherwise consult.
+    var CONFIG = {
+      displayModeBar: false,
+      displaylogo: false,
+      plotlyServerURL: "",
+      topojsonURL: "",
+      showTips: false,
+      scrollZoom: false,
+      doubleClick: false,
+      responsive: true
+    };
+
+    /* --- Accessibility layer -------------------------------------------------------------------------------
+       Applied ONLY through `plotly_afterplot`, Plotly's public post-render event, over its emitted DOM. No Plotly
+       internal is patched or forked. Two reasons that specific hook and not the promise Plotly.react returns:
+         1. it is the only hook that also fires for re-renders this component did NOT initiate (a responsive
+            resize, a host-driven relayout) — which is what "survives" has to mean;
+         2. Plotly resolves its own promises off an animation frame, so awaiting one never settles in a
+            non-compositing tab. Measured, not assumed. */
+    function sectorNodes() {
+      var els = Array.prototype.slice.call(root.querySelectorAll("g.slice path.surface"));
+      // Rove order is RING order — level first, then angular position — not Plotly's DOM order. Within a ring the
+      // payload's own index is the angular order, because the emitter's order is the draw order and `sort:false`
+      // preserves it.
+      els.sort(function (a, b) {
+        var na = idOf(a), nb = idOf(b);
+        var da = na ? depth(na) : 0, db = nb ? depth(nb) : 0;
+        if (da !== db) return da - db;
+        return (na && indexOf[na] !== undefined ? indexOf[na] : 0) - (nb && indexOf[nb] !== undefined ? indexOf[nb] : 0);
+      });
+      return els;
+    }
+    function idOf(el) {
+      var d = el.parentNode && el.parentNode.__data__;
+      return d && d.data && d.data.data ? d.data.data.id : null;
+    }
+    function announce(msg) { if (live) live.textContent = msg; }
+
+    function applyA11yLayer() {
+      var els = sectorNodes();
+      // Clamp on EVERY re-render. If the previously focused sector's index exceeds the new (smaller) count after a
+      // drill, no element receives tabindex="0" and the chart becomes unreachable by Tab until an arrow key or a
+      // fresh click re-establishes focus. The probe's version did not fire only because the tested epic's index
+      // happened to stay in bounds.
+      if (state.focusIndex >= els.length) state.focusIndex = els.length ? els.length - 1 : 0;
+      if (state.focusIndex < 0) state.focusIndex = 0;
+
+      // The tree lives on the HOST, not on Plotly's <svg>: an <svg> carrying role="tree" with the items nested
+      // inside its <g>s puts presentational wrappers between a tree and its treeitems. The wrappers are marked
+      // presentational instead, and each item carries aria-level / aria-posinset / aria-setsize — the standard
+      // ARIA pattern for a tree whose items cannot be physically nested.
+      root.setAttribute("role", "tree");
+      root.setAttribute("aria-label", (cfg.title || "Work hierarchy") + " — " + state.shape);
+      Array.prototype.forEach.call(root.querySelectorAll("svg"), function (s) { s.setAttribute("role", "presentation"); });
+      Array.prototype.forEach.call(root.querySelectorAll("g.slice text"), function (t) { t.setAttribute("aria-hidden", "true"); });
+
+      els.forEach(function (el, i) {
+        var id = idOf(el);
+        var n = id ? byId[id] : null;
+        el.setAttribute("role", "treeitem");
+        el.setAttribute("tabindex", i === state.focusIndex ? "0" : "-1");
+        if (n) {
+          // Status as PROSE, never the CSS class. The 20.4 probe read "— done, weight 44" precisely because it
+          // used the class; UX-DR17/19 want words.
+          el.setAttribute("aria-label", n.label + " — " + n.statusLabel + ", weight " + n.value);
+          el.setAttribute("aria-level", String(depth(n.id) + 1));
+          var sibs = n.parentId ? (childrenOf[n.parentId] || []) : [n];
+          var pos = 0;
+          for (var k = 0; k < sibs.length; k++) { if (sibs[k].id === n.id) { pos = k + 1; break; } }
+          el.setAttribute("aria-posinset", String(pos || 1));
+          el.setAttribute("aria-setsize", String(sibs.length || 1));
+          // Every parent that is DRAWN has its children drawn too (the payload is three levels deep and no
+          // maxdepth is set), so a drawn parent is by definition expanded. If a future instance sets maxdepth this
+          // must become a check against the sectors actually present.
+          if (hasChildren(n.id)) el.setAttribute("aria-expanded", "true");
+          else el.removeAttribute("aria-expanded");
+        } else if (!el.getAttribute("aria-label")) {
+          el.setAttribute("aria-label", "chart sector");
+        }
+        if (!el.__ssHierBound) {
+          el.__ssHierBound = true;
+          el.addEventListener("keydown", onKeydown);
+          el.addEventListener("focus", function () {
+            var idx = sectorNodes().indexOf(el);
+            if (idx >= 0) state.focusIndex = idx;
+          });
+        }
+      });
+    }
+
+    function focusAt(i) {
+      var els = sectorNodes();
+      if (!els.length) return;
+      state.focusIndex = ((i % els.length) + els.length) % els.length;
+      els.forEach(function (el, j) { el.setAttribute("tabindex", j === state.focusIndex ? "0" : "-1"); });
+      els[state.focusIndex].focus();
+      announce(els[state.focusIndex].getAttribute("aria-label") || "");
+    }
+
+    function onKeydown(ev) {
+      var els = sectorNodes();
+      var i = els.indexOf(ev.currentTarget);
+      switch (ev.key) {
+        case "ArrowRight": case "ArrowDown": ev.preventDefault(); focusAt(i + 1); break;
+        case "ArrowLeft": case "ArrowUp": ev.preventDefault(); focusAt(i - 1); break;
+        case "Home": ev.preventDefault(); focusAt(0); break;
+        case "End": ev.preventDefault(); focusAt(els.length - 1); break;
+        case "Enter": case " ": case "Spacebar": ev.preventDefault(); activate(idOf(ev.currentTarget)); break;
+        case "Escape": ev.preventDefault(); drillUp(); break;
+        default: return;
+      }
+    }
+
+    /* --- The activation grammar, stated once [AC #3] -------------------------------------------------------
+       Plotly drills on click by default; that is CANCELLED (the click handler honours a `false` return, and the
+       event carries the level it would have moved to) and the level re-applied here, so exactly one thing happens
+       per activation and drill-in stays a distinct affordance from activation:
+         node WITH children -> primary action is DRILL IN. Its own destination stays reachable from the
+                               breadcrumb's "Open page" link once drilled, and from the text twin.
+         LEAF               -> primary action is ACTIVATE: `navigate` mode follows the node's href (the Story 9.13
+                               destination contract); `select` mode raises the selection and does NOT navigate.
+         Escape / crumb     -> DRILL UP.
+       This is the Story 20.2 grammar extended by mode, chosen because a per-sector secondary control is not
+       expressible in a chart sector at all. */
+    function activate(id) {
+      var n = id ? byId[id] : null;
+      if (!n) return;
+      if (id === state.level) { drillUp(); return; }
+      if (hasChildren(id)) { drillTo(id, true); return; }
+      if (selectMode) {
+        publishSelection(id);
+        announce("Selected " + n.label + ". " + n.statusLabel + ", weight " + n.value + ".");
+        return;
+      }
+      if (n.href) location.href = n.href;
+    }
+
+    function drillTo(id, pushHash) {
+      if (id && !byId[id]) id = null;
+      // The synthesized project root is a TREE root, not a scope. Left as a level it draws exactly what no level
+      // draws, but it would publish `data-sb-scope="__project__"` and `#sb=__project__` — sending the Story 20.3
+      // rail hunting for a card that cannot exist and putting a meaningless id in a shareable link. "Everything"
+      // has one representation here, and it is the absence of a scope.
+      if (id === ROOT_ID) id = null;
+      if ((id || null) === state.level) return;
+      state.level = id || null;
+      redraw();
+      applyState(pushHash);
+      announce(state.level ? "Zoomed into " + byId[state.level].label : "Showing the whole project");
+    }
+
+    function drillUp() {
+      if (!state.level) { announce("Already at the top of the hierarchy"); return; }
+      var cur = byId[state.level];
+      drillTo(cur && cur.parentId ? cur.parentId : null, true);
+    }
+
+    /* --- Selection seam: ADOPTED, never minted -------------------------------------------------------------
+       `specscribe:explorer-select` is the event Story 20.3's details rail already listens for, and 20.3's record
+       is explicit that 20.5 and 20.8 must adopt it rather than mint a second. `nodeId` is null at root scope.
+       ORDERING HAZARD, already documented by 20.3: this block runs earlier in this file than the rail's listener,
+       so the first event fires before that listener exists. The rail re-syncs on its own init by reading
+       `data-sb-scope` off the panel — so publishing that attribute is not optional decoration; dropping it
+       silently breaks a deep-linked page. */
+    var publishedTokens = [];
+    function publishSelection(explicitId) {
+      var id = explicitId !== undefined ? explicitId : state.level;
+      try {
+        panel.dispatchEvent(new CustomEvent("specscribe:explorer-select", {
+          bubbles: true,
+          detail: { nodeId: id || null, label: id && byId[id] ? byId[id].label : null, root: panel }
+        }));
+      } catch (e) { /* no CustomEvent, or a throwing listener — the rail's server-rendered default stands */ }
+    }
+
+    // State only. The script publishes `data-sb-scope` plus one `data-tok-<status>` per status still drawn, and
+    // the stylesheet decides what that means for the swatch strip — the pure-CSS contract a guard test pins, which
+    // this block keeps true by naming no swatch class and touching no swatch node. `data-sb-scope` stays the DRILL
+    // scope (never a leaf selection), because that is what "the statuses currently on screen" is derived from.
+    function publishScopeState() {
+      publishedTokens.forEach(function (t) { panel.removeAttribute("data-tok-" + t); });
+      publishedTokens = [];
+      if (!state.level) { panel.removeAttribute("data-sb-scope"); return; }
+      panel.setAttribute("data-sb-scope", state.level);
+      var seen = Object.create(null);
+      (function walk(id) {
+        var kids = childrenOf[id] || [];
+        kids.forEach(function (k) { seen[k.statusClass] = true; walk(k.id); });
+      })(state.level);
+      seen[byId[state.level].statusClass] = true;
+      for (var t in seen) {
+        if (Object.prototype.hasOwnProperty.call(seen, t) && /^[a-z][a-z0-9-]*$/.test(t)) {
+          panel.setAttribute("data-tok-" + t, "");
+          publishedTokens.push(t);
+        }
+      }
+    }
+
+    /* --- Breadcrumb ---------------------------------------------------------------------------------------- */
+    function renderCrumbs() {
+      if (!crumbList) return;
+      var chain = [];
+      // Stops at ROOT_ID: the synthesized root is already the "top" crumb built below, so walking through it would
+      // render the project name twice in a row.
+      var cur = state.level, guard = 0;
+      while (cur && cur !== ROOT_ID && byId[cur] && guard++ < 64) { chain.unshift(byId[cur]); cur = byId[cur].parentId; }
+      while (crumbList.firstChild) crumbList.removeChild(crumbList.firstChild);
+      var topLabel = ROOT_ID && byId[ROOT_ID] ? byId[ROOT_ID].label : "All epics";
+      var top = document.createElement("li");
+      if (chain.length) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "ss-hierarchy-crumb";
+        btn.textContent = topLabel;
+        btn.addEventListener("click", function () { drillTo(null, true); });
+        top.appendChild(btn);
+      } else {
+        var span = document.createElement("span");
+        span.className = "ss-hierarchy-crumb ss-hierarchy-crumb-current";
+        span.textContent = topLabel;
+        top.appendChild(span);
+      }
+      crumbList.appendChild(top);
+      chain.forEach(function (n, i) {
+        var li = document.createElement("li");
+        if (i === chain.length - 1) {
+          var cs = document.createElement("span");
+          cs.className = "ss-hierarchy-crumb ss-hierarchy-crumb-current";
+          cs.textContent = n.label;
+          li.appendChild(cs);
+          // A drilled node's OWN destination stays reachable here — the counterpart to "a node with children
+          // drills instead of opening". Without this the grammar would make group pages unreachable by pointer.
+          if (n.href) {
+            var open = document.createElement("a");
+            open.className = "ss-hierarchy-crumb-open";
+            open.href = n.href;
+            open.textContent = "Open page →";
+            li.appendChild(open);
+          }
+        } else {
+          var b = document.createElement("button");
+          b.type = "button";
+          b.className = "ss-hierarchy-crumb";
+          b.textContent = n.label;
+          (function (id) { b.addEventListener("click", function () { drillTo(id, true); }); })(n.id);
+          li.appendChild(b);
+        }
+        crumbList.appendChild(li);
+      });
+      if (drillBar) drillBar.hidden = false;
+    }
+
+    /* --- Hash deep-linking (UX-DR6) ------------------------------------------------------------------------
+       Reuses the Story 20.2 fragment and history semantics rather than re-deriving them, and keeps the key
+       configurable so 20.7's other instances can differ while the dashboard's existing `sb=` links keep working.
+       Two behaviours that are corrections, not preferences: never destroy other fragment pairs on zoom-out (that
+       ate in-page anchors like #glance), and under the SPA REPLACE rather than push, carrying the router's own
+       {path, fragment} keys — a foreign state entry sends the SPA popstate handler down its "unknown state" path
+       and tears the chart down mid-interaction. Extracted to component scope so 20.7's deletion of the 20.2 block
+       does not take them with it. */
+    var HASH_KEY = (cfg.hashKey || "sb") + "=";
+    var spaHost = document.getElementById("spa-content");
+    function hashWith(id) {
+      var raw = location.hash.replace(/^#/, "");
+      var parts = raw ? raw.split("&") : [];
+      var kept = [];
+      for (var i = 0; i < parts.length; i++) { if (parts[i].indexOf(HASH_KEY) !== 0 && parts[i]) kept.push(parts[i]); }
+      if (id) kept.unshift(HASH_KEY + encodeURIComponent(id));
+      return kept.length ? "#" + kept.join("&") : location.pathname + location.search;
+    }
+    function scopeFromHash() {
+      var raw = location.hash.replace(/^#/, "");
+      var parts = raw ? raw.split("&") : [];
+      for (var i = 0; i < parts.length; i++) {
+        if (parts[i].indexOf(HASH_KEY) === 0) {
+          var id;
+          // A hostile or merely stale fragment must not throw: decodeURIComponent rejects a lone '%'.
+          try { id = decodeURIComponent(parts[i].slice(HASH_KEY.length)); } catch (e) { return null; }
+          // Same normalization as drillTo: the tree root is not a scope, and an unknown or leaf id from a
+          // stale/hostile fragment resolves to "no scope" rather than throwing or drilling somewhere odd.
+          return id !== ROOT_ID && byId[id] && hasChildren(id) ? id : null;
+        }
+      }
+      return null;
+    }
+    function syncHistory() {
+      if (!window.history || !history.pushState) return;
+      var url = hashWith(state.level);
+      try {
+        if (spaHost) {
+          var path = spaHost.getAttribute("data-path") || "";
+          history.replaceState({ path: path, fragment: url.charAt(0) === "#" ? url.slice(1) : "" }, "", url);
+        } else {
+          history.pushState({ ssHierarchy: state.level || "" }, "", url);
+        }
+      } catch (e) { /* history is unavailable (file:// in some engines) — the chart still works, links just aren't shareable */ }
+    }
+
+    /* --- Render -------------------------------------------------------------------------------------------- */
+    function redraw() { return Plotly.react(root, [buildTrace()], layout(), CONFIG); }
+
+    function applyState(pushHash) {
+      renderCrumbs();
+      publishScopeState();
+      publishSelection();
+      if (pushHash) syncHistory();
+    }
+
+    // --- Mount. Reveal the host and give it its configured height first (never a literal in this file), plot,
+    // and only then hide the server chart. If newPlot throws, the host is hidden again and the SVG is simply the
+    // page — which is the whole reason the SVG is still there in this story.
+    root.style.height = (cfg.size || 380) + "px";
+    root.style.maxWidth = "100%";
+    root.setAttribute("data-hierarchy-ready", "1");
+    state.level = scopeFromHash();
+    try {
+      Plotly.newPlot(root, [buildTrace()], layout(), CONFIG);
+    } catch (e) {
+      root.removeAttribute("data-hierarchy-ready");
+      root.style.height = "";
+      return false;
+    }
+
+    // Bound so even the FIRST render goes through the same public seam every later one does.
+    root.on("plotly_afterplot", function () { applyA11yLayer(); });
+    // Cancel Plotly's own drill animation — a 750 ms module constant with no schema attribute — and re-apply the
+    // level ourselves. The re-apply goes through Plotly.react, which never animates, so the drill snaps by
+    // construction and `prefers-reduced-motion` selects that same instant path a fortiori (UX-DR18). Any duration
+    // this component ever does use is read from the shipped --motion-* tokens, never typed.
+    root.on("plotly_sunburstclick", function (e) {
+      activate(clickedId(e));
+      return false;
+    });
+    root.on("plotly_treemapclick", function (e) {
+      activate(clickedId(e));
+      return false;
+    });
+    function clickedId(e) {
+      var p = e && e.points && e.points[0];
+      if (p && p.id !== undefined && p.id !== null) return p.id;
+      return e && e.nextLevel ? e.nextLevel : null;
+    }
+
+    // --- Shape selector. Revealed only now, because switching a trace type needs script: with JS off it would be
+    // an inert control, which is why the server ships it [hidden].
+    if (controls) {
+      controls.hidden = false;
+      Array.prototype.forEach.call(controls.querySelectorAll(".ss-hierarchy-shape"), function (radio) {
+        radio.addEventListener("change", function () {
+          if (!radio.checked) return;
+          state.shape = radio.value === "treemap" ? "treemap" : "sunburst";
+          redraw();
+          announce("Showing the " + state.shape);
+        });
+      });
+    }
+
+    // Both listeners are on `window`, so an SPA swap that detaches this host leaves them behind; without the
+    // containment check they would call Plotly.react on a node that is no longer in the document.
+    function onHistoryScope() {
+      if (!document.contains(root)) return;
+      var next = scopeFromHash();
+      if ((next || null) !== state.level) { state.level = next; redraw(); applyState(false); }
+    }
+    window.addEventListener("hashchange", onHistoryScope);
+    window.addEventListener("popstate", onHistoryScope);
+
+    // --- The takeover. TWO parts, and the second is the one that has already bitten this epic: an SVG <a> at
+    // display:none STAYS FOCUSABLE (unlike HTML), which is exactly how the Story 20.2 review's phantom tab stop
+    // got in. The test suite structurally cannot see a stray tab stop, so both halves are done here and the tab
+    // order is checked in a real browser.
+    var legacySvg = panel.querySelector("svg.sunburst");
+    if (legacySvg) {
+      legacySvg.style.display = "none";
+      legacySvg.setAttribute("aria-hidden", "true");
+      Array.prototype.forEach.call(legacySvg.querySelectorAll("a"), function (a) { a.setAttribute("tabindex", "-1"); });
+    }
+    var legacyDrill = panel.querySelector(".sb-explorer-drill");
+    if (legacyDrill) legacyDrill.hidden = true;
+    // The handshake: 20.2's own skip guard. Set LAST, and only here, so it can only ever mean "mounted".
+    panel.setAttribute("data-explorer-ready", "1");
+
+    applyState(false);
+    return true;
+  }
+
+  initHierarchyExplorers(document);
+  document.addEventListener("specscribe:content-swapped", function (e) {
+    initHierarchyExplorers(e && e.detail ? e.detail.root : document);
+  });
+
   // ---- Remaining-work sunburst explorer: click-to-zoom drill-in [Story 20.2] ----------------
   // Progressive enhancement ONLY (NFR8). The server ships the complete static Story 10.7 sunburst (every wedge an
   // <a> to its Story 9.13 destination) PLUS one inline JSON island of the SAME weights/hierarchy the SVG drew. With

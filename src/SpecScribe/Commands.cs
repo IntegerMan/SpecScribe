@@ -622,6 +622,15 @@ public sealed class InteractiveCommand : Command<SiteSettings>
         // Persist the choices so they're restored on the next run.
         if (SettingsStore.TrySave(settings) is not { } savedPath)
         {
+            // TrySave returns null both when there was nothing worth saving (expected, silent) and when the write
+            // itself failed (write-protected path, disk full) — distinguish here so a real failure isn't swallowed:
+            // the typed values still take effect for THIS session (they're already on `settings`), but won't
+            // survive to the next run, and the user should know that rather than finding out later. [Review][Patch]
+            if (!SettingsStore.Capture(settings).IsEmpty)
+            {
+                AnsiConsole.MarkupLine("[yellow]![/] [yellow]Could not save settings[/] [grey](using them for this session only)[/]");
+            }
+
             return load;
         }
 

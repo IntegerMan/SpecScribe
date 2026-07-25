@@ -1,0 +1,8 @@
+{
+  "name": "specscribe-plotly-vendor",
+  "private": true,
+  "description": "Throwaway workspace for regenerating the vendored plotly.js hierarchy bundle for the SpecScribe Hierarchy Explorer. Unlike tools/prism-vendor this has NO devDependencies: the custom-bundle task ships only in plotly.js's git repo, not its npm package, so build.mjs clones a pinned tag instead.",
+  "scripts": {
+    "build": "node build.mjs"
+  }
+}

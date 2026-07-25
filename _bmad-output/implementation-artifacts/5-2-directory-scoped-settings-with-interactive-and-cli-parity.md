@@ -4,7 +4,7 @@ baseline_commit: 6e12d0d79bbd891e20603759218699b0b4f1aeef
 
 # Story 5.2: Directory-Scoped Settings with Interactive and CLI Parity
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -67,6 +67,23 @@ so that I can keep my preferred behavior without hidden global side effects — 
   - [x] Extend `SettingsStoreTests.cs`: walk-up discovery finds a `.specscribe` in a parent directory; write-then-read round-trip including the new `IncludeReadme`; a `.specscribe` JSON *without* `IncludeReadme` still loads (backward compat); malformed JSON → `TryLoad` returns null (best-effort).
   - [x] Keep Spectre/`AnsiConsole` out of the units — extract the provenance-line string building into a small pure helper (mirroring how 5.1 extracted the summary/exit-code helpers) so `--show-config`'s output is asserted without a live console.
   - [x] Run the full suite: `dotnet test` from repo root; all existing tests (incl. the four `SettingsStoreTests`) stay green.
+
+### Review Findings
+
+_Code review 2026-07-25 (bmad-code-review), scoped to `git diff 6e12d0d..HEAD` restricted to this story's own File List (sibling stories 5.1/5.3/5.5/5.6 and epic-20/25/26 changes bundled in the same commit range excluded). Three parallel layers: Blind Hunter (adversarial), Edge Case Hunter, Acceptance Auditor (against this story's 4 ACs)._
+
+- [x] [Review][Decision] `.specscribe` walk-up read is anchored to the run's own start directory, independent of `ForgeOptions`' discovered `_bmad-output` root — settings saved from a subdirectory before any `.specscribe` exists can silently fail to apply when a later run starts from the true repo root. This restates the story's own unresolved Open Question #1 (walk-up-read vs repo-root anchoring). — **RESOLVED by owner 2026-07-25: keep walk-up-read as-is** (the anchoring behavior is unchanged). Owner additionally directed that `.specscribe` become a FOLDER containing `config.json` rather than a flat file, to leave room for future per-directory state (incremental-build caching, run-history tracking) — implemented in this review pass, see below and **ADR 0014**. [src/SpecScribe/SettingsStore.cs]
+- [x] [Review][Patch] `ConsoleUi.PrintConfigDiagnostics` writes `--show-config` lines straight to `Console.Out` with no `IOException` guard, unlike `PrintMachineSummary` (patched in Story 5.1 for the identical "downstream pipe closed early" failure) — `specscribe generate --show-config | head` can flip an otherwise-successful run to a fatal exit. [src/SpecScribe/ConsoleUi.cs:117-123] — **Applied**: wrapped in `try/catch (IOException)`, same guard/reason as `PrintMachineSummary`.
+- [x] [Review][Patch] `CliOverrides.Capture` treats an empty-string CLI value (e.g. `--source ""`) as "not CLI-set" (`{Length: > 0}`), but `SettingsStore.ApplyTo` treats it as already-set (`??=` does not fill over an empty string) — the two predicates disagree, so an explicit empty override silently wins while its `--show-config` provenance is misreported as `SavedSettings`/`Default`. [src/SpecScribe/SettingsResolver.cs:35-46, src/SpecScribe/SettingsStore.cs:172-195] — **Applied**: `CliOverrides.Capture`'s path/name predicates changed to `is not null`, matching `ApplyTo`'s `??=`. `TodayPolicy` deliberately left as `{ Length: > 0 }` (already internally consistent with `ResolveDatePolicy`/`Validate`).
+- [x] [Review][Patch] When `SettingsStore.TrySave` fails inside `ConfigurePaths` (write-protected path, disk full), the method returns the pre-edit `load` unchanged even though `settings` was already mutated with the newly typed values — subsequent provenance reports mislabel those live values as `Default` rather than "entered but not persisted". [src/SpecScribe/Commands.cs:622-626] — **Applied**: `ConfigurePaths` now distinguishes "nothing worth saving" (silent, expected) from "the write failed" (`Capture(settings).IsEmpty` check) and warns the user in the latter case that the choices apply to this session only.
+- [x] [Review][Patch] `FormatConfigLines` has no guard against an embedded newline in a field's `EffectiveValue` (reachable via a hand-edited `.specscribe` or a quoted CLI value) — a multi-line value would split across extra unprefixed lines, breaking the documented one-line-per-field `--show-config` contract CI scripts rely on. [src/SpecScribe/SettingsResolver.cs:169-184] — **Applied**: new `EscapeForLine` helper collapses `\r\n`/`\r`/`\n` to a literal `\n` escape before formatting; test added.
+- [x] [Review][Patch] `SettingsResolver.Load` performs two independent `.specscribe` walk-ups per call (once inside `SettingsStore.TryLoad`, again via `SettingsStore.ResolvePath` for `SettingsLoad.Path`) — minor redundant work and a theoretical TOCTOU window where the reported settings-file path could name a different file than the one actually parsed. [src/SpecScribe/SettingsResolver.cs:89-100] — **Applied**: new `SettingsStore.TryLoad(startDirectory, out loadedFrom)` overload walks up exactly once and reports the location that actually supplied the data; `SettingsResolver.Load` now uses it instead of a separate `ResolvePath` call. Bundled with the next finding (same walk-up rewrite).
+- [x] [Review][Patch] `SettingsStore.FindExisting` picks the nearest `.specscribe` purely by `File.Exists`, and `TryLoad` returns null for the whole lookup on a parse failure instead of continuing up-tree — a malformed nearest file silently shadows a perfectly valid ancestor file with no fallback or warning. [src/SpecScribe/SettingsStore.cs:68-111] — **Applied**: the new `TryLoad` walk-up skips a candidate that fails to parse and continues to the next ancestor instead of stopping; `FindExisting`/`ResolvePath` (existence-only, used by the write path) are unchanged. 2 new tests.
+- [x] [Review][Patch] No test locks the `saved.IncludeReadme == true` + no-CLI-override provenance branch — only the `false`-saved and saved-with-CLI-override cases are covered; logic verified correct by inspection but the leaf is uncovered. [tests/SpecScribe.Tests/SettingsResolverTests.cs:150-184] — **Applied**: `Resolve_AttributesAnExplicitPersistedReadmeInclusionToSavedSettings` added.
+
+All 7 patches applied 2026-07-25. Verification: `dotnet test --filter "SettingsStoreTests|SettingsResolverTests"` — 65 passed / 0 failed (includes 8 new/changed tests across the patches). Full suite re-run: golden content-fingerprint and golden output-inventory both pass (regenerated by the concurrent Story 20.5 session on top of this work, see `SiteGeneratorAdapterTests.cs`'s provenance comment); the remaining 5–8 failures across two full-suite runs are the pre-existing git-fixture/concurrency flake this repo's other stories already document (varying failing set run-to-run, "git CLI unavailable on this host" errors under concurrent load) — none touch `SettingsStore`/`SettingsResolver`/`ConsoleUi`/`Commands`/`HowToReadTemplater`.
+
+10 findings dismissed as noise/false-positive/by-design (see review record): CodeUrl's `Default` provenance conflating "hardcoded default" with "auto-detected" (consistent with how every other auto-discovered field already reports `Default`, not a 5.2-specific inconsistency); `PrintPaths`'s `ToDictionary` on a hardcoded 8-entry array that cannot contain duplicate keys; `SettingsResolver.Resolve` trusting the caller to keep `load`/`settings` in sync (a documented convention, not a reachable bug); a golden-fingerprint comment nitpick; `--show-config` printing the human paths block before the machine lines (deliberate — both surfaces are documented as intentionally coexisting); the README-inclusion prompt's boolean mapping (verified correct by trace; TTY-only, already flagged in Completion Note #9 as awaiting owner verification); no invariant-checking constructor on `SettingsLoad`/`ResolvedConfig` (design nitpick); `--show-config` propagating `DirectoryNotFoundException` on discovery failure (confirmed intentional — `Program.cs:59-63` catches it and exits 1 with a friendly message, exactly as documented at `Commands.cs:472`); `SettingsStore.ResolvePath`'s default-parameter widening (no caller outside this story's File List uses the zero-arg overload); Completion Note #7's "constant unchanged" wording read against the full `baseline..HEAD` diff (verified accurate for 5.2's own isolated contribution — the visible constant change is ~5 sibling stories' bundled regenerations on shared `main`, not 5.2's).
 
 ## Dev Notes
 
@@ -237,23 +254,39 @@ and `6e12d0d` with the normalized fingerprint input dumped to disk and diffed. T
 ### File List
 
 - `src/SpecScribe/SettingsResolver.cs` — **NEW.** `SettingsResolver` (`Load`/`Resolve`/`FormatConfigLines`/
-  `DisplayTag`/`OriginToken`/`Fields`), `ConfigSource`, `ConfigProvenance`, `CliOverrides`, `SettingsLoad`,
-  `ResolvedConfig`.
+  `DisplayTag`/`OriginToken`/`Fields`/`EscapeForLine` **[Review]**), `ConfigSource`, `ConfigProvenance`,
+  `CliOverrides` (path/name predicates changed to `is not null` **[Review]**), `SettingsLoad`, `ResolvedConfig`.
 - `src/SpecScribe/SettingsStore.cs` — `SavedSettings.IncludeReadme`; `IsEmpty` updated; new `FindExisting`
   (git-style walk-up) + `startDirectory` on `ResolvePath`/`TryLoad`/`TrySave`; `Capture` extracted from `TrySave`;
-  `ApplyTo` honors the persisted README preference.
+  `ApplyTo` honors the persisted README preference. **[Review, ADR 0014]** `.specscribe` is now a FOLDER containing
+  `config.json` (`ConfigFileName`), not a flat file — `FindExisting`/`ReadConfigJson` support the folder form and a
+  not-yet-migrated legacy flat file; `TrySave` migrates a legacy file to the folder form on write. New
+  `TryLoad(startDirectory, out loadedFrom)` overload walks up exactly once, skips a malformed candidate and
+  continues to the next ancestor instead of stopping, and reports the location that actually supplied the data.
 - `src/SpecScribe/SiteSettings.cs` — new `--show-config` option; `Resolve(string? startDirectory = null)` seam.
 - `src/SpecScribe/Commands.cs` — `generate`/`watch`/bare-default routed through `SettingsResolver` with the
   `--show-config` early return; menu loads once at entry and resolves per action from that load; `TryResolve` now
   returns `ResolvedConfig`; `ConfigurePaths` gained the README confirm prompt and re-bases the load after a save.
+  **[Review]** `ConfigurePaths` now warns when `TrySave` fails for a real reason (not just "nothing to save").
 - `src/SpecScribe/ConsoleUi.cs` — `PrintPaths` provenance overload + `Tag` helper; new `PrintResolvedConfig` and
-  `PrintConfigDiagnostics`; `PrintSettingsLoaded` lists README/deep-git/code-URL.
+  `PrintConfigDiagnostics`; `PrintSettingsLoaded` lists README/deep-git/code-URL. **[Review]**
+  `PrintConfigDiagnostics` now guards `IOException` (closed downstream pipe), mirroring `PrintMachineSummary`.
+- `src/SpecScribe/HowToReadTemplater.cs` — **[Review, ADR 0014]** generated copy updated: `.specscribe` **folder**,
+  not *file*.
+- `docs/adrs/0014-specscribe-settings-folder-format.md` — **NEW [Review].** Documents `.specscribe` becoming a
+  folder containing `config.json`, extending ADR 0003; cross-linked from `docs/adrs/README.md`.
 - `tests/SpecScribe.Tests/SettingsResolverTests.cs` — **NEW.** 18 tests: precedence, per-field provenance,
   README/deep-git restore, resolve-once, discovery propagation, `--show-config` shape (incl. a path with spaces).
+  **[Review]** +4 tests: folder-form resolve smoke test, README-inclusion-true-no-override provenance leaf,
+  newline-escaping in `FormatConfigLines`.
 - `tests/SpecScribe.Tests/SettingsStoreTests.cs` — 12 new tests (walk-up discovery, write-back symmetry,
-  `IncludeReadme` round-trip, backward compat, malformed JSON) + `IDisposable` temp-root fixture.
+  `IncludeReadme` round-trip, backward compat, malformed JSON) + `IDisposable` temp-root fixture. **[Review, ADR
+  0014]** +6 tests: folder-form read/write, legacy-file migration, malformed folder-form JSON, malformed-nearest-
+  falls-back-to-valid-ancestor (×2, incl. reported path).
 - `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — **out-of-scope fix, see Completion Note #7:** `BuildRow`
-  normalizer `[^<]*` → `.*?`. Golden constant unchanged.
+  normalizer `[^<]*` → `.*?`. Golden constant unchanged at the time; **regenerated since** by the concurrent
+  Story 20.5 session on top of this story's rendering-visible change (the `.specscribe` "folder" copy edit) — see
+  that file's provenance comment, not touched directly by this story.
 
 ## Change Log
 
@@ -268,6 +301,21 @@ and `6e12d0d` with the normalized fingerprint input dumped to disk and diffed. T
   `SiteGeneratorAdapterTests` (`[^<]*` → `.*?`), which had been leaking the short commit SHA into the golden
   fingerprint and failing the gate on every commit. Golden constant **unchanged** — it now passes at two different
   commits, which is the proof. See Completion Note #7.
+- **2026-07-25 — Code review (bmad-code-review).** 3-layer adversarial review (Blind Hunter, Edge Case Hunter,
+  Acceptance Auditor) found all 4 ACs implemented correctly; 1 decision-needed, 7 patch, 10 dismissed. Owner resolved
+  the decision-needed item by directing a bigger-than-patch change: **`.specscribe` becomes a folder containing
+  `config.json`**, not a flat file, to leave room for future per-directory state (incremental-build caching, run
+  history) — see new **ADR 0014**, which extends ADR 0003. Read is backward compatible with the pre-ADR-0014 flat
+  file; write migrates it to the folder form in place. All 7 patch findings applied (IOException guard on
+  `--show-config`'s output; `CliOverrides.Capture` predicate aligned with `ApplyTo`'s null-check semantics for the
+  empty-string edge case; a real `TrySave` failure now warns the user instead of silently reporting stale
+  provenance; `FormatConfigLines` escapes embedded newlines; the settings walk-up now happens exactly once per
+  `SettingsResolver.Load` call and skips a malformed nearer candidate instead of shadowing a valid ancestor; added
+  the missing README-inclusion-true provenance test). 10 new/changed tests. `SettingsStoreTests`/`SettingsResolverTests`
+  **65 passed / 0 failed**. Full suite re-verified: golden content-fingerprint and golden output-inventory both pass
+  (regenerated by the concurrent Story 20.5 session on top of this work); remaining full-suite failures (5–8,
+  varying run to run) are the pre-existing git-fixture/concurrency flake this repo's other stories already document,
+  none touching this story's files.
 
 ## Open Questions (for the maintainer — non-blocking; sensible defaults chosen)
 

@@ -344,4 +344,100 @@ public class SettingsStoreTests : IDisposable
         Assert.NotNull(loaded);
         Assert.Null(loaded!.TodayPolicy);
     }
+
+    // ---- ADR 0014: `.specscribe` is a folder containing config.json, not a flat file ----
+
+    private static string WriteFolderSettings(string dir, string json)
+    {
+        var folder = Directory.CreateDirectory(Path.Combine(dir, SettingsStore.FileName)).FullName;
+        File.WriteAllText(Path.Combine(folder, SettingsStore.ConfigFileName), json);
+        return folder;
+    }
+
+    [Fact]
+    public void TryLoad_ReadsTheFolderFormat()
+    {
+        var repo = NewDir();
+        WriteFolderSettings(repo, """{ "Source": "from-folder" }""");
+
+        var loaded = SettingsStore.TryLoad(repo);
+
+        Assert.NotNull(loaded);
+        Assert.Equal("from-folder", loaded!.Source);
+    }
+
+    [Fact]
+    public void TryLoad_ReturnsNullForMalformedJsonInTheFolderForm()
+    {
+        var repo = NewDir();
+        WriteFolderSettings(repo, "{ not json at all");
+
+        Assert.Null(SettingsStore.TryLoad(repo));
+    }
+
+    [Fact]
+    public void TrySave_WritesTheFolderFormWithConfigJsonInside()
+    {
+        var repo = NewDir();
+
+        var savedPath = SettingsStore.TrySave(new SiteSettings { Output = "out" }, repo);
+
+        Assert.NotNull(savedPath);
+        Assert.True(Directory.Exists(savedPath));
+        Assert.True(File.Exists(Path.Combine(savedPath!, SettingsStore.ConfigFileName)));
+    }
+
+    /// <summary>A save must not leave a flat file and a folder both claiming the same name — the flat file a
+    /// pre-ADR-0014 version wrote is replaced by the folder form the next time settings are saved from it.</summary>
+    [Fact]
+    public void TrySave_MigratesALegacyFlatFileToTheFolderForm()
+    {
+        var repo = NewDir();
+        var legacyFile = Path.Combine(repo, SettingsStore.FileName);
+        File.WriteAllText(legacyFile, """{ "Source": "from-legacy-file" }""");
+
+        var savedPath = SettingsStore.TrySave(new SiteSettings { Output = "out" }, repo);
+
+        Assert.Equal(legacyFile, savedPath);
+        Assert.True(Directory.Exists(savedPath));
+        Assert.True(File.Exists(Path.Combine(savedPath!, SettingsStore.ConfigFileName)));
+        var loaded = SettingsStore.TryLoad(repo);
+        Assert.NotNull(loaded);
+        Assert.Equal("out", loaded!.Output);
+    }
+
+    // ---- [Review][Patch]: a malformed nearest `.specscribe` must not shadow a valid ancestor ----
+
+    /// <summary>A broken subdirectory `.specscribe` must not blind a run to a perfectly good repo-root one — the
+    /// walk-up continues past the malformed candidate instead of stopping at the first (invalid) match.</summary>
+    [Fact]
+    public void TryLoad_SkipsAMalformedNearestFileAndFallsBackToAValidAncestor()
+    {
+        var repo = NewDir();
+        var nested = Directory.CreateDirectory(Path.Combine(repo, "sub")).FullName;
+        File.WriteAllText(Path.Combine(repo, SettingsStore.FileName), """{ "Source": "from-root" }""");
+        File.WriteAllText(Path.Combine(nested, SettingsStore.FileName), "{ not json at all");
+
+        var loaded = SettingsStore.TryLoad(nested);
+
+        Assert.NotNull(loaded);
+        Assert.Equal("from-root", loaded!.Source);
+    }
+
+    /// <summary>The out-param overload reports the ancestor that actually supplied the data, not the nearer
+    /// malformed candidate that was skipped — so a "loaded from" display or `--show-config`'s `settings_file=`
+    /// line never names a file that didn't actually load.</summary>
+    [Fact]
+    public void TryLoad_ReportsTheAncestorPathWhenTheNearestCandidateWasSkipped()
+    {
+        var repo = NewDir();
+        var nested = Directory.CreateDirectory(Path.Combine(repo, "sub")).FullName;
+        var rootFile = Path.Combine(repo, SettingsStore.FileName);
+        File.WriteAllText(rootFile, """{ "Source": "from-root" }""");
+        File.WriteAllText(Path.Combine(nested, SettingsStore.FileName), "{ not json at all");
+
+        SettingsStore.TryLoad(nested, out var loadedFrom);
+
+        Assert.Equal(rootFile, loadedFrom);
+    }
 }

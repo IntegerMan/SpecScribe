@@ -33,16 +33,23 @@ public sealed record ConfigProvenance(string Field, string Option, string Effect
 public sealed record CliOverrides(bool Source, bool Adrs, bool Output, bool ProjectName, bool NoReadme, bool DeepGit, bool CodeUrl, bool TodayPolicy)
 {
     public static CliOverrides Capture(SiteSettings settings) => new(
-        Source: settings.Source is { Length: > 0 },
-        Adrs: settings.Adrs is { Length: > 0 },
-        Output: settings.Output is { Length: > 0 },
-        ProjectName: settings.ProjectName is { Length: > 0 },
+        // `is not null`, NOT `{ Length: > 0 }` — must agree with SettingsStore.ApplyTo's `??=`, which only fills a
+        // field when it is null. An explicit `--source ""` is non-null, so ApplyTo leaves it alone and the CLI value
+        // silently wins either way; the predicate here has to agree or the field is misattributed to SavedSettings/
+        // Default while the CLI's (empty) value is what actually took effect. [Review][Patch]
+        Source: settings.Source is not null,
+        Adrs: settings.Adrs is not null,
+        Output: settings.Output is not null,
+        ProjectName: settings.ProjectName is not null,
         // Boolean flags have no "unset" on the command line: absent is indistinguishable from an explicit off, so
         // only the on-state can be claimed as a CLI override. Same reasoning as SettingsStore.ApplyTo's tri-state.
         NoReadme: settings.NoReadme,
         DeepGit: settings.DeepGit,
-        CodeUrl: settings.CodeUrl is { Length: > 0 },
-        // A value-carrying option like the paths, not a bare flag: present means explicitly chosen. [Story 5.5]
+        CodeUrl: settings.CodeUrl is not null,
+        // TodayPolicy is deliberately still `{ Length: > 0 }`, not `is not null`: SiteSettings.Validate() and
+        // ResolveDatePolicy() both already treat an empty string identically to "not passed" (falls back to
+        // MachineLocal) — unlike the path/name fields above, there is no ApplyTo `??=` divergence to reconcile
+        // here, so aligning with THAT existing behavior is correct, not a bug. [Story 5.5]
         TodayPolicy: settings.TodayPolicy is { Length: > 0 });
 }
 
@@ -90,13 +97,16 @@ public static class SettingsResolver
     {
         // Snapshot FIRST: ApplyTo mutates in place and would otherwise erase the distinction. [AC #3]
         var cli = CliOverrides.Capture(settings);
-        var saved = SettingsStore.TryLoad(startDirectory);
+        // The out-param overload walks up exactly once and reports the location that actually supplied `saved` —
+        // not necessarily the nearest candidate, since a malformed nearer one is skipped rather than shadowing a
+        // valid ancestor. [Review][Patch]
+        var saved = SettingsStore.TryLoad(startDirectory, out var loadedFrom);
         if (saved is not null)
         {
             SettingsStore.ApplyTo(saved, settings);
         }
 
-        return new SettingsLoad(saved, saved is null ? null : SettingsStore.ResolvePath(startDirectory), cli);
+        return new SettingsLoad(saved, loadedFrom, cli);
     }
 
     /// <summary>Resolves an already-loaded configuration into absolute paths — exactly one call to the pure
@@ -177,11 +187,21 @@ public static class SettingsResolver
         {
             lines.Add(string.Create(
                 CultureInfo.InvariantCulture,
-                $"{LinePrefix} field={entry.Field} origin={OriginToken(entry.Source)} value={entry.EffectiveValue}"));
+                $"{LinePrefix} field={entry.Field} origin={OriginToken(entry.Source)} value={EscapeForLine(entry.EffectiveValue)}"));
         }
 
         return lines;
     }
+
+    /// <summary>Escapes an embedded newline out of a value bound for a <see cref="FormatConfigLines"/> line — reachable
+    /// via a hand-edited <c>.specscribe</c> or a value containing a literal newline — so it cannot split the value
+    /// across extra, unprefixed lines and break the documented one-line-per-field contract. [Review][Patch]</summary>
+    private static string EscapeForLine(string value)
+        => value.Contains('\n') || value.Contains('\r')
+            ? value.Replace("\r\n", "\\n", StringComparison.Ordinal)
+                .Replace("\r", "\\n", StringComparison.Ordinal)
+                .Replace("\n", "\\n", StringComparison.Ordinal)
+            : value;
 
     /// <summary>The lowercase token a script matches on. Spelled out rather than <c>ToString().ToLower()</c> so
     /// renaming an enum member cannot silently change a published contract.</summary>

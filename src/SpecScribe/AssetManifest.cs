@@ -19,4 +19,12 @@ public sealed record AssetManifest
     /// init module. The producer computes it from the rendered body (<see cref="Mermaid.ContainsBlock"/>), so
     /// the flag can never disagree with what the page actually contains.</summary>
     public required bool MermaidNeeded { get; init; }
+
+    /// <summary>Whether this page carries at least one Hierarchy Explorer (Story 20.5) and therefore needs the
+    /// vendored plotly.js bundle. Computed by the producer from the RENDERED BODY
+    /// (<see cref="HierarchyExplorer.ContainsHost"/>), exactly like <see cref="MermaidNeeded"/> — so the flag can
+    /// never disagree with what the page actually contains, which is the failure mode a hand-set boolean invites.
+    /// <para>Optional with a <c>false</c> default rather than <c>required</c>: every page that does not host a
+    /// hierarchy chart must stay byte-identical, and 1.2 MB is not a rounding error.</para></summary>
+    public bool HierarchyEngineNeeded { get; init; }
 }

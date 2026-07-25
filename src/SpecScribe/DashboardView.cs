@@ -139,4 +139,14 @@ public sealed record DashboardView
     /// Routed through this one builder → adapter path (never hand-appended to one surface) so HTML/webview/SPA stay
     /// parity-identical (Story 6.2 discipline). Mirrors <see cref="TraceabilityStripHtml"/>. [Story 20.3]</summary>
     public string RelatedWorkHtml { get; init; } = string.Empty;
+
+    /// <summary>Pre-rendered Story 20.5 <em>Hierarchy Explorer</em> block
+    /// (<see cref="HierarchyExplorer.Render"/>) — the whole framed panel: Story 10.2 framing, the shape selector,
+    /// the breadcrumb, the chart host, the data island and the text twin. Empty when there are no epics, which
+    /// omits the panel entirely rather than shipping an inert selector over an empty chart (NFR8).
+    /// <para>Built HERE rather than in the adapter for the same AD-2 reason as its siblings above — a section's
+    /// HTML comes from its view model, not from inside a delivery adapter (Story 6.2's guardrail; the Story 21.1
+    /// review had to patch exactly that). It also keeps HTML/webview/SPA parity-identical by construction.</para>
+    /// [Story 20.5]</summary>
+    public string HierarchyExplorerHtml { get; init; } = string.Empty;
 }

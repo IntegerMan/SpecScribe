@@ -476,6 +476,69 @@ public class StylesheetTests
 
     // ---- Story 3.8 seams (Git Insights hub tables + the sanctioned sort/filter enhancer) ----------
 
+    // ---- Story 20.5 seams (the Hierarchy Explorer component) --------------------------------------
+
+    [Fact]
+    public void Stylesheet_HasTheHierarchyPatternFillRule()
+    {
+        // THE rule with no Plotly attribute behind it. Plotly emits the hatch <path> inside every <pattern> with a
+        // `stroke` but NO `fill`, so SVG's initial black paints beneath every hatched sector (21 occurrences
+        // measured on the real dashboard). Config cannot fix it — the <pattern> element is generated, not
+        // configured — and this single rule took the foreign-colour count 1 -> 0. If it is ever "cleaned up"
+        // because the trace already sets colours, the chart goes back to painting black under 57 sectors.
+        Assert.Contains(".ss-hierarchy defs pattern > path { fill: none; }", ReadStylesheet());
+    }
+
+    [Fact]
+    public void Stylesheet_HasHierarchyExplorerRules()
+    {
+        var css = ReadStylesheet();
+        // The host is hidden until the component reveals it: reserving a chart-sized blank box for a chart that is
+        // never coming is worse for a JS-off visitor than no box at all.
+        Assert.Contains(".ss-hierarchy { display: none; }", css);
+        Assert.Contains(".ss-hierarchy[data-hierarchy-ready]", css);
+        Assert.Contains(".ss-hierarchy-breadcrumb", css);
+        Assert.Contains(".ss-hierarchy-twin", css);
+        // Owner decision D3's accepted cost, made explicit: the labelled explorer stacks its rail earlier so the
+        // chart gets full width before its labels get squeezed out.
+        Assert.Contains(".explorer-layout-labelled", css);
+    }
+
+    [Fact]
+    public void Script_DisablesTheModeBar_AndShipsNoCloudUploadOrRemoteOrigin()
+    {
+        // plotly.js 3.7.0 changed the modebar's cloud button to UPLOAD the chart to Plotly Cloud. For a
+        // local-first, offline-capable generator that control must never exist, so this is a privacy/NFR-3 guard
+        // rather than a cosmetic preference — and the empty server/topojson URLs remove every remote origin the
+        // bundle could otherwise consult. Asserted over the SHIPPED asset, not over a source comment.
+        var js = ReadScript();
+        Assert.Contains("displayModeBar: false", js);
+        Assert.Contains("plotlyServerURL: \"\"", js);
+        Assert.Contains("topojsonURL: \"\"", js);
+        Assert.Contains("displaylogo: false", js);
+        Assert.DoesNotContain("sendDataToCloud", js);
+
+        // No CDN anywhere on either shipped surface — the engine is vendored, always (ADR 0012 §1).
+        foreach (var asset in new[] { js, ReadStylesheet() })
+        {
+            Assert.DoesNotContain("cdn.plot.ly", asset);
+            Assert.DoesNotContain("plotly.com", asset);
+        }
+    }
+
+    [Fact]
+    public void Script_AdoptsTheExistingSeams_RatherThanMintingParallelOnes()
+    {
+        // Four contracts this component must ADOPT: Story 20.3's selection event, the SPA re-init seam, Story
+        // 20.2's own init guard (which is the takeover handshake), and the scope attribute the rail re-syncs from
+        // on init. Minting a second of any of them is the drift ADR 0012 exists to end.
+        var js = ReadScript();
+        Assert.Contains("specscribe:explorer-select", js);
+        Assert.Contains("specscribe:content-swapped", js);
+        Assert.Contains("data-explorer-ready", js);
+        Assert.Contains("data-sb-scope", js);
+    }
+
     [Fact]
     public void Stylesheet_HasGitInsightsTableStyles()
     {
