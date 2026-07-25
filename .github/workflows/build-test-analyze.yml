@@ -1,0 +1,189 @@
+# The repository's FIRST build+test gate (Story 25.1, Epic 25 / NFR11).
+#
+# Story 16.2 EXTENDS this workflow — branch protection, required-status-check
+# configuration, release-branch coverage. It must NOT create a second build+test
+# workflow. The required-check string 16.2 needs is the job name, verbatim:
+#
+#     build-test-analyze
+#
+# The quality gate itself is Story 25.2's: `sonar.qualitygate.wait` is
+# deliberately NOT set here, so a failing gate does not fail this build yet.
+name: Build, Test & Analyze
+
+on:
+  # Deliberately NO `paths:` filter. A build+test gate that skips on some paths
+  # is not a gate. (publish-docs-live-pages.yml correctly *does* filter, because
+  # it only republishes docs — a different job with a different contract.)
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  # Least privilege. SonarCloud PR decoration is performed by the SonarQube
+  # Cloud GitHub App using its own installation token, not by GITHUB_TOKEN, so
+  # `pull-requests: write` is not required here.
+  contents: read
+
+concurrency:
+  # Must NOT be `pages` — publish-docs-live-pages.yml owns that group, and
+  # sharing it would make the two workflows cancel one another.
+  group: build-test-analyze-${{ github.ref }}
+  # Superseded PR pushes are cancelled; `main` runs always complete, because a
+  # cancelled run on `main` would leave a commit with no analysis.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build-test-analyze:
+    name: build-test-analyze
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    env:
+      # The token is exposed to the job as an environment variable and is only
+      # ever referenced as $env:SONAR_TOKEN. It is never interpolated into a
+      # `run:` script body, which would inline the value into the rendered
+      # command. On pull requests from forks GitHub does not provide secrets,
+      # so this resolves to the empty string — see the `if:` guards below.
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      # The scanner tool targets an older .NET runtime than this repo's net10.0.
+      # Preemptive: lets it roll forward rather than fail to launch on a runner
+      # image that only carries the .NET 10 runtime.
+      DOTNET_ROLL_FORWARD: Major
+      DOTNET_NOLOGO: "true"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Sonar: "shallow clones should be disabled for a better relevancy of
+          # analysis" — blame data drives new-code detection and issue authorship.
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          # Every project in this repo targets net10.0. Do NOT copy the 9.0.x pin
+          # from publish-docs-live-pages.yml — SDK 9 cannot build a net10.0
+          # project, and that workflow only survives because the hosted runner
+          # image happens to ship a .NET 10 SDK alongside it.
+          dotnet-version: "10.0.x"
+          cache: true
+          cache-dependency-path: |
+            src/SpecScribe/SpecScribe.csproj
+            tests/SpecScribe.Tests/SpecScribe.Tests.csproj
+
+      - name: Setup Java
+        # SonarQube Cloud stopped supporting scanner runtimes below Java 21 on
+        # 2026-07-20 — analyses on Java 17 now FAIL rather than warn. JRE
+        # auto-provisioning would also cover this, but relying on an undeclared
+        # default makes the workflow's correctness invisible. Declared, not
+        # inferred. Left ungated so a guard bug can never surface as an obscure
+        # Java error at the `begin` step.
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Cache SonarQube Cloud scanner
+        id: cache-sonar-scanner
+        uses: actions/cache@v4
+        with:
+          path: .\.sonar\scanner
+          key: ${{ runner.os }}-sonar-scanner
+          restore-keys: ${{ runner.os }}-sonar-scanner
+
+      - name: Install SonarQube Cloud scanner
+        if: steps.cache-sonar-scanner.outputs.cache-hit != 'true' && env.SONAR_TOKEN != ''
+        run: |
+          New-Item -Path .\.sonar\scanner -ItemType Directory -Force | Out-Null
+          dotnet tool update dotnet-sonarscanner --tool-path .\.sonar\scanner
+
+      # ---------------------------------------------------------------------
+      # begin -> build -> test -> end, in this order and no other. The scanner
+      # injects MSBuild targets during `begin`; anything built before `begin`
+      # produces an empty analysis.
+      # ---------------------------------------------------------------------
+
+      - name: SonarScanner begin
+        if: env.SONAR_TOKEN != ''
+        run: |
+          .\.sonar\scanner\dotnet-sonarscanner begin `
+            /o:"integerman-github" `
+            /k:"IntegerMan_SpecScribe" `
+            /d:sonar.token="$env:SONAR_TOKEN" `
+            /d:sonar.cs.opencover.reportsPaths="**/TestResults/**/coverage.opencover.xml" `
+            /d:sonar.exclusions="src/SpecScribe/assets/prism.js,src/SpecScribe/assets/prism.css,src/SpecScribe/assets/plotly-hierarchy.min.js,spike/**,tools/**,extension/node_modules/**,extension/dist/**,extension/bin/**,SpecScribeOutput/**,docs/live/**,artifacts/**,_bmad-output/**"
+
+      - name: Build
+        # --no-incremental: an incremental build can skip compilation entirely
+        #   and hand the scanner nothing to analyze.
+        # --disable-build-servers: stops MSBuild node processes holding the
+        #   scanner's DLLs locked, which matters most on Windows runners.
+        # No `continue-on-error` and no `if: always()` anywhere in this job — a
+        # red build or a red test must stop the run.
+        run: dotnet build SpecScribe.slnx --no-incremental --disable-build-servers
+
+      - name: Test
+        # Coverage is emitted as OpenCover, not coverlet's Cobertura default:
+        # SonarScanner for .NET reads `sonar.cs.opencover.reportsPaths` and does
+        # not document Cobertura support for C#. Produced here — after `build`,
+        # before `end` — because a report written after `end` is silently ignored.
+        run: dotnet test SpecScribe.slnx --no-build --collect:"XPlat Code Coverage;Format=opencover"
+
+      - name: SonarScanner end
+        if: env.SONAR_TOKEN != ''
+        run: .\.sonar\scanner\dotnet-sonarscanner end /d:sonar.token="$env:SONAR_TOKEN"
+
+  # -------------------------------------------------------------------------
+  # Portability probe (Story 25.1 AC #4).
+  #
+  # The ~2,350-test suite has never executed off the owner's Windows machine,
+  # and GoldenContentFingerprint is a byte-exact SHA-256 over every generated
+  # file with no .gitattributes in this repo to normalize line endings. This
+  # job measures that divergence instead of guessing at it.
+  #
+  # It is INFORMATIONAL: `continue-on-error` is set at the JOB level so a Linux
+  # divergence is reported as a finding rather than blocking the gate. That is
+  # not a weakening of AC #1 — build-test-analyze above is the gate, and it has
+  # no such escape. Story 16.2 must require `build-test-analyze` and must NOT
+  # require this job.
+  # -------------------------------------------------------------------------
+  portability-probe:
+    name: portability-probe (ubuntu, non-gating)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 30
+
+    env:
+      DOTNET_NOLOGO: "true"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+          cache: true
+          cache-dependency-path: |
+            src/SpecScribe/SpecScribe.csproj
+            tests/SpecScribe.Tests/SpecScribe.Tests.csproj
+
+      - name: Build
+        run: dotnet build SpecScribe.slnx --no-incremental --disable-build-servers
+
+      - name: Test
+        # No coverage here — this job answers "does the suite pass on Linux",
+        # not "what is covered". Analysis is never uploaded from this job.
+        run: dotnet test SpecScribe.slnx --no-build

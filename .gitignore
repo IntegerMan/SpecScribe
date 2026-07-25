@@ -494,3 +494,10 @@ docs/live/
 *.patch
 
 *.diff
+
+# SonarScanner for .NET working directories (Story 25.1).
+# NOTE: TestResults/ and coverage*.xml are already covered above by the
+# [Tt]est[Rr]esult*/ and coverage*.xml rules -- verified with git check-ignore --
+# so no redundant rule is added for them here.
+.sonarqube/
+.sonar/
