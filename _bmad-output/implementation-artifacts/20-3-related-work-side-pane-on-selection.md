@@ -4,7 +4,7 @@ baseline_commit: 8db18aaddd7cc1325910bfc9b00e0ae9d1ac66a1
 
 # Story 20.3: Related-Work Side Pane on Selection
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -117,7 +117,38 @@ Implemented:
 
 ### Review Findings
 
-_(populated during code-review)_
+Reviewed 2026-07-24 via `/bmad-code-review 20.3` (Blind Hunter + Edge Case Hunter + Acceptance Auditor, run in parallel against a file-scoped diff of this story's own File List, baseline `8db18aa`→HEAD). Sibling-story hunks riding the same shared files (`SiteGenerator.cs`'s Story 5.3/5.5 work, `SunburstExplorer.cs`'s `noPlanWeight` threading) were excluded per CLAUDE.md's shared-`main` scoping rule.
+
+**Decision needed — resolved by owner 2026-07-25:**
+
+- [x] [Review][Decision] Related-work pane renders inside the VS Code webview, contradicting this story's own "Anti-patterns to prevent: Leaking the block into the webview/CLI surfaces (HTML+SPA only)". **Owner decision: keep it in the webview; correct the story text instead** — folded into the patch list below.
+- [x] [Review][Decision] Two `aria-live="polite"` regions announce on a single chart selection (the explorer's "Zoomed into Epic N" + the pane's "Related work for Epic N."). **Owner decision: merge into one announcement** — the explorer's own live region stays the one authoritative per-click announcement; the pane's live region should only speak for information the explorer doesn't already convey (the empty-selection result) — folded into the patch list below.
+
+**Patch:**
+
+- [x] [Review][Patch] Correct the "Anti-patterns to prevent" bullet in Dev Notes (and elevate the "Parity and surface reach" Completion Notes paragraph to the same "Deviation, reasoned" prominence the `edges` deviation got) now that the owner has confirmed the webview should keep the pane — the rule should read as a documented exception, not a broken absolute [story file Dev Notes + Completion Notes].
+- [x] [Review][Patch] Suppress the redundant "Related work for Epic N." / "Showing project overview." live-region announcements in `revealRelatedCard` (they duplicate the explorer's own "Zoomed into Epic N" / "Showing all epics" announcements) while keeping the "No related work items for Epic N." empty-state announcement, which is genuinely new information the explorer's live region never conveys [src/SpecScribe/assets/specscribe.js:2191-2224].
+
+- [x] [Review][Patch] JS-off relationship data renders collapsed, not expanded — breaks AC #2/NFR8's "expanded with JS off" guarantee and contradicts the Completion Notes' own claim of live verification with "all `<details>` expanded" [src/SpecScribe/RelatedWorkTemplater.cs:81] — the `<details class="related-card-full">` element ships with no `open` attribute, so it renders collapsed by default per the HTML spec; a JS-off visitor must click each card to see its relationships.
+- [x] [Review][Patch] `RelatedWorkModel.Overflow`/`OverflowLabels` are computed from the work graph's own honestly-reported draw overflow but never read or rendered anywhere in the pane, contradicting the Completion Notes' explicit "surfaced in the pane rather than under-reported (rule 5)" claim [src/SpecScribe/RelatedWork.cs:71-72,144-145,164-165] — `RelatedWorkCards.Build`/`RelatedWorkPaneModel`/`RelatedWorkTemplater.RenderPane` never reference `.Overflow`/`.OverflowLabels`.
+- [x] [Review][Patch] A story cross-referenced from another epic's follow-up (as a `StemmedFrom`/`Resolves` source, before its own epic's subgraph is processed) has its `ScopeAnchor` bound to the wrong (first-referencing) epic, so if that story's own related-work groups exceed `MaxEntriesPerGroup`, its "+N more" deep link points at the wrong epic's anchor on `work-graph.html` [src/SpecScribe/RelatedWork.cs:150-158,200-202] — `scopeOfNode` is a first-seen-wins map and `AncestorIslandIdFor` already derives a story's home epic from its own id for the *fold* path, but the node's *own-section* `Anchor` still comes from whichever subgraph happened to reference it first.
+- [x] [Review][Patch] A selection change can silently drop keyboard focus to `<body>` when the focused card (e.g. its "View details" link) becomes `hidden`, with no focus redirection to the newly-current card or the pane heading [src/SpecScribe/assets/specscribe.js:2191-2208] (`revealRelatedCard`).
+- [x] [Review][Patch] `storySubjectsByEpic` (a `Dictionary<string, List<RelatedWorkSubject>>`) is enumerated directly with no explicit order list in the "epic with story relationships but no scope node of its own" fallback path, unlike every other place in this story that explicitly avoids relying on dictionary enumeration order for the FR31 determinism/golden-fingerprint invariant [src/SpecScribe/RelatedWorkCards.cs:102].
+- [x] [Review][Patch] Reduced-motion cancellation for the card-reveal fade targets a selector (`.related-node`) that no shipped markup ever has (the real class is `.related-card` + attribute `data-related-node`), so the explicit "paired reduce block" cancellation Task 5 describes never fires [src/SpecScribe/assets/specscribe.css:6308]. Functionally masked today by the pre-existing universal `*, *::before, *::after { animation-duration: 0.01ms !important }` override two lines above (line 6276-6278) — so no real reduced-motion user sees the fade — but the selector should still be corrected to match the documented belt-and-suspenders intent.
+- [x] [Review][Patch] `RelatedWorkCards.Resolve()`'s story-id branch and the private `StorySummary` helper are unreachable dead code — both call sites already filter out or synthesize past any node whose island id is a bare story id before `Resolve()` runs, a leftover from before the owner's "no standalone story cards" redesign [src/SpecScribe/RelatedWorkCards.cs:140-146,155-164].
+- [x] [Review][Patch] The "drop the story's own outgoing Contains/Part-of group" filter predicate is written independently in two files rather than shared, a duplication risk this story explicitly avoided elsewhere (single-sourcing `NodeText`/`EdgeVerb`) [src/SpecScribe/RelatedWork.cs:210-211; src/SpecScribe/RelatedWorkCards.cs:80].
+- [x] [Review][Patch] No direct unit test exercises the new `BmadCommands.PrimaryEpicCommand`/`PrimaryProjectCommand`/`RenderPrimaryActionBadge`, and `RelatedWorkTests` derives island ids via the 2-arg `Charts.SunburstExplorerNodes(epics, geometry)` overload rather than the real 3-arg production call `DashboardViewBuilder.BuildRelatedWorkHtml` uses (`epicsModel, geometry, unplannedGeometry`) — a regression in how the orphan/unplanned root surfaces through `UnplannedWorkGeometry` would go uncaught [tests/SpecScribe.Tests/RelatedWorkTests.cs:326].
+
+All 11 patches applied 2026-07-25 (including the two resolved decisions). Full suite green (2354 passed / 3 skipped /
+0 failed). Golden fingerprint regenerated `9232e3f5…` → `9288bf55…` (asset-bytes-only delta — `specscribe.css`/`.js`
+changed, no dashboard markup shift visible to the no-work-graph fixture), stable across 2 repeated runs. Verified
+live: JS-off (genuinely script-blocked sandbox iframe) shows all 15 `<details>` expanded and the overflow note ("38
+more related items not drawn"); JS-on confirms focus redirects to the newly-current card instead of `<body>`, and
+the "Related work for X" announcement is suppressed while the empty-state announcement still fires.
+
+**Deferred:**
+
+- [x] [Review][Defer] `epicsByNumber = epics.Epics.ToDictionary(e => e.Number)` throws on a duplicate epic number with no dedup guard [src/SpecScribe/RelatedWorkCards.cs:61] — deferred, pre-existing: the same unguarded pattern already exists at `Charts.cs:4322` and `RequirementsParser.cs:55,307`, so this is a codebase-wide assumption this story inherited, not a regression it introduced.
 
 ## Dev Notes
 
@@ -188,7 +219,7 @@ The pane groups by the four shipped edge kinds. If/when Epic 19 (or Epic 24's co
 - A new tooltip node instead of the body-level `.ss-tooltip` seam.
 - Introducing a framework/bundler by default (ADR-triggering — escalate).
 - Positional-id fragility: keying the pane on `d{epic}-{i}` derived from a *second* ordering that can drift from `WorkGraphBuilder`'s — prefer a stable slug/href identity.
-- Leaking the block into the webview/CLI surfaces (HTML+SPA only).
+- Leaking *interactive* markup (the `specscribe.js` reveal block, the explorer's own island/script) into the webview/CLI surfaces. **Amended 2026-07-25 (owner decision, code review):** the Related-work pane itself is an exception, not a violation — it is server-rendered content with no script or JSON island of its own, so it ships in the webview like any other static section (`TraceabilityStripHtml`, the sunburst SVG). The rule still holds for anything that depends on client JS to be meaningful.
 
 ### Project Structure Notes
 
@@ -446,11 +477,16 @@ Routed builder → `DashboardView.RelatedWorkHtml` → adapter, mirroring `Trace
 webview render identical bytes from one path. `_workGraph` is threaded into all three `BuildIndexPage`/`RenderIndex`
 call sites.
 
-**Webview deliberately NOT gated out**, which departs from the story's Task 6 phrasing. The explorer's *interactive*
-markup is a webview non-goal, but this pane is not interactive markup — it is server-rendered content whose links
-resolve inside the captured webview site. Gating it out would remove working content from a surface that can use
-it, to honour a rule written about scripts. The webview strips JSON islands (`WebviewRenderAdapter.cs`), and the
-pane has none, so nothing needed a new `HostRenderException`.
+**Deviation, reasoned — webview deliberately NOT gated out.** This departs from the story's Task 6 phrasing and its
+own "Anti-patterns to prevent" bullet ("Leaking the block into the webview/CLI surfaces (HTML+SPA only)"), which was
+written about the explorer's *interactive* markup — a genuine webview non-goal. This pane is not that: it is
+server-rendered content with no script or JSON island of its own, whose links resolve inside the captured webview
+site exactly like `TraceabilityStripHtml` or the sunburst SVG already do. Gating it out would remove working content
+from a surface that can use it, to honour a rule written about scripts. The webview strips JSON islands
+(`WebviewRenderAdapter.cs`), and the pane has none, so nothing needed a new `HostRenderException`. **Confirmed by
+owner at code review (2026-07-25):** keep the pane in the webview; the "Anti-patterns to prevent" bullet in Dev Notes
+was amended in place to state this as a documented exception rather than an absolute the shipped code silently
+broke.
 
 No `RenderParity` case was added. `RenderParity.cs` has **no island or pane fact awareness at all** — Story 20.1's
 review §4a established that its "a dropped fact must make the forms differ" guarantee did not hold when written.

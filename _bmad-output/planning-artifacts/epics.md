@@ -88,6 +88,13 @@ FR36: Explore and provide baseline coverage for BMad's own module and expansion 
 
 <!-- FR35–FR36 added 2026-07-11 (SCP 2026-07-11, correct-course): FR35 seats the VS Code Native-Integration Recommendations (docs/VSCodeIntegrationRecommendations.md, R1–R8) as Epic 6 host-integration surface growth; FR36 seats Epic 18 (BMad module/expansion exploration), distinct from the third-party-framework Epics 11–15. Sync back into the PRD when convenient. -->
 
+FR41: Optionally ingest external code-analysis findings (SonarCloud first) from a configured source and surface them alongside the entities SpecScribe already models — code files, directories, epics, stories, and requirements — through one source-agnostic findings model, so a project's quality signal is readable in the same place as its delivery signal. The integration is disabled by default and every surface degrades to absent-not-broken when it is unconfigured, disabled, or unavailable.
+
+<!-- FR41 added 2026-07-25 (SCP 2026-07-25, correct-course, owner-directed) to seat Epic 26 (optional external
+     code-analysis insights in the portal, Sonar first). Sync into the PRD when convenient — same treatment as
+     FR37–FR40. Note FR37–FR40 are declared at their epics' Epic List entries rather than in this list; FR41 is
+     listed here because it is a product capability with cross-epic coverage. -->
+
 ### NonFunctional Requirements
 
 NFR1: Baseline generation performance remains responsive for local OSS repositories, with deeper analytics separated from baseline runs.
@@ -119,6 +126,19 @@ NFR9: Release builds are reproducible and produced by CI from a clean checkout; 
 NFR10: SpecScribe is hardened to run safely and correctly against both public and private codebases before community publication: generated output leaks no secrets or unintended private content, rendered surfaces are injection-safe, untrusted-workspace / tool-resolution attack surfaces are closed, dependencies are audited, and no personal-structure assumptions remain — verified by a dedicated pre-publication hardening review.
 
 <!-- NFR10 added 2026-07-11 (SCP 2026-07-11, correct-course) for Epic 17 (Code Hardening & Release-Readiness Review), which runs after feature completion and before Epic 16's publication/cut stories. -->
+
+NFR11: SpecScribe's own codebase is continuously analyzed by an automated code-quality service on every push to the default branch and on pull requests, with the analysis attached to a reproducible clean-checkout build+test run, and with findings triaged into the project's own backlog rather than only viewed on an external dashboard.
+
+NFR12: External-service integrations are opt-in, offline-safe, and credential-safe: disabled by default, never required for baseline generation, generation succeeds unchanged when the service is unreachable or unconfigured, and no secret, token, or credential value is ever written into generated output or into a directory-scoped settings file that is committed.
+
+<!-- NFR11–NFR12 added 2026-07-25 (SCP 2026-07-25, correct-course, owner-directed): NFR11 seats Epic 25 (SonarCloud
+     continuous analysis of SpecScribe's OWN codebase — dev-time, ships no product code); NFR12 is the cross-cutting
+     opt-in / offline-safe / credential-safe posture every external-service integration must honor, and is AD-4
+     ("optional insight providers may enrich output but never own baseline success") restated for a NETWORKED
+     provider. Epic 26 is the first integration bound by it.
+     ⚠️ These two entries are appended to THIS list only. The PRD § 8 NFR list is numbered independently and already
+     disagrees with this one (see the NUMBERING COLLISION note above NFR7). This SCP deliberately does NOT resolve
+     that collision — it remains its own open item, now with two more entries riding on the unresolved numbering. -->
 
 ### Additional Requirements
 
@@ -216,6 +236,9 @@ FR38: Epic 20 - Standardized Hierarchy Explorer component (Plotly-based sunburst
 FR39: Epic 21 - Value & correlation insights (traceability coverage matrix, delivery cadence / cycle-time, planning↔code impact map) derived at generation time.
 FR40: Epic 24 - File-level change-coupling intelligence (directional confidence/support/lift + cross-boundary emphasis) rendered as an accessible ranked list AND interactive multi-form relationship graphs (force-directed network, chord/arc, adjacency-matrix heatmap) at per-file and whole-repo scopes, derived at generation time from git history.
 NFR10: Epic 17 - Pre-publication code hardening and security/privacy review for public + private codebase readiness.
+FR41: Epic 26 - Optional external code-analysis findings surfaced against code, directories, and planning entities.
+NFR11: Epic 25 - Continuous SonarCloud analysis of SpecScribe's own codebase on every push to main, with findings triaged into the project backlog.
+NFR12: Epic 26 - Opt-in, offline-safe, credential-safe posture for external-service integrations.
 
 ## Epic List
 
@@ -315,6 +338,28 @@ Replace the C# presentation/templating layer with a component-oriented **Vue + N
 ### Epic 24: File Relationship & Change-Coupling Insights — Directional Metric + Multi-Form Coupling Graphs
 Turn "what changes alongside this file" from a flat co-change list into a rigorous, richly visual relationship surface: upgrade coupling from raw symmetric counts to **directional strength** (confidence / support / lift) with cross-boundary "surprising coupling" emphasis, and render the relationships as **polished, interactive graphs in three complementary forms** — force-directed network, chord/arc diagram, and adjacency-matrix heatmap — at **two scopes**: a per-file ego graph on code pages and a whole-repo coupling explorer. The upgraded ranked list is retained as the accessible text-twin. All metrics derive at generation time from the existing `--deep-git` numstat parse (no new git calls); every interactive graph degrades to static SVG + text when JavaScript is off (NFR8).
 **FRs covered:** FR40 (sync into PRD when convenient) · **UX-DRs:** UX-DR19, UX-DR20, UX-DR21 · **NFRs:** NFR8 · **Status:** backlog · unscheduled · **Source:** market research 2026-07-22 (git-activity file-level insights).
+
+### Epic 25: Continuous Code-Quality Analysis for SpecScribe's Own Development (SonarCloud)
+Put SpecScribe's own codebase under continuous automated analysis: every push to `main` and every pull request builds, tests, and is analyzed by SonarCloud on a clean checkout, with a quality gate that fails loudly and findings that are **triaged into this project's own backlog** rather than left on an external dashboard. Also defines — via a spike and one implementation — the **framework-neutral contract** by which analysis findings reach AI agents doing spec-driven development work, which Epic 26's human-facing surfaces then reuse. Dev-time only: **ships no product code.**
+**NFRs covered:** NFR11 · **Status:** backlog · **Note:** pulls the CI build+test foundation ahead of Story 16.2, which is amended to extend this workflow rather than create a second one.
+
+### Epic 26: Optional External Code-Analysis Insights — Findings Alongside Code, Directories, and Planning
+Make external code-quality analysis an **optional insight provider** in SpecScribe (AD-4), so a user who has Sonar can see findings rendered against the entities the portal already models — code files, directories, epics, stories, and requirements — through **one source-agnostic findings model** that compiler/analyzer warnings and other services can ride later. Led by an owner-elicited ideation round (26.1) and a decision-first spike (26.2) that settles the ingestion posture, the credential design, and the NFR-3 local-first question with a ratified ADR before any surface is built. Optional in the tool; disabled by default; every surface degrades to absent-not-broken.
+**FRs covered:** FR41 · **NFRs:** NFR12, NFR8 · **UX-DRs:** UX-DR17, UX-DR21, UX-DR22 · **Status:** backlog · unscheduled · **Depends on:** Story 25.3 (the findings contract), Epic 7 (code pages), Story 21.3 (`PlanningCodeImpact`, the shipped story↔file miner), Story 5.2 (`SettingsResolver`).
+
+<!-- Epics 25–26 added 2026-07-25 (SCP 2026-07-25, correct-course, owner-directed). Split per owner decision D1:
+     Epic 25 = "useful for developing the tool" (dev-time CI, no product code); Epic 26 = "optional in the tool"
+     (product capability). Owner decision D2 reframed the AI-agent thread as INBOUND and VISUAL — findings attach to
+     entities SpecScribe already models — so the framework-neutral contract lands ONCE in Story 25.3 and Epic 26's
+     surfaces consume it, rather than two epics inventing two findings models. Owner decision D3 left the ingestion
+     posture (SonarCloud web API vs on-disk export) and the NFR-3 crossing to Story 26.2's spike + ADR.
+     The model is SOURCE-AGNOSTIC from the first line — the owner's "we could potentially fold in code analysis
+     warnings as well, but that gets to be language dependent" is exactly why Sonar must be instance #1, not the
+     schema; additional source classes are scoped to Story 26.7.
+     STRUCTURAL CONSEQUENCE: this repository has NO build/test CI today (.github/workflows/ holds only
+     publish-docs-live-pages.yml) and the story that would add it — 16.2 — is backlog behind the entire roadmap.
+     Story 25.1 therefore stands up the FIRST build+test workflow and Story 16.2 is AMENDED to extend it rather than
+     create a second one. Append-only, no renumber. -->
 
 <!-- Epic 24 added 2026-07-22 (owner-directed, from the git-activity file-level-insights market research —
      _bmad-output/planning-artifacts/research/market-git-activity-analysis-tools-file-level-insights-research-2026-07-22.md).
@@ -2638,6 +2683,17 @@ So that packaging work starts with an agreed scope and no surprise blockers.
 
 ### Story 16.2: Continuous Integration Build & Test Gate
 
+<!-- AMENDED 2026-07-25 (SCP 2026-07-25, correct-course): Story 25.1 stands up SpecScribe's FIRST build+test CI
+     workflow, because SonarCloud analysis of a C# project must wrap a real build and the owner wants it useful
+     DURING development — while this story sits backlog behind the entire roadmap. This story therefore no longer
+     CREATES the gate; it HARDENS the Epic 25 workflow into a release-relevant required gate (branch protection,
+     required-check status, release-branch coverage, and any release-specific matrix). Do NOT create a second
+     build+test workflow — two workflows that both build and test is the exact drift class this project has
+     repeatedly paid for. FR/NFR coverage is unchanged: this story still covers NFR9.
+     Previous AC #1 wording: "Given a pull request or push to a release-relevant branch / When CI runs / Then it
+     restores, builds, and executes the `tests/SpecScribe.Tests` suite on a clean checkout, and the job fails on any
+     build or test failure." -->
+
 As a maintainer,
 I want every pull request and push to build and run the test suite in CI,
 So that release builds start from a known-green baseline and regressions are caught before merge.
@@ -2645,9 +2701,10 @@ So that release builds start from a known-green baseline and regressions are cau
 **Acceptance Criteria:**
 
 1.
-**Given** a pull request or push to a release-relevant branch
-**When** CI runs
-**Then** it restores, builds, and executes the `tests/SpecScribe.Tests` suite on a clean checkout, and the job fails on any build or test failure.
+**Given** the build+test+analyze workflow established by Story 25.1
+**When** this story runs
+**Then** it is extended and configured as a **required** status check for release-relevant branches — covering pull requests and pushes — restoring, building, and executing the `tests/SpecScribe.Tests` suite on a clean checkout and failing on any build or test failure
+**And** it does **not** introduce a second workflow that duplicates the build or test steps.
 
 2.
 **Given** the gate is green
@@ -2852,7 +2909,13 @@ So that neither a hostile public repo nor a sensitive private one can produce an
 **Given** SpecScribe may run on a private codebase
 **When** the privacy review runs
 **Then** generated output is confirmed to leak no secrets or unintended private content beyond what the source artifacts already expose, no personal-structure assumptions remain that would misrender or drop a differently-organized repo (Epic 4 de-personalization verified end to end), and third-party dependencies (C# and the extension's npm tree) are audited for known vulnerabilities
-**And** local-first / no-remote-telemetry operation (NFR3) is re-confirmed for every code path added since it was last verified.
+**And** local-first / no-remote-telemetry operation (NFR3) is re-confirmed for every code path added since it was last verified
+**And** the audit scope explicitly includes the CI supply chain introduced by Epic 25 (the SonarScanner and any CI actions, plus the third-party service's access to the repository) and, if Epic 26 shipped, its external-service integration — verifying that no credential value reaches generated output or a committed settings file (NFR12), that the integration is off by default, and that the NFR3 re-confirmation accounts for the outbound network path Story 26.2's ADR authorized.
+
+<!-- AC #2's third clause added 2026-07-25 (SCP 2026-07-25, correct-course): Epics 25/26 add a CI scanner, a
+     third-party service with repository access, and (if 26 ships) a credentialed outbound integration — all new
+     supply-chain and privacy surface. Without naming them here, this epic would audit a pre-Sonar tool. -->
+
 
 ### Story 17.3: Performance and Efficiency Pass
 
@@ -3245,6 +3308,22 @@ So that every hierarchy surface shares one implementation, one interaction gramm
 **When** the datasource projects that node's weight
 **Then** the node is sized to the **average weight of the drafted nodes** — not a 1-unit sliver that reads as misleadingly trivial — while every drafted node keeps its honest weight (the floor only lifts, it never shrinks a real wedge), and a project with nothing drafted yet falls back to the historical 1-unit floor
 **And** the component **preserves** this policy rather than re-deriving it: the interim SVG glance + Story 20.2 explorer island already ship it via `Charts.SunburstNoPlanStoryWeight` (threaded through `SunburstStoryWeight`/`SunburstEpicWeight`), so Story 20.7's conversion must carry the average-bump forward — verified in a live browser that un-drafted stories render at a typical, clickable size, not a hairline.
+
+<!-- 2026-07-25 (create-story 20.5): four owner decisions elicited and locked. They constrain HOW the ACs above are
+     met; they do not amend them. Recorded here as well as in the story file because two of them are visible
+     product choices, not implementation detail. (D1) MOUNT — the component lands on the DASHBOARD ONLY, with the
+     server-rendered SVG KEPT UNDERNEATH as a live fallback: the component hides it and renders Plotly in its place
+     only on SUCCESSFUL mount. Nothing retires, so ADR 0013 §3's per-surface gate and Story 20.6's fingerprint
+     replacement stay intact, and Story 20.7's deletion becomes a clean subtraction. (D2) RING GEOMETRY — the 20.4
+     spike's Finding C ("parent weight ≠ Σ children", 14 of 25 parents disagree) is resolved as CHILDREN WIN: a
+     parent's value is the exact sum of its drawn children. Accepted cost: some epic sweeps shift visibly, because
+     today's Charts.SunburstEpicWeight also counts epic-level follow-up PEERS that are not drawn as children.
+     (D3) VISUAL DIRECTION — "Labelled explorer": larger radius, Plotly in-sector labels where they fit, a
+     breadcrumb bar above the chart, labelled treemap tiles. Accepted cost: it competes with Story 20.3's card rail
+     inside `.explorer-layout`, so the story carries a stacking-breakpoint plan the owner verifies in the iterate
+     round rather than silently shrinking labels to preserve the rail. (D4) WEBVIEW — the "does the webview keep
+     the island?" decision the spike assigned to 20.5 is DEFERRED TO STORY 20.7, which owns RenderParity and is
+     where the ADR 0005 CSP amendment lands jointly with Story 23.4; WebviewRenderAdapter.cs is untouched by 20.5. -->
 
 ### Story 20.6: Text-Twin Audit and Golden-Fingerprint Replacement — the ADR 0013 Gate
 
@@ -3873,3 +3952,340 @@ So that the choice ADR 0012 §4 explicitly deferred to "Epic 24's own spike" is 
 **When** the spike concludes
 **Then** it lands a **ratified ADR** recording the decision, its options table, and its consequences — either a new ADR that ADR 0012 §4 hands off to, or an explicit supersession of ADR 0012 if the choice unifies both families (the ECharts outcome ADR 0012's own options table pre-authorizes)
 **And** the report states what each finding hands to Stories 24.2/24.3/24.4/24.5, and resolves whether the Epic 24 ego graph **supersedes or coexists with** the shipped `Charts.ReferenceGraph` — which already renders a hub-and-spoke focal-file graph carrying a co-changed-file node population, four pre-rendered toggle variants, and cross-edges, and whose retirement would trigger an ADR 0013 §3 text-twin audit no Epic 24 story currently owns.
+
+<!-- Epics 25–26 added 2026-07-25 (SCP 2026-07-25, correct-course, owner-directed) — see the provenance comment in
+     the Epic List above for the full rationale, the D1–D3 owner decisions, and the Story 16.2 consequence. -->
+
+## Epic 25: Continuous Code-Quality Analysis for SpecScribe's Own Development (SonarCloud)
+
+Put SpecScribe's own codebase under continuous automated analysis. Every push to `main` and every pull request builds, tests, and is analyzed by SonarCloud on a clean checkout; a quality gate reports pass/fail as a visible signal; and — the half that makes this more than a dashboard — findings are **triaged into this project's own backlog** using the existing FR30 provenance conventions, so Sonar produces work items the maintainer acts on rather than a page they stop visiting. The epic also defines, via a spike and one implementation, the **framework-neutral contract** by which analysis findings reach AI agents doing spec-driven-development work. That contract is deliberately seated here rather than in Epic 26 because both epics bind to it: Epic 25's agents and Epic 26's human-facing surfaces must consume **one** findings model, not two.
+
+**Dev-time only — this epic ships no product code.** SpecScribe's generated portal output is unchanged by it; the golden fingerprint does not move.
+
+**NFRs covered:** NFR11 · **Status:** backlog · **Depends on:** nothing — Story 25.1 is schedulable immediately.
+
+**Structural note.** This repository has **no build/test CI today** — `.github/workflows/` contains only `publish-docs-live-pages.yml`. The story that would add one, **Story 16.2**, sits `backlog` behind the entire roadmap (Epic 16 runs last, after Epic 17's hardening sign-off). SonarCloud's C# analysis must wrap a real build, so **Story 25.1 stands up the repository's first build+test workflow** and **Story 16.2 is amended** to harden that workflow into a release-relevant required gate rather than create a second one. NFR9 coverage is unaffected.
+
+### Story 25.1: SonarCloud Onboarding and Automated Analysis on Every Push to `main`
+
+> Stands up SpecScribe's **first** build+test CI workflow. See the Story 16.2 amendment — 16.2 extends this workflow rather than creating a second one.
+
+As the SpecScribe maintainer,
+I want every push to `main` and every pull request to build, test, and be analyzed by SonarCloud on a clean checkout,
+So that code-quality regressions surface automatically instead of being discovered during a hardening epic months later.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a push to `main` or a pull request
+**When** CI runs
+**Then** a workflow restores, builds, and executes `tests/SpecScribe.Tests` on a clean checkout, runs the SonarScanner for .NET wrapping that build (begin → build → test → end), and uploads results to a SonarCloud project bound to `IntegerMan/SpecScribe`
+**And** the job fails on any build or test failure, and the workflow is independent of and does not disturb `publish-docs-live-pages.yml`.
+
+2.
+**Given** analysis requires a token
+**When** the workflow authenticates
+**Then** `SONAR_TOKEN` is read from a repository secret, no secret value is committed, and the workflow is safe on pull requests from forks (analysis is skipped or runs without the token rather than leaking it)
+**And** the SonarCloud project's visibility and the free-OSS-tier terms are recorded in the story record.
+
+3.
+**Given** test coverage improves finding quality
+**When** the analysis runs
+**Then** the story records an explicit decision on coverage collection — collector, report format, upload path, and the measured effect on suite runtime for a ~2,350-test suite — either implementing it or recording why it is deferred, never leaving it unstated.
+
+### Story 25.2: Quality Gate and Findings Triage into the Project Backlog
+
+As the SpecScribe maintainer,
+I want the analysis results scanned and routed into this project's own backlog,
+So that Sonar produces work items I actually act on rather than a dashboard I stop visiting.
+
+**Acceptance Criteria:**
+
+1.
+**Given** an analysis run completes
+**When** the quality gate evaluates
+**Then** a defined gate (new-code conditions at minimum) reports pass/fail as a visible signal on the pull request
+**And** the story records which conditions are enforcing vs advisory, and what a failing gate blocks.
+
+2.
+**Given** findings accumulate
+**When** they are triaged
+**Then** a documented, repeatable triage pass routes each material finding to a decision — fixed, scheduled into a named story, or explicitly accepted with rationale — and lands in `deferred-work.md` / `sprint-status.yaml` action items using the existing FR30 provenance conventions
+**And** the initial baseline triage of the existing codebase is performed and its result recorded, so Epic 17's hardening pass inherits a known state rather than an unread dashboard.
+
+3.
+**Given** findings overlap Epic 17's scope
+**When** triage runs
+**Then** items matching Stories 17.1–17.3 (structural, security/privacy, performance) are tagged to those stories rather than duplicated
+**And** anything Sonar reports that the project deliberately does not follow is recorded as a rule-level decision, not silently re-triaged every run.
+
+### Story 25.3: SPIKE — A Framework-Neutral Findings Contract for AI Agents in SDD Workflows
+
+> Decision-first, timeboxed (~2d), **throwaway — no production code**. Durable deliverables: `25-3-spike-report.md`
+> and a **ratified ADR**. This spike's contract is consumed by Story 25.4 **and** by all of Epic 26 — it is the one
+> place the findings model is defined.
+
+As a maintainer whose planning agents should know what the analyzer knows,
+I want the shape of agent-consumable analysis findings decided once — framework-neutral and source-agnostic —
+So that neither Epic 25's tooling nor Epic 26's surfaces invent a Sonar-shaped, BMad-shaped model that the other has to work around.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the owner's framework-neutral requirement (NFR8)
+**When** the spike defines the contract
+**Then** it specifies a findings model keyed to **entities SpecScribe already projects** — file, directory, epic, story, requirement — carrying at minimum: source/provider, rule identity, severity **on a normalized scale with a text label** (never color-alone, UX-DR17), location, message, and provenance/analysis timestamp
+**And** it demonstrates the model holds for a **second, structurally different source class** — compiler/analyzer warnings, which the owner flagged as language-dependent — proving Sonar is instance #1 and not the schema.
+
+2.
+**Given** findings must attach to planning entities, not just files
+**When** the spike defines attachment
+**Then** it specifies how a file-scoped finding reaches an epic/story/requirement, evaluating the **shipped** `PlanningCodeImpact` (`src/SpecScribe/PlanningCodeImpact.cs:54`) commit/branch miner and the Epic 19 work graph as the join, and states honestly where the join is approximate or absent
+**And** it states what happens to findings that attach to **no** planning entity (the common case) so they are never silently dropped.
+
+3.
+**Given** agents consume this in SDD workflows across frameworks
+**When** the spike evaluates delivery channels
+**Then** it compares — with a recommendation — at least: a generated agent-readable digest artifact, a field on the Epic 22 JSON IR, and an MCP-server surface; reporting for each the framework-neutrality (NFR8), the offline behavior, and whether it requires SpecScribe to gain a runtime it does not have
+**And** it states which channel Story 25.4 implements and what it defers.
+
+4.
+**Given** CLAUDE.md § Decision records
+**When** the spike concludes
+**Then** it lands a **ratified ADR** recording the findings contract, its options table, and its consequences — this is a cross-cutting contract two epics bind to, and must not be settled inside an implementation story's dev pass
+**And** the report states explicitly what it hands to Story 25.4 and to Stories 26.2–26.6.
+
+### Story 25.4: Agent-Consumable Findings Channel for SpecScribe's Own SDD Workflow
+
+As a maintainer running create-story and dev-story,
+I want the current analysis findings available to my agents in the channel Story 25.3 selected,
+So that planning and implementation passes account for known quality debt in the files they are about to touch.
+
+**Acceptance Criteria:**
+
+1.
+**Given** Story 25.3's ratified contract and selected channel
+**When** the channel is implemented
+**Then** current findings for this repository are emitted in the contracted shape and are demonstrably consumable by an agent during a real create-story or dev-story pass, with a worked example recorded
+**And** the implementation honors NFR12: it is opt-in, produces nothing rather than failing when findings are unavailable, and writes no token value anywhere.
+
+2.
+**Given** this is dev-time tooling, not a product feature
+**When** it ships
+**Then** it does not alter SpecScribe's generated portal output — the golden fingerprint is unmoved — and any code added is quarantined from the generation critical path, with Epic 26 named as the epic that makes findings a *product* surface
+**And** staleness is honest: consumers can tell how old the analysis is and when it predates the working tree.
+
+## Epic 26: Optional External Code-Analysis Insights — Findings Alongside Code, Directories, and Planning
+
+Make external code-quality analysis an **optional insight provider** in SpecScribe, so a user who has Sonar can see findings rendered against the entities the portal already models — code files, directories, epics, stories, and requirements — rather than in a separate tool. This is AD-4 ("optional insight providers may enrich output but never own baseline success") applied to a **networked** provider, which is why NFR12 exists: opt-in, offline-safe, credential-safe, and **disabled by default**.
+
+The findings model is **source-agnostic from the first line**. Sonar is instance #1, not the schema — the owner's "we could potentially fold in code analysis warnings as well, but that gets to be language dependent" is exactly the pressure the model must survive. Additional source classes are surveyed in Story 26.7, not assumed here.
+
+The epic is led by an owner-elicited **ideation** round (26.1) that fixes visual direction before any surface is built, and a decision-first **spike** (26.2) that settles the ingestion posture, the credential design, and the PRD NFR-3 local-first question with a ratified ADR. **The attach points already exist** — `CodeFileTemplater` (`src/SpecScribe/CodeFileTemplater.cs:18`), `FileInsight` (`src/SpecScribe/GitMetrics.cs:169`), `PlanningCodeImpact` (`src/SpecScribe/PlanningCodeImpact.cs:54`), and `SettingsResolver` (`src/SpecScribe/SettingsResolver.cs:63`) — so no new entity modelling is required to hang findings on code, directories, or planning items.
+
+**FRs covered:** FR41 · **NFRs:** NFR12, NFR8 · **UX-DRs:** UX-DR17 (severity is never color-alone), UX-DR21 (one primary representation per dataset; text twins are contract), UX-DR22 (designed empty states) · **Status:** backlog · unscheduled · **Depends on:** Story 25.3 (the findings contract it consumes), Epic 7 (code pages), Story 21.3 (`PlanningCodeImpact`), Story 5.2 (`SettingsResolver`).
+
+**Execution order:** 26.1 → 26.2 → 26.3 → 26.4 / 26.5 / 26.6. Story 26.7 is independent and schedulable at any time.
+
+<!-- 2026-07-25 (SCP 2026-07-25): THE NFR-3 CROSSING IS STORY 26.2's TO DECIDE, and is deliberately not pre-decided
+     here. If 26.2's spike selects the SonarCloud web API, SpecScribe makes its first outbound network call and gains
+     its first credential handling, which sits against the PRD's NFR-3 ("analysis runs locally BY DEFAULT; no remote
+     telemetry is REQUIRED FOR CORE OPERATION") and brushes the § 5 Non-Goal on remote data processing. Note NFR-3's
+     own qualifiers may already accommodate an opt-in, non-required integration — an amendment may prove to be a
+     clarification rather than a concession. 26.2 must state which it is, plainly, and draft exact replacement text
+     if an amendment is needed (the ADR 0013 / NFR-5 precedent: preserve prior wording + rationale inline; never
+     frame a real product concession as a reinterpretation). -->
+
+### Story 26.1: IDEATION — Where Analysis Findings Belong in the Portal
+
+> Owner-elicited ideation, per the project's create-story visual-intent convention. Deliverable is a decision record
+> naming the integration points and their visual direction — **no code**.
+
+As the owner,
+I want to decide deliberately where and how analysis findings should appear across the portal before any surface is built,
+So that the integration-point stories start from named visual direction instead of discovering it in a post-implementation revision round.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the entity set the owner named — code, directories, epics, stories, requirements
+**When** the ideation round runs
+**Then** it produces, for each candidate surface, a concrete proposal covering placement, density, empty state, and how severity reads **without color** (UX-DR17), with **2–3 named design directions** offered for every new visual surface and the owner's selection recorded
+**And** it names which candidates are **in** for Stories 26.4–26.6 and which are explicitly **out**, so the integration-point stories have a closed scope.
+
+2.
+**Given** the portal already carries substantial insight surfacing
+**When** placement is chosen
+**Then** the record states where findings **reuse** an existing surface (code pages, code map, traceability matrix, dashboard strip) versus where a **new** page is justified, and applies UX-DR21 (one primary representation per dataset)
+**And** it states what a project **without** any analysis configured sees — the default case for every user.
+
+3.
+**Given** the owner's "we could potentially fold in code analysis warnings as well"
+**When** scope is set
+**Then** the record states whether non-Sonar source classes are in scope for Epic 26's surfaces or deferred to Story 26.7, with the language-dependence trade-off recorded rather than left implicit.
+
+### Story 26.2: SPIKE — Ingestion Posture, Credential Design, and the NFR-3 Local-First Question
+
+> Decision-first, timeboxed (~2d), **throwaway — no production code**. Durable deliverables: `26-2-spike-report.md`
+> and a **ratified ADR**. **Gates Stories 26.3–26.6.**
+
+As a maintainer about to give SpecScribe its first outbound network capability,
+I want the ingestion posture and credential design decided on evidence with an ADR behind it,
+So that the local-first question is answered once, in the open, rather than implied by whichever implementation story happens to land first.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the owner deferred the posture to this spike
+**When** candidate sources are evaluated
+**Then** it reports, per candidate — **SonarCloud web API**, **on-disk scanner report/export**, and **both** — the data available, freshness, offline behavior, credential requirement, rate limits, and the failure mode when the source is missing or stale
+**And** it evaluates the on-disk path at its true cost, including whether a user without a SonarCloud account can get any value at all.
+
+2.
+**Given** PRD **NFR-3** ("analysis runs locally by default; no remote telemetry is required for core operation") and the § 5 Non-Goal on remote data processing
+**When** the spike assesses the crossing
+**Then** it states plainly whether the recommended posture **requires a PRD amendment** or is already accommodated by NFR-3's "by default" / "required for core operation" wording — and if an amendment is required, it drafts the exact replacement text with the prior wording and rationale preserved inline, following the ADR 0013 / NFR-5 precedent
+**And** it does **not** treat a real product concession as a reinterpretation.
+
+3.
+**Given** any network posture needs a credential
+**When** the spike designs credential handling
+**Then** it specifies where the token lives (environment variable, directory-scoped `.specscribe` via `SettingsResolver` `src/SpecScribe/SettingsResolver.cs:63`, or external), proves no token value can reach generated output, `--show-config`, the diagnostics page, or a committed settings file, and states the private-repository posture
+**And** it names the supply-chain surface any new dependency adds, handing it to Story 17.2 (NFR10).
+
+4.
+**Given** Story 25.3's contract and CLAUDE.md § Decision records
+**When** the spike concludes
+**Then** it lands a **ratified ADR** covering ingestion posture, credential design, and the AD-4 provider boundary, **consuming Story 25.3's findings model rather than defining a second one** — and stating explicitly if it must amend it
+**And** the report states what it hands to Stories 26.3–26.6 and to Epic 22's IR schema (Story 22.2).
+
+### Story 26.3: Analysis Integration Configuration (CLI, Interactive, and Settings Parity)
+
+As a user,
+I want to turn analysis integration on, point it at my project, and see where its configuration came from, using the same mechanisms as every other SpecScribe option,
+So that it is not a special case I have to learn.
+
+**Acceptance Criteria:**
+
+1.
+**Given** NFR7 configurability parity and AD-3
+**When** the integration is configured
+**Then** enablement and source configuration are available as CLI flags, in the interactive flow, and as directory-scoped `.specscribe` persistence — resolved once through `SettingsResolver` with three-way provenance visible in `--show-config`, per the Story 5.2 pattern
+**And** the README documents the options as a table with short descriptive text (PRD §12.3).
+
+2.
+**Given** NFR12 and AD-4
+**When** the integration is unconfigured, disabled, or the source is unreachable
+**Then** baseline generation completes unchanged and non-fatally with a clear diagnostic, findings surfaces are **absent rather than broken or misleadingly empty** (NFR8/UX-DR22), and default generation performance does not regress (NFR1)
+**And** **disabled is the default** — an existing user upgrading sees no behavior change and makes no network call.
+
+3.
+**Given** credentials
+**When** configuration is surfaced
+**Then** no token value appears in `--show-config`, the diagnostics page, generated output, or any file the tool writes into the repository — pinned by a regression test
+**And** a misconfigured or expired credential produces an actionable message, never a stack trace or a silent empty surface.
+
+### Story 26.4: Findings on Code Pages and the Code Map (File and Directory Scope)
+
+As a developer browsing a file in the portal,
+I want that file's analysis findings shown alongside its git and coupling signal,
+So that quality context lives where I am already looking instead of in a separate tool.
+
+**Acceptance Criteria:**
+
+1.
+**Given** an ingested findings set and a code page
+**When** it renders
+**Then** the file's findings appear on the page in the direction Story 26.1 selected, each showing rule, normalized severity **as text as well as any color** (UX-DR17/NFR8), message, and line — deep-linking to the existing `#L{n}` code anchor — attaching through the `CodeFileTemplater` / `FileInsight` seam (`src/SpecScribe/CodeFileTemplater.cs:18`, `src/SpecScribe/GitMetrics.cs:169`) rather than a parallel code-page pipeline
+**And** a file with no findings shows a designed empty state, never a broken or misleading one.
+
+2.
+**Given** the directory-scope surface (code map / treemap)
+**When** findings are surfaced there
+**Then** directory-level aggregation is rendered per Story 26.1's direction with a Story 10.2-compliant real-value legend, analysis window, and framing sentence
+**And** it honors the Hierarchy Explorer contract if it rides a hierarchy chart (ADR 0012) and carries a server-rendered text twin (ADR 0013 §3) verified JS-off in a live browser.
+
+3.
+**Given** deterministic generation (FR31)
+**When** the surfaces render
+**Then** output is stable across repeated runs from the same inputs, and the golden fingerprint move is intentional and re-baselined with a stability check across two runs (CLAUDE.md).
+
+### Story 26.5: Findings on Planning Entities (Epics, Stories, Requirements)
+
+As a stakeholder reading an epic or story,
+I want to see the quality findings in the code that work touched,
+So that "done" carries quality context and not only a status badge.
+
+**Acceptance Criteria:**
+
+1.
+**Given** Story 25.3's attachment rule and the shipped `PlanningCodeImpact` (`src/SpecScribe/PlanningCodeImpact.cs:54`)
+**When** findings are attached to planning entities
+**Then** epic, story, and requirement pages surface the findings in the code their work touched, using the existing miner as the join — never a second, divergent story↔file mapping
+**And** the attachment's **approximateness is stated on the surface**, following the Story 21.2 cycle-time precedent, so an inferred link is never presented as a tracked fact.
+
+2.
+**Given** many findings attach to no planning entity
+**When** the surfaces render
+**Then** unattached findings are reachable from the hub (Story 26.6) and are never silently dropped, and an entity with no attributable findings shows a designed empty state distinguishable from "analysis not configured" (UX-DR22/NFR8)
+**And** counts route through the existing single count source (FR21 / Story 8.3) rather than a new tally.
+
+3.
+**Given** NFR8 framework-agnosticism
+**When** the surfaces render for a non-BMad project
+**Then** they degrade to absent rather than broken where the framework lacks the underlying artifact types, with any framework-specific vocabulary supplied through the Epic 4 adapter contract.
+
+### Story 26.6: Analysis Hub Page and Dashboard Signal
+
+As a maintainer,
+I want one page that answers "what is the state of this project's code quality" and a compact dashboard signal pointing at it,
+So that findings have a home and a 30-second summary.
+
+**Acceptance Criteria:**
+
+1.
+**Given** an ingested findings set
+**When** the hub renders
+**Then** a dedicated page presents the findings set in the direction Story 26.1 selected — reachable from the insight-pages nav (FR27) on the integration's own gate, mirroring the Git Insights hub pattern — with sortable/filterable access to every finding including those attached to no planning entity
+**And** every chart on it carries a Story 10.2 real-value legend, analysis window, and framing sentence, plus a text twin per ADR 0013 §3.
+
+2.
+**Given** the dashboard's 30-second-pulse contract (Epic 8)
+**When** the signal renders
+**Then** a compact strip summarizes quality state and links to the hub, following the Story 21.1/21.2 dashboard-strip placement pattern, without displacing existing pulse content
+**And** it is absent — not empty — when the integration is disabled, which is the default.
+
+3.
+**Given** analysis data has an age
+**When** any surface renders
+**Then** the analysis timestamp is shown using the portal-wide date token (UX-DR25) and stale analysis is marked honestly rather than presented as current
+**And** output remains generation-time deterministic (FR31).
+
+### Story 26.7: INVESTIGATION — Future External-Service Integration Points
+
+> Investigation, timeboxed, **no production code**. Deliverable: a written landscape + recommendation record.
+> Independent of the rest of Epic 26 — schedulable at any time.
+
+As the maintainer deciding what SpecScribe should connect to next,
+I want the broader external-signal landscape surveyed once,
+So that the second and third integrations extend Story 26.2's provider boundary instead of each inventing their own.
+
+**Acceptance Criteria:**
+
+1.
+**Given** Sonar as the first external provider
+**When** the investigation surveys the landscape
+**Then** it inventories candidate external signal sources — for example GitHub code scanning / Dependabot / Actions status, coverage services, dependency-vulnerability services, other quality platforms, and **local compiler/analyzer output** (the owner's language-dependent case) — recording for each the data available, auth requirement, offline behavior, and whether it fits Story 25.3's findings model unchanged
+**And** it explicitly separates candidates that fit the existing model from those that would require a new one.
+
+2.
+**Given** NFR12 and AD-4
+**When** the investigation assesses the provider boundary
+**Then** it states whether Story 26.2's ingestion design generalizes to a **pluggable external-signal provider seam**, or whether each service needs bespoke work, with a concrete recommendation and the ADR trigger named if a seam is warranted
+**And** it assesses the local-first and credential-sprawl cost of each additional integration honestly, including the case for stopping at one.
+
+3.
+**Given** this is exploratory
+**When** it concludes
+**Then** it produces a **prioritized** recommendation of which integrations (if any) to seat as future stories, with a stated "none of these" option, feeding `deferred-work.md` / the epic backlog rather than auto-seating stories
+**And** it records what would have to be true for each candidate to become worth building.

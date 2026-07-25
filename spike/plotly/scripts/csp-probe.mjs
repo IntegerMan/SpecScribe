@@ -33,7 +33,7 @@ const adapter = readFileSync(resolve(here, '..', '..', '..', 'src', 'SpecScribe'
 const shipped = adapter.match(/<meta http-equiv="Content-Security-Policy" content="([^"]+)"/)?.[1]
 if (!shipped) { console.error('csp-probe: could not read the CSP string out of WebviewRenderAdapter.cs'); process.exit(1) }
 
-const base = (n) => shipped.replace(/__CSP_SOURCE__/g, self_).replace('__NONCE__', n)
+const base = (n) => shipped.replace(/__CSP_SOURCE__/g, self_).replace(/__NONCE__/g, n)
 
 const POLICIES = {
   webview: (n) => base(n),

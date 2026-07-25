@@ -83,11 +83,15 @@ correction for the ADR, not a blocker.
 
 | Artifact | min | min+gzip | min+brotli | ×`prism.js` (min) | ×`prism.js` (gzip) |
 |---|---|---|---|---|---|
-| **custom, standard** (4 traces) | **1,223,515** | **413,449** | 336,985 | **12.19×** | **4.12×** |
-| custom, `--strict` (4 traces) | 1,223,522 | 413,451 | 337,105 | 12.19× | 4.12× |
+| **custom, standard** (4 trace types / 5 modules incl. `core`+`calendars`) | **1,223,515** | **413,449** | 336,985 | **12.19×** | **4.12×** |
+| custom, `--strict` (4 trace types / 5 modules) | 1,223,522 | 413,451 | 337,105 | 12.19× | 4.12× |
 | custom, `--strict`, heatmap dropped | 1,191,574 | 400,522 | 329,660 | 11.87× | 3.99× |
 | upstream **full** bundle | 4,855,045 | 1,475,636 | 1,098,710 | 48.35× | 14.70× |
 | upstream **full strict** bundle | 5,198,413 | 1,577,856 | 1,151,381 | 51.77× | 15.71× |
+
+> "Trace types" (4: `heatmap`, `scatter`, `sunburst`, `treemap`) and "modules" (5: the above plus the non-trace
+> `core` and `calendars` components R1 found bundled in) count different things — both are given together above so
+> neither number is quoted alone as "the" trace count.
 
 **[HARNESS]** — `node scripts/measure-bundle.mjs`, `measurements/bundle.json`.
 
@@ -140,6 +144,14 @@ default `https://cdn.plot.ly/un/` (a geo-trace default; geo is not in this bundl
 | **Break-even page count** | **27** chart-carrying pages | |
 
 The portal carries **130**. The bundle is amortised roughly **five times over**.
+
+> **Read this figure as "amortised," not as "27 pages each individually clear the cost."** The 27-page break-even
+> is `bundle size ÷ average per-page saving` — an average, not a ranked list of which pages actually pay it off. The
+> two dominant pages alone (§3.3 below: `code-map.html` −3,493,000 B, `git-insights.html` −1,510,735 B) sum to
+> **−5,003,735 B, more than the entire portal-wide net delta.** That means the other 128 hierarchy-carrying pages
+> net out to roughly break-even or worse in aggregate — the win is concentrated in a small number of large surfaces,
+> not spread evenly across 27 of 130 pages. Story 20.7 should weigh per-surface adoption accordingly rather than
+> assuming a uniform per-page payoff.
 
 **Projection basis, stated plainly:** the one real island measures **23,258 B over 119 nodes = 195.4 B/node**. For
 the 129 surfaces with no island yet, the payload is projected as *(that page's actually-drawn node count) ×
@@ -246,6 +258,7 @@ it every golden fixture gains 1.2 MB.
 ## 4. AC #2 — the webview CSP axis (escalation trigger (a))
 
 **Verdict: PASS. Trigger (a) did not fire. The ADR 0012 §5 text-twin fallback is not selected by this evidence.**
+**This verdict is a lower bound (§4.5): `vscode-resource:` delivery and an Electron paint are untested.**
 
 The script and style axes are reported **separately**, per R3.
 
@@ -336,10 +349,10 @@ relaxation is required for the policy string itself**, which should make that am
 
 | UX-DR | Requirement | Verdict | Evidence |
 |---|---|---|---|
-| **UX-DR7** | Tab order, Enter/Space to drill, Escape to go up; per-node accessible names | **PASS (configured around)** | §5.1 — 10/10 survival steps intact |
+| **UX-DR7** | Tab order, Enter/Space to drill, Escape to go up; per-node accessible names | **PASS (configured around)** | §5.1 — 8/8 re-render events survived; Tab order is DOM order, not ring order (§5.1) |
 | **UX-DR16** | Landmarks, whole-chart accessible name, announced state | **PASS** | §5.2 |
 | **UX-DR17** | Status never signalled by color alone | **PASS** | §5.3 — three independent channels |
-| **UX-DR18** | `prefers-reduced-motion`: transitions snap, nothing loops | **PASS (configured around)** | §5.4 |
+| **UX-DR18** | `prefers-reduced-motion`: transitions snap, nothing loops | **PASS (configured around)** | §5.4 — the click-driven drill never animates at all; there is no transition to suppress |
 
 Verdicts use the story's decision rule verbatim. "Partial", "mostly" and "with work" do not appear.
 
@@ -369,8 +382,17 @@ Survival predicate, applied mechanically after each event: *sectors > 0 **and** 
 | 8 | **bare `Plotly.react`** the component did not initiate | 7 | ✅ | ✅ |
 | 9 | **`Plotly.relayout`** | 7 | ✅ | ✅ |
 
+**8/8 re-render events survived** (steps 2-9, the ones that actually re-render the chart); steps 0-1 are the
+initial-render and keyboard-reachability baseline, not survival tests. All 10 audited snapshots were **INTACT**,
+which is the more precise claim than "10/10 survival."
+
 **[SESSION]**, measured **under the shipped webview CSP** (the strictest realistic condition), and reproduced
 identically without CSP. `measurements/session.json § a11ySurvival`.
+
+**Untested:** two overlapping re-renders in flight at once (e.g. a second drill or a resize fired before the prior
+`plotly_afterplot` settles). Each of the ten steps above was triggered, awaited to settle, then the next was fired
+— the harness never drives a race between two update paths. Named here as an explicit boundary, not inferred to be
+safe.
 
 Step 8 is the adversarial one and it is the reason the verdict is trustworthy: an update path the component did
 **not** initiate still triggers `plotly_afterplot`, so the layer is restored. A layer that only survived the
@@ -495,6 +517,14 @@ never settles in a non-compositing tab. `plotly_afterplot` is the reliable seam 
 one that also fires for re-renders the component did not initiate. **Story 20.5 should hang the a11y layer on the
 event, never on the promise.**
 
+A sixth, from code review of this probe rather than a live measurement: **the probe's roving-tabindex
+`focusIndex` is not reclamped after a drill shrinks the sector count.** If the previously-focused sector's index
+exceeds the new (smaller) child count, no element receives `tabindex="0"` and the chart becomes unreachable by
+Tab until an arrow key or a fresh click re-establishes focus. This did not fire in this session's measured run
+(the tested epic's index stayed in-bounds after drilling), so the §5 verdicts are unaffected, but **Story 20.5's
+real implementation should clamp the roving index to the new sector count on every re-render**, not carry this
+probe's simplification forward.
+
 ---
 
 ## 8. Supply-chain record for the Epic 17 / NFR10 audit
@@ -545,6 +575,14 @@ This is SpecScribe's **first third-party runtime dependency**.
   Story 20.5's create-story elicitation, where the silhouette is the owner's call anyway.
 * **The golden fingerprint is not offered as evidence.** Per R9 it builds from a synthetic temp fixture and cannot
   move for a spike; Story 23.1 had to retract that exact claim as structurally vacuous.
+* **No real screen-reader/assistive-technology run.** All four a11y PASS verdicts in §5 rest on DOM structure and
+  computed-style introspection (`role`, `aria-label`, `tabindex`, live-region text mutations) — none was confirmed
+  against an actual NVDA/VoiceOver/JAWS session. The decision rule as written only requires DOM-level conformance,
+  so the verdicts stand, but this is the most consequential unstated boundary given AC #2 is the ADR-reopening
+  trigger, and it belongs alongside the other named boundaries above.
+* **No overlapping/rapid re-render race tested.** §5.1's ten survival steps are each triggered and awaited to
+  settle before the next fires; no two update paths (e.g. a second drill fired mid-render, or a resize during a
+  drill) were driven concurrently. Named as a boundary, not inferred to be safe.
 
 ---
 

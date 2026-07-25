@@ -42,6 +42,16 @@ public static class RelatedWorkTemplater
         foreach (var card in model.Cards)
             RenderCard(sb, card, model.WorkGraphHref);
 
+        // The work graph's own honestly-reported draw overflow (Story 20.1 spike §1a rule 5) — surfaced, never
+        // silently dropped, mirroring the per-group "+N more" pattern below. [Story 20.3]
+        if (model.Overflow > 0)
+        {
+            var link = model.WorkGraphHref is { Length: > 0 } wgHref
+                ? $" <a href=\"{PathUtil.Html(wgHref)}\">See the full work graph &rarr;</a>"
+                : string.Empty;
+            sb.Append($"<p class=\"related-work-overflow\">{model.Overflow} more related {Charts.Plural(model.Overflow, "item", "items")} not drawn.{link}</p>\n");
+        }
+
         // Designed empty state (AC #2) for a selection whose node has no card — revealed by JS only. Server-rendered
         // hidden: with JS off there is no selection, so every scope's card is already showing.
         sb.Append("<p class=\"related-work-empty\" data-related-empty hidden>No related work items for this selection.</p>\n");
@@ -78,7 +88,9 @@ public static class RelatedWorkTemplater
         var rel = card.Relationships;
         if (rel.Groups.Count > 0 || rel.Subjects.Count > 0)
         {
-            sb.Append("  <details class=\"related-card-full\">\n");
+            // `open` is the JS-off truth (AC #2/NFR8): the CSS hides the whole element once
+            // [data-related-ready] is set, so this attribute never fights the JS-on single-card view.
+            sb.Append("  <details class=\"related-card-full\" open>\n");
             sb.Append($"    <summary>Related items ({rel.EntryCount})</summary>\n");
             AppendGroups(sb, rel.Groups, rel.ScopeAnchor, workGraphHref, indent: "    ");
             foreach (var subject in rel.Subjects)

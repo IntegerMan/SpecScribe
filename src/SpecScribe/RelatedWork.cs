@@ -198,7 +198,7 @@ public static class RelatedWork
                 if (scopeIndex.ContainsKey(own)) continue; // one section per island id
                 scopeIndex[own] = scopes.Count;
                 scopes.Add(new RelatedWorkNode(
-                    own, node.Label, node.Kind, node.Href, scopeOfNode[id].Anchor,
+                    own, node.Label, node.Kind, node.Href, AnchorForIslandId(own),
                     groups, Array.Empty<RelatedWorkSubject>()));
             }
             else
@@ -206,12 +206,14 @@ public static class RelatedWork
                 // A folded subject sits INSIDE its container's section, so its own outgoing "Part of → Epic N"
                 // group restates the heading above it. Drop it: on the live portal that was the single most
                 // repeated group in the pane and it told the reader nothing.
-                var meaningful = groups
-                    .Where(g => g.Kind != WorkEdgeKind.Contains || g.Direction != RelatedWorkDirection.Outgoing)
-                    .ToList();
+                var meaningful = groups.Where(g => !IsRestatedContainsGroup(g)).ToList();
                 if (meaningful.Count == 0) continue;
+                // Anchor from `host` (the correctly id-derived ancestor), NOT from `scopeOfNode[id]` — that
+                // scope is first-seen-wins across the whole flatten (rule 4), so a story cross-referenced from
+                // a foreign epic's follow-up before its own epic's subgraph is walked would otherwise carry
+                // that foreign epic's anchor here, sending its "+N more" link to the wrong section. [review]
                 foldedInto.Add((host, new RelatedWorkSubject(node.Label, node.Kind, node.Href, meaningful),
-                    scopeOfNode[id].Anchor));
+                    AnchorForIslandId(host)));
             }
         }
 
@@ -239,6 +241,21 @@ public static class RelatedWork
         islandId == OrphanIslandId
             ? "Unattributed"
             : islandId.StartsWith("epic-", StringComparison.Ordinal) ? "Epic " + islandId[5..] : islandId;
+
+    /// <summary>The <see cref="WorkGraphEpic.Anchor"/> a given island id maps to, computed from the id itself
+    /// rather than from whatever <see cref="WorkGraphEpic"/> instance happened to be walked first — the id is
+    /// always correct (it is what <see cref="IslandIdFor"/>/<see cref="AncestorIslandIdFor"/> already resolved),
+    /// while a scope reference can be the wrong epic's for a node reached first as a foreign cross-reference.
+    /// Mirrors <see cref="WorkGraphEpic.Anchor"/>'s own two-branch shape exactly.</summary>
+    internal static string AnchorForIslandId(string islandId) =>
+        islandId == OrphanIslandId ? "wg-unattributed" : $"wg-{islandId}";
+
+    /// <summary>True for a node's own outgoing "Part of → Epic N" group — the shared test for "drop this group
+    /// because the section/subject it would sit under already states the relationship as its container." Used
+    /// both when a node owns its own section (here) and when <see cref="RelatedWorkCards"/> folds a story's
+    /// groups into its epic card, so the rule can't drift into two names for one thing.</summary>
+    internal static bool IsRestatedContainsGroup(RelatedWorkGroup g) =>
+        g.Kind == WorkEdgeKind.Contains && g.Direction == RelatedWorkDirection.Outgoing;
 
     /// <summary>The (edge kind × direction) buckets for one node, iterated over <see cref="WorkEdgeKind"/>'s
     /// declared values so a future kind renders without a rewrite. Empty buckets are omitted — a section the graph

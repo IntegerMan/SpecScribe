@@ -49,20 +49,20 @@ catch (CommandParseException ex)
 {
     // Bad or unknown arguments: explain, then drop into the interactive menu when a human is present.
     ConsoleUi.PrintFatalError(ex);
-    if (AnsiConsole.Profile.Capabilities.Interactive)
+    if (ConsoleUi.IsInteractive)
     {
         AnsiConsole.WriteLine();
         return InteractiveCommand.RunMenu(new SiteSettings());
     }
-    return 1;
+    return ExitCodes.Failure;
 }
 catch (DirectoryNotFoundException ex)
 {
     ConsoleUi.PrintFatalError(ex);
-    return 1;
+    return ExitCodes.Failure;
 }
 catch (Exception ex)
 {
     ConsoleUi.PrintFatalError(ex);
-    return 1;
+    return ExitCodes.Failure;
 }

@@ -225,10 +225,16 @@ for (const name of ['code-map.html', 'index.html']) {
 const bundlePath = join(here, '..', 'plotly-src', 'dist', 'plotly-specscribe-hierarchy.min.js')
 const bundleMin = existsSync(bundlePath) ? statSync(bundlePath).size : null
 const bundleGz = existsSync(bundlePath) ? gz(readFileSync(bundlePath)) : null
+if (bundleMin === null) {
+  console.error(`\n⚠️  WARNING: bundle not found at ${bundlePath} — NET figure below silently excludes the one-time bundle cost. Build it first (see README § Reproduce).`)
+}
 
 const realIsland = pages.find((p) => p.islandBytes !== null)
 const islandNodes = realIsland ? JSON.parse(readFileSync(join(root, realIsland.page), 'utf8').match(ISLAND_RE)[1]).nodes.length : null
 const bytesPerNode = realIsland && islandNodes ? realIsland.islandBytes / islandNodes : null
+if (!realIsland) {
+  console.error(`\n⚠️  WARNING: no page under ${root} carries a sunburst-explorer-data island — every projected payload below is silently priced at 0 B/node. Generate against a repo where Story 20.2's island is emitted.`)
+}
 
 console.log('\n' + '='.repeat(112))
 console.log('NET OUTPUT-SIZE DELTA (AC #1 headline)')

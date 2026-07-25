@@ -149,10 +149,11 @@ public static class ConsoleUi
         AnsiConsole.WriteLine();
     }
 
-    /// <summary>True when there is a real terminal to paint — the single TTY signal the whole CLI branches on
-    /// (also used by <c>Program.cs</c>'s menu fallback and <see cref="InteractiveCommand"/>). Wrapped here so the
-    /// interactive/non-interactive decision has one name rather than a repeated property chain. [Story 5.1 AC #3]</summary>
-    private static bool IsInteractive => AnsiConsole.Profile.Capabilities.Interactive;
+    /// <summary>True when there is a real terminal to paint — the single TTY signal the whole CLI branches on.
+    /// Reused as-is by <c>Program.cs</c>'s menu fallback and by <see cref="InteractiveCommand"/> so the
+    /// interactive/non-interactive decision has one name and one source rather than three separate calls to
+    /// <see cref="AnsiConsole.Profile"/>. [Story 5.1 AC #3]</summary>
+    internal static bool IsInteractive => AnsiConsole.Profile.Capabilities.Interactive;
 
     /// <summary>Runs a full generation pass, with a live per-phase progress display when a terminal can animate one.
     /// <para>The non-interactive branch (CI, piped or redirected stdout) is EXPLICIT rather than leaning on Spectre's
@@ -229,7 +230,17 @@ public static class ConsoleUi
     /// neither substitutes for the other. Kept as one helper so Story 5.3's per-rebuild watch summary can reuse the
     /// identical shape rather than growing a second, drifting format.</para></summary>
     private static void PrintMachineSummary(GenerationCounts counts, TimeSpan total)
-        => Console.Out.WriteLine(GenerationSummary.FormatLine(counts, total));
+    {
+        try
+        {
+            Console.Out.WriteLine(GenerationSummary.FormatLine(counts, total));
+        }
+        catch (IOException)
+        {
+            // Downstream reader gone (e.g. `specscribe generate | head`) — generation itself already succeeded, so
+            // this must not surface as a fatal error and flip an otherwise-successful run's exit code.
+        }
+    }
 
     public static void LogEvent(GenerationEvent ev)
     {

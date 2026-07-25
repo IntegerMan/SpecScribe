@@ -2193,8 +2193,10 @@
     if (!cards.length) return;
     var empty = pane.querySelector("[data-related-empty]");
     var live = pane.querySelector(".related-work-live");
-    var project = pane.querySelector(".related-card-project .related-card-title");
     var selecting = nodeId !== null && nodeId !== undefined && nodeId !== "";
+    // Card the currently-focused element sits in, BEFORE the toggle loop below changes what is showing — used to
+    // redirect focus if that card is about to stop being the current/visible one. [Story 20.3 review]
+    var activeCard = closestCard(document.activeElement, cards);
 
     var match = null;
     Array.prototype.forEach.call(cards, function (c) {
@@ -2207,26 +2209,44 @@
       c.hidden = selecting && !hit;
     });
 
+    // A card that just lost focus-ability (hidden, or simply no longer `.is-related-current` under
+    // [data-related-ready]) must not silently drop focus to <body> — move it to the newly-current card, or the
+    // pane heading when there is none (deselecting back to the project default). [Story 20.3 review]
+    if (activeCard && activeCard !== match) {
+      var target = match || pane.querySelector("#related-work-h");
+      if (target) {
+        if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
+        target.focus();
+      }
+    }
+
     if (!selecting) {
       // No selection → the project card. Clearing the attribute lets the CSS show the project card and hide the
-      // scope cards; nothing was force-shown, so nothing has to be restored.
+      // scope cards; nothing was force-shown, so nothing has to be restored. No announcement here: the explorer's
+      // own live region already says "Showing all epics" for this same activation — a second message would be
+      // redundant. [Story 20.3 review]
       pane.removeAttribute("data-related-scope");
       if (empty) empty.hidden = true;
-      say(live, project ? "Showing project overview." : "");
       return;
     }
 
     pane.setAttribute("data-related-scope", nodeId);
     // A selection with no card has no work-graph relationships — the DESIGNED empty state, never a blank rail.
     if (empty) empty.hidden = !!match;
-    var name = label || (match ? titleOf(match) : null) || nodeId;
-    say(live, match ? ("Related work for " + name + ".") : ("No related work items for " + name + "."));
+    // Announce ONLY the empty-state case: it's information the explorer's own "Zoomed into X" announcement never
+    // carries. A match needs no second announcement — the explorer already said which node is selected.
+    // [Story 20.3 review]
+    if (!match) {
+      var name = label || nodeId;
+      say(live, "No related work items for " + name + ".");
+    }
   }
 
-  // The scope's NAME, for the announcement fallback when the explorer supplied no label (the deep-link/init path).
-  function titleOf(card) {
-    var h = card.querySelector(".related-card-title");
-    return h ? h.textContent.replace(/\s+/g, " ").trim() || null : null;
+  // The nearest ancestor card (or null) containing el, if any.
+  function closestCard(el, cards) {
+    if (!el) return null;
+    for (var i = 0; i < cards.length; i++) { if (cards[i].contains(el)) return cards[i]; }
+    return null;
   }
   function say(live, msg) { if (live) live.textContent = msg; }
 

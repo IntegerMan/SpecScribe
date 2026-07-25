@@ -989,3 +989,18 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 - source_spec: `spec-multi-epic-retro-attribution.md`
   summary: The `LooksLikeUnrecognizedRetro` safety net still has blind spots for retro-first and no-separator spellings — `retro-epic-19.md`, `epic19-21-retro-x.md` and `19-21-retro.md` are neither ingested nor reported. The predicate was deliberately narrowed to `^epics?-[0-9].*retro` during review to stop false positives on deliberate non-retros (`epics-retro-process.md`), so widening it again is a genuine precision/recall trade that deserves its own pass rather than a hasty tweak.
   evidence: Edge Case Hunter, verified during triage; the two findings pull in opposite directions and both concern a warning heuristic, not rendering correctness. [`src/SpecScribe/RetroParser.cs`]
+
+## Deferred from: code review of 5-1-cli-generate-and-watch-modes-with-smart-defaults (2026-07-24)
+
+- source_spec: `5-1-cli-generate-and-watch-modes-with-smart-defaults.md`
+  summary: AC #3's interactive/non-interactive branching (`ConsoleUi.RunWithProgress`'s `if (!IsInteractive)`, `PrintInitialSummary`'s `IsInteractive` gates) has zero automated coverage — no `Spectre.Console.Testing`/`TestConsole` harness exists in the test project, so the table-vs-plain-text and progress-vs-no-reporter branches are unverified by the suite. Pre-existing test-infra gap; already honestly disclosed by the story's own "Honest limits on verification" section (both available dev harnesses report `Interactive == false`, so the TTY branch was never even manually exercised).
+  evidence: Blind Hunter, verified during triage. [`src/SpecScribe/ConsoleUi.cs:161-222`]
+- source_spec: `5-1-cli-generate-and-watch-modes-with-smart-defaults.md`
+  summary: Nothing drives `GenerateCommand.Execute`/`RunGeneration`'s actual return-wiring end-to-end — every exit-code test in `CliFeedbackTests.cs` calls `GenerationSummary.ExitCode` directly or hand-constructs a `GenerationRun`; none exercises `Execute`'s one-line `return RunGeneration(options).ExitCode;` against a real error-containing pass. Closing this needs a new `CommandContext`/Spectre.Console.Cli test harness that doesn't currently exist in the project, not a small unambiguous patch.
+  evidence: Blind Hunter, verified during triage. [`src/SpecScribe/Commands.cs:25-44`]
+
+## Deferred from: code review of 20-3-related-work-side-pane-on-selection (2026-07-24)
+
+- source_spec: `20-3-related-work-side-pane-on-selection.md`
+  summary: "epicsByNumber = epics.Epics.ToDictionary(e => e.Number)" throws on a duplicate epic number with no dedup guard. Not a regression this story introduced — the same unguarded ToDictionary(e => e.Number) pattern already exists at Charts.cs:4322 and RequirementsParser.cs:55,307, so this is a codebase-wide assumption (epics.md never produces duplicate epic numbers) this story inherited rather than created.
+  evidence: Edge Case Hunter, verified during triage. [`src/SpecScribe/RelatedWorkCards.cs:61`]

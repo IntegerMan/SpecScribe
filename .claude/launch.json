@@ -8,6 +8,12 @@
       "port": 5411
     },
     {
+      "name": "plotly-csp-unsafe-eval",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["spike/plotly/scripts/csp-probe.mjs", "5414", "unsafe-eval"],
+      "port": 5414
+    },
+    {
       "name": "plotly-csp-off",
       "runtimeExecutable": "node",
       "runtimeArgs": ["spike/plotly/scripts/csp-probe.mjs", "5412", "off"],

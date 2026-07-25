@@ -458,7 +458,7 @@ public sealed class WatchCommand : Command<SiteSettings>
 
         exitSignal.Wait();
         AnsiConsole.MarkupLine("[grey]Stopping...[/]");
-        return 0;
+        return ExitCodes.Success;
     }
 }
 
@@ -479,7 +479,7 @@ public sealed class InteractiveCommand : Command<SiteSettings>
             return ExitCodes.Success;
         }
 
-        if (!AnsiConsole.Profile.Capabilities.Interactive)
+        if (!ConsoleUi.IsInteractive)
         {
             // No terminal to prompt in (CI, redirected output) — show usage instead of hanging.
             ConsoleUi.PrintLogo();

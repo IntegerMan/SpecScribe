@@ -973,7 +973,15 @@ public class SiteGeneratorAdapterTests : IDisposable
         // this story's four files plus another session's untracked spike/plotly/ scratch directory, which lives
         // outside this temp fixture and cannot reach the hash. Verified stable across two repeated runs.
         // [Story 5.6; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
-        const string expected = "9232e3f5e0d2aee38c1cd4e76829b0633aadc8331462a8d55b531c2cdb820f68";
+        // Regenerated for Story 20.3's code-review patch round (2026-07-25): asset-bytes-only delta, no dashboard
+        // markup change visible to this no-work-graph fixture. `specscribe.css` shrank/shifted (fixed the dead
+        // `.related-node` reduced-motion selector; added `.related-work-overflow`) and `specscribe.js` changed
+        // (focus-management + suppressed redundant aria-live announcements in `revealRelatedCard`). Both files are
+        // embedded assets written on every run regardless of work-graph presence, so they move this hash even
+        // though the fixture renders no related-work rail. Verified stable across two repeated runs.
+        // PROVENANCE (shared main): captured on a tree carrying only this story's own patch-round files.
+        // [Story 20.3 code review; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
+        const string expected = "9288bf5595ffa883edb21eef021e86caaf5c6a2a06a30f23ca1a99ddb7343836";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

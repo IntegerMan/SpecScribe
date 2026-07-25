@@ -269,7 +269,8 @@ body {
 /* A node with no generated page is a plain chip, never a dead link (Epic 7 guarded-href discipline). */
 .related-chip { color: var(--ink-light); }
 .related-more,
-.related-work-empty { margin: 0.3rem 0 0; font-size: 0.78rem; color: var(--ink-light); font-style: italic; }
+.related-work-empty,
+.related-work-overflow { margin: 0.3rem 0 0; font-size: 0.78rem; color: var(--ink-light); font-style: italic; }
 
 /* ---- JS-on collapse. Without [data-related-ready] (script blocked / not yet run) every card and its expanded
    relationships stay visible — that is the complete NFR8 view. Once the client takes over it shows the project
@@ -6305,7 +6306,7 @@ body:has(main.req-detail) .doc-header {
   .refinement-funnel,
   .req-flow,
   .sunburst.is-anim .sb-seg,
-  [data-related-pane][data-related-scope] .related-node.is-related-current {
+  [data-related-ready] .related-card[data-related-node].is-related-current {
     animation: none;
   }
 

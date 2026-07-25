@@ -51,6 +51,7 @@ public static class GenerationSummary
                 case GenerationOutcome.Removed: removed++; break;
                 case GenerationOutcome.Skipped: skipped++; break;
                 case GenerationOutcome.Error: errors++; break;
+                default: throw new ArgumentOutOfRangeException(nameof(events), ev.Outcome, "Unhandled GenerationOutcome — add a case here so it isn't silently dropped from every count, the machine summary line, and the exit-code decision.");
             }
         }
 
@@ -68,16 +69,9 @@ public static class GenerationSummary
             CultureInfo.InvariantCulture,
             $"{LinePrefix} generated={counts.Generated} updated={counts.Updated} skipped={counts.Skipped} errors={counts.Errors} elapsed_ms={(long)Math.Round(elapsed.TotalMilliseconds)}");
 
-    /// <summary>Convenience overload for callers holding the raw events.</summary>
-    public static string FormatLine(IEnumerable<GenerationEvent> events, TimeSpan elapsed)
-        => FormatLine(Count(events), elapsed);
-
     /// <summary>Maps a run's outcome onto a process exit code: any <see cref="GenerationOutcome.Error"/> makes the
     /// run untrustworthy, so CI must see a non-zero exit. Deliberately NOT triggered by
     /// <see cref="GenerationOutcome.Skipped"/> — a skip is NFR2's "degrade with a non-fatal notice", not a
     /// failure. [AC #4]</summary>
     public static int ExitCode(GenerationCounts counts) => counts.HasErrors ? ExitCodes.Failure : ExitCodes.Success;
-
-    /// <summary>Convenience overload for callers holding the raw events.</summary>
-    public static int ExitCode(IEnumerable<GenerationEvent> events) => ExitCode(Count(events));
 }

@@ -13,6 +13,12 @@ public class CliFeedbackTests
     private static GenerationEvent Ev(GenerationOutcome outcome, string path = "page.md", string? message = null)
         => new(outcome, path, TimeSpan.Zero, message);
 
+    private static string FormatLine(IEnumerable<GenerationEvent> events, TimeSpan elapsed)
+        => GenerationSummary.FormatLine(GenerationSummary.Count(events), elapsed);
+
+    private static int ExitCode(IEnumerable<GenerationEvent> events)
+        => GenerationSummary.ExitCode(GenerationSummary.Count(events));
+
     // ---- AC #3: the machine-parseable summary line -------------------------------------------------
 
     [Fact]
@@ -27,7 +33,7 @@ public class CliFeedbackTests
             Ev(GenerationOutcome.Error, "broken.md", "boom"),
         };
 
-        var line = GenerationSummary.FormatLine(events, TimeSpan.FromMilliseconds(1234));
+        var line = FormatLine(events, TimeSpan.FromMilliseconds(1234));
 
         Assert.Equal("SpecScribe: generated=2 updated=1 skipped=1 errors=1 elapsed_ms=1234", line);
     }
@@ -35,7 +41,7 @@ public class CliFeedbackTests
     [Fact]
     public void FormatLine_IsASingleGreppableLineWithNoMarkup()
     {
-        var line = GenerationSummary.FormatLine(new[] { Ev(GenerationOutcome.Generated) }, TimeSpan.FromSeconds(2));
+        var line = FormatLine(new[] { Ev(GenerationOutcome.Generated) }, TimeSpan.FromSeconds(2));
 
         // No control characters at all: that covers the newline/carriage-return that would split the record CI
         // greps as a unit, AND the ESC (0x1B) that would open an ANSI colour sequence. The line goes straight to
@@ -55,7 +61,7 @@ public class CliFeedbackTests
         try
         {
             CultureInfo.CurrentCulture = new CultureInfo("de-DE");
-            var line = GenerationSummary.FormatLine(
+            var line = FormatLine(
                 new[] { Ev(GenerationOutcome.Generated) }, TimeSpan.FromMilliseconds(1234567));
 
             Assert.Equal("SpecScribe: generated=1 updated=0 skipped=0 errors=0 elapsed_ms=1234567", line);
@@ -69,7 +75,7 @@ public class CliFeedbackTests
     [Fact]
     public void FormatLine_RoundsElapsedToWholeMilliseconds()
     {
-        var line = GenerationSummary.FormatLine(Array.Empty<GenerationEvent>(), TimeSpan.FromTicks(15_006));
+        var line = FormatLine(Array.Empty<GenerationEvent>(), TimeSpan.FromTicks(15_006));
 
         // 1.5006 ms -> 2, never "1.5006" or a truncated 1.
         Assert.EndsWith("elapsed_ms=2", line, StringComparison.Ordinal);
@@ -79,7 +85,7 @@ public class CliFeedbackTests
     public void FormatLine_EmitsZerosForACleanEmptyRunRatherThanOmittingKeys()
     {
         // Stable key set: a consumer's parser must never have to cope with a missing key.
-        var line = GenerationSummary.FormatLine(Array.Empty<GenerationEvent>(), TimeSpan.Zero);
+        var line = FormatLine(Array.Empty<GenerationEvent>(), TimeSpan.Zero);
 
         Assert.Equal("SpecScribe: generated=0 updated=0 skipped=0 errors=0 elapsed_ms=0", line);
     }
@@ -111,7 +117,7 @@ public class CliFeedbackTests
     {
         var events = new[] { Ev(GenerationOutcome.Generated), Ev(GenerationOutcome.Updated) };
 
-        Assert.Equal(ExitCodes.Success, GenerationSummary.ExitCode(events));
+        Assert.Equal(ExitCodes.Success, ExitCode(events));
     }
 
     [Fact]
@@ -119,8 +125,8 @@ public class CliFeedbackTests
     {
         var events = new[] { Ev(GenerationOutcome.Generated), Ev(GenerationOutcome.Error, "broken.md", "boom") };
 
-        Assert.Equal(ExitCodes.Failure, GenerationSummary.ExitCode(events));
-        Assert.NotEqual(0, GenerationSummary.ExitCode(events));
+        Assert.Equal(ExitCodes.Failure, ExitCode(events));
+        Assert.NotEqual(0, ExitCode(events));
     }
 
     [Fact]
@@ -130,26 +136,25 @@ public class CliFeedbackTests
         // would make every tolerated-but-unparsed file a CI outage.
         var events = new[] { Ev(GenerationOutcome.Generated), Ev(GenerationOutcome.Skipped, "odd.md", "not tracked") };
 
-        Assert.Equal(ExitCodes.Success, GenerationSummary.ExitCode(events));
+        Assert.Equal(ExitCodes.Success, ExitCode(events));
     }
 
     [Fact]
     public void ExitCode_IsZeroForAnEmptyRun()
     {
-        Assert.Equal(ExitCodes.Success, GenerationSummary.ExitCode(Array.Empty<GenerationEvent>()));
+        Assert.Equal(ExitCodes.Success, ExitCode(Array.Empty<GenerationEvent>()));
     }
 
-    [Fact]
-    public void GenerationRun_SurfacesTheExitCodeGenerateCommandReturns()
-    {
-        // The pair GenerateCommand.RunGeneration hands back: `generate` returns run.ExitCode, while `watch` reads
-        // the same run for its generator and deliberately ignores the code (live-edit loop, no fail-fast).
-        var generator = new SiteGenerator(ForgeOptions.Resolve(
-            source: Path.Combine(Path.GetTempPath(), "specscribe-nonexistent-source"),
-            output: Path.Combine(Path.GetTempPath(), "specscribe-nonexistent-output")));
+    // ---- GenerationRun: delegation to GenerationSummary ---------------------------------------------
 
-        var failed = new GenerationRun(generator, GenerationSummary.Count(new[] { Ev(GenerationOutcome.Error) }));
-        var clean = new GenerationRun(generator, GenerationSummary.Count(new[] { Ev(GenerationOutcome.Generated) }));
+    [Fact]
+    public void GenerationRun_ComputesExitCodeAndHadErrorsFromCounts()
+    {
+        // GenerationRun.ExitCode/HadErrors are thin delegations onto GenerationSummary.ExitCode/GenerationCounts.HasErrors
+        // (Commands.cs) — asserted here directly against the record, independent of the Generator field, which
+        // `generate` never inspects (only `watch` reads it, to keep the loop running on the same SiteGenerator).
+        var failed = new GenerationRun(null!, GenerationSummary.Count(new[] { Ev(GenerationOutcome.Error) }));
+        var clean = new GenerationRun(null!, GenerationSummary.Count(new[] { Ev(GenerationOutcome.Generated) }));
 
         Assert.True(failed.HadErrors);
         Assert.Equal(ExitCodes.Failure, failed.ExitCode);

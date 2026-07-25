@@ -104,12 +104,12 @@ writeFileSync(join(probe, 'index.html'), page({ cspMeta: null, scriptNonce: null
 // every header variant look blocked for the wrong reason.
 writeFileSync(join(probe, 'nonced.html'), page({ cspMeta: null, scriptNonce: NONCE, title: 'nonced (policy comes from the HTTP header)' }))
 writeFileSync(join(probe, 'webview-meta.html'), page({
-  cspMeta: SHIPPED_CSP.replace(/__CSP_SOURCE__/g, "'self'").replace('__NONCE__', NONCE),
+  cspMeta: SHIPPED_CSP.replace(/__CSP_SOURCE__/g, "'self'").replace(/__NONCE__/g, NONCE),
   scriptNonce: NONCE,
   title: 'shipped webview CSP via <meta>',
 }))
 writeFileSync(join(probe, 'webview-partial.html'), page({
-  cspMeta: SHIPPED_CSP.replace(/__CSP_SOURCE__/g, "'self'").replace('__NONCE__', NONCE),
+  cspMeta: SHIPPED_CSP.replace(/__CSP_SOURCE__/g, "'self'").replace(/__NONCE__/g, NONCE),
   scriptNonce: 'WRONG-NONCE-half-applied-relaxation',
   title: 'PARTIAL relaxation (wrong nonce) — the blank-region case',
 }))

@@ -88,8 +88,11 @@ public class RelatedWorkTests
     [Fact]
     public void Build_StoryWithoutAWedge_GetsNoSection()
     {
-        // A dense or fully-done epic emits no per-story payload nodes, so that story can never BE the selection.
-        // It must be dropped from the keyed sections rather than claiming a wedge the chart never drew.
+        // A dense or fully-done epic emits no per-story payload nodes, so that story can never BE the selection. It
+        // must be dropped from the keyed sections rather than claiming a wedge the chart never drew. Deliberately an
+        // island set narrower than what the real chart would draw for this geometry (a direct unit test of
+        // RelatedWork.Build's own id-set handling) — the orphan-root test below covers the real end-to-end
+        // derivation via Charts.SunburstExplorerNodes instead.
         var graph = WorkGraphBuilder.Build(TwoEpicModel(),
             Geometry(deferred: new[] { Deferred("A debt", epic: 1, sourceStoryId: "1.1") }));
 
@@ -103,13 +106,17 @@ public class RelatedWorkTests
     public void Build_UnattributedBucket_MapsToTheSunburstOrphanRoot_NotToEpicZero()
     {
         // The bucket is built with EpicNumber 0 but it is NOT epic 0 — it is the sunburst's `orphan` root, and it is
-        // identified by BucketLabel so a real Epic 0 could never be mistaken for it.
+        // identified by BucketLabel so a real Epic 0 could never be mistaken for it. Island ids are derived from the
+        // SAME geometry through the real Charts.SunburstExplorerNodes call (not hand-picked), so this also proves
+        // the chart actually draws the `orphan` wedge for an orphan action item.
+        var epics = TwoEpicModel();
         var orphanAction = new SprintActionItem("An unattributed obligation", "open", null, null);
-        var graph = WorkGraphBuilder.Build(TwoEpicModel(), Geometry(
-            actions: new[] { orphanAction },
-            deferred: new[] { Deferred("Orphan debt", epic: 99) }));
+        var geometry = Geometry(actions: new[] { orphanAction }, deferred: new[] { Deferred("Orphan debt", epic: 99) });
+        var graph = WorkGraphBuilder.Build(epics, geometry);
+        var islandIds = IslandIds(epics, geometry);
+        Assert.Contains(RelatedWork.OrphanIslandId, islandIds); // the chart really did draw this wedge
 
-        var model = RelatedWork.Build(graph, new[] { "epic-1", "epic-2", RelatedWork.OrphanIslandId });
+        var model = RelatedWork.Build(graph, islandIds);
 
         Assert.Contains(model.Nodes, n => n.IslandId == RelatedWork.OrphanIslandId);
         Assert.DoesNotContain(model.Nodes, n => n.IslandId == "epic-0");
@@ -300,6 +307,98 @@ public class RelatedWorkTests
         Assert.Equal(string.Empty, RelatedWorkTemplater.RenderPane(pane));
     }
 
+    // ---- The Overflow honesty gate (Story 20.1 spike §1a rule 5) -----------------------------------------
+
+    [Fact]
+    public void RenderPane_SurfacesTheGraphsOwnOverflow_RatherThanUnderReporting()
+    {
+        var pane = RelatedWorkCards.Build(
+            new RelatedWorkModel(Array.Empty<RelatedWorkNode>(), Overflow: 3, OverflowLabels: Array.Empty<string>()),
+            TwoEpicModel(), CommandCatalog.Empty, FollowUpGeometry.Empty, ProjectCounts.Empty, "SpecScribe",
+            SiteNav.WorkGraphOutputPath);
+
+        var html = RelatedWorkTemplater.RenderPane(pane);
+
+        Assert.Contains("related-work-overflow", html);
+        Assert.Contains("3 more related items not drawn", html);
+        Assert.Contains(SiteNav.WorkGraphOutputPath, html);
+    }
+
+    // ---- BmadCommands AI-action helpers (Story 20.3) ------------------------------------------------------
+
+    [Fact]
+    public void PrimaryEpicCommand_ReturnsTheFirstSuggestedCommand_ForAPendingEpic()
+    {
+        var epic = new EpicInfo
+        {
+            Number = 9, Title = "Undrafted", GoalHtml = string.Empty,
+            Status = EpicStatus.Pending, Section = EpicSection.VerticalSlice, Stories = Array.Empty<StoryInfo>(),
+        };
+        var commands = new CommandCatalog("BMad", new Dictionary<string, string>
+        {
+            ["create-epics-and-stories"] = "/bmad-create-epics-and-stories",
+        });
+
+        Assert.Equal("/bmad-create-epics-and-stories", BmadCommands.PrimaryEpicCommand(epic, commands));
+    }
+
+    [Fact]
+    public void PrimaryEpicCommand_ReturnsNull_ForADoneEpicWithNoNextAction()
+    {
+        var epic = new EpicInfo
+        {
+            Number = 1, Title = "Foundation", GoalHtml = string.Empty,
+            Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice, HasRetrospective = true,
+            Stories = new[]
+            {
+                new StoryInfo
+                {
+                    Id = "1.1", EpicNumber = 1, Title = "Done story", UserStoryHtml = string.Empty,
+                    AcBlocksHtml = Array.Empty<string>(), Status = "done",
+                },
+            },
+        };
+        var commands = new CommandCatalog("BMad", new Dictionary<string, string>
+        {
+            ["retrospective"] = "/bmad-retrospective",
+        });
+
+        Assert.Null(BmadCommands.PrimaryEpicCommand(epic, commands));
+    }
+
+    [Fact]
+    public void PrimaryProjectCommand_ReturnsTheFirstSuggestedCommand_ForTheProject()
+    {
+        var commands = new CommandCatalog("BMad", new Dictionary<string, string>
+        {
+            ["create-story"] = "/bmad-create-story",
+        });
+
+        // TwoEpicModel's Epic 1 is drafted with an undrafted Story 1.1 — the next-story-to-draft suggestion.
+        Assert.Equal("/bmad-create-story 1.1", BmadCommands.PrimaryProjectCommand(TwoEpicModel(), commands));
+    }
+
+    [Fact]
+    public void PrimaryProjectCommand_ReturnsNull_WhenTheModuleExposesNoMatchingCommand()
+    {
+        Assert.Null(BmadCommands.PrimaryProjectCommand(TwoEpicModel(), CommandCatalog.Empty));
+    }
+
+    [Fact]
+    public void RenderPrimaryActionBadge_RendersACopyBadge_ForARealCommand()
+    {
+        var html = BmadCommands.RenderPrimaryActionBadge("/bmad-create-story 1.1");
+
+        Assert.Contains("data-copy=\"/bmad-create-story 1.1\"", html);
+    }
+
+    [Fact]
+    public void RenderPrimaryActionBadge_RendersNothing_ForANullOrBlankCommand()
+    {
+        Assert.Equal(string.Empty, BmadCommands.RenderPrimaryActionBadge(null));
+        Assert.Equal(string.Empty, BmadCommands.RenderPrimaryActionBadge("  "));
+    }
+
     // ---- Helpers ------------------------------------------------------------------------------------------
 
     /// <summary>Builds the whole details rail exactly as the dashboard does — the relationship projection joined to
@@ -315,16 +414,27 @@ public class RelatedWorkTests
     }
 
     /// <summary>Projects with the island id set the real dashboard would produce for <see cref="TwoEpicModel"/> —
-    /// derived from <see cref="Charts.SunburstExplorerNodes"/> itself, so the test can never key on a wedge the
-    /// chart would not draw. Note the projection's ONLY inputs are the work-graph model and this id list: there is
-    /// no <see cref="ProjectCounts"/> seam to reach, which is how the "never re-counts" invariant is enforced —
-    /// by construction, not by a mock.</summary>
+    /// derived from the SAME 3-arg <see cref="Charts.SunburstExplorerNodes"/> call
+    /// <see cref="DashboardViewBuilder.BuildRelatedWorkHtml"/> makes in production (including
+    /// <see cref="UnplannedWorkGeometry"/>, which is what actually surfaces the orphan/unplanned root's island id) —
+    /// so a test can never key on a wedge the chart would not draw, and a regression in how the orphan root reaches
+    /// the payload would be caught here rather than only in a hand-constructed id array. Note the projection's ONLY
+    /// inputs are the work-graph model and this id list: there is no <see cref="ProjectCounts"/> seam to reach,
+    /// which is how the "never re-counts" invariant is enforced — by construction, not by a mock.</summary>
     private static RelatedWorkModel Project(FollowUpGeometry geometry)
     {
         var epics = TwoEpicModel();
         var graph = WorkGraphBuilder.Build(epics, geometry);
-        var islandIds = Charts.SunburstExplorerNodes(epics, geometry).Select(n => n.Id).ToList();
-        return RelatedWork.Build(graph, islandIds);
+        return RelatedWork.Build(graph, IslandIds(epics, geometry));
+    }
+
+    /// <summary>The island id set the real dashboard would produce for a given epics model + geometry — the same
+    /// 3-arg <see cref="Charts.SunburstExplorerNodes"/> call <see cref="DashboardViewBuilder.BuildRelatedWorkHtml"/>
+    /// makes in production. [Story 20.3 review]</summary>
+    private static IReadOnlyList<string> IslandIds(EpicsModel epics, FollowUpGeometry geometry)
+    {
+        var unplanned = UnplannedWorkGeometry.From(WorkInventory.Empty, geometry, epics);
+        return Charts.SunburstExplorerNodes(epics, geometry, unplanned).Select(n => n.Id).ToList();
     }
 
     private static RelatedWorkNode Node(RelatedWorkModel model, string islandId) =>

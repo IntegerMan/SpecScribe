@@ -9,7 +9,7 @@ replaces: 20-4-shared-client-side-geometry-engine # seated 2026-07-23 by the Epi
 
 # Story 20.4: Plotly Engine-Adoption Spike — Vendoring, Budget, CSP, and Accessibility
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -272,8 +272,8 @@ the chart any more**, so what fails here fails with nothing beneath it except th
   - [x] Report `Σ(SVG removed) − Σ(payload added) − (one bundle)` for the whole portal, and separately for `code-map.html` alone (the surface with the most to gain). State the **break-even page count** — the point at which the one-time bundle is amortized. This is the single most decision-relevant number in AC #1.
   - [x] If the delta is **not** a reduction, say so plainly and prominently. ADR 0012 §"Spike validation" #2 says it *"is expected to be a reduction; it must be verified, not assumed"* — an unexpected result here is the spike doing its job, not a failure.
 
-- [x] **Task 4 — Offline and `file://`** (AC: #1)
-  - [x] Render the probe from a local `file://` path with **no server running and networking disabled**. Confirm the chart draws. Any fetch/XHR, any CDN reference, any `import` of a sibling chunk is a **finding**, not a detail — NFR-3 local-first and the portal is routinely opened as loose files.
+- [~] **Task 4 — Offline and `file://`** (AC: #1) — partial, see below
+  - [ ] Render the probe from a local `file://` path with **no server running and networking disabled**. Confirm the chart draws. Any fetch/XHR, any CDN reference, any `import` of a sibling chunk is a **finding**, not a detail — NFR-3 local-first and the portal is routinely opened as loose files. **NOT PERFORMED — the in-app preview pane gave no live `file://` context and no external browser was connected this session (spike-report.md §3.4/§9). Structural evidence is strong (zero requests, zero imports measured over HTTP) but the `file://` run itself is owed; repro step given in §3.4.**
   - [x] Confirm no telemetry / no outbound request (`read_network_requests` on the preview, or DevTools network with the network disabled).
 
 - [x] **Task 5 — Packaging impact** (AC: #1) — honor R5's measured-vs-design-level split
@@ -314,7 +314,38 @@ the chart any more**, so what fails here fails with nothing beneath it except th
 
 ### Review Findings
 
-_(populated during code-review)_
+Reviewed 2026-07-24 via `bmad-code-review`, scoped to Story 20.4's own File List (Blind Hunter + Edge Case Hunter + Acceptance Auditor, run in parallel; `review_mode = full` against this story file). Sibling-story content bundled into the same commits (`8db18aa`, `9369ca4` — Stories 20.1/20.2/20.3/5.2/5.3/5.5/5.6/24.6) was excluded per CLAUDE.md's scope-by-File-List rule; `spike/plotly/package-lock.json` and `spike/plotly/measurements/*.json` were excluded from line-by-line review as generated/raw-data, not hand-authored logic.
+
+**decision-needed:** 0 · **patch:** 15 · **defer:** 0 · **dismissed as noise:** 9
+
+**All 15 patches applied 2026-07-25** — edits landed in `20-4-spike-report.md` (§3.1, §3.3, §4, §5.1, §5.4, §7, §9), `spike/plotly/package.json`, `.claude/launch.json` (new `plotly-csp-unsafe-eval` entry), Task 4's checklist item above, and the probe scripts `build-probe.mjs`/`csp-probe.mjs` (nonce substitution) and `measure-baseline.mjs` (missing-input warnings). No headline byte figures changed — all fixes are report-clarity, checklist-accuracy, and script-robustness corrections; none alter a reported measurement.
+
+- [x] [Review][Patch] Break-even "27 of 130 pages" is an unweighted average that masks a 2-page concentration — `code-map.html` (−3,493,000 B) and `git-insights.html` (−1,510,735 B) alone account for ≈105% of the −4,787,124 B net delta, so the other 128 pages plausibly net near-zero or negative individually; the report never orders pages by actual savings. [20-4-spike-report.md: "NET OUTPUT-SIZE DELTA" section; spike/plotly/scripts/measure-baseline.mjs:247-250]
+- [x] [Review][Patch] Bundle table still labels the recommended build "4 traces" one paragraph after correcting the true floor to 5 modules (`core`+`heatmap`+`sunburst`+`treemap`+`calendars`) — internally inconsistent, unreconciled. [20-4-spike-report.md:80,86]
+- [x] [Review][Patch] CSP headline/Completion Notes state the trigger "did not fire" unqualified; the report's own §4.5 lower-bound caveat (`vscode-resource:`/Electron untested, narrower than Story 23.1's coverage) doesn't travel with the headline. [20-4-spike-report.md headline table; §4.5]
+- [x] [Review][Patch] UX-DR18 headline row doesn't disclose that the real click-driven drill never animates at all (`redraw()` always calls `Plotly.react`, which never animates) — the PASS reflects "nothing to suppress," not a suppressed transition; the report's own §5.4 body says this but the table row doesn't. [20-4-spike-report.md:342; §5.4]
+- [x] [Review][Patch] UX-DR7's DOM-order-vs-ring-order Tab-order gap is filed under "Refinements 20.5 owes (none of them change the verdict)" rather than flagged against the PASS verdict it actually qualifies. [20-4-spike-report.md:379-382]
+- [x] [Review][Patch] `spike/plotly/package.json`'s `"build": "node build.js"` script references a file that was never created — Task 2 explicitly asked for a `build.js` mirroring `tools/prism-vendor/`'s shape; `npm run build` fails today. [spike/plotly/package.json:6]
+- [x] [Review][Patch] `.claude/launch.json` ships 3 of `csp-probe.mjs`'s 4 CSP variants (`webview`, `off`, `no-inline-style`); missing `plotly-csp-unsafe-eval`, the one variant that would let a future reviewer directly reproduce the "no `unsafe-eval` needed" claim via one click. [.claude/launch.json]
+- [x] [Review][Patch] Task 4's checklist item is checked `[x]` though §3.4/Completion Notes state the `file://` run was **not** performed (structural evidence only, no live run). A reader trusting the checklist alone would believe the obligation was discharged. [20-4-plotly-engine-adoption-spike.md Task 4; 20-4-spike-report.md §3.4]
+- [x] [Review][Patch] The report's boundaries section (§9) names the missing `file://` run and missing screenshot but not the absence of any real screen-reader/AT run — all four a11y PASS verdicts rest solely on DOM/computed-style introspection, which is arguably the single most consequential unstated caveat given AC #2 is the ADR-reopening trigger. [20-4-spike-report.md §9]
+- [x] [Review][Patch] A rapid/overlapping re-render (two drills back-to-back, or a drill immediately followed by a resize, before the prior `plotly_afterplot` settles) is untested by the survival harness and not named among the report's boundaries, despite being exactly the class of risk Task 7 exists to find. [spike/plotly/probe-src/survival.js; 20-4-spike-report.md §9]
+- [x] [Review][Patch] "10/10 survival steps intact" language counts 2 non-survival snapshots (initial render, keyboard reachability) alongside the 8 rows that actually test re-render survival — used elsewhere as shorthand for "ten hazards cleared." [20-4-spike-report.md §5.1; spike/plotly/probe-src/survival.js:57-66]
+- [x] [Review][Patch] `build-probe.mjs`/`csp-probe.mjs`'s `__NONCE__` substitution uses `.replace('__NONCE__', n)` — a plain string, not a `/g` regex — so only the first occurrence is replaced. The shipped CSP has exactly one `__NONCE__` today so this didn't fire, but it silently breaks the "drift-free by construction, read from source" guarantee the moment a second nonce placeholder is added. [spike/plotly/scripts/build-probe.mjs:107,112; spike/plotly/scripts/csp-probe.mjs:36]
+- [x] [Review][Patch] `measure-baseline.mjs` silently prices every projected page's payload at 0 B (via `bytesPerNode ?? 0`) if no page carries a real `sunburst-explorer-data` island, with no warning printed — this protects the single most decision-relevant number in the report (net delta) with zero self-check. [spike/plotly/scripts/measure-baseline.mjs:229-231,245]
+- [x] [Review][Patch] `measure-baseline.mjs` silently treats the vendored bundle's one-time cost as 0 B (via `bundleMin ?? 0`) if the bundle file is missing on disk, with no warning printed — same headline-number exposure as above. [spike/plotly/scripts/measure-baseline.mjs:225-226,247]
+- [x] [Review][Patch] `explorer.js`'s roving-tabindex `state.focusIndex` isn't reclamped after a drill shrinks the sector count, so tabbing into a sector whose index exceeds the new (smaller) child count leaves **no** element focusable — didn't fire in this session's actual run (the tested epic's index stayed in-bounds) but isn't documented as a hand-off risk for Story 20.5's real implementation. [spike/plotly/probe-src/explorer.js:242-246]
+
+**Dismissed as noise / not actionable in 20.4's scope (9):**
+- `sprint-status.yaml`'s diff bundles Story 20.3's edit to the stale top-of-file comment and Story 24.6's "blocked" status definition + entry — confirmed sibling-story content in a shared file, excluded per CLAUDE.md's scope-by-File-List rule, not a defect in this story's own work.
+- Remaining `explorer.js`/`survival.js` robustness gaps against malformed data (unguarded `JSON.parse`, id-collision with the synthesized root, leaf-weight-null passthrough, unguarded `.focus()` in the survival harness) — real, but confined to disposable throwaway code; none fired against this session's actual data and none corrupted the reported results.
+- UX-DR18's "PASS (configured around)" classification (event-interception via `plotly_<type>click`, not literal DOM augmentation) stretches a decision rule written with UX-DR7 in mind — already transparently disclosed in the report; a reader can independently judge the fit.
+- VSIX packaging measured via a proxy (manual bundle drop into `extension/bin/` rather than the real `EmbeddedResource` inclusion path) — reasonable spike methodology; the resulting delta numbers independently verified accurate.
+- "Conditional emission must be preserved or golden fixtures gain 1.2 MB" stated with declarative confidence — this is an explicit hand-off requirement for Story 20.7, not a claim that this spike validated it; appropriate framing for a spike.
+- No accounting of whether every cited number came from one consistent snapshot of `main` — inherent to measuring on shared `main` under CLAUDE.md's accepted concurrent-work condition; the two actual instances of drift that occurred were caught and disclosed.
+- Task 1's "work on an isolated branch/worktree" checkbox reads `[x]` despite the disclosed main-not-worktree deviation — the deviation is prominently bolded in the Debug Log immediately below; checkbox literalism isn't materially misleading here.
+- `WebviewRenderAdapter.cs:113` citation is stale (the policy is now at line 116) — cosmetic; both harnesses read the policy live by regex at runtime, so no reported conclusion is affected.
+- R1's "calendars" trace-list finding has no corresponding entry in `measurements/*.json`, unlike other `[HARNESS]`-tagged claims — independently re-verified true against the real generated `lib/index-specscribe-hierarchy.js`; a provenance-logging completeness nit, not an inaccuracy.
 
 ## Dev Notes
 
