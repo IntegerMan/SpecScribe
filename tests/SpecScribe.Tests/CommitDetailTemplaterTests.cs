@@ -101,9 +101,15 @@ public class CommitDetailTemplaterTests
 
         Assert.Contains("assets/logo.png", html);
         Assert.Contains("commit-file-binary", html);
-        // A binary row never prints +0 / −0.
-        Assert.DoesNotContain("+0", html);
-        Assert.DoesNotContain("&minus;0", html);
+        // A binary row never prints +0 / −0 — both numeric cells render an em dash.
+        // The churn assertions are scoped to the cells themselves: a bare "+0" substring
+        // search also matches the page footer's rendered UTC offset ("… UTC+00:00 …")
+        // whenever the host's local time zone is UTC, which is every CI runner. That made
+        // this test pass only by accident of the author's machine being at a negative offset.
+        Assert.Contains("<td class=\"commit-num commit-added\">&mdash;</td>", html);
+        Assert.Contains("<td class=\"commit-num commit-deleted\">&mdash;</td>", html);
+        Assert.DoesNotContain("commit-added\">+0<", html);
+        Assert.DoesNotContain("commit-deleted\">&minus;0<", html);
     }
 
     [Fact]
