@@ -11,7 +11,8 @@ touches: [".github/workflows/**", ".gitignore", "README.md"] # NOT src/** and NO
 
 # Story 25.1: SonarCloud Onboarding and Automated Analysis on Every Push to `main`
 
-Status: ready-for-dev
+Status: in-progress <!-- NOT review: the build+test gate is done and green, but the ANALYSIS half of AC #1
+has never run. Blocked on two owner actions — see Dev Agent Record → Completion Notes § 0. -->
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
