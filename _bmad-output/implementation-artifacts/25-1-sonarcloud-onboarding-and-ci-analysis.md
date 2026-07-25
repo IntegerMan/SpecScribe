@@ -485,12 +485,12 @@ All five run against `windows-latest` for the gate job and `ubuntu-latest` for t
 | # | Requirement | Run | Result |
 |---|---|---|---|
 | 1a | Green run on `main` | [`30175713872`](https://github.com/IntegerMan/SpecScribe/actions/runs/30175713872) | ✅ **success** — `build-test-analyze` green, 2390/2390 |
-| 1b | Green run on a pull request | see § Open items | ⚠️ **not yet obtained** — the `pull_request` trigger is configured but had not fired at the time of writing |
+| 1b | Green run on a pull request | [`30176207551`](https://github.com/IntegerMan/SpecScribe/actions/runs/30176207551) (PR [#2](https://github.com/IntegerMan/SpecScribe/pull/2)) | ✅ **success** — `pull_request` trigger fires and the gate is green. Same-repo PR, so the token-absent path was still taken (no secret exists yet). |
 | 2 | Passed/failed/skipped from `dotnet test` in CI | `30175713872` | Windows **2390 passed / 0 failed / 0 skipped**; Ubuntu **2388 / 2 / 0** |
 | 3a | A deliberately-failing **test** turns the job red | [`30175320065`](https://github.com/IntegerMan/SpecScribe/actions/runs/30175320065) | ✅ **failure** — `Test` red ⇒ job red, `SonarScanner end` **skipped**. (Not staged: this was the genuine first run, red on a real pre-existing bug. Stronger evidence than a planted one.) |
 | 3b | A deliberately-broken **build** turns the job red | `30175978438` | ✅ **failure** — a planted compile error made `Build` red; `Test` **skipped**, `SonarScanner end` **skipped**. Run performed on a throwaway branch, since deleted. |
 | 4 | Token-absent run still builds + tests, skips analysis cleanly | `30175713872` (and every run so far) | ✅ `Install scanner`, `SonarScanner begin`, `SonarScanner end` all **skipped**; `Build` and `Test` both **ran and passed**. The job log shows `SONAR_TOKEN:` resolving to empty. This is the exact code path a fork PR takes. |
-| 5 | `publish-docs-live-pages.yml` undisturbed | `30175320065`, `30175713872` | ✅ It correctly **did not trigger** — neither push touched a path in its `paths:` filter. Co-existence on a shared push is confirmed when this story record lands (it touches `_bmad-output/**`). No shared `concurrency.group`; this workflow uses `build-test-analyze-${{ github.ref }}`, not `pages`. |
+| 5 | `publish-docs-live-pages.yml` undisturbed | `30176316010` + `30176315939` | ✅ **Both workflows ran on the same push (the PR #2 merge) and both succeeded.** Neither cancelled the other; the Pages job took 1 m 5 s and the gate 2 m 5 s, concurrently. On the two earlier pushes (`30175320065`, `30175713872`) Pages correctly **did not** trigger, because neither touched a path in its `paths:` filter. No shared `concurrency.group` — this workflow uses `build-test-analyze-${{ github.ref }}`, not `pages`. |
 
 **On item 3a — AC #1 is demonstrated, not asserted, in both directions.** A `Build` failure and a `Test` failure were each shown to turn the job red, and in both cases `SonarScanner end` was skipped rather than running unconditionally. That was the specific hazard the story called out.
 
@@ -649,8 +649,8 @@ dotnet-sonarscanner` **unversioned**, matching Sonar's own documented sample; pi
    rather than observed.
 4. **README badge (Task 7)** — deliberately **not added**. The story permits it "only if it renders green",
    and no analysis has run. Adding it now would put a permanently-red badge on the front page.
-5. **Green pull-request run** — the `pull_request` trigger is configured but unfired. This record is being
-   landed via a PR specifically to close that gap.
+5. ~~Green pull-request run~~ — **closed.** PR [#2](https://github.com/IntegerMan/SpecScribe/pull/2), run
+   `30176207551`, green. The merge push then ran the gate and the Pages workflow concurrently, both green.
 6. **The `.gitattributes` / golden-fingerprint portability finding** deserves its own story — see § 4.
 
 ### Proposed follow-up story (raised here rather than buried)
