@@ -1,0 +1,11 @@
+{
+  "name": "specscribe-plotly-vendor-spike",
+  "private": true,
+  "description": "Story 20.4 THROWAWAY probe: builds custom Plotly bundles (standard + strict) and measures them. Mirrors tools/prism-vendor/ in shape. NOT part of any build.",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "devDependencies": {
+    "plotly.js": "3.7.0"
+  }
+}

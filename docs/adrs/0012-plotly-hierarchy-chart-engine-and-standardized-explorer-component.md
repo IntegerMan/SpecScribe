@@ -118,3 +118,89 @@ The direction in this ADR is decided. The Epic 20 engine-adoption spike is a **v
 - **Its necessary companion:** [ADR 0013](0013-text-twin-is-the-no-js-contract.md) — Plotly cannot server-render, so the no-JS contract must change with it.
 - **The story it invalidates:** Story 20.4 (Shared Client-Side Geometry Engine), seated `backlog` 2026-07-23.
 - **The CSP amendment it shares:** Story 23.4's owed ADR 0005 amendment (`_bmad-output/implementation-artifacts/23-1-spike-report.md`).
+
+---
+
+## Addendum — Story 20.4 spike validation (2026-07-24)
+
+**Status stays `Accepted`.** This addendum records measurement against the six *Spike validation* items above; it
+validates the ratified direction, it does not re-ratify it. **Neither escalation trigger fired.** Full evidence,
+with per-number provenance, in [`20-4-spike-report.md`](../../_bmad-output/implementation-artifacts/20-4-spike-report.md);
+the throwaway harness is `spike/plotly/`.
+
+Measured against **plotly.js 3.7.0 (MIT)** and this repository generated at `--deep-git` scale (679 pages,
+89,876,581 B).
+
+| # | Item | Result |
+|---|---|---|
+| 1 | **Bundle size** | **1,223,515 B min / 413,449 B gzip** — 25% of the full bundle minified, 12.2× the already-accepted `prism.js`, 4.1× gzipped. Acceptable. |
+| 2 | **Net output-size delta** | **−4,787,124 B across the portal — a REDUCTION, verified not assumed.** Break-even at **27** chart-carrying pages; the portal has **130**. `code-map.html` −3,493,000 B; `git-insights.html` −1,510,735 B. |
+| 3 | **Webview CSP** | **PASS. Trigger did not fire.** Renders completely under the byte-verbatim shipped policy, **header- and `<meta>`-delivered**. No `'unsafe-eval'`. The style axis is satisfied and is not even load-bearing. **The §5 text-twin fallback is not selected by this evidence.** |
+| 4 | **Keyboard / AT conformance** | **PASS. Trigger did not fire. This ADR is not reopened.** UX-DR7 **PASS (configured around)** — a roving-tabindex layer applied through `plotly_afterplot` survived all six re-render events (drill-in, drill-up, shape switch, drill inside treemap, resize, and a `Plotly.react`/`Plotly.relayout` the component did not initiate). UX-DR16 **PASS**, UX-DR17 **PASS**. |
+| 5 | **Packaging** | **VSIX measured: +414,279 B (+20.9%)** on a 1,978,282 B baseline — the only channel with a real pipeline. Self-contained binary and npx are **design-level**: Epic 16 is entirely `backlog`. Global-tool nupkg baseline 1,877,099 B, projected ≈ +22.1%. |
+| 6 | **Reduced motion (UX-DR18)** | **PASS (configured around).** Plotly's 750 ms drill is a **module constant** (`src/traces/sunburst/constants.js CLICK_TRANSITION_TIME`) with no public attribute — but the click is cancellable by returning `false` from `plotly_<type>click`, and the event carries `nextLevel`. Measured on a real click: **0 `Plotly.animate` calls**; the drill snaps by construction. No CSS animation, no `@keyframes`, zero SVG `<animate>` elements. |
+
+### Corrections to this ADR's text
+
+1. **§1 and Ratified decision #1 say the custom build is "limited to `sunburst` + `treemap` + `heatmap`". That is
+   not achievable.** `npm run custom-bundle` resolves the trace list to `heatmap, scatter, sunburst, treemap` —
+   `scatter` lives in `lib/core.js` and cannot be excluded from any bundle — and the generated index also
+   registers `calendars`. **The true floor is `core` (incl. `scatter`) + `heatmap` + `sunburst` + `treemap` +
+   `calendars`.** Documentation correction; not a blocker.
+2. **§5's concern that "`style-src` must accommodate the runtime `<style>` Plotly injects" is already satisfied.**
+   `WebviewRenderAdapter.cs:113` has granted `style-src 'unsafe-inline'` since ADR 0005. Measured further: with
+   `'unsafe-inline'` *removed*, Plotly detects the block, logs `Cannot addRelatedStyleRule, probably due to
+   strict CSP...`, and **still renders** — losing only hover/cursor cosmetics. The style axis was never the risk.
+3. **The `--strict` bundle variant buys nothing for this trace set** and should not be adopted. It is 7 bytes
+   larger with a byte-identical CSP-construct profile, because the `Function`-constructor paths it exists to
+   avoid live in gl/regl traces this build already excludes. **Vendor the standard bundle.**
+4. **`npm run custom-bundle` is not available from the npm package** — `plotly.js@3.7.0` ships no `tasks/`
+   directory. Vendoring requires `git clone --branch v3.7.0 --depth 1`, so `tools/plotly-vendor/` cannot be a
+   straight copy of `tools/prism-vendor/`'s shape.
+5. **Story 20.7 must preserve conditional emission.** `SiteGenerator.cs:1983` copies `prism.js` only when
+   in-portal code pages exist, "so a site with no code pages stays byte-identical". Without the same guard on the
+   Plotly bundle, every golden fixture gains 1.2 MB.
+
+### New constraints on §2's component contract (the 20.2 island is not directly consumable)
+
+Four defects between the shipped `sunburst-explorer-data` island and Plotly's hierarchy model were found. All are
+blocking for Story 20.5 and all are cheap; the hand-rolled SVG never surfaced them because it scales each ring
+independently and draws its centre as a circle rather than a node.
+
+- **One root required.** The island is a **25-root forest** (24 epics + `unplanned`) and Plotly refuses it
+  outright. A project root must be synthesized — which is also where Escape-to-top and the breadcrumb land.
+- **Parent weight ≠ Σ children.** 14 of 25 parents disagree, because an epic's weight counts its stories while
+  its emitted children also include `aggregate` follow-up nodes. `branchvalues: 'total'` is invalid. Story 20.5
+  must choose leaf-only weights or a parent-inclusive island — **a visible-geometry decision, not a detail**.
+- **`null` in `values` silently renders nothing** (calcdata collapses to a single point, no error, no warning).
+  Branch values must be `0`.
+- **`plotly_afterplot`, never the returned promise.** Plotly resolves its promises off an animation frame, and
+  the event is the only hook that also fires for re-renders the component did not initiate.
+
+### Additions to §6 (tokens, not colorways)
+
+Zero foreign colors reach the rendered DOM — **demonstrated over computed styles**, against an allowlist built at
+runtime from the shipped `.sb-*` cascade. Reaching zero required three fixes a config-level assertion would have
+missed: `marker.pattern` needs an explicit per-sector `bgcolor` (its backing rect is otherwise **black**);
+`outsidetextfont` and `layout.font.color` must be set alongside `insidetextfont` (the root label alone took
+Plotly's default); and **Plotly emits the hatch `<path>` inside every `<pattern>` with no `fill`**, so SVG's
+initial black is painted beneath it. That last one **has no Plotly attribute** — the component must ship
+`defs pattern > path { fill: none; }`.
+
+Also: the shipped chart distinguishes follow-up and no-plan wedges by **stroke dash**, which Plotly's
+`marker.line` cannot express. **`marker.pattern` hatching is the replacement** and is a stronger channel; with it,
+status is carried on three independent channels (fill token, hatch, and the status word in every sector's
+accessible name).
+
+### Boundaries on this validation
+
+- **`file://` was not directly exercised.** The session's preview pane gives no live `file://` context and no
+  external browser was connected. Structural evidence is strong (4 same-origin requests after the full
+  interaction suite; zero `fetch`, zero ESM imports, zero external origins), but the run is owed.
+- **The CSP verdict is a lower bound on the webview gap.** `vscode-resource:` URI delivery and an Electron paint
+  were not tested. This is narrower than Story 23.1's boundary — meta delivery *was* tested here — but it is real.
+- **No screenshot exists.** The preview pane never composited a frame; all visual claims are computed-style,
+  DOM-geometry and focus-model evidence. A human eyeball is owed at Story 20.5's create-story elicitation.
+- **§5's ADR 0005 amendment was not authored here** (it lands once, jointly with Story 23.4). The evidence it will
+  cite is that **no relaxation of the policy string is required**.
+- **§4's Epic 24 graph engine remains open.** Plotly has no force-directed trace; nothing here settles Story 24.2.

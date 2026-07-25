@@ -3,8 +3,8 @@ using SpecScribe;
 namespace SpecScribe.Tests;
 
 /// <summary>Generation-level coverage for Help orientation pages: <c>how-to-read.html</c> (How to use SpecScribe —
-/// reading order + glossary only) and the About Spec-Driven Development hub + framework sub-pages. Follows the
-/// temp-dir fixture style of <see cref="SiteGeneratorOutlineTests"/>.</summary>
+/// reading order, CLI generate/watch guidance, glossary) and the About Spec-Driven Development hub + framework
+/// sub-pages. Follows the temp-dir fixture style of <see cref="SiteGeneratorOutlineTests"/>.</summary>
 public class SiteGeneratorHowToReadTests : IDisposable
 {
     private readonly string _root = Directory.CreateTempSubdirectory("specscribe-howtoread-").FullName;
@@ -399,6 +399,123 @@ public class SiteGeneratorHowToReadTests : IDisposable
         Assert.Contains("Narrative Design", gds);
         Assert.DoesNotContain("BMad is not detected", bmad);
         Assert.DoesNotContain("BMad GDS is not detected", gds);
+    }
+
+    [Fact]
+    public void HowToRead_GenerateSection_CoversGenerateAndWatch_BetweenReadingOrderAndGlossary()
+    {
+        new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
+        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+
+        Assert.Contains("<h2 id=\"generate\">Generate with SpecScribe</h2>", html);
+        Assert.Contains("<code>specscribe generate</code>", html);
+        Assert.Contains("<code>specscribe watch</code>", html);
+
+        // Onboarding flows first (read the portal, then produce it); the glossary/commands are reference
+        // material consulted later.
+        var readingOrder = html.IndexOf("<h2 id=\"reading-order\">", StringComparison.Ordinal);
+        var generate = html.IndexOf("<h2 id=\"generate\">", StringComparison.Ordinal);
+        var glossary = html.IndexOf("<h2 id=\"glossary\">", StringComparison.Ordinal);
+        Assert.True(readingOrder >= 0 && generate > readingOrder && glossary > generate,
+            "Generate section must sit between Reading order and Glossary");
+    }
+
+    [Fact]
+    public void HowToRead_GenerateSection_NamesPathOverrides_AndDefersToHelpForTheRest()
+    {
+        new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
+        var html = GenerateSectionOf(File.ReadAllText(Path.Combine(Site, "how-to-read.html")));
+
+        Assert.Contains("<code>--source</code>", html);
+        Assert.Contains("<code>--adrs</code>", html);
+        Assert.Contains("<code>--output</code>", html);
+        Assert.Contains("--help", html);
+
+        // The flag table lives in --help, not here — a second copy drifts the moment Epic 5 adds an option.
+        Assert.DoesNotContain("--project-name", html);
+        Assert.DoesNotContain("--no-readme", html);
+        Assert.DoesNotContain("--spa", html);
+        Assert.DoesNotContain("--code-url", html);
+        Assert.DoesNotContain("--today-policy", html);
+    }
+
+    [Fact]
+    public void HowToRead_GenerateSection_NamesDiagnosticsFieldLabels_AndLinksThere()
+    {
+        new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
+        var full = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+        var html = GenerateSectionOf(full);
+
+        // The exact labels DiagnosticsTemplater.RenderConfig renders, so prose here maps onto what a real run
+        // shows — not a renamed parallel vocabulary.
+        var diagnostics = File.ReadAllText(Path.Combine(Site, "diagnostics.html"));
+        foreach (var label in new[] { "Source root", "ADR location", "Output directory", "README included", "Deep-git analytics", "External source base" })
+        {
+            Assert.Contains(label, html);
+            Assert.Contains($"<dt>{label}</dt>", diagnostics);
+        }
+
+        Assert.Contains("href=\"diagnostics.html\"", html);
+        Assert.Contains(".specscribe", html);
+        Assert.Contains("Configure paths", html);
+        Assert.Contains("--show-config", html);
+    }
+
+    [Fact]
+    public void HowToRead_GenerateSection_IsFrameworkAgnostic_AndRendersWithoutADetectedModule()
+    {
+        // Same NFR8 discipline the reading order already follows: this section names slots and SpecScribe's own
+        // CLI, never a methodology's folder names — and unlike every other section it has no availability gate,
+        // so an undetected repo (no glossary, no commands, no reading-order pages) still gets it.
+        var bareRoot = Directory.CreateTempSubdirectory("specscribe-howtoread-bare-").FullName;
+        try
+        {
+            var source = Path.Combine(bareRoot, "_bmad-output");
+            Directory.CreateDirectory(source);
+            var output = Path.Combine(bareRoot, "site");
+
+            new SiteGenerator(ForgeOptions.Resolve(source: source, output: output, projectName: "SpecScribe", includeReadme: false)).GenerateAll();
+            var full = File.ReadAllText(Path.Combine(output, "how-to-read.html"));
+
+            Assert.DoesNotContain("<h2 id=\"reading-order\">", full);
+            Assert.DoesNotContain("<h2 id=\"glossary\">", full);
+            Assert.Contains("<h2 id=\"generate\">Generate with SpecScribe</h2>", full);
+            // The subtitle/intro must not promise reading order or glossary content that isn't there.
+            Assert.DoesNotContain("Start with the reading order", full);
+
+            var section = GenerateSectionOf(full);
+            Assert.DoesNotContain("_bmad-output", section);
+            Assert.DoesNotContain("BMad", section);
+            Assert.DoesNotContain("bmad", section);
+        }
+        finally
+        {
+            Directory.Delete(bareRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void HowToRead_SubtitleAndIntro_MentionGeneratingNotJustReading()
+    {
+        new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
+        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+
+        Assert.Contains("then generate the site yourself", html);
+        Assert.Contains("how to rebuild", html);
+        Assert.Contains("how to generate and refresh the site from the command line", html); // meta description
+    }
+
+    /// <summary>The Generate section's own markup, from its <c>h2</c> to the next one (or the end of the panel) —
+    /// so a DoesNotContain assertion can't be satisfied or defeated by the surrounding page (the nav bar and the
+    /// glossary both mention BMad on a detected repo).</summary>
+    private static string GenerateSectionOf(string html)
+    {
+        var start = html.IndexOf("<h2 id=\"generate\">", StringComparison.Ordinal);
+        Assert.True(start >= 0, "Generate section should be present");
+        var next = html.IndexOf("<h2 ", start + 1, StringComparison.Ordinal);
+        var end = next >= 0 ? next : html.IndexOf("</section>", start, StringComparison.Ordinal);
+        Assert.True(end > start, "Generate section should have an end boundary");
+        return html[start..end];
     }
 
     [Fact]

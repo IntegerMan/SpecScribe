@@ -1,6 +1,10 @@
+---
+baseline_commit: 5a96f711c8f10654e011cac23a5823079634d565
+---
+
 # Story 5.6: How to use SpecScribe — CLI Generate and Watch Guidance
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -35,35 +39,35 @@ That comment is this story. Remove/replace it once the section lands.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Add the "Generate with SpecScribe" section (AC: #1)**
-  - [ ] In [HowToReadTemplater.cs](../../src/SpecScribe/HowToReadTemplater.cs), add a new private `AppendGenerateSection` method (mirror `AppendReadingOrder`/`AppendGlossary`'s shape: `h2` with a stable `id`, appended into the same `sections` `StringBuilder` in `RenderPage`) and call it **between** `AppendReadingOrder` and `AppendGlossary` — reading order and "how to produce the site" are both onboarding flows; glossary/commands are reference material consulted later. This section is unconditional (always renders — `generate`/`watch` always exist, unlike the gated reading-order steps), so it needs no availability guard.
-  - [ ] Content (keep to EXPERIENCE.md's voice: active voice, numbers over adjectives, no marketing fluff — [EXPERIENCE.md:61-71](../../_bmad-output/planning-artifacts/ux-designs/ux-SpecScribe-2026-07-05/EXPERIENCE.md)):
+- [x] **Task 1 — Add the "Generate with SpecScribe" section (AC: #1)**
+  - [x] In [HowToReadTemplater.cs](../../src/SpecScribe/HowToReadTemplater.cs), add a new private `AppendGenerateSection` method (mirror `AppendReadingOrder`/`AppendGlossary`'s shape: `h2` with a stable `id`, appended into the same `sections` `StringBuilder` in `RenderPage`) and call it **between** `AppendReadingOrder` and `AppendGlossary` — reading order and "how to produce the site" are both onboarding flows; glossary/commands are reference material consulted later. This section is unconditional (always renders — `generate`/`watch` always exist, unlike the gated reading-order steps), so it needs no availability guard.
+  - [x] Content (keep to EXPERIENCE.md's voice: active voice, numbers over adjectives, no marketing fluff — [EXPERIENCE.md:61-71](../../_bmad-output/planning-artifacts/ux-designs/ux-SpecScribe-2026-07-05/EXPERIENCE.md)):
     - One-shot vs. continuous: `specscribe generate` builds once; `specscribe watch` keeps rebuilding as source files change.
     - Smart defaults (AC1 "aligned to 5.1–5.3"): for a supported repo layout, no flags are required — source and output roots are auto-discovered. State this as present-tense fact, not a promise; it is already true today (`ForgeOptions.Resolve`'s walk-up discovery predates Epic 5 — see Dev Notes).
     - Overrides: name `--source`, `--adrs`, `--output` for a non-standard layout, and point to `specscribe generate --help` for the full option list rather than reproducing every flag (avoids drift when the flag surface grows).
-  - [ ] Update the page's meta description ([HowToReadTemplater.cs:21](../../src/SpecScribe/HowToReadTemplater.cs), currently "…a suggested reading order and a glossary of the terms used throughout") and the `doc-subtitle`/intro paragraph ([:41](../../src/SpecScribe/HowToReadTemplater.cs), [:54-57](../../src/SpecScribe/HowToReadTemplater.cs)) to mention generating/refreshing the site, not just reading it. These currently promise only "reading order and glossary" — leaving them as-is after this story would make the page's own subtitle inaccurate.
-  - [ ] Remove the "CLI generate/watch guidance is intentionally out of scope" line from the class doc comment ([HowToReadTemplater.cs:9](../../src/SpecScribe/HowToReadTemplater.cs)) and replace with an accurate one-line description of the new section.
-  - [ ] The existing "For framework overviews and SpecScribe support, see [About Spec-Driven Development]" link ([HowToReadTemplater.cs:57](../../src/SpecScribe/HowToReadTemplater.cs)) already satisfies AC1's "links to About SDD" clause — do not duplicate the About SDD support matrix inside the new section; a single sentence pointer is enough if the new section wants its own, but it's not required.
+  - [x] Update the page's meta description ([HowToReadTemplater.cs:21](../../src/SpecScribe/HowToReadTemplater.cs), currently "…a suggested reading order and a glossary of the terms used throughout") and the `doc-subtitle`/intro paragraph ([:41](../../src/SpecScribe/HowToReadTemplater.cs), [:54-57](../../src/SpecScribe/HowToReadTemplater.cs)) to mention generating/refreshing the site, not just reading it. These currently promise only "reading order and glossary" — leaving them as-is after this story would make the page's own subtitle inaccurate.
+  - [x] Remove the "CLI generate/watch guidance is intentionally out of scope" line from the class doc comment ([HowToReadTemplater.cs:9](../../src/SpecScribe/HowToReadTemplater.cs)) and replace with an accurate one-line description of the new section.
+  - [x] The existing "For framework overviews and SpecScribe support, see [About Spec-Driven Development]" link ([HowToReadTemplater.cs:57](../../src/SpecScribe/HowToReadTemplater.cs)) already satisfies AC1's "links to About SDD" clause — do not duplicate the About SDD support matrix inside the new section; a single sentence pointer is enough if the new section wants its own, but it's not required.
 
-- [ ] **Task 2 — Name the same effective-settings surface as Diagnostics, framework-agnostically (AC: #2)**
-  - [ ] Reuse the **exact field labels** `DiagnosticsTemplater.RenderConfig` already renders ([DiagnosticsTemplater.cs:264-272](../../src/SpecScribe/DiagnosticsTemplater.cs)) — "Source root", "ADR location", "Output directory", "README included", "Deep-git analytics", "External source base" — so a reader can map this page's prose directly onto what they'll see after a real run. Don't invent parallel/renamed terms.
-  - [ ] State that settings can be saved per-repository via the interactive menu's "Configure paths" (persisted to `.specscribe`, gitignored/personal — never committed) and that CLI flags always override the saved value for a single run (the CLI-wins precedence `SettingsStore.ApplyTo` already implements — see [5-2 story](5-2-directory-scoped-settings-with-interactive-and-cli-parity.md) Dev Notes: "the persistence primitives already exist... do not rebuild them").
-  - [ ] Add one link to `diagnostics.html` (`SiteNav.DiagnosticsOutputPath`) as "see exactly what a given run resolved" — the definitive per-run values, not restated here.
-  - [ ] **Framework-agnostic (NFR8):** no methodology-specific nouns (no "BMad", no `_bmad-output`, no slash-command names) — this page renders identically regardless of detected module, exactly like `AppendReadingOrder`/`AppendGlossary` already do (they describe *slots*, not *BMad's* slots). Say "your spec artifacts directory" / "source root", not any framework's actual folder name.
+- [x] **Task 2 — Name the same effective-settings surface as Diagnostics, framework-agnostically (AC: #2)**
+  - [x] Reuse the **exact field labels** `DiagnosticsTemplater.RenderConfig` already renders ([DiagnosticsTemplater.cs:264-272](../../src/SpecScribe/DiagnosticsTemplater.cs)) — "Source root", "ADR location", "Output directory", "README included", "Deep-git analytics", "External source base" — so a reader can map this page's prose directly onto what they'll see after a real run. Don't invent parallel/renamed terms.
+  - [x] State that settings can be saved per-repository via the interactive menu's "Configure paths" (persisted to `.specscribe`, gitignored/personal — never committed) and that CLI flags always override the saved value for a single run (the CLI-wins precedence `SettingsStore.ApplyTo` already implements — see [5-2 story](5-2-directory-scoped-settings-with-interactive-and-cli-parity.md) Dev Notes: "the persistence primitives already exist... do not rebuild them").
+  - [x] Add one link to `diagnostics.html` (`SiteNav.DiagnosticsOutputPath`) as "see exactly what a given run resolved" — the definitive per-run values, not restated here.
+  - [x] **Framework-agnostic (NFR8):** no methodology-specific nouns (no "BMad", no `_bmad-output`, no slash-command names) — this page renders identically regardless of detected module, exactly like `AppendReadingOrder`/`AppendGlossary` already do (they describe *slots*, not *BMad's* slots). Say "your spec artifacts directory" / "source root", not any framework's actual folder name.
 
-- [ ] **Task 3 — Fix the now-stale Help quick-link blurb (AC: #1, regression)**
-  - [ ] [SiteNav.cs:146](../../src/SpecScribe/SiteNav.cs) — the command-palette/quick-links entry for this page reads `"Reading order and glossary for this portal."` This becomes inaccurate once the page also covers generating the site. Update the blurb to mention both (e.g. `"Reading order, glossary, and how to generate the site."`). Leave the nav label itself ("How to use SpecScribe", [:142](../../src/SpecScribe/SiteNav.cs)) unchanged — it was already generic enough.
+- [x] **Task 3 — Fix the now-stale Help quick-link blurb (AC: #1, regression)**
+  - [x] [SiteNav.cs:146](../../src/SpecScribe/SiteNav.cs) — the command-palette/quick-links entry for this page reads `"Reading order and glossary for this portal."` This becomes inaccurate once the page also covers generating the site. Update the blurb to mention both (e.g. `"Reading order, glossary, and how to generate the site."`). Leave the nav label itself ("How to use SpecScribe", [:142](../../src/SpecScribe/SiteNav.cs)) unchanged — it was already generic enough.
 
-- [ ] **Task 4 — Tests + golden regen**
-  - [ ] Extend [SiteGeneratorHowToReadTests.cs](../../tests/SpecScribe.Tests/SiteGeneratorHowToReadTests.cs) (follow its existing fixture/assertion style — plain `Assert.Contains`/`DoesNotContain` on rendered HTML, no new fixture needed):
+- [x] **Task 4 — Tests + golden regen**
+  - [x] Extend [SiteGeneratorHowToReadTests.cs](../../tests/SpecScribe.Tests/SiteGeneratorHowToReadTests.cs) (follow its existing fixture/assertion style — plain `Assert.Contains`/`DoesNotContain` on rendered HTML, no new fixture needed):
     - New section renders with a stable heading and id, and mentions both `specscribe generate` and `specscribe watch`.
     - Section names `--source`, `--adrs`, `--output` and points to `--help` rather than reproducing every flag.
     - Section names the Diagnostics field labels (or a strict subset) and links `href="diagnostics.html"`.
     - `Assert.DoesNotContain` any BMad-specific token (mirror the file's existing `Assert.DoesNotContain("sdd-tab", …)` / `Assert.DoesNotContain("class=\"mermaid\"", …)` discipline) — e.g. assert the new section text doesn't contain `"_bmad-output"` or `"BMad"`.
     - Existing tests (`HowToRead_ReadingOrder_*`, `HowToRead_Glossary_*`, `HowToRead_BypassesApplyReferenceLinks`, `HowToRead_NavAndH1LabeledHowToUseSpecScribe`) must stay green unmodified in behavior — only the subtitle/intro text assertions (if any exist against the exact current wording) need updating for Task 1's copy change; check none currently pin the literal subtitle sentence before assuming a change is needed.
-  - [ ] Add/extend a `SiteNavTests.cs` assertion for the updated quick-link blurb (Task 3) if an existing test pins the old string; otherwise add one.
-  - [ ] `how-to-read.html` is written on every full run ([HowToReadTemplater.cs:9](../../src/SpecScribe/HowToReadTemplater.cs): "Written on every full run"), so this story **will** move the golden content fingerprint ([SiteGeneratorAdapterTests.cs:224](../../tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs), `GenerateAll_GoldenContentFingerprint_IsStableAfterNormalizingVolatileTokens`). Regenerate it and record the new hash in Completion Notes. **Confirm the hash is stable across two clean runs before locking it into the test constant** (stale-build first-captured-hash trap — [memory: golden-diff-normalization-gotchas]).
-  - [ ] Run the full suite: `dotnet test` from repo root; all existing tests stay green.
+  - [x] Add/extend a `SiteNavTests.cs` assertion for the updated quick-link blurb (Task 3) if an existing test pins the old string; otherwise add one.
+  - [x] `how-to-read.html` is written on every full run ([HowToReadTemplater.cs:9](../../src/SpecScribe/HowToReadTemplater.cs): "Written on every full run"), so this story **will** move the golden content fingerprint ([SiteGeneratorAdapterTests.cs:224](../../tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs), `GenerateAll_GoldenContentFingerprint_IsStableAfterNormalizingVolatileTokens`). Regenerate it and record the new hash in Completion Notes. **Confirm the hash is stable across two clean runs before locking it into the test constant** (stale-build first-captured-hash trap — [memory: golden-diff-normalization-gotchas]).
+  - [x] Run the full suite: `dotnet test` from repo root; all existing tests stay green.
 
 ## Dev Notes
 
@@ -130,8 +134,48 @@ The page is called from exactly one site: `SiteGenerator.WriteHowToRead` ([SiteG
 
 ### Agent Model Used
 
+claude-opus-5 (dev-story workflow)
+
 ### Debug Log References
+
+- `dotnet test --filter "FullyQualifiedName~SiteGeneratorHowToReadTests|FullyQualifiedName~SiteNavTests"` → 58 passed / 0 failed.
+- `dotnet test --filter "FullyQualifiedName~GoldenContentFingerprint"` × 2 → same hash both runs (see Completion Notes).
+- `dotnet run --project src/SpecScribe -- generate` → 375 pages, `generated=375 updated=0 skipped=4 errors=0`, exit 0.
+- Live DOM check on the generated `how-to-read.html` (browser pane, `javascript_tool`): four `h2`s in order `reading-order → generate → glossary → commands`; `diagnostics.html` link present in the panel; no horizontal overflow at either document or `.howtoread-panel` level; no console errors.
+- `dotnet test` (full suite) → 2347 passed / 0 failed / 3 skipped.
 
 ### Completion Notes List
 
+**Scope held.** Content/rendering only. `SiteSettings.cs`, `Commands.cs`, `ForgeOptions.cs`, `SettingsStore.cs` untouched — the CLI surface was read, not changed. No new files, no new CSS classes, no JS, no `<details>`, no Toc.
+
+**The unconditional section forced a restructure of the honesty gate.** `RenderPage` previously built ONE `sections` builder and used `sections.Length > 0` to pick between a "here's the reading order and glossary" subtitle/intro and a degraded "content appears as the project grows" pair. Appending an always-renders section into that same builder would have made the gate permanently true and silently killed the degraded branch — the page would then promise a reading order and glossary to an undetected repo that has neither. Fixed by splitting into `readingOrder` + `reference` builders whose combined length is the (unchanged) module-content signal, with `AppendGenerateSection` composed between them and **outside** it. Both branches now render the Generate section; both tell the truth about what else is there. `HowToRead_GenerateSection_IsFrameworkAgnostic_AndRendersWithoutADetectedModule` pins the degraded branch specifically (asserts the Generate `h2` present, reading-order/glossary `h2`s absent, and `"Start with the reading order"` NOT in the page).
+
+**AC#2 labels verified against live output, not the story's snapshot.** The six named labels — Source root, ADR location, Output directory, README included, Deep-git analytics, External source base — were confirmed as literal `<dt>` values in the freshly generated `diagnostics.html`. Note the live config `<dl>` has since grown two more rows the story's snapshot didn't list (`Detected framework`, and Story 5.5's `Date-page "today" policy`, which sits between Deep-git analytics and README included); AC#2 asks for the same *surface*, not an exhaustive mirror, so the six were kept and the new test asserts each one is BOTH in this page's prose AND a real `<dt>` on `diagnostics.html` — so a future rename of either side breaks the test rather than drifting silently.
+
+**One deviation from the task text, deliberate: `.specscribe` is not described as "gitignored".** Task 2 said "persisted to `.specscribe`, gitignored/personal — never committed". SpecScribe does not write a `.gitignore` entry — this repo's own `.gitignore:488` has one because a human added it. Stating "gitignored" as fact in shared chrome would be false for any project that hasn't done that. Copy says instead: "one per checkout, so ignore it in version control if you'd rather not share your local paths" — actionable and true everywhere.
+
+**Two additions beyond the task list, both verified live in `SiteSettings.cs`:** `--show-config` (Story 5.2) is named as the way to see resolved provenance without generating, and the section states the CLI-wins precedence in one clause. Both are AC1's "aligned to 5.1–5.3" and neither reproduces the flag table.
+
+**Flag-table drift guard.** `HowToRead_GenerateSection_NamesPathOverrides_AndDefersToHelpForTheRest` asserts the section does NOT name `--project-name`, `--no-readme`, `--spa`, `--code-url`, or `--today-policy`, so a future well-meant addition re-creates the second-source-of-truth this story's Dev Notes forbids and fails instead.
+
+**Section-scoped assertions.** The NFR8 "no BMad token" checks run against a `GenerateSectionOf` slice (`h2#generate` → next `h2`), not the whole page — on a detected repo the nav bar and glossary both legitimately say "BMad Method", so a whole-page `DoesNotContain` would be unsatisfiable, and on the bare fixture it would pass for the wrong reason.
+
+**Golden fingerprint regenerated: `f9c79d98…` → `9232e3f5e0d2aee38c1cd4e76829b0633aadc8331462a8d55b531c2cdb820f68`.** Confirmed identical across two repeated runs before locking in (stale-build first-hash trap). Two rendered deltas: (1) `how-to-read.html`'s new section + reworded meta description / subtitle / intro; (2) the `SiteNav` quick-link blurb, which renders as that entry's `data-tooltip` in the white key-views band, so every page carrying that band shifted by one attribute value. No asset bytes, no file-set change. PROVENANCE (shared main): captured on a tree carrying only this story's five files plus another session's untracked `spike/plotly/` scratch directory, which lives outside the temp fixture and cannot reach the hash.
+
+**Verification limit recorded honestly:** the browser pane would not composite frames in this session, so no screenshot was captured. Verification was done on the live generated page via DOM/computed-geometry inspection (`javascript_tool`) and rendered-text extraction rather than by eye — sufficient for a prose section reusing the panel's existing `h2`/`p` styling, but the owner-verification pass should still look at it.
+
+**Open Questions #1 and #2 (from story close) both answered as authored:** section placed between Reading order and Glossary; settings kept to naming the Diagnostics labels + one link + the precedence clause, not a full settings walkthrough. Both remain one-line changes if the owner prefers otherwise.
+
 ### File List
+
+- `src/SpecScribe/HowToReadTemplater.cs` — modified (new `AppendGenerateSection`; `RenderPage` split into `readingOrder`/`reference` builders + `hasModuleContent` gate; meta description, both subtitles, both intro paragraphs; class doc comment)
+- `src/SpecScribe/SiteNav.cs` — modified (one string literal: the How-to-use quick-link blurb, `:188`)
+- `tests/SpecScribe.Tests/SiteGeneratorHowToReadTests.cs` — modified (5 new `[Fact]`s + `GenerateSectionOf` helper + class doc comment)
+- `tests/SpecScribe.Tests/SiteNavTests.cs` — modified (1 new `[Fact]` pinning the quick-link blurb)
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — modified (golden content fingerprint constant + provenance comment)
+
+## Change Log
+
+| Date | Change |
+| --- | --- |
+| 2026-07-24 | Story implemented. Added the unconditional "Generate with SpecScribe" section to `how-to-read.html` (generate/watch, no-flags default, `--source`/`--adrs`/`--output` + `--help`, Diagnostics field labels + link, `.specscribe` persistence and CLI-wins precedence, `--show-config`); reworded the page's meta description, subtitle, and intro; fixed the stale Help quick-link blurb; 6 new tests; golden content fingerprint regenerated to `9232e3f5…`. Full suite 2347 passed / 0 failed / 3 skipped. Status → review. |

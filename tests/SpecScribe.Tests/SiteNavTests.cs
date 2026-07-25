@@ -34,6 +34,17 @@ public class SiteNavTests
     }
 
     [Fact]
+    public void Build_HowToUseQuickLink_BlurbCoversGeneratingTheSite()
+    {
+        // The page covers reading order, glossary AND generating the site (Story 5.6) — the quick-link blurb is
+        // the command-palette's only description of it, so a reading-only blurb misdescribes the destination.
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe");
+
+        var link = Assert.Single(nav.QuickLinks, q => q.Label == "How to use SpecScribe");
+        Assert.Equal("Reading order, glossary, and how to generate the site.", link.Description);
+    }
+
+    [Fact]
     public void Build_OmitsMissingArtifactClasses()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);

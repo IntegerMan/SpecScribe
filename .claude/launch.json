@@ -2,6 +2,24 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "plotly-csp-webview",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["spike/plotly/scripts/csp-probe.mjs", "5411", "webview"],
+      "port": 5411
+    },
+    {
+      "name": "plotly-csp-off",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["spike/plotly/scripts/csp-probe.mjs", "5412", "off"],
+      "port": 5412
+    },
+    {
+      "name": "plotly-csp-no-inline-style",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["spike/plotly/scripts/csp-probe.mjs", "5413", "no-inline-style"],
+      "port": 5413
+    },
+    {
       "name": "specscribe-output",
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8099", "--directory", "SpecScribeOutput"],

@@ -3,11 +3,11 @@ using System.Text;
 namespace SpecScribe;
 
 /// <summary>Renders the "How to use SpecScribe" orientation page (<c>how-to-read.html</c>): a suggested
-/// reading order through the pages that actually exist, plus a glossary of the detected module's vocabulary.
+/// reading order through the pages that actually exist, how to generate and refresh the site from the
+/// command line, plus a glossary of the detected module's vocabulary.
 /// Written on every full run so its Help-nav link never 404s, and — like About/Diagnostics — it is written
 /// directly rather than through <c>ApplyReferenceLinks</c>, so it never self-expands the glossary terms it
-/// defines. CLI generate/watch guidance is intentionally out of scope here (Epic 5 follow-on story).
-/// [Story 10.3; Help nav; How to use SpecScribe]</summary>
+/// defines. [Story 10.3; Story 5.6; Help nav; How to use SpecScribe]</summary>
 public static class HowToReadTemplater
 {
     public static string RenderPage(SiteNav nav, IReadOnlyList<ModuleDoc> moduleDocs, IReadOnlyList<GlossaryTerm> glossary, CommandCatalog commands)
@@ -18,7 +18,7 @@ public static class HowToReadTemplater
         sb.Append(PathUtil.RenderHeadOpen(
             $"How to use SpecScribe — {nav.SiteTitle}",
             ForgeOptions.StylesheetName, ForgeOptions.ScriptName,
-            $"Orientation for a first visit to {nav.SiteTitle}'s documentation portal: a suggested reading order and a glossary of the terms used throughout."));
+            $"Orientation for a first visit to {nav.SiteTitle}'s documentation portal: a suggested reading order, how to generate and refresh the site from the command line, and a glossary of the terms used throughout."));
         sb.Append(nav.RenderNavBar(outputPath));
         sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
         {
@@ -29,40 +29,53 @@ public static class HowToReadTemplater
         sb.Append("<header class=\"doc-header\">\n");
         sb.Append("  <h1>How to use SpecScribe</h1>\n");
 
-        // Build sections first so the header subtitle + intro can tell the truth when every append is a
-        // no-op (undetected module + no reading-order pages) — never promise content that doesn't exist.
-        var sections = new StringBuilder();
-        AppendReadingOrder(sections, nav, moduleDocs);
-        AppendGlossary(sections, glossary);
-        AppendCommandLegend(sections, commands);
+        // Build sections first so the header subtitle + intro can tell the truth when every MODULE-DERIVED
+        // append is a no-op (undetected module + no reading-order pages) — never promise content that doesn't
+        // exist. The Generate section is deliberately outside that signal: the CLI exists no matter what was
+        // detected, so it renders in both branches and the page is never actually empty. Split into two
+        // builders only so the unconditional section can sit between them in reading position. [Story 5.6]
+        var readingOrder = new StringBuilder();
+        AppendReadingOrder(readingOrder, nav, moduleDocs);
 
-        if (sections.Length > 0)
+        var reference = new StringBuilder();
+        AppendGlossary(reference, glossary);
+        AppendCommandLegend(reference, commands);
+
+        var hasModuleContent = readingOrder.Length > 0 || reference.Length > 0;
+
+        var sections = new StringBuilder();
+        sections.Append(readingOrder);
+        AppendGenerateSection(sections);
+        sections.Append(reference);
+
+        if (hasModuleContent)
         {
-            sb.Append("  <div class=\"doc-subtitle\">New here? Start with the reading order and glossary below.</div>\n");
+            sb.Append("  <div class=\"doc-subtitle\">New here? Start with the reading order and glossary below, then generate the site yourself.</div>\n");
         }
         else
         {
-            sb.Append("  <div class=\"doc-subtitle\">Orientation for a first visit — content appears as the project grows.</div>\n");
+            sb.Append("  <div class=\"doc-subtitle\">Orientation for a first visit — and how to generate this site yourself.</div>\n");
         }
         sb.Append("</header>\n\n");
 
         sb.Append("<main id=\"main-content\" class=\"info-page\">\n");
         sb.Append("<section class=\"chart-panel howtoread-panel\">\n");
 
-        if (sections.Length > 0)
+        if (hasModuleContent)
         {
             sb.Append("  <p>This portal documents a project built with an AI-assisted development methodology. ");
-            sb.Append("If you're new to it, the sections below walk you through what to read first and what the ");
-            sb.Append("recurring terms mean. For framework overviews and SpecScribe support, see ");
-            sb.Append($"<a href=\"{SiteNav.AboutSddOutputPath}\">About Spec-Driven Development</a>.</p>\n");
-            sb.Append(sections);
+            sb.Append("If you're new to it, the sections below walk you through what to read first, how to rebuild ");
+            sb.Append("this site yourself, and what the recurring terms mean. For framework overviews and SpecScribe ");
+            sb.Append($"support, see <a href=\"{SiteNav.AboutSddOutputPath}\">About Spec-Driven Development</a>.</p>\n");
         }
         else
         {
-            sb.Append("  <p>Orientation content appears as the project grows. ");
-            sb.Append($"Meanwhile, see <a href=\"{SiteNav.AboutSddOutputPath}\">About Spec-Driven Development</a> ");
-            sb.Append("for frameworks SpecScribe can work with.</p>\n");
+            sb.Append("  <p>Orientation content appears as the project grows. The section below covers generating ");
+            sb.Append("and refreshing this site from the command line; for frameworks SpecScribe can work with, see ");
+            sb.Append($"<a href=\"{SiteNav.AboutSddOutputPath}\">About Spec-Driven Development</a>.</p>\n");
         }
+
+        sb.Append(sections);
 
         sb.Append("</section>\n");
         sb.Append("</main>\n\n");
@@ -122,6 +135,37 @@ public static class HowToReadTemplater
             sb.Append($"    <li><a href=\"{PathUtil.Html(step.OutputRelativePath)}\">{PathUtil.Html(step.Label)}</a></li>\n");
         }
         sb.Append("  </ol>\n");
+    }
+
+    /// <summary>How to produce and refresh the site the reader is standing in: the two commands, the
+    /// no-flags-needed default, the three path overrides, and where the effective settings live. Unconditional —
+    /// unlike every other section here it has no availability gate, because the CLI it documents is the same
+    /// regardless of which methodology (if any) was detected. Framework-agnostic by the same discipline
+    /// <see cref="AppendReadingOrder"/> follows (NFR8): it names the <see cref="DiagnosticsConfig"/> field labels
+    /// a reader will actually see on <c>diagnostics.html</c>, never a specific framework's folder names. Deliberately
+    /// does NOT reproduce the flag table — <c>--help</c> is the one surface that can't drift. [Story 5.6]</summary>
+    private static void AppendGenerateSection(StringBuilder sb)
+    {
+        sb.Append("  <h2 id=\"generate\">Generate with SpecScribe</h2>\n");
+
+        sb.Append("  <p><code>specscribe generate</code> builds this site once. <code>specscribe watch</code> keeps ");
+        sb.Append("going: it rebuilds after every source change, so a browser tab left open stays current while ");
+        sb.Append("you edit.</p>\n");
+
+        sb.Append("  <p>In a conventional repository layout neither command needs a flag — SpecScribe walks up from ");
+        sb.Append("the current directory to find the source root and writes the site beside it. For a different ");
+        sb.Append("layout, <code>--source</code> sets the source root, <code>--adrs</code> the decision-record ");
+        sb.Append("directory, and <code>--output</code> the directory the HTML is written to. Run ");
+        sb.Append("<code>specscribe generate --help</code> for the full option list.</p>\n");
+
+        sb.Append("  <p>The values a run actually uses are the ones reported on ");
+        sb.Append($"<a href=\"{SiteNav.DiagnosticsOutputPath}\">Diagnostics</a>: Source root, ADR location, Output ");
+        sb.Append("directory, README included, Deep-git analytics, and External source base. Save them per ");
+        sb.Append("repository from the interactive menu's \"Configure paths\", which writes a <code>.specscribe</code> ");
+        sb.Append("file beside your project — one per checkout, so ignore it in version control if you'd rather not ");
+        sb.Append("share your local paths. A flag on the command line always wins over a saved value for that one ");
+        sb.Append("run, and <code>specscribe generate --show-config</code> prints where each value came from without ");
+        sb.Append("generating anything.</p>\n");
     }
 
     /// <summary>The module's vocabulary as a definition list, acronyms first (stable sort preserves each

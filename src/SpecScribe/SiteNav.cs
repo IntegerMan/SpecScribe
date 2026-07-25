@@ -185,7 +185,7 @@ public sealed class SiteNav
         help.Add(("About Spec-Driven Development", AboutSddOutputPath));
         help.Add(("About", AboutOutputPath));
         help.Add(("Logs", DiagnosticsOutputPath));
-        quickLinks.Add(("How to use SpecScribe", HowToReadOutputPath, "Reading order and glossary for this portal.", "Help"));
+        quickLinks.Add(("How to use SpecScribe", HowToReadOutputPath, "Reading order, glossary, and how to generate the site.", "Help"));
         quickLinks.Add(("About Spec-Driven Development", AboutSddOutputPath, "Frameworks, support matrix, and getting started with SDD.", "Help"));
         quickLinks.Add(("About", AboutOutputPath, "SpecScribe version, build, and product details.", "Help"));
         quickLinks.Add(("Logs", DiagnosticsOutputPath, "Generation diagnostics and the run log.", "Help"));

@@ -1,0 +1,1607 @@
+{
+  "root": "C:\\Users\\MattE\\AppData\\Local\\Temp\\claude\\C--Dev-SpecScribe\\2a4b1176-ca7b-4696-bff9-8ec1a81f959b\\scratchpad\\portal-20-4",
+  "totalFiles": 1274,
+  "totalPortalBytes": 89876581,
+  "totalHierarchy": 8484973,
+  "totalIsland": 23258,
+  "hierarchyPages": 130,
+  "islandPages": 1,
+  "bundleMin": 1223515,
+  "bundleGz": 413449,
+  "islandNodes": 119,
+  "bytesPerNode": 195.4453781512605,
+  "projectedPayload": 2474334,
+  "projectedNodes": 12660,
+  "netRaw": 4787124,
+  "breakEvenPages": 27,
+  "pages": [
+    {
+      "page": "code-map.html",
+      "pageBytes": 5682933,
+      "hierarchyBytes": 4675835,
+      "hierarchyNodes": 6052,
+      "hierarchyKinds": [
+        "codemap",
+        "codemap-sunburst",
+        "codemap",
+        "codemap-sunburst",
+        "codemap",
+        "codemap-sunburst",
+        "codemap",
+        "codemap-sunburst"
+      ],
+      "otherSvgBytes": 10024,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 82.3
+    },
+    {
+      "page": "git-insights.html",
+      "pageBytes": 2042439,
+      "hierarchyBytes": 2010293,
+      "hierarchyNodes": 2556,
+      "hierarchyKinds": [
+        "ownership-sunburst",
+        "ownership-treemap"
+      ],
+      "otherSvgBytes": 18113,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 98.4
+    },
+    {
+      "page": "index.html",
+      "pageBytes": 484583,
+      "hierarchyBytes": 45323,
+      "hierarchyNodes": 119,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 77614,
+      "islandBytes": 23258,
+      "hierarchyPctOfPage": 9.4
+    },
+    {
+      "page": "epics.html",
+      "pageBytes": 193058,
+      "hierarchyBytes": 42678,
+      "hierarchyNodes": 119,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 24565,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 22.1
+    },
+    {
+      "page": "epics/story-7-6.html",
+      "pageBytes": 162963,
+      "hierarchyBytes": 34927,
+      "hierarchyNodes": 49,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 16401,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 21.4
+    },
+    {
+      "page": "epics/story-23-1.html",
+      "pageBytes": 157010,
+      "hierarchyBytes": 32326,
+      "hierarchyNodes": 59,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 17660,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 20.6
+    },
+    {
+      "page": "epics/story-7-11.html",
+      "pageBytes": 157260,
+      "hierarchyBytes": 29685,
+      "hierarchyNodes": 60,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 21037,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 18.9
+    },
+    {
+      "page": "epics/epic-6.html",
+      "pageBytes": 176815,
+      "hierarchyBytes": 28581,
+      "hierarchyNodes": 59,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 50260,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 16.2
+    },
+    {
+      "page": "epics/story-20-2.html",
+      "pageBytes": 138813,
+      "hierarchyBytes": 26902,
+      "hierarchyNodes": 46,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13071,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 19.4
+    },
+    {
+      "page": "epics/story-9-6.html",
+      "pageBytes": 134001,
+      "hierarchyBytes": 26035,
+      "hierarchyNodes": 54,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 20040,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 19.4
+    },
+    {
+      "page": "epics/story-2-3.html",
+      "pageBytes": 164676,
+      "hierarchyBytes": 25979,
+      "hierarchyNodes": 48,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 16791,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 15.8
+    },
+    {
+      "page": "epics/story-21-3.html",
+      "pageBytes": 153930,
+      "hierarchyBytes": 25698,
+      "hierarchyNodes": 52,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 20640,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 16.7
+    },
+    {
+      "page": "epics/story-4-8.html",
+      "pageBytes": 127444,
+      "hierarchyBytes": 25281,
+      "hierarchyNodes": 45,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 15303,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 19.8
+    },
+    {
+      "page": "epics/story-6-4.html",
+      "pageBytes": 163399,
+      "hierarchyBytes": 24872,
+      "hierarchyNodes": 52,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 22353,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 15.2
+    },
+    {
+      "page": "epics/story-6-7.html",
+      "pageBytes": 163716,
+      "hierarchyBytes": 24396,
+      "hierarchyNodes": 46,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 21191,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 14.9
+    },
+    {
+      "page": "epics/story-3-3.html",
+      "pageBytes": 121573,
+      "hierarchyBytes": 23896,
+      "hierarchyNodes": 33,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 16268,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 19.7
+    },
+    {
+      "page": "epics/story-6-9.html",
+      "pageBytes": 170355,
+      "hierarchyBytes": 22770,
+      "hierarchyNodes": 49,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 19112,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 13.4
+    },
+    {
+      "page": "epics/story-3-7.html",
+      "pageBytes": 135376,
+      "hierarchyBytes": 22540,
+      "hierarchyNodes": 32,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 16140,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 16.6
+    },
+    {
+      "page": "epics/story-20-1.html",
+      "pageBytes": 187825,
+      "hierarchyBytes": 22495,
+      "hierarchyNodes": 51,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 20825,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 12
+    },
+    {
+      "page": "epics/story-6-3.html",
+      "pageBytes": 156455,
+      "hierarchyBytes": 22281,
+      "hierarchyNodes": 43,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 21160,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 14.2
+    },
+    {
+      "page": "epics/story-3-2.html",
+      "pageBytes": 120205,
+      "hierarchyBytes": 22023,
+      "hierarchyNodes": 37,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 17065,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 18.3
+    },
+    {
+      "page": "epics/story-2-5.html",
+      "pageBytes": 155067,
+      "hierarchyBytes": 21738,
+      "hierarchyNodes": 45,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 19165,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 14
+    },
+    {
+      "page": "epics/story-3-5.html",
+      "pageBytes": 109702,
+      "hierarchyBytes": 21278,
+      "hierarchyNodes": 31,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 15264,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 19.4
+    },
+    {
+      "page": "epics/epic-7.html",
+      "pageBytes": 157230,
+      "hierarchyBytes": 20683,
+      "hierarchyNodes": 44,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 45071,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 13.2
+    },
+    {
+      "page": "epics/story-19-2.html",
+      "pageBytes": 131393,
+      "hierarchyBytes": 20464,
+      "hierarchyNodes": 51,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 19711,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 15.6
+    },
+    {
+      "page": "epics/story-2-1.html",
+      "pageBytes": 130747,
+      "hierarchyBytes": 20459,
+      "hierarchyNodes": 42,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13556,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 15.6
+    },
+    {
+      "page": "epics/story-24-6.html",
+      "pageBytes": 121065,
+      "hierarchyBytes": 20383,
+      "hierarchyNodes": 51,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 12877,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 16.8
+    },
+    {
+      "page": "epics/story-3-8.html",
+      "pageBytes": 156350,
+      "hierarchyBytes": 20371,
+      "hierarchyNodes": 41,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 19388,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 13
+    },
+    {
+      "page": "epics/story-9-2.html",
+      "pageBytes": 119755,
+      "hierarchyBytes": 20356,
+      "hierarchyNodes": 39,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 20647,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 17
+    },
+    {
+      "page": "epics/story-2-2.html",
+      "pageBytes": 138936,
+      "hierarchyBytes": 20192,
+      "hierarchyNodes": 33,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 15769,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 14.5
+    },
+    {
+      "page": "epics/epic-9.html",
+      "pageBytes": 143679,
+      "hierarchyBytes": 20026,
+      "hierarchyNodes": 42,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 46514,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 13.9
+    },
+    {
+      "page": "epics/story-6-1.html",
+      "pageBytes": 121681,
+      "hierarchyBytes": 19409,
+      "hierarchyNodes": 40,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 17423,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 16
+    },
+    {
+      "page": "epics/story-6-5.html",
+      "pageBytes": 131061,
+      "hierarchyBytes": 19313,
+      "hierarchyNodes": 39,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 20161,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 14.7
+    },
+    {
+      "page": "epics/story-2-4.html",
+      "pageBytes": 129385,
+      "hierarchyBytes": 19153,
+      "hierarchyNodes": 33,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 16802,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 14.8
+    },
+    {
+      "page": "epics/story-20-4.html",
+      "pageBytes": 112701,
+      "hierarchyBytes": 19147,
+      "hierarchyNodes": 49,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 12877,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 17
+    },
+    {
+      "page": "epics/story-7-1.html",
+      "pageBytes": 139795,
+      "hierarchyBytes": 19082,
+      "hierarchyNodes": 48,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 19881,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 13.6
+    },
+    {
+      "page": "epics/story-1-5.html",
+      "pageBytes": 132335,
+      "hierarchyBytes": 18729,
+      "hierarchyNodes": 46,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 16823,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 14.2
+    },
+    {
+      "page": "epics/story-6-11.html",
+      "pageBytes": 182244,
+      "hierarchyBytes": 18225,
+      "hierarchyNodes": 38,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 22336,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 10
+    },
+    {
+      "page": "epics/story-9-9.html",
+      "pageBytes": 107113,
+      "hierarchyBytes": 18209,
+      "hierarchyNodes": 42,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13556,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 17
+    },
+    {
+      "page": "epics/story-10-4.html",
+      "pageBytes": 130662,
+      "hierarchyBytes": 18192,
+      "hierarchyNodes": 43,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 19245,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 13.9
+    },
+    {
+      "page": "epics/story-10-1.html",
+      "pageBytes": 113304,
+      "hierarchyBytes": 18156,
+      "hierarchyNodes": 39,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 18288,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 16
+    },
+    {
+      "page": "epics/story-4-2.html",
+      "pageBytes": 122697,
+      "hierarchyBytes": 17755,
+      "hierarchyNodes": 37,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 16348,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 14.5
+    },
+    {
+      "page": "epics/story-10-3.html",
+      "pageBytes": 113916,
+      "hierarchyBytes": 17752,
+      "hierarchyNodes": 36,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 15830,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 15.6
+    },
+    {
+      "page": "epics/story-9-12.html",
+      "pageBytes": 98929,
+      "hierarchyBytes": 16688,
+      "hierarchyNodes": 50,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 16927,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 16.9
+    },
+    {
+      "page": "epics/story-3-1.html",
+      "pageBytes": 97995,
+      "hierarchyBytes": 16595,
+      "hierarchyNodes": 32,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 19848,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 16.9
+    },
+    {
+      "page": "epics/story-10-10.html",
+      "pageBytes": 113860,
+      "hierarchyBytes": 16589,
+      "hierarchyNodes": 50,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 16351,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 14.6
+    },
+    {
+      "page": "epics/story-7-3.html",
+      "pageBytes": 141103,
+      "hierarchyBytes": 16545,
+      "hierarchyNodes": 37,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 18896,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 11.7
+    },
+    {
+      "page": "epics/story-21-1.html",
+      "pageBytes": 117952,
+      "hierarchyBytes": 16484,
+      "hierarchyNodes": 31,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 15574,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 14
+    },
+    {
+      "page": "epics/story-9-5.html",
+      "pageBytes": 108973,
+      "hierarchyBytes": 16378,
+      "hierarchyNodes": 30,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 18011,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 15
+    },
+    {
+      "page": "epics/story-9-3.html",
+      "pageBytes": 108447,
+      "hierarchyBytes": 16082,
+      "hierarchyNodes": 28,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13332,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 14.8
+    },
+    {
+      "page": "epics/story-22-1.html",
+      "pageBytes": 121184,
+      "hierarchyBytes": 14904,
+      "hierarchyNodes": 31,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 23083,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 12.3
+    },
+    {
+      "page": "epics/story-10-11.html",
+      "pageBytes": 102865,
+      "hierarchyBytes": 14700,
+      "hierarchyNodes": 38,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 17024,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 14.3
+    },
+    {
+      "page": "epics/story-21-2.html",
+      "pageBytes": 113368,
+      "hierarchyBytes": 14646,
+      "hierarchyNodes": 28,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 16609,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 12.9
+    },
+    {
+      "page": "epics/story-19-1.html",
+      "pageBytes": 118808,
+      "hierarchyBytes": 14599,
+      "hierarchyNodes": 34,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 15578,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 12.3
+    },
+    {
+      "page": "epics/story-24-1.html",
+      "pageBytes": 84678,
+      "hierarchyBytes": 14554,
+      "hierarchyNodes": 31,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 12877,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 17.2
+    },
+    {
+      "page": "epics/story-9-7.html",
+      "pageBytes": 91571,
+      "hierarchyBytes": 14530,
+      "hierarchyNodes": 44,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 16936,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 15.9
+    },
+    {
+      "page": "epics/story-6-6.html",
+      "pageBytes": 96088,
+      "hierarchyBytes": 14444,
+      "hierarchyNodes": 31,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 16200,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 15
+    },
+    {
+      "page": "epics/story-7-9.html",
+      "pageBytes": 128090,
+      "hierarchyBytes": 14265,
+      "hierarchyNodes": 40,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13071,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 11.1
+    },
+    {
+      "page": "epics/epic-3.html",
+      "pageBytes": 101667,
+      "hierarchyBytes": 14137,
+      "hierarchyNodes": 30,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 37318,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 13.9
+    },
+    {
+      "page": "epics/story-10-2.html",
+      "pageBytes": 94901,
+      "hierarchyBytes": 14007,
+      "hierarchyNodes": 31,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13556,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 14.8
+    },
+    {
+      "page": "epics/story-6-12.html",
+      "pageBytes": 103289,
+      "hierarchyBytes": 13939,
+      "hierarchyNodes": 31,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13071,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 13.5
+    },
+    {
+      "page": "epics/story-6-10.html",
+      "pageBytes": 152196,
+      "hierarchyBytes": 13853,
+      "hierarchyNodes": 35,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 15405,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 9.1
+    },
+    {
+      "page": "epics/story-7-2.html",
+      "pageBytes": 119243,
+      "hierarchyBytes": 13673,
+      "hierarchyNodes": 31,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 18180,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 11.5
+    },
+    {
+      "page": "epics/story-1-4.html",
+      "pageBytes": 119205,
+      "hierarchyBytes": 13354,
+      "hierarchyNodes": 33,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 16618,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 11.2
+    },
+    {
+      "page": "epics/story-10-5.html",
+      "pageBytes": 113964,
+      "hierarchyBytes": 13302,
+      "hierarchyNodes": 31,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 16921,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 11.7
+    },
+    {
+      "page": "epics/story-9-13.html",
+      "pageBytes": 100873,
+      "hierarchyBytes": 13283,
+      "hierarchyNodes": 46,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 18115,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 13.2
+    },
+    {
+      "page": "epics/story-9-10.html",
+      "pageBytes": 86060,
+      "hierarchyBytes": 13078,
+      "hierarchyNodes": 38,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 17378,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 15.2
+    },
+    {
+      "page": "epics/story-9-4.html",
+      "pageBytes": 90778,
+      "hierarchyBytes": 13055,
+      "hierarchyNodes": 37,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13295,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 14.4
+    },
+    {
+      "page": "epics/epic-10.html",
+      "pageBytes": 109745,
+      "hierarchyBytes": 12864,
+      "hierarchyNodes": 28,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 34790,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 11.7
+    },
+    {
+      "page": "epics/story-18-1.html",
+      "pageBytes": 91822,
+      "hierarchyBytes": 12398,
+      "hierarchyNodes": 28,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 12877,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 13.5
+    },
+    {
+      "page": "epics/story-9-8.html",
+      "pageBytes": 87966,
+      "hierarchyBytes": 12375,
+      "hierarchyNodes": 38,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 15893,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 14.1
+    },
+    {
+      "page": "epics/story-10-8.html",
+      "pageBytes": 91209,
+      "hierarchyBytes": 12331,
+      "hierarchyNodes": 33,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13071,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 13.5
+    },
+    {
+      "page": "epics/story-4-1.html",
+      "pageBytes": 88118,
+      "hierarchyBytes": 12220,
+      "hierarchyNodes": 25,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13071,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 13.9
+    },
+    {
+      "page": "epics/story-6-2.html",
+      "pageBytes": 125469,
+      "hierarchyBytes": 12213,
+      "hierarchyNodes": 27,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13071,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 9.7
+    },
+    {
+      "page": "epics/story-3-6.html",
+      "pageBytes": 102831,
+      "hierarchyBytes": 12196,
+      "hierarchyNodes": 21,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 16111,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 11.9
+    },
+    {
+      "page": "epics/story-7-10.html",
+      "pageBytes": 138394,
+      "hierarchyBytes": 11744,
+      "hierarchyNodes": 31,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 16602,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 8.5
+    },
+    {
+      "page": "epics/story-6-8.html",
+      "pageBytes": 124380,
+      "hierarchyBytes": 11587,
+      "hierarchyNodes": 34,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13071,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 9.3
+    },
+    {
+      "page": "epics/story-5-2.html",
+      "pageBytes": 96026,
+      "hierarchyBytes": 11478,
+      "hierarchyNodes": 23,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13235,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 12
+    },
+    {
+      "page": "epics/story-7-12.html",
+      "pageBytes": 120032,
+      "hierarchyBytes": 11439,
+      "hierarchyNodes": 32,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13071,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 9.5
+    },
+    {
+      "page": "epics/story-1-3.html",
+      "pageBytes": 120204,
+      "hierarchyBytes": 11298,
+      "hierarchyNodes": 31,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 16601,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 9.4
+    },
+    {
+      "page": "epics/story-8-3.html",
+      "pageBytes": 120632,
+      "hierarchyBytes": 11096,
+      "hierarchyNodes": 32,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 18982,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 9.2
+    },
+    {
+      "page": "epics/story-15-1.html",
+      "pageBytes": 104910,
+      "hierarchyBytes": 10781,
+      "hierarchyNodes": 26,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 12877,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 10.3
+    },
+    {
+      "page": "epics/story-20-3.html",
+      "pageBytes": 115890,
+      "hierarchyBytes": 10710,
+      "hierarchyNodes": 29,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13235,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 9.2
+    },
+    {
+      "page": "epics/story-23-2.html",
+      "pageBytes": 78701,
+      "hierarchyBytes": 10686,
+      "hierarchyNodes": 31,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 12877,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 13.6
+    },
+    {
+      "page": "epics/story-8-2.html",
+      "pageBytes": 116902,
+      "hierarchyBytes": 10606,
+      "hierarchyNodes": 31,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 16975,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 9.1
+    },
+    {
+      "page": "epics/story-7-8.html",
+      "pageBytes": 128532,
+      "hierarchyBytes": 10275,
+      "hierarchyNodes": 27,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 16440,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 8
+    },
+    {
+      "page": "epics/story-12-1.html",
+      "pageBytes": 101378,
+      "hierarchyBytes": 10191,
+      "hierarchyNodes": 27,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 12877,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 10.1
+    },
+    {
+      "page": "epics/story-9-11.html",
+      "pageBytes": 86131,
+      "hierarchyBytes": 9910,
+      "hierarchyNodes": 28,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 16902,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 11.5
+    },
+    {
+      "page": "epics/story-10-9.html",
+      "pageBytes": 82358,
+      "hierarchyBytes": 9846,
+      "hierarchyNodes": 21,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13071,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 12
+    },
+    {
+      "page": "epics/story-7-5.html",
+      "pageBytes": 139824,
+      "hierarchyBytes": 9694,
+      "hierarchyNodes": 25,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 16802,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 6.9
+    },
+    {
+      "page": "epics/story-14-1.html",
+      "pageBytes": 95588,
+      "hierarchyBytes": 9686,
+      "hierarchyNodes": 24,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 12877,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 10.1
+    },
+    {
+      "page": "epics/story-13-1.html",
+      "pageBytes": 103648,
+      "hierarchyBytes": 9659,
+      "hierarchyNodes": 22,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 12877,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 9.3
+    },
+    {
+      "page": "epics/story-9-1.html",
+      "pageBytes": 76806,
+      "hierarchyBytes": 9503,
+      "hierarchyNodes": 23,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 15429,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 12.4
+    },
+    {
+      "page": "epics/story-8-8.html",
+      "pageBytes": 107178,
+      "hierarchyBytes": 9489,
+      "hierarchyNodes": 28,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 15870,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 8.9
+    },
+    {
+      "page": "epics/story-5-5.html",
+      "pageBytes": 90221,
+      "hierarchyBytes": 9361,
+      "hierarchyNodes": 24,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13235,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 10.4
+    },
+    {
+      "page": "epics/epic-2.html",
+      "pageBytes": 73460,
+      "hierarchyBytes": 8991,
+      "hierarchyNodes": 19,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 24911,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 12.2
+    },
+    {
+      "page": "epics/story-2-6.html",
+      "pageBytes": 107107,
+      "hierarchyBytes": 8975,
+      "hierarchyNodes": 18,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 16234,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 8.4
+    },
+    {
+      "page": "epics/story-5-6.html",
+      "pageBytes": 76339,
+      "hierarchyBytes": 8734,
+      "hierarchyNodes": 18,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13235,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 11.4
+    },
+    {
+      "page": "epics/story-5-1.html",
+      "pageBytes": 79981,
+      "hierarchyBytes": 8529,
+      "hierarchyNodes": 21,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13235,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 10.7
+    },
+    {
+      "page": "epics/story-10-7.html",
+      "pageBytes": 89588,
+      "hierarchyBytes": 7896,
+      "hierarchyNodes": 29,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 15823,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 8.8
+    },
+    {
+      "page": "epics/epic-8.html",
+      "pageBytes": 77571,
+      "hierarchyBytes": 7659,
+      "hierarchyNodes": 17,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 22875,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 9.9
+    },
+    {
+      "page": "epics/story-11-1.html",
+      "pageBytes": 84620,
+      "hierarchyBytes": 7627,
+      "hierarchyNodes": 21,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 12877,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 9
+    },
+    {
+      "page": "epics/story-7-4.html",
+      "pageBytes": 111015,
+      "hierarchyBytes": 7234,
+      "hierarchyNodes": 20,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13071,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 6.5
+    },
+    {
+      "page": "epics/story-1-2.html",
+      "pageBytes": 82315,
+      "hierarchyBytes": 6870,
+      "hierarchyNodes": 22,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 16642,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 8.3
+    },
+    {
+      "page": "epics/epic-20.html",
+      "pageBytes": 97979,
+      "hierarchyBytes": 6559,
+      "hierarchyNodes": 14,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 20497,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 6.7
+    },
+    {
+      "page": "epics/epic-22.html",
+      "pageBytes": 85748,
+      "hierarchyBytes": 6511,
+      "hierarchyNodes": 14,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 21564,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 7.6
+    },
+    {
+      "page": "epics/story-8-5.html",
+      "pageBytes": 104451,
+      "hierarchyBytes": 6506,
+      "hierarchyNodes": 19,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13556,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 6.2
+    },
+    {
+      "page": "epics/story-8-6.html",
+      "pageBytes": 102533,
+      "hierarchyBytes": 6501,
+      "hierarchyNodes": 20,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13556,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 6.3
+    },
+    {
+      "page": "epics/story-5-3.html",
+      "pageBytes": 105701,
+      "hierarchyBytes": 6472,
+      "hierarchyNodes": 24,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13235,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 6.1
+    },
+    {
+      "page": "epics/story-8-7.html",
+      "pageBytes": 96946,
+      "hierarchyBytes": 6395,
+      "hierarchyNodes": 18,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13071,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 6.6
+    },
+    {
+      "page": "epics/story-8-4.html",
+      "pageBytes": 100349,
+      "hierarchyBytes": 6313,
+      "hierarchyNodes": 17,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13556,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 6.3
+    },
+    {
+      "page": "epics/story-10-6.html",
+      "pageBytes": 68561,
+      "hierarchyBytes": 6254,
+      "hierarchyNodes": 23,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13071,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 9.1
+    },
+    {
+      "page": "epics/epic-1.html",
+      "pageBytes": 61420,
+      "hierarchyBytes": 6248,
+      "hierarchyNodes": 14,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 21254,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 10.2
+    },
+    {
+      "page": "epics/epic-21.html",
+      "pageBytes": 73303,
+      "hierarchyBytes": 6175,
+      "hierarchyNodes": 13,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 23391,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 8.4
+    },
+    {
+      "page": "epics/story-8-1.html",
+      "pageBytes": 64107,
+      "hierarchyBytes": 5550,
+      "hierarchyNodes": 16,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 17527,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 8.7
+    },
+    {
+      "page": "epics/story-1-1.html",
+      "pageBytes": 58981,
+      "hierarchyBytes": 5132,
+      "hierarchyNodes": 20,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13556,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 8.7
+    },
+    {
+      "page": "epics/epic-19.html",
+      "pageBytes": 61818,
+      "hierarchyBytes": 4330,
+      "hierarchyNodes": 9,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 20554,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 7
+    },
+    {
+      "page": "epics/epic-23.html",
+      "pageBytes": 67039,
+      "hierarchyBytes": 3783,
+      "hierarchyNodes": 8,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 17593,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 5.6
+    },
+    {
+      "page": "epics/epic-4.html",
+      "pageBytes": 48566,
+      "hierarchyBytes": 3362,
+      "hierarchyNodes": 7,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 16653,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 6.9
+    },
+    {
+      "page": "epics/epic-16.html",
+      "pageBytes": 57767,
+      "hierarchyBytes": 3233,
+      "hierarchyNodes": 8,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13067,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 5.6
+    },
+    {
+      "page": "epics/epic-24.html",
+      "pageBytes": 68164,
+      "hierarchyBytes": 2787,
+      "hierarchyNodes": 6,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13555,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 4.1
+    },
+    {
+      "page": "epics/epic-5.html",
+      "pageBytes": 50612,
+      "hierarchyBytes": 2257,
+      "hierarchyNodes": 5,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13581,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 4.5
+    },
+    {
+      "page": "epics/epic-17.html",
+      "pageBytes": 48770,
+      "hierarchyBytes": 2154,
+      "hierarchyNodes": 5,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13067,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 4.4
+    },
+    {
+      "page": "epics/story-7-7.html",
+      "pageBytes": 53864,
+      "hierarchyBytes": 2092,
+      "hierarchyNodes": 4,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 17369,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 3.9
+    },
+    {
+      "page": "epics/epic-18.html",
+      "pageBytes": 46497,
+      "hierarchyBytes": 1678,
+      "hierarchyNodes": 4,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13313,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 3.6
+    },
+    {
+      "page": "epics/epic-12.html",
+      "pageBytes": 37690,
+      "hierarchyBytes": 1012,
+      "hierarchyNodes": 2,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13313,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 2.7
+    },
+    {
+      "page": "epics/epic-15.html",
+      "pageBytes": 38414,
+      "hierarchyBytes": 1000,
+      "hierarchyNodes": 2,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13313,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 2.6
+    },
+    {
+      "page": "epics/epic-11.html",
+      "pageBytes": 37554,
+      "hierarchyBytes": 985,
+      "hierarchyNodes": 2,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13313,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 2.6
+    },
+    {
+      "page": "epics/epic-13.html",
+      "pageBytes": 37602,
+      "hierarchyBytes": 985,
+      "hierarchyNodes": 2,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13313,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 2.6
+    },
+    {
+      "page": "epics/epic-14.html",
+      "pageBytes": 37489,
+      "hierarchyBytes": 976,
+      "hierarchyNodes": 2,
+      "hierarchyKinds": [
+        "sunburst"
+      ],
+      "otherSvgBytes": 13313,
+      "islandBytes": null,
+      "hierarchyPctOfPage": 2.6
+    }
+  ],
+  "classTotals": {
+    "site-nav-mark": 469900,
+    "ss-icon": 13792308,
+    "specscribe-badge-mark": 480060,
+    "icon": 189208,
+    "heatmap": 34915,
+    "ref-graph": 5976496,
+    "host-icon": 152004,
+    "codemap": 3106622,
+    "codemap-sunburst": 1569213,
+    "coupling-graph": 10156,
+    "sunburst": 1798845,
+    "work-graph": 696538,
+    "donut": 275795,
+    "ownership-sunburst": 1042930,
+    "ownership-treemap": 967363,
+    "funnel": 2528,
+    "req-flow-svg": 34954,
+    "risk-quadrant": 653680
+  }
+}

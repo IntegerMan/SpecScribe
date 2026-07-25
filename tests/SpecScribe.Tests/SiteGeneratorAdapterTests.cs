@@ -962,7 +962,18 @@ public class SiteGeneratorAdapterTests : IDisposable
         // fixture, so this hash is NOT attributable to the sunburst bump alone; it was captured after that session's
         // build went green and verified stable across two repeated runs. [owner 2026-07-24 sunburst no-plan bump;
         // CLAUDE.md shared-main + golden-diff-normalization-gotchas]
-        const string expected = "f9c79d98c369e389abab275d485d42ee5bffccfd01ca579eee18e4f10613eaba";
+        // Regenerated for Story 5.6 (How to use SpecScribe — CLI generate/watch guidance): how-to-read.html is
+        // written on every full run, and it gained a new unconditional "Generate with SpecScribe" h2 between the
+        // reading order and the glossary, plus reworded <head> meta description / doc-subtitle / intro paragraph
+        // (all three previously promised only "reading order and glossary"). Content-only — no asset bytes, no
+        // file-set change. The second delta is SiteNav's How-to-use quick-link blurb ("Reading order and glossary
+        // for this portal." → "…, and how to generate the site."), which renders as that entry's `data-tooltip`
+        // in the white key-views band, so every page carrying that band shifted by one attribute value.
+        // PROVENANCE (shared main): captured on a tree carrying only
+        // this story's four files plus another session's untracked spike/plotly/ scratch directory, which lives
+        // outside this temp fixture and cannot reach the hash. Verified stable across two repeated runs.
+        // [Story 5.6; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
+        const string expected = "9232e3f5e0d2aee38c1cd4e76829b0633aadc8331462a8d55b531c2cdb820f68";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

@@ -3708,6 +3708,22 @@ Turn "what changes alongside this file" from a flat co-change list into a rigoro
      24 adds renderers to a file whose existing renderers are about to be deleted.
      (3) 24.5's adjacency matrix may ride Plotly's `heatmap` trace — the one Epic 24 view the hierarchy engine
      already covers (ADR 0012 §4). -->
+
+<!-- 2026-07-24 (create-story 24.2 → halted and re-seated): the "this epic's own spike" that ADR 0012 §4 hands the
+     graph-engine decision to DID NOT EXIST — Stories 24.1–24.5 are all implementation stories, so the named open
+     question had no owner and would have been answered implicitly inside Story 24.2's dev pass (the exact failure
+     mode the Epic 10 retro's ADR-creation-trigger action item exists to prevent). **Story 24.6 is that spike**,
+     added below with owner approval.
+
+     EXECUTION ORDER ≠ NUMERIC ORDER: 24.1 → **24.6** → 24.2 → 24.3 → 24.4 / 24.5. A renumber was rejected because
+     ADR 0012 §4 names Stories "24.2, 24.3, and 24.4" verbatim, as do `sprint-status.yaml` and project memory;
+     Epic 23's documented non-numeric order (23.2→23.3→23.5→23.4) is the house precedent for this.
+
+     CONSEQUENCE FOR 24.2: it now carries THREE gates, not two — Story 24.1 (the metric spine it renders),
+     Story 20.7 (don't add renderers to a file whose existing ones are about to be deleted), and Story 24.6 (the
+     engine). Its sprint-status key is `blocked` until all three clear. 24.5 is NOT gated by 24.6: ADR 0012 §4
+     already frees it to ride Plotly's `heatmap` trace. -->
+
  Story 7.11 (Code Ownership & Bus-Factor) already shipped the "who changes this file" half — this epic is the "what changes alongside it" half, deliberately not re-doing ownership.
 
 ### Story 24.1: Directional Coupling Metric Foundation (Confidence, Support, Lift, Cross-Boundary) + Upgraded List
@@ -3820,3 +3836,40 @@ So that dense relationships that overwhelm a node-link graph read unambiguously 
 **When** the matrix renders
 **Then** every cell's strength is available as non-color text (title/tooltip and the shared coupled-pairs table), the matrix is bounded to a readable set of the most-coupled files with an honest "+N more" disclosure, and it degrades to the readable table with JavaScript off
 **And** the surface stays within the deep-git performance envelope and is generation-time deterministic (FR31).
+
+### Story 24.6: Epic 24 Graph-Engine Spike — Force-Directed, Chord, and Matrix Under One Contract
+
+> **Runs after Story 24.1 and BEFORE Story 24.2.** Numbered last, executed third — see the epic note above. This is
+> the spike [ADR 0012](../../docs/adrs/0012-plotly-hierarchy-chart-engine-and-standardized-explorer-component.md) §4
+> hands the graph-engine decision to. Decision-first, timeboxed (~2d), throwaway: **no production code**. Durable
+> deliverables are `24-6-spike-report.md` and a **ratified ADR**.
+
+As a maintainer about to build four interactive relationship views,
+I want Epic 24's graph engine decided on measured evidence before Story 24.2 writes a line of rendering code,
+So that the choice ADR 0012 §4 explicitly deferred to "Epic 24's own spike" is made once, in one place, with an ADR behind it — instead of being improvised inside an implementation story.
+
+**Acceptance Criteria:**
+
+1.
+**Given** ADR 0012 §4's named open question and the "two engine families permitted, a third requires an ADR" rule
+**When** the spike evaluates candidate engines for the force-directed (24.2, 24.3) and chord/arc (24.4) views
+**Then** it reports, per candidate, a comparable table of **bundle size** (minified and min+gzip, as a multiple of the already-vendored `prism.js`), **license and provenance** (NFR10), **coverage of the four Epic 24 shapes**, **whether it is a single classic script with no runtime fetch and no ES-module imports**, and **whether adopting it would constitute a third engine family** requiring ADR 0012 to be superseded rather than extended
+**And** the "Plotly `scatter` + generation-time layout" option is evaluated **as a first-class candidate at its true marginal cost** — Plotly's `scatter` trace cannot be excluded from any bundle, so if Epic 20 ships Plotly at all, that option costs zero additional bytes.
+
+2.
+**Given** ADR 0013 removed the server-rendered SVG that used to sit behind every chart
+**When** the spike evaluates the leading candidate(s)
+**Then** it reports **explicit PASS / PASS (configured around) / FAIL** conformance per UX-DR7, UX-DR16, UX-DR17 (including per-edge dash/width control, since cross-boundary emphasis may never be color-alone), and UX-DR18 (a force simulation that animates to rest must be able to snap under `prefers-reduced-motion`), verified in a **live browser** using Story 20.4's decision rule
+**And** it reports whether the candidate renders under the byte-verbatim VS Code webview CSP, reporting the **script axis and style axis separately** and carrying Story 23.1's `<meta>`-vs-header honesty boundary.
+
+3.
+**Given** FR31 generation-time determinism (named by hand in Stories 24.3 and 24.5) and ADR 0010 §3's "computed once at generation time and embedded" (which ADR 0012 §7 leaves standing)
+**When** the spike evaluates layout strategy
+**Then** it answers whether node position is **data** (solved in C# at generation time, embedded as coordinates) or **presentation** (solved client-side), demonstrates a deterministic result across repeated runs, and reports what happens to determinism when Story 24.3's threshold/grouping clutter controls change the node set
+**And** it reports at-scale legibility on **this repository at `--deep-git` scale** — node/edge counts after the Story 24.1 support floor, the point at which the whole-repo view becomes a hairball, and the bounding/threshold defaults Story 24.3 should ship with.
+
+4.
+**Given** CLAUDE.md § Decision records and the fact that this choice adds a runtime dependency or a new engine family
+**When** the spike concludes
+**Then** it lands a **ratified ADR** recording the decision, its options table, and its consequences — either a new ADR that ADR 0012 §4 hands off to, or an explicit supersession of ADR 0012 if the choice unifies both families (the ECharts outcome ADR 0012's own options table pre-authorizes)
+**And** the report states what each finding hands to Stories 24.2/24.3/24.4/24.5, and resolves whether the Epic 24 ego graph **supersedes or coexists with** the shipped `Charts.ReferenceGraph` — which already renders a hub-and-spoke focal-file graph carrying a co-changed-file node population, four pre-rendered toggle variants, and cross-edges, and whose retirement would trigger an ADR 0013 §3 text-twin audit no Epic 24 story currently owns.
