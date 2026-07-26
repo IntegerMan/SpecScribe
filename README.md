@@ -190,6 +190,18 @@ dotnet run --project src/SpecScribe -- generate    # run without installing
 
 The solution is `SpecScribe.slnx`; the tool lives in `src/SpecScribe`, tests in `tests/SpecScribe.Tests`.
 
+### Continuous integration
+
+Every push to `main` and every pull request builds the solution and runs the full test suite via
+[`.github/workflows/build-test-analyze.yml`](.github/workflows/build-test-analyze.yml), which also submits the
+build to SonarQube Cloud for code-quality analysis.
+
+Build and test need no configuration. The analysis half requires a one-time SonarCloud setup — generating a
+token and storing it as the `SONAR_TOKEN` repository secret — described in
+**[SonarCloud Setup](docs/SonarCloudSetup.md)**. Until that is done CI still runs green; the scanner steps
+simply skip, which is also what happens on pull requests from forks, since GitHub does not share secrets with
+them.
+
 ## License
 
 [MIT](LICENSE) — Copyright (c) 2026 Matt Eland
