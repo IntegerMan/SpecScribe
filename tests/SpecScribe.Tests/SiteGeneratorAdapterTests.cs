@@ -1014,7 +1014,30 @@ public class SiteGeneratorAdapterTests : IDisposable
         // PROVENANCE (shared main): still sitting on top of another session's staged Story 5.2 / ADR 0014
         // settings-folder work. Verified stable across two repeated runs.
         // [Story 20.5 owner verify round; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
-        const string expected = "8af720433cf6a1dd6fee6ebd3708f3a041e517bff6223244d9d1474dbe1f5d0e";
+        // Regenerated for Story 25.1's CI stand-up (2026-07-26). This is a NORMALIZATION change — nothing about the
+        // rendered portal moved. The repo's first CI run showed the old constant (8af72043…) failing on BOTH
+        // windows-latest and ubuntu-latest, which read as a rendering regression and was not one. Two independent
+        // defects in the fingerprint's own normalization made it non-portable, and both are fixed above:
+        //
+        //   1. CHECKOUT dependence. VendoredAssetToken SHA-256'd the vendored bundle's RAW bytes. With no
+        //      .gitattributes in this repo, that asset is CRLF where core.autocrlf=true and LF everywhere else —
+        //      48 bytes apart. It now folds line endings first, like every other file.
+        //   2. DATE and TIME-ZONE dependence — the more serious one. NormalizeVolatile's FoldToday rewrites TODAY's
+        //      date to <date-iso>; both are exactly ten characters, so the substitution is length-neutral and hides
+        //      from any size check. specscribe.css carries a dated SOURCE comment ("[owner verify round
+        //      2026-07-25]"), so on the single calendar day that date was "today" it got folded and on every other
+        //      day it did not. The constant thus depended on the wall clock: captured on a box whose local date was
+        //      2026-07-25, it failed on runners already at 2026-07-26 UTC — and would have failed on the author's
+        //      own machine the next morning with no code change at all. Verbatim-copied assets are no longer
+        //      date-folded (see IsCopiedAsset); only rendered HTML, which alone can carry a GENERATED date, is.
+        //
+        // VERIFICATION — the first golden constant in this project confirmed on more than one machine: stable
+        // across two repeated local runs, and byte-identical on the author's Windows box, GitHub windows-latest,
+        // and GitHub ubuntu-latest. The previous constants were only ever confirmed on one box.
+        // PROVENANCE (shared main): captured on a clean tree at commit 2c1128d, immediately after bcca682 landed
+        // the concurrent session's Stories 18.1/18.2/20.5/20.8/5.3 — so this constant sits on top of that work.
+        // [Story 25.1; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
+        const string expected = "91c3aeb4346cd2f9915254ab4ed35ddf0a651251d5a3dbbf392c743a269a950c";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
@@ -1050,7 +1073,9 @@ public class SiteGeneratorAdapterTests : IDisposable
         {
             var full = Path.Combine(root, rel);
             sb.Append(FoldToday(rel)).Append('\n')
-              .Append(IsVendoredAsset(rel) ? VendoredAssetToken(full) : NormalizeVolatile(File.ReadAllText(full)))
+              .Append(IsVendoredAsset(rel) ? VendoredAssetToken(full)
+                  : IsCopiedAsset(rel) ? FoldLineEndings(File.ReadAllText(full))
+                  : NormalizeVolatile(File.ReadAllText(full)))
               .Append("\n \n");
         }
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString()))).ToLowerInvariant();
@@ -1062,6 +1087,29 @@ public class SiteGeneratorAdapterTests : IDisposable
     /// business pattern-matching a minifier's output — a coincidental match there would move the golden constant
     /// with no rendering change behind it), and a diff would point at an opaque blob rather than at anything a
     /// reader could act on. The asset's IDENTITY is what the fingerprint actually needs to pin. [Story 20.5]</summary>
+    /// <summary>SpecScribe's OWN embedded assets, copied to the output byte-for-byte by
+    /// <c>CopyEmbeddedAsset</c> and never rendered. They must be pinned by CONTENT — a stylesheet change is a real
+    /// rendering change — but they must NOT go through <see cref="NormalizeVolatile"/>, whose folds are written for
+    /// generated markup and actively corrupt static source.
+    ///
+    /// <para><b>The concrete bug this fixes.</b> <c>FoldToday</c> rewrites TODAY's date to the <c>&lt;date-iso&gt;</c>
+    /// placeholder so the Story 7.3 artifact-mtime date pages don't drift the constant day to day. Both strings are
+    /// exactly ten characters, so the substitution is length-neutral and invisible to any size check. specscribe.css
+    /// carries a dated SOURCE COMMENT ("[owner verify round 2026-07-25]") that has nothing to do with generation —
+    /// and on the one calendar day that date IS today, it got folded. The golden constant therefore depended on the
+    /// wall-clock DATE and the machine's TIME ZONE: it was captured on a box whose local date was 2026-07-25, and
+    /// failed on CI runners already at 2026-07-26 UTC. It would equally have started failing on the author's own
+    /// machine the next morning, with no code change behind it — read as a rendering regression, inviting a
+    /// needless regeneration. Only rendered HTML can contain a GENERATED date, so only rendered HTML is folded.
+    /// [Story 25.1 CI; golden-diff-normalization-gotchas]</para></summary>
+    private static bool IsCopiedAsset(string relativePath) =>
+        relativePath is ForgeOptions.StylesheetName or ForgeOptions.ScriptName or SpaDelivery.ScriptName;
+
+    /// <summary>The one normalization a verbatim-copied asset still needs: this repo has no <c>.gitattributes</c>,
+    /// so a checked-out text asset is CRLF wherever <c>core.autocrlf=true</c> and LF everywhere else (including
+    /// every CI runner). Content, not checkout, is what the fingerprint pins.</summary>
+    private static string FoldLineEndings(string content) => content.Replace("\r\n", "\n");
+
     private static bool IsVendoredAsset(string relativePath) =>
         relativePath is ForgeOptions.HierarchyEngineScriptName
             or ForgeOptions.CodeHighlightScriptName
@@ -1072,7 +1120,19 @@ public class SiteGeneratorAdapterTests : IDisposable
     /// without the bytes themselves entering the normalization path.</summary>
     private static string VendoredAssetToken(string fullPath)
     {
-        var bytes = File.ReadAllBytes(fullPath);
+        // Line endings are folded to LF FIRST — the same normalization NormalizeVolatile applies to every other
+        // file, and the form these assets have in git's index. Without it the token was checkout-dependent, not
+        // content-dependent: this repo has no .gitattributes, so a vendored bundle is classified as text and
+        // materializes as CRLF wherever core.autocrlf=true (a typical Windows dev box) and as LF everywhere else,
+        // including every GitHub runner. `git ls-files --eol` reports `i/lf w/crlf attr/` for it. plotly's bundle
+        // carries 48 line breaks, so the two checkouts differ by 48 bytes and produce different SHA-256s — which
+        // made the golden constant pass on the machine that captured it and fail in CI on both windows-latest and
+        // ubuntu-latest, reading as a rendering regression when nothing rendered differently at all. That directly
+        // contradicted FingerprintTree's own contract ("portable across machines and CI, not pinned to this box").
+        // The asset's IDENTITY is still fully pinned: a re-vendored or edited bundle changes its non-newline bytes
+        // and still flips the token. [Story 25.1 CI]
+        var text = File.ReadAllText(fullPath).Replace("\r\n", "\n");
+        var bytes = Encoding.UTF8.GetBytes(text);
         var sha = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
         return $"<vendored asset: {Path.GetFileName(fullPath)}, {bytes.Length} bytes, sha256:{sha[..16]}>";
     }
