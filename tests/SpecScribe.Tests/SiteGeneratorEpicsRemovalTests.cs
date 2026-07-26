@@ -262,6 +262,22 @@ public class SiteGeneratorEpicsRemovalTests : IDisposable
         // AC #1/#6: several debounce timers can fire at once for different files. Every write-producing route takes
         // the same _gate, so they serialize — the assertion is on the CONVERGED state (no torn or empty HTML, same
         // file set a from-scratch ground-truth pass produces), never on which order actually won.
+
+        // The GenerateOne leg below needs a doc the WATCH DISPATCH would actually hand to GenerateOne. A plain
+        // notes/ document is that; a story artifact is NOT, for the same reason the directory-rename test above
+        // avoids one. FileWatcherService routes on IsDataSource → IsAdr → IsEpicsRelated → GenerateOne, and
+        // IsEpicsRelated claims EVERYTHING under implementation-artifacts/ (BmadArtifactAdapter
+        // .IsUnderImplementationArtifacts), so a story artifact always reaches RegenerateEpics and can never
+        // reach GenerateOne in production. Driving GenerateOne with one anyway wrote a standalone
+        // implementation-artifacts/1-1-foundation.html that no full rebuild ever produces — GenerateAll excludes
+        // consumed artifacts from its page pass and renders them as epics/story-N-M.html — so this assertion
+        // failed ~23% of the time, whenever GenerateOne won the tail of the race against a RegenerateEpics that
+        // would otherwise have pruned the orphan. Keep this a non-artifact doc.
+        var notes = Path.Combine(Source, "notes");
+        Directory.CreateDirectory(notes);
+        var genericDoc = Path.Combine(notes, "concurrent-doc.md");
+        File.WriteAllText(genericDoc, "# Concurrent Doc\n\nA plain document the generic single-file route owns.\n");
+
         var gen = GeneratedSite();
 
         var exceptions = new System.Collections.Concurrent.ConcurrentBag<Exception>();
@@ -278,7 +294,7 @@ public class SiteGeneratorEpicsRemovalTests : IDisposable
                 {
                     case 0: gen.RegenerateEpics(); break;
                     case 1: gen.RegenerateAdrs(); break;
-                    case 2: gen.GenerateOne(Path.Combine(Source, "implementation-artifacts", "1-1-foundation.md")); break;
+                    case 2: gen.GenerateOne(genericDoc); break;
                     default: gen.RegenerateFromDataSource(SprintPath); break;
                 }
             }
