@@ -112,6 +112,14 @@ jobs:
       # ---------------------------------------------------------------------
 
       - name: SonarScanner begin
+        # The exclusion list is deliberately here rather than in the SonarCloud UI: it is reviewable in a diff
+        # and versioned with the code. (For the .NET scanner a sonar-project.properties file is not read at all,
+        # so the only alternatives were this and server-side settings.) It was WIDENED after the first real
+        # analysis: the initial list was written by enumerating directories rather than by measuring, and left
+        # ~11.7k lines of non-authored content in scope — `chat.json` at the repo root (4,861 lines), the
+        # installed BMad skill packs under `.claude/` and `.agents/` (Python, and duplicated across both), and
+        # `_bmad/scripts`. They dominated the findings list on day one, which is exactly what this list exists
+        # to prevent. `extension/src` stays IN scope — it is genuine first-party source.
         if: env.SONAR_TOKEN != ''
         run: |
           .\.sonar\scanner\dotnet-sonarscanner begin `
@@ -119,7 +127,7 @@ jobs:
             /k:"IntegerMan_SpecScribe" `
             /d:sonar.token="$env:SONAR_TOKEN" `
             /d:sonar.cs.opencover.reportsPaths="**/TestResults/**/coverage.opencover.xml" `
-            /d:sonar.exclusions="src/SpecScribe/assets/prism.js,src/SpecScribe/assets/prism.css,src/SpecScribe/assets/plotly-hierarchy.min.js,spike/**,tools/**,extension/node_modules/**,extension/dist/**,extension/bin/**,SpecScribeOutput/**,docs/live/**,artifacts/**,_bmad-output/**"
+            /d:sonar.exclusions="src/SpecScribe/assets/prism.js,src/SpecScribe/assets/prism.css,src/SpecScribe/assets/plotly-hierarchy.min.js,spike/**,tools/**,extension/node_modules/**,extension/dist/**,extension/bin/**,SpecScribeOutput/**,docs/live/**,artifacts/**,_bmad-output/**,_bmad/**,.claude/**,.agents/**,chat.json"
 
       - name: Build
         # --no-incremental: an incremental build can skip compilation entirely
