@@ -229,12 +229,49 @@ body {
    took the foreign-color count 1 -> 0. Do not delete it because "the config already sets the colors". [Story 20.4] */
 .ss-hierarchy defs pattern > path { fill: none; }
 
-/* Focus ring on a sector. Plotly's <path>s carry the roving tabindex, so without this a keyboard visitor moving
-   through the chart gets no visible indication of where they are. */
+/* Focus and selection on a sector — THREE distinct states that must not be confused: hovered, focused, and
+   selected. `outline` is deliberately NOT used: on an SVG <path> the browser draws it as the bounding RECTANGLE,
+   which on a wedge is a box floating off in the corner (the owner saw exactly that). A stroke follows the sector's
+   real geometry, so it reads as "this wedge" instead of "some rectangle near this wedge". */
+/* NO transition on these nodes. Plotly rewrites a sector's `stroke`/`stroke-width` inline on every redraw, so a
+   transition here animates against the engine on each re-render — and it cost real debugging time once: a
+   half-second stroke transition reads back through getComputedStyle as the START value until frames advance, which
+   made a correctly-applied selection ring look like it was being ignored entirely. */
 .ss-hierarchy g.slice path.surface:focus { outline: none; }
+/* `outline` and NOT `stroke`, and that is a measured decision rather than a style preference. A sector's stroke
+   cannot be moved from CSS at all here: Plotly owns that channel, and setting `stroke-width` on one of its
+   `path.surface` nodes changes nothing — verified against ink geometry, not just computed style, and it stays
+   inert even from an inline `!important` on the element itself. `outline` does render. So focus uses the outline
+   (a box, which is what a browser draws around an SVG path) and the SELECTION ring is drawn through Plotly's own
+   `marker.line` channel in specscribe.js, which is the same channel that already paints the sector separators and
+   therefore certainly renders. Do not "fix" this back into a stroke rule; it will silently do nothing. */
 .ss-hierarchy g.slice path.surface:focus-visible {
   outline: 2px solid var(--teal);
   outline-offset: 1px;
+}
+
+/* Rich hover card — the shared body-level `.ss-tooltip` node renders this as innerHTML, exactly as the code map's
+   `.codemap-card` does, so a hierarchy chart's tooltip looks like every other tooltip in the portal rather than
+   like whatever the chart engine ships. Deliberately states NO layout weight: `value` is a rendering input, not a
+   fact about the work. [owner verify round 2026-07-25] */
+.ss-hierarchy-card { display: block; white-space: normal; min-width: 10rem; max-width: 17rem; }
+.ss-hierarchy-card-kind {
+  display: block;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faded);
+}
+.ss-hierarchy-card-name { display: block; font-weight: 700; color: var(--ink); font-size: 0.8rem; margin: 0.1rem 0; }
+.ss-hierarchy-card-status { display: block; color: var(--ink); font-size: 0.72rem; }
+.ss-hierarchy-card-detail { display: block; color: var(--ink-faded); font-size: 0.72rem; font-variant-numeric: tabular-nums; }
+.ss-hierarchy-card-hint {
+  display: block;
+  margin-top: 0.3rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--border);
+  color: var(--rust);
+  font-size: 0.66rem;
 }
 
 .ss-hierarchy-controls { display: flex; justify-content: center; margin: 0 0 0.6rem; }

@@ -4,7 +4,7 @@ baseline_commit: 8db18aaddd7cc1325910bfc9b00e0ae9d1ac66a1
 
 # Story 5.3: Watch Regeneration Safety and Scope-Aware Rebuilds
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -167,6 +167,95 @@ types appearing) never leave stale or broken pages behind.
   - [x] Run the full suite: `dotnet test` from repo root; all existing tests stay green — especially
     `SiteGeneratorSprintTests`, `SiteGeneratorStoryEpicPagesTests`, and `SiteGeneratorTraceabilityTests`, which
     exercise the epics/sprint machinery this story edits.
+
+### Review Findings
+
+*Reviewed 2026-07-25 against commit range `8db18aa..f9b52bd`, scoped to this story's own File List (per
+CLAUDE.md's shared-`main` convention, sibling-story hunks landing in the same commit — Story 20.3's retro-fan-out
+rewrite and `workGraph:` parameter, both inside `SiteGenerator.cs` — were excluded from this audit).*
+
+- [x] [Review][Patch] `CopyEmbeddedAsset` accepts a truncated/corrupt asset as "already correct" once retries are
+  exhausted — `File.Create` truncates the destination on every attempt before `CopyTo` writes a byte, so a
+  disk-full-class failure partway through the final attempt leaves a non-empty but corrupt file, and the
+  `Length: > 0` acceptance check can't tell that apart from a genuinely-complete prior copy. [src/SpecScribe/SiteGenerator.cs:4290-4318]
+  **FIXED** — copies to a sibling `.tmp` and `File.Move(overwrite: true)`s it into place only once the copy has
+  fully landed, so `dest` is never touched by a failed attempt; the fallback's "an existing non-empty copy is a
+  complete prior write" claim is now actually true. New `TryDeleteTempAsset` best-effort cleans up on each failure.
+- [x] [Review][Patch] `DeleteOutputFile`/`DeleteOutputDirectory` evict `_spaCapture` entries before confirming the
+  underlying `File.Delete`/`Directory.Delete` actually succeeded — exactly the "file held open by a reader"
+  scenario the methods' own docstrings cite as the reason for the try/catch existing. A failed delete leaves the
+  static page on disk but already dropped from the SPA bundle, so `--spa` and static-site visitors diverge.
+  `DeleteOutputDirectory` also returns early without pruning `_spaCapture` when the directory is already absent.
+  [src/SpecScribe/SiteGenerator.cs:786-829]
+  **FIXED** — `DeleteOutputFile` now evicts only after a successful delete (and still converges the capture when
+  the file was already gone). `DeleteOutputDirectory` routes all three exits through a new
+  `ReconcileSpaCapturePrefix`, which drops only the entries whose file genuinely no longer exists — so a PARTIAL
+  directory delete (one locked file mid-tree) converges correctly instead of evicting all-or-nothing.
+- [x] [Review][Patch] `RegenerateTopology()`'s call to `GenerateAll()` mutates `_codeFiles` outside `_gate`
+  (`GenerateAll` assigns it before its own `lock (_gate)` block), while `RegenerateEpics`/`GenerateOne`/
+  `RegenerateAdrs` read it inside their own locked sections via `BuildNav`. `GenerateAll` previously only ran at
+  watch startup, so this pre-existing gap was never live; `RegenerateTopology` is the first caller that can race
+  it from a background timer against another in-flight regeneration. The new
+  `ConcurrentRegenerations_SerializeOnTheWriterLock_AndConvergeToCoherentOutput` stress test doesn't include this
+  route in its rotation, so the one new write path most likely to expose the race is untested.
+  [src/SpecScribe/SiteGenerator.cs:176-184,839-843]
+  **FIXED** — the `_codeFiles = EnumerateCodeFiles()` assignment moved inside `GenerateAll`'s `lock (_gate)`, so
+  every read and every write of it is now under the one writer lock.
+- [x] [Review][Patch] `RunDebouncedPass` computes its relative-path label (`Path.GetRelativePath`) before entering
+  `RunGuarded`, and is itself invoked directly from a raw `Timer` callback with no wrapping try/catch — an
+  exception on that one line would still take down the whole `watch` process, the exact failure class this
+  story's crash-guard pass exists to close. `RunTopologyPass`'s entire body sits inside the guard; this is the one
+  line in the per-file path that doesn't. [src/SpecScribe/FileWatcherService.cs:337-342,360-363]
+  **FIXED** — the whole body is now inside a try/catch that falls back to the raw full path as the event label
+  when the relative one can't be computed, so nothing in this method can escape the Timer callback.
+- [x] [Review][Patch] The directory-topology watcher's `Error` handler (buffer overflow — the realistic trigger on
+  a large rename/refactor, per its own comment) only logs a `GenerationOutcome.Error`; it never falls back to
+  forcing a rebuild via `DebounceTopology`. A dropped/overflowed directory event under exactly the bulk-operation
+  burst AC #6 names can leave output silently stale, short of AC #5's "escalates... rather than silently doing
+  nothing." [src/SpecScribe/FileWatcherService.cs:184-205]
+  **FIXED** — new `ForceTopologyRebuild()` (factored out of `DebounceTopology`, which keeps its `IsUnderOutputRoot`
+  guard) is now called from the `Error` handler, so an overflow escalates to a full rebuild rather than trusting an
+  event stream that just proved incomplete. The handler itself is wrapped in `SafeHandle`.
+- [x] [Review][Patch] `FileWatcherServiceCrashGuardTests.ThrowingEventCallback_DoesNotEscapeTheConfigDirHandler`'s
+  comment says it drives `OnConfigDirCreated` "present-then-vanished so the report path is taken," but the test
+  never removes the directory — `CreateWatcher` succeeds, the success path never calls `_onEvent`, and
+  `Assert.Null(ex)` passes without ever exercising the reporter-throw guard this test is named for.
+  [tests/SpecScribe.Tests/FileWatcherServiceCrashGuardTests.cs:229-243]
+  **FIXED** — added an `OnConfigDirCreated(fullPath, Func<FileSystemWatcher> watcherFactory)` test-seam overload
+  (the existing one-arg method delegates to it with the real factory) so the TOCTOU catch branch — which a real
+  filesystem race can't be landed on reliably from a single-threaded test — is now driven deterministically via a
+  throwing factory. Plus a counter-test (`ConfigDirHandler_RegistersOnTheSuccessPath_WhenTheDirectoryIsStillThere`)
+  so the guard can't be satisfied by swallowing everything.
+- [x] [Review][Patch] `BurstOfSaves_CoalescesAndLeavesCoherentOutput`'s docstring claims to prove "the per-file
+  debounce must collapse the burst rather than emitting an event per raw FS notification," but it only asserts
+  final on-disk content and the absence of `Error` events — never the emitted-event count. A regression that
+  disabled debouncing entirely would still pass. [tests/SpecScribe.Tests/FileWatcherServiceTests.cs:233-267]
+  **FIXED** — `bulk-0.md` is now rewritten 5× inside one debounce window and the test asserts exactly ONE emitted
+  event for it, so the coalescing claim is actually pinned. *(Trap worth recording: the event's `RelativePath` is
+  the SOURCE-relative `.md` path from `Path.GetRelativePath` — OS separator — not the normalized forward-slash
+  `.html` output path; the first two versions of this assertion failed on that.)*
+- [x] [Review][Patch] `OutputRootInsideTheSourceRoot_DoesNotSelfTriggerARebuildLoop` proves its negative claim with
+  two fixed `Thread.Sleep(DebounceInterval * 4)` calls, which is exactly the flakiness pattern the test class's own
+  doc comment warns against ("a fixed sleep is what makes this class of test flaky under a loaded CI machine").
+  [tests/SpecScribe.Tests/FileWatcherServiceTests.cs:297-326]
+  **FIXED** — replaced with a bounded poll for 5 consecutive stable readings of the event count. A self-triggering
+  loop now fails fast (the count keeps climbing on every sample) instead of being checked once at the far end of a
+  fixed gap, and a loaded box just shifts where the plateau lands inside the existing `SettleTimeout`.
+- [x] [Review][Defer] `EpicsFamilyPages`/`EpicsFamilyDirectories` is a hand-maintained list; a future epics-gated
+  page added without also updating this list can silently reopen the AC #3 dangling-link bug this story fixes.
+  [src/SpecScribe/SiteGenerator.cs:717-729] — deferred, pre-existing pattern (mirrors `GenerateAdrsInternal`'s
+  same hand-maintained convention; currently verified correct against every existing `_epicsModel`-gated writer).
+- [x] [Review][Defer] `CopyEmbeddedAsset`'s retry sleep runs while holding `_gate` (reached via `EnsureScaffold`,
+  called by every locked regeneration route), briefly blocking every other pending watch route on contention.
+  [src/SpecScribe/SiteGenerator.cs:4290-4318] — deferred, pre-existing lock scope (the call site was already
+  inside `_gate` before this story); bounded to ~75ms worst case by the existing deliberately-small retry budget.
+
+*Dismissed as noise:* `TopologySentinelKey`'s doc comment overstates its collision-freedom claim as Windows-specific,
+but `DebounceTopology` always keys `_pending` on the `TopologySentinelKey` constant itself, never on the real
+`fullPath` — a real watched path can never literally equal the bare string `<topology>`, so no collision is
+possible on any platform regardless of which characters are legal in a filename there. AC #6's coalescing clause
+was also flagged by two reviewers as a literal AC sentence with no corresponding code — not a defect: the
+Completion Notes already document this as a deliberate, reasoned non-implementation deferred to Story 6.11's R6.4.
 
 ## Dev Notes
 
@@ -520,14 +609,19 @@ symbols added by this story were grep-verified present after every edit.
 
 - `src/SpecScribe/SiteGenerator.cs` — modified (`RegenerateEpics` removal branch; new `ClearEpicsFamilyOutputs`,
   `DeleteOutputFile`, `DeleteOutputDirectory`, `RegenerateTopology`, `EpicsFamilyPages`, `EpicsFamilyDirectories`,
-  `AssetWriteRetries`/`AssetWriteRetryDelayMs`; hardened `CopyEmbeddedAsset`)
+  `AssetWriteRetries`/`AssetWriteRetryDelayMs`; hardened `CopyEmbeddedAsset`; **review-fixes:** `_codeFiles`
+  assignment moved inside `GenerateAll`'s `_gate`, `CopyEmbeddedAsset` now temp-file + atomic-move with new
+  `TryDeleteTempAsset`, new `ReconcileSpaCapturePrefix` + delete-then-evict ordering in the two delete helpers)
 - `src/SpecScribe/FileWatcherService.cs` — modified (`TopologySentinelKey`, `TopologyEventLabel`,
   `CreateDirectoryWatcher`, `DebounceTopology`, `IsUnderOutputRoot`, `CreateTopologyTimer`, `RunGuarded`; follow-up
   pass added `SafeNotify`, `SafeHandle`, `RunDebouncedPass`, `RunTopologyPass`, and the three watcher-label
-  constants)
-- `tests/SpecScribe.Tests/FileWatcherServiceCrashGuardTests.cs` — new (follow-up pass)
+  constants; **review-fixes:** new `ForceTopologyRebuild` wired into the directory watcher's `Error` handler,
+  `RunDebouncedPass` fully wrapped, new `OnConfigDirCreated(string, Func<FileSystemWatcher>)` test seam)
+- `tests/SpecScribe.Tests/FileWatcherServiceCrashGuardTests.cs` — new (follow-up pass); **review-fix:** the config-dir
+  guard test now drives the TOCTOU branch through the factory seam, plus a new success-path counter-test
 - `tests/SpecScribe.Tests/SiteGeneratorEpicsRemovalTests.cs` — new
-- `tests/SpecScribe.Tests/FileWatcherServiceTests.cs` — new
+- `tests/SpecScribe.Tests/FileWatcherServiceTests.cs` — new; **review-fixes:** burst test now asserts the
+  coalesced event COUNT, self-trigger-loop test polls for a stable plateau instead of two fixed sleeps
 - `tests/SpecScribe.Tests/SiteGeneratorSpaTests.cs` — modified (one pinned outcome `Skipped` → `Removed`; the
   test's subject is unchanged — see Full-suite accounting)
 
@@ -535,6 +629,7 @@ symbols added by this story were grep-verified present after every edit.
 
 | Date | Change |
 | --- | --- |
+| 2026-07-25 | Code review (3 adversarial layers, scoped to this story's File List). 8 patches applied, 2 items deferred, 2 dismissed. Production fixes: `_codeFiles` moved inside `GenerateAll`'s `_gate` (a race `RegenerateTopology` newly made reachable); `CopyEmbeddedAsset` now writes to a temp file + atomic move so a partial copy can never be accepted as complete; the two delete helpers evict `_spaCapture` only after the delete actually succeeds, and reconcile partial directory deletes against real disk state; `RunDebouncedPass` fully wrapped so nothing escapes its Timer callback; the directory watcher's `Error` handler now escalates to a rebuild instead of only logging (a buffer overflow means events were DROPPED). Test fixes: the config-dir crash-guard test never reached the branch it was named for (new factory seam + success-path counter-test); the burst test never asserted coalescing (now pins the event count); the self-trigger-loop test replaced two fixed sleeps with a stable-plateau poll. Full suite green: **2391 passed / 0 failed / 3 skipped**. |
 | 2026-07-24 | Follow-up pass (owner-requested audit of the crash-guard class): the original `RunGuarded` fix was INCOMPLETE — it guarded the generator call but handed the result to `_onEvent` outside the try, so a throwing reporter (`ConsoleUi.LogEvent` on a closed stdout) still killed the process, and on the SUCCESS path. New `SafeNotify` is now the single exit for every event; new `SafeHandle` wraps all raw `FileSystemWatcher` handlers (previously unguarded on their dispatch thread) and `OnConfigDirCreated`'s `EnableRaisingEvents`. Timer bodies extracted to `RunDebouncedPass`/`RunTopologyPass` internal seams so a guard regression fails a test instead of taking down the test host. 11 new tests. |
 | 2026-07-24 | Story 5.3 implemented. `epics.md` deletion now tears down its whole output family (8 pages + 2 subtrees) and reports `Removed`; new directory-topology watcher escalates folder create/rename/delete to a full rebuild via `SiteGenerator.RegenerateTopology()`. Tasks 1–2 found already shipped by Story 6.11 — closed with the end-to-end coverage that was missing rather than a redundant `RegenerateSprint()`. Two hardening defects fixed that the new tests surfaced: the debounce `Timer` callback ran unguarded (any transient killed the whole `watch` process) and `CopyEmbeddedAsset` could throw a transient sharing violation. `_progress` is split rather than nulled so the epic mosaic's links go without orphaning the git-insights pages. 16 new tests. |
 

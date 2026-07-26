@@ -175,14 +175,18 @@ public sealed class SiteGenerator
         reporter?.BeginPhase(GenerationPhase.Scan);
         var files = EnumerateSourceFiles();
         var sourceRelatives = files.Select(ToSourceRelative).ToList();
-        // Story 7.6: the source-code walk gates the Code Map nav item/page. Enumerated once here (before the nav is
-        // built) and cached so WriteCodeMap reuses the exact same set — never a broken "Code Map" link.
-        _codeFiles = EnumerateCodeFiles();
         reporter?.EndPhase(GenerationPhase.Scan);
 
         var events = new List<GenerationEvent>();
         lock (_gate)
         {
+            // Story 7.6: the source-code walk gates the Code Map nav item/page. Enumerated once here (before the nav
+            // is built) and cached so WriteCodeMap reuses the exact same set — never a broken "Code Map" link.
+            // Inside _gate (review-fix, Story 5.3): RegenerateEpics/GenerateOne/RegenerateAdrs read _codeFiles via
+            // BuildNav inside their own locked sections, so assigning it outside this lock raced them the moment
+            // RegenerateTopology gave GenerateAll a caller other than watch startup.
+            _codeFiles = EnumerateCodeFiles();
+
             // A full rebuild starts from a clean slate so renamed/removed source docs don't leave
             // orphaned HTML behind (incremental watch-mode updates never wipe the whole tree).
             if (Directory.Exists(_options.OutputRoot))
@@ -785,18 +789,27 @@ public sealed class SiteGenerator
     /// pass degrades rather than crashing the loop (NFR2). [Story 5.3]</summary>
     private bool DeleteOutputFile(string outputRelativePath)
     {
-        _spaCapture?.Remove(PathUtil.NormalizeSlashes(outputRelativePath));
+        var key = PathUtil.NormalizeSlashes(outputRelativePath);
         var full = Path.Combine(_options.OutputRoot, outputRelativePath.Replace('/', Path.DirectorySeparatorChar));
-        if (!File.Exists(full)) return false;
+        if (!File.Exists(full))
+        {
+            // Already gone from disk (e.g. an earlier partial cleanup) — still converge a stale capture entry.
+            _spaCapture?.Remove(key);
+            return false;
+        }
         try
         {
             File.Delete(full);
-            return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            // Delete failed — the page is still really on disk, so the capture must keep reflecting that too
+            // (review-fix, Story 5.3: evicting unconditionally here left static-site and --spa visitors diverged
+            // whenever the delete lost a race with a reader holding the file open).
             return false;
         }
+        _spaCapture?.Remove(key);
+        return true;
     }
 
     /// <summary>Recursively deletes one output-relative subdirectory and evicts every captured page beneath it,
@@ -805,26 +818,49 @@ public sealed class SiteGenerator
     private int DeleteOutputDirectory(string outputRelativeDir)
     {
         var full = Path.Combine(_options.OutputRoot, outputRelativeDir.Replace('/', Path.DirectorySeparatorChar));
-        if (!Directory.Exists(full)) return 0;
-
-        if (_spaCapture is not null)
+        if (!Directory.Exists(full))
         {
-            var prefix = PathUtil.NormalizeSlashes(outputRelativeDir) + "/";
-            foreach (var key in _spaCapture.Keys.Where(k => k.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToList())
-            {
-                _spaCapture.Remove(key);
-            }
+            // Already gone from disk — still converge any stale capture entries left over from an earlier partial
+            // cleanup, rather than leaving them to linger forever. [Story 5.3 review-fix]
+            ReconcileSpaCapturePrefix(outputRelativeDir);
+            return 0;
         }
 
         try
         {
             var count = Directory.GetFiles(full, "*", SearchOption.AllDirectories).Length;
             Directory.Delete(full, recursive: true);
+            ReconcileSpaCapturePrefix(outputRelativeDir);
             return count;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            // A partial delete may have removed some files but not all (one locked file mid-tree). Reconcile the
+            // capture against what's genuinely still on disk instead of assuming the whole subtree went — evicting
+            // unconditionally here (the pre-review-fix behavior) could drop capture entries for pages that never
+            // actually left disk. [Story 5.3 review-fix]
+            ReconcileSpaCapturePrefix(outputRelativeDir);
             return 0;
+        }
+    }
+
+    /// <summary>Evicts every <see cref="_spaCapture"/> entry under <paramref name="outputRelativeDir"/> whose file no
+    /// longer exists on disk, so the capture converges to real disk state even after a partial directory delete
+    /// (some files gone, some not) rather than being evicted or kept as an all-or-nothing block. [Story 5.3
+    /// review-fix]</summary>
+    private void ReconcileSpaCapturePrefix(string outputRelativeDir)
+    {
+        if (_spaCapture is null) return;
+
+        var prefix = PathUtil.NormalizeSlashes(outputRelativeDir) + "/";
+        var fullDir = Path.Combine(_options.OutputRoot, outputRelativeDir.Replace('/', Path.DirectorySeparatorChar));
+        foreach (var key in _spaCapture.Keys.Where(k => k.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToList())
+        {
+            var candidate = Path.Combine(fullDir, key[prefix.Length..].Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(candidate))
+            {
+                _spaCapture.Remove(key);
+            }
         }
     }
 
@@ -4290,6 +4326,12 @@ public sealed class SiteGenerator
     private void CopyEmbeddedAsset(string resourceName, string outputFileName)
     {
         var dest = Path.Combine(_options.OutputRoot, outputFileName);
+        // Copy to a sibling temp file and atomically move it into place, so a failure mid-copy (disk full, an
+        // interrupted write) never leaves dest itself truncated/corrupt — dest is only ever replaced once a copy has
+        // FULLY landed. Without this, File.Create's implicit truncation of dest on each attempt meant a partial
+        // CopyTo on the final retry could leave a non-empty-but-corrupt file that the fallback below would then
+        // silently accept as "already correct". [Story 5.3 review-fix]
+        var tempDest = dest + ".tmp";
         using var source = typeof(SiteGenerator).Assembly.GetManifestResourceStream(resourceName)
             ?? throw new InvalidOperationException($"Embedded asset '{resourceName}' is missing from the assembly.");
 
@@ -4297,16 +4339,20 @@ public sealed class SiteGenerator
         {
             try
             {
-                using var destStream = File.Create(dest);
-                source.CopyTo(destStream);
+                using (var destStream = File.Create(tempDest))
+                {
+                    source.CopyTo(destStream);
+                }
+                File.Move(tempDest, dest, overwrite: true);
                 return;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
+                TryDeleteTempAsset(tempDest);
                 if (attempt >= AssetWriteRetries)
                 {
-                    // Already present and non-empty → the contended write was a no-op anyway. Otherwise the asset
-                    // genuinely never landed and the caller must hear about it.
+                    // dest itself is never touched by a failed attempt (only tempDest is), so an existing non-empty
+                    // copy here is genuinely a complete prior write, not a partial one from this call.
                     if (new FileInfo(dest) is { Exists: true, Length: > 0 }) return;
                     throw;
                 }
@@ -4314,6 +4360,18 @@ public sealed class SiteGenerator
                 Thread.Sleep(AssetWriteRetryDelayMs);
                 source.Position = 0;
             }
+        }
+    }
+
+    private static void TryDeleteTempAsset(string tempDest)
+    {
+        try
+        {
+            File.Delete(tempDest);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Best-effort cleanup only — a leftover .tmp file is overwritten by File.Create on the next attempt.
         }
     }
 

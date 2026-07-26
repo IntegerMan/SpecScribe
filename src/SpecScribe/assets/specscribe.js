@@ -97,7 +97,10 @@
     deactivate();
   }
 
-  var SEG = ".sb-seg, .heatmap-cell, .donut-seg";
+  // `.ss-hierarchy-sector` is the Story 20.5 component's Plotly sectors opting into this SAME tooltip rather than
+  // Plotly's own hover card — one tooltip system site-wide, so the chart engine changing does not change how a
+  // tooltip looks. They carry `data-tip-html` (the rich-card path the code map already uses). [Story 20.5]
+  var SEG = ".sb-seg, .heatmap-cell, .donut-seg, .ss-hierarchy-sector";
   // Hover/focus/touch also fire on HTML elements that opt in with .js-tip (rich card/wheel tooltips).
   var HOVER = SEG + ", .js-tip";
 
@@ -1809,8 +1812,64 @@
     var inkColor = tokenFor("sb-unrecognized").fill;
     var edgeColor = tokenFor("sb-done").stroke || inkColor;
 
+    // Label legibility (owner verify round 2026-07-25: "font readability is tough"). One ink colour across every
+    // sector cannot work: the palette spans a dark teal and a pale parchment, so a single mid-grey is unreadable on
+    // one end or the other. Pick per sector by the fill's own relative luminance, and take BOTH candidate colours
+    // from the shipped cascade rather than typing them.
+    var rootStyle = getComputedStyle(document.documentElement);
+    function cssVar(name, fallback) {
+      var v = rootStyle.getPropertyValue(name).trim();
+      return v || fallback;
+    }
+    var onDarkColor = cssVar("--warm-white", "#fff");
+    var onLightColor = cssVar("--ink", inkColor);
+    function luminance(color) {
+      var m = /rgba?\(([^)]+)\)/.exec(color);
+      if (!m) return 1;
+      var p = m[1].split(",").map(parseFloat);
+      // Rec. 601 luma — enough to choose between two candidates, and cheap.
+      return (0.299 * p[0] + 0.587 * p[1] + 0.114 * p[2]) / 255;
+    }
+    function textOn(statusClass) {
+      return luminance(fillFor(statusClass)) < 0.55 ? onDarkColor : onLightColor;
+    }
+
     /* --- State --------------------------------------------------------------------------------------------- */
-    var state = { shape: cfg.shape === "treemap" ? "treemap" : "sunburst", level: null, focusIndex: 0 };
+    var state = { shape: cfg.shape === "treemap" ? "treemap" : "sunburst", level: null, focusIndex: 0, selected: null };
+
+    function esc(v) {
+      return String(v == null ? "" : v)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+    // The rich tooltip card, matching the code map's `.codemap-card` shape: a muted kind eyebrow, the FULL title,
+    // the prose status, and the human-meaningful detail. `value` — the layout number Plotly sizes sectors by — is
+    // deliberately absent: the owner's verify round called it "a confusing value ... not helpful or intuitive for
+    // the reader", and it is a rendering input, not a fact about the work.
+    function tipCardFor(n) {
+      var out = '<span class="ss-hierarchy-card">';
+      out += '<span class="ss-hierarchy-card-kind">' + esc(kindWord(n)) + "</span>";
+      out += '<span class="ss-hierarchy-card-name">' + esc(n.label) + "</span>";
+      out += '<span class="ss-hierarchy-card-status">' + esc(n.statusLabel) + "</span>";
+      if (n.detail) out += '<span class="ss-hierarchy-card-detail">' + esc(n.detail) + "</span>";
+      if (n.href) out += '<span class="ss-hierarchy-card-hint">' + esc(hintFor(n)) + "</span>";
+      return out + "</span>";
+    }
+    function kindWord(n) {
+      switch (n.kind) {
+        case "project": return "Project";
+        case "epic": return "Epic";
+        case "story": return "Story";
+        case "story-summary": return "Stories";
+        case "unplanned": return "Direct work";
+        default: return "Follow-ups";
+      }
+    }
+    // States the ONE thing activating this node will do, so the drill-vs-activate grammar is discoverable rather
+    // than something a visitor has to infer by clicking and being surprised.
+    function hintFor(n) {
+      if (hasChildren(n.id)) return "Click to zoom in";
+      return selectMode ? "Click to select" : "Click to open";
+    }
 
     function buildTrace() {
       var t = {
@@ -1829,7 +1888,16 @@
         branchvalues: cfg.branchvalues || "total",
         marker: {
           colors: NODES.map(function (n) { return fillFor(n.statusClass); }),
-          line: { color: edgeColor, width: 1 },
+          // Per-sector, because this is ALSO the selection ring. CSS cannot draw it: setting `stroke` on one of
+          // Plotly's `path.surface` nodes is inert (verified against ink geometry, and inert even from an inline
+          // `!important`). `marker.line` is the channel that paints the separators, so it is the one that works.
+          // Width AND colour both change, so the selection is never signalled by colour alone (UX-DR17).
+          line: {
+            // The ring takes the SAME per-sector contrast pick the labels use, not one fixed accent: a gold ring
+            // on a gold "ready" sector is invisible, and the selection can land on any status.
+            color: NODES.map(function (n) { return n.id === state.selected ? textOn(n.statusClass) : edgeColor; }),
+            width: NODES.map(function (n) { return n.id === state.selected ? 4 : 1; })
+          },
           pattern: {
             shape: NODES.map(function (n) { return patternFor(n.statusClass); }),
             fillmode: "overlay",
@@ -1841,17 +1909,20 @@
             solidity: 0.28
           }
         },
-        // Status as TEXT in the hover card, so nothing is signalled by colour alone even to a viewer who cannot
-        // distinguish fill or hatch at all. Prose, never the CSS class.
+        // Status as TEXT, so nothing is signalled by colour alone even to a viewer who cannot distinguish fill or
+        // hatch at all. Prose, never the CSS class.
         text: NODES.map(function (n) { return n.statusLabel; }),
-        hovertemplate: "<b>%{customdata}</b><br>%{text}<br>weight: %{value}<extra></extra>",
+        // Plotly's own hover card is switched OFF: the portal already has one tooltip and this component uses it
+        // (see `.ss-hierarchy-sector` in SEG above), so a chart does not get a second look just because a different
+        // engine drew it. [owner verify round: "we lost some of the pretty formatting we used on our tooltips"]
+        hoverinfo: "none",
         // Draw order stays the emitter's order, which is the SVG's draw order.
         sort: false,
         // Both font slots plus layout.font below. With only `insidetextfont` set, the ROOT label alone took
         // Plotly's default rgb(68,68,68) — one element out of 119, exactly the kind of miss a config-level
         // assertion never catches.
-        insidetextfont: { color: inkColor },
-        outsidetextfont: { color: inkColor }
+        insidetextfont: { color: NODES.map(function (n) { return textOn(n.statusClass); }), weight: 700 },
+        outsidetextfont: { color: onLightColor, weight: 700 }
       };
       if (state.shape === "sunburst") {
         t.leaf = { opacity: 1 };
@@ -1947,10 +2018,16 @@
         var n = id ? byId[id] : null;
         el.setAttribute("role", "treeitem");
         el.setAttribute("tabindex", i === state.focusIndex ? "0" : "-1");
+        // Opt this sector into the portal's shared tooltip (see SEG) and mark the current selection so it reads as
+        // selected rather than merely focused. Both re-applied on every render — Plotly rebuilds these nodes.
+        if (el.classList) el.classList.add("ss-hierarchy-sector");
         if (n) {
+          el.setAttribute("data-tip-html", tipCardFor(n));
+          if (state.selected && n.id === state.selected) el.setAttribute("data-ss-selected", "1");
+          else el.removeAttribute("data-ss-selected");
           // Status as PROSE, never the CSS class. The 20.4 probe read "— done, weight 44" precisely because it
           // used the class; UX-DR17/19 want words.
-          el.setAttribute("aria-label", n.label + " — " + n.statusLabel + ", weight " + n.value);
+          el.setAttribute("aria-label", n.label + " — " + n.statusLabel + (n.detail ? ", " + n.detail : ""));
           el.setAttribute("aria-level", String(depth(n.id) + 1));
           var sibs = n.parentId ? (childrenOf[n.parentId] || []) : [n];
           var pos = 0;
@@ -1974,6 +2051,14 @@
           });
         }
       });
+
+      if (state.refocusAfterPlot && els.length) {
+        state.refocusAfterPlot = false;
+        // Only when the caret was already inside the chart — never steal focus from the rail or the page.
+        if (!document.activeElement || document.activeElement === document.body || root.contains(document.activeElement)) {
+          els[state.focusIndex].focus();
+        }
+      }
     }
 
     function focusAt(i) {
@@ -2014,10 +2099,18 @@
       var n = id ? byId[id] : null;
       if (!n) return;
       if (id === state.level) { drillUp(); return; }
-      if (hasChildren(id)) { drillTo(id, true); return; }
+      if (hasChildren(id)) { state.selected = null; drillTo(id, true); return; }
       if (selectMode) {
+        // A selection is a THIRD state, distinct from focus and from the drill scope: the owner's verify round
+        // showed a picked leaf reading as nothing at all. Paint it, announce it, and publish it for the rail.
+        state.selected = id;
+        // The ring lives in the trace, so selecting redraws. Redraw replaces every sector node, which would drop
+        // keyboard focus to <body> — the exact defect Story 20.3's review had to fix on its own pane — so the
+        // a11y pass restores it once the new nodes exist.
+        state.refocusAfterPlot = true;
+        redraw();
         publishSelection(id);
-        announce("Selected " + n.label + ". " + n.statusLabel + ", weight " + n.value + ".");
+        announce("Selected " + n.label + ". " + n.statusLabel + (n.detail ? ", " + n.detail : "") + ".");
         return;
       }
       if (n.href) location.href = n.href;

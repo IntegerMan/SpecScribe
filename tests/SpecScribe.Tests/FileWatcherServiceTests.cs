@@ -245,10 +245,17 @@ public class FileWatcherServiceTests : IDisposable
 
         using var watcher = StartedWatcher(gen);
 
-        // The burst: rewrite all eight back-to-back, the shape a find/replace or a git checkout produces.
+        // The burst: rewrite all eight back-to-back, the shape a find/replace or a git checkout produces. bulk-0 is
+        // additionally rewritten several more times in the same tight loop — well inside one DebounceInterval — so
+        // its final event COUNT (asserted below), not just its final content, directly proves the per-file timer
+        // coalesces repeated notifications into one fire rather than one per raw FS event. [Story 5.3 review-fix]
         for (var i = 0; i < 8; i++)
         {
             File.WriteAllText(Path.Combine(docs, $"bulk-{i}.md"), $"# Bulk {i}\n\nREPLACED\n");
+        }
+        for (var extra = 0; extra < 4; extra++)
+        {
+            File.WriteAllText(Path.Combine(docs, "bulk-0.md"), $"# Bulk 0\n\nREPLACED-{extra}\n");
         }
 
         Assert.True(WaitFor(() => Enumerable.Range(0, 8).All(i =>
@@ -264,6 +271,14 @@ public class FileWatcherServiceTests : IDisposable
             Assert.Contains("</html>", html);
         }
         Assert.DoesNotContain(Observed(), e => e.Outcome == GenerationOutcome.Error);
+
+        // The coalescing assertion itself: bulk-0.md was rewritten 5 times total in one burst, well inside one
+        // DebounceInterval, so a working per-file debounce collapses that into exactly ONE regeneration event for
+        // its page — a regression that regenerated on every raw notification would fail this. GenerateOneInternal
+        // labels its event with the SOURCE-relative path (.md) via Path.GetRelativePath (OS separator), not the
+        // output page (.html) with the site's normalized forward slashes.
+        var bulk0Relative = Path.Combine("notes", "bulk-0.md");
+        Assert.Equal(1, Observed().Count(e => e.RelativePath == bulk0Relative));
     }
 
     [Fact]
@@ -318,10 +333,23 @@ public class FileWatcherServiceTests : IDisposable
             e => e.RelativePath == "<directory change>",
             "a real directory change should still be observed when the output root is nested");
 
-        Thread.Sleep(ForgeOptions.DebounceInterval * 4);
-        var settled = Observed().Count(e => e.RelativePath == "<directory change>");
-        Thread.Sleep(ForgeOptions.DebounceInterval * 4);
+        // Poll for a run of consecutive stable readings rather than two blind fixed-length sleeps (the class's own
+        // anti-flakiness rule): a self-triggering loop keeps growing on every sample, so this fails fast on a broken
+        // guard instead of only checking once at the far end of a fixed gap — and a slow/loaded box just shifts
+        // where the plateau lands within the window rather than producing a false failure. [Story 5.3 review-fix]
+        const int requiredStableSamples = 5;
+        var deadline = DateTime.UtcNow + SettleTimeout;
+        var stableRun = 0;
+        var lastCount = -1;
+        while (DateTime.UtcNow < deadline && stableRun < requiredStableSamples)
+        {
+            var count = Observed().Count(e => e.RelativePath == "<directory change>");
+            stableRun = count == lastCount ? stableRun + 1 : 1;
+            lastCount = count;
+            Thread.Sleep(50);
+        }
 
-        Assert.Equal(settled, Observed().Count(e => e.RelativePath == "<directory change>"));
+        Assert.True(stableRun >= requiredStableSamples,
+            $"'<directory change>' event count never stabilized (still climbing at {lastCount} — a self-triggered rebuild loop)");
     }
 }

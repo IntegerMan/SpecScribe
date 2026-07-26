@@ -3010,25 +3010,42 @@ So that baseline coverage starts with a defined scope, a prioritized target modu
 **Then** framework/module-extra data is recorded as candidate projection extensions or explicit non-goals, and deliberately-unsupported conventions are listed with rationale and the non-fatal notice they will emit
 **And** the current BMM-specific next-step-command mapping is assessed for generalization to other modules (per the "strongly GDS-oriented … requires generalization" note in Additional Requirements), giving the coverage story an agreed scope boundary.
 
-### Story 18.2: Priority BMad Module Baseline Coverage
+<!-- Story 18.2 REDEFINED 2026-07-25 (post-18.1 spike, owner-approved scope split): 18.1 found that the first
+     unit of work in Epic 18 is not artifact coverage at all but a LIVE module-identity defect — ModuleContext
+     infers the module from the skill prefix, and every first-party BMad module except GDS prefixes its skills
+     `bmad-`, so CIS/TEA/BMB silently resolve to BmadMethod and inherit BMM's glossary site-wide; single-winner
+     ChoosePrimary additionally strips ALL BMM commands from a genuine BMM repo on a manifest-order tie. 18.2 is
+     therefore rescoped to that foundation (ADR 0015 Decisions 1/2/4), and its former artifact-coverage ACs move
+     VERBATIM to the new Story 18.5, which 18.2 now gates. Sprint key changed
+     18-2-priority-bmad-module-baseline-coverage → 18-2-bmad-module-identity-foundation; both artifacts updated
+     in the same change. -->
 
-As a team using a BMad module beyond BMM,
-I want my module's core planning and tracking artifacts interpreted in the portal,
-So that I can track progress without switching tools or losing module-specific work.
+### Story 18.2: BMad Module Identity Foundation
+
+As a team using any BMad module other than BMM,
+I want SpecScribe to identify my module correctly — or admit honestly that it does not model it —
+So that the portal never asserts a vocabulary my project does not use, and installing a second module never silently degrades the module I already had.
 
 **Acceptance Criteria:**
 
 1.
-**Given** the priority module(s) chosen by Story 18.1's coverage map
-**When** generation runs against a representative repository for that module
-**Then** the module's core planning and tracking artifacts render without fatal failures via the shared adapter contract, each discovered artifact labeled rendered, summarized, or unsupported
-**And** output stays coherent alongside the existing BMM and framework surfaces, with BMM support fully intact.
+**Given** a repository whose installed BMad module is not one SpecScribe models (for example `cis`, `tea`, `bmb`, or a BMad Builder-generated custom module)
+**When** generation runs
+**Then** the module is identified from its module **code** — the `_bmad/{code}/` directory name — rather than from a skill-id prefix, and resolves to an unmodeled identity that carries its real module label and its parsed command catalog while publishing **no** planning docs and **no** glossary
+**And** neither the how-to-read glossary nor the site-wide abbreviation expansion presents BMad Method's vocabulary for it
+**And** the situation is reported once as a non-fatal `Informational` diagnostic naming the code and label.
 
 2.
-**Given** module-specific artifacts the projection does not model
-**When** they are discovered
-**Then** they surface as explicit non-fatal notices (coverage-tier labeling where partial) and never block full-site generation
-**And** any module-specific next-step-command vocabulary flows through the adapter contract rather than being hard-coded (NFR8).
+**Given** a repository with more than one BMad module installed (for example BMM alongside Test Architect or the Creative Intelligence Suite)
+**When** primary-module selection runs
+**Then** BMad Method and Game Dev Studio are never demoted below an auxiliary module by installed-manifest ordering, so an existing BMM repository keeps its planning docs, glossary and next-step commands intact after a second module is installed
+**And** the About-SDD "Detected" reporting and the selected primary module never contradict each other.
+
+3.
+**Given** the modules SpecScribe already supports
+**When** the identity change lands
+**Then** BMad Method and Game Dev Studio detection, docs, glossary and commands are unchanged, verified against **real** module `module-help.csv` content rather than synthetic fixtures
+**And** the existing test suite and the golden byte-parity gate stay green (or any intentional change is re-baselined).
 
 <!-- Stories 18.3–18.4 added 2026-07-19: BMad-authoring-tool integrations explored in chat (bmad-index-docs,
      bmad-forge-idea). 18.3 spike-led per the Epics 11–15/18.1 pattern. 18.4 depends on 18.3's pinned contract
@@ -3075,6 +3092,38 @@ So that idea-stage lineage and rationale are visible alongside requirements/epic
 **Given** no forge-idea artifacts exist in a repository
 **When** generation runs
 **Then** the Ideas page/nav entry is omitted entirely rather than showing an empty page, matching existing optional-surface conventions elsewhere in the portal.
+
+<!-- Story 18.5 added 2026-07-25 (post-18.1 spike, owner-approved scope split): carries the ORIGINAL Story 18.2
+     acceptance criteria verbatim — only the story number and the now-resolved priority module changed. 18.1's
+     coverage map selects Test Architect (TEA) as that priority module: it is the only candidate with structured,
+     distinctively-named on-disk artifacts (traceability-matrix.csv, nfr-report.md) and they overlap surfaces
+     SpecScribe already has (Story 21.1 traceability, Story 9.2 NFR coverage). CIS was assessed and deferred —
+     its output declares a bare `output_folder` and already renders via the generic markdown pass, so a CIS
+     module case would buy only a glossary. BMad Builder is a non-goal for artifact rendering (a meta-tool whose
+     outputs are other modules' scaffolding) but drove Story 18.2's open-world requirement. GATED BY 18.2:
+     covering a module is meaningless while module identity is still inferred from the skill prefix. Known
+     prerequisite for this story: TEA writes to a `test_artifacts` output key that lives in `_bmad/tea/config.yaml`,
+     and SpecScribe reads no module `config.yaml` at all today. -->
+
+### Story 18.5: Priority BMad Module Baseline Coverage
+
+As a team using a BMad module beyond BMM,
+I want my module's core planning and tracking artifacts interpreted in the portal,
+So that I can track progress without switching tools or losing module-specific work.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the priority module(s) chosen by Story 18.1's coverage map
+**When** generation runs against a representative repository for that module
+**Then** the module's core planning and tracking artifacts render without fatal failures via the shared adapter contract, each discovered artifact labeled rendered, summarized, or unsupported
+**And** output stays coherent alongside the existing BMM and framework surfaces, with BMM support fully intact.
+
+2.
+**Given** module-specific artifacts the projection does not model
+**When** they are discovered
+**Then** they surface as explicit non-fatal notices (coverage-tier labeling where partial) and never block full-site generation
+**And** any module-specific next-step-command vocabulary flows through the adapter contract rather than being hard-coded (NFR8).
 
 <!-- Epic 19 added 2026-07-17: directed work graph across epics/stories/quick-dev/deferred/reviews/code.
      Spike-led. Exploratory — not release-blocking. Run create-story when scheduled. -->
@@ -3403,6 +3452,22 @@ So that exactly one implementation of a hierarchy chart exists in the codebase.
 
 ### Story 20.8: Dashboard Details Pane — `select` Mode in Practice
 
+> **AC #1 was DELIVERED EARLY, in Story 20.5, owner-directed 2026-07-25.** During 20.5's verify round the
+> owner selected a story leaf on the live dashboard and got nothing actionable — no card, no command, no
+> link — which broke the whole point of `select` mode ("find work I wanted to do and click their quick
+> action buttons to copy text to my clipboard so I could start new Claude Code sessions"). The unlock was
+> small rather than new: `BmadCommands.PrimaryStoryCommand`, the copy-to-clipboard badge and the card
+> renderer all already existed, and Story 20.3 skipped stories only because *"a story wedge NAVIGATES on
+> click … so a standalone story card would never be reachable via selection"* — the exact premise 20.5's
+> `select` mode invalidated. So the rail now carries a card per SELECTABLE node (story leaves included),
+> each with its single most-relevant BMad command and a view-more link, and the story→epic subject fold is
+> gone so a story's relationships appear once.
+>
+> **What 20.8 still owns:** the RICHER pane — task-level detail, deferred children, relationship depth, the
+> full per-story command set rather than one primary — plus the **payload ceiling decision this forced**:
+> the rail is now **283,263 B of a 742,107 B dashboard (38.2%)**, up from 21.5%, because a card per story
+> is a card per story. The lever remains `RelatedWork.MaxEntriesPerGroup` and it is the owner's to pull.
+
 As a visitor exploring the project from the home page,
 I want clicking a node in the explorer to populate a details pane beside it rather than navigating away,
 So that I can survey the project's structure and read about each part without losing my place.
@@ -3426,6 +3491,43 @@ So that I can survey the project's structure and read about each part without lo
 **When** the pane would be empty
 **Then** it shows a designed empty state per UX-DR22 rather than an incidental blank region
 **And** the pane reuses Story 20.3's related-work groupings rather than introducing a second relationship vocabulary.
+
+<!-- 2026-07-25 (create-story 20.8): three owner decisions elicited and locked. They constrain HOW the ACs above
+     are met; they do not amend them. Elicited against the REAL working tree (Story 20.5's round-2 verify work
+     uncommitted), not against this epic text — `RelatedWorkCards.cs` changed between two reads during that
+     session. Recorded here as well as in the story file because two are visible product choices.
+     (D1) PAYLOAD CEILING = RESTORE THE FOLD, story cards go MINIMAL. This is the ceiling decision the amendment
+     above assigns to this story, and it REVERSES round 2's removal of the story→epic subject fold — an
+     owner-directed decision taken hours earlier, before the measurement existed. A story's relationship groups
+     return to living ONCE under its epic's card (Story 20.3's shipped design); the story's own card keeps title,
+     summary, command affordance and "View details →" and carries NO relationship block. Measured starting point:
+     283,263 B of a 742,107 B dashboard (38.2%), 104 cards, 78 of them stories, up from 101,435 B / 21.5%.
+     `RelatedWork.MaxEntriesPerGroup` STAYS AT 12 — removing the duplication is the honest fix; truncating further
+     trades away JS-off completeness for every node including epics. Accepted cost: a story's relationships are
+     one click away (its epic's card, its own page, or work-graph.html) rather than on its card.
+     (D2) RICHER CARD = more COMMAND and more CHILDREN, not more relationships. `BmadCommands.PrimaryStoryCommand`
+     stays the always-visible primary badge; the full `BmadCommands.StoryCommands` set sits behind a COLLAPSED
+     NATIVE <details> (JS-off openable) with the primary NEVER repeated inside it; the story's open deferred /
+     action children are listed by name via `FollowUpGeometry.DeferredForSource`. This is the amendment's
+     "task-level detail, deferred children, the full per-story command set rather than one primary" MINUS
+     "relationship depth", which D1 deliberately removes. D1 and D2 pull in OPPOSITE directions by design — D1
+     removes the heavy thing (348 relationship links on this portal), D2 adds light things (2-4 command entries
+     and a short deferred list per story) — and the net must be MEASURED and reported honestly even if it is up.
+     (D3) AGGREGATES = the follow-up ones get cards, `~summary` does not. `epic-N~open`, `epic-N~done`,
+     `orphan~open`, `orphan~done`, `unplanned~open`, `unplanned~done` AND THE `unplanned` ROOT get cards (they
+     link to real follow-up group pages and represent work with no other card); `epic-N~summary` resolves to its
+     parent epic's card instead, because it is the epic restated and its href IS the epic page.
+     GAP CLOSED THAT NEITHER 20.3 NOR 20.5 NOTICED, live on shipped reviewed code: `RelatedWork.IslandIdFor`
+     maps only `WorkNodeKind.Epic` → `epic-{N}`/`orphan` and `WorkNodeKind.Story` → the bare story id, and
+     `SynthesizeNode` returns null for anything else — so the `unplanned` ROOT has NO CARD AT ALL and drilling
+     into Unplanned today shows the rail's designed empty state. The full selectable-id map is tabled in the story
+     file, and the story carries a COMPLETENESS INVARIANT test (every selectable payload id resolves to a card or
+     a named, tested redirect) — the rail's analogue of `Projector_NodeSet_EqualsTheWedgesTheSvgDrew` — so the gap
+     cannot recur silently on the next payload change.
+     ALSO PINNED: AC #2 is stated precisely rather than loosely — the chart's `HierarchyExplorer.TextTwinHtml` and
+     the RAIL's own JS-off stacked view carry DIFFERENT facts (the twin: label, prose status, Detail, resolving
+     href; the rail: summary, command badge, view-more link), and the Dev Agent Record must say which surface
+     carries which rather than claiming the twin carries the details. -->
 
 <!-- Epic 21 added 2026-07-19 (SCP 2026-07-19, correct-course): value & correlation insights — cross-cutting displays
      that make product value legible and surface correlations across work items AND code. Distinct from Epic 7's

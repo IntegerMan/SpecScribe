@@ -229,7 +229,10 @@ public class FileWatcherServiceCrashGuardTests : IDisposable
     public void ThrowingEventCallback_DoesNotEscapeTheConfigDirHandler()
     {
         // OnConfigDirCreated reports its TOCTOU miss through the same callback, and the registration path runs on the
-        // repo-root watcher's dispatch thread. Drive it with _bmad present-then-vanished so the report path is taken.
+        // repo-root watcher's dispatch thread. A real present-then-vanished race can't be landed on reliably from a
+        // single-threaded test, so drive the TOCTOU catch branch deterministically via the watcher-factory seam
+        // instead — the review-fix's whole point being that this test previously never reached that branch at all
+        // (the directory was left in place, so the success path ran and _onEvent was never invoked). [Story 5.3 review-fix]
         var gen = GeneratedSite();
         using var watcher = new FileWatcherService(
             Options(), gen, _ => throw new IOException("reporter down"));
@@ -237,9 +240,28 @@ public class FileWatcherServiceCrashGuardTests : IDisposable
         var configDir = Path.Combine(_root, ForgeOptions.ConfigDirName);
         Directory.CreateDirectory(configDir);
 
-        var ex = Record.Exception(() => watcher.OnConfigDirCreated(configDir));
+        var ex = Record.Exception(() => watcher.OnConfigDirCreated(
+            configDir, () => throw new ArgumentException("_bmad vanished between the check and construction")));
 
         Assert.Null(ex);
+    }
+
+    [Fact]
+    public void ConfigDirHandler_RegistersOnTheSuccessPath_WhenTheDirectoryIsStillThere()
+    {
+        // Counter-test to the TOCTOU case above: with the directory genuinely still present and a real watcher
+        // factory, registration must actually succeed — the guard must not be satisfiable by swallowing everything.
+        // [Story 5.3 review-fix]
+        var gen = GeneratedSite();
+        using var watcher = new FileWatcherService(Options(), gen, _ => { });
+
+        var configDir = Path.Combine(_root, ForgeOptions.ConfigDirName);
+        Directory.CreateDirectory(configDir);
+
+        var countBefore = watcher.WatcherCount;
+        watcher.OnConfigDirCreated(configDir);
+
+        Assert.Equal(countBefore, watcher.WatcherCount); // the fallback repo-root detector is retired as the real one registers
     }
 
     [Fact]

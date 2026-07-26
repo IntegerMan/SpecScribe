@@ -32,12 +32,19 @@ public enum HierarchyMode
 /// smallest that fits any sector — and hides the rest, so a single long title suppresses labels chart-wide.
 /// Measured on the real dashboard: drilled into an epic, full titles left <b>2 of 7</b> sectors labelled. Owner
 /// decision D3 asks for a labelled explorer, and a chart that hides five labels in seven is not one.</param>
+/// <param name="Detail">The human-meaningful size sentence — "3 of 8 tasks done", "12 stories", "No task plan
+/// yet". <paramref name="Value"/> is a LAYOUT number: it is what Plotly needs to size a sector, and the owner's
+/// 2026-07-25 verify round named it exactly right — "weight is a confusing value on the tooltip that is not
+/// helpful or intuitive for the reader". So `Value` stays in the payload because the chart cannot draw without
+/// it, and `Detail` is what a person is ever shown, in the tooltip and in the accessible name. Empty when the
+/// node's own label already carries its count ("Epic 7: 3 open follow-ups").</param>
 public sealed record HierarchyNode(
     string Id,
     string? ParentId,
     string Label,
     string ShortLabel,
     int Value,
+    string Detail,
     string StatusClass,
     string StatusLabel,
     string? Href,
@@ -128,7 +135,46 @@ public static class HierarchyExplorer
         UnplannedWorkGeometry? unplanned = null)
     {
         var source = Charts.SunburstExplorerNodes(model, followUps, unplanned);
-        return new HierarchyExplorerModel(config, Reparent(source, siteTitle, SiteNav.HomeOutputPath));
+        var nodes = Reparent(source, siteTitle, SiteNav.HomeOutputPath);
+        return new HierarchyExplorerModel(config, WithDetails(nodes, model));
+    }
+
+    /// <summary>Fills each node's <see cref="HierarchyNode.Detail"/> — the sentence a reader actually sees in place
+    /// of the layout number. A lookup against the SAME <see cref="EpicsModel"/> the projection came from, never a
+    /// second walk of it, and phrased the way the shipped SVG's own <c>&lt;title&gt;</c> phrases it so the two
+    /// charts cannot describe one story differently.</summary>
+    private static IReadOnlyList<HierarchyNode> WithDetails(IReadOnlyList<HierarchyNode> nodes, EpicsModel model)
+    {
+        if (nodes.Count == 0) return nodes;
+
+        var storiesById = new Dictionary<string, StoryInfo>(StringComparer.Ordinal);
+        var epicsByIsland = new Dictionary<string, EpicInfo>(StringComparer.Ordinal);
+        foreach (var epic in model.Epics)
+        {
+            epicsByIsland.TryAdd($"epic-{epic.Number}", epic);
+            foreach (var story in epic.Stories) storiesById.TryAdd(story.Id, story);
+        }
+
+        var epicCount = model.Epics.Count;
+        var result = new List<HierarchyNode>(nodes.Count);
+        foreach (var n in nodes)
+        {
+            var detail = n.Kind switch
+            {
+                ProjectRootKind => $"{epicCount} {Charts.Plural(epicCount, "epic", "epics")}",
+                "epic" when epicsByIsland.TryGetValue(n.Id, out var e) =>
+                    $"{e.Stories.Count} {Charts.Plural(e.Stories.Count, "story", "stories")}",
+                "story" when storiesById.TryGetValue(n.Id, out var s) =>
+                    // Matches Charts.Sunburst's own wedge <title>: an un-drafted story says so in words rather than
+                    // reporting "0 of 0 tasks done", which reads as failure instead of as not-yet-planned.
+                    s.TasksTotal == 0 ? "No task plan yet" : $"{s.TasksDone} of {s.TasksTotal} tasks done",
+                // story-summary, aggregate, follow-up and unplanned nodes already state their count in their own
+                // label ("Epic 7: 3 open follow-ups"), so a Detail here would only repeat it.
+                _ => string.Empty,
+            };
+            result.Add(detail.Length == 0 ? n : n with { Detail = detail });
+        }
+        return result;
     }
 
     /// <summary>Maps the Story 20.2 explorer nodes onto the Plotly hierarchy contract: one synthesized root
@@ -150,13 +196,13 @@ public static class HierarchyExplorer
         // the colour cascade resolves it to plain ink like every other unclassified mark.
         var nodes = new List<HierarchyNode>(source.Count + 1)
         {
-            new(ProjectRootId, null, rootLabel, rootLabel, 0, "unrecognized",
+            new(ProjectRootId, null, rootLabel, rootLabel, 0, string.Empty, "unrecognized",
                 ProjectRootStatusLabel, rootHref, ProjectRootKind),
         };
         foreach (var n in source)
         {
             nodes.Add(new HierarchyNode(
-                n.Id, n.ParentId ?? ProjectRootId, n.Label, ShortLabelFor(n), n.Weight,
+                n.Id, n.ParentId ?? ProjectRootId, n.Label, ShortLabelFor(n), n.Weight, string.Empty,
                 n.StatusClass, StatusLabelFor(n.StatusClass, n.Kind), n.Href, n.Kind));
         }
 
@@ -343,6 +389,7 @@ public static class HierarchyExplorer
                 label = n.Label,
                 shortLabel = n.ShortLabel,
                 value = n.Value,
+                detail = n.Detail,
                 statusClass = n.StatusClass,
                 statusLabel = n.StatusLabel,
                 href = n.Href,
@@ -400,7 +447,10 @@ public static class HierarchyExplorer
                 ? $"<a href=\"{PathUtil.Html(href)}\">{PathUtil.Html(n.Label)}</a>"
                 : PathUtil.Html(n.Label));
             // Status as a WORD and weight as a number — the whole non-color reading of the chart (UX-DR17).
-            sb.Append($" <span class=\"ss-hierarchy-twin-meta\">{PathUtil.Html(n.StatusLabel)} &middot; weight {n.Value}</span>");
+            var meta = n.Detail.Length > 0
+                ? $"{PathUtil.Html(n.StatusLabel)} &middot; {PathUtil.Html(n.Detail)}"
+                : PathUtil.Html(n.StatusLabel);
+            sb.Append($" <span class=\"ss-hierarchy-twin-meta\">{meta}</span>");
             // Cycle guard: ids come from author-controlled markdown, and a self-parenting node must not hang
             // generation. `visiting` is added LAST so a failed descent never removes an id an ancestor owns.
             // Depth cap for the same reason.

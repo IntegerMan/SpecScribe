@@ -52,7 +52,8 @@ public static class RelatedWorkCards
         FollowUpGeometry geometry,
         ProjectCounts counts,
         string projectTitle,
-        string? workGraphHref)
+        string? workGraphHref,
+        IReadOnlyList<string>? selectableIslandIds = null)
     {
         var project = new RelatedProjectCard(
             projectTitle,
@@ -67,74 +68,109 @@ public static class RelatedWorkCards
         var storiesById = epics.Epics.SelectMany(e => e.Stories).GroupBy(s => s.Id)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
 
-        // A card exists only for what the explorer can actually SELECT — the zoom scopes (epics + the orphan/unplanned
-        // roots). A story wedge is a leaf that NAVIGATES to its own page on click (Story 20.2's model), so a standalone
-        // story card would never be reachable via selection. Each story's relationships are instead folded into its
-        // epic's card as a labelled subject, so the epic you drill into carries the full "what stemmed from what" —
-        // and the JS-off stacked view stays complete (AC #2) without duplicating a story under both its epic and
-        // itself. [Story 20.3 — owner redesign 2026-07-24]
-        var storySubjectsByEpic = new Dictionary<string, List<RelatedWorkSubject>>(StringComparer.Ordinal);
-        // Dictionary enumeration order is an implementation detail (same rule RelatedWork.Build follows for
-        // nodeOrder/FR31), so first-seen epic order is carried explicitly rather than trusted to the dictionary.
-        var storySubjectEpicOrder = new List<string>();
-        foreach (var node in relationships.Nodes)
-        {
-            if (!storiesById.ContainsKey(node.IslandId)) continue; // not a bare story id → handled as a scope below
-            var dot = node.IslandId.IndexOf('.');
-            if (dot <= 0) continue;
-            var epicIslandId = $"epic-{node.IslandId[..dot]}";
-            // Drop the story's own outgoing "Part of → Epic N": it restates the card it now lives inside.
-            var groups = node.Groups.Where(g => !RelatedWork.IsRestatedContainsGroup(g)).ToList();
-            if (groups.Count == 0) continue;
-            if (!storySubjectsByEpic.TryGetValue(epicIslandId, out var list))
-            {
-                list = storySubjectsByEpic[epicIslandId] = new List<RelatedWorkSubject>();
-                storySubjectEpicOrder.Add(epicIslandId);
-            }
-            list.Add(new RelatedWorkSubject(node.Label, node.Kind, node.Href, groups));
-        }
-
+        // A card exists for everything the explorer can SELECT — and after Story 20.5 that includes story leaves.
+        //
+        // Story 20.3 deliberately gave stories no card of their own, and stated the precondition for that in the
+        // same breath: "a story wedge is a leaf that NAVIGATES to its own page on click (Story 20.2's model), so a
+        // standalone story card would never be reachable via selection." Story 20.5's `select` mode is exactly what
+        // makes it reachable — activating a story leaf now raises `specscribe:explorer-select` carrying its id and
+        // navigates nowhere. The owner's 2026-07-25 verify round confirmed the consequence from the other side:
+        // selecting a story showed nothing of value, which broke the whole point of select mode (find the work you
+        // want, copy its command, go).
+        //
+        // So the fold is gone rather than kept alongside a story card: a story's relationships now live on the
+        // story's own card, once. Keeping both would put every story under its epic AND under itself, which is
+        // precisely the duplication 20.3's fold existed to avoid — the JS-off stacked view shows every card.
+        // [Story 20.5, owner-directed 2026-07-25; supersedes the Story 20.3 owner redesign 2026-07-24]
         var cards = new List<RelatedCard>();
+        var byIslandId = relationships.Nodes.ToDictionary(n => n.IslandId, StringComparer.Ordinal);
         var placed = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var node in relationships.Nodes)
+
+        // Draw order first, so the rail's card order matches the chart's — and so a selectable node with NO
+        // work-graph relationships still gets a card. That last part is the actual fix: story 23.2 had no edges, so
+        // under the old projection it had no node, no card, and the rail's designed empty state. A story with no
+        // relationships still has a name, a status, a page and a next command; "no related items" is a fact about
+        // its edges, never a reason to show the reader nothing.
+        foreach (var islandId in selectableIslandIds ?? Array.Empty<string>())
         {
-            if (storiesById.ContainsKey(node.IslandId)) continue; // stories fold into their epic, no card of their own
-            var extra = storySubjectsByEpic.TryGetValue(node.IslandId, out var s) ? s : null;
-            var enriched = extra is null ? node : node with { Subjects = node.Subjects.Concat(extra).ToList() };
-            var (title, kindWord, summary, command) = Resolve(enriched, epicsByNumber, commands, geometry);
-            cards.Add(new RelatedCard(node.IslandId, title, kindWord, summary, command, node.Href, enriched));
-            placed.Add(node.IslandId);
+            if (!placed.Add(islandId)) continue;
+            var node = byIslandId.TryGetValue(islandId, out var known)
+                ? known
+                : SynthesizeNode(islandId, epicsByNumber, storiesById);
+            if (node is null) continue;
+            var (title, kindWord, summary, command) = Resolve(node, epicsByNumber, storiesById, commands, geometry);
+            cards.Add(new RelatedCard(islandId, title, kindWord, summary, command, node.Href, node));
         }
 
-        // An epic that has story relationships but no scope node of its own (its own Contains group was empty) still
-        // needs a card to host those stories, or the JS-off view would drop them (AC #2). Rare, but real.
-        foreach (var epicIslandId in storySubjectEpicOrder)
+        // Anything the graph knows about that the chart did not draw in this pass — kept so the JS-off stacked view
+        // never silently loses a relationship set that used to be reachable.
+        foreach (var node in relationships.Nodes)
         {
-            if (placed.Contains(epicIslandId)) continue;
-            var subjects = storySubjectsByEpic[epicIslandId];
-            if (!int.TryParse(epicIslandId.AsSpan("epic-".Length), out var n) || !epicsByNumber.TryGetValue(n, out var epic))
-                continue;
-            var host = new RelatedWorkNode(
-                epicIslandId, $"Epic {epic.Number}", WorkNodeKind.Epic,
-                $"epics/epic-{epic.Number}.html", RelatedWork.AnchorForIslandId(epicIslandId),
-                Array.Empty<RelatedWorkGroup>(), subjects);
-            var (title, kindWord, summary, command) = Resolve(host, epicsByNumber, commands, geometry);
-            cards.Add(new RelatedCard(epicIslandId, title, kindWord, summary, command, host.Href, host));
+            if (!placed.Add(node.IslandId)) continue;
+            var (title, kindWord, summary, command) = Resolve(node, epicsByNumber, storiesById, commands, geometry);
+            cards.Add(new RelatedCard(node.IslandId, title, kindWord, summary, command, node.Href, node));
         }
 
         return new RelatedWorkPaneModel(project, cards, workGraphHref, relationships.Overflow);
     }
 
-    /// <summary>Resolves an epic-scope card's title/kind/summary/command. The card set is keyed to what the
-    /// explorer can actually SELECT (epics + the orphan/unplanned roots) — a bare story id never reaches here,
-    /// since both call sites skip/never construct one (stories fold into their epic's card instead). [Story 20.3
-    /// owner redesign]</summary>
+    /// <summary>A card for a selectable node the work graph has no entry for — a story or epic the chart drew but
+    /// that has no edges. It carries no relationships (there are none), which is the honest state; everything else
+    /// a reader needs is on the domain object. Returns null for an id that maps to no domain object at all.
+    /// [Story 20.5]</summary>
+    private static RelatedWorkNode? SynthesizeNode(
+        string islandId,
+        IReadOnlyDictionary<int, EpicInfo> epicsByNumber,
+        IReadOnlyDictionary<string, StoryInfo> storiesById)
+    {
+        if (storiesById.TryGetValue(islandId, out var story))
+        {
+            var href = story.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(story.Id);
+            return new RelatedWorkNode(
+                islandId, $"Story {story.Id}", WorkNodeKind.Story, href,
+                RelatedWork.AnchorForIslandId(islandId),
+                Array.Empty<RelatedWorkGroup>(), Array.Empty<RelatedWorkSubject>());
+        }
+        if (islandId.StartsWith("epic-", StringComparison.Ordinal)
+            && int.TryParse(islandId.AsSpan("epic-".Length), out var n)
+            && epicsByNumber.TryGetValue(n, out var epic))
+        {
+            return new RelatedWorkNode(
+                islandId, $"Epic {epic.Number}", WorkNodeKind.Epic, $"epics/epic-{epic.Number}.html",
+                RelatedWork.AnchorForIslandId(islandId),
+                Array.Empty<RelatedWorkGroup>(), Array.Empty<RelatedWorkSubject>());
+        }
+        // An aggregate/summary wedge (`epic-7~open`, `epic-7~summary`) is a roll-up of work the rail already shows
+        // under its parent — no card of its own, so selecting one falls through to the designed empty state.
+        return null;
+    }
+
+    /// <summary>Resolves a card's title/kind/summary/command for the three selectable shapes: an epic scope, a
+    /// STORY leaf (Story 20.5's select mode made these reachable), or a relationship-only scope such as the
+    /// Unattributed root.</summary>
     private static (string Title, string KindWord, string Summary, string? Command) Resolve(
         RelatedWorkNode node,
         IReadOnlyDictionary<int, EpicInfo> epicsByNumber,
+        IReadOnlyDictionary<string, StoryInfo> storiesById,
         CommandCatalog commands,
         FollowUpGeometry geometry)
     {
+        // Story leaf: full title, its real status and task progress, and the ONE command that actually moves it
+        // forward — the same BmadCommands.PrimaryStoryCommand the story page and the VS Code outline already use,
+        // so the rail can never suggest a different next step than the rest of the portal. That command badge is
+        // the copy-to-clipboard button this whole surface exists for.
+        if (storiesById.TryGetValue(node.IslandId, out var story))
+        {
+            var title = $"Story {story.Id}: {PathUtil.StripHtmlTags(story.Title)}";
+            var stage = StatusStyles.ForStory(story);
+            var progress = story.TasksTotal == 0
+                ? "no task plan yet"
+                : $"{story.TasksDone} of {story.TasksTotal} tasks done";
+            var openDeferred = geometry.DeferredForSource(story.Id)?.Where(IsOpen).ToList();
+            var summary = $"{StatusStyles.StoryLabel(stage)} · {progress}";
+            return (title, "Story", summary, BmadCommands.PrimaryStoryCommand(story, commands, openDeferred));
+        }
+
         // Epic scope: full title, story count + open follow-up count, the epic's primary next-step command.
         if (node.IslandId.StartsWith("epic-", StringComparison.Ordinal)
             && int.TryParse(node.IslandId.AsSpan("epic-".Length), out var epicNumber)

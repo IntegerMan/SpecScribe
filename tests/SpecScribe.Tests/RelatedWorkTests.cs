@@ -227,10 +227,13 @@ public class RelatedWorkTests
         // One card per SELECTABLE scope (epics + roots), full title — not the terse work-graph label.
         Assert.Contains("data-related-node=\"epic-1\"", html);
         Assert.Contains("Epic 1: Foundation", html);
-        // A story wedge navigates on click (Story 20.2), so there is no standalone story card — Story 1.1 folds into
-        // its epic's card as a subject instead.
-        Assert.DoesNotContain("data-related-node=\"1.1\"", html);
-        Assert.Contains("epics/story-1-1.html", html); // present as a folded subject inside epic-1's card
+        // A STORY LEAF now has a card of its own. Story 20.3 folded stories into their epic because a story wedge
+        // navigated on click and "a standalone story card would never be reachable via selection" — Story 20.5's
+        // `select` mode is exactly what made it reachable, and the owner's 2026-07-25 verify round found the
+        // consequence: selecting a story showed nothing to act on. The fold is gone rather than kept alongside the
+        // card, so a story's relationships appear once, on the story. [Story 20.5, owner-directed]
+        Assert.Contains("data-related-node=\"1.1\"", html);
+        Assert.Contains("epics/story-1-1.html", html);
         // The details link is a distinct button to the node's own page.
         Assert.Contains("related-card-more", html);
         Assert.Contains("epics/epic-1.html", html);
@@ -408,8 +411,12 @@ public class RelatedWorkTests
     {
         var epics = TwoEpicModel();
         var rel = Project(geometry);
+        // The selectable id set the chart actually drew, in draw order — the same thing DashboardViewBuilder hands
+        // in. Passing it is what gives a story leaf a card of its own (Story 20.5's select mode).
+        var islandIds = Charts.SunburstExplorerNodes(epics, geometry).Select(n => n.Id).ToList();
         var pane = RelatedWorkCards.Build(
-            rel, epics, commands ?? CommandCatalog.Empty, geometry, ProjectCounts.Empty, "SpecScribe", workGraphHref);
+            rel, epics, commands ?? CommandCatalog.Empty, geometry, ProjectCounts.Empty, "SpecScribe", workGraphHref,
+            selectableIslandIds: islandIds);
         return RelatedWorkTemplater.RenderPane(pane);
     }
 

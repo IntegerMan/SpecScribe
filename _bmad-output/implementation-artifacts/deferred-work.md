@@ -2,6 +2,15 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of 5-3-watch-regeneration-safety-and-scope-aware-rebuilds (2026-07-25)
+
+- source_spec: `5-3-watch-regeneration-safety-and-scope-aware-rebuilds.md`
+  summary: `EpicsFamilyPages`/`EpicsFamilyDirectories` is a hand-maintained list of every page/directory gated on `_epicsModel`; a future epics-derived page added without also updating this list can silently reopen the AC #3 dangling-link bug this story fixes (a page left on disk after `epics.md` is deleted).
+  evidence: Blind Hunter. Currently verified correct against every existing `_epicsModel`-gated writer; mirrors `GenerateAdrsInternal`'s same hand-maintained convention elsewhere in the file. Revisit when the next epics-gated page is added. [`SiteGenerator.cs:717-729`]
+- source_spec: `5-3-watch-regeneration-safety-and-scope-aware-rebuilds.md`
+  summary: `CopyEmbeddedAsset`'s retry-with-sleep (added this story) runs while holding `SiteGenerator._gate` — reached via `EnsureScaffold`, which every locked regeneration route calls — so a contended asset write briefly blocks every other pending watch route.
+  evidence: Blind Hunter. Pre-existing lock scope (the call site was already inside `_gate` before this story); bounded to ~75ms worst case by the existing deliberately-small retry budget (3 attempts × 25ms). [`SiteGenerator.cs:4290-4318`]
+
 ## Deferred from: code review of 21-1-traceability-coverage-matrix (2026-07-22)
 
 - source_spec: `21-1-traceability-coverage-matrix.md`

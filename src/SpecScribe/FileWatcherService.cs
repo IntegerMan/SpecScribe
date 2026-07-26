@@ -126,7 +126,14 @@ public sealed class FileWatcherService : IDisposable
     /// done and nothing should keep polling directory-name events for the rest of the session. Internal so the test
     /// suite can drive it deterministically instead of racing a real FileSystemWatcher event.
     /// [Story 6.11 deferred-work cleanup]</summary>
-    internal void OnConfigDirCreated(string fullPath)
+    internal void OnConfigDirCreated(string fullPath) =>
+        OnConfigDirCreated(fullPath, () => CreateWatcher(fullPath, ForgeOptions.ConfigFileName));
+
+    /// <summary>Test seam overload: <paramref name="watcherFactory"/> defaults to the real
+    /// <see cref="CreateWatcher"/> call above but lets tests inject a throwing factory to deterministically exercise
+    /// the TOCTOU catch branch below, which a real filesystem race cannot be landed on reliably in a single-threaded
+    /// test. [Story 5.3 review-fix]</summary>
+    internal void OnConfigDirCreated(string fullPath, Func<FileSystemWatcher> watcherFactory)
     {
         if (!string.Equals(Path.GetFileName(fullPath), ForgeOptions.ConfigDirName, StringComparison.OrdinalIgnoreCase))
         {
@@ -148,7 +155,7 @@ public sealed class FileWatcherService : IDisposable
             FileSystemWatcher watcher;
             try
             {
-                watcher = CreateWatcher(fullPath, ForgeOptions.ConfigFileName);
+                watcher = watcherFactory();
             }
             catch (Exception ex) when (ex is ArgumentException or FileNotFoundException or IOException)
             {
@@ -198,9 +205,14 @@ public sealed class FileWatcherService : IDisposable
             DebounceTopology(e.FullPath);
         }, DirectoryWatcherLabel);
         // Tagged distinctly from CreateWatcher's generic "<watcher>" label so a directory-watcher failure (buffer
-        // overflow on a large rename-refactor is the realistic case) is distinguishable in the event stream.
-        watcher.Error += (_, e) =>
+        // overflow on a large rename-refactor is the realistic case) is distinguishable in the event stream. Also
+        // forces a fallback rebuild (review-fix, Story 5.3): an overflow means the OS dropped events outright, so
+        // logging alone could leave output silently stale — exactly the AC #5 failure this watcher exists to close.
+        watcher.Error += (_, e) => SafeHandle(() =>
+        {
             SafeNotify(new GenerationEvent(GenerationOutcome.Error, DirectoryWatcherLabel, TimeSpan.Zero, e.GetException().Message));
+            ForceTopologyRebuild();
+        }, DirectoryWatcherLabel);
         return watcher;
     }
 
@@ -283,6 +295,15 @@ public sealed class FileWatcherService : IDisposable
             return;
         }
 
+        ForceTopologyRebuild();
+    }
+
+    /// <summary>Arms (or re-arms) the topology debounce timer unconditionally. Factored out of
+    /// <see cref="DebounceTopology"/> so the directory watcher's <c>Error</c> handler (a buffer overflow — no single
+    /// path is known, since the OS-level event queue is what overflowed) can still force a fallback rebuild rather
+    /// than silently trusting an event stream that just proved incomplete. [Story 5.3 review-fix]</summary>
+    private void ForceTopologyRebuild()
+    {
         _pending.AddOrUpdate(
             TopologySentinelKey,
             addValueFactory: _ => CreateTopologyTimer(),
@@ -359,18 +380,30 @@ public sealed class FileWatcherService : IDisposable
     /// same reason. [Story 5.3 follow-up]</para></summary>
     internal void RunDebouncedPass(string fullPath)
     {
-        var relative = Path.GetRelativePath(_options.RepoRoot, fullPath).Replace('\\', '/');
-        var ev = RunGuarded(() => _generator.IsDataSource(fullPath)
-            ? _generator.RegenerateFromDataSource(fullPath)
-            : _generator.IsAdr(fullPath)
-                ? _generator.RegenerateAdrs()
-                : _generator.IsEpicsRelated(fullPath)
-                    ? _generator.RegenerateEpics()
-                    : !fullPath.EndsWith(".md", StringComparison.OrdinalIgnoreCase)
-                        ? new GenerationEvent(GenerationOutcome.Skipped, relative, TimeSpan.Zero, "non-markdown, not a recognized data source")
-                        : File.Exists(fullPath)
-                            ? _generator.GenerateOne(fullPath)
-                            : _generator.RemoveFor(fullPath), relative);
+        GenerationEvent ev;
+        try
+        {
+            var relative = Path.GetRelativePath(_options.RepoRoot, fullPath).Replace('\\', '/');
+            ev = RunGuarded(() => _generator.IsDataSource(fullPath)
+                ? _generator.RegenerateFromDataSource(fullPath)
+                : _generator.IsAdr(fullPath)
+                    ? _generator.RegenerateAdrs()
+                    : _generator.IsEpicsRelated(fullPath)
+                        ? _generator.RegenerateEpics()
+                        : !fullPath.EndsWith(".md", StringComparison.OrdinalIgnoreCase)
+                            ? new GenerationEvent(GenerationOutcome.Skipped, relative, TimeSpan.Zero, "non-markdown, not a recognized data source")
+                            : File.Exists(fullPath)
+                                ? _generator.GenerateOne(fullPath)
+                                : _generator.RemoveFor(fullPath), relative);
+        }
+        catch (Exception ex)
+        {
+            // Path.GetRelativePath sat outside RunGuarded's boundary — a throw there (a pathological path under
+            // resource pressure) would otherwise still escape this Timer callback with no caller, exactly the crash
+            // class RunGuarded exists to close. Falls back to the raw full path as the event's label since the
+            // relative one couldn't be computed. [Story 5.3 review-fix]
+            ev = new GenerationEvent(GenerationOutcome.Error, fullPath, TimeSpan.Zero, ex.Message);
+        }
         SafeNotify(ev);
     }
 

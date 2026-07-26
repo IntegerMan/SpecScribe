@@ -272,6 +272,68 @@ public class HierarchyExplorerTests
         Assert.All(built.Nodes, n => Assert.True(n.ShortLabel.Length <= n.Label.Length));
     }
 
+    // ---- What a reader is shown instead of the layout number (owner verify round 2026-07-25) ----------------
+
+    [Fact]
+    public void Detail_ReplacesTheLayoutNumberWithSomethingAReaderCanUse()
+    {
+        // "Weight is a confusing value on the tooltip that is not helpful or intuitive for the reader." `Value`
+        // stays because Plotly cannot size a sector without it; `Detail` is what a person is ever shown, phrased
+        // the way the shipped SVG's own wedge <title> phrases it so the two charts cannot describe one story
+        // differently.
+        var model = Model(
+            Epic(1, "Alpha", Story("1.1", "Planned", "in progress", 3, 8), Story("1.2", "NoPlan", null, 0, 0)),
+            Epic(2, "Beta", Story("2.1", "Three", "done", 4, 4, epicNumber: 2)));
+
+        var nodes = Build(model).Nodes.ToDictionary(n => n.Id, StringComparer.Ordinal);
+
+        Assert.Equal("3 of 8 tasks done", nodes["1.1"].Detail);
+        // An un-drafted story says so in words. "0 of 0 tasks done" would read as failure rather than as not-yet-planned.
+        Assert.Equal("No task plan yet", nodes["1.2"].Detail);
+        Assert.Equal("2 stories", nodes["epic-1"].Detail);
+        Assert.Equal("1 story", nodes["epic-2"].Detail);
+        Assert.Equal("2 epics", nodes[HierarchyExplorer.ProjectRootId].Detail);
+    }
+
+    [Fact]
+    public void Detail_IsEmptyWhereTheLabelAlreadyCarriesTheCount()
+    {
+        // An aggregate's own label already reads "Epic 1: 2 open follow-ups", so a Detail would only repeat it.
+        var model = SampleModel();
+        var items = new[]
+        {
+            new SprintActionItem("Chase a thing", "open", EpicNumber: 1, Owner: null),
+            new SprintActionItem("Another", "open", EpicNumber: 1, Owner: null),
+        };
+        var work = new WorkInventory
+        {
+            QuickDev = Array.Empty<QuickDevEntry>(),
+            Deferred = new DeferredWorkEntry("Deferred work", "deferred-work.html", OpenItemCount: 0),
+        };
+        // The ledger is the single source of the open tally and FollowUpGeometry.From asserts the two agree — the
+        // chart layer must never recount. Declare the 2 open items rather than passing Empty.
+        var counts = ProjectCounts.Empty with { OpenActionItems = 2 };
+        var geometry = FollowUpGeometry.From(items, counts, work, epics: model);
+
+        var built = HierarchyExplorer.ProjectDashboard(model, "SpecScribe", Config(), geometry);
+        var aggregates = built.Nodes.Where(n => n.Kind == "aggregate").ToList();
+
+        Assert.NotEmpty(aggregates);
+        Assert.All(aggregates, n => Assert.Equal(string.Empty, n.Detail));
+    }
+
+    [Fact]
+    public void RenderedSurfaces_NeverShowTheWordWeightToAReader()
+    {
+        // The regression guard for the whole point above: neither the twin nor any rendered attribute may put the
+        // layout number in front of someone. (The framing sentence's ordinary English use of the word is prose in
+        // Charts.WhyText, not a value readout, and is not part of this block.)
+        var built = Build(SampleModel());
+
+        Assert.DoesNotContain("weight ", HierarchyExplorer.TextTwinHtml(built));
+        Assert.All(built.Nodes, n => Assert.DoesNotContain("weight", n.Detail, StringComparison.OrdinalIgnoreCase));
+    }
+
     // ---- Island shape --------------------------------------------------------------------------------------
 
     [Fact]
@@ -387,8 +449,13 @@ public class HierarchyExplorerTests
         Assert.Contains("<ul class=\"ss-hierarchy-twin-list\">\n<li>", twin);
         Assert.True(Regex.Matches(twin, "<ul class=\"ss-hierarchy-twin-list\">").Count > 1,
             "child levels must nest in their own list, not flatten into one");
-        // Weight is stated as a number so the twin conveys what sector SIZE conveys.
-        Assert.Contains("weight ", twin);
+        // What a sector's SIZE conveys is stated in words a reader can use — "3 of 8 tasks done", never the raw
+        // layout number. The owner's verify round: "weight is a confusing value ... not helpful or intuitive".
+        Assert.DoesNotContain("weight ", twin);
+        foreach (var node in built.Nodes.Where(n => n.Detail.Length > 0))
+        {
+            Assert.Contains(PathUtil.Html(node.Detail), twin);
+        }
     }
 
     [Fact]

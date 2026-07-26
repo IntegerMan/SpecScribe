@@ -204,8 +204,12 @@ public static class DashboardViewBuilder
         // linkPrefix "" — the dashboard is at the site root, so WorkGraphEpic.Reprefixed is a no-op there. The rule
         // is applied rather than assumed away, so a nested host page stays correct. [Story 20.1 spike §1a rule 6]
         var relationships = RelatedWork.Build(workGraph, islandIds, linkPrefix: string.Empty);
+        // `islandIds` goes on to the card builder too, in draw order: after Story 20.5 the rail owes a card to
+        // everything the chart can SELECT — including a story leaf with no work-graph edges at all, which used to
+        // fall through to the "no related work items" empty state and left the owner with nothing to act on.
         var pane = RelatedWorkCards.Build(
-            relationships, epicsModel, commands, geometry, counts, projectTitle, SiteNav.WorkGraphOutputPath);
+            relationships, epicsModel, commands, geometry, counts, projectTitle, SiteNav.WorkGraphOutputPath,
+            selectableIslandIds: islandIds);
         return RelatedWorkTemplater.RenderPane(pane);
     }
 

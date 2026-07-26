@@ -1,6 +1,10 @@
+---
+baseline_commit: 611097d63ff1f8fa6b71c8d58158dd6e303e6991
+---
+
 # Story 18.1: BMad Module Landscape and Coverage Spike
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -105,40 +109,40 @@ Confirm whether Story 11.1/12.1/13.1/14.1/15.1 have reached `done` with a landed
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Confirm the contract and existing BMad-module machinery against live code (AC: #1)**
-  - [ ] Read `IArtifactAdapter.cs`, `ArtifactBundle.cs`, `AdapterDiagnostic.cs`, `BmadArtifactAdapter.cs`, `ModuleContext.cs` (all 425 lines — this is the primary object of study), `EpicsModel.cs`, `RequirementsModel.cs`, `RetroModel.cs`, `SprintStatus.cs`, `AboutSddTemplater.cs`, `ArtifactCoverage.cs` in full — do not rely solely on this story's summary tables.
-  - [ ] Confirm `AboutSddTemplater.Frameworks` [AboutSddTemplater.cs:10-18] and `README.md:19-24` still show BMad Method + BMad GDS both `Supported: true`/✅ — these are NOT this spike's targets.
-  - [ ] Confirm (or correct) this story's claim that no cross-framework adapter registry exists (`SiteGenerator.cs:51`) and check whether any of Stories 11.1-15.1 has landed a registry conclusion (read their Completion Notes if `done`).
-  - [ ] Precisely map where `ModuleContext`'s generic module-detection machinery (manifest/`module-help.csv` reading, `CommandCatalog`) ends and the two-case (`BmadMethod`/`GameDevStudio`) hardcoding (`WellKnownDocs`, glossaries) begins — this is the central architectural finding of Task 3/4.
+- [x] **Task 1 — Confirm the contract and existing BMad-module machinery against live code (AC: #1)**
+  - [x] Read `IArtifactAdapter.cs`, `ArtifactBundle.cs`, `AdapterDiagnostic.cs`, `BmadArtifactAdapter.cs`, `ModuleContext.cs` (all 425 lines — this is the primary object of study), `EpicsModel.cs`, `RequirementsModel.cs`, `RetroModel.cs`, `SprintStatus.cs`, `AboutSddTemplater.cs`, `ArtifactCoverage.cs` in full — do not rely solely on this story's summary tables.
+  - [x] Confirm `AboutSddTemplater.Frameworks` [AboutSddTemplater.cs:10-18] and `README.md:19-24` still show BMad Method + BMad GDS both `Supported: true`/✅ — these are NOT this spike's targets.
+  - [x] Confirm (or correct) this story's claim that no cross-framework adapter registry exists (`SiteGenerator.cs:51`) and check whether any of Stories 11.1-15.1 has landed a registry conclusion (read their Completion Notes if `done`).
+  - [x] Precisely map where `ModuleContext`'s generic module-detection machinery (manifest/`module-help.csv` reading, `CommandCatalog`) ends and the two-case (`BmadMethod`/`GameDevStudio`) hardcoding (`WellKnownDocs`, glossaries) begins — this is the central architectural finding of Task 3/4.
 
-- [ ] **Task 2 — Obtain and inspect representative BMad-module documentation/examples (AC: #1, #2)**
-  - [ ] Fetch/inspect `github.com/bmad-code-org/BMAD-METHOD`'s README and module list to confirm the current roster of modules beyond BMM/GDS (this story's hypothesis: BMad Builder, Test Architect, Creative Intelligence Suite — reconfirm names/scope, the ecosystem moves fast).
-  - [ ] For each candidate module, fetch its dedicated docs (e.g. `cis-docs.bmad-method.org`, `bmad-builder-docs.bmad-method.org`, or DeepWiki pages) to find concrete artifact shapes: file naming, default output paths, whether a `module-help.csv`/`module.yaml` pair exists per the generic pattern `ModuleContext` already expects.
-  - [ ] Actively search for (or note the absence of) a real, downstream project that has installed one of these modules and produced real on-disk artifacts — distinguish "the framework's own docs/demo" from "a project that used the module," same caution 15.1 applied to Superpowers.
-  - [ ] Resolve the Difference #3 puzzle: check `_bmad/bmm/` in this repo (or BMad Method's own docs) to determine whether `bmad-brainstorming`/`bmad-forge-idea`/`bmad-prfaq`/`bmad-party-mode`/`bmad-domain-research`/`bmad-market-research` are BMM-native skills or CIS-overlapping functionality, before concluding what CIS uniquely adds.
+- [x] **Task 2 — Obtain and inspect representative BMad-module documentation/examples (AC: #1, #2)**
+  - [x] Fetch/inspect `github.com/bmad-code-org/BMAD-METHOD`'s README and module list to confirm the current roster of modules beyond BMM/GDS (this story's hypothesis: BMad Builder, Test Architect, Creative Intelligence Suite — reconfirm names/scope, the ecosystem moves fast).
+  - [x] For each candidate module, fetch its dedicated docs (e.g. `cis-docs.bmad-method.org`, `bmad-builder-docs.bmad-method.org`, or DeepWiki pages) to find concrete artifact shapes: file naming, default output paths, whether a `module-help.csv`/`module.yaml` pair exists per the generic pattern `ModuleContext` already expects.
+  - [x] Actively search for (or note the absence of) a real, downstream project that has installed one of these modules and produced real on-disk artifacts — distinguish "the framework's own docs/demo" from "a project that used the module," same caution 15.1 applied to Superpowers.
+  - [x] Resolve the Difference #3 puzzle: check `_bmad/bmm/` in this repo (or BMad Method's own docs) to determine whether `bmad-brainstorming`/`bmad-forge-idea`/`bmad-prfaq`/`bmad-party-mode`/`bmad-domain-research`/`bmad-market-research` are BMM-native skills or CIS-overlapping functionality, before concluding what CIS uniquely adds.
 
-- [ ] **Task 3 — Answer the "extend vs. new adapter" question (AC: #1)**
-  - [ ] State explicitly whether covering a new BMad module (e.g. CIS) means (a) extending `BmadArtifactAdapter`/`ModuleContext` with a new `BmadModule` case + doc/glossary arrays (most likely, since `AppliesTo`'s `_bmad/` marker already covers any BMad module), or (b) something registry-shaped is still needed — and why.
-  - [ ] If (a), name the exact extension points: new `BmadModule` enum value, new `ModuleDoc[]` array, new `GlossaryTerm[]` array, new switch arms in `DocsFor`/`GlossaryFor` [ModuleContext.cs:118-123,151-156], and (if the module can coexist with BMM/GDS in one repo) a new `IsXPresent` helper mirroring `IsMethodPresent`/`IsGdsPresent` [ModuleContext.cs:162-170].
-  - [ ] Assess whether `ChoosePrimary`'s tie-breaking heuristic [ModuleContext.cs:259-286] needs a third branch for the prioritized module, or whether it's fine for a niche module to lose ties to BMM/GDS by default.
+- [x] **Task 3 — Answer the "extend vs. new adapter" question (AC: #1)**
+  - [x] State explicitly whether covering a new BMad module (e.g. CIS) means (a) extending `BmadArtifactAdapter`/`ModuleContext` with a new `BmadModule` case + doc/glossary arrays (most likely, since `AppliesTo`'s `_bmad/` marker already covers any BMad module), or (b) something registry-shaped is still needed — and why.
+  - [x] If (a), name the exact extension points: new `BmadModule` enum value, new `ModuleDoc[]` array, new `GlossaryTerm[]` array, new switch arms in `DocsFor`/`GlossaryFor` [ModuleContext.cs:118-123,151-156], and (if the module can coexist with BMM/GDS in one repo) a new `IsXPresent` helper mirroring `IsMethodPresent`/`IsGdsPresent` [ModuleContext.cs:162-170].
+  - [x] Assess whether `ChoosePrimary`'s tie-breaking heuristic [ModuleContext.cs:259-286] needs a third branch for the prioritized module, or whether it's fine for a niche module to lose ties to BMM/GDS by default.
 
-- [ ] **Task 4 — Classify every discovered artifact type per candidate module (AC: #1)**
-  - [ ] For each of BMad Builder, Test Architect, and Creative Intelligence Suite (plus any additional module found in Task 2), classify its distinctive artifacts as **mappable** (name the exact target: `ArtifactBundle` field + model type, or the `ModuleContext` doc/glossary extension point), **partially-mappable** (name what maps and what doesn't), or **unsupported** (name why) — noting explicitly that BMad Method and GDS are already covered, not re-classified.
-  - [ ] Resolve whether any candidate module's output is close enough to `EpicsModel`/`RequirementsModel`/`SprintStatus`/`RetroModel` shape to reuse those models directly, or whether it's better modeled as pure `ModuleContext` doc/glossary/command additions with `Epics`/`Sprint`/`Requirements`/`Retros` staying null/empty (per NFR8, honest absence) — this is the central modeling question, mirroring 15.1's "does this map to StoryInfo, EpicInfo, or neither" puzzle but for BMad-native modules.
-  - [ ] Recommend the single priority module to cover first (AC #1's "recommends a priority module (or modules)") with rationale (e.g. likelihood of real adoption, richness of distinctive on-disk artifacts, size of Story 18.2's resulting scope).
+- [x] **Task 4 — Classify every discovered artifact type per candidate module (AC: #1)**
+  - [x] For each of BMad Builder, Test Architect, and Creative Intelligence Suite (plus any additional module found in Task 2), classify its distinctive artifacts as **mappable** (name the exact target: `ArtifactBundle` field + model type, or the `ModuleContext` doc/glossary extension point), **partially-mappable** (name what maps and what doesn't), or **unsupported** (name why) — noting explicitly that BMad Method and GDS are already covered, not re-classified.
+  - [x] Resolve whether any candidate module's output is close enough to `EpicsModel`/`RequirementsModel`/`SprintStatus`/`RetroModel` shape to reuse those models directly, or whether it's better modeled as pure `ModuleContext` doc/glossary/command additions with `Epics`/`Sprint`/`Requirements`/`Retros` staying null/empty (per NFR8, honest absence) — this is the central modeling question, mirroring 15.1's "does this map to StoryInfo, EpicInfo, or neither" puzzle but for BMad-native modules.
+  - [x] Recommend the single priority module to cover first (AC #1's "recommends a priority module (or modules)") with rationale (e.g. likelihood of real adoption, richness of distinctive on-disk artifacts, size of Story 18.2's resulting scope).
 
-- [ ] **Task 5 — Framework-extra data and deliberately-unsupported conventions (AC: #2)**
-  - [ ] For any candidate-module convention richer than the shared model (e.g. BMad Builder's generated `agent.yaml`/`module.yaml` scaffolding, CIS's `design-methods.csv` reference dataset), record it as either a candidate projection extension or an explicit non-goal with rationale.
-  - [ ] For anything SpecScribe will deliberately not support, name the exact `AdapterDiagnosticCategory` (`Unsupported`/`Malformed`/`Skipped`/`Error`/`Informational`) its non-fatal notice would use and draft the notice's wording, mirroring `BmadArtifactAdapter`'s existing diagnostic messages [BmadArtifactAdapter.cs:170-188,219-224,262-276] for tone/specificity.
-  - [ ] Assess the current BMM-specific next-step-command mapping for generalization to other BMad modules (AC #2's second clause): confirm whether `CommandCatalog`/`BuildContext` [ModuleContext.cs:26-59,291-357] is already module-neutral (it parses `module-help.csv` generically today, keyed by `skill`/`module` columns, not hardcoded to BMM) or whether some caller still assumes BMM/GDS-only vocabulary — check `HowToReadTemplater`/`AboutSddTemplater`'s "Next Steps" panels and the "strongly GDS-oriented … requires generalization" phrasing this AC quotes from the epic's Additional Requirements (search `epics.md`/`architecture.md` for that exact phrase to find its origin before answering).
+- [x] **Task 5 — Framework-extra data and deliberately-unsupported conventions (AC: #2)**
+  - [x] For any candidate-module convention richer than the shared model (e.g. BMad Builder's generated `agent.yaml`/`module.yaml` scaffolding, CIS's `design-methods.csv` reference dataset), record it as either a candidate projection extension or an explicit non-goal with rationale.
+  - [x] For anything SpecScribe will deliberately not support, name the exact `AdapterDiagnosticCategory` (`Unsupported`/`Malformed`/`Skipped`/`Error`/`Informational`) its non-fatal notice would use and draft the notice's wording, mirroring `BmadArtifactAdapter`'s existing diagnostic messages [BmadArtifactAdapter.cs:170-188,219-224,262-276] for tone/specificity.
+  - [x] Assess the current BMM-specific next-step-command mapping for generalization to other BMad modules (AC #2's second clause): confirm whether `CommandCatalog`/`BuildContext` [ModuleContext.cs:26-59,291-357] is already module-neutral (it parses `module-help.csv` generically today, keyed by `skill`/`module` columns, not hardcoded to BMM) or whether some caller still assumes BMM/GDS-only vocabulary — check `HowToReadTemplater`/`AboutSddTemplater`'s "Next Steps" panels and the "strongly GDS-oriented … requires generalization" phrasing this AC quotes from the epic's Additional Requirements (search `epics.md`/`architecture.md` for that exact phrase to find its origin before answering).
 
-- [ ] **Task 6 — Name the adapter-registry gap as a shared finding, coordinated with 11.1-15.1 (AC: #1, #2)**
-  - [ ] Confirm the registry-gap claim against `SiteGenerator.cs:51`. State whether Epic 18 actually needs the registry (per Task 3's conclusion) or can proceed via extension alone — this may make Epic 18 the one framework epic that does NOT depend on the registry landing first, which is itself worth stating plainly.
-  - [ ] If a registry is still needed for any part of Epic 18, defer to 11.1-15.1's conclusion/ADR if one exists by the time this spike is reviewed; do not propose a competing registry ADR.
+- [x] **Task 6 — Name the adapter-registry gap as a shared finding, coordinated with 11.1-15.1 (AC: #1, #2)**
+  - [x] Confirm the registry-gap claim against `SiteGenerator.cs:51`. State whether Epic 18 actually needs the registry (per Task 3's conclusion) or can proceed via extension alone — this may make Epic 18 the one framework epic that does NOT depend on the registry landing first, which is itself worth stating plainly.
+  - [x] If a registry is still needed for any part of Epic 18, defer to 11.1-15.1's conclusion/ADR if one exists by the time this spike is reviewed; do not propose a competing registry ADR.
 
-- [ ] **Task 7 — Record findings; no production code (AC: #1, #2)**
-  - [ ] Write the coverage map (candidate-module table × classification × target projection/extension point + extend-vs-registry decision + non-goals + command-generalization assessment + priority recommendation + 18.2 scope boundary) into this story's **Completion Notes**, mirroring Story 11.1's/12.1's/15.1's convention.
-  - [ ] Do **not** land production `src/**`/`tests/**` changes from this story. No new ADR unless Task 6 concludes a genuine fork exists AND none of the sibling spikes already covers it.
+- [x] **Task 7 — Record findings; no production code (AC: #1, #2)**
+  - [x] Write the coverage map (candidate-module table × classification × target projection/extension point + extend-vs-registry decision + non-goals + command-generalization assessment + priority recommendation + 18.2 scope boundary) into this story's **Completion Notes**, mirroring Story 11.1's/12.1's/15.1's convention.
+  - [x] Do **not** land production `src/**`/`tests/**` changes from this story. No new ADR unless Task 6 concludes a genuine fork exists AND none of the sibling spikes already covers it.
 
 ### Review Findings
 
@@ -177,7 +181,11 @@ _(populated during code-review)_
 
 - Story file: `_bmad-output/implementation-artifacts/18-1-bmad-module-landscape-and-coverage-spike.md`
 - Sprint key: `18-1-bmad-module-landscape-and-coverage-spike`
-- Downstream story key (not created by this spike): `18-2-priority-bmad-module-baseline-coverage` (already seeded in epics.md with draft ACs, not yet detailed via create-story)
+- Downstream story keys — **updated 2026-07-25 after this spike's findings drove an owner-approved scope split.**
+  At drafting there was one seeded downstream story, `18-2-priority-bmad-module-baseline-coverage`. It became two:
+  - `18-2-bmad-module-identity-foundation` (`ready-for-dev`) — the identity fix this spike surfaced (ADR 0015
+    Decisions 1/2/4), which now **gates** coverage work.
+  - `18-5-priority-bmad-module-baseline-coverage` (`backlog`) — the original 18.2 ACs verbatim, retargeted to TEA.
 - No `src/`/`tests/` touches expected.
 - No ADR file expected unless Task 3/6 concludes a genuine architecture fork not already covered by 11.1-15.1's shared registry finding.
 
@@ -209,14 +217,443 @@ No BMad Builder, Test Architect, or Creative Intelligence Suite code, docs, or p
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+claude-opus-5 (Opus 5)
 
 ### Debug Log References
 
+Detection behavior was **empirically verified**, not reasoned about. A throwaway console probe was built in
+the session scratchpad (never in the repo; deleted after the run) referencing `src/SpecScribe/SpecScribe.csproj`,
+which constructed eight synthetic repo fixtures under the OS temp dir — each with a real
+`_bmad/_config/manifest.yaml` plus verbatim first rows of each module's **real** `module-help.csv` (fetched
+from the module repos) — and called `ModuleContext.Detect` / `IsMethodPresent` / `IsGdsPresent` on each.
+`git status` confirms the only file this story modified is the story file itself. The probe's raw output is
+reproduced in Finding 3 below.
+
+**Regression run — 3 pre-existing failures, none attributable to this story.** `dotnet test` reported
+**2384 passed / 3 failed / 3 skipped (2390 total)**. This story changed **no** compiled code or assets (its only
+edits are this markdown file and `sprint-status.yaml`), and all three failures were traced to a **concurrent
+session's uncommitted work** in the shared working tree — the condition CLAUDE.md describes as an accepted
+working condition. Per CLAUDE.md these were **left untouched**: no `git reset`/`checkout`/`clean`, and no
+"fixing" of another session's in-flight story.
+
+| Failing test | Attribution |
+|---|---|
+| `HierarchyExplorerTests.TextTwin_IsComplete_Navigable_NonColor_AndNestedByParent` | Uncommitted `src/SpecScribe/HierarchyExplorer.cs` (+58 lines, dated **2026-07-25**, comment: *"verify round named it exactly right — 'weight is a confusing value on the tooltip'"*) **deletes** the ` weight {n.Value}` span the test asserts via `Assert.Contains("weight ")`. The test simply has not been updated yet by that session. |
+| `SiteGeneratorAdapterTests.GenerateAll_GoldenContentFingerprint_...` | Uncommitted `specscribe.css` (+42) / `specscribe.js` (+92). The test's own comment history shows the fingerprint moves on any every-page stylesheet/script byte change; its fixture "cites no real repo files", so this story's markdown edits cannot reach it. Matches the known *"expect the golden fingerprint to move under you"* condition. |
+| `FileWatcherServiceTests.BurstOfSaves_CoalescesAndLeavesCoherentOutput` | **Passes in isolation** (re-run: 1 passed). Load/timing-sensitive under the full suite, plausibly aggravated by the concurrent session writing into the tree during the run. Not deterministic, not attributable here. |
+
 ### Completion Notes List
+
+## Story 18.1 — BMad Module Landscape & Coverage Map (spike deliverable)
+
+**Verdict up front:** Epic 18's first unit of work is **not** any module's artifacts. It is a
+module-**identity** defect that is live today: a repo whose only installed BMad module is CIS, TEA, or BMB is
+silently reported as **BMad Method** and is served BMM's entire glossary. The artifact-coverage question
+(which module to render first) is real but secondary, and the answer to it is **TEA**.
+
+---
+
+### 1. Confirmations of this story's premises (Task 1)
+
+Every claim below was checked against live code/files at baseline commit `611097d`, not taken from the story's
+summary tables.
+
+| Story premise | Verdict | Evidence |
+|---|---|---|
+| BMM + GDS both `Supported: true`, not this spike's targets | **Confirmed** | `AboutSddTemplater.cs:12-13`; `README.md:19-20` (BMad Method 6.10.0 ✅, BMad GDS 0.6.0 ✅) |
+| The four third-party rows are Epics 11-15's targets | **Confirmed** | `AboutSddTemplater.cs:14-17` (`speckit`/`gsd`/`gsd-pi`/`superpowers`, all `false`) |
+| No adapter registry exists | **Confirmed** | `SiteGenerator.cs:51` — `private readonly BmadArtifactAdapter _adapter = new();` with the "registry … arrives with Stories 4.3+" comment intact |
+| No sibling spike has landed a registry conclusion to defer to | **Confirmed** | 11.1 / 12.1 / 13.1 / 14.1 / 15.1 are all `Status: ready-for-dev` with **empty** Completion Notes |
+| `AppliesTo` markers `_bmad/` as a whole, not a sub-module | **Confirmed** | `BmadArtifactAdapter.cs:76-77` — `Directory.Exists(Path.Combine(options.RepoRoot, "_bmad"))` |
+| Diagnostic vocabulary is exactly five values | **Confirmed** | `AdapterDiagnostic.cs:7-32` — `Unsupported`, `Malformed`, `Skipped`, `Error`, `Informational` |
+| Difference #3: are `bmad-brainstorming` etc. BMM-native or CIS evidence? | **Resolved — BMM/Core-native** | see §2 |
+
+**Correction to the story's framing.** The story states a new BMad module "already produces a `CommandCatalog`
+with real slash commands … **without any code change** — IF that module's `module-help.csv` follows the existing
+CSV shape." The CSV-reading half is true; the **module-identification** half is not. See Finding 3 — this is the
+single most important correction this spike makes.
+
+#### Where the generic seam actually ends (Task 1, final subtask)
+
+Sharper than the story's description. The boundary is *inside* `BuildContext`, not between it and `WellKnownDocs`:
+
+| Layer | Mechanism | Generic? |
+|---|---|---|
+| Install discovery | `ReadInstalledModules` reads `_bmad/_config/manifest.yaml`; disk fallback scans `_bmad/*/module-help.csv` (`ModuleContext.cs:204-218`) | ✅ **Fully generic** — any module code works, `core` correctly excluded |
+| Presence checks | `IsModulePresent(repoRoot, code)` (`ModuleContext.cs:174-188`) | ✅ **Fully generic** — takes an arbitrary code; only the two public wrappers are hardcoded |
+| CSV parse → `byStep` + `ModuleLabel` | `BuildContext` rows 291-345 | ✅ **Generic** — `ModuleLabel` comes through correctly for CIS/TEA/BMB (probe-verified) |
+| **Module identification** | `BuildContext` **lines 346-348**: `prefix.StartsWith("gds") ? GameDevStudio : BmadMethod` | ❌ **Not generic — and not a graceful default.** A closed binary with no `Unknown` branch |
+| Docs / glossary | `DocsFor` / `GlossaryFor` switches (`ModuleContext.cs:118-123, 151-156`) | ❌ Hardcoded per enum case (as the story said) |
+| Primary selection | `ChoosePrimary` (`ModuleContext.cs:259-286`) | ⚠️ Directory-name based (`gds` prefix), then **manifest order** — see Finding 3b |
+
+The load-bearing detail: **`BmadModule` has an `Unknown` case, and `BuildContext` never returns it.** Detection
+either succeeds or falls through to `BmadMethod`. `ModuleContext.None` is only reachable when no CSV parses at
+all — never when a *foreign but well-formed* module CSV parses.
+
+---
+
+### 2. Difference #3, resolved: the ideation skills are BMM/Core-native (Task 2)
+
+The story flagged this repo's `bmad-brainstorming` / `bmad-forge-idea` / `bmad-prfaq` / `bmad-party-mode` /
+`bmad-domain-research` / `bmad-market-research` as possible CIS evidence. Checked on disk — they split **two**
+ways, and neither is CIS:
+
+- **BMM-native** (`_bmad/bmm/module-help.csv`, module column `BMad Method`): `bmad-brainstorming` (row 12),
+  `bmad-market-research` (13), `bmad-domain-research` (14), `bmad-prfaq` (17).
+- **Core-native** (`_bmad/core/module-help.csv`, module column `Core`): `bmad-brainstorming`, `bmad-party-mode`,
+  `bmad-forge-idea`, plus `bmad-spec`, `bmad-shard-doc`, the editorial/review skills, `bmad-customize`.
+- Cross-checked against `_bmad/_config/skill-manifest.csv`, which carries an explicit `module` column
+  (`"core"` / `"bmm"`) per skill. **No `cis` anywhere.**
+
+**Consequence for CIS's uniqueness:** partially deflating, and confirmed from CIS's own manifest. CIS's real
+`module-help.csv` lists `bmad-brainstorming` **as one of its own five skills** — the *same skill id* Core already
+ships. So CIS is not wholly novel surface; it overlaps Core by at least one workflow. Its genuinely distinctive
+skills are `bmad-cis-innovation-strategy`, `-problem-solving`, `-design-thinking`, `-storytelling`.
+
+**Bonus finding (skill-id collisions across modules).** Because module A and module B can ship the *same* skill
+id, `BuildContext`'s "first row wins for a given step" rule (`ModuleContext.cs:334-338`) is only safe *within*
+one module's CSV. Any future work that merges catalogs across modules must decide a collision rule. Noted for 18.2.
+
+**Structural finding — what actually lands on disk.** `_bmad/bmm/` in this repo contains **only** `config.yaml`
+and `module-help.csv`; the 189 `bmm/…` paths in `_bmad/_config/files-manifest.csv` are not present as files
+(this install routes skills to `.claude/skills/`). Two consequences:
+1. **`_bmad/{code}/module-help.csv` is the only dependable per-module on-disk marker** — which is exactly what
+   `ModuleContext` already keys on. SpecScribe picked the right signal; 18.2 should not switch to walking
+   `_bmad/{code}/` subtrees.
+2. **`module.yaml` is an installer-*source* file and is NOT installed.** It is tempting (it carries a clean
+   `code:` + `name:`) but it is unavailable in a consuming repo. `_bmad/{code}/config.yaml` carries no module
+   identity either. **The `module` column of `module-help.csv` is the only on-disk module label.**
+
+---
+
+### 3. The central finding: non-BMM modules silently impersonate BMad Method (Tasks 1, 3, 4)
+
+#### 3a. Probe output (verbatim)
+
+```
+--- bmm-only ---   Module enum: BmadMethod       ModuleLabel: BMad Method                 /create-story: /bmad-create-story
+--- gds-only ---   Module enum: GameDevStudio    ModuleLabel: Game Dev Studio             /create-story: /gds-create-story
+--- cis-only ---   Module enum: BmadMethod  (!)  ModuleLabel: Creative Intelligence Suite /create-story: (null)
+--- tea-only ---   Module enum: BmadMethod  (!)  ModuleLabel: Test Architecture Enterprise/create-story: (null)
+--- bmb-only ---   Module enum: BmadMethod  (!)  ModuleLabel: BMad Builder                /create-story: (null)
+```
+
+For all three of `cis-only` / `tea-only` / `bmb-only`:
+`Docs = prd.md, ARCHITECTURE-SPINE.md, brief.md, DESIGN.md, EXPERIENCE.md` and
+`Glossary = FR, NFR, AC, ADR, PRD, spec kernel, …` — **BMM's, in full.**
+
+**Root cause:** every first-party BMad module except GDS prefixes its skills `bmad-`. Verified against the real
+`module-help.csv` of each module repo:
+
+| Module | code | `module` column label | Skill ids | `prefix` computed | Identified as |
+|---|---|---|---|---|---|
+| BMM | `bmm` | BMad Method | `bmad-create-story` | `bmad` | BmadMethod ✅ |
+| GDS | `gds` | Game Dev Studio | `gds-gdd`, `gds-create-story` | `gds` | GameDevStudio ✅ |
+| CIS | `cis` | Creative Intelligence Suite | `bmad-cis-innovation-strategy` | `bmad` | BmadMethod ❌ |
+| TEA | `tea` | Test Architecture Enterprise | `bmad-testarch-trace` | `bmad` | BmadMethod ❌ |
+| BMB | `bmb` | BMad Builder | `bmad-bmb-setup`, `bmad-module-builder` | `bmad` | BmadMethod ❌ |
+
+GDS is the *only* module whose skill prefix happens to equal its module code — which is precisely why the
+current two-case switch has worked so far. **`prefix` is a coincidence, not a contract.**
+
+> Note on a near-miss: BMad's docs advertise GDS commands as `/bmgd-gdd` / `/bmgd-narrative`, which would have
+> broken `prefix.StartsWith("gds")`. Checked the real file rather than trusting the docs —
+> `bmad-module-game-dev-studio/src/module-help.csv` uses `gds-*` throughout, and `src/module.yaml` says
+> `code: gds`, `name: "BMGD: BMad Game Dev Studio"`. **`BMGD` is branding; `gds` is the code. Current GDS
+> support is correct.** The repo's own tests use synthetic `gds-*` fixtures
+> (`ModuleContextTests.cs:57-58`), so they would not have caught a divergence — 18.2 should pin fixtures to
+> real module CSVs.
+
+#### 3b. How far the harm actually propagates (bounded honestly)
+
+| Surface | Affected? | Why |
+|---|---|---|
+| Nav / quick-link **module docs** | **No** | `SiteNav.cs:206-215` skips any `ModuleDoc` with no filename match in the source tree. A CIS repo has no `prd.md`, so no phantom links. Self-limiting. |
+| **Command panels** ("Next Steps") | **No — degrades correctly** | Every `Command()` lookup misses → `null` → ~40 call sites omit the suggestion. Honest NFR8 absence. |
+| **Glossary** on `how-to-read.html` | **YES — unconditional** | `HowToReadTemplater.AppendGlossary` gates only on `glossary.Count == 0` (`:176`). BMM's 10 terms render for a module that publishes none of them. |
+| **Every rendered page** | **YES — unconditional** | `SiteGenerator.cs:4270` runs `AbbreviationExpander.Expand(html, _module.Glossary)`, wrapping FR/NFR/AC/ADR/PRD in `<abbr>` site-wide. |
+| About-SDD "Detected" badge | Partly | `IsMethodPresent`/`IsGdsPresent` are independent and correct — a CIS-only repo shows neither as Detected. Consistent. |
+
+So the defect is **narrower than "the portal lies everywhere"** but is a genuine NFR8 violation on the two
+surfaces that are not file-gated: SpecScribe asserts a vocabulary the project does not use.
+
+#### 3c. The dual-install regression (sharpest consequence)
+
+`ChoosePrimary` returns `candidates.FirstOrDefault(c => !DirName(c).StartsWith("gds"))` — i.e. **manifest
+order** decides among non-GDS modules. Probe-verified:
+
+```
+--- bmm+cis (bmm first in manifest) --- ModuleLabel: BMad Method   /create-story: /bmad-create-story   IsMethodPresent=True
+--- cis+bmm (cis first in manifest) --- ModuleLabel: Creative Intelligence Suite  /create-story: (null)  IsMethodPresent=True
+--- bmm+tea (tea first in manifest) --- ModuleLabel: Test Architecture Enterprise /create-story: (null)  IsMethodPresent=True
+```
+
+A repo that **genuinely has BMM installed** loses **all** BMM command suggestions across the entire portal
+because a sibling module won a manifest-order tie — while `IsMethodPresent` still reports `True`, so the
+About-SDD page says "BMad — Supported, Detected". That is an internally contradictory portal state, it is
+install-order-dependent (therefore intermittent), and it will trigger the first time an owner adds TEA or CIS
+to a BMM project. **This is the highest-severity item Epic 18 has to fix, and it is a regression to existing
+BMM support, not new-module coverage.**
+
+---
+
+### 4. Extend vs. new adapter — answered (Tasks 3, 6)
+
+**Answer: (a) extend. Epic 18 does NOT need the adapter registry.** Epic 18 is the one framework epic that can
+proceed while the registry gap stays open — worth stating plainly to the other five spikes.
+
+Rationale: `AppliesTo` markers `_bmad/` as a whole (`BmadArtifactAdapter.cs:76-77`), so *every* BMad module —
+BMM, GDS, CIS, TEA, BMB, and any BMB-generated custom module — already self-selects into the existing adapter.
+A second `IArtifactAdapter` would have an identical `AppliesTo`, making registry selection ambiguous rather
+than helpful. **Do not build a registry for Epic 18, and do not propose a sixth competing registry ADR** —
+defer wholly to whichever of 11.1-15.1 lands that decision first.
+
+**Named extension points for 18.2** (exact, verified line refs):
+
+1. `BmadModule` enum (`ModuleContext.cs:8`) — add cases. **But see the ADR proposal below: the enum being
+   *closed and single-valued* is the real constraint.**
+2. `BuildContext` **lines 346-348** — replace skill-prefix inference with **module-code inference from the
+   containing directory name** (`Path.GetFileName(Path.GetDirectoryName(csvPath))`), which is already how
+   `ChoosePrimary` and `IsModulePresent` identify modules and is the value that actually equals the module
+   code (`bmm`/`gds`/`cis`/`tea`/`bmb`). **This one change is the fix for Finding 3.** An unrecognized code must
+   map to `BmadModule.Unknown` with an empty doc/glossary set, not fall through to `BmadMethod`.
+3. `DocsFor` switch (`:118-123`) + a new `ModuleDoc[]` array — *only if* the module publishes well-known docs.
+   CIS/TEA/BMB publish **none** with fixed filenames, so for all three this array is legitimately empty.
+4. `GlossaryFor` switch (`:151-156`) + a new `GlossaryTerm[]` array.
+5. A new `IsXPresent` wrapper mirroring `:165`/`:170` — one line each; `IsModulePresent` is already generic.
+6. `AboutSddTemplater.Frameworks` (`:10-18`) + its `detected` switches (`:38-43`, `:66-70`) + `SiteNav` output
+   paths + the `README.md:19-24` table — these are **per-module hardcoded rosters** the story did not list as
+   extension points, but any new module needs a row in each. `AboutSddTemplater`'s `detected` switch takes only
+   two bools (`methodPresent`, `gdsPresent`) and its signature must widen.
+
+**`ChoosePrimary` (Task 3, third subtask):** it needs more than "a third branch." Its current contract —
+return exactly one winner — is the thing that breaks (Finding 3c). Minimum viable fix for 18.2: make
+BMM/GDS **win** ties over auxiliary modules (invert today's accidental manifest-order behavior), so adding TEA
+to a BMM repo cannot demote BMM. That is a small, safe change and it fixes the regression without waiting for
+the larger multi-module redesign.
+
+---
+
+### 5. Per-module coverage map (Task 4)
+
+Classification vocabulary is AC #1's — **mappable / partially-mappable / unsupported**. No tier vocabulary
+imported from 12.1, per Dev Notes.
+
+#### Already covered — confirmed current, not re-surveyed
+- **BMad Method (`bmm`)** — `Supported: true`, fully covered.
+- **BMad GDS (`gds`)** — `Supported: true`. Re-confirmed against the real module: its `module-help.csv` ships
+  `gds-create-epics-and-stories`, `gds-sprint-planning`, `gds-sprint-status`, `gds-retrospective`,
+  `gds-create-story`, `gds-dev-story` — i.e. GDS produces the *same artifact families* as BMM, which is why one
+  adapter serves both. `module.yaml` confirms `code: gds`, version 0.6.0, matching `README.md:20`.
+
+#### Test Architect / Test Architecture Enterprise (`tea`) — **partially-mappable. Recommended priority.**
+
+| Distinctive artifact | Classification | Target projection |
+|---|---|---|
+| `traceability-matrix.csv` (from `bmad-testarch-trace`) | **Partially-mappable** | Genuinely close to `RequirementsModel` + SpecScribe's **existing** `traceability.html` (Story 21.1). CSV, not markdown — needs a parser; the requirement-id join key is unverified. |
+| `nfr-report.md` (`bmad-testarch-nfr`) | **Partially-mappable** | SpecScribe already models NFRs (`RequirementKind.Design`/NFR handling, Story 9.2). Overlap is real. |
+| test-design doc, review report, ATDD checklist, gate/release decision | **Unsupported (candidate extension)** | No `ArtifactBundle` field. A QA/quality artifact family with no analog. |
+| framework scaffold, CI config, generated `*.spec.ts` | **Unsupported (non-goal)** | Executable/config output, not planning artifacts. |
+| Epics / stories / sprint / retros | **N/A** | TEA produces none — `Epics`/`Sprint`/`Retros` stay null/empty. Honest NFR8 absence. |
+
+**Blocking unknown for 18.2:** TEA writes to a `test_artifacts` output key (every row of its `module-help.csv`
+`output-location` column). That key exists in **neither** core config nor `_bmad/bmm/config.yaml` — it would live
+in `_bmad/tea/config.yaml`, which is generated at install time. **SpecScribe currently reads no module
+`config.yaml` at all.** 18.2 must either read `_bmad/{code}/config.yaml` for output-path keys or accept that TEA
+artifacts are only found when they happen to fall inside the scanned source root. This is a real prerequisite,
+not a detail.
+
+#### Creative Intelligence Suite (`cis`) — **mappable, but with near-zero marginal value**
+
+| Distinctive artifact | Classification | Target projection |
+|---|---|---|
+| Innovation-strategy / problem-solving / design-thinking / storytelling session docs | **Mappable — already rendered today** | All five skills declare `output-location: output_folder`, i.e. the same `_bmad-output` root SpecScribe already walks. They are freeform markdown with **no fixed filenames** and are picked up by the existing generic-page pass **with zero code change**. |
+| `design-methods.csv`, `innovation-frameworks.csv`, `solving-methods.csv`, `story-types.csv` | **Unsupported — non-goal** | Reference datasets shipped *with the skills* under `.claude/skills/`, not project output. Rendering them would surface tool internals as project content. |
+| Epics / requirements / sprint / retros | **N/A** | CIS produces none. |
+
+> The story's hypothesis of a dated `{output_folder}/analysis/brainstorming-session-{date}.md` path was **not
+> confirmed**: CIS's own `module-help.csv` declares a bare `output_folder` with no subfolder and no filename
+> convention. Correcting the hypothesis rather than carrying it forward.
+
+**Therefore CIS is explicitly *not* recommended first.** Its outputs already render; a dedicated CIS module case
+would buy a glossary and an About-SDD row, nothing more.
+
+#### BMad Builder (`bmb`) — **unsupported as an artifact source; but see the important twist**
+
+The story asked for this framing to be confirmed or rejected explicitly. **Confirmed:** BMB is a meta-tool. Its
+outputs are *other modules'* scaffolding — `module.yaml`, `module-help.csv`, `SKILL.md`, `customize.toml`,
+workflow step files (verified in `bmad-builder/skills/…/assets/` and `samples/`). It produces **no**
+project-tracking artifacts. **Non-goal for artifact rendering.**
+
+**The twist — this is the finding that matters most about BMB.** BMB's *whole purpose* is generating custom
+modules with **arbitrary, user-chosen module codes**, each shipping a `module.yaml` (`code:`) and a
+`module-help.csv`. Since `Detect` treats **any** non-`core` `_bmad/*/module-help.csv` as a candidate, a
+BMB-generated custom module is *already* a live input to SpecScribe's detection today — and hits Finding 3
+exactly like CIS/TEA do. **18.2 cannot enumerate a closed set of module codes.** It must handle "a module code I
+have never heard of" as a first-class, well-behaved case: correct label, no docs, no glossary,
+`BmadModule.Unknown`, no impersonation. **This is the strongest argument that Finding 3's fix is the real scope
+of 18.2, and that the fix must be open-world rather than three more enum cases.**
+
+#### Ecosystem roster correction (Task 2)
+
+The story's three-module hypothesis is **incomplete**. The `bmad-code-org` org additionally publishes
+`bmad-loop`, `bmad-automator`, `bmad-manticore`, `bmad-method-ui`, `bmad-method-wds-expansion`,
+`bmad-utility-skills`, `bmad-module-template`, and a `bmad-plugins-marketplace`. These were **not** classified
+here (out of the ACs' named scope, and several are plugins/marketplace entries rather than installed modules),
+but their existence is itself the point: **the module set is open and growing**, which independently supports the
+open-world conclusion above. Flagged for 18.2 scoping rather than silently omitted.
+
+**Real-downstream-usage caveat (the check 15.1 demanded).** No repo that has actually *installed and used*
+CIS/TEA/BMB was found. Evidence is each module's own source repo — one tier better than doc-site prose (real
+`module-help.csv` / `module.yaml` bytes, and real detection behavior via the probe), but still not a downstream
+adopter. `bmad-code-org/bmad-method-sample-data` was located and inspected as the closest candidate; it holds
+spec-kernel, braindump, and brainstorming samples (`brainstorm.html`, `brainstorm-intent.md`) but **no
+`_bmad/` install and no TEA/CIS/BMB module output**, so it does not settle artifact filenames. **TEA's and CIS's
+concrete output filenames therefore remain the largest unverified area of this map.**
+
+---
+
+### 6. Priority recommendation (Task 4, final subtask)
+
+**Sequence 18.2 as: fix identity first, then cover TEA.**
+
+1. **Module identity + the dual-install regression (Finding 3).** Highest severity, smallest diff, and it is a
+   fix to *existing shipped BMM support*, not new coverage. It is a prerequisite for every other module.
+2. **TEA** as the priority *coverage* module. Rationale: (i) it is the only candidate with **structured,
+   distinctively-named** on-disk artifacts (`traceability-matrix.csv`, `nfr-report.md`); (ii) those artifacts
+   overlap surfaces SpecScribe **already has** (Story 21.1 traceability, Story 9.2 NFR coverage), so coverage
+   compounds rather than starting a new surface; (iii) it is the module this project's own tooling already
+   references (`bmad-create-story` suggests `/bmad:tea:automate`), making real adoption most likely.
+   Its `test_artifacts` config-key dependency is the first thing 18.2 must resolve.
+3. **CIS** — defer. Already renders via the generic pass; near-zero marginal value.
+4. **BMB** — non-goal for artifact rendering; its requirement is absorbed into item 1 (open-world module codes).
+
+**Recommended 18.2 scope boundary:** identity fix + open-world unknown-module handling + TEA artifact coverage.
+**Out:** CIS/BMB module cases, any registry, any `ArtifactBundle` field addition.
+
+---
+
+### 7. Framework-extra data, non-goals, and diagnostic wording (Task 5)
+
+**Candidate projection extensions** (recorded, not landed):
+- A **quality/test artifact family** for TEA (test strategy, NFR report, traceability matrix, gate decisions).
+  Would be a new `ArtifactBundle` field; the traceability matrix may instead fold into `RequirementsModel`.
+- **Per-module output-path config** — reading `_bmad/{code}/config.yaml` for keys like `test_artifacts`.
+- **Multi-module `ModuleContext`** — see the ADR proposal in §8.
+
+**Explicit non-goals with rationale:**
+- BMB-generated scaffolding (`module.yaml`, `SKILL.md`, `customize.toml`, workflow steps) — tool internals, not
+  project artifacts.
+- CIS/TEA reference datasets (`design-methods.csv`, `innovation-frameworks.csv`, `solving-methods.csv`,
+  `story-types.csv`, `tea-index.csv`) — ship with the skills, not project output.
+- TEA-generated test code, CI YAML, framework scaffolds — executable output; the repo's own code surfaces
+  already cover source files.
+- Any new authoring schema — unchanged project rule.
+
+**Non-fatal notices, mapped onto the five-value vocabulary** (no sixth invented), drafted in the tone of
+`BmadArtifactAdapter.cs:170-188, 219-224, 262-276`:
+
+| Situation | Category | Drafted message |
+|---|---|---|
+| A `_bmad/{code}/module-help.csv` parses but `{code}` is not a module SpecScribe models | `Informational` | `"Detected BMad module '{code}' ({label}); SpecScribe has no module-specific docs or glossary for it, so those sections are omitted."` |
+| Module CSV present but no usable `skill` column | `Unsupported` | `"module-help.csv has no 'skill' column; command suggestions for this module are omitted."` |
+| Module CSV unreadable / parse exception | `Malformed` | `"Could not read module-help.csv: {message}"` |
+| >1 non-GDS module installed; one chosen as primary | `Skipped` | `"{n} additional installed module(s) not used for command suggestions in favor of '{code}'."` |
+| `_bmad/` unreadable (permissions/IO) | `Error` | *(existing behavior — `Detect` swallows to `None`; 18.2 should surface it instead of silently degrading)* |
+
+The `Informational` row is the important one: it is exactly what turns Finding 3 from a silent lie into honest
+absence, and it uses the category `AdapterDiagnostic.cs:26-31` was written for.
+
+**Command-generalization assessment (AC #2, second clause).** The quoted note lives at
+`epics.md:157` (Additional Requirements): *"current next-step command mapping is strongly GDS-oriented and
+requires generalization."* **That note is now stale and should be retired.** The *mechanism* was generalized when
+`CommandCatalog`/`BuildContext` became CSV-driven: `ModuleContext.cs:329-338` strips the prefix and keys on the
+step remainder, so `/bmad-create-story` and `/gds-create-story` both resolve `create-story` with zero
+module-specific code, and `Command()` returning `null` makes ~40 call sites omit cleanly. The residue is
+narrower and worth naming precisely: the ~40 call sites (`BmadCommands.cs`, `SprintTemplater.cs`,
+`EpicsViewBuilder.cs`, `HtmlRenderAdapter.Epics.cs`, `ActionItemsTemplater.cs`, `SiteGenerator.cs:4539`)
+hardcode a **step vocabulary** — `create-story`, `dev-story`, `code-review`, `sprint-planning`, `sprint-status`,
+`retrospective`, `correct-course`, `quick-dev`, `create-epics-and-stories`,
+`check-implementation-readiness` — which is the BMM∩GDS planning vocabulary. CIS/TEA/BMB share **none** of it.
+
+**Assessment: no generalization work is required for Epic 18.** Those call sites live on surfaces
+(sprint board, epics, story pages) that only exist when there *are* epics/stories — which only BMM and GDS
+produce. For a TEA/CIS repo the panels correctly vanish. Recommend **replacing** `epics.md:157`'s note with the
+accurate residual statement rather than carrying a stale "GDS-oriented" claim forward. **Agreed scope boundary
+for 18.2: command generalization is explicitly OUT.**
+
+---
+
+### 8. Architecture fork found — ADR proposed, not written (Tasks 3, 6)
+
+Per this project's ADR-creation-trigger discipline, a genuine fork surfaced. It is **distinct from** the
+adapter-registry question owned by 11.1-15.1, so proposing it does not duplicate or compete with theirs.
+
+> **Proposed ADR — "BMad module identity is open-world and multi-valued."**
+> **Context.** `ArtifactBundle.Module` carries exactly one `ModuleContext`, whose `Module` is one closed-enum
+> value. Real BMad repos are increasingly multi-module (BMM + TEA + CIS), and BMB exists to mint modules with
+> codes SpecScribe cannot know in advance. The current single-winner design produces both false identity
+> (Finding 3a) and a live regression (Finding 3c).
+> **Decision to ratify.** Module identity derives from the **module code** (directory name), not the skill
+> prefix; an unrecognized code is a **first-class supported outcome** (`Unknown` + correct label + no docs/
+> glossary + an `Informational` diagnostic), never a fallback to `BmadMethod`; and `ModuleContext` carries the
+> **set** of installed modules with a designated primary, rather than a single winner.
+> **Consequence.** Touches a cross-cutting contract (`ArtifactBundle.Module`), which is why it warrants an ADR
+> rather than an owner-locked story note.
+
+**Now drafted, at the owner's explicit request (2026-07-25), as
+[`docs/adrs/0015-bmad-module-identity-open-world-and-multi-valued.md`](../../docs/adrs/0015-bmad-module-identity-open-world-and-multi-valued.md)
+— `Status: Proposed`, awaiting ratification.** The spike itself did not author it; the owner asked for the draft
+after reviewing these findings. It carries seven decisions (identify by module **code**; first-class `Unknown`
+with an `Informational` diagnostic; multi-valued `ModuleContext`; BMM/GDS never demoted by a manifest-order tie;
+per-module coverage stays an explicit act; Epic 18 extends rather than registers; detection fixtures pinned to
+real module CSVs), an explicit non-goal that it must **not** become a sixth competing registry proposal, and
+three open questions for ratification — chiefly whether Decisions 1/2/4 land in 18.2 as a prerequisite slice
+with Decision 3 (the multi-valued contract change) deferred to its own story. The spike recommends that split.
 
 ### File List
 
+_No production or test files (`src/**`, `tests/**`) were created, modified, or deleted. This story is a spike;
+its deliverable is the coverage map in Completion Notes above._
+
+- `_bmad-output/implementation-artifacts/18-1-bmad-module-landscape-and-coverage-spike.md` (modified)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (modified — 18-1 → `review`, plus `last_updated`)
+- `docs/adrs/0015-bmad-module-identity-open-world-and-multi-valued.md` (**added**) — drafted at the owner's
+  explicit request after the spike completed, per §8. `Status: Proposed`; not ratified.
+- `docs/adrs/README.md` (modified — ADR 0015 index entry)
+
 ## Change Log
 
+- 2026-07-25 — **ADR 0015 drafted at owner request** (post-completion follow-up, not spike scope):
+  `docs/adrs/0015-bmad-module-identity-open-world-and-multi-valued.md`, `Status: Proposed`, plus its
+  `docs/adrs/README.md` index entry. Formalizes §8's proposal. Still **no** `src/`/`tests/` changes. Explicit
+  non-goal recorded in the ADR: it must not become a sixth competing adapter-registry proposal — that decision
+  stays with Epics 11-15, and per its Decision 6 Epic 18 does not need it. Three open questions left for
+  ratification, chiefly the recommended scope split (Decisions 1/2/4 as an 18.2 prerequisite slice; Decision 3,
+  the multi-valued `ModuleContext` contract change, deferred to its own story).
+- 2026-07-25 — Story 18.1 executed (dev-story) → `review`. Spike only; **no `src/`/`tests/` changes** (`git status`
+  clean apart from this file). Coverage map written to Completion Notes. Headline outcome: the central deliverable
+  turned out **not** to be an artifact-coverage table but a live module-**identity** defect —
+  `ModuleContext.BuildContext:346-348` infers the module from the *skill prefix*, and every first-party BMad module
+  except GDS prefixes its skills `bmad-`, so CIS/TEA/BMB (and any BMB-generated custom module) are silently
+  identified as `BmadModule.BmadMethod` and served BMM's full glossary site-wide. Verified empirically with a
+  scratchpad probe over eight fixtures built from the modules' **real** `module-help.csv` files, not by inspection.
+  A dual-install regression falls out of the same root cause: with CIS or TEA ahead of BMM in manifest order,
+  `ChoosePrimary` demotes BMM and **all** BMM command suggestions vanish while `IsMethodPresent` still reports
+  `True`. Other outcomes: Epic 18 confirmed as the one framework epic that does **not** need the adapter registry
+  (`AppliesTo` already markers `_bmad/` wholesale) — extend, don't register, and no competing ADR; Difference #3
+  resolved (the ideation skills are BMM/Core-native, and CIS ships Core's `bmad-brainstorming` itself, so CIS is
+  less novel than hypothesized); GDS re-confirmed correct after checking the real module against docs that
+  advertise a `/bmgd-*` prefix (`module.yaml` says `code: gds` — BMGD is branding); priority recommendation is
+  **identity fix first, then TEA** (structured `traceability-matrix.csv`/`nfr-report.md` that overlap SpecScribe's
+  existing Story 21.1/9.2 surfaces), with CIS deferred (its output already renders via the generic pass) and BMB a
+  non-goal for rendering — though BMB drives the requirement that unknown module codes be an open-world supported
+  case. Two hypotheses corrected rather than carried forward: CIS has no dated `analysis/brainstorming-session-*`
+  path (bare `output_folder`, no filename convention), and the ecosystem is larger than the story's three-module
+  table. Two gaps recorded for 18.2: TEA writes to a `test_artifacts` config key SpecScribe never reads (it reads
+  no module `config.yaml` at all), and `epics.md:157`'s "strongly GDS-oriented … requires generalization" note is
+  now **stale** — the mechanism was generalized when `CommandCatalog` became CSV-driven, so command generalization
+  is explicitly OUT of 18.2's scope. One genuine architecture fork found and **proposed, not written** (ADR:
+  "BMad module identity is open-world and multi-valued") — distinct from 11.1-15.1's registry question, flagged
+  for owner decision.
 - 2026-07-21 — Story 18.1 drafted (create-story). Ultimate context engine analysis completed — comprehensive developer guide created. Spike-only: coverage map of BMad's own module ecosystem (BMad Builder, Test Architect, Creative Intelligence Suite) beyond the already-supported BMad Method/GDS, an explicit extend-vs-registry architectural finding (likely differs from the third-party spikes' assumption), a command-generalization assessment, and an 18.2 scope recommendation; no production code. First story of Epic 18 (BMad-native module exploration), distinct from the third-party-framework Epics 11-15; moves Epic 18 from `backlog` to `in-progress`.

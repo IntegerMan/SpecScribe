@@ -1004,7 +1004,17 @@ public class SiteGeneratorAdapterTests : IDisposable
         // touch rendered output, so this constant sits on top of them, not only on this story's files. Verified
         // stable across two repeated runs.
         // [Story 20.5; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
-        const string expected = "9dad8c5b53148d883296fc68168635e565e8090db5284282a88060a5a3f844d2";
+        // Regenerated again for Story 20.5's OWNER VERIFY ROUND (2026-07-25). Five rendered changes, each a
+        // direct answer to a point the owner raised against the live page: in-sector labels are bold and take a
+        // per-sector contrast colour; the chart uses the portal's own tooltip instead of Plotly's hover card; the
+        // layout number ("weight 44") is gone from the twin and from every accessible name in favour of a
+        // human-meaningful detail ("3 of 8 tasks done"); a selected sector is ringed; and the details rail now
+        // carries a card per SELECTABLE node — including story leaves, which Story 20.3 had folded into their
+        // epic on the (now false) premise that a story wedge navigates rather than selects.
+        // PROVENANCE (shared main): still sitting on top of another session's staged Story 5.2 / ADR 0014
+        // settings-folder work. Verified stable across two repeated runs.
+        // [Story 20.5 owner verify round; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
+        const string expected = "8af720433cf6a1dd6fee6ebd3708f3a041e517bff6223244d9d1474dbe1f5d0e";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
