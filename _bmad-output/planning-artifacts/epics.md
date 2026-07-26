@@ -95,6 +95,22 @@ FR41: Optionally ingest external code-analysis findings (SonarCloud first) from 
      FR37–FR40. Note FR37–FR40 are declared at their epics' Epic List entries rather than in this list; FR41 is
      listed here because it is a product capability with cross-epic coverage. -->
 
+FR42: Optionally ingest a test-coverage report produced by the user's own test run and surface per-file and per-directory coverage against the code entities SpecScribe already models — as rollups on code file pages and as an encoding on the treemap/sunburst hierarchy surfaces — alongside the other code-analysis signal, with a link out to the external analysis tool's page for that file where one is configured. Coverage is read from a report the user already generates; it is disabled by default, never runs or requires a test execution itself, and every surface degrades to absent-not-broken when no report is configured or the report cannot be parsed.
+
+<!-- FR42 added 2026-07-26 (owner-directed, this session) to seat Epic 27 (test-coverage insights in the generated
+     portal). Deliberately NOT given its own NFR: the opt-in / absent-not-broken posture is AD-4 ("optional insight
+     providers may enrich output but never own baseline success"), and the only external-service touch — the link out
+     to the analysis tool's per-file page — is already governed by NFR12. Adding an NFR13 that restated either would
+     be the drift class CLAUDE.md warns about.
+     SCOPE BOUNDARY vs FR41/Epic 26: FR41 owns FINDINGS (discrete, severity-bearing items). FR42 owns COVERAGE (a
+     per-file/per-directory METRIC). They attach to the same entities and the owner wants them read together, which
+     is a coordination requirement recorded in both epics — not a reason to merge them: coverage has a purely LOCAL,
+     credential-free ingestion path that findings do not, and findings have a severity model that coverage does not.
+     NAMING COLLISION — load-bearing: `ArtifactCoverage.cs` / `RefreshCoverage()` / the dashboard's "Planning
+     Artifacts" panel ALREADY own the word "coverage" in this codebase, meaning PLANNING-ARTIFACT coverage. Story
+     27.2 must fix a distinct vocabulary before any surface ships, or the portal will show two unrelated things both
+     labelled "coverage". Same class as the still-unresolved PRD-vs-epics.md NFR numbering collision above. -->
+
 ### NonFunctional Requirements
 
 NFR1: Baseline generation performance remains responsive for local OSS repositories, with deeper analytics separated from baseline runs.
@@ -239,6 +255,7 @@ NFR10: Epic 17 - Pre-publication code hardening and security/privacy review for 
 FR41: Epic 26 - Optional external code-analysis findings surfaced against code, directories, and planning entities.
 NFR11: Epic 25 - Continuous SonarCloud analysis of SpecScribe's own codebase on every push to main, with findings triaged into the project backlog.
 NFR12: Epic 26 - Opt-in, offline-safe, credential-safe posture for external-service integrations.
+FR42: Epic 27 - Optional test-coverage insights (per-file and per-directory rollups on code pages and hierarchy surfaces, with link-out to the external analysis tool).
 
 ## Epic List
 
@@ -347,6 +364,23 @@ Put SpecScribe's own codebase under continuous automated analysis: every push to
 Make external code-quality analysis an **optional insight provider** in SpecScribe (AD-4), so a user who has Sonar can see findings rendered against the entities the portal already models — code files, directories, epics, stories, and requirements — through **one source-agnostic findings model** that compiler/analyzer warnings and other services can ride later. Led by an owner-elicited ideation round (26.1) and a decision-first spike (26.2) that settles the ingestion posture, the credential design, and the NFR-3 local-first question with a ratified ADR before any surface is built. Optional in the tool; disabled by default; every surface degrades to absent-not-broken.
 **FRs covered:** FR41 · **NFRs:** NFR12, NFR8 · **UX-DRs:** UX-DR17, UX-DR21, UX-DR22 · **Status:** backlog · unscheduled · **Depends on:** Story 25.3 (the findings contract), Epic 7 (code pages), Story 21.3 (`PlanningCodeImpact`, the shipped story↔file miner), Story 5.2 (`SettingsResolver`).
 
+### Epic 27: Test-Coverage Insights — Per-File Coverage on Code Pages and Hierarchy Surfaces
+Surface **test coverage** for the user's own codebase against the code entities SpecScribe already models — per-file and per-directory rollups on code file pages and as an encoding on the Code Map treemap and the Hierarchy Explorer — read from a report the user's own test run already produced. SpecScribe **never runs tests**. AD-4 applied to a purely LOCAL provider: no network, no credential, no service dependency in the baseline path, which is the sharp difference from Epic 26.
+**FRs covered:** FR42 · **NFRs:** NFR12 (link-out only), NFR8 · **UX-DRs:** UX-DR17, UX-DR21, UX-DR22 · **Status:** backlog · unscheduled · **Depends on:** Epic 7 (code pages), Story 20.5 (Hierarchy Explorer), Story 7.6 (Code Map treemap).
+
+<!-- Epic 27 added 2026-07-26 (owner-directed, during Story 25.1's dev pass). Owner scope call: ROLLUPS AND
+     ANALYTICS, not per-line marks — covered/total line COUNTS are carried as numbers, but per-line gutter marks
+     are out (Story 27.6 revisits that on evidence).
+     KEPT SEPARATE FROM EPIC 26 DELIBERATELY, despite sharing surfaces: coverage is a per-file METRIC with a local,
+     credential-free ingestion path; findings are discrete SEVERITY-BEARING items from a networked service. Merging
+     would drag coverage into NFR12's credential/offline design for no benefit. The coordination requirement is
+     real and is owned by Story 27.4 AC #2: whichever epic lands second EXTENDS the first's code-page section
+     rather than adding a second one.
+     NAMING COLLISION, LOAD-BEARING: ArtifactCoverage.cs / RefreshCoverage() / the "Planning Artifacts" panel
+     already mean PLANNING-ARTIFACT coverage. Story 27.2 must fix a distinct vocabulary via ADR before any surface
+     ships, or the portal shows two unrelated metrics both labelled "coverage".
+     NO NEW NFR: the opt-in / absent-not-broken posture is AD-4 and the only external touch (link-out) is already
+     governed by NFR12. An NFR13 restating either would be drift. -->
 <!-- Epics 25–26 added 2026-07-25 (SCP 2026-07-25, correct-course, owner-directed). Split per owner decision D1:
      Epic 25 = "useful for developing the tool" (dev-time CI, no product code); Epic 26 = "optional in the tool"
      (product capability). Owner decision D2 reframed the AI-agent thread as INBOUND and VISUAL — findings attach to
@@ -4220,6 +4254,58 @@ So that planning and implementation passes account for known quality debt in the
 **Then** it does not alter SpecScribe's generated portal output — the golden fingerprint is unmoved — and any code added is quarantined from the generation critical path, with Epic 26 named as the epic that makes findings a *product* surface
 **And** staleness is honest: consumers can tell how old the analysis is and when it predates the working tree.
 
+### Story 25.5: A Local, Browsable Coverage Report in One Command
+
+> Dev-time tooling only. Ships NO product code and must not move the golden fingerprint.
+
+As the SpecScribe maintainer,
+I want to produce a browsable coverage report locally with a single documented command,
+So that I can find untested code while I am working, without pushing a commit and opening SonarCloud to see it.
+
+**Acceptance Criteria:**
+
+1.
+**Given** `coverlet.collector` 6.0.4 is already referenced and Story 25.1 already emits OpenCover from `dotnet test`
+**When** the documented command is run
+**Then** a browsable HTML coverage report is produced locally from that same collector and format — **no second coverage mechanism is introduced** — and the command is recorded in `README.md` alongside the existing `dotnet test` guidance
+**And** the report output directory is gitignored, verified with `git check-ignore`, not assumed.
+
+2.
+**Given** CI already measures coverage at 89.8%
+**When** the local report is generated
+**Then** the local percentage is reconciled against the CI/SonarCloud figure and any discrepancy is explained rather than left as two numbers that disagree
+**And** the story records the measured cost of generating the report, so the command's expense is known before it is recommended.
+
+3.
+**Given** this is dev-time tooling
+**When** it ships
+**Then** `GoldenContentFingerprint` is unmoved and nothing under `src/` changes.
+
+### Story 25.6: Coverage and Quality Badges on the README
+
+As a visitor evaluating SpecScribe,
+I want the README to show current build, coverage, and quality-gate status at a glance,
+So that the project's health is visible before I read a line of code.
+
+**Acceptance Criteria:**
+
+1.
+**Given** SonarCloud publishes badge endpoints for this project
+**When** badges are added to `README.md`
+**Then** they render **green at the moment they land** — a permanently-red badge on the front page is worse than none — and each badge links to the surface that explains it
+**And** the coverage badge shows the same figure the CI analysis reports, not a separately-computed one.
+
+2.
+**Given** the quality gate is Story 25.2's decision, not this story's
+**When** a quality-gate badge is added
+**Then** it is added **after** 25.2 has settled what the gate asserts, so the badge cannot advertise a gate that does not yet mean anything
+**And** if 25.2 has not landed, the coverage and build badges may ship alone and the story says so explicitly.
+
+3.
+**Given** badges are external image requests
+**When** they are added
+**Then** the story records what each badge URL discloses about the project, confirming nothing private is implied by a public badge (NFR10's disclosure discipline).
+
 ## Epic 26: Optional External Code-Analysis Insights — Findings Alongside Code, Directories, and Planning
 
 Make external code-quality analysis an **optional insight provider** in SpecScribe, so a user who has Sonar can see findings rendered against the entities the portal already models — code files, directories, epics, stories, and requirements — rather than in a separate tool. This is AD-4 ("optional insight providers may enrich output but never own baseline success") applied to a **networked** provider, which is why NFR12 exists: opt-in, offline-safe, credential-safe, and **disabled by default**.
@@ -4434,3 +4520,210 @@ So that the second and third integrations extend Story 26.2's provider boundary 
 **When** it concludes
 **Then** it produces a **prioritized** recommendation of which integrations (if any) to seat as future stories, with a stated "none of these" option, feeding `deferred-work.md` / the epic backlog rather than auto-seating stories
 **And** it records what would have to be true for each candidate to become worth building.
+
+## Epic 27: Test-Coverage Insights — Per-File Coverage on Code Pages and Hierarchy Surfaces
+
+Surface **test coverage** for the user's own codebase against the code entities SpecScribe already models, so "how well tested is this?" is readable in the same place as "how often does this change?" and "what does this implement?". Coverage is read from a report the user's own test run already produces — SpecScribe **never runs tests** and never requires them to be run.
+
+This is AD-4 ("optional insight providers may enrich output but never own baseline success") applied to a **purely local** provider: a coverage report on disk. That is the sharp difference from Epic 26 — no network call, no credential, no service dependency in the baseline path, so NFR12's tension does not arise here. The only external touch is the optional link out to the analysis tool's per-file page, which NFR12 already governs.
+
+Owner-directed scope (2026-07-26): **rollups and analytics, not per-line marks.** Per-file and per-directory percentages, encoded onto the treemap/sunburst hierarchy surfaces and shown on code file pages, with covered/total **line counts** carried as numbers. Per-line covered/uncovered gutter marks are explicitly **out** — see Story 27.6 for how that decision gets revisited on evidence.
+
+**The attach points already exist**, so no new entity modelling is required: `CodeFileTemplater` for the code page, `FileInsight` (`src/SpecScribe/GitMetrics.cs`) for the per-file record hotspots and coupling already ride, `CodeMap`/`HierarchyExplorer` for the treemap and sunburst, and `SettingsResolver` for opt-in configuration.
+
+**FRs covered:** FR42 · **NFRs:** NFR12 (link-out only), NFR8 · **UX-DRs:** UX-DR17 (coverage is never color-alone), UX-DR21 (one primary representation per dataset; the text twin is contract), UX-DR22 (designed empty states) · **ADRs:** AD-4, ADR 0010, ADR 0012 / ADR 0013 · **Status:** backlog · unscheduled · **Depends on:** Epic 7 (code pages), Story 20.5 (the standardized Hierarchy Explorer), Story 7.6 (the Code Map treemap).
+
+**Execution order:** 27.1 → 27.2 → 27.3 → 27.4 / 27.5 → 27.6. Stories 27.4 and 27.5 are parallelizable once 27.3's metric spine exists.
+
+<!-- Epic 27 added 2026-07-26 (owner-directed, during Story 25.1's dev pass). Three things a later reader needs:
+
+     1. NAMING COLLISION, LOAD-BEARING. `ArtifactCoverage.cs`, `SiteGenerator.RefreshCoverage()`, and the
+        dashboard's "Planning Artifacts" panel ALREADY mean PLANNING-ARTIFACT coverage when they say "coverage".
+        Ship test coverage under that same bare word and the portal shows two unrelated metrics both labelled
+        "coverage". Story 27.2 must fix a distinct vocabulary BEFORE any surface is built. Same class as the
+        unresolved PRD-vs-epics.md NFR numbering collision — a naming collision left implicit is paid for later
+        at multiplied cost.
+
+     2. COORDINATION WITH EPIC 26, NOT MERGER. The owner asked for coverage 'in addition to other information from
+        code analysis and a link to the external tool page' — i.e. coverage and Epic 26's findings share surfaces.
+        They are kept as separate epics deliberately: coverage is a per-file METRIC with a local, credential-free
+        ingestion path; findings are discrete SEVERITY-BEARING items arriving from a networked service. Merging
+        would drag coverage into NFR12's credential/offline design for no benefit. But whichever epic lands second
+        MUST extend the first's code-page section rather than add a second one — that is the drift class this
+        project has repeatedly paid for. Story 27.4 owns that constraint explicitly.
+
+     3. SCOPE DISCIPLINE. SpecScribe must never run the user's tests. It reads a report the user already produced.
+        Any story that starts shelling out to `dotnet test` / `npm test` has left this epic. -->
+
+### Story 27.1: IDEATION — How Coverage Should Read Across the Portal
+
+> Owner-elicited ideation, per the project's create-story visual-intent convention. Deliverable is a decision record
+> naming the surfaces and their visual direction — **no code**.
+
+As the owner,
+I want to decide deliberately how coverage should read on each surface before any of it is built,
+So that the implementation stories start from named visual direction instead of discovering it in a post-implementation revision round.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the surfaces the owner named — the Code Map treemap, the sunburst / Hierarchy Explorer, and code file pages
+**When** the ideation round runs
+**Then** it produces for each surface a concrete proposal covering placement, density, empty state, and **how coverage reads without color** (UX-DR17), with **2–3 named design directions** offered per surface and the owner's selection recorded
+**And** it names which surfaces are **in** for Stories 27.4–27.6 and which are explicitly **out**, so those stories have a closed scope.
+
+2.
+**Given** coverage is a continuous 0–100% value while the portal's existing encodings are categorical status tokens
+**When** the visual direction is chosen
+**Then** it states whether coverage gets a **new** scale or reuses an existing token family, and if new, how it stays distinguishable from the six `--status-*` tokens that already carry stage meaning
+**And** it decides what an **unknown**-coverage file looks like — a file absent from the report is not the same as a file at 0%, and conflating them would be a lie the eye cannot catch.
+
+3.
+**Given** the hierarchy surfaces already encode weight and status
+**When** coverage is added to them
+**Then** the proposal states what coverage **replaces or coexists with**, honoring UX-DR21's one-primary-representation rule rather than stacking a third meaning onto one wedge.
+
+### Story 27.2: SPIKE — Coverage Ingestion Contract, Path Mapping, and Vocabulary
+
+> Decision-first, timeboxed, throwaway. NO production code. Durable deliverables are the spike report and a **ratified ADR**.
+
+As the maintainer,
+I want the coverage ingestion posture settled before any surface is built,
+So that format support, path mapping, and the naming collision are decided once rather than re-litigated in every downstream story.
+
+**Acceptance Criteria:**
+
+1.
+**Given** coverage reports come in several formats
+**When** the spike runs
+**Then** it selects which formats the first cut supports — **Cobertura, OpenCover, and lcov are the candidates**, and Cobertura is the cross-ecosystem default most tools emit — and states plainly which are deferred and why
+**And** it decides how the report is located: explicit setting, convention-based discovery, or both, routed through `SettingsResolver` rather than a new configuration mechanism.
+
+2.
+**Given** a coverage report addresses files by its own path convention and SpecScribe addresses them by repo-relative path
+**When** the mapping is designed
+**Then** the spike proves it against a **real** report from a real repository, not a hand-written fixture, and states its failure mode when a path cannot be matched
+**And** unmatched entries surface as a diagnostic rather than being silently dropped — a coverage surface that quietly omits half the codebase is worse than none. This is the lesson Story 25.1 paid for when an exclusion list looked complete and was ~26% wrong.
+
+3.
+**Given** `ArtifactCoverage` already owns the word "coverage" in this codebase for PLANNING-ARTIFACT coverage
+**When** the vocabulary is fixed
+**Then** the ADR names the distinct user-facing term and the distinct type/member names test coverage will use, and confirms no existing surface's label becomes ambiguous
+**And** the decision is ratified as an ADR, not left as a note in a story file.
+
+4.
+**Given** SpecScribe must never run the user's tests
+**When** the posture is recorded
+**Then** the ADR states that ingestion is read-only over an existing report, opt-in, and absent-not-broken, and that a missing, stale, or malformed report degrades the surface rather than failing generation (AD-4, NFR2)
+**And** it decides whether report **staleness** relative to the working tree is detectable and, if so, how it is disclosed — a confidently-rendered coverage figure computed from a month-old report is a quiet lie.
+
+5.
+**Given** the owner asked for a link out to the external analysis tool's page for a file
+**When** that link is designed
+**Then** the spike states how the target URL is derived and configured, and confirms it honors NFR12 — no credential, and the link is simply absent when unconfigured rather than rendering broken.
+
+### Story 27.3: The Coverage Metric Spine
+
+> Non-visual. Mirrors Story 24.1's pattern: the metric and its tests land first and gate every surface that renders it.
+
+As the maintainer,
+I want a tested per-file and per-directory coverage model before anything renders it,
+So that the visual stories consume one authoritative metric instead of each computing its own.
+
+**Acceptance Criteria:**
+
+1.
+**Given** Story 27.2's ratified ingestion contract
+**When** a coverage report is ingested
+**Then** a per-file record carries **covered lines, total coverable lines, and the derived percentage** — the counts the owner asked to keep, not the percentage alone — and rolls up to directories as a **line-weighted** aggregate, never a mean of percentages, which would let a 3-line file outvote a 3,000-line one
+**And** a file present in the codebase but absent from the report is representable as **unknown**, distinctly from 0%.
+
+2.
+**Given** the portal already carries a per-file insight record
+**When** coverage is added
+**Then** it extends the existing `FileInsight` seam that hotspots and coupling already ride rather than introducing a parallel per-file model
+**And** the metric is computed once at generation time and handed to every surface, per ADR 0010's precomputation rule.
+
+3.
+**Given** coverage is opt-in
+**When** no report is configured
+**Then** generated output is **byte-identical** to output produced before this story — proven by the golden fingerprint being unmoved — so the feature costs nothing to projects that do not use it.
+
+### Story 27.4: Coverage on Code File Pages
+
+As a developer reading a file in the portal,
+I want that file's coverage shown alongside its other code-analysis signal, with a link to the external tool,
+So that I can judge how well tested it is without leaving the page or opening another tool.
+
+**Acceptance Criteria:**
+
+1.
+**Given** Story 27.3's metric and Story 27.1's chosen direction
+**When** a code file page renders for a file present in the coverage report
+**Then** it shows the coverage percentage **and** the covered/total line counts behind it, so the number is auditable rather than asserted
+**And** coverage is conveyed by more than color (UX-DR17), with the accessible text equivalent every insight surface in this project owes.
+
+2.
+**Given** Epic 26 places findings on this same page
+**When** whichever of the two epics lands second is implemented
+**Then** it **extends the existing code-analysis section rather than adding a second one** — two independently-placed analysis blocks on one page is exactly the drift this project has repeatedly paid for
+**And** the story states explicitly which epic landed first and what it inherited.
+
+3.
+**Given** a link to the external analysis tool is configured
+**When** the page renders
+**Then** the link targets that tool's page for **this file**, and when unconfigured the link is simply absent rather than broken or placeholder (NFR12).
+
+4.
+**Given** a file is absent from the report, or no report is configured
+**When** the page renders
+**Then** it shows a **designed empty state** distinguishing "not measured" from "0% covered" (UX-DR22), never a bare 0 or a blank space.
+
+### Story 27.5: Coverage on the Treemap and Hierarchy Surfaces
+
+As a developer surveying a codebase,
+I want to see coverage across the whole file tree at once,
+So that I can find poorly-tested areas without opening files one at a time.
+
+**Acceptance Criteria:**
+
+1.
+**Given** Story 27.1's chosen encoding and Story 27.3's line-weighted rollups
+**When** the Code Map treemap and the Hierarchy Explorer render with coverage available
+**Then** coverage is encoded per the owner's selected direction at both file and directory level, and the encoding is **never color-alone** (UX-DR17)
+**And** an **unknown**-coverage node is visually distinct from a low-coverage one.
+
+2.
+**Given** ADR 0013 makes the server-rendered text twin the no-JS contract for hierarchy surfaces
+**When** coverage is added to a hierarchy surface
+**Then** the twin carries the coverage figures too — a twin that omits the new signal silently breaks the contract that made the SVG retirement acceptable
+**And** the per-node byte cost of the added coverage data is **measured** against Story 20.7's budget, not assumed negligible; Story 20.5 already found the twin cost ~180 B/node that its own spike never modelled.
+
+3.
+**Given** the hierarchy surfaces already encode weight and status
+**When** coverage is added
+**Then** it honors UX-DR21's one-primary-representation rule per Story 27.1's decision, and the existing status encoding is not silently displaced without that being the recorded choice.
+
+### Story 27.6: Coverage × Churn — Finding Code That Changes Often and Is Poorly Tested
+
+As a maintainer deciding where to spend testing effort,
+I want to see which files combine high change frequency with low coverage,
+So that I can target the code most likely to break rather than chasing a global percentage.
+
+**Acceptance Criteria:**
+
+1.
+**Given** `--deep-git` already computes per-file churn and hotspots, and Story 27.3 provides coverage
+**When** both signals are available
+**Then** a surface ranks files by the combination — high churn with low coverage first — and the ranking rule is **stated and defensible**, not an unexplained composite score
+**And** it reuses the existing deep-git metric path (`GitMetrics.TryComputeDeep`) rather than adding a second git traversal.
+
+2.
+**Given** this project's charting conventions
+**When** the surface renders
+**Then** it carries an accessible text equivalent and conveys risk by more than color, and degrades to absent-not-broken when either signal is missing — coverage without `--deep-git`, or churn without a coverage report.
+
+3.
+**Given** per-line coverage marks were explicitly scoped OUT of this epic
+**When** this story is planned
+**Then** it records whether the analytics work changed the case for per-line marks, so that decision is revisited **on evidence** rather than silently dropped or silently expanded.
