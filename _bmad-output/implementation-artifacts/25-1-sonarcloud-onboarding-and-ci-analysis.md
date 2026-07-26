@@ -510,14 +510,30 @@ All five run against `windows-latest` for the gate job and `ubuntu-latest` for t
 
 **`ubuntu-latest` divergences — 2, both real, neither papered over:**
 
-1. **`SiteGeneratorAdapterTests.GenerateAll_GoldenContentFingerprint_IsStableAfterNormalizingVolatileTokens`.**
-   Linux produces `bd926ba9f163b03e7ef7c65b6d57b98971814ae82740027eeccaa0a6b0cd4939`; the committed constant
-   was generated on Windows. **The story's central prediction, confirmed: the fingerprint is
-   platform-dependent.** Per the story's explicit instruction, the constant was **NOT regenerated** — it is
-   a rendering-regression tripwire, and the runner that matches it was chosen instead. Root cause is not
-   isolated here (candidates remain file-enumeration order, filesystem case sensitivity, and CRLF-vs-LF
-   from the absent `.gitattributes`). **This is a finding that deserves its own story**, not a maintenance
-   chore, and it is the reason the ubuntu job is non-gating rather than absent.
+1. ~~**`GenerateAll_GoldenContentFingerprint_IsStableAfterNormalizingVolatileTokens`** — Linux produces a
+   different hash; "the story's central prediction, confirmed: the fingerprint is platform-dependent."~~
+   **⚠️ RETIRED 2026-07-26 — this conclusion was WRONG, and the correction matters more than the original
+   finding.** The fingerprint was never platform-dependent. Linux now produces the **identical** hash
+   (`91c3aeb4…`) as Windows local and Windows CI. Two independent defects in the *test's own normalization*
+   made the constant non-portable, and both are fixed (commit `98a90c6`, test-only):
+
+   - **Checkout dependence.** `VendoredAssetToken` SHA-256'd the vendored plotly bundle's **raw bytes**,
+     bypassing `NormalizeVolatile`. With no `.gitattributes`, that asset is text-classified and materializes
+     as CRLF where `core.autocrlf=true` and LF everywhere else — `git ls-files --eol` reports
+     `i/lf w/crlf attr/`, a 48-byte difference.
+   - **Date and time-zone dependence — the serious one.** `FoldToday` rewrites *today's* date to
+     `<date-iso>`. Both are exactly ten characters, so the substitution is **length-neutral and invisible to
+     any size check**. `specscribe.css` carries a dated *source comment* (`[owner verify round 2026-07-25]`),
+     so on the single calendar day that date was "today" it got folded and on every other day it did not.
+     **The constant depended on the wall clock**: captured on a box whose local date was 2026-07-25, it
+     failed on runners already at 2026-07-26 UTC — and would have failed on the owner's own machine the next
+     morning with no code change behind it, reading as a rendering regression and inviting exactly the
+     needless regeneration the story warns against.
+
+   The constant was regenerated `8af72043` → `91c3aeb4` as a deliberate **normalization** change with no
+   rendering behind it, and is the **first golden constant in this project confirmed on more than one
+   machine**: stable across two repeated local runs and byte-identical on the owner's Windows box,
+   `windows-latest`, and `ubuntu-latest`. Every previous constant was only ever confirmed on one box.
 
 2. **`PathUtilTests.EscapesRepoRoot_ChecksTheLeadingSegment_NotABareSubstring(relativePath: "C:/Dev/SpecScribe/file.md", expected: True)`.**
    The theory case asserts a `C:/`-rooted path escapes the repo root. That is true on Windows and false on
@@ -532,7 +548,16 @@ All five run against `windows-latest` for the gate job and `ubuntu-latest` for t
 |---|---|---|
 | `CommitDetailTemplaterTests.RenderPage_BinaryRowShowsMarkerNotZeroChurn` (commit `43e9528`) | `Assert.DoesNotContain("+0", html)` searched the **whole rendered page**. The page footer renders the host's local UTC offset; on a host at UTC that string is `… UTC+00:00 …`, which contains `+0`. The test passed only by accident of the author's machine sitting at a **negative** offset. It failed on **both** runners, so this is a **time-zone** bug, not an OS bug. | Both churn assertions were narrowed to the cell markup they are actually about (`commit-added">+0<`, `commit-deleted">&minus;0<`), and **two positive assertions were added** that the binary row's numeric cells render `&mdash;`. The test now checks the intended behaviour more tightly than before, not less. No `src/` change; `GoldenContentFingerprint` untouched. |
 
-**No other `tests/**.cs` file was modified, and no file under `src/` was modified.**
+Two further `tests/**.cs` changes landed later in the same session, after `bcca682` put the concurrent
+session's Stories 18.1/18.2/20.5/20.8/5.3 on `main` and turned the gate red. Both are recorded here under the
+same AC #4 rule:
+
+| Test | Root cause | Why this is a fix, not a weakened assertion |
+|---|---|---|
+| `SiteGeneratorAdapterTests` — `VendoredAssetToken` + new `IsCopiedAsset`/`FoldLineEndings`; constant `8af72043` → `91c3aeb4` (commit `98a90c6`) | The fingerprint's own normalization was **checkout-dependent** (raw-byte hash of a CRLF-vs-LF asset) and **date/time-zone-dependent** (`FoldToday` folding a dated *source comment* on exactly one calendar day, length-neutrally). Full detail in § 4 divergence 1. | Nothing rendered differently; only the normalization changed. The assets remain fully content-pinned — any real edit still flips the hash. The constant went from valid-on-one-box-on-one-day to verified identical on three environments. |
+| `SiteGeneratorEpicsRemovalTests.ConcurrentRegenerations_SerializeOnTheWriterLock_AndConvergeToCoherentOutput` (commit `2c1128d`) | Drove `GenerateOne` with a **story artifact**, a call the watch dispatch cannot produce: `FileWatcherService` routes `IsDataSource → IsAdr → IsEpicsRelated → GenerateOne`, and `IsEpicsRelated` claims everything under `implementation-artifacts/`. The direct call wrote a standalone page no full rebuild produces; ~23% of runs (3 of 13) failed depending on whether a racing `RegenerateEpics` pruned the orphan. | The generator was not at fault and was not touched. The leg now drives a plain `notes/` doc — what the dispatch would actually hand it, and the same reasoning the directory-rename test in that class already documents. Contention is unchanged: four routes still race on `_gate`. 0 failures in 25 consecutive runs. |
+
+**No file under `src/` was modified at any point in this story.**
 
 #### 4b. The coverage decision (AC #3) — all four required fields
 
@@ -654,14 +679,23 @@ dotnet-sonarscanner` **unversioned**, matching Sonar's own documented sample; pi
    `30176207551`, green. The merge push then ran the gate and the Pages workflow concurrently, both green.
 6. **The `.gitattributes` / golden-fingerprint portability finding** deserves its own story — see § 4.
 
-### Proposed follow-up story (raised here rather than buried)
+### Proposed follow-up story (rewritten 2026-07-26 — its original premise was disproven)
 
-**"Make `GoldenContentFingerprint` platform-independent, or prove it cannot be."** Evidence: `ubuntu-latest`
-computes `bd926ba9…4939` where the Windows-generated constant differs, on identical source. Suspects:
-file-enumeration order, filesystem case sensitivity, and CRLF-vs-LF from the **absent `.gitattributes`**.
-Value: it would let the gate move to `ubuntu-latest`, which ran the suite in **14 s vs 49 s** — a ~3.5×
-saving on every push — and would retire a latent correctness question about the generator's determinism.
-Also worth folding in: adding a `.gitattributes`, which this repo has never had.
+**"Move the gate to `ubuntu-latest`."** The fingerprint half of this is **already done** (see § 4 divergence
+1): Linux and Windows now agree byte-for-byte. What remains is **one** test, and it is small:
+
+`PathUtilTests.EscapesRepoRoot_ChecksTheLeadingSegment_NotABareSubstring(relativePath: "C:/Dev/SpecScribe/file.md", expected: True)`
+— a `C:/…` path is absolute on Windows and an ordinary relative name on Linux, so `EscapesRepoRoot`
+correctly returns `False` there. The theory case encodes a Windows-only assumption; it needs to assert the
+platform-appropriate expectation rather than a fixed `True`.
+
+**Payoff:** `ubuntu-latest` runs the suite in **13 s vs 47 s** on `windows-latest` — roughly 3.5× on every
+push and PR — and the ubuntu job could then become the gate instead of a non-gating probe.
+
+**Still worth doing separately:** add a `.gitattributes`. The repo has never had one, and its absence is
+what made the vendored asset checkout-dependent in the first place. It is no longer *blocking* anything,
+which is precisely why it should be filed rather than forgotten. Note that adding one will move the golden
+constant again (working-tree line endings change), so it is a deliberate, reviewed change of its own.
 
 ### File List
 
