@@ -202,6 +202,8 @@ public class SiteGeneratorAdapterTests : IDisposable
             "epics/story-2-1.html",
             // Story 10.3: the how-to-read orientation page is written on every full run, like about.html/diagnostics.html.
             "how-to-read.html",
+            // Story 23.2: the design-system reference — same always-written guarantee, so its Help link never dangles.
+            "design-system.html",
             // About Spec-Driven Development hub + per-framework sub-pages (always written).
             "about-sdd.html",
             "about-sdd-bmad.html",
@@ -1037,7 +1039,19 @@ public class SiteGeneratorAdapterTests : IDisposable
         // PROVENANCE (shared main): captured on a clean tree at commit 2c1128d, immediately after bcca682 landed
         // the concurrent session's Stories 18.1/18.2/20.5/20.8/5.3 — so this constant sits on top of that work.
         // [Story 25.1; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
-        const string expected = "91c3aeb4346cd2f9915254ab4ed35ddf0a651251d5a3dbbf392c743a269a950c";
+        // Regenerated for Story 23.2: the always-written design-system.html joins the output set (a new page,
+        // so GoldenOutputInventory above moves too), and its "Design System" Help entry + quick link land on
+        // EVERY page through the one RenderNavMarkup seam — which is why a single new page shifts the whole
+        // tree's hash. Icons.ForConcept gained the matching palette glyph.
+        //
+        // PROVENANCE (shared main): captured on a tree that ALSO carried a concurrent session's uncommitted
+        // Story 20.x work — specscribe.css (+24 lines of .ss-hierarchy-booting anti-flash rules), specscribe.js,
+        // HierarchyExplorer, SunburstExplorer, DashboardViewBuilder, HtmlRenderAdapter, and SiteGenerator's new
+        // WriteTextWithRetry. specscribe.css is copied to the output verbatim, so that session's edits are
+        // inside this hash as well as mine; the two could not be separated without destroying uncommitted work
+        // (CLAUDE.md forbids reset/checkout/clean here, and rightly). Stable across two repeated local runs.
+        // [Story 23.2; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
+        const string expected = "2050b5862e2c9fa8fa94f832739900487f3c84b18f16bb10d7697250d492063a";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

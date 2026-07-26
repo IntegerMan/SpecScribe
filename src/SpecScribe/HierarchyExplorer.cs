@@ -134,7 +134,9 @@ public static class HierarchyExplorer
         FollowUpGeometry? followUps = null,
         UnplannedWorkGeometry? unplanned = null)
     {
-        var source = Charts.SunburstExplorerNodes(model, followUps, unplanned);
+        // `expandDenseEpics: true` — the component drills, so an epic's own view has the whole sweep to itself and
+        // the static chart's "8 stories" collapse would only hide the stories the reader drilled in to find.
+        var source = Charts.SunburstExplorerNodes(model, followUps, unplanned, expandDenseEpics: true);
         var nodes = Reparent(source, siteTitle, SiteNav.HomeOutputPath);
         return new HierarchyExplorerModel(config, WithDetails(nodes, model));
     }
@@ -329,6 +331,19 @@ public static class HierarchyExplorer
         // --- Breadcrumb (drill scope) + the polite live region the a11y layer announces through.
         body.Append("<div class=\"ss-hierarchy-drill\" hidden><ol class=\"ss-hierarchy-breadcrumb\" aria-label=\"Zoom scope\"></ol></div>\n");
 
+        // --- The boot placeholder — the anti-flash half of the JS handshake.
+        //
+        // Without it a scripted visitor sees the server SVG paint, then a differently-organized Plotly chart
+        // replace it a moment later — the owner's words: "a jarring experience ... I'd rather see an
+        // 'Initializing...' if JS is present." The marker that reveals this is set by
+        // <see cref="HtmlRenderAdapter"/> at the CHROME level, before the body is parsed: nothing deferred could
+        // prevent the flash, because `specscribe.js` runs after the document is parsed and the SVG has painted.
+        // It lives there rather than here precisely so the webview and SPA surfaces — which consume this body
+        // directly and must carry no script — never receive it.
+        // The placeholder itself. Sized to the chart it is standing in for, so the swap costs no reflow.
+        body.Append($"<div class=\"ss-hierarchy-booting\" role=\"status\" style=\"min-height:{cfg.Size}px\">")
+            .Append("<span>Initializing chart&hellip;</span></div>\n");
+
         // --- Chart host. EMPTY at render time and `display:none` until the component reveals it (the CSS default
         // for `.ss-hierarchy`). Reserving its height server-side would leave a JS-off visitor staring at a blank
         // box the size of a chart that is never coming; the component sets the height from `config.size` at the
@@ -468,6 +483,36 @@ public static class HierarchyExplorer
     /// <summary>The chart host's opt-in marker — the ONE string that names the class ↔ script ↔ asset-flag
     /// contract, so no consumer re-types it.</summary>
     public const string HostMarker = "data-hierarchy";
+
+    /// <summary>Set on the PANEL by the client the moment a mount succeeds. It ends the boot placeholder and
+    /// disarms the inline script's expiry timer, so the two never fight over whether to show the server SVG.</summary>
+    public const string MountedMarker = "data-hierarchy-mounted";
+
+    /// <summary>Set on the panel by the client when a mount DECLINES or throws, so the server SVG comes straight
+    /// back instead of the reader watching a placeholder until <see cref="BootTimeoutMs"/> expires.</summary>
+    public const string FailedMarker = "data-hierarchy-failed";
+
+    /// <summary>How long the boot placeholder may stand before it gives up and hands the page back to the server
+    /// SVG. Long enough for a large bundle to parse and plot on a slow machine, short enough that a blocked script
+    /// is not mistaken for a slow one.</summary>
+    public const int BootTimeoutMs = 5000;
+
+    /// <summary>The anti-flash handshake, injected by <see cref="HtmlRenderAdapter"/> BEFORE the page body so it
+    /// runs while the body is still being parsed — the only moment at which the server SVG can be suppressed
+    /// without the reader seeing it paint first. <c>specscribe.js</c> is <c>defer</c>, so it cannot do this.
+    ///
+    /// <para>It lives on the CHROME seam rather than inside the component's markup for a hard reason: the webview
+    /// and SPA surfaces consume <see cref="PageView.BodyHtml"/> directly and must carry <b>no</b> script
+    /// (<c>SiteGeneratorWebviewTests.EverySurface_CarriesTheChromeAndNoScript</c> pins that, and owner decision D4
+    /// forbids touching <see cref="WebviewRenderAdapter"/>). Emitting it here keeps both true.</para>
+    ///
+    /// <para>The expiry is what keeps owner decision D1 honest. If the bundle is blocked or missing,
+    /// <c>specscribe.js</c> may never mount anything — and a hide-first with no timeout would leave a permanent
+    /// "Initializing…" over a chart that exists and works. So the marker is removed from any panel that has neither
+    /// mounted nor reported failure, and the server SVG is simply the page.</para></summary>
+    public static readonly string BootScript =
+        "<script>(function(){var r=document.documentElement;r.setAttribute('data-ss-hierarchy-boot','1');"
+        + $"setTimeout(function(){{r.removeAttribute('data-ss-hierarchy-boot');}},{BootTimeoutMs});}})();</script>\n";
 
     /// <summary>Whether a rendered body carries a Hierarchy Explorer host. The producer of an
     /// <see cref="AssetManifest"/> calls this over the FINISHED body, mirroring

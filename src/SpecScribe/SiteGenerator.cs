@@ -465,6 +465,7 @@ public sealed class SiteGenerator
             events.Add(WriteDiagnostics(nav, events));
             events.Add(WriteAbout(nav));
             events.Add(WriteHowToRead(nav));
+            events.Add(WriteDesignSystem(nav));
             events.AddRange(WriteAboutSdd(nav));
 
             // Opt-in JSON+SPA delivery form, emitted LAST so every captured page is present. Strictly additive:
@@ -3224,7 +3225,7 @@ public sealed class SiteGenerator
         // `_workGraph` is handed in verbatim — the SAME instance WriteWorkGraph renders — so the Story 20.3
         // related-work pane is a pure read over the already-computed model, never a second projection. [Story 20.3]
         var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, inventory, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts, followUps, unplanned, cadence: _cadence, workGraph: _workGraph, dateCutoff: _today);
-        File.WriteAllText(indexPath, ApplyReferenceLinks(html, "index.html"));
+        WriteTextWithRetry(indexPath, ApplyReferenceLinks(html, "index.html"));
         EnsureHierarchyEngine(html);
     }
 
@@ -3798,6 +3799,20 @@ public sealed class SiteGenerator
         var html = HowToReadTemplater.RenderPage(nav, _module.Docs, _module.Glossary, _module.Commands);
         WriteOutput(SiteNav.HowToReadOutputPath, html);
         return new GenerationEvent(GenerationOutcome.Generated, SiteNav.HowToReadOutputPath, sw.Elapsed);
+    }
+
+    /// <summary>Writes <c>design-system.html</c> — the portal's status/motion token families and shared visual
+    /// primitives. Static (no run dependency); written on every full run alongside About/How-to-read so its
+    /// Help-nav link always resolves. Rides <see cref="WriteOutput"/> so the SPA and webview
+    /// <c>CapturePages</c> forms pick it up like any other page. Deliberately NOT run through
+    /// <see cref="ApplyReferenceLinks"/> — the page's subject IS the portal's vocabulary, so it must not
+    /// self-expand its own terms into reference chips. [Story 23.2 AC #6]</summary>
+    private GenerationEvent WriteDesignSystem(SiteNav nav)
+    {
+        var sw = Stopwatch.StartNew();
+        var html = DesignSystemTemplater.RenderPage(nav);
+        WriteOutput(SiteNav.DesignSystemOutputPath, html);
+        return new GenerationEvent(GenerationOutcome.Generated, SiteNav.DesignSystemOutputPath, sw.Elapsed);
     }
 
     /// <summary>Writes About Spec-Driven Development hub + framework sub-pages. [About SDD]</summary>
@@ -4379,6 +4394,33 @@ public sealed class SiteGenerator
     // failure surfaces well inside one debounce interval rather than stalling the watch loop.
     private const int AssetWriteRetries = 3;
     private const int AssetWriteRetryDelayMs = 25;
+
+    /// <summary>Writes a page with the same brief transient-contention retry <see cref="CopyEmbeddedAsset"/> uses,
+    /// and for the same reason (NFR2). <c>index.html</c> is the most-rewritten file in a watch session — every
+    /// debounced save regenerates it — so it is the likeliest to lose a race with something holding it open for a
+    /// moment: a virus scanner sweeping the freshly-written tree, a browser tab reloading it, an editor preview.
+    /// A sharing violation there is transient by nature and should cost a few milliseconds, not a reported error.
+    ///
+    /// <para>Surfaced by a real burst-of-saves failure: the home page grew substantially in Story 20.5 (the
+    /// Hierarchy Explorer's island and text twin, and a details-rail card per selectable node), which lengthened
+    /// each write enough to turn a pre-existing, rarely-hit race into an intermittent one. The size change exposed
+    /// the gap; the missing retry was always the defect. [Story 20.5 owner round]</para></summary>
+    private static void WriteTextWithRetry(string path, string content)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                File.WriteAllText(path, content);
+                return;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                if (attempt >= AssetWriteRetries) throw;
+                Thread.Sleep(AssetWriteRetryDelayMs);
+            }
+        }
+    }
 
     private List<string> EnumerateSourceFiles() =>
         Directory.Exists(_options.SourceRoot)

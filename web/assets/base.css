@@ -1,0 +1,63 @@
+/* The Nuxt app's own base layer. Hand-authored (unlike tokens.css, which is generated) — but every value
+   here resolves through a `var(--…)` token, so it adds NO second colour or timing definition.
+ *
+ * Why this exists at all: the app imports ONLY tokens.css from the C# side (Story 23.2 owner decision 2), so
+ * nothing supplies page-level typography and reset. Re-importing the 7,000-line specscribe.css to get them —
+ * the 23.1 spike's move — would drag the whole monolith into every route and keep alive the fragility class
+ * Epic 23 exists to end. This file is the deliberate minimum instead: reset, page chrome, reduced-motion.
+ *
+ * Component rules do NOT belong here. They belong in each SFC's `<style scoped>`. See CONVENTIONS.md. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--cream);
+  color: var(--ink);
+  /* Matches the portal's antiquarian serif stack — the design system's most recognisable single trait. */
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
+  line-height: 1.65;
+  min-height: 100vh;
+}
+
+a {
+  color: var(--teal);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--gold-light);
+}
+
+a:hover {
+  color: var(--rust);
+}
+
+code,
+pre {
+  font-family: 'Courier New', Courier, monospace;
+}
+
+/* Focus ring — UX-DR16. Never removed, only restyled: a keyboard user must always be able to see where
+   they are. Mirrors the portal's own visible-focus contract. */
+:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+
+/* The reduce half of the motion contract. Authored ONCE, globally, because it must neutralise every
+   component's entrance — a per-SFC copy of this block is exactly the drift the motion tokens exist to
+   prevent. Components declare motion only through --motion-*; this turns all of it off at the root.
+   [motion-token-system; UX-DR — no motion without an opt-out] */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

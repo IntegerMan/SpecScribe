@@ -61,6 +61,10 @@ public static class Icons
             // How-to-use / About SDD orientation. [Help nav; About SDD]
             "How to use SpecScribe" => Svg("<path d=\"M3 2.8h10v10.4H3Z\"/><path d=\"M5.2 5.6h5.6M5.2 8h5.6M5.2 10.4h3.4\"/>"),
             "About Spec-Driven Development" or "Spec-Driven Development" => Svg("<circle cx=\"8\" cy=\"8\" r=\"5.3\"/><path d=\"M10.2 5.8 8.7 8.7 5.8 10.2 7.3 7.3Z\"/>"),
+            // An artist's palette: a rounded body with three distinct wells. Reads as "the shared visual
+            // vocabulary" — deliberately unlike the document/card outlines the other Help leaves use, since the
+            // design-system page is the only one whose subject is how the portal LOOKS. [Story 23.2]
+            "Design System" => Svg("<path d=\"M8 2.6c3 0 5.4 2.2 5.4 4.9 0 1.6-1.3 2.4-2.4 2.4h-1c-.8 0-1.4.6-1.4 1.3 0 .3.1.6.3.8.2.2.3.5.3.8 0 .8-.7 1.2-1.2 1.2-3 0-5.4-2.4-5.4-5.7S5 2.6 8 2.6Z\"/><path d=\"M5.6 6.2v.2M8 5v.2M10.2 6.6v.2\"/>"),
             "Git Insights" => Svg("<path d=\"M2.8 11.2V8.4l2.4-4 2.4 2.4 2.4-3.2 2.4 4.8v3.2\"/><path d=\"M2.8 11.2h10.4\"/>"),
             "Deep Analytics" => Svg("<circle cx=\"4\" cy=\"8\" r=\"1.7\"/><circle cx=\"12\" cy=\"4.2\" r=\"1.7\"/><circle cx=\"12\" cy=\"11.8\" r=\"1.7\"/><path d=\"M5.5 7.2 10.5 4.8M5.5 8.8 10.5 11.2\"/>"),
             "Deferred Work" => Svg("<circle cx=\"8\" cy=\"8\" r=\"5.2\"/><path d=\"M5.6 5.6 10.4 10.4M10.4 5.6 5.6 10.4\"/>"),

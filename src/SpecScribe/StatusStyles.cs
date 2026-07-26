@@ -356,6 +356,20 @@ public static class StatusStyles
         return $"<span class=\"status-badge {cls} js-tip\" data-tip=\"{tip}\" title=\"{tip}\">{Icon(iconClass)}{PathUtil.Html(label)}</span>";
     }
 
+    /// <summary>The display word for a canonical legend stage — the single label seam, delegating to
+    /// <see cref="StoryLabel"/> / <see cref="RequirementLabel"/> / <see cref="SprintLabel"/> so no caller
+    /// grows a parallel stage→word switch that can drift from its siblings. Extracted from
+    /// <see cref="LegendKey"/> when the design-system page became a second consumer — a page whose whole
+    /// subject is the status vocabulary is the last place a second copy of it belongs.
+    /// [spec-epic8-deferred-debt-cleanup; Story 23.2]</summary>
+    public static string LegendWord(string cssClass) => cssClass switch
+    {
+        "deferred" => RequirementLabel(RequirementStatus.Deferred),
+        "unmapped" => RequirementLabel(RequirementStatus.Unmapped),
+        "retired" => SprintLabel("retired"),
+        _ => StoryLabel(cssClass),
+    };
+
     /// <summary>On-demand status legend disclosure: a compact "?" toggle that opens a single-column popover
     /// (swatch + icon + word + meaning) for every canonical stage. Static reference — never zero-suppresses.
     /// Call beside status-bearing headers/badges; native <c>&lt;details&gt;</c> so it works with JS off and under
@@ -371,15 +385,7 @@ public static class StatusStyles
         sb.Append("    <ul class=\"status-legend-key-list\">\n");
         foreach (var stage in LegendStages)
         {
-            // Single label seam — no parallel stage→word switch that can drift from StoryLabel / siblings.
-            // [spec-epic8-deferred-debt-cleanup]
-            var word = stage switch
-            {
-                "deferred" => RequirementLabel(RequirementStatus.Deferred),
-                "unmapped" => RequirementLabel(RequirementStatus.Unmapped),
-                "retired" => SprintLabel("retired"),
-                _ => StoryLabel(stage),
-            };
+            var word = LegendWord(stage);
             var meaning = PathUtil.Html(StageMeaning(stage));
             // Unmapped reuses the pending/tan swatch (no 7th token) while icon + word stay distinct. [Story 9.9]
             var swatchClass = stage == "unmapped" ? "pending" : stage;

@@ -198,7 +198,10 @@ public static class DashboardViewBuilder
         string projectTitle)
     {
         if (workGraph is null || workGraph.IsEmpty || epicsModel is null) return string.Empty;
-        var islandIds = Charts.SunburstExplorerNodes(epicsModel, geometry, unplannedGeometry)
+        // Same `expandDenseEpics: true` the Hierarchy Explorer uses, so the rail's selectable set is exactly what
+        // the component can select — a story inside a dense epic included. Passing the collapsed set here would
+        // give those stories a wedge to click and no card to show for it.
+        var islandIds = Charts.SunburstExplorerNodes(epicsModel, geometry, unplannedGeometry, expandDenseEpics: true)
             .Select(n => n.Id)
             .ToList();
         // linkPrefix "" — the dashboard is at the site root, so WorkGraphEpic.Reprefixed is a no-op there. The rule

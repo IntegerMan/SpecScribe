@@ -1,0 +1,88 @@
+/* GENERATED FILE — DO NOT EDIT.
+ * Extracted verbatim from the `:root` block of src/SpecScribe/assets/specscribe.css (lines 6-82)
+ * by `npm run extract:tokens`. That C# stylesheet is the single source of truth for SpecScribe's
+ * presentation tokens (AD-7); this file is a copy, never a second definition.
+ *
+ * Re-run `npm run extract:tokens` after ANY token change in the C# stylesheet.
+ * `npm run check:tokens` fails the build when this file and the source diverge.
+ *
+ * Host CHROME remaps (specscribe-webview-theme.css) are deliberately NOT carried here — those are
+ * host-owned under AD-7. Only content-semantic tokens cross this bridge.
+ */
+:root {
+  --parchment: #f4ead5;
+  --parchment-dark: #e8d5b0;
+  --parchment-deep: #d4b896;
+  --cream: #f5f0e8;
+  --warm-white: #faf7f2;
+  --ink: #2a1f0e;
+  --ink-faded: #5a4535;
+  /* Deepened from #7a6250 (measured 3.95:1 on --parchment-dark — below AA) to clear 4.5:1 on BOTH parchment
+     surfaces (4.90 on parchment-dark, 5.91 on parchment) while keeping the warm hue. Pinned by the computed
+     WCAG test in StylesheetTests. [spec-scribes-nib-branding contrast pass] */
+  --ink-light: #6b5442;
+  /* The refinement funnel's stage-linking band. Deliberately its OWN token (not --parchment-dark, whose webview
+     remap made the connector invisible on dark hosts): visibly distinct from both page and panel surfaces here
+     (1.95:1 / 1.61:1 vs the old ~1.1:1), and re-valued per theme in the webview bridge.
+     [spec-scribes-nib-branding contrast pass] */
+  --funnel-connector: #c7a56d;
+  --rust: #8b3a1a;
+  --rust-light: #c4622d;
+  --moss: #4a6741;
+  --moss-light: #6b8f62;
+  --teal-deep: #1e4a5a;
+  --teal: #2e6b7a;
+  /* A genuinely distinct 4th accent hue (violet), not a lightness variant of rust/moss/teal — added for the
+     Code Map's file-type "Other Languages" bucket (Story 7.9 review), which previously reused --ink-light (a
+     muted text token elsewhere) and risked reading as de-emphasized rather than as a real, equally-weighted
+     category. */
+  --violet: #6a4a7a;
+  --gold: #b8860b;
+  --gold-light: #d4a017;
+  --border: #d4c4a8;
+  --shadow: rgba(42, 31, 14, 0.15);
+  /* Approximate sticky-nav height (two tiers: dark identity/journey bar + white key-views chip band) — the
+     sticky TOC sidebar sits below the nav and anchored jumps clear it. Mobile collapses the journey menu, so
+     the offset drops there. */
+  --nav-offset: 6.5rem;
+
+  /* ---- Status lifecycle tokens (Story 1.5 B2/B3) ----
+     ONE token per lifecycle stage, consumed by every chart, legend, swatch and badge so a stage reads as
+     the same color everywhere. StatusStyles remains the single status→stage source; this is the single
+     stage→color source. Adopts the sunburst's six-stage vocabulary (B1): drafted and pending are their own
+     tokens (previously the donuts collapsed drafted→ready and pending→parchment, disagreeing with the
+     sunburst). Do not reintroduce per-chart literal colors — route new status color through these. */
+  --status-pending: #b8b2a8;   /* tan-grey — listed, no plan yet */
+  --status-drafted: #e8d9a8;   /* pale gold — stories drafted */
+  --status-ready: var(--gold-light);   /* gold — has a plan, ready to build */
+  --status-active: var(--teal);        /* teal — in development */
+  --status-review: var(--teal-deep);   /* deep teal — in review */
+  --status-done: var(--moss-light);    /* green — done ONLY */
+  /* Frozen at the value --ink-light held before the spec-scribes-nib-branding contrast pass deepened that
+     TEXT token — the deferred ACCENT must not drift when muted-text contrast is tuned (they only ever shared
+     a value by coincidence, and the owner's no-accent-retune constraint covers this stage too). */
+  --status-deferred: #7a6250; /* grey-brown — requirements shelved for later */
+  /* Non-lifecycle: present native status with no canonical map. Cool slate outline — must NOT read as any
+     of the six real stages or deferred (AC #3). [Story 8.2] */
+  --status-unrecognized: #5c6570;
+  /* Alternate hatch stripe for unrecognized chrome — token so dark/webview remaps can retune it. */
+  --status-unrecognized-hatch: #e8ecf0;
+
+  /* Diagnostics severity background (Story 4.8) — a pale rust tint pairing with --rust, deliberately outside
+     the six-stage --status-* vocabulary (a run notice isn't a delivery stage) but still a named token rather
+     than an inline literal, per the project's variable-only palette convention. [Review][Patch] */
+  --diag-error-bg: #f4e2dc;
+
+  /* ---- Motion vocabulary (Story 3.5 Task 1) ----
+     ONE named set of motion primitives — the same single-source discipline the --status-* tokens enforce for
+     color, applied to timing: every insight-surface entrance/hover reads with the same deliberate feel instead
+     of the scattered literal seconds (0.9s, 0.6s, 0.12s) they replaced. A NEW parallel family — it does NOT
+     touch or reshape the status tokens. Consumed almost entirely inside the two paired prefers-reduced-motion
+     blocks near the end of this file (the reduce half neutralizes everything these drive), plus the shared
+     chart hover transitions. "Flashy but purposeful" is one vocabulary, not per-chart magic numbers. */
+  --motion-fast: 0.12s;         /* hover/opacity feel — .sb-seg + .donut-seg emphasis */
+  --motion-entrance: 0.6s;      /* the chart reveal — donuts, sunburst, heatmap cells, insight panels */
+  --motion-entrance-long: 0.9s; /* the progress-bar width sweep */
+  --motion-ease: ease-out;
+  --motion-stagger: 0.04s;      /* per-item entrance delay unit — heatmap columns wipe left-to-right */
+}

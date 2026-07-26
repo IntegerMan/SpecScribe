@@ -50,7 +50,7 @@ public class SiteNavTests
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
         // Help is always present (How to use / About SDD / About / Logs); Project omits when empty.
-        Assert.Equal(new[] { "Home", "Epics", "Requirements", "Traceability", "Cadence", "How to use SpecScribe", "About Spec-Driven Development", "About", "Logs" }, nav.Items.Select(i => i.Label).ToArray());
+        Assert.Equal(new[] { "Home", "Epics", "Requirements", "Traceability", "Cadence", "How to use SpecScribe", "Design System", "About Spec-Driven Development", "About", "Logs" }, nav.Items.Select(i => i.Label).ToArray());
     }
 
     [Fact]
@@ -66,7 +66,7 @@ public class SiteNavTests
 
         // Journey order: Home → Delivery → Project → Help (How to use / About SDD / About / Logs).
         Assert.Equal(
-            new[] { "Home", "Epics", "Requirements", "Traceability", "Cadence", "GDD", "Narrative", "Game Architecture", "ADRs", "How to use SpecScribe", "About Spec-Driven Development", "About", "Logs" },
+            new[] { "Home", "Epics", "Requirements", "Traceability", "Cadence", "GDD", "Narrative", "Game Architecture", "ADRs", "How to use SpecScribe", "Design System", "About Spec-Driven Development", "About", "Logs" },
             nav.Items.Select(i => i.Label).ToArray());
     }
 
@@ -76,7 +76,7 @@ public class SiteNavTests
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasReadme: true);
 
         // Readme sits in Project (after Delivery); Help trails with How to use / About SDD / About / Logs.
-        Assert.Equal(new[] { "Home", "Epics", "Requirements", "Traceability", "Cadence", "Readme", "How to use SpecScribe", "About Spec-Driven Development", "About", "Logs" }, nav.Items.Select(i => i.Label).ToArray());
+        Assert.Equal(new[] { "Home", "Epics", "Requirements", "Traceability", "Cadence", "Readme", "How to use SpecScribe", "Design System", "About Spec-Driven Development", "About", "Logs" }, nav.Items.Select(i => i.Label).ToArray());
         Assert.Equal(SiteNav.ReadmeOutputPath, nav.Items.First(i => i.Label == "Readme").OutputRelativePath);
         Assert.True(nav.HasReadme);
     }
@@ -96,7 +96,7 @@ public class SiteNavTests
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
 
         // Help (How to use / About SDD / About / Logs) follows Delivery in group order.
-        Assert.Equal(new[] { "Home", "Epics", "Requirements", "Traceability", "Cadence", "Sprint", "How to use SpecScribe", "About Spec-Driven Development", "About", "Logs" }, nav.Items.Select(i => i.Label).ToArray());
+        Assert.Equal(new[] { "Home", "Epics", "Requirements", "Traceability", "Cadence", "Sprint", "How to use SpecScribe", "Design System", "About Spec-Driven Development", "About", "Logs" }, nav.Items.Select(i => i.Label).ToArray());
         Assert.Equal(SiteNav.SprintOutputPath, nav.Items.First(i => i.Label == "Sprint").OutputRelativePath);
         Assert.True(nav.HasSprint);
 
@@ -115,7 +115,7 @@ public class SiteNavTests
         Assert.DoesNotContain("Sprint", nav.Items.Select(i => i.Label));
         Assert.DoesNotContain(nav.QuickLinks, q => q.Label == "Sprint");
         Assert.False(nav.HasSprint);
-        Assert.Equal(new[] { "Home", "Epics", "Requirements", "Traceability", "Cadence", "How to use SpecScribe", "About Spec-Driven Development", "About", "Logs" }, nav.Items.Select(i => i.Label).ToArray());
+        Assert.Equal(new[] { "Home", "Epics", "Requirements", "Traceability", "Cadence", "How to use SpecScribe", "Design System", "About Spec-Driven Development", "About", "Logs" }, nav.Items.Select(i => i.Label).ToArray());
     }
 
     [Fact]
@@ -127,7 +127,7 @@ public class SiteNavTests
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasCodeMap: true);
 
         Assert.Equal(
-            new[] { "Home", "Epics", "Requirements", "Traceability", "Cadence", "Code Map", "Risk Quadrant", "How to use SpecScribe", "About Spec-Driven Development", "About", "Logs" },
+            new[] { "Home", "Epics", "Requirements", "Traceability", "Cadence", "Code Map", "Risk Quadrant", "How to use SpecScribe", "Design System", "About Spec-Driven Development", "About", "Logs" },
             nav.Items.Select(i => i.Label).ToArray());
         Assert.True(nav.HasCodeMap);
 
@@ -217,7 +217,7 @@ public class SiteNavTests
 
         // Delivery before Project; Help trails with How to use / About SDD / About / Logs. Brief/UX stay quick-links only.
         Assert.Equal(
-            new[] { "Home", "Epics", "Requirements", "Traceability", "Cadence", "PRD", "Architecture", "How to use SpecScribe", "About Spec-Driven Development", "About", "Logs" },
+            new[] { "Home", "Epics", "Requirements", "Traceability", "Cadence", "PRD", "Architecture", "How to use SpecScribe", "Design System", "About Spec-Driven Development", "About", "Logs" },
             nav.Items.Select(i => i.Label).ToArray());
 
         var quickLabels = nav.QuickLinks.Select(q => q.Label).ToArray();
@@ -244,7 +244,7 @@ public class SiteNavTests
         // Spec rides the Project group in the top nav (Story 10.1) and stays a quick-link too.
         Assert.Contains("Spec", nav.Items.Select(i => i.Label));
         Assert.Equal(
-            new[] { "Home", "Epics", "Requirements", "Traceability", "Cadence", "PRD", "Architecture", "Spec", "How to use SpecScribe", "About Spec-Driven Development", "About", "Logs" },
+            new[] { "Home", "Epics", "Requirements", "Traceability", "Cadence", "PRD", "Architecture", "Spec", "How to use SpecScribe", "Design System", "About Spec-Driven Development", "About", "Logs" },
             nav.Items.Select(i => i.Label).ToArray());
     }
 
@@ -376,7 +376,7 @@ public class SiteNavTests
         Assert.Contains(view.Groups, g => g.Label == "Insights" && g.Children.Count == 2);
         Assert.Contains(view.Groups, g => g.Label == "Follow-ups" && g.Children.Count == 2);
         Assert.Contains(view.Groups, g => g.Label == "Delivery");
-        Assert.Contains(view.Groups, g => g.Label == "Help" && g.Children.Count == 4);
+        Assert.Contains(view.Groups, g => g.Label == "Help" && g.Children.Count == 5);
     }
 
     [Fact]
@@ -388,6 +388,7 @@ public class SiteNavTests
         Assert.Equal(
             new[] {
                 ("How to use SpecScribe", SiteNav.HowToReadOutputPath),
+                ("Design System", SiteNav.DesignSystemOutputPath),
                 ("About Spec-Driven Development", SiteNav.AboutSddOutputPath),
                 ("About", SiteNav.AboutOutputPath),
                 ("Logs", SiteNav.DiagnosticsOutputPath),

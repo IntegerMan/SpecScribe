@@ -100,6 +100,12 @@ public sealed class SiteNav
     /// <c>How to use SpecScribe</c>. [Story 10.3; Help nav]</summary>
     public const string HowToReadOutputPath = "how-to-read.html";
 
+    /// <summary>The design-system reference (<c>design-system.html</c>): the <c>--status-*</c> and
+    /// <c>--motion-*</c> token families plus the shared visual primitives every surface is built from.
+    /// Written on EVERY full run (like About/How-to-read/Diagnostics) so its Help-nav link can never dangle.
+    /// Surfaced under Help as <c>Design System</c>. [Story 23.2; Help nav]</summary>
+    public const string DesignSystemOutputPath = "design-system.html";
+
     /// <summary>About Spec-Driven Development hub — support matrix + links to framework guides. [About SDD]</summary>
     public const string AboutSddOutputPath = "about-sdd.html";
     public const string AboutSddBmadOutputPath = "about-sdd-bmad.html";
@@ -179,13 +185,18 @@ public sealed class SiteNav
         var help = new List<(string Label, string Path)>();
         var quickLinks = new List<(string, string, string, string)>();
 
-        // Help: always-written orientation + product pages. Order: How to use SpecScribe → About SDD →
-        // About → Logs. Framework sub-pages ride the white local-context bar, not this dropdown. [Help nav]
+        // Help: always-written orientation + product pages. Order: How to use SpecScribe → Design System →
+        // About SDD → About → Logs. Design System sits second because it explains how to READ every other
+        // page (what a status colour means, what a framed panel is telling you), which is orientation — the
+        // product/support pages that follow answer a different question. Framework sub-pages ride the white
+        // local-context bar, not this dropdown. [Help nav; Story 23.2]
         help.Add(("How to use SpecScribe", HowToReadOutputPath));
+        help.Add(("Design System", DesignSystemOutputPath));
         help.Add(("About Spec-Driven Development", AboutSddOutputPath));
         help.Add(("About", AboutOutputPath));
         help.Add(("Logs", DiagnosticsOutputPath));
         quickLinks.Add(("How to use SpecScribe", HowToReadOutputPath, "Reading order, glossary, and how to generate the site.", "Help"));
+        quickLinks.Add(("Design System", DesignSystemOutputPath, "Status and motion tokens, and the shared visual primitives.", "Help"));
         quickLinks.Add(("About Spec-Driven Development", AboutSddOutputPath, "Frameworks, support matrix, and getting started with SDD.", "Help"));
         quickLinks.Add(("About", AboutOutputPath, "SpecScribe version, build, and product details.", "Help"));
         quickLinks.Add(("Logs", DiagnosticsOutputPath, "Generation diagnostics and the run log.", "Help"));

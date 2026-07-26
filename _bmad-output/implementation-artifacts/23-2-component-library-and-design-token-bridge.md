@@ -1,6 +1,10 @@
+---
+baseline_commit: cd7f30255bb07112332c0876f4335e6b77ca9f4d
+---
+
 # Story 23.2: Component Library + Design-Token Bridge
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -42,37 +46,37 @@ owner's design-system-page decision (AC 6)._
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Scaffold the `web/` Nuxt app** (AC: #3)
-  - [ ] Create repo-root `web/` with `package.json` (devDependencies: `nuxt ^3.14`, `vue ^3.5`, `vue-router ^4.4` — mirror `spike/nuxt-ir/package.json`), `nuxt.config.ts` (`ssr: true`, `telemetry: false`, `devtools.enabled: false`, full prerender per ADR 0009 Option B), and `app.vue`.
-  - [ ] Confirm `node_modules/` is already covered by `.gitignore` (it is — global `node_modules/` rule) and that `web/` is **not** added to `SpecScribe.slnx`.
-  - [ ] Do **not** wire `web/` into `specscribe generate` — packaging is Story 23.5, sequenced ahead of 23.4.
-- [ ] **Task 2 — Token bridge: extract `tokens.css` from the C# stylesheet** (AC: #1)
-  - [ ] Write `web/scripts/extract-tokens.mjs` that reads the `:root { … }` block from `src/SpecScribe/assets/specscribe.css` and emits `web/assets/tokens.css` containing exactly those custom properties (status, motion, and brand palette). Keep the extraction a pure copy — no re-typed literals.
-  - [ ] Import `tokens.css` (and only `tokens.css`) as the token source in the Nuxt app; author every component's own rules with `<style scoped>`.
-  - [ ] Add a **drift check** (`web/scripts/check-tokens.mjs`, wired as `npm run check:tokens`) that re-extracts and diffs against the committed `web/assets/tokens.css`, exiting non-zero on divergence. Document that `npm run extract:tokens` must be re-run after any token change in the C# stylesheet.
-- [ ] **Task 3 — Build the proof primitives as scoped-CSS Vue components** (AC: #3)
-  - [ ] `StatusBadge.vue` — the six-stage `--status-*` badge, status conveyed by **label text**, not color alone (UX-DR17). Model semantics on `.status-badge` in `specscribe.css`.
-  - [ ] `ChartPanel.vue` (or `FramedPanel.vue`) — the `chart-panel` + `Charts.Framed`/`ChartMeta` frame (title, analysis window, framing sentence, legend slot) per Story 10.2.
-  - [ ] `ListRow.vue` — the unified `ListRow` primitive (`--list-row-accent`; Story 10.8 grammar).
-  - [ ] `PageShell.vue` — the page shell (header/main/footer chrome), reused by the design-system route.
-  - [ ] Every color/timing value comes from a `var(--…)` token; no primitive re-types a token value.
-- [ ] **Task 4 — Measure the `<NuxtIsland>` / server-component shape** (AC: #4)
-  - [ ] Render at least one representative primitive both ways (async-data path vs `<NuxtIsland>`/server-component) under `nuxt generate`; record the output-weight delta.
-  - [ ] Write the measured recommendation into the conventions doc so 23.3 uses the payload-avoiding shape by default.
-- [ ] **Task 5 — Document scoped-SFC / CSS-module conventions** (AC: #2, #5)
-  - [ ] `web/CONVENTIONS.md` (or a section in `web/README.md`) covering: tokens.css is the only token import and is generated (never hand-edit); `<style scoped>` for template-authored markup; **`:deep()`/global sheet is required to style `v-html`'d IR content** (the spike's load-bearing finding — 23.3 depends on it); the measured `<NuxtIsland>` payload recommendation from Task 4; AD-7 boundary (SpecScribe owns semantic tokens, host owns chrome).
-- [ ] **Task 6 — Nuxt `/design-system` route** (AC: #3, #6)
-  - [ ] `web/pages/design-system.vue` renders every primitive in every relevant status/motion state, using `PageShell.vue`. This is the worked example for the conventions doc and the future portal design-system surface.
-  - [ ] Verify live in a browser (`npm run dev` and/or `nuxt generate` + serve): tokens resolve (`var(--status-done)` → the moss value), reduced-motion honored, status readable by name with JS off.
-- [ ] **Task 7 — C#-generated `design-system.html`, wired into Help nav** (AC: #6)
-  - [ ] Add `DesignSystemTemplater.cs` (model on `HowToReadTemplater.cs` / `AboutSddTemplater.cs`): renders the token families and primitive gallery as static, JS-optional HTML using the existing `specscribe.css` classes. Status by name, non-color (UX-DR17). Reduced-motion respected (the motion tokens are already neutralized by the sheet's reduce block).
-  - [ ] Add `SiteNav.DesignSystemOutputPath = "design-system.html"` and register it in the **Help** group and Help quick-links in `SiteNav.Build` (see the `help.Add(...)` / `quickLinks.Add(...)` block).
-  - [ ] Add `WriteDesignSystem(nav)` to `SiteGenerator`, called from the always-written page block beside `WriteHowToRead(nav)` (~line 460), going through `WriteOutput` (so SPA/webview `CapturePages` picks it up). Write it **directly**, without `ApplyReferenceLinks`, mirroring How-to-read/About (a token-vocabulary page must not self-expand its own terms).
-  - [ ] Regenerate the golden fingerprint constant (it **will** move — new page + new nav entry on every page). Confirm the hash is stable across two repeated runs before locking it (concurrent-main hazard — see Dev Notes).
-- [ ] **Task 8 — Tests** (AC: #1, #6)
-  - [ ] C#: a `DesignSystemTemplaterTests` / `SiteGeneratorDesignSystemTests` (model on `SiteGeneratorHowToReadTests.cs`) asserting the page renders, carries the token/primitive content, and is JS-optional; a nav coherence assertion that the Help entry resolves; RenderParity coverage (`RenderParityTests.cs` — HTML ≡ webview capture) since the page rides `WriteOutput`.
-  - [ ] web/: `npm run check:tokens` passes; the design-system route prerenders without error.
-  - [ ] Full suite green; golden fingerprint regenerated and confirmed stable.
+- [x] **Task 1 — Scaffold the `web/` Nuxt app** (AC: #3)
+  - [x] Create repo-root `web/` with `package.json` (devDependencies: `nuxt ^3.14`, `vue ^3.5`, `vue-router ^4.4` — mirror `spike/nuxt-ir/package.json`), `nuxt.config.ts` (`ssr: true`, `telemetry: false`, `devtools.enabled: false`, full prerender per ADR 0009 Option B), and `app.vue`.
+  - [x] Confirm `node_modules/` is already covered by `.gitignore` (it is — global `node_modules/` rule) and that `web/` is **not** added to `SpecScribe.slnx`.
+  - [x] Do **not** wire `web/` into `specscribe generate` — packaging is Story 23.5, sequenced ahead of 23.4.
+- [x] **Task 2 — Token bridge: extract `tokens.css` from the C# stylesheet** (AC: #1)
+  - [x] Write `web/scripts/extract-tokens.mjs` that reads the `:root { … }` block from `src/SpecScribe/assets/specscribe.css` and emits `web/assets/tokens.css` containing exactly those custom properties (status, motion, and brand palette). Keep the extraction a pure copy — no re-typed literals.
+  - [x] Import `tokens.css` (and only `tokens.css`) as the token source in the Nuxt app; author every component's own rules with `<style scoped>`.
+  - [x] Add a **drift check** (`web/scripts/check-tokens.mjs`, wired as `npm run check:tokens`) that re-extracts and diffs against the committed `web/assets/tokens.css`, exiting non-zero on divergence. Document that `npm run extract:tokens` must be re-run after any token change in the C# stylesheet.
+- [x] **Task 3 — Build the proof primitives as scoped-CSS Vue components** (AC: #3)
+  - [x] `StatusBadge.vue` — the six-stage `--status-*` badge, status conveyed by **label text**, not color alone (UX-DR17). Model semantics on `.status-badge` in `specscribe.css`.
+  - [x] `ChartPanel.vue` (or `FramedPanel.vue`) — the `chart-panel` + `Charts.Framed`/`ChartMeta` frame (title, analysis window, framing sentence, legend slot) per Story 10.2.
+  - [x] `ListRow.vue` — the unified `ListRow` primitive (`--list-row-accent`; Story 10.8 grammar).
+  - [x] `PageShell.vue` — the page shell (header/main/footer chrome), reused by the design-system route.
+  - [x] Every color/timing value comes from a `var(--…)` token; no primitive re-types a token value.
+- [x] **Task 4 — Measure the `<NuxtIsland>` / server-component shape** (AC: #4)
+  - [x] Render at least one representative primitive both ways (async-data path vs `<NuxtIsland>`/server-component) under `nuxt generate`; record the output-weight delta. **Three** variants measured (a static control was added — it turned out to be the winner).
+  - [x] Write the measured recommendation into the conventions doc so 23.3 uses the payload-avoiding shape by default.
+- [x] **Task 5 — Document scoped-SFC / CSS-module conventions** (AC: #2, #5)
+  - [x] `web/CONVENTIONS.md` (or a section in `web/README.md`) covering: tokens.css is the only token import and is generated (never hand-edit); `<style scoped>` for template-authored markup; **`:deep()`/global sheet is required to style `v-html`'d IR content** (the spike's load-bearing finding — 23.3 depends on it); the measured `<NuxtIsland>` payload recommendation from Task 4; AD-7 boundary (SpecScribe owns semantic tokens, host owns chrome).
+- [x] **Task 6 — Nuxt `/design-system` route** (AC: #3, #6)
+  - [x] `web/pages/design-system.vue` renders every primitive in every relevant status/motion state, using `PageShell.vue`. This is the worked example for the conventions doc and the future portal design-system surface.
+  - [x] Verify live in a browser (`npm run dev` and/or `nuxt generate` + serve): tokens resolve (`var(--status-done)` → the moss value), reduced-motion honored, status readable by name with JS off.
+- [x] **Task 7 — C#-generated `design-system.html`, wired into Help nav** (AC: #6)
+  - [x] Add `DesignSystemTemplater.cs` (model on `HowToReadTemplater.cs` / `AboutSddTemplater.cs`): renders the token families and primitive gallery as static, JS-optional HTML using the existing `specscribe.css` classes. Status by name, non-color (UX-DR17). Reduced-motion respected (the motion tokens are already neutralized by the sheet's reduce block).
+  - [x] Add `SiteNav.DesignSystemOutputPath = "design-system.html"` and register it in the **Help** group and Help quick-links in `SiteNav.Build` (see the `help.Add(...)` / `quickLinks.Add(...)` block).
+  - [x] Add `WriteDesignSystem(nav)` to `SiteGenerator`, called from the always-written page block beside `WriteHowToRead(nav)` (~line 460), going through `WriteOutput` (so SPA/webview `CapturePages` picks it up). Write it **directly**, without `ApplyReferenceLinks`, mirroring How-to-read/About (a token-vocabulary page must not self-expand its own terms).
+  - [x] Regenerate the golden fingerprint constant (it **will** move — new page + new nav entry on every page). Confirm the hash is stable across two repeated runs before locking it (concurrent-main hazard — see Dev Notes).
+- [x] **Task 8 — Tests** (AC: #1, #6)
+  - [x] C#: a `DesignSystemTemplaterTests` / `SiteGeneratorDesignSystemTests` (model on `SiteGeneratorHowToReadTests.cs`) asserting the page renders, carries the token/primitive content, and is JS-optional; a nav coherence assertion that the Help entry resolves; RenderParity coverage (`RenderParityTests.cs` — HTML ≡ webview capture) since the page rides `WriteOutput`.
+  - [x] web/: `npm run check:tokens` passes; the design-system route prerenders without error.
+  - [x] Full suite green; golden fingerprint regenerated and confirmed stable.
 
 ## Dev Notes
 
@@ -197,8 +201,151 @@ Do **not** pull in the webview theme remaps (`specscribe-webview-theme.css`); th
 
 ### Agent Model Used
 
+claude-opus-5 (dev-story, 2026-07-25)
+
 ### Debug Log References
+
+- `npm run check:tokens` — RED before extraction (exit 1, "does not exist"), GREEN after; and proven to
+  **catch** drift by hand-editing `--status-done` to `#00ff00` (reported `~ --status-done: #00ff00 ->
+  var(--moss-light)`, exit 1) before restoring. A gate that has only ever been observed passing is not a gate.
+- `npm run generate` — 13 routes prerendered, no errors.
+- `npm run measure:payload` — reproduced identically across two builds (table below).
+- Golden fingerprint captured twice, identically: `2050b586…`.
+- Full suite: 2404 passed / 3 skipped. See "Test-suite flakes" below.
 
 ### Completion Notes List
 
+**AC #4's result contradicts the hypothesis it was written to test — this is the story's most important finding.**
+
+The 23.1 spike traced its 2.26× site weight entirely to hydration payload and hypothesised that
+`<NuxtIsland>`/server components would avoid it. Measured on three routes rendering **identical markup from
+identical data** (200 story-shaped rows through `ListRow` + `StatusBadge`), differing only in the data path:
+
+| variant | HTML | payload | island JSON | total | vs control |
+| --- | --- | --- | --- | --- | --- |
+| A — `useAsyncData` | 125.5 KB | 44.5 KB | — | **170.0 KB** | 1.36× |
+| B — `.server.vue` island | 125.1 KB | 3.1 KB | 121.8 KB | **250.0 KB** | 1.99× |
+| C — build-time (control) | 125.4 KB | 0.1 KB | — | **125.4 KB** | 1.00× |
+
+The island shape **loses, and loses to the thing it was supposed to beat.** It does drain the route payload
+(44.5 KB → 3.1 KB), but then emits the island's entire rendered HTML *and its scoped CSS* a second time into
+`__nuxt_island/<Component>_<hash>.json` for the client to re-fetch — verified by reading that file. For content
+that is static once prerendered it is a payload *amplifier*.
+
+A third variant was added that the story did not ask for, and it is the one 23.3 should use: **resolve IR data
+at build time, at module scope, with no data composable at all** — 0.1 KB of payload on a 125 KB page. The IR
+is available at build time by construction, so there is no reason for it to arrive through a composable that
+exists to serve runtime fetching. Recorded with both caveats (island JSON dedupes across routes sharing a props
+hash, which does not help per-page IR content; variant B remains right for genuinely per-request content, of
+which Epic 23 has none).
+
+**AC #5 is demonstrated, not just described.** `/design-system` carries the failing control and the working fix
+side by side. Confirmed live in the browser: the `v-html`-injected node has **no** `data-v-*` attribute and
+computes to the default ink colour under a plain scoped rule, while the `:deep()` variant computes to
+`rgb(30, 74, 90)` with its 3px accent. That is the spike's finding reproduced as executable documentation.
+
+**The C# page is built from the real primitives.** `DesignSystemTemplater` calls `StatusStyles.Badge`,
+`ListRow.Render`/`Chip`/`PrimaryLink` and `Charts.Framed` rather than look-alike markup, and a test asserts the
+**exact** primitive output appears — a gallery that mocked up its own badges could drift from the real ones,
+and a design-system page that misrepresents the design system is worse than none. For the same reason nothing
+on either page states a token's value: swatches show their colour by *using* `var(--status-*)`, pinned by
+`DesignSystem_NeverStatesATokenValueAsALiteral`.
+
+**One production seam extracted, one latent gap closed** (neither in the story's task list, both drift bugs):
+- `StatusStyles.LegendWord` — the stage→word switch was private inside `LegendKey`. The design-system page is
+  its second consumer, and a page whose subject *is* the status vocabulary is the last place a second copy of
+  it belongs. Extracted; a test pins that both surfaces read the same seam.
+- `HtmlRenderAdapter.QuickLinkFamily` had an explicit `family-help` label list that "Design System" was not in,
+  so the classifier answered "planning" for a Help entry. Latent today (it is only consulted when a group has
+  exactly one member, and Help always has five), but it is a second membership map beside `QuickLinks.Group`
+  and would have been wrong the moment it mattered.
+
+`Icons.ForConcept` needed a "Design System" glyph — caught by `IconsTests.ForConcept_EveryEmittedLabelHasAGlyph`,
+which is a genuinely good guardrail: adding a nav label without an icon fails the build.
+
+**Golden fingerprint** `91c3aeb4…` → `2050b5862e2c9fa8fa94f832739900487f3c84b18f16bb10d7697250d492063a`, stable
+across two repeated runs. **Provenance (shared main):** the tree also carried a concurrent session's uncommitted
+Story 20.x work — `specscribe.css` (+24 lines of `.ss-hierarchy-booting` anti-flash rules), `specscribe.js`,
+`HierarchyExplorer`, `SunburstExplorer`, `DashboardViewBuilder`, `HtmlRenderAdapter`, and `SiteGenerator`'s new
+`WriteTextWithRetry`. `specscribe.css` is copied to the output verbatim, so **that session's edits are inside
+this hash as well as mine**; they could not be separated without destroying uncommitted work, which CLAUDE.md
+forbids and I did not attempt. `SiteGenerator.cs` reported as modified-on-disk mid-edit; every edit was
+grep-verified afterwards.
+
+**Test-suite flakes (pre-existing, not from this story).** Each full run failed exactly one test, a *different*
+one each time — `FileWatcherServiceTests.BurstOfSaves`, `SiteGeneratorTimelineTests` (×3),
+`SiteGeneratorCommitDetailsTests`, `SiteGeneratorCodeMapTests.GenerateAll_DeterministicAcrossTwoRuns`,
+`SiteGeneratorGitInsightsTests.GenerateAll_DeepGitLaterDisabled_…`. All pass in isolation, and all sit in the
+file-write-contention family the concurrent session is *currently* adding `WriteTextWithRetry` for. Reported
+rather than papered over: the honest reading is 2404 passed / 3 skipped with one rotating contention flake per
+full-suite run, not a clean 2408.
+
+**Verification.** The C# page was inspected live at `http://localhost:8102/design-system.html`: all ten stages
+resolve to real token colours (`--status-done` → `rgb(107, 143, 98)`), each with icon **and** word; `<main>`
+carries 0 scripts, 0 `display:none`, 0 `hidden`, and 22 native `title=` fallbacks behind the `js-tip`
+enhancement — so the page is fully readable with JS off. The Nuxt route was verified the same way at
+`:8101/design-system/`, plus a mobile pass that found the token grid overflowing its panel; the reference grids
+now stack under 34rem (page body never scrolled sideways either way, but "scroll the table to find the badge"
+is a worse answer than stacking). **Screenshots were not available** — the Browser pane is not displayed in
+this session, so `computer{action:"screenshot"}` times out; verification was by live computed styles and DOM
+geometry instead, which is what catches containment leaks and sub-pixel collapse, but the owner's verify round
+should still look at both pages.
+
+**Not done, deliberately:** `web/` is not in `SpecScribe.slnx` and not wired into `specscribe generate` (23.5
+owns packaging); `spike/nuxt-ir/` is left untouched as the throwaway 23.1 probe. The `web/**` sources produce no
+`code/web/**` pages in the generated portal — `.vue`/`.mjs`/`.ts` are outside the code-page extension set, which
+is existing behaviour and out of scope here.
+
 ### File List
+
+**New — `web/` (Nuxt app):**
+- `web/.gitignore`
+- `web/package.json`
+- `web/package-lock.json`
+- `web/nuxt.config.ts`
+- `web/app.vue`
+- `web/README.md`
+- `web/CONVENTIONS.md`
+- `web/assets/tokens.css` *(generated by `extract:tokens`; committed so the drift gate has a baseline)*
+- `web/assets/base.css`
+- `web/components/StatusBadge.vue`
+- `web/components/ChartPanel.vue`
+- `web/components/ListRow.vue`
+- `web/components/PageShell.vue`
+- `web/components/MeasureRows.server.vue`
+- `web/pages/index.vue`
+- `web/pages/design-system.vue`
+- `web/pages/measure/async.vue`
+- `web/pages/measure/island.vue`
+- `web/pages/measure/static.vue`
+- `web/utils/measure-rows.ts`
+- `web/scripts/tokens-lib.mjs`
+- `web/scripts/extract-tokens.mjs`
+- `web/scripts/check-tokens.mjs`
+- `web/scripts/measure-payload.mjs`
+
+**New — C#:**
+- `src/SpecScribe/DesignSystemTemplater.cs`
+- `tests/SpecScribe.Tests/SiteGeneratorDesignSystemTests.cs`
+
+**Modified — C#:**
+- `src/SpecScribe/SiteNav.cs` — `DesignSystemOutputPath` const + Help group/quick-link registration
+- `src/SpecScribe/SiteGenerator.cs` — `WriteDesignSystem(nav)` + always-written call site
+- `src/SpecScribe/StatusStyles.cs` — extracted `LegendWord` from `LegendKey`
+- `src/SpecScribe/Icons.cs` — "Design System" palette glyph
+- `src/SpecScribe/HtmlRenderAdapter.Dashboard.cs` — "Design System" added to the `family-help` classifier
+
+**Modified — tests:**
+- `tests/SpecScribe.Tests/SiteNavTests.cs` — nav-order arrays, Help group membership + child count
+- `tests/SpecScribe.Tests/RenderParityTests.cs` — nav-target arrays
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — golden inventory + regenerated fingerprint
+- `tests/SpecScribe.Tests/SiteGeneratorWebviewTests.cs` — `CapturePages` includes `design-system.html`
+
+**Modified — tooling:**
+- `.claude/launch.json` — preview servers for the Nuxt prerender output and the generated portal
+
+## Change Log
+
+| Date | Change |
+| --- | --- |
+| 2026-07-25 | Story 23.2 implemented. `web/` Nuxt app established with a generated token bridge + drift gate, four scoped-CSS primitives, and a `/design-system` route. AC #4's payload experiment measured and **contradicted the spike's hypothesis** — server components cost 1.99× vs async-data's 1.36×; build-time data (1.00×) is the recorded recommendation for 23.3. C#-generated `design-system.html` shipped and wired into the Help nav. Golden fingerprint regenerated to `2050b586…` on top of a concurrent session's uncommitted Story 20.x work. |

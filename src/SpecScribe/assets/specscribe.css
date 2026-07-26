@@ -223,6 +223,30 @@ body {
 .ss-hierarchy { display: none; }
 .ss-hierarchy[data-hierarchy-ready] { display: block; margin: 0 auto; max-width: 100%; }
 
+/* The boot placeholder — the anti-flash half of the JS handshake. Its whole job is that a scripted visitor never
+   watches the server SVG paint and then get replaced by a differently-organized chart a moment later.
+   The gate is `[data-js]`, set by an inline script that runs DURING PARSING, before the SVG below it exists — so
+   the suppression lands without a flash. Nothing deferred could do that. With JS off none of this applies and the
+   SVG is the page from first paint; if the mount fails or times out `data-js` comes off and the SVG returns. */
+.ss-hierarchy-booting { display: none; }
+:root[data-ss-hierarchy-boot] [data-explorer]:has(.ss-hierarchy) .ss-hierarchy-booting {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-faded);
+  font-size: 0.8rem;
+  font-style: italic;
+}
+/* Only the chart is suppressed while booting — the swatch strip below it describes the Plotly chart just as well
+   as the SVG, so hiding it too would make the panel flash twice instead of once. */
+:root[data-ss-hierarchy-boot] [data-explorer]:has(.ss-hierarchy) svg.sunburst { display: none; }
+/* Both exits, and both must out-specify the suppression above rather than merely follow it. MOUNTED: the chart is
+   up, so the placeholder goes and the SVG stays hidden (the component also hides it inline). FAILED: no engine, so
+   the SVG comes straight back instead of the reader waiting out the boot timer. */
+:root[data-ss-hierarchy-boot] [data-explorer][data-hierarchy-mounted] .ss-hierarchy-booting,
+:root[data-ss-hierarchy-boot] [data-explorer][data-hierarchy-failed] .ss-hierarchy-booting { display: none; }
+:root[data-ss-hierarchy-boot] [data-explorer][data-hierarchy-failed] svg.sunburst { display: block; }
+
 /* Plotly emits the hatch <path> inside every <pattern> with a `stroke` but NO `fill`, so SVG's initial black
    paints beneath every hatched sector (21 occurrences measured on the real dashboard). There is no Plotly
    attribute for this — the pattern element is generated, not configured — so this rule is the only fix, and it

@@ -67,10 +67,24 @@ public static partial class Charts
     /// <see cref="ProjectCounts"/> re-count, no second geometry). Ordering mirrors <see cref="Sunburst"/>'s draw
     /// order exactly so the payload can never claim a wedge the chart didn't draw (or omit one it did). Returns an
     /// empty list when there are no epics (the chart shows its empty state). [Story 20.2]</summary>
+    /// <param name="expandDenseEpics">Emit a node per STORY even for an epic the static SVG collapses to one
+    /// summary wedge (<see cref="StoryDensityCollapseThreshold"/>+ stories).
+    /// <para>Default <c>false</c> preserves the Story 20.2 contract exactly: the payload claims precisely the
+    /// wedges <see cref="Sunburst"/> drew, which is what
+    /// <c>SunburstExplorerTests.Projector_NodeSet_EqualsTheWedgesTheSvgDrew</c> pins.</para>
+    /// <para><c>true</c> is for the Story 20.5 Hierarchy Explorer, and the reason it is allowed to differ is that
+    /// the collapse is a DRAWING constraint, not a fact about the work: a fixed 380 px static chart cannot fit
+    /// eight legible story wedges in one epic's sweep, so it draws "8 stories" instead. The component is larger and
+    /// — decisively — it DRILLS, so an epic's own view has the whole sweep to itself. Collapsing there cost the
+    /// owner the thing select mode exists for: "when I drill into an epic I can't see the component stories, which
+    /// makes it hard to understand what's going on in this epic or select individual stories." Weights are
+    /// unaffected either way: the summary wedge's weight is exactly the sum of the per-story weights this emits,
+    /// so a parent still equals the sum of its children. [Story 20.5, owner-directed 2026-07-25]</para></param>
     public static IReadOnlyList<SunburstExplorerNode> SunburstExplorerNodes(
         EpicsModel model,
         FollowUpGeometry? followUps = null,
-        UnplannedWorkGeometry? unplanned = null)
+        UnplannedWorkGeometry? unplanned = null,
+        bool expandDenseEpics = false)
     {
         var epics = model.Epics.OrderBy(e => e.Number).ToList();
         var nodes = new List<SunburstExplorerNode>();
@@ -108,7 +122,7 @@ public static partial class Charts
             var storyWeightSum = epic.Stories.Sum(s => SunburstStoryWeight(geometry, epic.Number, s, noPlanWeight));
             if (storyWeightSum > 0)
             {
-                if (epic.Stories.Count >= StoryDensityCollapseThreshold)
+                if (epic.Stories.Count >= StoryDensityCollapseThreshold && !expandDenseEpics)
                 {
                     // Preserve the server's drawn collapse: a dense epic shows ONE summary wedge, so the payload
                     // carries one summary node (no per-story wedges the static chart never drew). The absence of any
@@ -201,14 +215,16 @@ public static partial class Charts
     /// <paramref name="size"/> (the same size passed to <see cref="Sunburst"/>). [Story 20.2]</summary>
     public static SunburstExplorerModel SunburstExplorerData(
         EpicsModel model, int size = SunburstGlanceSize,
-        FollowUpGeometry? followUps = null, UnplannedWorkGeometry? unplanned = null)
+        FollowUpGeometry? followUps = null, UnplannedWorkGeometry? unplanned = null,
+        bool expandDenseEpics = false)
     {
         var meta = new SunburstExplorerMeta(
             size, size / 2.0, SbPad, SbStartAngle,
             size * SbEpicInnerF, size * SbEpicOuterF,
             size * SbStoryInnerF, size * SbStoryOuterF,
             size * SbAggInnerF, size * SbAggOuterF);
-        return new SunburstExplorerModel(meta, SunburstExplorerNodes(model, followUps, unplanned), Array.Empty<object>());
+        return new SunburstExplorerModel(
+            meta, SunburstExplorerNodes(model, followUps, unplanned, expandDenseEpics), Array.Empty<object>());
     }
 
     /// <summary>The inline JSON island the dashboard mounts beside <see cref="Sunburst"/> — the client drill-in's

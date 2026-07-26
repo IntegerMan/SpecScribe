@@ -1,0 +1,10 @@
+# Nuxt build artifacts. (`node_modules/` is already covered by the repo-root .gitignore, and SiteGenerator
+# skips dot-prefixed directories, so none of these reach the generated portal either.)
+.nuxt/
+.output/
+.nitro/
+.cache/
+dist/
+
+# assets/tokens.css is GENERATED but deliberately COMMITTED — `npm run check:tokens` needs a committed
+# artifact to diff the C# source against, which is the whole mechanism of the drift gate.

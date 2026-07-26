@@ -1722,9 +1722,17 @@
         if (initHierarchyExplorer(root)) {
           root.setAttribute("data-hierarchy-ready", "1");
           hierarchyMounts.push(root);
+        } else {
+          // Declined rather than threw (no engine, no island) — same outcome for the reader, so release the
+          // placeholder immediately and let the server SVG be the page.
+          var declined = root.closest("[data-explorer]");
+          if (declined) declined.setAttribute("data-hierarchy-failed", "1");
         }
       } catch (err) {
-        // Degrade to the untouched server chart. Per root, so one bad instance cannot take the page down.
+        // Degrade to the untouched server chart, and do it NOW rather than leaving the visitor watching a
+        // placeholder until the inline script's timer expires. Per root, so one bad instance cannot down the page.
+        var failed = root.closest("[data-explorer]");
+        if (failed) failed.setAttribute("data-hierarchy-failed", "1");
       }
     });
   }
@@ -2360,6 +2368,9 @@
     if (legacyDrill) legacyDrill.hidden = true;
     // The handshake: 20.2's own skip guard. Set LAST, and only here, so it can only ever mean "mounted".
     panel.setAttribute("data-explorer-ready", "1");
+    // Ends the boot placeholder and disarms the inline script's expiry timer (which would otherwise un-hide the
+    // server SVG under a chart that mounted perfectly well).
+    panel.setAttribute("data-hierarchy-mounted", "1");
 
     applyState(false);
     return true;

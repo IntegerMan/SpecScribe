@@ -1,0 +1,20 @@
+{
+  "name": "specscribe-web",
+  "private": true,
+  "type": "module",
+  "description": "SpecScribe's Vue/Nuxt 3 presentation layer (Epic 23). Production-intent, but NOT in SpecScribe.slnx and NOT wired into `specscribe generate` — packaging is Story 23.5.",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "generate": "nuxt generate",
+    "postinstall": "nuxt prepare",
+    "extract:tokens": "node scripts/extract-tokens.mjs",
+    "check:tokens": "node scripts/check-tokens.mjs",
+    "measure:payload": "node scripts/measure-payload.mjs"
+  },
+  "devDependencies": {
+    "nuxt": "^3.14.0",
+    "vue": "^3.5.0",
+    "vue-router": "^4.4.0"
+  }
+}

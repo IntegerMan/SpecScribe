@@ -494,6 +494,9 @@ public class SiteGeneratorWebviewTests : IDisposable
             && !string.Equals(k, SiteNav.AdrsLandingOutputPath, StringComparison.OrdinalIgnoreCase));
         Assert.Contains(SiteNav.RequirementsOutputPath, keys);
         Assert.Contains(SiteNav.AboutOutputPath, keys);
+        // Story 23.2: design-system.html rides WriteOutput like every other always-written page, so the
+        // webview picks it up without its own capture wiring — the Help nav links to it from inside the panel.
+        Assert.Contains(SiteNav.DesignSystemOutputPath, keys);
         Assert.Contains("planning-artifacts/prd.html", keys);
         Assert.Contains("index.html", keys);
         Assert.Contains("epics.html", keys);

@@ -62,6 +62,30 @@
       "port": 8095
     },
     {
+      "name": "web-prerender-23-2",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8101",
+        "--directory",
+        "web/.output/public"
+      ],
+      "port": 8101
+    },
+    {
+      "name": "design-system-23-2",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8102",
+        "--directory",
+        "SpecScribeOutput"
+      ],
+      "port": 8102
+    },
+    {
       "name": "verify-site",
       "runtimeExecutable": "python",
       "runtimeArgs": [

@@ -217,12 +217,10 @@ public class HierarchyExplorerTests
     public void AC1_ComponentNodeIdSet_EqualsTheSvgNodeIdSet_PlusOnlyTheSynthesizedRoot()
     {
         // While the server SVG and the component are BOTH live (owner decision D1), the two must describe the same
-        // work. The only permitted difference is the synthesized root, which the SVG draws as a decorative circle.
-        // This extends SunburstExplorerTests.Projector_NodeSet_EqualsTheWedgesTheSvgDrew rather than replacing it.
+        // work. For a model with no dense epic the only permitted difference is the synthesized root, which the SVG
+        // draws as a decorative circle rather than a data node.
         var model = SampleModel();
-        var svgIds = Regex.Matches(Charts.Sunburst(model, nodeIds: true), "data-node-id=\"(?<id>[^\"]+)\"")
-            .Select(m => m.Groups["id"].Value)
-            .ToHashSet(StringComparer.Ordinal);
+        var svgIds = SvgNodeIds(model);
 
         var componentIds = Build(model).Nodes.Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
 
@@ -230,6 +228,48 @@ public class HierarchyExplorerTests
         componentIds.Remove(HierarchyExplorer.ProjectRootId);
         Assert.Equal(svgIds, componentIds);
     }
+
+    [Fact]
+    public void AC1_DenseEpic_TheComponentExpandsWhatTheSvgHadToCollapse()
+    {
+        // The ONE sanctioned divergence, and it is a divergence in what can be DRAWN rather than in what is true.
+        // A fixed 380 px static chart cannot fit eight legible story wedges inside one epic's sweep, so it draws a
+        // single "8 stories" summary. The component drills — an epic's own view has the whole sweep — so collapsing
+        // there would hide exactly the stories the reader drilled in to find, and make them unselectable, which is
+        // what select mode exists for. [owner-directed 2026-07-25]
+        var stories = Enumerable.Range(1, Charts.StoryDensityCollapseThreshold)
+            .Select(i => Story($"1.{i}", $"Story {i}", "in progress", 1, 2))
+            .ToArray();
+        var model = Model(Epic(1, "Dense", stories));
+
+        var svgIds = SvgNodeIds(model);
+        var componentIds = Build(model).Nodes.Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
+
+        // The SVG collapsed; the component did not.
+        Assert.Contains("epic-1~summary", svgIds);
+        Assert.DoesNotContain("epic-1~summary", componentIds);
+        foreach (var story in stories) Assert.Contains(story.Id, componentIds);
+
+        // And the divergence is EXACTLY that: swap the summary for its stories and the two sets agree again, so a
+        // real drift still fails this test rather than hiding behind the exemption.
+        var reconciled = componentIds
+            .Where(id => id != HierarchyExplorer.ProjectRootId)
+            .Where(id => !stories.Any(s => s.Id == id))
+            .Append("epic-1~summary")
+            .ToHashSet(StringComparer.Ordinal);
+        Assert.Equal(svgIds, reconciled);
+
+        // Weights are untouched by the expansion: the summary wedge's weight is the sum of the stories that
+        // replaced it, so a parent still equals the sum of its children (Finding C / D2 holds either way).
+        var nodes = Build(model).Nodes.ToDictionary(n => n.Id, StringComparer.Ordinal);
+        var summaryWeight = Charts.SunburstExplorerNodes(model).Single(n => n.Id == "epic-1~summary").Weight;
+        Assert.Equal(summaryWeight, stories.Sum(s => nodes[s.Id].Value));
+    }
+
+    private static HashSet<string> SvgNodeIds(EpicsModel model) =>
+        Regex.Matches(Charts.Sunburst(model, nodeIds: true), "data-node-id=\"(?<id>[^\"]+)\"")
+            .Select(m => m.Groups["id"].Value)
+            .ToHashSet(StringComparer.Ordinal);
 
     // ---- Status prose, not CSS classes --------------------------------------------------------------------
 
@@ -474,6 +514,39 @@ public class HierarchyExplorerTests
     }
 
     // ---- Asset flag ----------------------------------------------------------------------------------------
+
+    [Fact]
+    public void Render_ShipsTheBootPlaceholder_ButNoScriptOfItsOwn()
+    {
+        // The owner's second point: with JS on you saw the server SVG paint and then get replaced by a
+        // differently-organized chart. The placeholder is the visible half of the fix and lives in the body; the
+        // MARKER that reveals it is emitted on the chrome seam (see BootScript), because the webview and SPA
+        // surfaces consume this body directly and must carry no script at all.
+        var html = HierarchyExplorer.Render(Build(SampleModel()), fallbackHtml: "<svg class=\"sunburst\"></svg>\n");
+
+        Assert.Contains("ss-hierarchy-booting", html);
+        Assert.Contains("Initializing", html);
+        Assert.DoesNotContain("<script>", html);
+
+        // The placeholder must precede the chart host it stands in for, and both must precede the SVG.
+        var placeholderAt = html.IndexOf("ss-hierarchy-booting", StringComparison.Ordinal);
+        var hostAt = html.IndexOf(HierarchyExplorer.HostMarker + ">", StringComparison.Ordinal);
+        var svgAt = html.IndexOf("<svg class=\"sunburst\">", StringComparison.Ordinal);
+        Assert.True(placeholderAt < hostAt && hostAt < svgAt,
+            "the placeholder must precede the chart host and the SVG it stands in for");
+    }
+
+    [Fact]
+    public void BootScript_SuppressesTheFlash_AndCannotStrandTheReaderIfTheEngineNeverArrives()
+    {
+        // ORDER IS THE WHOLE MECHANISM: this runs while the body is still parsing, which is the only moment the
+        // server SVG can be suppressed without the reader watching it paint. Nothing deferred can do that.
+        Assert.Contains("data-ss-hierarchy-boot", HierarchyExplorer.BootScript);
+        // The expiry is what keeps owner decision D1 honest — a blocked bundle must degrade to the server chart,
+        // never to a permanent "Initializing…" over a chart that works.
+        Assert.Contains("removeAttribute", HierarchyExplorer.BootScript);
+        Assert.Contains(HierarchyExplorer.BootTimeoutMs.ToString(), HierarchyExplorer.BootScript);
+    }
 
     [Fact]
     public void ContainsHost_DrivesTheEngineFlagFromTheRenderedBody()

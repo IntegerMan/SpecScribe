@@ -530,6 +530,7 @@ public sealed partial class HtmlRenderAdapter
         if (label.Equals("Help", StringComparison.OrdinalIgnoreCase)
             || label.Equals("About", StringComparison.OrdinalIgnoreCase)
             || label.Equals("Logs", StringComparison.OrdinalIgnoreCase)
+            || label.Equals("Design System", StringComparison.OrdinalIgnoreCase)
             || label.Equals("How to use SpecScribe", StringComparison.OrdinalIgnoreCase)
             || label.Equals("About Spec-Driven Development", StringComparison.OrdinalIgnoreCase)
             || label.Equals("Spec-Driven Development", StringComparison.OrdinalIgnoreCase))

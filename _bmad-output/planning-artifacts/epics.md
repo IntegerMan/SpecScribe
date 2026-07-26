@@ -3232,17 +3232,23 @@ Turn the project's hierarchy charts into one fluid, explorable, **standardized**
      and seven Charts.cs hierarchy entry points. A shared COMPONENT is far harder to accidentally reinvent than a
      shared CONVENTION. -->
 
-**Rollout inventory (the surfaces Story 20.7 converts — verified in code 2026-07-24):**
+**Rollout inventory (verified in code 2026-07-24; the "Converted by" column added 2026-07-25 when create-story 20.7's owner decision D1 split the rollout):**
 
-| Surface | Call site | Server-side entry points |
-|---|---|---|
-| Dashboard | `HtmlRenderAdapter.Dashboard.cs:54` | `Charts.Sunburst` + `SunburstCompanionList` |
-| Epics | `HtmlRenderAdapter.Epics.cs:32` | `Charts.Sunburst` + `SunburstCompanionList` |
-| Epic detail | `HtmlRenderAdapter.Epics.cs:208` | `Charts.EpicSunburst` |
-| Story detail | `HtmlRenderAdapter.Epics.cs:550` | `Charts.TaskSunburst` |
-| Code Map | `CodeMapTemplater.cs:152,158` | `Charts.CodeTreemap` + `CodeMapSunburst` |
-| Git Insights (ownership) | `GitInsightsTemplater.cs:173,178` | `Charts.CodeOwnershipSunburst` + `CodeOwnershipTreemap` |
-| Impact Map | `ImpactMapTemplater.cs:126` | client-rendered treemap/sunburst (Story 21.3) |
+| Surface | Call site | Server-side entry points | Converted by |
+|---|---|---|---|
+| Dashboard | `HtmlRenderAdapter.Dashboard.cs:54` | `Charts.Sunburst` + `SunburstCompanionList` | 20.7 |
+| Epics | `HtmlRenderAdapter.Epics.cs:32` | `Charts.Sunburst` + `SunburstCompanionList` | 20.7 |
+| Epic detail | `HtmlRenderAdapter.Epics.cs:208` | `Charts.EpicSunburst` | 20.7 |
+| Story detail | `HtmlRenderAdapter.Epics.cs:550` | `Charts.TaskSunburst` | 20.7 |
+| Impact Map | `ImpactMapTemplater.cs:126` | client-rendered treemap/sunburst (Story 21.3) | 20.7 |
+| Code Map | `CodeMapTemplater.cs:152,158` | `Charts.CodeTreemap` + `CodeMapSunburst` | **20.9** |
+| Git Insights (ownership) | `GitInsightsTemplater.cs:173,178` | `Charts.CodeOwnershipSunburst` + `CodeOwnershipTreemap` | **20.9** |
+
+The split is by *colorize model*, not by convenience: the five 20.7 surfaces resolve their fills from a single
+`--status-*` class per node, while the two 20.9 surfaces carry a **live client-side colorize dimension** the
+component has no concept of — Code Map renders 7 dimensions × 4 filter variants (8 charts) with a switch that
+re-fills every rect, and Git Insights ownership renders 4 live modes plus a contributor select and a staleness
+threshold. **`SunburstCompanionList` is not in the inventory: it stays** (Story 20.6 D4).
 
 <!-- Owner request logged 2026-07-22 (Story 7.11 design-feedback session, git-insights.html's Code Ownership
      sunburst): "click and drill into a directory and filter down to that level — at least in the sunburst. You
@@ -3461,28 +3467,66 @@ So that ADR 0013's no-JS contract is proven rather than assumed, and chart regre
 ### Story 20.7: Site-Wide Rollout — Every Sunburst and Treemap Through the Component
 
 As a maintainer eliminating the drift ADR 0010 §6 could not prevent,
-I want all seven hierarchy call sites converted to the component and the superseded renderers deleted,
+I want the hierarchy call sites converted to the component and their superseded renderers deleted,
 So that exactly one implementation of a hierarchy chart exists in the codebase.
 
-**Acceptance Criteria:**
+**Acceptance Criteria** *(AC #1 and #2 AMENDED 2026-07-25 by owner decision D1 at create-story — the rollout splits by risk; the residue is Story 20.9, and Epic 20's "exactly one implementation" finishes there)*
 
 1.
-**Given** the Epic 20 rollout inventory (dashboard, epics, epic detail, story detail, Code Map, Git Insights ownership, Impact Map)
+**Given** the Epic 20 rollout inventory, **scoped to: dashboard, epics index, epic detail, story detail, Impact Map**
 **When** the rollout completes
-**Then** every one of those surfaces renders through the Story 20.5 component with a single consistent selector ordering and idiom — ending the current divergence where Code Map and Impact Map order *Treemap, Sunburst* and Git Insights orders *Sunburst, Treemap*
+**Then** every one of those surfaces renders through the Story 20.5 component with a single consistent selector **ordering** and idiom — ending the current divergence where the Impact Map orders *Treemap, Sunburst* and every other toggle disagrees (the *default shape* remains per-instance config: sunburst for the planning surfaces, treemap for the Impact Map)
 **And** each converted surface is verified in a live browser (CLAUDE.md § Verification), with its Story 20.6 twin audit passing before its SVG is retired.
 
 2.
-**Given** the superseded implementations
+**Given** the superseded implementations **in this story's scope**
 **When** the rollout completes
-**Then** `Charts.cs`'s seven hierarchy entry points (`Sunburst`, `EpicSunburst`, `TaskSunburst`, `CodeMapSunburst`, `CodeOwnershipSunburst`, `CodeTreemap`, `CodeOwnershipTreemap`) and `specscribe.js`'s three arc renderers (`initOwnershipSunburst`, `renderSunburst`/`arcPath`, `initSunburstExplorer`) are removed
-**And** no remaining code path constructs a sunburst or treemap by any other route (verified by search, not assumed — a symbol's absence is confirmed, per the shared-main verification rule).
+**Then** `Charts.cs`'s three **planning** hierarchy entry points (`Sunburst`, `EpicSunburst`, `TaskSunburst`) and `specscribe.js`'s 20.2 explorer (`initSunburstExplorers`/`initSunburstExplorer`) and the Impact Map's arc renderer (`renderSunburst`/`arcPath`) are removed
+**And** no remaining code path constructs a **planning** sunburst or the Impact Map's shapes by any other route (verified by search, not assumed — a symbol's absence is confirmed, per the shared-main verification rule)
+**And** the four Code Map / ownership entry points and `initCodeMapPanel` / `initOwnershipSunburst` are left standing and named as Story 20.9's, so a partial rollout cannot be mistaken for a complete one.
 
 3.
 **Given** the VS Code webview and the SPA adapter
 **When** the converted surfaces render on those hosts
 **Then** HTML/SPA/webview parity holds via the existing `RenderParity` harness
-**And** if the ADR 0012 §5 CSP amendment cannot deliver acceptable webview chart rendering, the webview presents the text twin as the documented accepted degradation.
+**And** the webview presents the text twin as the documented accepted degradation (ADR 0012 §5 / ADR 0013 §7), registered in `HostRenderExceptions` rather than left as a silent divergence — the ADR 0005 CSP amendment stays with Story 23.4, where ADR 0012 §5 requires it to land once.
+
+<!-- 2026-07-25 (create-story 20.7): five owner decisions elicited and locked. D1 AMENDS AC #1 and #2 above (the
+     rollout splits, and Story 20.9 is added below); D2-D5 constrain HOW the ACs are met. Recorded here as well as
+     in the story file because three of them are visible product choices. Elicited against a code-level read of all
+     seven live call sites, not against this epic's inventory table.
+     (D1) SCOPE = SPLIT BY RISK. This story converts the four PLANNING surfaces plus the IMPACT MAP (already
+     client-rendered, already carrying the exemplar text twin, so its conversion is a JS swap rather than an SVG
+     retirement). CODE MAP and GIT INSIGHTS OWNERSHIP move to the new Story 20.9, because both carry a live
+     client-side COLORIZE DIMENSION the component has no concept of — Code Map renders 7 dimensions x 4 filter
+     variants = 8 charts with a client-side dimension switch that re-fills every rect, and Git Insights ownership
+     renders 4 live modes plus a contributor select and a staleness threshold. Neither is expressible in
+     HierarchyNode.StatusClass. Consequence to state plainly: EPIC 20's "exactly one implementation of a hierarchy
+     chart" is satisfied at 20.9, NOT at 20.7.
+     (D2) SELECTOR = STANDARDIZE ORDERING ONLY. Sunburst | Treemap in that order site-wide (the divergence AC#1
+     names, and the ordering 20.5 already fixed); WHICH shape is checked on load stays per-instance config. A deep
+     file tree reads better as rectangles and demoting that would be a regression dressed as consistency.
+     (D3) WEBVIEW = THE TEXT TWIN, the degradation ADR 0012 §5 and ADR 0013 §7 both pre-authorize. This CLOSES
+     Story 20.5's D4, which deferred the decision here. The ADR 0005 CSP amendment stays with Story 23.4. Accepted
+     cost: webview surfaces lose the chart picture until 23.4 — a sequencing choice, not a technical limit, since
+     the 20.4 spike proved Plotly renders under the byte-verbatim shipped policy.
+     (D4) IMPACT MAP = EPIC -> DIRECTORY -> FILE, and the epic multi-select becomes a generic subtree filter. The
+     chart's shape then MATCHES its epic-grouped text twin (Charts.ImpactMapBody). VISIBLE CHANGE: a file touched
+     by three epics draws three times, so root churn reads as TOTAL ATTRIBUTED churn rather than distinct-file
+     churn — the legend and framing sentence must say so.
+     (D5) PAYLOAD CEILING = MEASURE AFTER THE SVG RETIRES. RelatedWork.MaxEntriesPerGroup stays at 12; today's
+     283,263 B of 742,107 B (38.2%) is a PRE-retirement figure and this story deletes the SVG out from under it.
+     FOUR CODE-VERIFIED FINDINGS the epic, both ADRs, and Stories 20.5/20.6 all miss. (F1) `SunburstLegend` is
+     emitted INSIDE all three entry points being deleted (Charts.cs:614, 1102, 1226), so the legend must move into
+     the component's framing block — which ADR 0012 §2 required anyway — and the Story 3.5 legend HOVER-EMPHASIS
+     dies regardless, because its CSS keys on `.sb-seg` while Plotly draws `path.surface`, with a guard test
+     forbidding a JS re-implementation. (F2) Three of the five surfaces have NO PROJECTOR and HierarchyExplorer
+     ships exactly one (ProjectDashboard); ProjectEpic, ProjectStoryTasks and ProjectImpactMap are new work.
+     (F3) The Impact Map needs two capabilities the component lacks — a second COLOR FAMILY (its 5-level commit
+     ramp; the resolver today hard-codes `"sb-seg " + STATUS_CLASS[...]`) and a client-side NODE FILTER — both of
+     which Story 20.9 also needs, so they must be designed for two consumers. (F4) 58 test references point at the
+     three entry points being deleted (44 / 11 / 3) and splitting them into rewrite-against-the-payload vs
+     delete-as-geometry is the largest and most under-estimated chunk of the story. -->
 
 ### Story 20.8: Dashboard Details Pane — `select` Mode in Practice
 
@@ -3562,6 +3606,47 @@ So that I can survey the project's structure and read about each part without lo
      the RAIL's own JS-off stacked view carry DIFFERENT facts (the twin: label, prose status, Detail, resolving
      href; the rail: summary, command badge, view-more link), and the Dev Agent Record must say which surface
      carries which rather than claiming the twin carries the details. -->
+
+<!-- Story 20.9 ADDED 2026-07-25 (create-story 20.7, owner decision D1). It is the OTHER HALF of the rollout, not
+     a new feature: the two surfaces whose conversion needs component capability that does not exist yet. Epic 20's
+     "exactly one implementation of a hierarchy chart" finishes HERE. Also inherits Story 20.6's per-surface twin
+     work for these two — 20.6 D2 audits all seven and fixes only dashboard+epics, and its F2 records that Git
+     Insights has NO TWIN AT ALL (Story 7.11 deleted both prior ownership tables) while its own doc comment still
+     states the superseded ADR 0010 §2 no-JS contract. That surface's entire no-JS story rests on the SVG this
+     story deletes, which makes its twin a prerequisite rather than a polish item. -->
+
+### Story 20.9: Colorized Hierarchies — Code Map and Git Insights Ownership Through the Component
+
+As a maintainer finishing the rollout ADR 0012 §2 requires,
+I want the two colorize-driven hierarchy surfaces converted to the component and their renderers deleted,
+So that "exactly one implementation of a hierarchy chart exists in the codebase" is finally true rather than nearly true.
+
+**Acceptance Criteria:**
+
+1.
+**Given** the component's single-`statusClass` color model and these two surfaces' live colorize dimensions
+**When** the component is extended
+**Then** it carries a **dimension contract**: a node may resolve its fill from any token family through the shipped cascade (never a re-typed token value, AD-7), a surface may offer several dimensions, and switching dimension re-colors in place without re-deriving geometry, re-counting against `ProjectCounts`, or issuing a fetch
+**And** the non-color channel holds across every dimension (UX-DR17) — no state is signalled by hue alone.
+
+2.
+**Given** the Code Map (`CodeMapTemplater.cs` — 7 colorize dimensions × 4 filter variants = 8 charts, plus the drill breadcrumb and the per-variant file table)
+**When** it is converted
+**Then** every variant renders through the component with the standard selector ordering, its treemap default shape, and its drill behavior preserved
+**And** its per-variant file table is **kept** as the text twin (Story 20.6 D1 — it is richer than the generic nested list, carrying per-file git metrics), audited complete before any SVG is retired.
+
+3.
+**Given** Git Insights ownership (`GitInsightsTemplater.cs` — 4 live modes, a contributor select, and a staleness threshold) which Story 20.6 F2 recorded as having **no text twin at all**
+**When** it is converted
+**Then** a complete, navigable, non-color twin is built for it **first**, verified live with JavaScript disabled, and only then is its SVG retired
+**And** its stale ADR 0010 §2 progressive-enhancement doc comment is corrected to the ADR 0013 contract
+**And** author information stays descriptive attribution in every mode, never a ranked scoreboard (FR-10, ADR 0010 §4 — unaffected by rendering technology).
+
+4.
+**Given** the last four `Charts.cs` hierarchy entry points (`CodeTreemap`, `CodeMapSunburst`, `CodeOwnershipSunburst`, `CodeOwnershipTreemap`) and the last two client renderers (`initCodeMapPanel`, `initOwnershipSunburst`)
+**When** the conversion completes
+**Then** they are removed, Story 20.7's rollout-completeness allowlist shrinks to empty, and no code path constructs a sunburst or treemap by any route other than the component — **verified by search, not assumed**
+**And** the byte accounting is reported against the Story 20.4 spike's projection, since `code-map.html` (−3,493,000 B) and `git-insights.html` (−1,510,735 B) are where the entire portal-wide −4,787,124 B net delta actually lives.
 
 <!-- Epic 21 added 2026-07-19 (SCP 2026-07-19, correct-course): value & correlation insights — cross-cutting displays
      that make product value legible and surface correlations across work items AND code. Distinct from Epic 7's
