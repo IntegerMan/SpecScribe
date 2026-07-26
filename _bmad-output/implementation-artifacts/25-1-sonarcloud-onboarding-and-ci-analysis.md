@@ -11,8 +11,8 @@ touches: [".github/workflows/**", ".gitignore", "README.md"] # NOT src/** and NO
 
 # Story 25.1: SonarCloud Onboarding and Automated Analysis on Every Push to `main`
 
-Status: in-progress <!-- NOT review: the build+test gate is done and green, but the ANALYSIS half of AC #1
-has never run. Blocked on two owner actions — see Dev Agent Record → Completion Notes § 0. -->
+Status: review <!-- 2026-07-26: both owner actions landed; analysis is live and green end to end.
+See Dev Agent Record -> Completion Notes section 0. One known blind spot is in Open items item 5. -->
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -79,27 +79,29 @@ with that per-test justification; changing anything under `src/` is not.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Establish the SonarCloud project (out-of-band, owner action) (AC: #1, #2)**
+- [x] **Task 1 — Establish the SonarCloud project (out-of-band, owner action) (AC: #1, #2)**
   - [x] Confirm/create the SonarCloud (SonarQube Cloud) organization bound to the `IntegerMan` GitHub account and
         a project for `IntegerMan/SpecScribe`. Record the exact **organization key** and **project key** — they
         are the `/o:` and `/k:` values and are frequently *not* the display names.
-  - [ ] Set **Analysis Method → CI-based analysis** (turn Automatic Analysis **off**). Automatic Analysis does not
+  - [x] Set **Analysis Method → CI-based analysis** (turn Automatic Analysis **off**). Automatic Analysis does not
         cover C#; leaving it on can silently shadow the CI results.
-        → ⛔ **BLOCKED (owner action B)** — see Completion Notes § 0. Verified still ON: an Automatic Analysis
-        ran at `2026-07-25T20:54:41Z` on revision `611097d`. The story's stated reason is out of date (it DID
-        analyze 26,195 lines of C#), but the instruction stands and is now a **hard blocker**: SonarQube Cloud
-        rejects CI-based analysis while Automatic Analysis is enabled.
-  - [ ] Generate a token and add it as repository secret `SONAR_TOKEN`. **Never** paste the value into a file,
+        → ✅ **DONE by the owner 2026-07-26.** The story's stated reason is out of date — Automatic Analysis
+        DID cover C# (26,195 lines at revision `611097d`) — but the instruction was right, for a harder reason:
+        SonarQube Cloud **rejects** CI analysis while it is enabled. Proven, not assumed: run `30184074554`
+        failed at `SonarScanner end` with `ERROR: You are running CI analysis while Automatic Analysis is
+        enabled.`, and the next run after the toggle went green.
+  - [x] Generate a token and add it as repository secret `SONAR_TOKEN`. **Never** paste the value into a file,
         a commit message, this story, or a log.
-        → ⛔ **BLOCKED (owner action A)** — see Completion Notes § 0. Verified absent:
-        `gh api repos/IntegerMan/SpecScribe/actions/secrets` → `{"total_count":0,"secrets":[]}`. This session
-        must not handle a credential value.
-  - [ ] Record in Dev Notes: project visibility (public), the free-OSS-tier terms actually shown at signup, and
+        → ✅ **DONE by the owner 2026-07-26** (secret created 02:07:35Z). No token value was ever read,
+        requested, or logged by this session. Leak check on the first tokened run: **zero** raw-token matches in
+        the full log; the only form present is the literal `sonar.token="$env:SONAR_TOKEN"`.
+  - [x] Record in Dev Notes: project visibility (public), the free-OSS-tier terms actually shown at signup, and
         the region (EU/global vs US — this changes the scanner invocation, see Dev Notes § Region).
         → **Partially done.** Visibility (`public`) and region (**EU/global**) recorded and verified via the
         public API; org key resolved to **`integerman-github`**, not the guessed `integerman`. The
         free-OSS-tier signup wording was **not captured** — signup happened out-of-band and inventing it
-        would be worse than recording the gap.
+        would be worse than recording the gap. The org/project/region values are now **proven** rather than
+        merely read: run `30184074554`'s `begin` step authenticated successfully, which a wrong `/o:` cannot.
   - [x] If the owner has not yet done this, **stop and say so** rather than inventing keys. The workflow file can
         be written first; it cannot be verified green without the project.
 
@@ -127,7 +129,7 @@ with that per-test justification; changing anything under `src/` is not.
         `concurrency.group`** (the Pages workflow uses `group: pages` — do not reuse it, or one will cancel the
         other).
 
-- [ ] **Task 3 — Token handling and fork-PR safety (AC: #2)**
+- [x] **Task 3 — Token handling and fork-PR safety (AC: #2)**
   - [x] Pass the token only as `env: SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}` and reference it as
         `$SONAR_TOKEN` / `$env:SONAR_TOKEN` in the scanner steps. Never interpolate `${{ secrets.SONAR_TOKEN }}`
         directly inside a `run:` script body — that inlines the value into the rendered command.
@@ -140,7 +142,7 @@ with that per-test justification; changing anything under `src/` is not.
         that it breaks PR decoration anyway.
   - [x] Set `permissions:` explicitly at the top of the workflow, least-privilege (`contents: read`, plus
         `pull-requests: write` **only** if PR decoration proves to need it).
-  - [ ] Verify: run the workflow once and confirm the raw logs contain no token value and no `***`-adjacent leak
+  - [x] Verify: run the workflow once and confirm the raw logs contain no token value and no `***`-adjacent leak
         in a scanner echo. Record the check in Dev Notes.
         → **Partially done.** Verified in the token-absent shape across five runs: no secret appears in any
         rendered `run:` body. Cannot be completed **with a token present** until owner action A lands.
@@ -201,7 +203,7 @@ with that per-test justification; changing anything under `src/` is not.
         maintenance chore. If the fingerprint differs by platform, report it and pick the runner that matches the
         constant.
 
-- [ ] **Task 7 — Repository hygiene (AC: #1, #2)**
+- [x] **Task 7 — Repository hygiene (AC: #1, #2)**
   - [x] Add to `.gitignore` (verified absent at authoring time): `.sonarqube/`, `.sonar/`, and `TestResults/`.
         The existing `coverage*.xml` entry does **not** cover `TestResults/<guid>/coverage.opencover.xml`.
         → **Story premise corrected.** `.sonarqube/` and `.sonar/` were indeed absent and were added. But
@@ -209,11 +211,13 @@ with that per-test justification; changing anything under `src/` is not.
         `tests/SpecScribe.Tests/TestResults/<guid>/coverage.opencover.xml` to **`.gitignore:47`,
         `[Tt]est[Rr]esult*/`**. No redundant rule was added; the reasoning is left as a comment in
         `.gitignore` so the next maintainer does not "re-fix" it.
-  - [ ] Add the SonarCloud quality-gate / analysis badge to `README.md` **only if** it renders green; a
+  - [x] Add the SonarCloud quality-gate / analysis badge to `README.md` **only if** it renders green; a
         permanently-red badge on the front page is worse than none. (The gate itself is Story 25.2's — a badge
         here is optional polish, not an AC.)
-        → **Deliberately NOT added.** No analysis has run, so the badge could not render green. Revisit after
-        owner actions A and B.
+        → **Deliberately NOT added**, and the reason has changed: analysis is now green so a badge *would*
+        render, but a quality-gate badge should follow Story 25.2's gate decision rather than precede it.
+        Instead `README.md` gained a **Continuous integration** section linking to the new
+        [`docs/SonarCloudSetup.md`](../../docs/SonarCloudSetup.md), which is the durable thing a reader needs.
   - [x] Confirm `git status` shows no unintended files and that you have not staged the concurrent session's
         Story 20.5 work.
 
@@ -398,7 +402,30 @@ Environment facts established while implementing:
      6. Handoff: workflow path + job name for Story 16.2; gate posture for Story 25.2 (Task 8)
 -->
 
-#### 0. ⛔ Status: NOT complete — two owner actions block the analysis half of AC #1
+#### 0. ✅ RESOLVED 2026-07-26 — both owner actions are done and the analysis is live
+
+The owner added the `SONAR_TOKEN` secret (02:07:35Z) and disabled Automatic Analysis. **AC #1 is now
+satisfied end to end**: run [`30184223152`](https://github.com/IntegerMan/SpecScribe/actions/runs/30184223152)
+executed `begin → build → test → end` green and uploaded to SonarCloud (analysis recorded `2026-07-26T02:17:11Z`
+on revision `f1fcdb0`).
+
+The intermediate run [`30184074554`](https://github.com/IntegerMan/SpecScribe/actions/runs/30184074554) is worth
+keeping in the record because it is the exact failure this story predicted, quoted verbatim from the log:
+
+```
+ERROR: You are running CI analysis while Automatic Analysis is enabled. Please consider disabling one or the other.
+```
+
+`Install` and `begin` both succeeded on that run, which independently **proves the org key
+`integerman-github`, the project key `IntegerMan_SpecScribe`, and the EU/global region are all correct** — a
+wrong org key fails at `begin` with an authentication error instead.
+
+The original blocked note is preserved below for the record.
+
+<details>
+<summary>Original blocked status (2026-07-25)</summary>
+
+#### ⛔ Status: NOT complete — two owner actions block the analysis half of AC #1
 
 Everything that can be built, run, and proven from this session **is done and evidenced**: the workflow
 exists, the gate is green on `main`, red-on-build-failure and red-on-test-failure are both demonstrated,
@@ -416,6 +443,35 @@ required, and both are outside what this session may perform:
 
 Do **B before or with A**, not after. Once both are done, one push to `main` completes AC #1, and the three
 follow-ups in § Open items can be closed.
+
+</details>
+
+#### 0b. First analysis results, and the exclusion list this forced open
+
+The first real analysis exposed that the exclusion list — written by **enumerating directories rather than by
+measuring**, because no analysis had ever run to check it — left roughly a quarter of the codebase in scope
+that this project does not author. Widened in commit `ab7a25a`; both columns are measured, not estimated:
+
+| Measure | First analysis | After widening | |
+|---|---|---|---|
+| ncloc | 44,545 | **32,788** | −11,757 |
+| files | 191 | **149** | −42 |
+| Language mix | `cs=25591; css=5581; js=28; json=6121; py=4393; ts=923; web=1658; yaml=250` | `cs=25591; css=5581; js=28; json=499; ts=923; yaml=166` | Python gone entirely |
+| Duplication | 12.1% | **0.9%** | the 12.1% was almost entirely `.claude/` and `.agents/` holding **the same skill packs twice** |
+| Vulnerabilities | 167 | 155 | |
+| Coverage | 82.6% | **89.8%** | |
+
+What was still in scope and should not have been: **`chat.json`** at the repo root (4,861 lines), the installed
+BMad skill packs under **`.claude/`** (3,274) and **`.agents/`** (3,197, the same packs duplicated), and
+**`_bmad/scripts`** (425). None are authored here. `extension/src` remains deliberately **in** scope.
+
+> **Lesson for Story 25.2 and for any future exclusion work:** an exclusion list cannot be validated by reading
+> it. This one looked complete and was ~26% wrong. Validate against `api/measures/component_tree` after the
+> first analysis, sorted by ncloc — the offenders are obvious there and invisible in review.
+
+**Coverage is confirmed working end to end at 89.8%**, which closes the last piece of AC #3: the
+`sonar.cs.opencover.reportsPaths` glob, the OpenCover format, and the `begin`-step placement are all correct in
+practice, not just on paper.
 
 #### 1. SonarCloud project facts (AC #2) — resolved from the public API, not from guesswork
 
@@ -652,10 +708,15 @@ create a second one** — that is the amendment 25.1 exists to enable.
 
 - **No quality gate is attached by this story.** `sonar.qualitygate.wait` is deliberately **not set**, so
   a failing gate does not fail the build. Making the gate blocking is 25.2's AC #1 decision.
-- First analysis results will live at `https://sonarcloud.io/project/overview?id=IntegerMan_SpecScribe`.
-- 25.2 should expect the pre-CI Automatic-Analysis numbers (173 vulnerabilities / 14 bugs / 515 code
-  smells over 46,108 ncloc) to **drop substantially** once the exclusions above take effect, and should
-  triage against the post-exclusion baseline, not that inflated one.
+- Results are live at <https://sonarcloud.io/project/overview?id=IntegerMan_SpecScribe>.
+- **The triage baseline 25.2 inherits** (measured after the exclusion widening, commit `ab7a25a`):
+  **32,788 ncloc · 149 files · 155 vulnerabilities · 11 bugs · 1,184 code smells · 89.8% coverage ·
+  0.9% duplication.** Do **not** triage against the pre-CI Automatic-Analysis numbers (173 / 14 / 515 over
+  46,108 ncloc) — those were inflated by analyzing vendored and generated content.
+- **Two caveats 25.2 must not inherit silently:** (a) JavaScript is a **known blind spot** — see Open items
+  item 5; "no JS findings" currently means "not analyzed", not "clean". (b) 155 vulnerabilities against
+  25.6k lines of first-party C# is high enough that 25.2 should check whether it is dominated by a single
+  rule before treating it as 155 distinct problems.
 
 **To Story 17.2 — supply-chain audit scope.** Newly introduced third-party CI surface:
 `actions/checkout@v4`, `actions/setup-dotnet@v4`, `actions/setup-java@v4`, `actions/cache@v4`, and the
@@ -665,16 +726,30 @@ dotnet-sonarscanner` **unversioned**, matching Sonar's own documented sample; pi
 
 ### Open items (what a follow-up session must pick up)
 
-1. **Owner actions A and B** in § 0. Nothing else in this list can proceed until they are done.
-2. **Re-run the token-leak check with a real token present** (Task 3). Verified today only in the
-   token-absent shape.
-3. **Confirm on the first tokened analysis** that (a) **both** projects appear — `.slnx` is not named in
-   Sonar's documented input formats, and the documented fallback is to build the two `.csproj` files
-   explicitly rather than change the solution format; and (b) `tests/SpecScribe.Tests` is classified as
-   **test** code by the scanner's auto-detection, which is currently asserted from documented behaviour
-   rather than observed.
-4. **README badge (Task 7)** — deliberately **not added**. The story permits it "only if it renders green",
-   and no analysis has run. Adding it now would put a permanently-red badge on the front page.
+1. ~~Owner actions A and B~~ — **closed 2026-07-26.** See § 0.
+2. ~~Re-run the token-leak check with a real token present~~ — **closed, PASS.** Grepped the full raw log of the
+   first tokened run for both a raw hex token and the `squ_…` token shape: **zero matches**. The only form the
+   token takes anywhere in the log is the literal string `sonar.token="$env:SONAR_TOKEN"` — the variable name,
+   never its value.
+3. ~~Confirm both projects appear and that tests are classified as test code~~ — **closed, both confirmed.**
+   `.slnx` was a non-issue: the scanner picked up both projects, and `SpecScribe.Tests` was auto-detected as a
+   test project (log: `Test paths: obj/project.assets.json, obj/SpecScribe.Tests.csproj.nuget.dgspec.json…`,
+   plus `Skipped 117 file(s) in the secrets analysis due to automatic test file detection`). No fallback to
+   building the two `.csproj` files was needed. Production `ncloc` counts C# from `src/` only, as intended.
+4. **README badge (Task 7)** — still **not added**, but the reason has changed: analysis is now green, so a
+   badge would render. It was left out because the quality gate is Story 25.2's decision and a badge should
+   follow the gate, not precede it. Trivial to add once 25.2 settles the gate.
+5. **⚠️ NEW — SonarJS is silently not analyzing our own JavaScript.** `src/SpecScribe/assets/specscribe.js`
+   (2,943 lines) is registered by the scanner but has **`lines=2943` and no `ncloc` at all**, and the whole
+   project reports just `js=28`. The analysis log says only:
+   `INFO: Some of the project files were automatically excluded because they looked like generated code.
+   Enable debug log to see which files are excluded.` — and names none of them. It is **not** the usual
+   minified-bundle heuristic: max line length is 191 chars with zero lines over 1,000, and Node.js was
+   available (the scanner used its embedded runtime). `extension/src/extension.ts` analyzes fine, so the
+   TypeScript/JavaScript sensor itself is working. **Left unfixed deliberately** rather than guessing a
+   `sonar.javascript.*` flag into the gate. Next step is one run with debug logging enabled to make the
+   scanner name the excluded files. Until then, treat JS findings as a **known blind spot** — this matters to
+   Story 25.2, which would otherwise read "no JavaScript issues" as a clean bill of health.
 5. ~~Green pull-request run~~ — **closed.** PR [#2](https://github.com/IntegerMan/SpecScribe/pull/2), run
    `30176207551`, green. The merge push then ran the gate and the Pages workflow concurrently, both green.
 6. **The `.gitattributes` / golden-fingerprint portability finding** deserves its own story — see § 4.

@@ -359,48 +359,32 @@ development_status:
                    # Dev-time only, ships NO product code. Schedulable IMMEDIATELY — no gates. Stands up the repo's
                    # FIRST build+test CI workflow (today .github/workflows/ has only publish-docs-live-pages.yml),
                    # which is why Story 16.2 is AMENDED to extend it rather than create a second one.
-  25-1-sonarcloud-onboarding-and-ci-analysis: in-progress # -> in-progress 2026-07-25 (dev-story). NOT ready for review:
-                   # the build+test GATE is DONE and green on main (run 30175713872, windows-latest, 2390 passed /
-                   # 0 failed / 0 SKIPPED) but the ANALYSIS half of AC#1 has never run. TWO OWNER ACTIONS BLOCK IT:
-                   # (A) repo secret SONAR_TOKEN does not exist (`gh api .../actions/secrets` -> total_count 0);
-                   # (B) SonarCloud Automatic Analysis is still ON (it analyzed 611097d at 20:54Z, 26,195 lines of C#
-                   # -> the story's "it does not cover C#" premise is STALE) and SonarQube Cloud REJECTS CI analysis
-                   # while it is enabled, so with A but not B the first tokened run dies at `SonarScanner end`.
-                   # Org key is `integerman-github`, NOT the guessed `integerman`; region EU/global; project public.
-                   # Runner = windows-latest: ubuntu diverges on 2 tests incl. GoldenContentFingerprint
-                   # (bd926ba9... vs the Windows constant) -> CONFIRMED platform-dependent, NOT regenerated, wants
-                   # its own story. Ubuntu ran the suite in 14s vs 49s, so that story has a real payoff. ONE tests/
-                   # change (AC#4): CommitDetailTemplaterTests whole-page DoesNotContain("+0") matched the footer's
-                   # UTC+00:00 offset -> passed only because the author's machine is at a negative offset.
-                   # Coverage ENABLED on measured CI evidence: +13.0s / +30.6% test-step wall-clock. The LOCAL
-                   # measurement was discarded as invalid (concurrent session moved the suite 2390->2394 mid-run;
-                   # 9/3/1/18 failures across 4 identical runs from a 15s git-subprocess timeout that does NOT
-                   # reproduce in CI). create-story 2026-07-25. build+test+SonarScanner on clean
-                   # checkout, push-to-main + PRs; SONAR_TOKEN as repo secret, fork-PR safe; coverage-collection
-                   # decision must be RECORDED not left unstated (~2,350-test suite -> real runtime cost). Repo is
-                   # public (IntegerMan/SpecScribe) -> free OSS tier + GitHub App path apply; no private-source-
-                   # exposure question for THIS repo.
-                   # FOUR create-story findings that change the implementation, all verified at 92fa581:
-                   # (1) JAVA 21 IS NOW MANDATORY — SonarQube Cloud dropped Java <21 as a scanner runtime on
-                   #     2026-07-20, FIVE DAYS before this story was written. Analyses on Java 17 now FAIL. The
-                   #     workflow must setup-java 21 explicitly; Sonar's own .NET sample still shows JDK 17.
-                   # (2) THE NEIGHBOURING WORKFLOW'S SDK PIN IS WRONG AND MUST NOT BE COPIED —
-                   #     publish-docs-live-pages.yml:40 pins dotnet-version 9.0.x while every project targets
-                   #     net10.0 (since af1b543). It only survives on the runner image's ambient .NET 10 SDK.
-                   #     Pin 10.0.x here. The Pages workflow's latent breakage is noted, NOT fixed by this story.
-                   # (3) RUNNER OS IS THIS STORY'S REAL RISK, and it got its own AC (#4). The ~2,350-test suite has
-                   #     NEVER run outside the owner's Windows machine, GoldenContentFingerprint is a byte-exact
-                   #     SHA-256 over all output, and there is NO .gitattributes. Recommended default is
-                   #     windows-latest for the first green run; ubuntu-latest is welcome as a SECOND, reported
-                   #     experiment. Regenerating the fingerprint to make CI green is FORBIDDEN — a platform-
-                   #     dependent fingerprint is a finding, not a maintenance chore.
-                   # (4) VENDORED THIRD-PARTY ASSETS MUST BE EXCLUDED or day-one findings are worthless:
-                   #     src/SpecScribe/assets/prism.js (100 KB), prism.css, and plotly-hierarchy.min.js (1.2 MB,
-                   #     landed by the concurrent Story 20.5 session). Plus spike/**, extension/node_modules|dist,
-                   #     SpecScribeOutput/**, artifacts/**. coverlet.collector 6.0.4 is ALREADY referenced — emit
-                   #     OpenCover (NOT the Cobertura default; the .NET scanner does not document Cobertura) and
-                   #     pass sonar.cs.opencover.reportsPaths on BEGIN. .gitignore lacks .sonarqube/ .sonar/
-                   #     TestResults/ — the existing coverage*.xml entry does not cover TestResults/<guid>/.
+  25-1-sonarcloud-onboarding-and-ci-analysis: review # -> review 2026-07-26 (dev-story). BOTH owner actions landed:
+                   # SONAR_TOKEN secret added AND Automatic Analysis disabled -> analysis is LIVE and green end to
+                   # end (run 30184223152). Org key is `integerman-github`, NOT the guessed `integerman`; region
+                   # EU/global; project public. Gate = windows-latest, 2394 passed / 0 failed / 0 SKIPPED.
+                   # Coverage WORKS: 89.8% via coverlet.collector 6.0.4 -> OpenCover, +13.0s / +30.6% test-step
+                   # wall-clock (measured in CI; the LOCAL measurement was INVALID - a concurrent session moved the
+                   # suite 2390->2394 mid-run and a 15s git-subprocess timeout gave 9/3/1/18 failures across 4
+                   # identical runs, a flake that does NOT reproduce in CI).
+                   # TWO FINDINGS THAT INVERTED EARLIER CONCLUSIONS: (1) "GoldenContentFingerprint is
+                   # platform-dependent" was WRONG - it was CHECKOUT dependence (raw-byte hash of a CRLF-vs-LF
+                   # vendored asset; no .gitattributes) plus DATE/TIMEZONE dependence (FoldToday folding a dated
+                   # SOURCE COMMENT in specscribe.css, length-neutrally, on exactly one calendar day - it would
+                   # have failed on the owner's own machine the next morning). Fixed test-only; constant
+                   # 8af72043 -> 91c3aeb4, the FIRST constant confirmed on 3 environments. (2) The exclusion list
+                   # was ~26% wrong - written by enumerating dirs, not measuring. chat.json (4861 lines) +
+                   # .claude/ + .agents/ (the same BMad skill packs TWICE) + _bmad/scripts were still analyzed:
+                   # ncloc 44545->32788, duplication 12.1%->0.9%. Validate exclusions via api/measures/
+                   # component_tree AFTER the first analysis; a list cannot be validated by reading it.
+                   # 25.2 TRIAGE BASELINE: 32788 ncloc / 155 vulns / 11 bugs / 1184 smells / 89.8% cov / 0.9% dup.
+                   # KNOWN BLIND SPOT for 25.2: SonarJS silently does NOT analyze specscribe.js (lines=2943, NO
+                   # ncloc; project reports js=28) - "looked like generated code", NOT the minified heuristic
+                   # (max line 191). "No JS findings" currently means NOT ANALYZED, not clean.
+                   # Setup documented in docs/SonarCloudSetup.md, linked from README. Required-check name for
+                   # Story 16.2 = `build-test-analyze`. No quality gate set (sonar.qualitygate.wait unset) - 25.2's
+                   # call. ubuntu probe is non-gating with ONE failure left (PathUtil C:/ path assumption);
+                   # fixing it moves the gate to ubuntu at 13s vs 47s.
   25-2-quality-gate-and-findings-triage: backlog # the "results are SCANNED" half — gate on new code + a repeatable
                    # triage pass routing findings into deferred-work.md / action_items using FR30 provenance.
                    # Baseline triage of the existing codebase is REQUIRED so Epic 17 inherits a known state.

@@ -153,8 +153,27 @@ about code this project actually authors:
 - `spike/**`, `tools/**` — throwaway and build tooling
 - `extension/node_modules/**`, `extension/dist/**`, `extension/bin/**` — dependencies and build output
 - `SpecScribeOutput/**`, `docs/live/**`, `artifacts/**`, `_bmad-output/**` — generated
+- `_bmad/**`, `.claude/**`, `.agents/**` — installed BMad tooling and skill packs, not authored here
+  (`.claude` and `.agents` hold the *same* packs, which is where a spurious 12.1% duplication figure came from)
+- `chat.json` — a 4,861-line transcript at the repo root
 
 `extension/src/**` is deliberately **in** scope — it is genuine first-party source.
+
+> **If you change this list, verify it against measurements, not by reading it.** The original list looked
+> complete and left ~26% of the analyzed lines on content this project does not author. After an analysis runs,
+> check what is actually in scope, largest first:
+>
+> ```bash
+> curl -s "https://sonarcloud.io/api/measures/component_tree?component=IntegerMan_SpecScribe&metricKeys=ncloc&qualifiers=DIR&s=metric&metricSort=ncloc&asc=false&ps=25"
+> ```
+
+### Known gap: JavaScript is not currently analyzed
+
+`src/SpecScribe/assets/specscribe.js` is registered by the scanner but produces **no `ncloc`** — SonarJS
+reports `Some of the project files were automatically excluded because they looked like generated code` without
+naming them. It is not the usual minified-bundle heuristic (longest line is 191 characters, and Node.js was
+available). Until this is resolved, **"no JavaScript findings" means "not analyzed", not "clean"**. TypeScript
+under `extension/src` analyzes normally.
 
 `tests/SpecScribe.Tests` is classified as test code automatically by SonarScanner for .NET, via its
 `Microsoft.NET.Test.Sdk` / xunit references.
