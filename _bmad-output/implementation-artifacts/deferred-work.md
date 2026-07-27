@@ -2,6 +2,15 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of 5-6-how-to-use-specscribe-cli-guidance (2026-07-27)
+
+- source_spec: `5-6-how-to-use-specscribe-cli-guidance.md`
+  summary: Doc-subtitle/intro `hasModuleContent` gate (`readingOrder.Length > 0 || reference.Length > 0`) can overclaim reading-order OR glossary content — copy always promises both when either half alone is non-empty. Pre-existing shape (the prior single `sections.Length > 0` gate had the same ambiguity); this story added a third promise ("then generate the site yourself") on top without tightening it.
+  evidence: Edge Case Hunter + Blind Hunter (merged). Reachable for a modeled module with no reading-order pages on disk yet (glossary is intrinsic to the module, independent of what's on disk). Revisit if/when the subtitle logic is next touched — split the gate into independent `readingOrder.Length > 0` / `reference.Length > 0` checks. [`src/SpecScribe/HowToReadTemplater.cs:49-81`]
+- source_spec: `5-6-how-to-use-specscribe-cli-guidance.md`
+  summary: `<meta description>` tag is built before `hasModuleContent` is computed and never varies with it, so it always claims "a suggested reading order... and a glossary of the terms used throughout" even on an undetected-module run.
+  evidence: Edge Case Hunter. Pre-existing (the original meta description was equally unconditional); this story only added the always-true generate clause to the same static string. Low-impact (invisible metadata, not on-page content). [`src/SpecScribe/HowToReadTemplater.cs:23-26`]
+
 ## Deferred from: code review of 5-3-watch-regeneration-safety-and-scope-aware-rebuilds (2026-07-25)
 
 - source_spec: `5-3-watch-regeneration-safety-and-scope-aware-rebuilds.md`

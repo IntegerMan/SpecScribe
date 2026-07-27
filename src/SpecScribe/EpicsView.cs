@@ -121,6 +121,13 @@ public sealed record EpicsIndexView
 
     /// <summary>Unplanned / one-off work for the project sunburst Unplanned root. [Story 9.12]</summary>
     public UnplannedWorkGeometry UnplannedWork { get; init; } = UnplannedWorkGeometry.Empty;
+
+    /// <summary>The "Project at a Glance" Hierarchy Explorer block, already rendered. Built in
+    /// <see cref="EpicsViewBuilder.BuildIndex"/> rather than in the adapter (AD-2): the adapter renders the string,
+    /// it does not compose one. Empty when there are no epics, which is the signal for the surface's honest empty
+    /// note — this panel is NOT conditional on the page, so an empty string here must not become a bare heading.
+    /// [Story 20.7 Task 4.1]</summary>
+    public string HierarchyExplorerHtml { get; init; } = string.Empty;
 }
 
 /// <summary>The host-neutral SECTION view model for a single EPIC page body. The header + progress bars + the
@@ -193,6 +200,11 @@ public sealed record EpicPageView
     /// <summary>Open follow-ups scoped to this epic for the epic sunburst's story-ring peers. Defaults to
     /// <see cref="FollowUpGeometry.Empty"/> (no follow-up wedges when this epic has none). [Story 9.7]</summary>
     public FollowUpGeometry FollowUps { get; init; } = FollowUpGeometry.Empty;
+
+    /// <summary>The "Story Breakdown" Hierarchy Explorer block, already rendered. Built in
+    /// <see cref="EpicsViewBuilder.BuildEpic"/> (AD-2). Empty when this epic has neither stories nor follow-ups;
+    /// the panel is conditional on this page, so "" correctly means no panel. [Story 20.7 Task 5.1]</summary>
+    public string HierarchyExplorerHtml { get; init; } = string.Empty;
 
     /// <summary>Epic-attributed quick-dev only (project Unplanned root is never drawn on epic pages).
     /// [Story 9.12]</summary>
@@ -306,6 +318,11 @@ public sealed record StoryPageView
     /// <summary>Deferred-work items whose provenance names this story (reverse index). Empty → panel omitted
     /// (NFR8). [artifact-review-nav-and-deferred]</summary>
     public IReadOnlyList<FollowUpDeferredSlot> DeferredFromThis { get; init; } = Array.Empty<FollowUpDeferredSlot>();
+
+    /// <summary>The "Task Breakdown" Hierarchy Explorer block, already rendered. Built in
+    /// <see cref="EpicsViewBuilder.BuildStory"/> (AD-2). Empty when the story has neither tasks nor deferred
+    /// items — the panel is conditional on this page, so "" correctly means no panel. [Story 20.7 Task 6.1]</summary>
+    public string HierarchyExplorerHtml { get; init; } = string.Empty;
 
     /// <summary>Fallback href for reverse-panel rows whose detail URL is missing (deferred-work list).</summary>
     public string? DeferredListHref { get; init; }

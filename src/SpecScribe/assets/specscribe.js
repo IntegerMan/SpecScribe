@@ -1402,272 +1402,12 @@
     applyMode();
   }
 
-  // ---- Planning <-> Code Impact Map: interactive weighted treemap (Story 21.3) -----------
-  // The visitor multi-selects epics; we merge their touched files into one shared directory hierarchy and lay out
-  // a squarified treemap — tiles SIZED by churn (lines changed), COLORED by commit count. Owner-directed redesign;
-  // a deliberate crossing of the "pure-SVG, no JS" rule. Fully degrades: with JS off this block never runs, the
-  // controls stay hidden, and the epic-grouped text list below is the content. [Story 21.3]
-  var SVGNS = "http://www.w3.org/2000/svg";
-  if (document.getElementById("impact-treemap")) {
-    try { initImpactMap(); } catch (err) { /* degrade silently — the text list below stands */ }
-  }
-
-  function initImpactMap() {
-    var dataEl = document.getElementById("impact-map-data");
-    if (!dataEl) return;
-    var payload = null;
-    try { payload = JSON.parse(dataEl.textContent); } catch (err) { return; }
-    if (!payload || !payload.epics || !payload.epics.length) return;
-
-    var controls = document.querySelector(".impact-controls");
-    var fallback = document.getElementById("impact-fallback");
-    var treemapMount = document.getElementById("impact-treemap");
-    var sunburstMount = document.getElementById("impact-sunburst");
-    var countEl = document.querySelector(".impact-epic-filter .sprint-epic-filter-count");
-    var boxes = Array.prototype.slice.call(document.querySelectorAll(".impact-epic-toggle"));
-    if (!boxes.length || !treemapMount) return;
-
-    // Reveal the interactive controls (emitted hidden for no-JS) and tuck the text list away (still one click).
-    if (controls) controls.hidden = false;
-    if (fallback) fallback.open = false;
-
-    function el(name, attrs) {
-      var e = document.createElementNS(SVGNS, name);
-      for (var k in attrs) if (Object.prototype.hasOwnProperty.call(attrs, k)) e.setAttribute(k, attrs[k]);
-      return e;
-    }
-    function dirOf(p) { var i = p.lastIndexOf("/"); return i < 0 ? "" : p.substring(0, i); }
-    function baseOf(p) { var i = p.lastIndexOf("/"); return i < 0 ? p : p.substring(i + 1); }
-    function fileTitle(f) {
-      return f.p + " — " + f.c + (f.c === 1 ? " line" : " lines") + " changed · " + f.k + (f.k === 1 ? " commit" : " commits");
-    }
-    function emptyNote(container) {
-      container.textContent = "";
-      var note = document.createElement("p");
-      note.className = "impact-treemap-empty";
-      note.textContent = "Select at least one epic to see the code areas it touched.";
-      container.appendChild(note);
-    }
-
-    // Merge the checked epics' files into one path -> {churn, commits, href} map.
-    function mergedFiles() {
-      var sel = Object.create(null);
-      boxes.forEach(function (cb) { if (cb.checked) sel[cb.value] = true; });
-      // A prototype-less map: repo file paths are attacker/repo-controlled strings, and a path literally named
-      // "__proto__" would otherwise collide with the prototype setter on a plain {} and silently vanish.
-      // [Review][Patch]
-      var byPath = Object.create(null);
-      payload.epics.forEach(function (ep) {
-        if (!sel[String(ep.n)]) return;
-        ep.f.forEach(function (f) {
-          var cur = byPath[f.p];
-          if (cur) { cur.c += f.c; cur.k += f.k; }
-          else byPath[f.p] = { p: f.p, c: f.c, k: f.k, h: f.h };
-        });
-      });
-      var arr = [];
-      for (var key in byPath) if (Object.prototype.hasOwnProperty.call(byPath, key)) arr.push(byPath[key]);
-      return arr;
-    }
-
-    // Group the merged files into a shared directory hierarchy (one directory level, then files within). Both the
-    // group nodes AND the file nodes carry `.value` (churn) so the layout algorithms can size them.
-    function groupByDir(files) {
-      var map = Object.create(null);
-      files.forEach(function (f) {
-        f.value = f.c;
-        var d = dirOf(f.p);
-        if (!map[d]) map[d] = { name: d, value: 0, files: [] };
-        map[d].value += f.c; map[d].files.push(f);
-      });
-      var groups = [];
-      for (var g in map) if (Object.prototype.hasOwnProperty.call(map, g)) groups.push(map[g]);
-      groups.sort(function (a, b) { return b.value - a.value; });
-      groups.forEach(function (grp) { grp.files.sort(function (a, b) { return b.c - a.c; }); });
-      return groups;
-    }
-
-    // Squarified treemap of {value} nodes into a rect; sets node.rect = {x,y,w,h}. Nodes pre-sorted desc by value.
-    // Classic Bruls et al. worst-aspect-ratio strips. [Story 21.3]
-    function worst(areas, len) {
-      var sum = 0, max = -Infinity, min = Infinity, i;
-      for (i = 0; i < areas.length; i++) { sum += areas[i]; if (areas[i] > max) max = areas[i]; if (areas[i] < min) min = areas[i]; }
-      var s2 = sum * sum, len2 = len * len;
-      return Math.max((len2 * max) / s2, s2 / (len2 * min));
-    }
-    function squarify(nodes, x, y, w, h) {
-      var items = nodes.filter(function (n) { return n.value > 0; });
-      var total = 0; items.forEach(function (n) { total += n.value; });
-      if (total <= 0 || w <= 0 || h <= 0) return false;
-      var scale = (w * h) / total;
-      var areas = items.map(function (n) { return { n: n, a: n.value * scale }; });
-      var cx = x, cy = y, cw = w, ch = h, i = 0;
-      while (i < areas.length) {
-        var len = Math.min(cw, ch);
-        var row = [], rowA = 0, best = Infinity, j = i;
-        while (j < areas.length) {
-          var candA = rowA + areas[j].a;
-          var cand = row.map(function (r) { return r.a; }); cand.push(areas[j].a);
-          var wst = worst(cand, len);
-          if (row.length === 0 || wst <= best) { row.push(areas[j]); rowA = candA; best = wst; j++; }
-          else break;
-        }
-        if (cw >= ch) {
-          var stripW = rowA / ch, yy = cy;
-          row.forEach(function (r) { var hh = r.a / stripW; r.n.rect = { x: cx, y: yy, w: stripW, h: hh }; yy += hh; });
-          cx += stripW; cw -= stripW;
-        } else {
-          var stripH = rowA / cw, xx = cx;
-          row.forEach(function (r) { var ww = r.a / stripH; r.n.rect = { x: xx, y: cy, w: ww, h: stripH }; xx += ww; });
-          cy += stripH; ch -= stripH;
-        }
-        i = j;
-      }
-    }
-
-    function renderTreemap(container, groups, levelOf) {
-      container.textContent = "";
-      // A non-empty selection can still sum to zero total churn (e.g. binary-only attribution, which
-      // legitimately counts as an attributed file with zero churn) — mirror renderSunburst's guard so the
-      // treemap shows the same honest message instead of a blank SVG. [Review][Patch]
-      var total = 0; groups.forEach(function (g) { total += g.value; });
-      if (total <= 0) { emptyNote(container); return; }
-
-      var W = Math.max(container.clientWidth || 640, 320);
-      var H = Math.max(Math.min(Math.round(W * 0.6), 620), 360);
-      var svg = el("svg", { "class": "impact-tm", viewBox: "0 0 " + W + " " + H, width: "100%", height: H, preserveAspectRatio: "xMidYMid meet" });
-
-      squarify(groups, 0, 0, W, H);
-      groups.forEach(function (grp) {
-        if (!grp.rect || grp.rect.w < 2 || grp.rect.h < 2) return;
-        var gx = grp.rect.x + 1, gy = grp.rect.y + 1, gw = grp.rect.w - 2, gh = grp.rect.h - 2;
-        var labelH = (gw > 60 && gh > 30) ? 15 : 0;
-        if (labelH) {
-          var lbl = el("text", { "class": "impact-tm-dir", x: gx + 2, y: gy + 11 });
-          lbl.textContent = grp.name || "(root)";
-          svg.appendChild(el("rect", { "class": "impact-tm-dir-bg", x: gx, y: gy, width: gw, height: labelH }));
-          svg.appendChild(lbl);
-        }
-        squarify(grp.files, gx, gy + labelH, gw, gh - labelH);
-        grp.files.forEach(function (f) {
-          if (!f.rect || f.rect.w < 1 || f.rect.h < 1) return;
-          var host = f.h ? el("a", { href: f.h, "class": "impact-tm-link" }) : el("g", {});
-          var rect = el("rect", { "class": "impact-tm-tile impact-level-" + levelOf(f.k), x: f.rect.x, y: f.rect.y, width: Math.max(f.rect.w - 1, 0.5), height: Math.max(f.rect.h - 1, 0.5) });
-          var title = el("title", {}); title.textContent = fileTitle(f); rect.appendChild(title);
-          host.appendChild(rect);
-          if (f.rect.w > 46 && f.rect.h > 16) {
-            var t = el("text", { "class": "impact-tm-label", x: f.rect.x + 3, y: f.rect.y + 12 });
-            t.textContent = baseOf(f.p);
-            host.appendChild(t);
-          }
-          svg.appendChild(host);
-        });
-      });
-      container.appendChild(svg);
-    }
-
-    // Two-ring radial sunburst of the SAME merged hierarchy: an inner directory ring and an outer file ring, arcs
-    // sized by churn (angular span) and — for files — colored by commit level. Same tooltips + click-through as the
-    // treemap; the shared view toggle above swaps between them. [Story 21.3]
-    var TAU = Math.PI * 2;
-    function renderSunburst(container, groups, levelOf, fileCount) {
-      container.textContent = "";
-      var total = 0; groups.forEach(function (g) { total += g.value; });
-      if (total <= 0) { emptyNote(container); return; }
-
-      var W = Math.max(container.clientWidth || 640, 320);
-      var size = Math.max(Math.min(W, 560), 320);
-      var cx = size / 2, cy = size / 2;
-      var rHole = size * 0.16, rDir = size * 0.30, rFile = size * 0.47;
-      var svg = el("svg", { "class": "impact-sb", viewBox: "0 0 " + size + " " + size, width: "100%", height: "auto", preserveAspectRatio: "xMidYMid meet" });
-
-      function polar(r, a) { return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; }
-      function arcPath(r0, r1, a0, a1) {
-        if (a1 - a0 >= TAU) a1 = a0 + TAU - 1e-3; // a full circle can't be one arc segment — leave a hair's gap
-        var large = (a1 - a0) > Math.PI ? 1 : 0;
-        var p0 = polar(r1, a0), p1 = polar(r1, a1), p2 = polar(r0, a1), p3 = polar(r0, a0);
-        return "M" + p0[0].toFixed(2) + " " + p0[1].toFixed(2) +
-          "A" + r1.toFixed(2) + " " + r1.toFixed(2) + " 0 " + large + " 1 " + p1[0].toFixed(2) + " " + p1[1].toFixed(2) +
-          "L" + p2[0].toFixed(2) + " " + p2[1].toFixed(2) +
-          "A" + r0.toFixed(2) + " " + r0.toFixed(2) + " 0 " + large + " 0 " + p3[0].toFixed(2) + " " + p3[1].toFixed(2) + "Z";
-      }
-
-      var ang = -Math.PI / 2; // start at 12 o'clock
-      groups.forEach(function (grp) {
-        var gspan = (grp.value / total) * TAU;
-        var gEnd = ang + gspan;
-        var dseg = el("path", { "class": "impact-arc-dir", d: arcPath(rHole, rDir, ang, gEnd) });
-        var dt = el("title", {}); dt.textContent = (grp.name || "(root)") + " — " + grp.files.length + (grp.files.length === 1 ? " file" : " files");
-        dseg.appendChild(dt); svg.appendChild(dseg);
-
-        var fang = ang;
-        grp.files.forEach(function (f) {
-          // grp.value can be 0 (a group whose only files are zero-churn) while other groups keep total > 0;
-          // 0/0 would be NaN here even though gspan is already 0 for this group. [Review][Patch]
-          var fspan = grp.value > 0 ? (f.c / grp.value) * gspan : 0;
-          var fEnd = fang + fspan;
-          var host = f.h ? el("a", { href: f.h, "class": "impact-sb-link" }) : el("g", {});
-          var seg = el("path", { "class": "impact-arc impact-level-" + levelOf(f.k), d: arcPath(rDir, rFile, fang, fEnd) });
-          var t = el("title", {}); t.textContent = fileTitle(f); seg.appendChild(t);
-          host.appendChild(seg); svg.appendChild(host);
-          fang = fEnd;
-        });
-        ang = gEnd;
-      });
-
-      var center = el("text", { "class": "impact-sb-center", x: cx.toFixed(1), y: cy.toFixed(1), "text-anchor": "middle", "dominant-baseline": "central" });
-      center.textContent = fileCount + (fileCount === 1 ? " file" : " files");
-      svg.appendChild(center);
-      container.appendChild(svg);
-    }
-
-    function updateSummary() {
-      if (!countEl) return;
-      var n = 0; boxes.forEach(function (b) { if (b.checked) n++; });
-      countEl.textContent = n === 0 ? "none" : n === boxes.length ? "all (" + n + ")" : n + " selected";
-    }
-
-    function render() {
-      updateSummary();
-      var files = mergedFiles();
-      if (!files.length) {
-        emptyNote(treemapMount);
-        if (sunburstMount) emptyNote(sunburstMount);
-        return;
-      }
-      // Commit-count -> 1..5 color buckets, relative to the current selection's max so a narrow filter still
-      // reads a full ramp. Computed once and shared by both shapes so their colors agree.
-      var maxK = 1;
-      files.forEach(function (f) { if (f.k > maxK) maxK = f.k; });
-      function levelOf(k) { var lv = Math.ceil((5 * k) / maxK); return lv < 1 ? 1 : lv > 5 ? 5 : lv; }
-
-      var groups = groupByDir(files);
-      renderTreemap(treemapMount, groups, levelOf);
-      if (sunburstMount) renderSunburst(sunburstMount, groups, levelOf, files.length);
-    }
-
-    boxes.forEach(function (cb) { cb.addEventListener("change", render); });
-    var allBtn = document.querySelector(".impact-select-all");
-    var noneBtn = document.querySelector(".impact-select-none");
-    if (allBtn) allBtn.addEventListener("click", function () { boxes.forEach(function (c) { c.checked = true; }); render(); });
-    if (noneBtn) noneBtn.addEventListener("click", function () { boxes.forEach(function (c) { c.checked = false; }); render(); });
-
-    // Re-render on Treemap|Sunburst toggle too — the shape being revealed was hidden (0 clientWidth) at the last
-    // render, so its layout used the hardcoded fallback width instead of its real, now-visible container size.
-    // [Review][Patch]
-    Array.prototype.forEach.call(document.querySelectorAll('input[name="impact-view"]'), function (r) {
-      r.addEventListener("change", render);
-    });
-
-    // Re-layout on resize (debounced) so both shapes track the container width.
-    var resizeTimer = null;
-    window.addEventListener("resize", function () {
-      if (resizeTimer) clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(render, 150);
-    });
-
-    render();
-  }
+  // ---- Planning <-> Code Impact Map ---------------------------------------------------------
+  // Story 21.3's hand-rolled squarified treemap and arc renderer (`initImpactMap` / `renderTreemap` /
+  // `renderSunburst` / `arcPath`) were DELETED by Story 20.7. The Impact Map now renders through the Hierarchy
+  // Explorer component below, from a `ProjectImpactMap` payload, with its epic multi-select driving the
+  // component's generic root-subtree filter. `arcPath` was the last of the three independent arc renderers ADR
+  // 0010 §6 was supposed to have prevented. [Story 20.7 Task 8.3]
 
   // Work graph (Story 19.2): the scope <select> filters the page to one epic's subgraph (or "All epics").
   // Progressive enhancement — with JS off every .work-graph-section stays visible (the server default); JS only
@@ -1694,16 +1434,12 @@
   // three concurrent sessions produced three independent arc renderers in this very file. A shared component is
   // much harder to accidentally reinvent than a shared rule, which is the whole point of this block existing.
   //
-  // Progressive enhancement, and in this story deliberately conservative about it (owner decision D1): the server
-  // still emits the complete static sunburst SVG beneath the (hidden) chart host, and this block hides it ONLY
-  // once Plotly has actually mounted. So a missing bundle, a CSP block, or a throw anywhere below leaves the page
-  // exactly as the server rendered it. Nothing retires here; Story 20.7 does the deletions.
-  //
-  // THE TAKEOVER HANDSHAKE, and it must run before the Story 20.2 block below: on a successful mount we set
-  // `data-explorer-ready` on the panel root, which is already 20.2's own skip guard. Success -> the component owns
-  // the chart and 20.2's drill-in stands down with no new coordination code. Failure -> the flag is never set and
-  // 20.2's drill-in takes over the still-visible SVG unchanged. Any scheme that hid the SVG before the mount
-  // succeeded could leave a page with no chart at all, which is why this is the only mechanism used.
+  // Progressive enhancement, and after Story 20.7 the thing it degrades TO has changed. There is no retained
+  // server SVG on any converted surface any more, and no takeover handshake with Story 20.2's drill-in, because
+  // neither exists. A missing bundle, a CSP block, or a throw anywhere below leaves the reader with the
+  // server-rendered TEXT TWIN — complete, navigable, non-colour, and requiring no script to read (ADR 0013 §2).
+  // The mount markers that remain are about the BOOT PLACEHOLDER only: they tell the inline chrome script whether
+  // to keep showing "Initializing..." or hand the page back.
   var hierarchyMounts = [];
 
   function initHierarchyExplorers(scope) {
@@ -1750,13 +1486,10 @@
         try { if (window.Plotly && Plotly.purge) Plotly.purge(root); } catch (e) { /* nothing plotted */ }
         root.removeAttribute("data-hierarchy-ready");
         root.style.height = "";
-        var restore = root.__ssHierarchyRestore;
-        if (typeof restore === "function") { try { restore(); } catch (e) { /* best effort */ } }
         var cleanup = root.__ssHierarchyCleanup;
         if (typeof cleanup === "function") { try { cleanup(); } catch (e) { /* best effort */ } }
         var failed = root.closest("[data-explorer]") || root.parentNode;
         if (failed && failed.setAttribute) {
-          failed.removeAttribute("data-explorer-ready");
           failed.removeAttribute("data-hierarchy-mounted");
           failed.setAttribute("data-hierarchy-failed", "1");
         }
@@ -1802,18 +1535,19 @@
     var ROOT_ID = NODES[0] && !NODES[0].parentId ? NODES[0].id : null;
 
     /* --- Tokens: resolved from the SHIPPED cascade, never re-typed ------------------------------------------
-       Only the statusClass -> CSS class mapping is written here; every colour VALUE is read back out of
-       specscribe.css through a real element carrying the real class. A hard-coded hex would survive a token
-       change and quietly lie about it (AD-7). */
-    var STATUS_CLASS = {
-      done: "sb-done", active: "sb-active", review: "sb-review", ready: "sb-ready",
-      drafted: "sb-drafted", pending: "sb-pending", noplan: "sb-noplan",
-      "followup-open": "sb-followup-open", "followup-done": "sb-followup-done",
-      unplanned: "sb-unplanned", unrecognized: "sb-unrecognized"
-    };
+       NOTHING about a colour family is written here any more. The server emits each node's resolvable CLASS LIST
+       (`colorClass`) and this applies it verbatim to a probe element, reading fill/stroke back out of
+       specscribe.css. A hard-coded hex would survive a token change and quietly lie about it (AD-7).
+
+       Story 20.7 removed the `STATUS_CLASS` map that used to live here. It was a second copy of the status
+       vocabulary the client had to keep in step by hand, and — decisively — it was the reason this component
+       could only ever speak ONE colour family: `"sb-seg " + STATUS_CLASS[cls]` cannot express the Impact Map's
+       `impact-tm-tile impact-level-3`. Story 20.9's eleven colorize dimensions land on this same seam. */
+
     // UX-DR17: the shipped SVG distinguishes follow-up and no-plan wedges by a DASHED STROKE as well as fill.
     // Plotly's marker.line has no `dash`, so per-sector hatching replaces that channel — a stronger one, and the
-    // reason no state here is signalled by colour alone.
+    // reason no state here is signalled by colour alone. Keyed by CLASS TOKEN and matched against the node's whole
+    // class list, so a second family can bring its own non-colour channel without this becoming a status map again.
     var PATTERN_SHAPE = {
       "sb-followup-open": "/", "sb-followup-done": "\\", "sb-noplan": ".", "sb-unplanned": "x"
     };
@@ -1823,7 +1557,9 @@
     probeHost.style.cssText = "position:absolute;left:-9999px;width:0;height:0;overflow:hidden";
     document.body.appendChild(probeHost);
     var tokenCache = Object.create(null);
-    function tokenFor(cls) {
+    var DEFAULT_COLOR_CLASS = "sb-seg sb-unrecognized";
+    function tokenFor(classList) {
+      var cls = classList || DEFAULT_COLOR_CLASS;
       if (tokenCache[cls]) return tokenCache[cls];
       var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
       // `ss-hierarchy-probe` lets the stylesheet give this component a chart fill where the SVG's own rule is
@@ -1831,28 +1567,55 @@
       // no fill to resolve. Still the live cascade, still no token typed in this file. [Story 20.5 review]
       svg.setAttribute("class", "sunburst ss-hierarchy-probe");
       var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      path.setAttribute("class", "sb-seg " + cls);
+      // VERBATIM — the server decided the whole class list, including the wedge/tile class. Composing anything
+      // here would re-introduce family knowledge this file no longer has. [Story 20.7 Task 1.1]
+      path.setAttribute("class", cls);
       svg.appendChild(path);
       probeHost.appendChild(svg);
       var cs = getComputedStyle(path);
-      tokenCache[cls] = { fill: cs.fill, stroke: cs.stroke };
+      // fill-opacity is read and COMPOSITED into the colour rather than dropped. Several structural classes carry
+      // it (`.impact-arc-dir` is fill-opacity 0.7), and a resolver that returned only `fill` would paint them at
+      // full strength with no test able to see the difference — the family renders, just wrong.
+      tokenCache[cls] = { fill: withOpacity(cs.fill, cs.fillOpacity), stroke: cs.stroke };
       return tokenCache[cls];
     }
-    function fillFor(statusClass) {
-      var t = tokenFor(STATUS_CLASS[statusClass] || "sb-unrecognized");
+    // rgb(a) + a separate fill-opacity -> one rgba Plotly can use. Anything unparseable is passed through
+    // untouched rather than guessed at.
+    function withOpacity(color, opacity) {
+      var a = parseFloat(opacity);
+      if (!color || !isFinite(a) || a >= 1) return color;
+      var m = /^rgba?\(([^)]+)\)/.exec(color);
+      if (!m) return color;
+      var parts = m[1].split(",");
+      if (parts.length < 3) return color;
+      var existing = parts.length > 3 ? parseFloat(parts[3]) : 1;
+      if (!isFinite(existing)) existing = 1;
+      return "rgba(" + parts[0].trim() + "," + parts[1].trim() + "," + parts[2].trim() + "," + (existing * a) + ")";
+    }
+    function fillFor(n) {
+      var t = tokenFor(n && n.colorClass);
       var f = t.fill;
-      // Last-resort fallback for a status whose shipped rule paints no fill at all. It is deliberately NOT how
+      // Last-resort fallback for a class whose shipped rule paints no fill at all. It is deliberately NOT how
       // no-plan is resolved any more: falling back to the STROKE token gave `.sb-noplan` the value of
       // `--status-pending`, so a no-plan sector came out byte-identical to a Pending one while the legend showed a
       // pale hatched chip — the correspondence was simply broken. `.ss-hierarchy-probe .sb-noplan` in the
-      // stylesheet now gives it a real chart fill, so this branch is reached only by a status nobody has styled.
+      // stylesheet now gives it a real chart fill, so this branch is reached only by a class nobody has styled.
       // [Story 20.5 review]
       if (!f || f === "none" || f === "transparent" || f === "rgba(0, 0, 0, 0)") return t.stroke;
       return f;
     }
-    function patternFor(statusClass) { return PATTERN_SHAPE[STATUS_CLASS[statusClass]] || ""; }
-    var inkColor = tokenFor("sb-unrecognized").fill;
-    var edgeColor = tokenFor("sb-done").stroke || inkColor;
+    // The hatch channel resolves from the SAME class list as the fill, so a family declares both together.
+    function patternFor(n) {
+      var cls = (n && n.colorClass) || "";
+      if (!cls) return "";
+      var tokens = cls.split(/\s+/);
+      for (var i = 0; i < tokens.length; i++) {
+        if (PATTERN_SHAPE[tokens[i]]) return PATTERN_SHAPE[tokens[i]];
+      }
+      return "";
+    }
+    var inkColor = tokenFor("sb-seg sb-unrecognized").fill;
+    var edgeColor = tokenFor("sb-seg sb-done").stroke || inkColor;
 
     // Label legibility (owner verify round 2026-07-25: "font readability is tough"). One ink colour across every
     // sector cannot work: the palette spans a dark teal and a pale parchment, so a single mid-grey is unreadable on
@@ -1872,8 +1635,8 @@
       // Rec. 601 luma — enough to choose between two candidates, and cheap.
       return (0.299 * p[0] + 0.587 * p[1] + 0.114 * p[2]) / 255;
     }
-    function textOn(statusClass) {
-      return luminance(fillFor(statusClass)) < 0.55 ? onDarkColor : onLightColor;
+    function textOn(n) {
+      return luminance(fillFor(n)) < 0.55 ? onDarkColor : onLightColor;
     }
 
     /* --- State --------------------------------------------------------------------------------------------- */
@@ -1913,23 +1676,77 @@
       return selectMode ? "Click to select" : "Click to open";
     }
 
+    /* --- The node filter (config-gated) --------------------------------------------------------------------
+       Generic by construction: it is given a set of ROOT-CHILD ids to keep and knows nothing else. No surface
+       name appears here — an Impact-Map-shaped branch inside the shared component is exactly the drift this epic
+       exists to end, and Story 20.9 is the second consumer.
+
+       It re-projects an ALREADY-EMBEDDED payload; it never re-derives from live state (ADR 0012 §7 / ADR 0010 §3).
+       The parent roll-up is re-run with the SAME rule the emitter uses — children win — because a filtered parent
+       that kept an unfiltered total would draw a sector larger than the sum of what is inside it, and with
+       `branchvalues: "total"` Plotly renders that wrong rather than complaining. [Story 20.7 Task 1.3] */
+    var filterState = null;   // null = unfiltered; otherwise a map of kept root-child id -> true
+
+    function visibleNodes() {
+      if (!cfg.filterable || !filterState) return NODES;
+
+      var keep = Object.create(null);
+      // Keep the root itself, the selected root children, and every descendant of those.
+      if (ROOT_ID) keep[ROOT_ID] = true;
+      NODES.forEach(function (n) {
+        if (n.parentId === ROOT_ID && filterState[n.id]) keep[n.id] = true;
+      });
+      // NODES is emitted parent-before-child, so one forward pass propagates. A node whose parent is absent from
+      // `keep` is simply dropped, which also drops anything under it.
+      NODES.forEach(function (n) {
+        if (n.parentId && keep[n.parentId] && n.parentId !== ROOT_ID) keep[n.id] = true;
+      });
+
+      var kept = NODES.filter(function (n) { return keep[n.id]; });
+      // Nothing selected leaves only the synthesized root. Draw NOTHING rather than a lone zero-value root, which
+      // Plotly renders as an empty frame with a stale-looking centre label. The live region says what happened.
+      if (kept.length <= 1) return [];
+
+      // Roll up bottom-up over the KEPT set. Iterate children-before-parents by walking the kept list backwards,
+      // which is valid because the emitted order is parent-before-child at every level.
+      var sum = Object.create(null), hasKids = Object.create(null);
+      for (var i = kept.length - 1; i >= 0; i--) {
+        var n = kept[i];
+        var own = hasKids[n.id] ? sum[n.id] : n.value;
+        if (n.parentId && keep[n.parentId]) {
+          sum[n.parentId] = (sum[n.parentId] || 0) + own;
+          hasKids[n.parentId] = true;
+        }
+      }
+      return kept.map(function (n) {
+        return hasKids[n.id] ? shallowWithValue(n, sum[n.id]) : n;
+      });
+    }
+    function shallowWithValue(n, value) {
+      var out = {};
+      for (var k in n) { if (Object.prototype.hasOwnProperty.call(n, k)) out[k] = n[k]; }
+      out.value = value;
+      return out;
+    }
+
     function buildTrace() {
+      var VIS = visibleNodes();
       var t = {
         type: state.shape,
-        ids: NODES.map(function (n) { return n.id; }),
-        parents: NODES.map(function (n) { return n.parentId || ""; }),
+        ids: VIS.map(function (n) { return n.id; }),
+        parents: VIS.map(function (n) { return n.parentId || ""; }),
         // The SHORT label is what gets drawn in a sector; the full one rides in customdata for the hover card.
         // uniformtext sizes every label alike and hides what will not fit, so one long title silences the chart.
-        labels: NODES.map(function (n) { return n.shortLabel || n.label; }),
-        customdata: NODES.map(function (n) { return n.label; }),
+        labels: VIS.map(function (n) { return n.shortLabel || n.label; }),
+        customdata: VIS.map(function (n) { return n.label; }),
         // Every value is a NUMBER. A single null anywhere in `values` collapses calcdata to one point and renders
         // nothing — no error, no console warning. The emitter guarantees it; this never re-derives it.
-        values: NODES.map(function (n) { return n.value; }),
+        values: VIS.map(function (n) { return n.value; }),
         // Emitted by the server alongside the payload, because a payload/branchvalues mismatch draws a blank or
         // wrong chart with only a console warning. The two must be decided together, so they travel together.
         branchvalues: cfg.branchvalues || "total",
         marker: {
-          colors: NODES.map(function (n) { return fillFor(n.statusClass); }),
+          colors: VIS.map(function (n) { return fillFor(n); }),
           // Per-sector, because this is ALSO the selection ring. CSS cannot draw it: setting `stroke` on one of
           // Plotly's `path.surface` nodes is inert (verified against ink geometry, and inert even from an inline
           // `!important`). `marker.line` is the channel that paints the separators, so it is the one that works.
@@ -1937,23 +1754,23 @@
           line: {
             // The ring takes the SAME per-sector contrast pick the labels use, not one fixed accent: a gold ring
             // on a gold "ready" sector is invisible, and the selection can land on any status.
-            color: NODES.map(function (n) { return n.id === state.selected ? textOn(n.statusClass) : edgeColor; }),
-            width: NODES.map(function (n) { return n.id === state.selected ? 4 : 1; })
+            color: VIS.map(function (n) { return n.id === state.selected ? textOn(n) : edgeColor; }),
+            width: VIS.map(function (n) { return n.id === state.selected ? 4 : 1; })
           },
           pattern: {
-            shape: NODES.map(function (n) { return patternFor(n.statusClass); }),
+            shape: VIS.map(function (n) { return patternFor(n); }),
             fillmode: "overlay",
             // MUST be per-sector and explicit: left unset, Plotly paints the pattern's backing rect BLACK (67
             // occurrences measured), which is a default colour reaching the output.
-            bgcolor: NODES.map(function (n) { return fillFor(n.statusClass); }),
-            fgcolor: NODES.map(function () { return inkColor; }),
+            bgcolor: VIS.map(function (n) { return fillFor(n); }),
+            fgcolor: VIS.map(function () { return inkColor; }),
             size: 6,
             solidity: 0.28
           }
         },
         // Status as TEXT, so nothing is signalled by colour alone even to a viewer who cannot distinguish fill or
         // hatch at all. Prose, never the CSS class.
-        text: NODES.map(function (n) { return n.statusLabel; }),
+        text: VIS.map(function (n) { return n.statusLabel; }),
         // Plotly's own hover card is switched OFF: the portal already has one tooltip and this component uses it
         // (see `.ss-hierarchy-sector` in SEG above), so a chart does not get a second look just because a different
         // engine drew it. [owner verify round: "we lost some of the pretty formatting we used on our tooltips"]
@@ -1963,7 +1780,7 @@
         // Both font slots plus layout.font below. With only `insidetextfont` set, the ROOT label alone took
         // Plotly's default rgb(68,68,68) — one element out of 119, exactly the kind of miss a config-level
         // assertion never catches.
-        insidetextfont: { color: NODES.map(function (n) { return textOn(n.statusClass); }), weight: 700 },
+        insidetextfont: { color: VIS.map(function (n) { return textOn(n); }), weight: 700 },
         outsidetextfont: { color: onLightColor, weight: 700 }
       };
       if (state.shape === "sunburst") {
@@ -2380,7 +2197,6 @@
         panelEl.removeAttribute("data-hierarchy-mounted");
         panelEl.setAttribute("data-hierarchy-failed", "1");
       }
-      restoreLegacySvg();
     }
     try {
       var plotted = Plotly.newPlot(root, [buildTrace()], layout(), CONFIG);
@@ -2423,6 +2239,37 @@
           announce("Showing the " + state.shape);
         });
       });
+
+      // --- Root-subtree filter (config-gated). Same reveal, same bar: a surface's own controls inherit the
+      // handshake rather than re-inventing it. The control's `value` IS a root child's node id — that pairing is
+      // the entire contract, and nothing here knows what those ids mean.
+      if (cfg.filterable) {
+        var filterBoxes = Array.prototype.slice.call(controls.querySelectorAll("[data-hierarchy-filter]"));
+        if (filterBoxes.length) {
+          var applyFilter = function () {
+            var next = Object.create(null), kept = 0;
+            filterBoxes.forEach(function (box) { if (box.checked) { next[box.value] = true; kept++; } });
+            filterState = kept === filterBoxes.length ? null : next;
+            // A drilled scope that the filter just removed would leave Plotly pointing at a level that no longer
+            // exists — reset to the top rather than render an empty chart with a stale breadcrumb.
+            if (state.level && filterState && !next[state.level]) { state.level = null; }
+            redraw();
+            applyState(true);
+            announce(kept === filterBoxes.length
+              ? "Showing all " + filterBoxes.length
+              : "Showing " + kept + " of " + filterBoxes.length);
+          };
+          filterBoxes.forEach(function (box) { box.addEventListener("change", applyFilter); });
+          // The All / None shortcuts the sprint-board dropdown ships. They drive the same one path.
+          Array.prototype.forEach.call(controls.querySelectorAll(".impact-select-all, .impact-select-none"), function (btn) {
+            var on = btn.classList.contains("impact-select-all");
+            btn.addEventListener("click", function () {
+              filterBoxes.forEach(function (box) { box.checked = on; });
+              applyFilter();
+            });
+          });
+        }
+      }
     }
 
     // Both listeners are on `window`, so an SPA swap that detaches this host leaves them behind; without the
@@ -2461,56 +2308,26 @@
       if (sizeTimer) clearTimeout(sizeTimer);
       if (probeHost && probeHost.parentNode) probeHost.parentNode.removeChild(probeHost);
     };
-    // Exposed for the same reason: the takeover hides the server SVG with an INLINE style, and no stylesheet rule
-    // can outrank that — so a caller unwinding a failed mount has to be able to undo it directly.
-    root.__ssHierarchyRestore = restoreLegacySvg;
-
-    // --- The takeover. TWO parts, and the second is the one that has already bitten this epic: an SVG <a> at
-    // display:none STAYS FOCUSABLE (unlike HTML), which is exactly how the Story 20.2 review's phantom tab stop
-    // got in. The test suite structurally cannot see a stray tab stop, so both halves are done here and the tab
-    // order is checked in a real browser.
+    // --- There is no longer a server-rendered chart to take over from. Story 20.7 retired the SVG on every
+    // surface this component serves, so the hide/restore pair, the restore hook and the ready flag this block used
+    // to set are all deleted: they existed to coordinate with Story 20.2's drill-in over a shared SVG, and both
+    // the SVG and 20.2's block are gone.
     //
-    // The `.sunburst-hint` goes with it. It is rendered OUTSIDE the <svg> (Charts.BuildSunburstHint, appended by
-    // Charts.Sunburst) so hiding the SVG never touched it, and left beside the Plotly chart it stated four things
-    // that are false about the chart the reader is looking at: "Click any segment to open it" (this component
-    // SELECTS a leaf and DRILLS a parent), "Epics with many stories collapse to one summary wedge" (untrue since
-    // `expandDenseEpics: true`), "Inner ring: epics (stories + follow-up peers)" (contradicts owner decision D2 —
-    // an epic's value is the sum of its DRAWN children, which is why epic-1 reads 50 and not 42), and "Orange =
-    // open; green = done" (colour-only phrasing, UX-DR17). Same phantom/misdescribing-text class Stories 10.7 and
-    // 21.1 each closed, and that the Story 20.2 review closed for the legend. [Story 20.5 review]
-    hideLegacyChart();
-
-    // The exact inverse, so a failure exit puts the server chart back the way it found it — including the tab stops
-    // and the hint. Declared (not assigned) so the async `newPlot` rejection path above can reach it.
-    function hideLegacyChart() {
-      var svgEl = panel.querySelector("svg.sunburst");
-      if (svgEl) {
-        svgEl.style.display = "none";
-        svgEl.setAttribute("aria-hidden", "true");
-        Array.prototype.forEach.call(svgEl.querySelectorAll("a"), function (a) { a.setAttribute("tabindex", "-1"); });
-      }
-      var hintEl = panel.querySelector(".sunburst-hint");
-      if (hintEl) hintEl.hidden = true;
-      var drillEl = panel.querySelector(".sb-explorer-drill");
-      if (drillEl) drillEl.hidden = true;
-    }
-
-    function restoreLegacySvg() {
-      var svgEl = panel.querySelector("svg.sunburst");
-      if (svgEl) {
-        svgEl.style.display = "";
-        svgEl.removeAttribute("aria-hidden");
-        Array.prototype.forEach.call(svgEl.querySelectorAll("a"), function (a) { a.removeAttribute("tabindex"); });
-      }
-      var hintEl = panel.querySelector(".sunburst-hint");
-      if (hintEl) hintEl.hidden = false;
-      panel.removeAttribute("data-explorer-ready");
-    }
-    // The handshake: 20.2's own skip guard. Set LAST, and only here, so it can only ever mean "mounted".
-    panel.setAttribute("data-explorer-ready", "1");
-    // Ends the boot placeholder and disarms the inline script's expiry timer (which would otherwise un-hide the
-    // server SVG under a chart that mounted perfectly well).
+    // What stands behind a failed mount is now the TEXT TWIN, which is ADR 0013 §2's contract and is
+    // server-rendered on every instance regardless of what happens here. That is a stronger fallback than the one
+    // it replaces, not a weaker one: the twin is complete and navigable with no script at all, whereas the
+    // retained SVG needed this file to be reachable in order to be drilled.
+    // Ends the boot placeholder and disarms the inline script's expiry timer.
     panel.setAttribute("data-hierarchy-mounted", "1");
+
+    // A surface that ships its OWN visible listing can mark it to collapse once the chart is live. Declarative and
+    // generic, exactly like `data-hierarchy-filter`: nothing here knows what the element is. The Impact Map's
+    // epic-grouped <details> is the first user — it is `open` in the served HTML so a JS-off visitor gets the
+    // whole content, and the shipped `initImpactMap` collapsed it on mount for the same reason this does.
+    // Collapsing NEVER removes it: it stays one click away, which is what makes this presentation and not loss.
+    Array.prototype.forEach.call(
+      document.querySelectorAll("[data-hierarchy-collapse-on-mount]"),
+      function (el) { if (el.open) el.open = false; });
 
     applyState(false);
     return true;
@@ -2521,466 +2338,14 @@
     initHierarchyExplorers(e && e.detail ? e.detail.root : document);
   });
 
-  // ---- Remaining-work sunburst explorer: click-to-zoom drill-in [Story 20.2] ----------------
-  // Progressive enhancement ONLY (NFR8). The server ships the complete static Story 10.7 sunburst (every wedge an
-  // <a> to its Story 9.13 destination) PLUS one inline JSON island of the SAME weights/hierarchy the SVG drew. With
-  // JS off this block never runs: the static chart + its links are the whole, correct experience, and the island is
-  // inert data. This block adds, over that EXACT markup: activate a non-leaf wedge (epic with drawn stories) to zoom
-  // in — its children re-lay to fill the rings via client arc RE-LAYOUT (the codemap's viewBox-pan does NOT transfer
-  // to a sunburst; children must expand angularly, so we port Charts.AnnularSector/InsetStart/InsetEnd here) — with a
-  // breadcrumb + center control to zoom back out. A LEAF wedge keeps its native link (opens the 9.13 destination the
-  // server put on the <a> — never a parallel scheme). Zoom-out always restores each wedge's ORIGINAL server `d`, so
-  // the un-drilled chart is byte-for-byte the static baseline. Presentation math only — no counts, no fetch. [Story 20.2]
-  // Bootstrap is re-runnable: the SPA (specscribe-spa.js) replaces the content region with innerHTML, which both
-  // discards our listeners and never executes an injected <script> — so a once-at-parse pass would leave the
-  // explorer dead for the rest of an SPA session (the same class of defect HostRenderExceptions records for
-  // Mermaid). The SPA therefore fires `specscribe:content-swapped` after every swap and we re-enhance the fresh
-  // markup. `data-explorer-ready` keeps a root from being wired twice. [Story 20.2 review]
-  function initSunburstExplorers(scope) {
-    var host = scope && scope.querySelectorAll ? scope : document;
-    Array.prototype.forEach.call(host.querySelectorAll("[data-explorer]"), function (root) {
-      if (root.getAttribute("data-explorer-ready")) return;
-      root.setAttribute("data-explorer-ready", "1");
-      try { initSunburstExplorer(root); } catch (err) { /* degrade: static sunburst + 9.13 links stand */ }
-    });
-  }
-  initSunburstExplorers(document);
-  document.addEventListener("specscribe:content-swapped", function (e) {
-    initSunburstExplorers(e && e.detail ? e.detail.root : document);
-  });
-
-  function initSunburstExplorer(root) {
-    var svg = root.querySelector("svg.sunburst");
-    // Select the island BY ID, not by first-match-on-type: document order must not decide which payload the
-    // explorer parses if a second inline JSON island ever lands in this panel. (Story 20.3 was expected to add one
-    // for the work-graph edges and did NOT — see the `edges` note in Charts.SunburstExplorerIsland — but keeping
-    // the lookup id-anchored costs nothing and removes the hazard permanently.)
-    var dataEl = root.querySelector('script[type="application/json"]#sunburst-explorer-data')
-      || root.querySelector('script[type="application/json"]');
-    if (!svg || !dataEl) return;
-    var data;
-    try { data = JSON.parse(dataEl.textContent); } catch (e) { return; }
-    var meta = data && data.meta, nodes = (data && data.nodes) || [];
-    if (!meta || !nodes.length) return;
-
-    // Prototype-less maps throughout: node ids are derived from author-controlled markdown (story ids come straight
-    // from `### Story N.M:` headings), so an id of "constructor" or "__proto__" would otherwise resolve to an
-    // inherited Object member and blow up the lookups below — reachable from a crafted `#sb=` hash. Same hardening
-    // the impact map already carries. [Story 20.2 review]
-    var byId = Object.create(null), childrenOf = Object.create(null);
-    nodes.forEach(function (n) {
-      byId[n.id] = n;
-      if (n.parentId) { (childrenOf[n.parentId] = childrenOf[n.parentId] || []).push(n); }
-    });
-
-    // Join each payload node to its wedge <path> + wrapping <a>, and CAPTURE the original `d` so zoom-out restores
-    // the exact server geometry (keeping the un-drilled chart identical to the golden baseline).
-    // Ids are NOT guaranteed unique (a repeated story heading yields two wedges with the same data-node-id), and a
-    // last-write-wins map would leave the shadowed wedge permanently visible and un-restorable on drill. Keep EVERY
-    // colliding element under one entry so hide/re-lay/restore always act on all of them.
-    var wedges = Object.create(null);
-    Array.prototype.forEach.call(svg.querySelectorAll(".sb-seg[data-node-id]"), function (p) {
-      var id = p.getAttribute("data-node-id");
-      var entry = { path: p, link: p.closest("a"), d0: p.getAttribute("d") };
-      if (wedges[id]) { wedges[id].dupes = (wedges[id].dupes || []).concat([entry]); }
-      else { wedges[id] = entry; }
-    });
-    // Apply fn across a node id's primary wedge AND any duplicates sharing that id.
-    function eachWedge(id, fn) {
-      var w = wedges[id];
-      if (!w) return;
-      fn(w);
-      if (w.dupes) w.dupes.forEach(fn);
-    }
-    function eachWedgeAll(fn) {
-      for (var id in wedges) { if (Object.prototype.hasOwnProperty.call(wedges, id)) eachWedge(id, fn); }
-    }
-
-    var TWO_PI = Math.PI * 2;
-    var scope = null; // null = root (all epics)
-    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    var live = root.querySelector(".sb-explorer-live");
-    var drill = root.querySelector(".sb-explorer-drill");
-    var crumbs = root.querySelector(".sb-explorer-breadcrumb");
-    var centerBtn = null, animTimer = null;
-
-    // The ring a wedge sits on is stated by the payload (`node.ring`), never inferred from `kind`: the server draws
-    // an EPIC's open/done aggregates on the aggregate ring but the orphan/unplanned roots' aggregates on the STORY
-    // ring, so a kind→ring guess is wrong by ~55px for those four wedges. `kind` stays semantic (it drives the
-    // zoom-vs-open rule); `ring` is the presentation fact. Fallback keeps an older island shape working.
-    // [Story 20.2 review]
-    function bandFor(name) {
-      if (name === "story") return [meta.storyInner, meta.storyOuter];
-      if (name === "aggregate") return [meta.aggInner, meta.aggOuter];
-      return [meta.epicInner, meta.epicOuter];
-    }
-    function ring(node) {
-      if (node && node.ring) return bandFor(node.ring);
-      var kind = node && node.kind;
-      if (kind === "story" || kind === "story-summary") return bandFor("story");
-      if (kind === "aggregate") return bandFor("aggregate");
-      return bandFor("epic");
-    }
-    // A wedge zooms only if the chart actually DREW child stories under it (a dense-collapsed epic has just a
-    // story-summary child and stays a leaf that opens its epic page — we never invent wedges the static chart hid).
-    function drillable(id) {
-      var ch = childrenOf[id] || [];
-      for (var i = 0; i < ch.length; i++) { if (ch[i].kind === "story") return true; }
-      return false;
-    }
-
-    // Ported presentation math (Charts.cs F()/AnnularSector/InsetStart/InsetEnd) — angles → SVG `d`. Not byte-exact
-    // with the server (drilled arcs are a fresh view); the un-drilled restore uses the captured server `d`.
-    function f(v) { return (Math.round(v * 100) / 100).toString(); }
-    function annular(c, rI, rO, a0, a1) {
-      if (a1 <= a0) a1 = a0 + 0.0001;
-      var la = (a1 - a0) > Math.PI ? 1 : 0;
-      var x1 = c + rO * Math.cos(a0), y1 = c + rO * Math.sin(a0),
-        x2 = c + rO * Math.cos(a1), y2 = c + rO * Math.sin(a1),
-        x3 = c + rI * Math.cos(a1), y3 = c + rI * Math.sin(a1),
-        x4 = c + rI * Math.cos(a0), y4 = c + rI * Math.sin(a0);
-      return "M " + f(x1) + " " + f(y1) + " A " + f(rO) + " " + f(rO) + " 0 " + la + " 1 " + f(x2) + " " + f(y2) +
-        " L " + f(x3) + " " + f(y3) + " A " + f(rI) + " " + f(rI) + " 0 " + la + " 0 " + f(x4) + " " + f(y4) + " Z";
-    }
-    // A full annulus (the drilled epic's own inner band): outer circle CW + inner circle CCW so the non-zero winding
-    // leaves the center hole open for the zoom-out control.
-    function fullRing(c, rI, rO) {
-      return "M " + f(c + rO) + " " + f(c) + " A " + f(rO) + " " + f(rO) + " 0 1 1 " + f(c - rO) + " " + f(c) +
-        " A " + f(rO) + " " + f(rO) + " 0 1 1 " + f(c + rO) + " " + f(c) + " Z" +
-        " M " + f(c + rI) + " " + f(c) + " A " + f(rI) + " " + f(rI) + " 0 1 0 " + f(c - rI) + " " + f(c) +
-        " A " + f(rI) + " " + f(rI) + " 0 1 0 " + f(c + rI) + " " + f(c) + " Z";
-    }
-    function insetStart(a, s, pad) { return a + Math.min(pad, Math.max(0, s) / 2); }
-    function insetEnd(a, s, pad) { return a + s - Math.min(pad, Math.max(0, s) / 2); }
-
-    // Lay a set of sibling nodes across [a0, a0+total] on their ring, sized by weight. `pad` is per-call because the
-    // server does NOT pad uniformly: AppendFollowUpSlot draws the open/done aggregate halves with pad:0 so they read
-    // as one continuous band, and insetting them here opened a seam the static chart never has. [Story 20.2 review]
-    function layRing(kids, a0, total, pad) {
-      var slotPad = pad === undefined ? meta.pad : pad;
-      var sum = 0;
-      kids.forEach(function (k) { sum += Math.max(0, k.weight) || 0; });
-      // No positive weight anywhere in this band: leaving the siblings at their un-drilled angles would paint a
-      // coherent-looking ring that belongs to the previous scope, so hide them instead of returning silently.
-      if (sum <= 0) {
-        kids.forEach(function (k) { eachWedge(k.id, function (w) { (w.link || w.path).style.display = "none"; }); });
-        return;
-      }
-      var per = total / sum, ang = a0;
-      kids.forEach(function (k) {
-        var sw = (Math.max(0, k.weight) || 0) * per, r = ring(k);
-        var d = annular(meta.cx, r[0], r[1], insetStart(ang, sw, slotPad), insetEnd(ang, sw, slotPad));
-        eachWedge(k.id, function (w) { w.path.setAttribute("d", d); });
-        ang += sw;
-      });
-    }
-
-    function motionFastMs() {
-      try {
-        var raw = getComputedStyle(document.documentElement).getPropertyValue("--motion-fast").trim();
-        var ms = raw.indexOf("ms") >= 0 ? parseFloat(raw) : parseFloat(raw) * 1000;
-        return ms > 0 ? ms : 240;
-      } catch (e) { return 240; }
-    }
-    // The "tween": a brief token-timed fade on the re-laid wedges. Snaps under reduced motion (no class → no anim).
-    function pulse() {
-      if (reduce) return;
-      svg.classList.add("is-anim");
-      if (animTimer) clearTimeout(animTimer);
-      animTimer = setTimeout(function () { svg.classList.remove("is-anim"); }, motionFastMs());
-    }
-    function announce(msg) { if (live) live.textContent = msg; }
-
-    function restoreAll() {
-      eachWedgeAll(function (w) {
-        w.path.setAttribute("d", w.d0);
-        (w.link || w.path).style.display = "";
-      });
-    }
-
-    function drawScope(id) {
-      var keep = Object.create(null); keep[id] = true;
-      var kids = childrenOf[id] || [];
-      kids.forEach(function (k) { keep[k.id] = true; });
-      for (var wid in wedges) {
-        if (!Object.prototype.hasOwnProperty.call(wedges, wid)) continue;
-        var vis = keep[wid] ? "" : "none";
-        eachWedge(wid, function (w) { (w.link || w.path).style.display = vis; });
-      }
-      var er = bandFor("epic");
-      eachWedge(id, function (w) { w.path.setAttribute("d", fullRing(meta.cx, er[0], er[1])); });
-      layRing(kids.filter(function (k) { return k.kind === "story" || k.kind === "story-summary"; }), meta.start, TWO_PI);
-      // pad 0 mirrors AppendFollowUpSlot's own pad:0 — the open/done halves must meet with no seam.
-      layRing(kids.filter(function (k) { return k.kind === "aggregate"; }), meta.start, TWO_PI, 0);
-    }
-
-    // ---- Text twin: keep the legend, hint and accessible name describing what is ACTUALLY on screen ----------
-    // Under ADR 0013 the text equivalent IS the accessibility contract, so a drilled chart whose legend still
-    // advertises statuses with zero visible wedges (and whose aria-label still says "Project progress sunburst")
-    // is wrong, not merely untidy — the same phantom-entry class Story 10.7 and 21.1 each closed once.
-    // [Story 20.2 review]
-    var svgLabel0 = svg.getAttribute("aria-label") || "";
-    var hintEl = root.querySelector(".sunburst-hint");
-    var hint0 = hintEl ? hintEl.textContent : null;
-    var publishedTokens = [];
-
-    // Which status tokens the CURRENTLY VISIBLE wedges carry. Wedges are `sb-seg sb-<token>`; the same <token>
-    // names the matching legend swatch, which is how the stylesheet pairs the two.
-    function visibleTokens() {
-      var seen = Object.create(null);
-      Array.prototype.forEach.call(svg.querySelectorAll(".sb-seg[data-node-id]"), function (p) {
-        var a = p.closest("a");
-        if (a && a.style.display === "none") return;
-        Array.prototype.forEach.call(p.classList, function (c) {
-          if (c.indexOf("sb-") === 0 && c !== "sb-seg") seen[c.slice(3)] = true;
-        });
-      });
-      return seen;
-    }
-
-    // Keep the chart's TEXT TWIN describing what is actually on screen — under ADR 0013 the text equivalent IS the
-    // no-JS/accessibility contract, so a drilled chart still advertising statuses it no longer draws is wrong, not
-    // untidy (the phantom-entry class Story 10.7 and 21.1 each closed once).
-    //
-    // The script publishes STATE ONLY — `data-sb-scope` plus one `data-tok-<token>` per status still on screen — and
-    // the stylesheet decides which swatches show. Legend presentation stays pure CSS, which is the Story 3.5
-    // contract `StylesheetTests.Script_DoesNotImplementLegendEmphasis` pins: this block names no legend class and
-    // touches no legend node. [Story 20.2 review]
-    function syncTextTwin() {
-      svg.setAttribute("aria-label", scope && byId[scope]
-        ? svgLabel0 + " — zoomed into " + byId[scope].label
-        : svgLabel0);
-      if (hintEl && hint0 !== null) {
-        hintEl.textContent = scope && byId[scope]
-          ? "Zoomed into " + byId[scope].label + " — the rings now show only this epic. Use the breadcrumb above, or the centre of the chart, to zoom back out."
-          : hint0;
-      }
-      publishedTokens.forEach(function (t) { root.removeAttribute("data-tok-" + t); });
-      publishedTokens = [];
-      if (!scope) { root.removeAttribute("data-sb-scope"); return; }
-      root.setAttribute("data-sb-scope", scope);
-      var seen = visibleTokens();
-      for (var t in seen) {
-        // Attribute-name hygiene: only ever publish the known kebab-case status tokens.
-        if (Object.prototype.hasOwnProperty.call(seen, t) && /^[a-z][a-z0-9-]*$/.test(t)) {
-          root.setAttribute("data-tok-" + t, "");
-          publishedTokens.push(t);
-        }
-      }
-    }
-
-    // The zoom-out control: a POINTER-ONLY center hit-area, present only while drilled. "center → zoom out" (AC #1).
-    // Deliberately not focusable and not exposed to AT: the host <svg> carries role="img", whose descendants are
-    // presentational, so a role="button"/tabindex="0" circle in here is a focus stop that assistive tech may never
-    // name (WCAG 4.1.2). The keyboard/AT path to zoom out is the breadcrumb's real HTML "All epics" <button>, which
-    // lives outside the SVG and is announced properly. [Story 20.2 review]
-    function ensureCenter(show) {
-      if (show) {
-        if (!centerBtn) {
-          centerBtn = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-          centerBtn.setAttribute("class", "sb-center-zoom");
-          centerBtn.setAttribute("cx", f(meta.cx));
-          centerBtn.setAttribute("cy", f(meta.cx));
-          centerBtn.setAttribute("r", f(meta.epicInner));
-          centerBtn.setAttribute("aria-hidden", "true");
-          var out = document.createElementNS("http://www.w3.org/2000/svg", "title");
-          out.textContent = "Zoom out to all epics";
-          centerBtn.appendChild(out);
-          centerBtn.addEventListener("click", function () { zoomTo(null, true); focusScope(); });
-          svg.appendChild(centerBtn);
-        }
-        centerBtn.style.display = "";
-      } else if (centerBtn) {
-        centerBtn.style.display = "none";
-      }
-    }
-
-    function renderCrumbs() {
-      if (!crumbs) return;
-      crumbs.innerHTML = "";
-      var trail = [{ id: null, label: "All epics" }];
-      if (scope) { var n = byId[scope]; trail.push({ id: scope, label: n ? n.label : scope }); }
-      trail.forEach(function (t, idx) {
-        var li = document.createElement("li"), last = idx === trail.length - 1;
-        if (last) {
-          var span = document.createElement("span");
-          span.className = "sb-crumb-current";
-          span.setAttribute("aria-current", "true");
-          span.textContent = t.label;
-          li.appendChild(span);
-          // The drilled scope's OWN 9.13 group/detail page stays reachable via an explicit "open" link so a group
-          // page is never orphaned by the zoom interaction (AC #2).
-          if (t.id) {
-            var w = wedges[t.id], href = w && w.link ? w.link.getAttribute("href") : null;
-            if (href) {
-              var a = document.createElement("a");
-              a.className = "sb-crumb-open";
-              a.href = href;
-              a.textContent = "Open page";
-              li.appendChild(a);
-            }
-          }
-        } else {
-          var btn = document.createElement("button");
-          btn.type = "button";
-          btn.className = "sb-crumb";
-          btn.textContent = t.label;
-          btn.addEventListener("click", function () { zoomTo(t.id || null, true); focusScope(); });
-          li.appendChild(btn);
-        }
-        crumbs.appendChild(li);
-      });
-      if (drill) drill.hidden = !scope; // the bar shows only when there's somewhere to zoom back to
-    }
-
-    // Roving tabindex over the CURRENT scope's visible wedges (one tab stop; arrows move). Rebuilt on every zoom so
-    // the tab order always matches what's on screen; never ships in the no-JS page (set at runtime only).
-    function roveLinks() {
-      var out = [];
-      Array.prototype.forEach.call(svg.querySelectorAll(".sb-seg[data-node-id]"), function (p) {
-        var a = p.closest("a");
-        if (a && a.style.display !== "none") out.push(a);
-      });
-      return out;
-    }
-    function setRoving() {
-      // Clear EVERY wedge link before re-arming the current scope's. Unlike an HTML element, an SVG <a> carrying
-      // tabindex stays focusable at display:none, so a wedge hidden by a drill would otherwise keep the tabindex="0"
-      // it was given at root state — a phantom tab stop on an invisible wedge. Verified in-browser. [Story 20.2 review]
-      Array.prototype.forEach.call(svg.querySelectorAll(".sb-seg[data-node-id]"), function (p) {
-        var a = p.closest("a");
-        if (a) { a.setAttribute("tabindex", "-1"); a.removeAttribute("data-sb-rove"); }
-      });
-      roveLinks().forEach(function (a, i) {
-        a.setAttribute("tabindex", i === 0 ? "0" : "-1");
-        a.setAttribute("data-sb-rove", "1");
-      });
-    }
-    function focusScope() { var l = roveLinks(); if (l.length) l[0].focus(); }
-    // Activate a wedge the way Enter/Space should: drillable → zoom, leaf → follow its Story 9.13 destination.
-    // NB these are SVG <a> elements (SVGAElement), which — unlike HTMLElement — have NO .click() method, so the
-    // obvious `a.click()` throws and (because preventDefault ran first) silently eats the keypress. [Story 20.2 review]
-    function activateWedge(a) {
-      var p = a.querySelector(".sb-seg[data-node-id]");
-      var id = p ? p.getAttribute("data-node-id") : null;
-      if (id && drillable(id)) { zoomTo(id, true); return; }
-      var href = a.getAttribute("href");
-      if (href) location.href = href;
-    }
-    root.addEventListener("keydown", function (e) {
-      var a = e.target.closest ? e.target.closest("a[data-sb-rove]") : null;
-      if (!a) return;
-      if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); rove(a, 1); }
-      else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); rove(a, -1); }
-      else if (e.key === " ") { e.preventDefault(); activateWedge(a); } // links ignore Space by default
-    });
-    function rove(a, d) {
-      var l = roveLinks(), i = l.indexOf(a);
-      if (i < 0) return;
-      var n = (i + d + l.length) % l.length;
-      l.forEach(function (x) { x.setAttribute("tabindex", "-1"); });
-      l[n].setAttribute("tabindex", "0");
-      l[n].focus();
-    }
-
-    function applyState(animate) {
-      restoreAll();
-      if (scope) { drawScope(scope); svg.classList.add("is-drilled"); ensureCenter(true); }
-      else { svg.classList.remove("is-drilled"); ensureCenter(false); }
-      renderCrumbs();
-      setRoving();
-      syncTextTwin();
-      publishSelection();
-      if (animate) pulse();
-    }
-
-    // THE named selection seam [Story 20.3]. Story 20.1's contract reserved a selection signal but never named one,
-    // and 20.2 shipped without it — the explorer's only notion of "the item I am looking at" is its zoom scope. So
-    // that is what is published, under one name, from the ONE place every scope change funnels through (applyState
-    // covers click, Enter/Space, breadcrumb, centre control, hash and popstate alike). `nodeId` is null at the root
-    // scope. Story 20.5's component and Story 20.8's details pane inherit this event rather than minting a second.
-    // Guarded because a browser without the CustomEvent constructor must not break the drill-in the visitor
-    // actually asked for; the pane then keeps its server-rendered default, which is a correct view rather than a
-    // broken one. (A throwing listener does not need catching here — the DOM reports those to window.onerror
-    // instead of propagating to the dispatcher — but the guard costs nothing and covers both.)
-    function publishSelection() {
-      try {
-        root.dispatchEvent(new CustomEvent("specscribe:explorer-select", {
-          bubbles: true,
-          detail: { nodeId: scope, label: scope && byId[scope] ? byId[scope].label : null, root: root },
-        }));
-      } catch (e) { /* no CustomEvent, or a throwing listener — the pane's no-JS default stands */ }
-    }
-
-    // Rewrite location.hash's `sb=` pair WITHOUT destroying any other fragment the visitor arrived with — clearing
-    // the whole hash on zoom-out silently ate in-page anchors like #glance. [Story 20.2 review]
-    function hashWith(id) {
-      var raw = location.hash.replace(/^#/, "");
-      var parts = raw ? raw.split("&") : [];
-      var kept = [];
-      for (var i = 0; i < parts.length; i++) { if (parts[i].indexOf("sb=") !== 0 && parts[i]) kept.push(parts[i]); }
-      if (id) kept.unshift("sb=" + encodeURIComponent(id));
-      return kept.length ? "#" + kept.join("&") : location.pathname + location.search;
-    }
-    // Under the SPA the router owns history: a foreign state entry sends its popstate handler down the "unknown
-    // state" path, which re-swaps the content region and tears the explorer down mid-interaction. So in SPA mode we
-    // REPLACE rather than push — the drilled scope stays shareable/bookmarkable without minting entries the router
-    // will misread — and we carry the router's own {path, fragment} keys so the state is never foreign. In the
-    // static site nothing else owns history, so real pushState entries (and Back-to-zoom-out) are kept.
-    var spaHost = document.getElementById("spa-content");
-    function syncHistory() {
-      if (!window.history || !history.pushState) return;
-      var url = hashWith(scope);
-      if (spaHost) {
-        var path = spaHost.getAttribute("data-path") || "";
-        history.replaceState({ path: path, fragment: url.charAt(0) === "#" ? url.slice(1) : "", sb: scope || "" }, "", url);
-      } else {
-        history.pushState({ sb: scope || "" }, "", url);
-      }
-    }
-
-    function zoomTo(id, pushHash) {
-      if (id && !byId[id]) id = null;
-      if (id && !drillable(id)) return; // leaf: let the native <a> open its 9.13 destination
-      if ((id || null) === scope) return; // already here — don't mint a duplicate history entry for a no-op zoom
-      scope = id || null;
-      applyState(true);
-      announce(scope ? ("Zoomed into " + (byId[scope] ? byId[scope].label : scope)) : "Showing all epics");
-      if (pushHash) syncHistory();
-    }
-
-    // Intercept activation on drillable wedges → zoom (Enter + click). Leaves keep their native link untouched.
-    Array.prototype.forEach.call(svg.querySelectorAll(".sb-seg[data-node-id]"), function (p) {
-      var id = p.getAttribute("data-node-id"), link = p.closest("a");
-      if (!link || !drillable(id)) return;
-      link.addEventListener("click", function (e) {
-        // Respect explicit new-tab / new-window intents — a modified click still means "open the 9.13 destination",
-        // exactly as specscribe-spa.js guards its own delegated navigation. Without this, Ctrl+click zoomed instead.
-        if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-        e.preventDefault();
-        zoomTo(id, true);
-      });
-      link.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); zoomTo(id, true); } });
-      var base = link.getAttribute("aria-label") || "";
-      link.setAttribute("aria-label", base + " — activate to zoom in, or press the arrow keys to move between wedges");
-    });
-
-    function applyHash() {
-      var m = /[#&]sb=([^&]+)/.exec(location.hash);
-      var id = null;
-      // A malformed percent-escape (#sb=100%) makes decodeURIComponent throw; on the popstate path that escapes
-      // the init try/catch entirely. Treat an undecodable id as "no scope". [Story 20.2 review]
-      if (m) { try { id = decodeURIComponent(m[1]); } catch (e) { id = null; } }
-      if (id && (!byId[id] || !drillable(id))) id = null;
-      var changed = (id || null) !== scope;
-      scope = id;
-      applyState(false); // snap on load / back-forward (no entrance animation)
-      // Back/Forward changes the view just as the crumb does, so it must announce just as the crumb does.
-      if (changed) announce(scope ? ("Zoomed into " + (byId[scope] ? byId[scope].label : scope)) : "Showing all epics");
-    }
-    window.addEventListener("popstate", applyHash);
-    applyHash();
-  }
+  // ---- Remaining-work sunburst explorer [Story 20.2] -> RETIRED by Story 20.7 ----------------
+  // 20.2's client drill-in (`initSunburstExplorers` / `initSunburstExplorer`) and its arc RE-LAYOUT port of
+  // Charts.AnnularSector/InsetStart/InsetEnd were deleted here, together with the `sunburst-explorer-data` island
+  // and the server-rendered SVG they both enhanced. The Hierarchy Explorer component above is now the only route
+  // to a planning hierarchy chart, and the text twin — not a retained SVG — is what stands behind a failed mount
+  // (ADR 0013 §2). Much of 20.2's hard-won knowledge stopped mattering with it: SVGAElement has no .click(), an
+  // SVG <a> at display:none stays focusable, and the re-layout had to restore each wedge's original `d`. None of
+  // those are properties of anything this file still draws. [Story 20.7 Task 8.3]
 
   // ---- Related-work details rail: show the selected scope's card [Story 20.3] ---------------
   // Progressive enhancement ONLY (NFR8, AC #2). The server renders the project card PLUS one card per selectable

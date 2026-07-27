@@ -563,15 +563,19 @@ public class HtmlRenderAdapterTests
         var view = EpicsViewBuilder.BuildEpic(epic, ProgressFor(epic), CreateStoryCatalog(), epicRetroPath: null);
         var html = HtmlRenderAdapter.Shared.RenderEpicBody(view);
 
-        var sunburstStart = html.IndexOf("aria-label=\"Epic story breakdown\"", StringComparison.Ordinal);
-        Assert.True(sunburstStart >= 0);
-        var sunburstEnd = html.IndexOf("</svg>", sunburstStart, StringComparison.Ordinal);
-        Assert.True(sunburstEnd > sunburstStart);
-        var sunburst = html[sunburstStart..sunburstEnd];
+        // Story 20.7: scoped to the component's block instead of the retired `<svg aria-label="Epic story
+        // breakdown">`. The fact is unchanged and is exactly the one worth keeping — the destination rule was
+        // LIFTED into `HierarchyExplorer.ProjectEpic` verbatim rather than re-derived (Story 9.13's contract is
+        // the one that holds), and this proves the lift did not quietly reintroduce the in-page anchor fallback.
+        var panelStart = html.IndexOf("<h3>Story Breakdown</h3>", StringComparison.Ordinal);
+        Assert.True(panelStart >= 0, "the epic page must still carry a Story Breakdown panel");
+        var panelEnd = html.IndexOf("</details>", panelStart, StringComparison.Ordinal);
+        Assert.True(panelEnd > panelStart, "the panel must carry the component's text twin");
+        var panel = html[panelStart..panelEnd];
 
-        Assert.Contains("href=\"../epics/story-1-1.html\"", sunburst);
-        Assert.Contains("href=\"../epics/story-1-2.html\"", sunburst);
-        Assert.DoesNotContain("href=\"#story-", sunburst);
+        Assert.Contains("href=\"../epics/story-1-1.html\"", panel);   // drafted -> its artifact page
+        Assert.Contains("href=\"../epics/story-1-2.html\"", panel);   // undrafted -> its placeholder page
+        Assert.DoesNotContain("href=\"#story-", panel);
     }
 
     [Fact]
@@ -1520,10 +1524,12 @@ public class HtmlRenderAdapterTests
         Assert.Contains("Park the exposure", html);
         Assert.Contains("href=\"../follow-ups/deferred-abc.html\"", html);
         Assert.Contains("followup-row", html);
-        // Story-level task sunburst nests deferred under an inner Deferred parent (no full-circle fringe).
-        Assert.Contains("id=\"sec-task-breakdown\"", html);
-        Assert.Contains("Deferred item: Park the exposure.", html);
-        Assert.Contains("href=\"#sec-deferred-from-artifact\"", html);
+        // The Task Breakdown chart is no longer built by the adapter: Story 20.7 routes it through
+        // EpicsViewBuilder as a pre-rendered `HierarchyExplorerHtml` (AD-2), so a hand-built view model that
+        // supplies none correctly renders no panel — the honest empty state, not a regression. What this test is
+        // actually about — the deferred PANEL and its links — is asserted above and unaffected. The chart's own
+        // deferred coverage lives in HierarchyRolloutTests.ProjectStoryTasks_* and ChartsTests.TaskSunburst_*.
+        Assert.DoesNotContain("id=\"sec-task-breakdown\"", html);
     }
 
     [Fact]

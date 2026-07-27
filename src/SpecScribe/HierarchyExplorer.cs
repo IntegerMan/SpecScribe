@@ -38,6 +38,18 @@ public enum HierarchyMode
 /// helpful or intuitive for the reader". So `Value` stays in the payload because the chart cannot draw without
 /// it, and `Detail` is what a person is ever shown, in the tooltip and in the accessible name. Empty when the
 /// node's own label already carries its count ("Epic 7: 3 open follow-ups").</param>
+/// <param name="ColorClass">The node's RESOLVABLE CSS CLASS LIST — the string the client puts on a throwaway
+/// element to read its fill and stroke back out of the shipped cascade. It is a class list rather than a token
+/// name because the component now serves more than one colour family: the planning surfaces emit
+/// <c>"sb-seg sb-done"</c> and the Impact Map emits <c>"impact-tm-tile impact-level-3"</c>, and a resolver that
+/// composed <c>"sb-seg " + map[statusClass]</c> could only ever speak the first.
+/// <para><b>Why the server decides and the client only applies.</b> AD-7: a colour VALUE must never be typed in
+/// JS, because a token change has to move the chart with it. Emitting the class list keeps that true while
+/// removing the last piece of family knowledge from the script — the old <c>STATUS_CLASS</c> map WAS a second
+/// place the vocabulary lived. Story 20.9 adds its eleven colorize dimensions on this same seam.</para>
+/// <para><see cref="StatusClass"/> stays and keeps its three jobs: the text twin, the accessible name, and the
+/// <c>data-tok-*</c> publication the pure-CSS drilled legend consumes. It is the node's IDENTITY; this is only
+/// how it paints. [Story 20.7 F3(a)]</param>
 public sealed record HierarchyNode(
     string Id,
     string? ParentId,
@@ -48,7 +60,8 @@ public sealed record HierarchyNode(
     string StatusClass,
     string StatusLabel,
     string? Href,
-    string Kind);
+    string Kind,
+    string ColorClass = "");
 
 /// <summary>How the text twin PRESENTS. It never changes what the twin contains — ADR 0013 §2's completeness
 /// contract is identical in both modes — only whether a sighted reader sees a disclosure control for it.
@@ -81,6 +94,12 @@ public enum HierarchyTwinDisplay
 /// <param name="TwinDisplay">How the text twin presents (owner D3/D4). Config-driven, never a call-site literal
 /// and never a second twin builder — the same discipline that keeps <paramref name="Size"/> out of the JS.
 /// Trailing and defaulted so every existing call site keeps compiling and keeps the D3 default.</param>
+/// <param name="Filterable">Whether this instance honours root-subtree filter controls (Story 20.7 Task 1.3).
+/// When set, the client watches for <c>[data-hierarchy-filter]</c> checkboxes inside the panel — each carrying the
+/// id of a ROOT CHILD as its value — projects the payload to the checked roots plus their descendants, re-runs the
+/// parent roll-up client-side, and re-plots. It is config-gated and generic on purpose: the Impact Map's epic
+/// multi-select is the first consumer and Story 20.9's is the second, and an Impact-Map-shaped branch inside the
+/// shared component is precisely the drift ADR 0012 exists to end.</param>
 public sealed record HierarchyExplorerConfig(
     string DomId,
     string Shape,
@@ -89,7 +108,8 @@ public sealed record HierarchyExplorerConfig(
     int Size,
     bool Labels,
     Charts.ChartMeta Meta,
-    HierarchyTwinDisplay TwinDisplay = HierarchyTwinDisplay.Details);
+    HierarchyTwinDisplay TwinDisplay = HierarchyTwinDisplay.Details,
+    bool Filterable = false);
 
 /// <summary>The whole payload: component configuration + the node hierarchy. One datasource, both shapes — the
 /// selector re-types the trace, it never re-derives geometry, re-counts against <see cref="ProjectCounts"/>, or
@@ -111,7 +131,7 @@ public sealed record HierarchyExplorerModel(
 /// already-built view model plus string building. No <see cref="ProjectCounts"/> re-count, no second geometry, no
 /// git call, no adapter knowledge. <see cref="HtmlRenderAdapter"/> renders the string this produces; it does not
 /// build one.</para></summary>
-public static class HierarchyExplorer
+public static partial class HierarchyExplorer
 {
     /// <summary>Id of the synthesized single root (Story 20.4 spike, Finding A). Plotly's hierarchy traces require
     /// <b>exactly one</b> root and refuse a forest outright — <i>"Multiple implied roots, cannot build sunburst
@@ -135,6 +155,30 @@ public static class HierarchyExplorer
     /// wrong chart with only a console warning, so it is emitted in the island and asserted in a test rather than
     /// left as a shared assumption between C# and JS. [Story 20.4 Finding C; owner D2]</summary>
     public const string BranchValues = "total";
+
+    /// <summary>The CSS class every sunburst wedge carries, and the one the client's colour probe needs in order
+    /// to match the shipped <c>.sunburst .sb-seg.sb-&lt;token&gt;</c> rules. Named once here rather than typed into
+    /// <see cref="PlanningColorClass"/> twice.</summary>
+    public const string PlanningSegClass = "sb-seg";
+
+    /// <summary>The status tokens the shipped <c>.sb-*</c> cascade actually paints. This list used to live in
+    /// <c>specscribe.js</c> as <c>STATUS_CLASS</c>, where it was a second copy of the status vocabulary the client
+    /// had to keep in step by hand; moving it here makes the emitter the only thing that knows the family, which is
+    /// what lets a second family (the Impact Map's ramp, and Story 20.9's eleven dimensions) exist at all.</summary>
+    private static readonly HashSet<string> PaintedStatusTokens = new(StringComparer.Ordinal)
+    {
+        "done", "active", "review", "ready", "drafted", "pending", "noplan",
+        "followup-open", "followup-done", "unplanned", "unrecognized",
+    };
+
+    /// <summary>The planning family's <see cref="HierarchyNode.ColorClass"/>: the wedge class plus the node's own
+    /// status token. An unpainted token falls back to <c>sb-unrecognized</c> — the same last-resort the client's
+    /// old <c>STATUS_CLASS[…] || "sb-unrecognized"</c> took, preserved so the resolved colours are byte-identical
+    /// to what the SVG drew rather than merely similar. [Story 20.7 Task 1.1]</summary>
+    public static string PlanningColorClass(string statusClass) =>
+        PaintedStatusTokens.Contains(statusClass)
+            ? $"{PlanningSegClass} sb-{statusClass}"
+            : $"{PlanningSegClass} sb-unrecognized";
 
     /// <summary>Builds the dashboard's Hierarchy Explorer model over the project-glance datasource.
     ///
@@ -219,13 +263,14 @@ public static class HierarchyExplorer
         var nodes = new List<HierarchyNode>(source.Count + 1)
         {
             new(ProjectRootId, null, rootLabel, rootLabel, 0, string.Empty, "unrecognized",
-                ProjectRootStatusLabel, rootHref, ProjectRootKind),
+                ProjectRootStatusLabel, rootHref, ProjectRootKind, PlanningColorClass("unrecognized")),
         };
         foreach (var n in source)
         {
             nodes.Add(new HierarchyNode(
                 n.Id, n.ParentId ?? ProjectRootId, n.Label, ShortLabelFor(n), n.Weight, string.Empty,
-                n.StatusClass, StatusLabelFor(n.StatusClass, n.Kind), n.Href, n.Kind));
+                n.StatusClass, StatusLabelFor(n.StatusClass, n.Kind), n.Href, n.Kind,
+                PlanningColorClass(n.StatusClass)));
         }
 
         return RollUpParentValues(nodes);
@@ -238,6 +283,12 @@ public static class HierarchyExplorer
     /// <para>Iterative rather than recursive, and tolerant of a cycle: node ids come from author-controlled
     /// markdown (<c>### Story N.M:</c> headings, which nothing dedupes), so a hostile or merely careless authoring
     /// input must not be able to stack-overflow generation.</para></summary>
+    /// <summary>The roll-up seam every projector ends on. Named separately from <see cref="Reparent"/> because the
+    /// three Story 20.7 projectors build their own node list (they are not projecting a
+    /// <see cref="SunburstExplorerNode"/> forest) but must still land on the SAME Finding-C rule — a second
+    /// implementation of "children win" is exactly how two charts start disagreeing.</summary>
+    internal static IReadOnlyList<HierarchyNode> RollUp(List<HierarchyNode> nodes) => RollUpParentValues(nodes);
+
     private static IReadOnlyList<HierarchyNode> RollUpParentValues(List<HierarchyNode> nodes)
     {
         var childrenOf = new Dictionary<string, List<int>>(StringComparer.Ordinal);
@@ -314,17 +365,25 @@ public static class HierarchyExplorer
     /// <c>sunburst-panel</c>: the Story 3.5 legend-emphasis CSS is <c>.sunburst-panel:has(.sb-&lt;status&gt;-item:hover) …</c>,
     /// and dropping the class silently kills it (and three <c>StylesheetTests</c> assertions).</para>
     ///
-    /// <para><paramref name="fallbackHtml"/> is owner decision <b>D1</b> made concrete: the server-rendered chart
-    /// this component takes over from, kept INSIDE the same panel and rendered beneath the (initially hidden)
-    /// chart host. On a successful mount the component hides it; on any failure it is simply the page. That is
-    /// what makes the fallback real rather than theoretical, and what makes Story 20.7's deletion a clean
-    /// subtraction — the slot goes away with the argument. Nothing else may hide it: anything that hides the SVG
-    /// BEFORE the mount succeeds can leave a page with no chart at all.</para></summary>
+    /// <para><b>The <c>fallbackHtml</c> slot is gone.</b> It was owner decision D1 of Story 20.5 made concrete —
+    /// the server-rendered SVG this component took over from, kept inside the same panel so a failed mount left the
+    /// reader with a chart. Story 20.7 retires those SVGs, so the argument goes away with the thing it carried.
+    /// What stands behind a failed mount now is the TEXT TWIN, which is ADR 0013 §2's contract and is present on
+    /// every instance regardless.</para>
+    ///
+    /// <para><paramref name="controlsHtml"/> and <paramref name="legendHtml"/> are the two slots that let a surface
+    /// with its own vocabulary through the one component (Story 20.7 Task 7.2/7.3). Controls are appended INSIDE
+    /// the same <c>hidden</c> control bar as the shape selector, so a surface's own controls inherit the reveal
+    /// handshake rather than re-inventing it — a JS-off visitor never sees an inert control. A non-null
+    /// <paramref name="legendHtml"/> replaces the status legend for a family that does not speak
+    /// <c>--status-*</c>; passing "" is a deliberate "this surface has no legend", which is why it is nullable
+    /// rather than empty-checked.</para></summary>
     public static string Render(
         HierarchyExplorerModel model,
         string panelClass = "chart-panel",
         string panelAttributes = "",
-        string fallbackHtml = "")
+        string controlsHtml = "",
+        string? legendHtml = null)
     {
         if (model.Nodes.Count == 0) return string.Empty;
 
@@ -346,6 +405,9 @@ public static class HierarchyExplorer
         body.Append($"<label for=\"{PathUtil.Html(id)}-shape-sunburst\" class=\"board-tab\">Sunburst</label>");
         body.Append($"<label for=\"{PathUtil.Html(id)}-shape-treemap\" class=\"board-tab\">Treemap</label>");
         body.Append("</div></div>\n");
+        // A surface's own controls ride inside the SAME hidden bar, so they are revealed by the same successful
+        // mount and hidden by the same JS-off page. Nothing here knows what they are.
+        body.Append(controlsHtml);
         body.Append("</div>\n");
 
         // --- Breadcrumb (drill scope) + the polite live region the a11y layer announces through.
@@ -371,10 +433,7 @@ public static class HierarchyExplorer
         body.Append($"<div class=\"ss-hierarchy\" id=\"{PathUtil.Html(id)}\" {HostMarker}></div>\n");
         body.Append($"<div class=\"ss-hierarchy-live sr-only\" aria-live=\"polite\"></div>\n");
 
-        // --- The retained server-rendered chart (owner D1). Below the host, hidden only on a successful mount.
-        body.Append(fallbackHtml);
-
-        body.Append(LegendHtml(model));
+        body.Append(legendHtml ?? LegendHtml(model));
         body.Append(IslandHtml(model));
         body.Append(TextTwinHtml(model));
 
@@ -402,7 +461,21 @@ public static class HierarchyExplorer
     /// point at zero sectors. The prose comes from each node's own already-resolved <see cref="HierarchyNode.StatusLabel"/>
     /// rather than a second lookup, which is what makes chart, legend, tooltip, accessible name and text twin
     /// incapable of disagreeing. The synthesized root is excluded: it is the whole project, not a lifecycle stage,
-    /// and it is described by the breadcrumb and the twin instead.</para></summary>
+    /// and it is described by the breadcrumb and the twin instead.</para>
+    ///
+    /// <para><b>It renders through <see cref="Charts.SunburstLegend"/>, and the markup family is load-bearing</b>
+    /// (Story 20.7 Task 2.2). The pure-CSS DRILLED-LEGEND FILTERING — <c>[data-explorer][data-sb-scope]
+    /// .sunburst-legend .sb-legend-item { display: none }</c> plus one <c>data-tok-*</c> re-show per status — acts
+    /// on legend items, and it is the half of the legend's behaviour that survives the SVG's retirement. It only
+    /// keeps working if this legend IS a <c>.sunburst-legend</c> with <c>.sb-&lt;status&gt;-item</c> children. The
+    /// component's earlier <c>.ss-hierarchy-legend</c> family silently sat outside those selectors, so the
+    /// dashboard's drilled filtering was in fact still being done by the retained SVG's legend.</para>
+    ///
+    /// <para><b>What does NOT survive:</b> the Story 3.5 hover-emphasis (<c>.sunburst-panel:has(.sb-review-item:hover)
+    /// .sb-seg:not(.sb-review)</c>) dims <c>.sb-seg</c> wedges, and Plotly draws <c>path.surface</c>. Those rules
+    /// match nothing once the SVG is gone. Re-creating the behaviour would require the script to reach Plotly's
+    /// sectors from a legend handler, which <c>StylesheetTests.Script_DoesNotImplementLegendEmphasis</c> exists to
+    /// forbid. Recorded as a loss rather than routed around. [Story 20.7 F1 / Open Question 1]</para></summary>
     internal static string LegendHtml(HierarchyExplorerModel model)
     {
         // First label wins per status class, in canonical stage order then first-drawn order — deterministic for
@@ -419,21 +492,12 @@ public static class HierarchyExplorer
         }
         if (order.Count == 0) return string.Empty;
 
-        var ordered = order
-            .OrderBy(StatusStyles.CanonicalRank)
-            .ThenBy(order.IndexOf)
-            .ToList();
+        var items = Charts.SunburstLegendItemsPresent(order.Select(s => (s, seen[s])).ToList());
+        if (items.Length == 0) return string.Empty;
 
         var sb = new StringBuilder();
-        sb.Append("<div class=\"ss-hierarchy-legend\">\n");
-        foreach (var status in ordered)
-        {
-            sb.Append($"  <span class=\"ss-hierarchy-legend-item\">")
-              .Append($"<span class=\"ss-hierarchy-sw sb-{PathUtil.Html(status)}\"></span>")
-              .Append($"{PathUtil.Html(seen[status])}</span>\n");
-        }
-        sb.Append("</div>\n");
-        if (ordered.Any(s => Charts.SunburstLocalStatusLabel(s) is not null))
+        sb.Append(Charts.SunburstLegend(items));
+        if (items.Any(i => Charts.SunburstLocalStatusLabel(i.Status) is not null))
             sb.Append("<p class=\"ss-hierarchy-legend-note\">Hatched sectors are work outside the normal story lifecycle &mdash; follow-ups, direct changes, and stories with no task plan yet.</p>\n");
         return sb.ToString();
     }
@@ -471,6 +535,9 @@ public static class HierarchyExplorer
                 // Emitted, not assumed: the payload is parent-inclusive by construction (owner D2), and a
                 // payload/branchvalues mismatch renders wrong with only a console warning.
                 branchvalues = BranchValues,
+                // Task 1.3. Off unless a surface asked for it, so no instance grows a control-scanning path it
+                // has no controls for.
+                filterable = cfg.Filterable,
             },
             nodes = model.Nodes.Select(n => new
             {
@@ -482,6 +549,9 @@ public static class HierarchyExplorer
                 detail = n.Detail,
                 statusClass = n.StatusClass,
                 statusLabel = n.StatusLabel,
+                // The resolvable class list (Task 1.1). Applied VERBATIM by the client's probe — it composes
+                // nothing, so a family it has never heard of resolves exactly as its stylesheet says.
+                colorClass = n.ColorClass,
                 href = n.Href,
                 kind = n.Kind,
             }),

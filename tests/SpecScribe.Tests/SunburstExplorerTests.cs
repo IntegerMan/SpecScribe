@@ -39,11 +39,36 @@ public class SunburstExplorerTests
         Epics = epics,
     };
 
-    // The set of data-node-id values the SVG actually stamped onto its wedges.
-    private static HashSet<string> SvgNodeIds(string svg) =>
-        Regex.Matches(svg, "data-node-id=\"(?<id>[^\"]+)\"")
-            .Select(m => m.Groups["id"].Value)
+    /// <summary>The node set a READER can actually reach — parsed out of the text twin the Hierarchy Explorer
+    /// renders from this walk's output.
+    ///
+    /// <para>It used to be the <c>data-node-id</c> values <c>Charts.Sunburst</c> stamped onto its wedges. Story
+    /// 20.7 retired that chart, so the invariant below is retargeted rather than deleted: its job was always that
+    /// the payload can neither CLAIM something the reader cannot see nor OMIT something the reader can, and under
+    /// ADR 0013 §2 the twin is now that reader-visible surface. Deleting the guard because its counterpart went
+    /// away would have removed the anti-drift net at exactly the moment it matters most. [Story 20.7, Open
+    /// Question 2]</para></summary>
+    private static HashSet<string> TwinNodeIds(
+        EpicsModel model, FollowUpGeometry? followUps = null, UnplannedWorkGeometry? unplanned = null)
+    {
+        var config = new HierarchyExplorerConfig(
+            DomId: "t", Shape: "sunburst", Mode: HierarchyMode.Navigate, HashKey: "sb",
+            Size: 380, Labels: true, Meta: new Charts.ChartMeta(Title: "Project at a Glance"));
+        // `expandDenseEpics: false` — the collapse the SVG applied, so the comparison is like-for-like with what
+        // these tests were originally written against.
+        var nodes = HierarchyExplorer.Reparent(
+            Charts.SunburstExplorerNodes(model, followUps, unplanned, expandDenseEpics: false),
+            "Project", "index.html");
+        var twin = HierarchyExplorer.TextTwinHtml(new HierarchyExplorerModel(config, nodes));
+        var labels = Regex.Matches(twin, "<li>(?:<a [^>]*>)?(?<label>[^<]+)")
+            .Select(m => m.Groups["label"].Value)
             .ToHashSet(StringComparer.Ordinal);
+        // Map the twin's labels back to ids through the payload, so a node the twin silently dropped is missing here.
+        return nodes
+            .Where(n => n.Id != HierarchyExplorer.ProjectRootId && labels.Contains(PathUtil.Html(n.Label)))
+            .Select(n => n.Id)
+            .ToHashSet(StringComparer.Ordinal);
+    }
 
     [Fact]
     public void Projector_NodeSet_EqualsTheWedgesTheSvgDrew()
@@ -54,11 +79,10 @@ public class SunburstExplorerTests
             Epic(1, "Alpha", Story("1.1", "One", "in progress", 2, 5), Story("1.2", "Two", "done", 3, 3)),
             Epic(2, "Beta", Story("2.1", "Three", null, 0, 0)));
 
-        var svg = Charts.Sunburst(model, nodeIds: true);
-        var svgIds = SvgNodeIds(svg);
+        var reachableIds = TwinNodeIds(model);
         var payloadIds = Charts.SunburstExplorerNodes(model).Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
 
-        Assert.Equal(svgIds, payloadIds);
+        Assert.Equal(reachableIds, payloadIds);
     }
 
     [Fact]
@@ -95,11 +119,10 @@ public class SunburstExplorerTests
         var model = Model(Epic(1, "Dense", stories));
 
         var nodes = Charts.SunburstExplorerNodes(model);
-        var svgIds = SvgNodeIds(Charts.Sunburst(model, nodeIds: true));
 
         Assert.Contains(nodes, n => n.Id == "epic-1~summary" && n.Kind == "story-summary" && n.ParentId == "epic-1");
         Assert.DoesNotContain(nodes, n => n.Kind == "story"); // no per-story wedges drawn → none in the payload
-        Assert.Equal(svgIds, nodes.Select(n => n.Id).ToHashSet(StringComparer.Ordinal));
+        Assert.Equal(TwinNodeIds(model), nodes.Select(n => n.Id).ToHashSet(StringComparer.Ordinal));
     }
 
     [Fact]
@@ -150,10 +173,18 @@ public class SunburstExplorerTests
     }
 
     [Fact]
-    public void WebviewAdapter_StripsTheIsland_ButKeepsTheChartAndItsLinks()
+    public void WebviewAdapter_StripsTheIsland_ButKeepsTheTwinAndItsLinks()
     {
         // The webview ships no specscribe.js, so the island is unreadable weight there — dropped, and registered as
-        // the `data-island` host exception. What must NOT be dropped is the chart itself. [Story 20.2 review]
+        // the `data-island` host exception. What must NOT be dropped is whatever carries the INFORMATION.
+        //
+        // Story 20.7 rewrote this test rather than deleting it, and the rewrite is the whole point. It used to
+        // assert the webview keeps "the chart and its links", meaning the server-rendered SVG. That SVG is gone, so
+        // the original assertion is no longer true — but the QUESTION it was asking is more important now, not
+        // less: owner decision D3 accepts that this surface shows no chart picture, and the only thing that makes
+        // that a documented DEGRADATION rather than a hole is the text twin surviving the strip with its links
+        // intact. The strip is a regex over <script type="application/json">; the twin is <details>/<ul>/<a>
+        // markup, so it should survive — this confirms it rather than assuming it. [Story 20.7 Task 9.2/9.5]
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: true, hasReadme: true);
         var breadcrumb = BreadcrumbTrail.From(new (string, string?)[] { ("Home", null) });
         var page = new PageView
@@ -174,19 +205,33 @@ public class SunburstExplorerTests
                 ParentTarget = breadcrumb.ParentTarget,
                 ChildTargets = Array.Empty<string>(),
             },
-            BodyHtml = "<main id=\"main-content\"><div class=\"chart-panel\" data-explorer>"
-                + "<svg class=\"sunburst\"><a href=\"epics/epic-1.html\"><path class=\"sb-seg\" data-node-id=\"epic-1\"></path></a></svg>"
-                + "<script type=\"application/json\" id=\"sunburst-explorer-data\">{\"nodes\":[]}</script>\n"
+            // The real shape a converted surface ships: the component's island, and its text twin.
+            BodyHtml = "<main id=\"main-content\"><div class=\"chart-panel sunburst-panel\" data-explorer>"
+                + "<div class=\"ss-hierarchy\" id=\"dashboard-hierarchy\" data-hierarchy></div>\n"
+                + "<script type=\"application/json\" class=\"ss-hierarchy-data\" id=\"dashboard-hierarchy-data\">{\"nodes\":[]}</script>\n"
+                + "<details class=\"ss-hierarchy-twin\" id=\"dashboard-hierarchy-twin\">\n<summary>Full text listing</summary>\n"
+                + "<ul class=\"ss-hierarchy-twin-list\">\n<li><a href=\"epics/epic-1.html\">Epic 1: Alpha</a> "
+                + "<span class=\"ss-hierarchy-twin-meta\">Stories drafted</span></li>\n</ul>\n</details>\n"
                 + "</div></main>",
         };
 
         var rendered = new WebviewRenderAdapter().RenderContent(page);
 
+        // The island goes.
         Assert.DoesNotContain("application/json", rendered);
-        Assert.DoesNotContain("sunburst-explorer-data", rendered);
-        Assert.Contains("<svg class=\"sunburst\"", rendered);
+        Assert.DoesNotContain("ss-hierarchy-data", rendered);
+
+        // The twin stays, COMPLETE and NAVIGABLE — the two halves ADR 0013 §2 actually requires. A twin whose
+        // links were rewritten away would be a hole dressed as a degradation.
+        Assert.Contains("ss-hierarchy-twin", rendered);
+        Assert.Contains("Epic 1: Alpha", rendered);
         Assert.Contains("epics/epic-1.html", rendered);
+        Assert.Contains("Stories drafted", rendered);
+
+        // And no chart picture is claimed here — that absence is itself registered, not silent.
+        Assert.DoesNotContain("<svg class=\"sunburst\"", rendered);
         Assert.Contains(HostRenderExceptions.Registry, e => e.SurfaceId == "webview" && e.FactId == "data-island");
+        Assert.Contains(HostRenderExceptions.Registry, e => e.SurfaceId == "webview" && e.FactId == "hierarchy-chart");
     }
 
     [Fact]
@@ -194,7 +239,8 @@ public class SunburstExplorerTests
     {
         var empty = Model();
         Assert.Empty(Charts.SunburstExplorerNodes(empty));
-        Assert.Equal(string.Empty, Charts.SunburstExplorerIsland(empty));
+        // The island half moved with the island: Story 20.7 deleted Charts.SunburstExplorerIsland, and the
+        // component's own IslandHtml already returns "" for an empty model (HierarchyExplorerTests).
     }
 
     /// <summary>A geometry pair with BOTH an unattributed ("orphan") follow-up root and per-epic follow-up
@@ -232,10 +278,9 @@ public class SunburstExplorerTests
             Epic(2, "Beta", Story("2.1", "Three", null, 0, 0, epicNumber: 2)));
         var (followUps, unplanned) = GeometryWithOrphansAndAggregates(model);
 
-        var svgIds = SvgNodeIds(Charts.Sunburst(model, followUps: followUps, unplanned: unplanned, nodeIds: true));
         var nodes = Charts.SunburstExplorerNodes(model, followUps, unplanned);
 
-        Assert.Equal(svgIds, nodes.Select(n => n.Id).ToHashSet(StringComparer.Ordinal));
+        Assert.Equal(TwinNodeIds(model, followUps, unplanned), nodes.Select(n => n.Id).ToHashSet(StringComparer.Ordinal));
         Assert.Contains(nodes, n => n.Id == "orphan");           // the branch the bare-model tests never reached
         Assert.Contains(nodes, n => n.Id.EndsWith("~open", StringComparison.Ordinal));
     }
@@ -274,10 +319,9 @@ public class SunburstExplorerTests
             .ToArray();
         var model = Model(Epic(1, "Boundary", stories));
 
-        var svgIds = SvgNodeIds(Charts.Sunburst(model, nodeIds: true));
         var nodes = Charts.SunburstExplorerNodes(model);
 
-        Assert.Equal(svgIds, nodes.Select(n => n.Id).ToHashSet(StringComparer.Ordinal));
+        Assert.Equal(TwinNodeIds(model), nodes.Select(n => n.Id).ToHashSet(StringComparer.Ordinal));
         var collapsed = storyCount >= Charts.StoryDensityCollapseThreshold;
         Assert.Equal(collapsed, nodes.Any(n => n.Kind == "story-summary"));
         Assert.Equal(!collapsed, nodes.Any(n => n.Kind == "story"));
@@ -288,10 +332,9 @@ public class SunburstExplorerTests
     {
         var model = Model(Epic(1, "Empty"));
 
-        var svgIds = SvgNodeIds(Charts.Sunburst(model, nodeIds: true));
         var nodes = Charts.SunburstExplorerNodes(model);
 
-        Assert.Equal(svgIds, nodes.Select(n => n.Id).ToHashSet(StringComparer.Ordinal));
+        Assert.Equal(TwinNodeIds(model), nodes.Select(n => n.Id).ToHashSet(StringComparer.Ordinal));
         Assert.DoesNotContain(nodes, n => n.Kind == "story" || n.Kind == "story-summary");
     }
 
@@ -311,41 +354,15 @@ public class SunburstExplorerTests
         Assert.Equal(nodes.Select(n => n.Id).Distinct(StringComparer.Ordinal).Count(), nodes.Count);
     }
 
-    [Fact]
-    public void Sunburst_OmitsNodeIdHooks_UnlessTheSurfaceOptsIn()
-    {
-        // Only the surface that also mounts the explorer island needs the join hooks; the epics index renders the
-        // same chart with no explorer and should not carry ~2.5 KB of attributes nothing reads. [Story 20.2 review]
-        var model = Model(Epic(1, "Alpha", Story("1.1", "One", "in progress", 2, 5)));
+    // `Sunburst_OmitsNodeIdHooks_UnlessTheSurfaceOptsIn` was DELETED by Story 20.7, not rewritten. It asserted a
+    // GEOMETRY/attribute fact about `Charts.Sunburst` — whether an SVG carried `data-node-id` join hooks — and both
+    // the chart and the client block that joined against those hooks are gone. There is no payload or twin
+    // statement it could be retargeted at, because the fact it pinned no longer exists. [Story 20.7 Task 10.1]
 
-        Assert.DoesNotContain("data-node-id", Charts.Sunburst(model));
-        Assert.Contains("data-node-id", Charts.Sunburst(model, nodeIds: true));
-    }
-
-    [Fact]
-    public void Island_IsWellFormedJson_WithMetaNodesAndEmptyEdges()
-    {
-        var model = Model(Epic(1, "Alpha", Story("1.1", "One", "in progress", 2, 5)));
-
-        var island = Charts.SunburstExplorerIsland(model, size: 380);
-        Assert.StartsWith("<script type=\"application/json\" id=\"sunburst-explorer-data\">", island);
-        Assert.EndsWith("</script>\n", island);
-
-        var json = island[(island.IndexOf('>') + 1)..island.LastIndexOf("</script>", StringComparison.Ordinal)];
-        using var doc = JsonDocument.Parse(json);
-        var rootEl = doc.RootElement;
-
-        // Geometry meta drives the client re-layout onto the same rings.
-        Assert.Equal(380, rootEl.GetProperty("meta").GetProperty("size").GetInt32());
-        Assert.True(rootEl.GetProperty("meta").TryGetProperty("epicInner", out _));
-        // Story 20.2 ships edges empty (Story 20.3 fills them).
-        Assert.Equal(0, rootEl.GetProperty("edges").GetArrayLength());
-        // The first node is the epic, carrying the canonical id + camelCase fields the client reads.
-        var first = rootEl.GetProperty("nodes")[0];
-        Assert.Equal("epic-1", first.GetProperty("id").GetString());
-        Assert.Equal("epic", first.GetProperty("kind").GetString());
-        // `ring` is a separate fact from `kind` — the client reads it to place a drilled wedge on the right band.
-        Assert.Equal("epic", first.GetProperty("ring").GetString());
-        Assert.True(first.GetProperty("weight").GetInt32() >= 1);
-    }
+    // `Island_IsWellFormedJson_WithMetaNodesAndEmptyEdges` was DELETED by Story 20.7 along with
+    // `Charts.SunburstExplorerIsland` / `SunburstExplorerData` / `SunburstExplorerMeta`. It asserted the SHAPE of
+    // 20.2's island — the ring radii the client re-laid drilled arcs against, and the deliberately-empty edges
+    // array. Plotly computes its own geometry, so there is no second geometry left to pin. The equivalent
+    // assertions for the component's island (well-formed JSON, camelCase fields, the emitted branchvalues) live
+    // in HierarchyExplorerTests and are not duplicated here. [Story 20.7 Task 10.1]
 }

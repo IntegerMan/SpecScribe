@@ -3831,6 +3831,22 @@ So that static HTML, SPA, and webview can all project from one durable, chunked 
 
 ### Story 22.3: Static HTML Rendered from the IR
 
+> **⛔ RETIRED 2026-07-27 (owner decision D4, create-story 23.4). Superseded by [Story 23.4](#story-234-migrate-remaining-surfaces--retire-the-c-htmlrenderadapter-for-content).**
+> This story and 23.4 are **competing answers to the same question** — who renders static HTML from the IR.
+> 22.3 answers "a C# IR-projection path, byte-identical to golden"; 23.4 answers "the Vue/Nuxt projection
+> layer writes every `.html` and the C# page render is retired." Both cannot hold, and **Nuxt-over-IR is the
+> ratified direction** ([ADR 0009](../../docs/adrs/0009-frontend-framework-for-projection-layer.md)); Story
+> 23.3 has already shipped 189 surfaces on it with `<main>` byte-identical on 189/189. Keeping 22.3 alive
+> would institutionalise the two-renderer drift Epic 23 exists to end.
+> The ACs below are left in place for provenance and are **not to be implemented**. The same retirement is
+> recorded on the `22-3-static-html-rendered-from-the-ir` key in `sprint-status.yaml` in the same change.
+>
+> **⚠️ Consequence for [Story 22.4](#story-224-spa--webview-as-ir-consumers):** Story 23.4 AC #3 deliberately
+> **keeps one C# region-composition path** (nav + wayfinding + `<main>`) feeding the IR *and* the webview/SPA
+> — because that path is what the IR is built from. 22.4's AC #3 ("the duplicate, non-IR data paths for SPA
+> and webview are retired") must be read against that surviving shared path, not as a mandate to delete it.
+> Story 23.4 Task 8 owns restating it.
+
 As a maintainer relying on the JS-optional static HTML baseline,
 I want static HTML rendered as a projection of the canonical IR rather than directly from the core pipeline,
 So that NFR6's accessibility baseline is preserved while unifying all surfaces on one source of truth.
@@ -3853,6 +3869,15 @@ So that NFR6's accessibility baseline is preserved while unifying all surfaces o
 **Then** it renders and is fully navigable without JavaScript, identical in this respect to the pre-IR baseline.
 
 ### Story 22.4: SPA + Webview as IR Consumers
+
+> **⚠ SCOPE ADDITION 2026-07-27 (owner decision, create-story 22.3) — recorded in `sprint-status.yaml` in the same change, per CLAUDE.md § Decision records.**
+>
+> **22.4 inherits the two defects [Story 23.3](../implementation-artifacts/23-3-migrate-baseline-surfaces-dashboard-epics.md) handed back to Epic 22.** They were in retired [Story 22.3](#story-223-static-html-rendered-from-the-ir)'s scope by owner decision earlier the same day, and would otherwise be tracked nowhere:
+>
+> 1. **The 46-delta pipeline-ordering defect.** `RenderEpicsPages` is called at `SiteGenerator.cs:326`, the pages loop fills `_docs` at `:339`, and `BuildSpaBundle` reads `_docs.Values` at `:3052` — the epics pages render *before* `_docs` exists and the IR renders *after*. 23.3 measured the symptom as differing per-story work-graph node/edge counts across 46 surfaces, and named which side is stale: **the IR is the more complete render, so this is a latent defect in the static page, not a loss in the capture.** Diagnostics event ordering is load-bearing for the golden fingerprint (`SiteGenerator.cs:415-418`) — preserve it, and enumerate the resulting static-page byte delta rather than re-blessing the constant.
+> 2. **The two-region-shapes defect.** The IR carries two region shapes: 187 re-rendered family pages carry the page-wayfinding wrapper, while ~853 captured pages slice from *inside* it (`SpaDelivery.ExtractContentRegion` starts at the breadcrumb) and are unbalanced by one element. 23.3's adapter detects both and throws on a band it cannot balance — that workaround is what 22.4 should be able to delete.
+>
+> **AC #3 below must also be restated.** Per the Story 22.3 retirement note, **[Story 23.4](#story-234-migrate-remaining-surfaces--retire-the-c-htmlrenderadapter-for-content) AC #3 deliberately keeps one C# region-composition path** (nav + wayfinding + `<main>`) feeding the IR and the webview/SPA. AC #3's *"the duplicate, non-IR data paths… are retired"* must therefore be scoped **against that surviving path**, not read as contradicting it. The retired [Story 22.3 file](../implementation-artifacts/22-3-static-html-rendered-from-the-ir.md) is kept as a reference and characterizes exactly that path — the 25-templater inventory, the `NavLocalContext` blocker (there is **no** `path → NavLocalContext` resolver; any path that stops slicing must thread it), eight traps, the ADR constraint table, and the ranked test-gate map.
 
 As a maintainer of the SPA and VS Code webview surfaces,
 I want both surfaces to consume the canonical IR instead of their own duplicate data paths,
@@ -4051,6 +4076,32 @@ So that SpecScribe has a single renderer and no drift hazard between two templat
      that non-goal no longer exists — this is a SCOPE REDUCTION for 23.4: there is no C# chart-SVG generator left to
      carve out and preserve when the HtmlRenderAdapter is retired. The ADR 0005 CSP amendment 23.4 owes is now
      SHARED with ADR 0012's webview amendment and must be landed ONCE, not twice. -->
+
+> **Scope drift recorded 2026-07-27 (create-story 23.4).** The story file's ACs **extend** the two above to
+> eight, and the story is seeded **`blocked`** — not `ready-for-dev` — because the epic's own gate above
+> (":3940–3950") is unmet: Story 23.5 is `ready-for-dev`, not done. ACs 1–2 are these; ACs 3–8 carry the four
+> owner decisions locked at elicitation plus the 23.1 spike gate's assignment of the ADR 0005 CSP amendment.
+> Full detail in [`23-4-…md`](../implementation-artifacts/23-4-migrate-remaining-surfaces-retire-c-sharp-html-adapter.md)
+> and on the `23-4` key in `sprint-status.yaml`. The four decisions:
+>
+> 1. **D1 — seeded `blocked`.** The gate is 23.5, and specifically its Q2 (what the standalone binary does
+>    when Node is absent), because 23.4 deletes the C# HTML writer that currently answers it.
+> 2. **D2 — "retire the `HtmlRenderAdapter`" means C# stops WRITING `.html`.** It **keeps** a
+>    region-composition path (nav + wayfinding + `<main>`) that feeds the IR and the webview/SPA. The
+>    full-page assembly dies; the ~7,000 LOC of `*Templater.cs` that produce page bodies do **not**.
+> 3. **D3 — full componentization of the remaining 857 pass-through pages**, retiring `ir-content.css` to
+>    empty per [ADR 0018](../../docs/adrs/0018-transitional-ir-content-style-layer.md) — or an enumerated
+>    residue with a named blocker per rule.
+> 4. **D4 — [Story 22.3](#story-223-static-html-rendered-from-the-ir) is RETIRED**; 23.4 is the answer to
+>    "who renders static HTML from the IR." Recorded on 22.3 above in the same change.
+>
+> **The load-bearing finding:** for **857 of 1,046 pages the IR is produced by the very code this story
+> retires** — `SpaDelivery.ExtractContentRegion` slices the region back out of the C# renderer's own
+> full-page string, captured at `SiteGenerator.WriteOutput`. The region path must therefore be stood up and
+> proven **byte-equal** *before* any deletion. Two further inversions the story pins: `GoldenContentFingerprint`
+> must **move or be retired** here (23.3 asserted it stationary), and the owed **ADR 0005 CSP amendment is
+> probably documentation-only** now that 23.3's `noScripts: true` removed the hydration 23.1's
+> `'strict-dynamic'` finding was about.
 
 ### Story 23.5: Packaging Reconciliation
 

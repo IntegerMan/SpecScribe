@@ -148,35 +148,13 @@ body {
   border-radius: 3px;
 }
 
-/* SVG <a> segments: the default focus outline renders unreliably around SVG links across browsers, so
-   express focus on the <path> itself with a bright gold stroke bump (driven off the path, per the story). */
-.sunburst a:focus-visible { outline: none; }
-.sunburst a:focus-visible .sb-seg {
-  stroke: var(--gold-light);
-  stroke-width: 3;
-}
-
-/* ---- Story 20.2: remaining-work sunburst explorer (zoom/drill-in) ----
-   All of this only ever appears once specscribe.js has upgraded the panel; with JS off the drill bar stays
-   [hidden], no center control is injected, and the static sunburst + its 9.13 links are the whole chart (NFR8). */
-.sb-explorer-drill { margin: 0.4rem 0 0.2rem; }
-.sb-explorer-breadcrumb { list-style: none; display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; margin: 0; padding: 0; font-size: 0.8rem; }
-.sb-explorer-breadcrumb li { display: flex; align-items: center; gap: 0.3rem; }
-.sb-explorer-breadcrumb li + li::before { content: "\203A"; color: var(--ink-faded); margin-right: 0.05rem; }
-.sb-crumb {
-  background: none;
-  border: 0;
-  color: var(--rust);
-  cursor: pointer;
-  padding: 0.1rem 0.2rem;
-  font: inherit;
-  border-radius: 3px;
-}
-.sb-crumb:hover { text-decoration: underline; }
-.sb-crumb:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
-.sb-crumb-current { color: var(--ink); font-weight: 600; }
-.sb-crumb-open { font-size: 0.72rem; color: var(--rust); text-decoration: underline; }
-.sb-crumb-open:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
+/* ---- Story 20.2's explorer + the SVG-link focus rule: DELETED by Story 20.7 ----
+   `.sb-explorer-*` and `.sb-crumb*` styled 20.2's drill bar and breadcrumb over the server-rendered sunburst.
+   Both the SVG and 20.2's client block are gone; the component's own `.ss-hierarchy-crumb*` (below) carries the
+   same visual language. `.sunburst a:focus-visible .sb-seg` went with them: nothing emits an <a> inside an
+   `svg.sunburst` any more. The `.sb-seg` / `.sb-<status>` TOKEN rules further down STAY — they are the live
+   cascade the component's colour probe resolves against, and deleting them would silently un-colour every
+   converted chart. [Story 20.7 Task 8.3] */
 
 /* The zoom-out control lives in the sunburst hole; transparent but hittable, with a visible ring on hover/focus. */
 .sb-center-zoom { fill: transparent; cursor: pointer; }

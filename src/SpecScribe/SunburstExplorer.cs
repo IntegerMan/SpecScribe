@@ -22,44 +22,16 @@ public sealed record SunburstExplorerNode(
     string Kind,
     string Ring);
 
-/// <summary>The presentation geometry the client re-layout needs to land zoomed arcs on the SAME rings the static
-/// chart drew — projected from the same factors <see cref="Charts.Sunburst"/> uses, NOT a second geometry of
-/// weights/counts. All radii are absolute (× size already applied). [Story 20.2]</summary>
-public sealed record SunburstExplorerMeta(
-    int Size,
-    double Cx,
-    double Pad,
-    double Start,
-    double EpicInner,
-    double EpicOuter,
-    double StoryInner,
-    double StoryOuter,
-    double AggInner,
-    double AggOuter);
-
-/// <summary>The whole explorer payload island content: geometry meta + the node hierarchy + edges.
-///
-/// <para><b><see cref="Edges"/> stays empty, and that is the finished answer — not an unfinished one.</b> Story 20.2
-/// reserved this slot for Story 20.3 to fill from <c>SiteGenerator._workGraph</c>. Story 20.1's code review then
-/// established (§1a) that the two id spaces are DISJOINT and that most work-graph edge endpoints
-/// (<c>d*</c>/<c>a*</c>/<c>src:</c>/<c>res:</c>/<c>retro:</c>) have no wedge at all. Translating the graph into this
-/// namespace leaves exactly one joinable shape — <c>Contains</c>, story → epic — which <see cref="SunburstExplorerNode.ParentId"/>
-/// already states. So an edge array here would carry no information the payload does not already have, while adding
-/// bytes to an embedded payload that grows with project size (the one budget question 20.1 left open). Story 20.3
-/// therefore delivers the relationship truth as server-rendered DOM (<see cref="RelatedWorkTemplater"/>) keyed by
-/// this same id namespace, and the client joins DOM ↔ selection with no payload lookup at all. Kept in the shape
-/// rather than removed: the field is part of the shipped island contract, and an empty array is a smaller,
-/// clearer statement than a missing key. [Story 20.2; resolved by Story 20.3]</para></summary>
-public sealed record SunburstExplorerModel(
-    SunburstExplorerMeta Meta,
-    IReadOnlyList<SunburstExplorerNode> Nodes,
-    IReadOnlyList<object> Edges);
+// `SunburstExplorerMeta` (the ring radii the client re-laid drilled arcs against) and `SunburstExplorerModel`
+// (meta + nodes + the deliberately-empty edges array) were DELETED by Story 20.7 with the client block that read
+// them. Plotly computes its own geometry, so there is no second geometry to keep in step any more.
 
 public static partial class Charts
 {
-    /// <summary>DOM id / island id of the sunburst-explorer payload island — the one place the class ↔ script
-    /// contract is named. [Story 20.2]</summary>
-    public const string SunburstExplorerDataId = "sunburst-explorer-data";
+    // `SunburstExplorerDataId` / `SunburstExplorerData` / `SunburstExplorerIsland` — Story 20.2's island and its
+    // id — were DELETED by Story 20.7 along with the client block that read them. `SunburstExplorerNodes` below
+    // SURVIVES: it is still the single walk of EpicsModel, and HierarchyExplorer.ProjectDashboard is a thin
+    // adapter over its output. [Story 20.7 Task 8.3]
 
     /// <summary>Projects the project-glance sunburst into the Story 20.2 explorer payload: one node per drawn wedge,
     /// each carrying the SAME weight/hierarchy/status/destination the SVG already used — a pure projection over
@@ -211,61 +183,4 @@ public static partial class Charts
         return nodes;
     }
 
-    /// <summary>Builds the full explorer payload model (geometry meta + nodes + empty edges) for the given
-    /// <paramref name="size"/> (the same size passed to <see cref="Sunburst"/>). [Story 20.2]</summary>
-    public static SunburstExplorerModel SunburstExplorerData(
-        EpicsModel model, int size = SunburstGlanceSize,
-        FollowUpGeometry? followUps = null, UnplannedWorkGeometry? unplanned = null,
-        bool expandDenseEpics = false)
-    {
-        var meta = new SunburstExplorerMeta(
-            size, size / 2.0, SbPad, SbStartAngle,
-            size * SbEpicInnerF, size * SbEpicOuterF,
-            size * SbStoryInnerF, size * SbStoryOuterF,
-            size * SbAggInnerF, size * SbAggOuterF);
-        return new SunburstExplorerModel(
-            meta, SunburstExplorerNodes(model, followUps, unplanned, expandDenseEpics), Array.Empty<object>());
-    }
-
-    /// <summary>The inline JSON island the dashboard mounts beside <see cref="Sunburst"/> — the client drill-in's
-    /// only data source (no fetch, <c>file://</c>-safe). Returns "" when there is nothing to explore (no epics), so
-    /// the empty-state chart ships no inert island. System.Text.Json's default encoder escapes <c>&lt; &gt; &amp;</c>,
-    /// so the payload is safe to embed directly inside a <c>&lt;script&gt;</c>. [Story 20.2]</summary>
-    public static string SunburstExplorerIsland(
-        EpicsModel model, int size = SunburstGlanceSize,
-        FollowUpGeometry? followUps = null, UnplannedWorkGeometry? unplanned = null)
-    {
-        if (model.Epics.Count == 0) return string.Empty;
-        var data = SunburstExplorerData(model, size, followUps, unplanned);
-        var payload = new
-        {
-            meta = new
-            {
-                size = data.Meta.Size,
-                cx = data.Meta.Cx,
-                pad = data.Meta.Pad,
-                start = data.Meta.Start,
-                epicInner = data.Meta.EpicInner,
-                epicOuter = data.Meta.EpicOuter,
-                storyInner = data.Meta.StoryInner,
-                storyOuter = data.Meta.StoryOuter,
-                aggInner = data.Meta.AggInner,
-                aggOuter = data.Meta.AggOuter,
-            },
-            nodes = data.Nodes.Select(n => new
-            {
-                id = n.Id,
-                parentId = n.ParentId,
-                weight = n.Weight,
-                label = n.Label,
-                statusClass = n.StatusClass,
-                href = n.Href,
-                kind = n.Kind,
-                ring = n.Ring,
-            }),
-            edges = data.Edges,
-        };
-        var json = JsonSerializer.Serialize(payload);
-        return $"<script type=\"application/json\" id=\"{SunburstExplorerDataId}\">{json}</script>\n";
-    }
 }

@@ -213,9 +213,10 @@ public class WebviewThemingTests
         Assert.True(divergences.Count == 0, "expected parity, got: " + string.Join(" | ", divergences));
 
         // No section.* or THEMING exception was added: the WEBVIEW surface stays at its three 6.4 chrome/asset
-        // entries plus Story 20.2's asset-weight `data-island` one (theming itself is not a semantic divergence).
-        // Other surfaces' entries — e.g. Story 6.7's single spa mermaid exception — are out of scope here.
-        Assert.Equal(4, HostRenderExceptions.Registry.Count(e => e.SurfaceId == "webview"));
+        // entries plus the asset-weight `data-island` one and Story 20.7's `hierarchy-chart` degradation (theming
+        // itself is not a semantic divergence). Other surfaces' entries — e.g. Story 6.7's single spa mermaid
+        // exception — are out of scope here.
+        Assert.Equal(5, HostRenderExceptions.Registry.Count(e => e.SurfaceId == "webview"));
         Assert.DoesNotContain(HostRenderExceptions.Registry,
             e => e.SurfaceId == "webview" && e.FactId.Contains("theme", StringComparison.OrdinalIgnoreCase));
     }

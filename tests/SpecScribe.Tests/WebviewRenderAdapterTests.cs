@@ -402,19 +402,29 @@ public class WebviewRenderAdapterTests
     [Fact]
     public void Registry_CarriesExactlyTheJustifiedWebviewChromeExceptions()
     {
-        // The three ADR 0005 measured, plus Story 20.2's `data-island` — all webview-scoped, all chrome/asset
-        // facts, each with a real reason. No html-surface entry (the HTML adapter still diverges on nothing) and
-        // no section.* entry (the body facts hold FULL parity — the content is byte-identical by construction).
+        // The three ADR 0005 measured, plus `data-island`, plus Story 20.7's `hierarchy-chart` — all
+        // webview-scoped, all chrome/asset facts, each with a real reason. No html-surface entry (the HTML adapter
+        // still diverges on nothing) and no section.* entry (the body facts hold FULL parity).
         // Story 6.7's SPA surface adds its own single (mermaid) entry, asserted separately in RenderSpaParityTests.
-        // `data-island`: the webview strips inline JSON data islands. It is an ASSET-WEIGHT divergence — the island
-        // is unreadable here because this surface ships no specscribe.js (the asset.js entry), so no information is
-        // lost; the chart and its links render identically. [Story 20.2 review]
+        //
+        // `data-island`: the webview strips inline JSON data islands — an ASSET-WEIGHT divergence, because the
+        // island is unreadable here (this surface ships no specscribe.js; see asset.js).
+        //
+        // `hierarchy-chart` [Story 20.7, owner decision D3]: with no script there is no Plotly, and Story 20.7
+        // retired the server-rendered SVG that used to stand in its place — so this surface shows the TEXT TWIN and
+        // no chart picture. It is the fallback ADR 0012 §5 and ADR 0013 §7 both pre-authorize, and it is REGISTERED
+        // rather than left silent precisely because the thing that makes it a documented degradation instead of a
+        // hole is that the twin survives with its links. The ADR 0005 CSP amendment that would let Plotly load here
+        // lands once, with Story 23.4.
         var webview = HostRenderExceptions.Registry.Where(e => e.SurfaceId == "webview").ToList();
-        Assert.Equal(4, webview.Count);
+        Assert.Equal(5, webview.Count);
         Assert.All(webview, e => Assert.False(string.IsNullOrWhiteSpace(e.Reason)));
         Assert.Equal(
-            new[] { "asset.css", "asset.js", "data-island", "mermaid" },
+            new[] { "asset.css", "asset.js", "data-island", "hierarchy-chart", "mermaid" },
             webview.Select(e => e.FactId).OrderBy(f => f, StringComparer.Ordinal).ToList());
+        // The amended `data-island` reason must not still claim the retired SVG carries the information.
+        var island = webview.Single(e => e.FactId == "data-island");
+        Assert.Contains("text twin", island.Reason, StringComparison.OrdinalIgnoreCase);
         // Global hygiene across every surface: a section.* fact may never be excepted (a body divergence is
         // always a bug).
         Assert.DoesNotContain(HostRenderExceptions.Registry, e => e.FactId.StartsWith("section.", StringComparison.Ordinal));

@@ -28,9 +28,22 @@ public sealed partial class HtmlRenderAdapter
 
         sb.Append("<section class=\"dashboard\">\n");
         AppendEpicsProgressPanel(sb, view.Progress, view.Counts);
-        sb.Append("<div class=\"chart-panel sunburst-panel\">\n<h3>Project at a Glance</h3>\n");
-        sb.Append(Charts.Sunburst(model, followUps: view.FollowUps, unplanned: view.UnplannedWork));
-        sb.Append("</div>\n");
+        // The component supplies its own framed panel (heading, framing sentence, legend) — this call site no
+        // longer hand-writes any of it (ADR 0012 §2). Built in EpicsViewBuilder, never here (AD-2).
+        //
+        // The empty branch is NOT decoration. This panel is unconditional on this page, and the component returns
+        // "" for an empty model, so a project with no epics would go from `Charts.Sunburst`'s honest note to a bare
+        // heading — a missing panel is not an empty state (NFR8, Story 20.7 F1). [Story 20.7 Task 4.1]
+        if (view.HierarchyExplorerHtml.Length > 0)
+        {
+            sb.Append(view.HierarchyExplorerHtml);
+        }
+        else
+        {
+            sb.Append("<div class=\"chart-panel sunburst-panel\">\n<h3>Project at a Glance</h3>\n");
+            sb.Append("<div class=\"chart-empty\">Nothing to chart yet.</div>\n");
+            sb.Append("</div>\n");
+        }
 
         // Remaining Work by Epic — its own panel (Story 10.7 AC1 follow-up), same helper/markup as Dashboard.
         var companionGrid = Charts.SunburstCompanionList(model, followUps: view.FollowUps, unplanned: view.UnplannedWork);
@@ -201,14 +214,10 @@ public sealed partial class HtmlRenderAdapter
             main.Append(view.NextActionsPanelHtml);
             main.Append("</div>\n\n");
 
-            main.Append("<div class=\"chart-panel sunburst-panel\">\n<h3>Story Breakdown</h3>\n");
-            // Always the story's own page (drafted detail or undrafted placeholder) — never an in-page
-            // #story-N-M card jump. Matches story-card TitleHref and the project sunburst's StoryPagePath
-            // fallback so a sunburst click always leaves the epic page for the story surface.
-            main.Append(Charts.EpicSunburst(view.Epic, story =>
-                view.Prefix + (story.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(story.Id)),
-                followUps: view.FollowUps, unplanned: view.UnplannedWork));
-            main.Append("</div>\n");
+            // The component supplies the whole framed panel; the destination rule lives in the view builder
+            // (AD-2). "" means this epic has neither stories nor follow-ups, and this panel is conditional —
+            // no panel is the correct answer, not an empty frame.
+            main.Append(view.HierarchyExplorerHtml);
             main.Append("</div>\n</section>\n\n");
         }
         else if (view.NextStepsHtml.Length > 0)
@@ -544,11 +553,12 @@ public sealed partial class HtmlRenderAdapter
         }
 
         main.Append("<section class=\"dashboard-narrow\">\n<div class=\"chart-row\">\n");
-        if (view.Tasks.Count > 0 || view.DeferredFromThis.Count > 0)
+        // The component supplies the whole framed panel (heading + framing sentence + legend). The TOC entry is
+        // still gated on the panel actually rendering, so a story with no tasks gets neither an empty frame nor a
+        // TOC link to nothing.
+        if (view.HierarchyExplorerHtml.Length > 0)
         {
-            main.Append("<div class=\"chart-panel sunburst-panel\" id=\"sec-task-breakdown\">\n<h3>Task Breakdown</h3>\n");
-            main.Append(Charts.TaskSunburst(view.Tasks, deferred: view.DeferredFromThis));
-            main.Append("</div>\n");
+            main.Append(view.HierarchyExplorerHtml);
             toc.Add(new Toc.Entry(2, "Task Breakdown", "sec-task-breakdown"));
         }
         main.Append(view.NextStepsHtml);

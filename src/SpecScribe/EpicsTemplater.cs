@@ -39,6 +39,12 @@ public static class EpicsTemplater
                 StylesheetHref = prefix + ForgeOptions.StylesheetName,
                 ScriptHref = prefix + ForgeOptions.ScriptName,
                 MermaidNeeded = Mermaid.ContainsBlock(body),
+                // Story 20.7: this family now carries Hierarchy Explorer instances (epics index, epic detail,
+                // story detail), so the engine flag must be derived here too. Same discipline as MermaidNeeded —
+                // computed from the RENDERED BODY, so the flag cannot claim a chart the page does not have, or
+                // miss one it does. Omitting it was silent: the page rendered, the island shipped, the twin stood
+                // in, and only a live browser showed the chart never mounting.
+                HierarchyEngineNeeded = HierarchyExplorer.ContainsHost(body),
             },
             Interaction = new InteractionState
             {
@@ -92,6 +98,12 @@ public static class EpicsTemplater
                 StylesheetHref = prefix + ForgeOptions.StylesheetName,
                 ScriptHref = prefix + ForgeOptions.ScriptName,
                 MermaidNeeded = Mermaid.ContainsBlock(body),
+                // Story 20.7: this family now carries Hierarchy Explorer instances (epics index, epic detail,
+                // story detail), so the engine flag must be derived here too. Same discipline as MermaidNeeded —
+                // computed from the RENDERED BODY, so the flag cannot claim a chart the page does not have, or
+                // miss one it does. Omitting it was silent: the page rendered, the island shipped, the twin stood
+                // in, and only a live browser showed the chart never mounting.
+                HierarchyEngineNeeded = HierarchyExplorer.ContainsHost(body),
             },
             Interaction = new InteractionState
             {
@@ -188,6 +200,12 @@ public static class EpicsTemplater
                 StylesheetHref = PathUtil.RelativePrefix(outputPath) + ForgeOptions.StylesheetName,
                 ScriptHref = PathUtil.RelativePrefix(outputPath) + ForgeOptions.ScriptName,
                 MermaidNeeded = Mermaid.ContainsBlock(body),
+                // Story 20.7: this family now carries Hierarchy Explorer instances (epics index, epic detail,
+                // story detail), so the engine flag must be derived here too. Same discipline as MermaidNeeded —
+                // computed from the RENDERED BODY, so the flag cannot claim a chart the page does not have, or
+                // miss one it does. Omitting it was silent: the page rendered, the island shipped, the twin stood
+                // in, and only a live browser showed the chart never mounting.
+                HierarchyEngineNeeded = HierarchyExplorer.ContainsHost(body),
             },
             Interaction = new InteractionState
             {
@@ -241,6 +259,12 @@ public static class EpicsTemplater
                 StylesheetHref = prefix + ForgeOptions.StylesheetName,
                 ScriptHref = prefix + ForgeOptions.ScriptName,
                 MermaidNeeded = Mermaid.ContainsBlock(body),
+                // Story 20.7: this family now carries Hierarchy Explorer instances (epics index, epic detail,
+                // story detail), so the engine flag must be derived here too. Same discipline as MermaidNeeded —
+                // computed from the RENDERED BODY, so the flag cannot claim a chart the page does not have, or
+                // miss one it does. Omitting it was silent: the page rendered, the island shipped, the twin stood
+                // in, and only a live browser showed the chart never mounting.
+                HierarchyEngineNeeded = HierarchyExplorer.ContainsHost(body),
             },
             Interaction = new InteractionState
             {

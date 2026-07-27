@@ -977,7 +977,7 @@ public class SiteGeneratorAdapterTests : IDisposable
         // for this portal." → "…, and how to generate the site."), which renders as that entry's `data-tooltip`
         // in the white key-views band, so every page carrying that band shifted by one attribute value.
         // PROVENANCE (shared main): captured on a tree carrying only
-        // this story's four files plus another session's untracked spike/plotly/ scratch directory, which lives
+        // this story's five files plus another session's untracked spike/plotly/ scratch directory, which lives
         // outside this temp fixture and cannot reach the hash. Verified stable across two repeated runs.
         // [Story 5.6; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
         // Regenerated for Story 20.3's code-review patch round (2026-07-25): asset-bytes-only delta, no dashboard
@@ -1104,7 +1104,33 @@ public class SiteGeneratorAdapterTests : IDisposable
         // VERIFICATION: confirmed stable across two repeated full runs before locking in. Single-box only — the
         // cross-environment caveat above still stands and has NOT been re-measured for this value.
         // [Story 20.6; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
-        const string expected = "7adbdb016cf9bb7d6be3193ee27cad8f7888066d2d0f407eee98ea95f74b0c42";
+        // ── STORY 20.7 REGENERATION ──────────────────────────────────────────────────────────────────────────
+        // 7adbdb01… -> 126eed3a…, and this is the LARGE one the whole epic has been sequencing around. ADR 0013 §6
+        // measured chart SVG at 69.3% of the dashboard body, and this story deletes it on five surfaces:
+        // Charts.Sunburst / EpicSunburst / TaskSunburst, Story 20.2's island and drill scaffold, and the Impact
+        // Map's `impact-map-data` island with its two hand-rolled mounts. The constant therefore stops carrying
+        // any SVG-derived signal at all.
+        //
+        // WHAT STANDS IN ITS PLACE, and it was required to land FIRST (ADR 0013 §6): Story 20.6's replacement
+        // assertions over payload / config / twin, plus this story's own — HierarchyRolloutTests' four-invariant
+        // data-contract checks per projector, the rollout-completeness allowlist, and the colour-family
+        // assertions. CONFIRMED THEY CAN FAIL rather than assumed: each was observed red during development
+        // (the epics-index empty state, the payload-derived legend membership, and the retired-symbol sweep all
+        // failed before their fixes landed). A replacement net that cannot fail is not a net.
+        //
+        // PROVENANCE (shared main) — this hash is NOT this story's work alone. Captured on a tree carrying
+        // another session's uncommitted work, verified by `git status` at capture time:
+        //   • HowToReadTemplater.cs and SiteNav.cs (+ SiteNavTests.cs) — not this story's; `how-to-read.html` is
+        //     in GoldenOutputInventory, so that work IS rendering-visible in this fixture and part of this value.
+        //   • Three new story files (18-4, 22-3, 23-4) and edits to epics.md / sprint-status.yaml / deferred-work.md
+        //     / 18-3 / 5-6 — planning artifacts outside this fixture's source tree.
+        // They could not be separated without destroying uncommitted work (CLAUDE.md forbids reset/checkout/clean
+        // here, and rightly).
+        //
+        // VERIFICATION: confirmed stable across two repeated full runs before locking in. Single-box only — the
+        // cross-environment caveat above still stands and has NOT been re-measured for this value.
+        // [Story 20.7 Task 11.7; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
+        const string expected = "126eed3a87632a5e583b04cc9706fe85c389cf44929f1967258eb9d384d3585c";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

@@ -47,13 +47,26 @@ public static class HostRenderExceptions
         // — the same accepted fallback as the webview. Full Mermaid-in-SPA (re-init across swaps) is a deferred
         // enhancement; the diagram source is present and readable meanwhile (progressive enhancement / NFR6).
         new HostRenderException("webview", "data-island",
-            "Inline <script type=\"application/json\"> data islands (Story 20.2's sunburst-explorer payload, and any "
-            + "later one) are stripped from the webview content region. NOTE the reason is NOT CSP: a JSON data "
-            + "block is never executed, so script-src does not apply to it and the CSP would not have blocked it. "
-            + "The island is dropped because it is DEAD WEIGHT here — the webview deliberately ships no "
-            + "specscribe.js (see the asset.js exception above), so nothing on this surface can ever read it, and "
-            + "it is pure payload in a document the reader inlines. The static SVG chart and its Story 9.13 links "
-            + "are untouched, so no information is lost — this is an asset-weight divergence, not a content one."),
+            "Inline <script type=\"application/json\"> data islands (the Hierarchy Explorer payload, and any later "
+            + "one) are stripped from the webview content region. NOTE the reason is NOT CSP: a JSON data block is "
+            + "never executed, so script-src does not apply to it and the CSP would not have blocked it. The island "
+            + "is dropped because it is DEAD WEIGHT here — the webview deliberately ships no specscribe.js (see the "
+            + "asset.js exception above), so nothing on this surface can ever read it, and it is pure payload in a "
+            + "document the reader inlines. AMENDED BY STORY 20.7: this reason used to end \"the static SVG chart "
+            + "and its Story 9.13 links are untouched, so no information is lost\". That is now FALSE — 20.7 retired "
+            + "the SVG. What carries the information on this surface is the text twin, which the strip leaves in "
+            + "place (it is <details>/<div> markup, not a <script>). Still an asset-weight divergence, not a "
+            + "content one — see the hierarchy-chart exception below for the picture."),
+        new HostRenderException("webview", "hierarchy-chart",
+            "The webview presents the Hierarchy Explorer's TEXT TWIN and no chart picture. It ships no "
+            + "specscribe.js at all (see asset.js) and therefore no Plotly, so nothing can mount a chart here; the "
+            + "server-rendered SVG that used to stand in its place was retired by Story 20.7. This is the fallback "
+            + "ADR 0012 §5 and ADR 0013 §7 BOTH pre-authorize, not an unplanned gap: the twin is complete, "
+            + "navigable and non-colour, so NFR-5 as amended by ADR 0013 holds — JS-off may lose the "
+            + "visualization, never the information or the navigation. It is a SEQUENCING choice rather than a "
+            + "technical limit: the Story 20.4 spike proved Plotly renders under the byte-verbatim shipped policy, "
+            + "and the ADR 0005 CSP amendment that would let it load here lands ONCE, with Story 23.4 (ADR 0012 §5) "
+            + "— deliberately not twice. Owner decision D3, Story 20.7."),
         new HostRenderException("spa", "mermaid",
             "The SPA swaps content regions via innerHTML, where an injected Mermaid init script never executes and "
             + "is not re-run across swaps, so the epics roadmap's <pre class=\"mermaid\"> degrades to readable "

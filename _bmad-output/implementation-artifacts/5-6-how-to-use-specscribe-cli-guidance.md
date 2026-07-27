@@ -4,7 +4,7 @@ baseline_commit: 5a96f711c8f10654e011cac23a5823079634d565
 
 # Story 5.6: How to use SpecScribe — CLI Generate and Watch Guidance
 
-Status: review
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -68,6 +68,16 @@ That comment is this story. Remove/replace it once the section lands.
   - [x] Add/extend a `SiteNavTests.cs` assertion for the updated quick-link blurb (Task 3) if an existing test pins the old string; otherwise add one.
   - [x] `how-to-read.html` is written on every full run ([HowToReadTemplater.cs:9](../../src/SpecScribe/HowToReadTemplater.cs): "Written on every full run"), so this story **will** move the golden content fingerprint ([SiteGeneratorAdapterTests.cs:224](../../tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs), `GenerateAll_GoldenContentFingerprint_IsStableAfterNormalizingVolatileTokens`). Regenerate it and record the new hash in Completion Notes. **Confirm the hash is stable across two clean runs before locking it into the test constant** (stale-build first-captured-hash trap — [memory: golden-diff-normalization-gotchas]).
   - [x] Run the full suite: `dotnet test` from repo root; all existing tests stay green.
+
+### Review Findings
+
+- [x] [Review][Patch] SiteNav quick-link blurb lists sections in stale order — "Reading order, glossary, and how to generate the site." names glossary before generate, but the rendered page order (this story's own RenderPage restructuring) is Reading order → Generate → Glossary/Commands. Fixed: reworded to "Reading order, how to generate the site, and glossary." in `SiteNav.cs` and the pinning assertion in `SiteNavTests.cs`. [src/SpecScribe/SiteNav.cs:198]
+- [x] [Review][Patch] Dangling "— and" grammar fragment in the no-module-content doc-subtitle — "Orientation for a first visit — and how to generate this site yourself." reads as an incomplete sentence next to the true-branch phrasing. Fixed: reworded to "Orientation for a first visit — including how to generate this site yourself." [src/SpecScribe/HowToReadTemplater.cs:62]
+- [x] [Review][Patch] Golden-fingerprint provenance comment miscounts the story's file set — says "this story's four files" but the story's own File List has five. Fixed: corrected to "five files". [tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs:980]
+- [x] [Review][Defer] Doc-subtitle/intro `hasModuleContent` gate can overclaim reading-order OR glossary content — `hasModuleContent = readingOrder.Length > 0 || reference.Length > 0` licenses copy that promises BOTH "the reading order" and "glossary below," but each half is independently gated; a modeled module with no reading-order pages (or, more rarely, no glossary/commands) gets copy promising a section that isn't there. Pre-existing ambiguity (the original single `sections.Length > 0` gate had the same shape); this story added a third promise ("then generate the site yourself") on top of it without tightening the check. [src/SpecScribe/HowToReadTemplater.cs:49-81] — deferred, pre-existing
+- [x] [Review][Defer] `<meta description>` tag never varies with `hasModuleContent` — it's built at the top of `RenderPage` before `hasModuleContent` is known, so it always claims "a suggested reading order... and a glossary of the terms used throughout" even on an undetected-module run where neither renders. Pre-existing (the original meta description was equally unconditional); this story only added the (always-true) generate clause to the same static string. [src/SpecScribe/HowToReadTemplater.cs:23-26] — deferred, pre-existing
+
+**⚠️ Verification blocked at patch time (2026-07-27):** `dotnet build` currently fails on unrelated, uncommitted concurrent-session work (`ImpactMapTemplater.cs` referencing undefined members also touched in `Charts.cs`/`HierarchyExplorer.cs`/`DashboardViewBuilder.cs` — none of which this story or its patches touch). Per this repo's shared-main convention, that in-progress work was left alone rather than reset/reverted. As a result the 3 patches above (all rendered-text changes to `how-to-read.html` and the sitewide quick-link tooltip band) could NOT be verified via `dotnet test`, and the golden content fingerprint constant was NOT regenerated — it is now stale on top of these patches in addition to whatever later sibling stories already moved it. **Re-run `dotnet test --filter FullyQualifiedName~GoldenContentFingerprint` once the build is unblocked**, regenerate the constant, and confirm it twice before locking in.
 
 ## Dev Notes
 

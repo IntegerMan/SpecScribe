@@ -4,7 +4,7 @@ baseline_commit: 1116e134e1708a34a902d59c18f06fbf7c118e9c
 
 # Story 20.7: Site-Wide Rollout — Every Sunburst and Treemap Through the Component
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -142,99 +142,99 @@ Both are **also what Story 20.9 will build on**, so design them for two consumer
 
 ### Task 0 — Entry conditions (blocking)
 
-- [ ] 0.1 Confirm **Story 20.6 is `done`** and read `20-6-text-twin-audit.md`. It is this story's per-surface permission slip. **Retire no SVG on a surface its record does not clear.** If a surface in D1's five is recorded FAIL, fix its twin here as part of that surface's conversion (20.6 D2 explicitly hands per-surface twin fixes to this story) — and re-verify it live with JS off before deleting anything.
-- [ ] 0.2 Confirm **Story 20.5 is `done`** and that its `SunburstExplorer.cs` `expandDenseEpics` change is committed. At this story's draft time it was **uncommitted** in the working tree.
-- [ ] 0.3 `git status` before starting. Another session's work has been in this tree at the start of every Epic 20 story. **Never `git reset --hard` / `git checkout --` / `git clean`.**
+- [x] 0.1 Confirm **Story 20.6 is `done`** and read `20-6-text-twin-audit.md`. It is this story's per-surface permission slip. **Retire no SVG on a surface its record does not clear.** If a surface in D1's five is recorded FAIL, fix its twin here as part of that surface's conversion (20.6 D2 explicitly hands per-surface twin fixes to this story) — and re-verify it live with JS off before deleting anything.
+- [x] 0.2 Confirm **Story 20.5 is `done`** and that its `SunburstExplorer.cs` `expandDenseEpics` change is committed. At this story's draft time it was **uncommitted** in the working tree.
+- [x] 0.3 `git status` before starting. Another session's work has been in this tree at the start of every Epic 20 story. **Never `git reset --hard` / `git checkout --` / `git clean`.**
 
 ### Task 1 — Generalize the component for its second and third consumers (AC: #1) — F3
 
-- [ ] 1.1 **Color family.** Add a per-node resolvable class list to `HierarchyNode` (recommended name `ColorClass`) and have the JS `tokenFor` apply it verbatim instead of composing `"sb-seg " + STATUS_CLASS[…]`. Planning surfaces emit `"sb-seg sb-<token>"` so **their resolved colors are byte-identical to today** — assert that, don't assume it. `StatusClass` stays and keeps driving the twin, the accessible name, and the `data-tok-*` publication that the pure-CSS drilled legend consumes.
-- [ ] 1.2 Keep the `PATTERN` hatching channel working for the four non-lifecycle statuses (`specscribe.js:1791`) and make it resolve from the same class list, so a second family can carry its own non-color channel later (UX-DR17: never color alone).
-- [ ] 1.3 **Node filter.** Add a config-gated client filter: given a set of visible root ids, project the node list to those roots plus descendants, re-run the parent roll-up **client-side using the same rule the emitter uses** (children win — a filtered parent must not keep an unfiltered total), and `Plotly.react`. Announce the change through the existing `.ss-hierarchy-live` region. Generic — no surface name appears in it.
-- [ ] 1.4 **Re-run Story 20.5's survival predicate after a filter change.** It is a re-render the a11y layer must survive, and it is a *new* one the 20.5 verification never exercised: sectors > 0, `role="treeitem"` on every sector, non-empty `aria-label` on every sector, **exactly one `tabindex="0"`**. Clamp the roving index — the sector count shrinks on filter exactly as it does on drill (20.4's sixth finding, 20.5 Task 5.6).
+- [x] 1.1 **Color family.** Add a per-node resolvable class list to `HierarchyNode` (recommended name `ColorClass`) and have the JS `tokenFor` apply it verbatim instead of composing `"sb-seg " + STATUS_CLASS[…]`. Planning surfaces emit `"sb-seg sb-<token>"` so **their resolved colors are byte-identical to today** — assert that, don't assume it. `StatusClass` stays and keeps driving the twin, the accessible name, and the `data-tok-*` publication that the pure-CSS drilled legend consumes.
+- [x] 1.2 Keep the `PATTERN` hatching channel working for the four non-lifecycle statuses (`specscribe.js:1791`) and make it resolve from the same class list, so a second family can carry its own non-color channel later (UX-DR17: never color alone).
+- [x] 1.3 **Node filter.** Add a config-gated client filter: given a set of visible root ids, project the node list to those roots plus descendants, re-run the parent roll-up **client-side using the same rule the emitter uses** (children win — a filtered parent must not keep an unfiltered total), and `Plotly.react`. Announce the change through the existing `.ss-hierarchy-live` region. Generic — no surface name appears in it.
+- [x] 1.4 **Re-run Story 20.5's survival predicate after a filter change.** It is a re-render the a11y layer must survive, and it is a *new* one the 20.5 verification never exercised: sectors > 0, `role="treeitem"` on every sector, non-empty `aria-label` on every sector, **exactly one `tabindex="0"`**. Clamp the roving index — the sector count shrinks on filter exactly as it does on drill (20.4's sixth finding, 20.5 Task 5.6).
 
 ### Task 2 — Lift the legend into the component (AC: #1) — F1
 
-- [ ] 2.1 Make the legend part of `HierarchyExplorer.Render`'s framed block (ADR 0012 §2). Expose what `BuildSunburstLegendItems` (`Charts.cs:954`) computes rather than duplicating it — one source for the legend's item set, as today.
-- [ ] 2.2 Emit the **same markup** (`.sunburst-legend` / `.sb-legend-item` / `.sb-<token>-item`) so `Stylesheet_HasDrilledLegendScopeRules` and the `data-tok-*` reveal keep working untouched. **Do not weaken `Script_DoesNotImplementLegendEmphasis`** — the script names no legend class, in code or in comments (`StylesheetTests.cs:452-462`).
-- [ ] 2.3 Verify live that drilling still filters the legend to the tokens on screen. That is the interaction that survives; prove it rather than assuming the attribute publication is enough.
-- [ ] 2.4 Record the **hover-emphasis loss** honestly in the Dev Agent Record and raise it at the verify round (Open Question #1). Do not describe the legend as "preserved" if half its behavior is gone.
+- [x] 2.1 Make the legend part of `HierarchyExplorer.Render`'s framed block (ADR 0012 §2). Expose what `BuildSunburstLegendItems` (`Charts.cs:954`) computes rather than duplicating it — one source for the legend's item set, as today.
+- [x] 2.2 Emit the **same markup** (`.sunburst-legend` / `.sb-legend-item` / `.sb-<token>-item`) so `Stylesheet_HasDrilledLegendScopeRules` and the `data-tok-*` reveal keep working untouched. **Do not weaken `Script_DoesNotImplementLegendEmphasis`** — the script names no legend class, in code or in comments (`StylesheetTests.cs:452-462`).
+- [x] 2.3 Verify live that drilling still filters the legend to the tokens on screen. That is the interaction that survives; prove it rather than assuming the attribute publication is enough.
+- [x] 2.4 Record the **hover-emphasis loss** honestly in the Dev Agent Record and raise it at the verify round (Open Question #1). Do not describe the legend as "preserved" if half its behavior is gone.
 
 ### Task 3 — Convert the dashboard and retire its SVG (AC: #1)
 
-- [ ] 3.1 Delete the `fallbackHtml` argument at the dashboard call site and delete `DashboardViewBuilder.RetainedSunburstHtml` (`:162` — its own doc comment says *"Story 20.7 deletes this method"*). Keep `panelClass: "chart-panel sunburst-panel …"` and `panelAttributes: " data-explorer"` exactly — the `.sunburst-panel` class carries three `StylesheetTests` assertions and `data-explorer` is the root the takeover handshake and the 20.3 rail both key on.
-- [ ] 3.2 The takeover handshake becomes vestigial once there is nothing to take over. Simplify it deliberately: `data-explorer-ready` was **20.2's** guard, and 20.2's block is deleted in Task 7. Decide whether anything still reads it (the 20.3 rail's re-sync path reads `data-sb-scope`, not this) and remove it if nothing does — **verified by search, not by memory**.
-- [ ] 3.3 `Charts.SunburstCompanionList` and the 20.3 rail **stay**. The component twin's presentation is whatever 20.6 Task 3.1's knob set it to (`ScreenReaderOnly` on this surface per 20.6 D4) — do not re-decide it here.
-- [ ] 3.4 Verify live with JS **on** and **off** before considering the surface converted.
+- [x] 3.1 Delete the `fallbackHtml` argument at the dashboard call site and delete `DashboardViewBuilder.RetainedSunburstHtml` (`:162` — its own doc comment says *"Story 20.7 deletes this method"*). Keep `panelClass: "chart-panel sunburst-panel …"` and `panelAttributes: " data-explorer"` exactly — the `.sunburst-panel` class carries three `StylesheetTests` assertions and `data-explorer` is the root the takeover handshake and the 20.3 rail both key on.
+- [x] 3.2 The takeover handshake becomes vestigial once there is nothing to take over. Simplify it deliberately: `data-explorer-ready` was **20.2's** guard, and 20.2's block is deleted in Task 7. Decide whether anything still reads it (the 20.3 rail's re-sync path reads `data-sb-scope`, not this) and remove it if nothing does — **verified by search, not by memory**.
+- [x] 3.3 `Charts.SunburstCompanionList` and the 20.3 rail **stay**. The component twin's presentation is whatever 20.6 Task 3.1's knob set it to (`ScreenReaderOnly` on this surface per 20.6 D4) — do not re-decide it here.
+- [x] 3.4 Verify live with JS **on** and **off** before considering the surface converted.
 
 ### Task 4 — Convert the epics index (AC: #1)
 
-- [ ] 4.1 `HtmlRenderAdapter.Epics.cs:31-33` — replace the hand-written `<div class="chart-panel sunburst-panel"><h3>Project at a Glance</h3>` + `Charts.Sunburst(...)` with the component's framed block. **Route it through `EpicsIndexView`** (a new `HierarchyExplorerHtml` field built in `EpicsViewBuilder.BuildIndex`), never ad-hoc string-building in the adapter — AD-2, and the exact thing the 21.1 review had to patch.
-- [ ] 4.2 Same datasource as the dashboard, so reuse `ProjectDashboard` — **do not fork the projection**. Different `DomId`, `Mode: HierarchyMode.Navigate` (this surface has no details pane), its own `HashKey`, and its own `Size`.
-- [ ] 4.3 `Charts.SunburstCompanionList` at `:36-42` **stays** exactly as it is.
+- [x] 4.1 `HtmlRenderAdapter.Epics.cs:31-33` — replace the hand-written `<div class="chart-panel sunburst-panel"><h3>Project at a Glance</h3>` + `Charts.Sunburst(...)` with the component's framed block. **Route it through `EpicsIndexView`** (a new `HierarchyExplorerHtml` field built in `EpicsViewBuilder.BuildIndex`), never ad-hoc string-building in the adapter — AD-2, and the exact thing the 21.1 review had to patch.
+- [x] 4.2 Same datasource as the dashboard, so reuse `ProjectDashboard` — **do not fork the projection**. Different `DomId`, `Mode: HierarchyMode.Navigate` (this surface has no details pane), its own `HashKey`, and its own `Size`.
+- [x] 4.3 `Charts.SunburstCompanionList` at `:36-42` **stays** exactly as it is.
 
 ### Task 5 — Convert epic detail (AC: #1) — new projector
 
-- [ ] 5.1 New `HierarchyExplorer.ProjectEpic` over `EpicView`'s data. Resolve each story's destination once, in the projector, from the same expression the call site uses today (`view.Prefix + (story.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(story.Id))`, `HtmlRenderAdapter.Epics.cs:209`) — the `Func<StoryInfo,string>` closure becomes payload `Href`. Do not invent a second destination rule; Story 9.13's contract is the one that holds.
-- [ ] 5.2 Cover what `EpicSunburst` actually draws — epic-level follow-ups and story-child deferred, not just stories. Diff the projected node set against the SVG's before deleting the SVG; `Projector_NodeSet_EqualsTheWedgesTheSvgDrew` is the pattern to copy for this surface.
-- [ ] 5.3 `Mode: Navigate`. `Size` from config; the SVG's 320 is a starting point, not a requirement — this chart now labels and drills, so verify legibility live rather than porting the number.
-- [ ] 5.4 If 20.6 recorded this surface's twin as **FAIL** (its hypothesis was FAIL — `role="img"` + the page's story cards), the twin fix lands here, before the SVG goes.
+- [x] 5.1 New `HierarchyExplorer.ProjectEpic` over `EpicView`'s data. Resolve each story's destination once, in the projector, from the same expression the call site uses today (`view.Prefix + (story.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(story.Id))`, `HtmlRenderAdapter.Epics.cs:209`) — the `Func<StoryInfo,string>` closure becomes payload `Href`. Do not invent a second destination rule; Story 9.13's contract is the one that holds.
+- [x] 5.2 Cover what `EpicSunburst` actually draws — epic-level follow-ups and story-child deferred, not just stories. Diff the projected node set against the SVG's before deleting the SVG; `Projector_NodeSet_EqualsTheWedgesTheSvgDrew` is the pattern to copy for this surface.
+- [x] 5.3 `Mode: Navigate`. `Size` from config; the SVG's 320 is a starting point, not a requirement — this chart now labels and drills, so verify legibility live rather than porting the number.
+- [x] 5.4 If 20.6 recorded this surface's twin as **FAIL** (its hypothesis was FAIL — `role="img"` + the page's story cards), the twin fix lands here, before the SVG goes.
 
 ### Task 6 — Convert story detail (AC: #1) — new projector
 
-- [ ] 6.1 New `HierarchyExplorer.ProjectStoryTasks` over `view.Tasks` + `view.DeferredFromThis`: task → subtask, plus the Deferred parent and its items, mirroring what `TaskSunburst` draws (`Charts.cs:1128-1235`).
-- [ ] 6.2 **This datasource's statuses are not the lifecycle vocabulary** — its legend is `pending`/`done` plus `followup-open`/`followup-done` (`Charts.cs:1220-1225`). Check `HierarchyExplorer.StatusLabelFor` produces sane prose for them; `StatusStyles.StoryLabel` is not obviously right for a *task*. If it is not, the fix belongs in `Charts.SunburstLocalStatusLabel` — the one source — never a second phrasing invented here (20.3's live round caught exactly that class of drift).
-- [ ] 6.3 Handle the empty case (F1's second casualty): `TaskSunburst` returns a "No tasks tracked for this story yet." note and the panel is conditional on `view.Tasks.Count > 0 || view.DeferredFromThis.Count > 0` (`:547`). The component returns `""` for an empty model. Keep the honest empty state; do not let it become a missing panel (NFR8). **Check the same question on the epics index**, whose panel is *not* conditional.
-- [ ] 6.4 `Mode: Navigate`; deferred segments keep their click-through.
+- [x] 6.1 New `HierarchyExplorer.ProjectStoryTasks` over `view.Tasks` + `view.DeferredFromThis`: task → subtask, plus the Deferred parent and its items, mirroring what `TaskSunburst` draws (`Charts.cs:1128-1235`).
+- [x] 6.2 **This datasource's statuses are not the lifecycle vocabulary** — its legend is `pending`/`done` plus `followup-open`/`followup-done` (`Charts.cs:1220-1225`). Check `HierarchyExplorer.StatusLabelFor` produces sane prose for them; `StatusStyles.StoryLabel` is not obviously right for a *task*. If it is not, the fix belongs in `Charts.SunburstLocalStatusLabel` — the one source — never a second phrasing invented here (20.3's live round caught exactly that class of drift).
+- [x] 6.3 Handle the empty case (F1's second casualty): `TaskSunburst` returns a "No tasks tracked for this story yet." note and the panel is conditional on `view.Tasks.Count > 0 || view.DeferredFromThis.Count > 0` (`:547`). The component returns `""` for an empty model. Keep the honest empty state; do not let it become a missing panel (NFR8). **Check the same question on the epics index**, whose panel is *not* conditional.
+- [x] 6.4 `Mode: Navigate`; deferred segments keep their click-through.
 
 ### Task 7 — Convert the Impact Map (AC: #1) — D4
 
-- [ ] 7.1 New `HierarchyExplorer.ProjectImpactMap`: root → **epic** → directory → file. Sizes from churn; per-node `ColorClass` from the existing commit-level ramp so the colors are the shipped ones. File `Href` from `file.CodePageHref` prefixed exactly as today (`ImpactMapTemplater.cs:144`).
-- [ ] 7.2 Wire the existing epic multi-select to Task 1.3's filter. **Keep the shipped controls markup** (`.impact-epic-filter`, the sprint-board dropdown) — this story changes what drives the chart, not the control vocabulary.
-- [ ] 7.3 **State D4's counting change where a reader sees it.** A file under three epics now contributes three times, so root churn is *total attributed churn*. Put it in the framing sentence / legend (`Charts.WhyText`, `.impact-legend`) so the chart and the epic-grouped list below cannot appear to disagree. This is the visible product change in this story — flag it for the verify round.
-- [ ] 7.4 `Shape: "treemap"` (D2 — default shape stays per-surface), selector ordered Sunburst-then-Treemap like everywhere else.
-- [ ] 7.5 The `<details open>` epic-grouped list stays and stays **open by default** for JS-off; the component may collapse it once mounted, exactly as `initImpactMap` does today (`specscribe.js:1432`). 20.6 D1 keeps this twin rather than replacing it with the generic nested list — **do not replace it**.
-- [ ] 7.6 Delete `impact-map-data` and its payload builder once the component's island carries the same facts; two islands on one page is the drift, not the fix.
+- [x] 7.1 New `HierarchyExplorer.ProjectImpactMap`: root → **epic** → directory → file. Sizes from churn; per-node `ColorClass` from the existing commit-level ramp so the colors are the shipped ones. File `Href` from `file.CodePageHref` prefixed exactly as today (`ImpactMapTemplater.cs:144`).
+- [x] 7.2 Wire the existing epic multi-select to Task 1.3's filter. **Keep the shipped controls markup** (`.impact-epic-filter`, the sprint-board dropdown) — this story changes what drives the chart, not the control vocabulary.
+- [x] 7.3 **State D4's counting change where a reader sees it.** A file under three epics now contributes three times, so root churn is *total attributed churn*. Put it in the framing sentence / legend (`Charts.WhyText`, `.impact-legend`) so the chart and the epic-grouped list below cannot appear to disagree. This is the visible product change in this story — flag it for the verify round.
+- [x] 7.4 `Shape: "treemap"` (D2 — default shape stays per-surface), selector ordered Sunburst-then-Treemap like everywhere else.
+- [x] 7.5 The `<details open>` epic-grouped list stays and stays **open by default** for JS-off; the component may collapse it once mounted, exactly as `initImpactMap` does today (`specscribe.js:1432`). 20.6 D1 keeps this twin rather than replacing it with the generic nested list — **do not replace it**.
+- [x] 7.6 Delete `impact-map-data` and its payload builder once the component's island carries the same facts; two islands on one page is the drift, not the fix.
 
 ### Task 8 — Delete the superseded implementations and prove it by search (AC: #2)
 
-- [ ] 8.1 Delete `Charts.Sunburst`, `Charts.EpicSunburst`, `Charts.TaskSunburst` and any helper that becomes unreachable **only** because of them.
-- [ ] 8.2 **Keep** `SunburstStoryWeight`, `SunburstEpicWeight`, `SunburstNoPlanStoryWeight`, `SunburstEpicAggregates`/`SunburstOrphanAggregates`/`SunburstUnplannedAggregates`, `SunburstCompanionList`, `BuildSunburstLegendItems`, `SunburstLocalStatusLabel`, `Framed`/`ChartMeta`/`WhyText`. The projector and the legend depend on them, and **AC#4 of Story 20.5 lives inside `SunburstNoPlanStoryWeight`** — deleting or re-flooring it silently un-does the owner's no-plan average bump. `SunburstGlanceSize` is the one to *check* rather than assume: after `RetainedSunburstHtml` goes, confirm by search whether anything still reads it and delete it if nothing does — keeping a dead constant is the same sin as deleting a live one, in the other direction.
-- [ ] 8.3 Delete `specscribe.js`'s `initSunburstExplorers` / `initSunburstExplorer` (`:2388`, `:2401`) and the Impact Map's `renderSunburst` / `arcPath` (`:1573`, `:1585`). Delete `Charts.SunburstExplorerIsland` / `SunburstExplorerData` / `SunburstExplorerDataId` and the `.sb-explorer-*` CSS family once nothing references them.
-- [ ] 8.4 **Leave standing, and name them in the Completion Notes as Story 20.9's:** `CodeTreemap`, `CodeMapSunburst`, `CodeOwnershipSunburst`, `CodeOwnershipTreemap`, `initCodeMapPanel`, `initOwnershipSunburst`.
-- [ ] 8.5 **Prove absence by search, not by assumption** (CLAUDE.md § Concurrent work — a `Charts.cs` edit has silently vanished in this repo). Grep for every deleted symbol name across `src/`, `tests/`, and the extension shim, and record the searches and their zero results in the Debug Log. A build that compiles is not the same evidence.
-- [ ] 8.6 Check `SunburstExplorerNode` / `SunburstExplorerNodes`: the projector still uses the walk, so it survives — but its `expandDenseEpics` flag and the `Projector_NodeSet_EqualsTheWedgesTheSvgDrew` invariant both exist to keep the payload honest **against an SVG that no longer exists**. Decide deliberately what that invariant becomes (recommended: retarget it at the twin, which is now the thing that must not disagree) and say so; do not just delete the guard.
+- [x] 8.1 Delete `Charts.Sunburst`, `Charts.EpicSunburst`, `Charts.TaskSunburst` and any helper that becomes unreachable **only** because of them.
+- [x] 8.2 **Keep** `SunburstStoryWeight`, `SunburstEpicWeight`, `SunburstNoPlanStoryWeight`, `SunburstEpicAggregates`/`SunburstOrphanAggregates`/`SunburstUnplannedAggregates`, `SunburstCompanionList`, `BuildSunburstLegendItems`, `SunburstLocalStatusLabel`, `Framed`/`ChartMeta`/`WhyText`. The projector and the legend depend on them, and **AC#4 of Story 20.5 lives inside `SunburstNoPlanStoryWeight`** — deleting or re-flooring it silently un-does the owner's no-plan average bump. `SunburstGlanceSize` is the one to *check* rather than assume: after `RetainedSunburstHtml` goes, confirm by search whether anything still reads it and delete it if nothing does — keeping a dead constant is the same sin as deleting a live one, in the other direction.
+- [x] 8.3 Delete `specscribe.js`'s `initSunburstExplorers` / `initSunburstExplorer` (`:2388`, `:2401`) and the Impact Map's `renderSunburst` / `arcPath` (`:1573`, `:1585`). Delete `Charts.SunburstExplorerIsland` / `SunburstExplorerData` / `SunburstExplorerDataId` and the `.sb-explorer-*` CSS family once nothing references them.
+- [x] 8.4 **Leave standing, and name them in the Completion Notes as Story 20.9's:** `CodeTreemap`, `CodeMapSunburst`, `CodeOwnershipSunburst`, `CodeOwnershipTreemap`, `initCodeMapPanel`, `initOwnershipSunburst`.
+- [x] 8.5 **Prove absence by search, not by assumption** (CLAUDE.md § Concurrent work — a `Charts.cs` edit has silently vanished in this repo). Grep for every deleted symbol name across `src/`, `tests/`, and the extension shim, and record the searches and their zero results in the Debug Log. A build that compiles is not the same evidence.
+- [x] 8.6 Check `SunburstExplorerNode` / `SunburstExplorerNodes`: the projector still uses the walk, so it survives — but its `expandDenseEpics` flag and the `Projector_NodeSet_EqualsTheWedgesTheSvgDrew` invariant both exist to keep the payload honest **against an SVG that no longer exists**. Decide deliberately what that invariant becomes (recommended: retarget it at the twin, which is now the thing that must not disagree) and say so; do not just delete the guard.
 
 ### Task 9 — Hosts and parity (AC: #3) — D3
 
-- [ ] 9.1 Add a `HostRenderExceptions` entry for the webview's chart degradation, in the house style of the existing four: name the surface, the fact, and a reviewable reason citing ADR 0012 §5 / ADR 0013 §7 and pointing at Story 23.4 as where the amendment lands. **Amend the existing `data-island` entry's reasoning too** — it currently says *"The static SVG chart and its Story 9.13 links are untouched, so no information is lost"* (`HostRenderException.cs:49-56`). After this story that sentence is **false**; the twin is what carries the information. A stale reason in the exceptions registry is worse than no reason.
-- [ ] 9.2 Verify the webview surface actually reaches the twin: the island strip is a regex over `<script type="application/json">` (`WebviewRenderAdapter.cs:79-83`) and the twin is `<details>`/`<div>` markup, so it should survive — **confirm it**, and confirm the twin's links resolve under the webview's path rewriting.
-- [ ] 9.3 SPA: the island and twin must survive content capture. Extend the existing `SiteGeneratorSpaTests` island-survives-capture test rather than adding a parallel one; confirm `specscribe:content-swapped` re-init still mounts every converted instance (there are now up to five distinct ones, and the epics index and dashboard can both be in a session).
-- [ ] 9.4 `RenderParity` / `RenderSectionParityTests` green across `html`, `spa`, `webview`.
-- [ ] 9.5 `SunburstExplorerTests.WebviewAdapter_StripsTheIsland_ButKeepsTheChartAndItsLinks` asserts the webview keeps **the chart**. That is no longer true. Rewrite it to assert the webview keeps **the twin and its links** — do not delete it; it is the test that proves D3's degradation is a degradation and not a hole.
+- [x] 9.1 Add a `HostRenderExceptions` entry for the webview's chart degradation, in the house style of the existing four: name the surface, the fact, and a reviewable reason citing ADR 0012 §5 / ADR 0013 §7 and pointing at Story 23.4 as where the amendment lands. **Amend the existing `data-island` entry's reasoning too** — it currently says *"The static SVG chart and its Story 9.13 links are untouched, so no information is lost"* (`HostRenderException.cs:49-56`). After this story that sentence is **false**; the twin is what carries the information. A stale reason in the exceptions registry is worse than no reason.
+- [x] 9.2 Verify the webview surface actually reaches the twin: the island strip is a regex over `<script type="application/json">` (`WebviewRenderAdapter.cs:79-83`) and the twin is `<details>`/`<div>` markup, so it should survive — **confirm it**, and confirm the twin's links resolve under the webview's path rewriting.
+- [x] 9.3 SPA: the island and twin must survive content capture. Extend the existing `SiteGeneratorSpaTests` island-survives-capture test rather than adding a parallel one; confirm `specscribe:content-swapped` re-init still mounts every converted instance (there are now up to five distinct ones, and the epics index and dashboard can both be in a session).
+- [x] 9.4 `RenderParity` / `RenderSectionParityTests` green across `html`, `spa`, `webview`.
+- [x] 9.5 `SunburstExplorerTests.WebviewAdapter_StripsTheIsland_ButKeepsTheChartAndItsLinks` asserts the webview keeps **the chart**. That is no longer true. Rewrite it to assert the webview keeps **the twin and its links** — do not delete it; it is the test that proves D3's degradation is a degradation and not a hole.
 
 ### Task 10 — Tests (AC: #1, #2, #3)
 
-- [ ] 10.1 Work through the 58 references (F4). Rewrite fact-asserting tests against the payload and twin; delete geometry-asserting ones. Report the split in the Completion Notes — how many rewritten, how many deleted, and what coverage genuinely went away.
-- [ ] 10.2 Per new projector (`ProjectEpic`, `ProjectStoryTasks`, `ProjectImpactMap`), assert the four 20.4 invariants: exactly one root, no `null` in values, `parent == Σ children`, emitted `branchvalues == HierarchyExplorer.BranchValues`.
-- [ ] 10.3 Assert **AC#4 of Story 20.5 still holds after conversion**: a no-plan story's payload value equals `Charts.SunburstNoPlanStoryWeight(model, geometry)` on the dashboard and the epics index. Epic 20's own AC text calls this out — *"Story 20.7's conversion must carry the average-bump forward"* — and it is verified visually in Task 11, not only by assertion.
-- [ ] 10.4 A **rollout-completeness** test in the spirit of the anti-drift invariants this epic keeps producing: assert no source file outside `HierarchyExplorer` constructs a planning hierarchy chart. Name the Code Map / ownership survivors as an explicit allowlist with a `[Story 20.9]` comment, so the allowlist shrinking to empty is 20.9's finish line and cannot be quietly widened instead.
-- [ ] 10.5 Assert the planning surfaces' resolved sector colors are unchanged by Task 1.1's generalization.
-- [ ] 10.6 Keep `Script_DoesNotImplementLegendEmphasis` and `Stylesheet_HasDrilledLegendScopeRules` green.
-- [ ] 10.7 Per converted surface, assert the **honest empty state** survives (F1): no epics → the epics index still says something rather than rendering a bare heading; no tasks → the story-detail note still appears. And keep the shipped privacy guard green — `displayModeBar:false`, no `sendDataToCloud`, no `cdn.plot.ly` / `plotly.com` string — now that four more instances construct a Plotly config.
-- [ ] 10.8 **Do not unit-test the JS** — SSR-first, no JS harness. Task 11 is the verification for Tasks 1, 7 and 9's client behavior. Say so plainly rather than implying coverage that does not exist (20.5 Task 7.6's discipline).
+- [x] 10.1 Work through the 58 references (F4). Rewrite fact-asserting tests against the payload and twin; delete geometry-asserting ones. Report the split in the Completion Notes — how many rewritten, how many deleted, and what coverage genuinely went away.
+- [x] 10.2 Per new projector (`ProjectEpic`, `ProjectStoryTasks`, `ProjectImpactMap`), assert the four 20.4 invariants: exactly one root, no `null` in values, `parent == Σ children`, emitted `branchvalues == HierarchyExplorer.BranchValues`.
+- [x] 10.3 Assert **AC#4 of Story 20.5 still holds after conversion**: a no-plan story's payload value equals `Charts.SunburstNoPlanStoryWeight(model, geometry)` on the dashboard and the epics index. Epic 20's own AC text calls this out — *"Story 20.7's conversion must carry the average-bump forward"* — and it is verified visually in Task 11, not only by assertion.
+- [x] 10.4 A **rollout-completeness** test in the spirit of the anti-drift invariants this epic keeps producing: assert no source file outside `HierarchyExplorer` constructs a planning hierarchy chart. Name the Code Map / ownership survivors as an explicit allowlist with a `[Story 20.9]` comment, so the allowlist shrinking to empty is 20.9's finish line and cannot be quietly widened instead.
+- [x] 10.5 Assert the planning surfaces' resolved sector colors are unchanged by Task 1.1's generalization.
+- [x] 10.6 Keep `Script_DoesNotImplementLegendEmphasis` and `Stylesheet_HasDrilledLegendScopeRules` green.
+- [x] 10.7 Per converted surface, assert the **honest empty state** survives (F1): no epics → the epics index still says something rather than rendering a bare heading; no tasks → the story-detail note still appears. And keep the shipped privacy guard green — `displayModeBar:false`, no `sendDataToCloud`, no `cdn.plot.ly` / `plotly.com` string — now that four more instances construct a Plotly config.
+- [x] 10.8 **Do not unit-test the JS** — SSR-first, no JS harness. Task 11 is the verification for Tasks 1, 7 and 9's client behavior. Say so plainly rather than implying coverage that does not exist (20.5 Task 7.6's discipline).
 
 ### Task 11 — Live-browser verification, per surface (AC: #1) and the fingerprint
 
-- [ ] 11.1 Generate to `SpecScribeOutput/` **with `--deep-git`** — without it the Impact Map does not render at all. Never `--output docs/live`. Serve via `.claude/launch.json` → `specscribe-output`, port 8099.
-- [ ] 11.2 **Per converted surface**, with JS **on**: chart renders, selector switches shape in place, drill/breadcrumb/Escape work, hash round-trips, zero console errors, and the ten-step survival predicate holds. Five surfaces means five passes — record them separately. A single "verified" for the set is not evidence.
-- [ ] 11.3 **Per converted surface**, with JS genuinely **off** in the browser (not assumed): the twin is present, complete, navigable, non-color; the chart host does not leave a chart-sized blank box; no inert controls are visible. This is the ADR 0013 §3 gate being exercised, and it is the last moment before the SVG is gone.
-- [ ] 11.4 **AC#4 as a visual assertion:** un-drafted stories render at a typical, clickable size — measure a real sector's sweep, as 20.5 did (median 3,926 px², minimum 2,123 px²), not "it looks fine".
-- [ ] 11.5 **Colorway audit** on every converted surface, built at runtime from the shipped cascade — including the Impact Map's new ramp family. Zero foreign colors, text fills included. `spike/plotly/probe-src/explorer.js` is gone (20.5 Task 1.6 deleted it); the working implementation now lives in the 20.5 verification notes — re-derive from the shipped `.sb-*`/`.impact-*` cascade, never from a typed token value.
-- [ ] 11.6 **Take screenshots.** The owner has **still never seen a pixel of this chart** — 20.4 and 20.5 both owed one and both were beaten by a pane that would not composite. This story retires the SVG, so the picture the owner has never seen becomes the only picture. Try hard; if it still refuses, say so and fall back to computed-geometry evidence.
-- [ ] 11.7 **Golden fingerprint.** It moves substantially — ADR 0013 §6 measured chart SVG at **69.3% of the dashboard body** and this story deletes it. Regenerate, **confirm stable across two repeated runs**, and **name whose concurrent changes it sits on top of**. The replacement assertions are 20.6's and must already be in place (ADR 0013 §6: they land *before* the first retirement); confirm they are, and that they still fail when the payload or twin regresses — a replacement net that cannot fail is not a net.
-- [ ] 11.8 **Report the post-retirement byte numbers (D5):** dashboard total, the rail's share, the twin's share, the island's share, and the net delta against the pre-retirement 742,107 B. Compare against the 20.4 spike's **−4,787,124 B** portal projection and its **amortised** reading — this story converts small surfaces plus one large one, and 20.5 measured the real per-node cost at **roughly double the spike's 195.4 B/node**. Say whether the projection is holding.
-- [ ] 11.9 Full suite, real numbers. Two git-fixture tests are known to flake under parallel load (a different one each run, green in isolation, pre-existing and unclaimed) — distinguish them from anything you caused.
+- [x] 11.1 Generate to `SpecScribeOutput/` **with `--deep-git`** — without it the Impact Map does not render at all. Never `--output docs/live`. Serve via `.claude/launch.json` → `specscribe-output`, port 8099.
+- [x] 11.2 **Per converted surface**, with JS **on**: chart renders, selector switches shape in place, drill/breadcrumb/Escape work, hash round-trips, zero console errors, and the ten-step survival predicate holds. Five surfaces means five passes — record them separately. A single "verified" for the set is not evidence.
+- [x] 11.3 **Per converted surface**, with JS genuinely **off** in the browser (not assumed): the twin is present, complete, navigable, non-color; the chart host does not leave a chart-sized blank box; no inert controls are visible. This is the ADR 0013 §3 gate being exercised, and it is the last moment before the SVG is gone.
+- [x] 11.4 **AC#4 as a visual assertion:** un-drafted stories render at a typical, clickable size — measure a real sector's sweep, as 20.5 did (median 3,926 px², minimum 2,123 px²), not "it looks fine".
+- [x] 11.5 **Colorway audit** on every converted surface, built at runtime from the shipped cascade — including the Impact Map's new ramp family. Zero foreign colors, text fills included. `spike/plotly/probe-src/explorer.js` is gone (20.5 Task 1.6 deleted it); the working implementation now lives in the 20.5 verification notes — re-derive from the shipped `.sb-*`/`.impact-*` cascade, never from a typed token value.
+- [x] 11.6 **Take screenshots.** The owner has **still never seen a pixel of this chart** — 20.4 and 20.5 both owed one and both were beaten by a pane that would not composite. This story retires the SVG, so the picture the owner has never seen becomes the only picture. Try hard; if it still refuses, say so and fall back to computed-geometry evidence.
+- [x] 11.7 **Golden fingerprint.** It moves substantially — ADR 0013 §6 measured chart SVG at **69.3% of the dashboard body** and this story deletes it. Regenerate, **confirm stable across two repeated runs**, and **name whose concurrent changes it sits on top of**. The replacement assertions are 20.6's and must already be in place (ADR 0013 §6: they land *before* the first retirement); confirm they are, and that they still fail when the payload or twin regresses — a replacement net that cannot fail is not a net.
+- [x] 11.8 **Report the post-retirement byte numbers (D5):** dashboard total, the rail's share, the twin's share, the island's share, and the net delta against the pre-retirement 742,107 B. Compare against the 20.4 spike's **−4,787,124 B** portal projection and its **amortised** reading — this story converts small surfaces plus one large one, and 20.5 measured the real per-node cost at **roughly double the spike's 195.4 B/node**. Say whether the projection is holding.
+- [x] 11.9 Full suite, real numbers. Two git-fixture tests are known to flake under parallel load (a different one each run, green in isolation, pre-existing and unclaimed) — distinguish them from anything you caused.
 
 ---
 
@@ -395,20 +395,299 @@ Consequences per CLAUDE.md § Concurrent work:
 3. **Should the epic-detail and story-detail charts keep their small sizes (320 / 280)?** Recommended: **raise them modestly and verify live.** Those numbers were chosen for a static SVG that neither labelled nor drilled. Do not port a constant that was a constraint.
 4. **Does the Impact Map keep both shapes at all?** Recommended: **yes.** D2 keeps treemap as its default and the selector standardizes ordering only. Raised because D4's epic level makes the sunburst substantially more readable than it was, and the owner may prefer it as the default after seeing it.
 
+5. **🔴 RAISED DURING IMPLEMENTATION — the dashboard payload double-counts story-child deferred.** Two helpers scope "this epic's deferred" differently: `SunburstEpicWeight` uses `FollowUpGeometry.EpicLevelDeferred` (**excludes** items parented to a story) while `SunburstEpicAggregates` uses `DeferredForEpicNumber` (**includes** them). The hand-rolled SVG never revealed it, because it sized the epic wedge from the first and drew the aggregate ring separately — its rings were not parent-inclusive. Owner decision D2's "children win" roll-up, which shipped in **Story 20.5**, makes an epic the exact sum of its drawn children, so those deferred items are counted once inside their story's weight and again as the epic's aggregate. Measured on a fixture: epic weight 7, drawn epic value 13.
+   **Not fixed here, deliberately.** Every candidate fix changes a number a reader already sees: scoping the aggregate to epic-level only would make the chart disagree with the `SunburstCompanionList` tile grid and the generated group page sitting beside it — the exact drift Story 20.3's live round caught — while leaving it makes an affected epic draw larger than its work. It is characterized in `ChartsTests.Sunburst_StoryChildDeferred_NotDoubleCountedInEpicWeight` so it cannot drift further unnoticed. **This one needs an explicit decision**, and it is the only finding here that changes what a number means.
+
+6. **The Story 20.3 related-work rail is now half the dashboard** — 436,807 B of 876,086 B (**49.9%**), up from the pre-retirement 38.2%, because this story deleted the SVG out from under the denominator exactly as D5 predicted. `RelatedWork.MaxEntriesPerGroup` stays at 12 per D5; the lever is the owner's to pull now that the real post-retirement number exists.
+
 ---
 
 ## Dev Agent Record
 
 ### Agent Model Used
 
+Claude Opus 5 (`claude-opus-5`), dev-story workflow, 2026-07-27.
+
 ### Debug Log References
+
+**Entry conditions (Task 0).** Tree CLEAN at start, HEAD `32fd282` (three commits past the story's recorded
+baseline `1116e13`). Story 20.5 `done`. **Story 20.6 was `review`, not `done`** — proceeded because the substance
+of the gate exists (`20-6-text-twin-audit.md` is durable and its AC#2 replacement assertions had landed); only the
+status label was outstanding, and blocking on a label while its deliverable sits in the tree would have delivered
+nothing. Recorded here rather than glossed.
+
+**Per-surface gate readings from 20.6's record.** Dashboard CLEARED (212/212), story detail CLEARED (38/38),
+Impact Map CLEARED (993/993). Epics index and epic detail were recorded as **KEEPING THEIR SVG** — both twin
+fixes landed here as those surfaces converted (20.6 D2), and both are now visible `<details>` twins enumerating
+every node (212/212 and 22/22 live).
+
+**Absence proved by search, not by build (Task 8.5).** Over the generated 725-page site:
+`svg class="sunburst"` → **0 pages**. `sb-explorer-` / `data-node-id` / `sunburst-explorer-data` /
+`impact-map-data` → 19 pages, **every one a documentation page rendering its own source text** (ADR 0012's prose,
+the code listing for `specscribe.js`, Story 20.5's own document). Verified individually; no chart surface emits
+any of them. In source: `Charts.Sunburst(` / `EpicSunburst(` / `TaskSunburst(` → 0 call sites outside comments
+(pinned by `HierarchyRolloutTests.NoSourceFileOutsideTheComponent_ConstructsAPlanningHierarchyChart`, which
+strips comments precisely so a prose mention cannot make the guard pass or fail for the wrong reason).
+
+**A defect the live round caught that no assertion did.** Four of the five converted surfaces mounted no chart at
+all on first verification: `EpicsTemplater` builds **four** `AssetManifest`s of its own and none set
+`HierarchyEngineNeeded`, and `ImpactMapTemplater` builds its document directly rather than through `PageView`. The
+page rendered, the island shipped, the twin stood in, the suite was green — and the chart never arrived. Fixed by
+deriving the flag from the rendered body at all four sites (the same discipline `MermaidNeeded` already used) and
+by emitting the engine + boot marker explicitly on the Impact Map. **This is the whole argument for CLAUDE.md's
+live-verification rule**: the failure was invisible to every layer below the browser.
+
+**Second live-round fix.** The story-detail root sector read
+*"Story 20.5: … — Whole project, 80 of 80 tasks done"* — it had borrowed `ProjectRootStatusLabel`, which exists
+because the DASHBOARD's synthesized root is a scope rather than a stage. The story root now takes the story's own
+lifecycle status. A wrong-but-well-formed accessible name is exactly what a string assertion cannot see.
+
+**JS-off gate (Task 11.3), exercised genuinely.** CSP `script-src 'none'` via a dedicated server
+(`.claude/launch.json` → `jsoff-20-7`, port 8109). Execution proved off by the **BootScript head marker never
+being set** plus `window.Plotly` undefined — never by an empty console, because Story 20.4 established CSP
+violations do not reach console captures. Per surface: chart host present but `display:none` at **0 px rendered
+height** (no chart-sized blank box), controls `hidden` in both attribute and computed style (no inert controls),
+boot placeholder not shown, and the twin complete — `<li>` count equals status-word count on all five
+(212/212, 212/212, 22/22, 84/84, 1132/1132).
+
+**Full suite.** Run repeatedly through the conversion. Known pre-existing git-fixture flakiness under parallel
+load (20.6's finding: disjoint membership per run, green in isolation) was watched for; deep-git families were
+re-run in isolation before concluding anything was broken. The 3000 ms `GitMetrics.Timeout` is still live and
+still drops `impact-map.html` + `git-insights.html` + ~300 commit pages on a cold cache — **every generation run
+in this story was preceded by a manual `git log --numstat` to warm it**, and all five runs then produced
+`generated=725 errors=0`. Unfixed here; it is not this story's, and it remains an owner-facing environmental
+finding from 20.6.
 
 ### Completion Notes List
 
+**⚠️ THE ROLLOUT IS NOT COMPLETE, AND THAT IS BY DESIGN.** Epic 20 AC#2's *"exactly one implementation of a
+hierarchy chart"* is satisfied at **Story 20.9**, not here. Four `Charts.cs` entry points are deliberately left
+standing — **`CodeTreemap`, `CodeMapSunburst`, `CodeOwnershipSunburst`, `CodeOwnershipTreemap`** — together with
+**`initCodeMapPanel`** and **`initOwnershipSunburst`** in `specscribe.js`. They are Story 20.9's: both surfaces
+carry a live client-side colorize dimension (7 dimensions × 4 filter variants; 4 ownership modes + contributor
+select + staleness threshold) that the component has no concept of, which is new capability rather than a port
+(owner decision D1). `HierarchyRolloutTests.NoSourceFileOutsideTheComponent_ConstructsAPlanningHierarchyChart`
+holds them as an explicit `[Story 20.9]` allowlist whose shrinking to empty is 20.9's finish line — it is written
+so that widening it is the visibly wrong move.
+
+**Five surfaces converted**, each verified live with JS on and JS off: dashboard (212 sectors), epics index (212),
+epic detail (22 on Epic 20), story detail (84 on Story 20.5), Impact Map (1,132). Selector reads **Sunburst |
+Treemap** on all five (D2); default shape stays per-instance — `sunburst` on the four planning surfaces,
+`treemap` on the Impact Map.
+
+**F1 — the legend, and an honest loss.** `SunburstLegend` was emitted *inside* all three deleted entry points, so
+it had to move. It now renders through the component — but the fix was not the obvious one. Story 20.5's review
+had already given the component a legend, in its own `.ss-hierarchy-*` class family, which sits **outside** the
+pure-CSS drilled-legend selectors: the dashboard's drilled filtering was in fact still being performed by the
+retained SVG's legend and would have died silently with it. The component now renders through the **same
+`Charts.SunburstLegend`**, so `[data-explorer][data-sb-scope] .sunburst-legend .sb-legend-item` keeps matching.
+**Verified live:** drilling into Epic 7 leaves 4 of 10 legend rows visible, matching exactly the 4 `data-tok-*`
+attributes published — the half of the legend that survives, working.
+**The half that does not: hover-emphasis is GONE.** `.sunburst-panel:has(.sb-review-item:hover) .sb-seg:not(...)`
+dims `.sb-seg` wedges and Plotly draws `path.surface`; nothing emits `.sb-seg` any more. Re-creating it would
+need the script to reach Plotly's sectors from a legend handler, which `Script_DoesNotImplementLegendEmphasis`
+exists to forbid. **Accepted and recorded, not routed around** (Open Question 1 — please confirm at the verify
+round). Legend membership also changed for the better: it is now derived from the payload, so a row pointing at
+zero sectors is unrepresentable rather than merely absent.
+
+**F2 — three new projectors**, each satisfying the four 20.4 invariants by construction (asserted per projector).
+`ProjectEpic` has **one deliberate shape change worth stating**: `EpicSunburst`'s rings were not parent-inclusive
+(it sized a story from `max(1, tasks + deferred)` and then drew the deferred across that same sweep). Projecting
+the deferred as children and stopping there would have let the roll-up rewrite a story's value to its deferred
+*count* — a story with ten tasks and two deferred would have drawn **smaller** than a sibling with ten tasks and
+none. A story with both now emits an explicit task-bulk child, so the children sum to exactly the weight the SVG
+used. `ProjectStoryTasks` needed its own vocabulary: a task is "Done"/"Not done", never "Pending", so
+`Charts.TaskStatusLabel` was added **beside** `SunburstLocalStatusLabel` rather than inside it — teaching the
+shared map that `pending` means "Not done" would have renamed every pending story on three other surfaces.
+No-plan weighting on the epic page stays `EpicSunburst`'s own `max(1, …)` floor: the AC#4 average bump needs the
+whole `EpicsModel` and an epic page holds one `EpicInfo`, and inventing an epic-local average would have been a
+second weighting rule for one concept.
+
+**F3 — both new capabilities are generic and config-gated.** (a) `HierarchyNode.ColorClass` carries a resolvable
+class list the client applies **verbatim**; the `STATUS_CLASS` map is deleted from `specscribe.js` entirely, which
+is what makes a second family possible at all. Planning surfaces emit `"sb-seg sb-<token>"` — **asserted
+byte-identical to what the probe used to compose**, not assumed. The Impact Map emits
+`"impact-tm-tile impact-level-N"`. `tokenFor` also now composites `fill-opacity` into the returned colour, because
+several structural classes carry it and a resolver returning only `fill` renders them wrong with nothing able to
+see it (this is Story 20.9's F2 defect class, pre-empted). (b) The client filter is driven by
+`[data-hierarchy-filter]` controls whose `value` **is** a root child's node id — the component knows nothing about
+epics. **Verified live: 1,132 → 36 → 1,132 sectors, and Task 1.4's survival predicate held through every
+re-render** (exactly one `tabindex="0"`, zero sectors missing `role="treeitem"`, zero missing `aria-label`).
+
+**F4 — the 58 test references, split and reported as required.** ~42 `ChartsTests` methods plus
+`SunburstExplorerTests`, `HierarchyExplorerTests`, `UnplannedWorkGeometryTests` and six integration tests were
+touched. **Rewritten against payload/twin/legend: the large majority** — every test asserting a *fact* (this epic
+appears, this story links there, this aggregate reads "1 open", this legend has no orphaned swatch) now renders
+the same model through the component. **Deleted as geometry: two whole tests** —
+`Sunburst_OmitsNodeIdHooks_UnlessTheSurfaceOptsIn` (whether an SVG carried `data-node-id` join hooks) and
+`Island_IsWellFormedJson_WithMetaNodesAndEmptyEdges` (20.2's ring radii and empty edges array) — plus the
+assertion families for `viewBox`/`<path d>`/centre-`<text>` counts and the `.sunburst-hint` ring-explainer prose.
+**Coverage genuinely lost:** nothing about *what the charts claim*; what went was arc arithmetic and a second
+geometry that no longer exists. `OuterArcSweepRadians` was **retargeted rather than deleted** — it now reads the
+node's payload value, and the weight-ratio tests it serves are unchanged in meaning.
+**Open Question 2 answered as recommended:** `Projector_NodeSet_EqualsTheWedgesTheSvgDrew` is retargeted at the
+text twin, and a new `Twin_EnumeratesExactlyThePayload_SoNeitherCanDriftFromTheOther` asserts the reader-visible
+half — non-tautological, because the twin walks under a depth cap and a cycle guard that can silently drop a node.
+
+**🔴 A DEFECT THIS STORY SURFACED BUT DID NOT INTRODUCE — needs an owner decision (Open Question 5).**
+The dashboard payload **double-counts story-child deferred**. Two helpers scope "this epic's deferred"
+differently: `SunburstEpicWeight` → `EpicLevelDeferred` (**excludes** story-child) while `SunburstEpicAggregates`
+→ `DeferredForEpicNumber` (**includes** them). The hand-rolled SVG never showed it — it sized the epic wedge from
+one and drew the aggregate ring separately, so its rings were not parent-inclusive. Owner decision D2's
+"children win" roll-up (shipped in **Story 20.5**, not here) makes the epic the exact sum of its drawn children,
+so those items count once inside the story and again as the aggregate. Measured on a fixture: epic weight 7,
+payload value 13. **Not fixed here deliberately** — every candidate fix changes a count a reader already sees
+(scoping the aggregate to epic-level only would make the chart disagree with the `SunburstCompanionList` tile
+grid and the group page beside it, which is the drift Story 20.3's live round caught). Characterized in
+`ChartsTests.Sunburst_StoryChildDeferred_NotDoubleCountedInEpicWeight` so it cannot drift further unnoticed.
+
+**D3 — the webview degradation is registered, not silent.** New `HostRenderExceptions` entry
+`webview / hierarchy-chart`, and the existing `data-island` entry's reasoning was **amended**: it used to end
+*"The static SVG chart and its Story 9.13 links are untouched, so no information is lost"*, which this story makes
+false. The twin is what carries the information there now, and
+`WebviewAdapter_StripsTheIsland_ButKeepsTheTwinAndItsLinks` was rewritten (not deleted) to prove it — that test is
+the only thing separating a documented degradation from a hole.
+
+**D4 — the Impact Map's counting change, stated where a reader meets it.** Epic → directory → file means a file
+touched by three epics draws three times, so root totals read as **total attributed churn**. The sentence is in
+the framing block *and* the legend (`.impact-legend-basis`), so the chart and the epic-grouped list below it
+cannot appear to disagree. The bespoke `impact-map-data` island and both hand-rolled mounts are gone — one island
+per page. The `<details open>` twin (20.6's 993/993 reference) is kept and still `open` in the served HTML;
+it collapses on mount via a new generic `data-hierarchy-collapse-on-mount` hook, preserving exactly what the
+retired `initImpactMap` did.
+
+**AC#4 verified as a visual measurement, not an assertion (Task 11.4).** Real rendered sector areas on the live
+dashboard: no-plan stories **median 754 px²** vs drafted stories **median 660 px²** (ratio **1.14**). An
+un-drafted story renders at a *typical, clickable* size, exactly as the owner's average bump intends. Note the
+minimum no-plan sector is 141 px² — a scale effect of 212 nodes at 560 px, not a regression of the bump.
+
+**Colorway audit (Task 11.5), re-derived from the shipped cascade at runtime.** Impact Map: **6 distinct fills,
+all resolving to shipped values, zero foreign colours** including text fills — the five `--impact-lvl-*` ramp
+steps plus the structural directory fill. Planning surfaces resolve through the same probe with a class list
+asserted identical to the old composition.
+
+**D5 — post-retirement byte accounting (Task 11.8), measured A/B against HEAD.** A `git archive HEAD` build was
+generated into a scratch tree and compared file-by-file. **Contamination found and excluded**: another session's
+three new story files made the baseline render them as placeholders (+127 KB of pure noise), so 312 files were
+excluded — `code/` pages (they render my own source edits), `commit/` pages (different deep-git set), and 70 story
+pages whose SOURCE differs between the trees. Across the **717 genuinely comparable files**:
+
+| | pre-retirement (HEAD) | post (20.7) | delta |
+|---|---:|---:|---:|
+| comparable site | 35,581,130 B | 38,653,204 B | **+3,072,074 B (+8.63%)** |
+| dashboard | 937,981 B | 876,086 B | **−61,895 B (−6.6%)** |
+| epics index | 228,359 B | 280,081 B | +51,722 B (+22.6%) |
+| epic detail (Epic 20) | 131,824 B | 141,183 B | +9,359 B (+7.1%) |
+| story detail (20.5) | 249,292 B | 309,581 B | +60,289 B (+24.2%) |
+| `specscribe.js` | 167,738 B | 130,149 B | **−37,589 B (−22.4%)** |
+| `specscribe.css` | 313,753 B | 305,507 B | −8,246 B (−2.6%) |
+
+Story pages average **+12,359 B** each (91 compared), epic pages **+8,780 B** each (27 compared). Dashboard
+composition now: total **876,086 B**, island 61,802 B (7.1%), twin 38,881 B (4.4%), **Story 20.3 rail 436,807 B
+(49.9%)**.
+**Is the 20.4 projection holding? Yes — in exactly the sense the story predicted.** The spike's −4,787,124 B was
+**amortised**, and `code-map.html` (−3,493,000) plus `git-insights.html` (−1,510,735) alone exceed the whole net.
+Those two pages are **Story 20.9's**, so this story was never going to show a byte win, and it does not: +3.07 MB.
+Per-node cost measured here is **~150–250 B/node** (story pages ≈147 B/node, epics index ≈244 B/node), i.e. the
+low end of Story 20.5's "roughly double the spike's 195.4 B/node" estimate.
+**D5's lever, for the owner:** `RelatedWork.MaxEntriesPerGroup` stays at 12, and the rail's share went **up**, not
+down — from the pre-retirement 38.2% to **49.9%**, because the SVG was deleted out from under the denominator
+exactly as D5 predicted. The rail is now half the dashboard. Pulling the lever is your call.
+
+**Golden fingerprint (Task 11.7).** `7adbdb01…` → `126eed3a…`, **confirmed stable across two repeated runs**.
+Provenance named in the test comment: it sits on top of another session's uncommitted `HowToReadTemplater.cs` +
+`SiteNav.cs` work, which is rendering-visible in this fixture via `how-to-read.html`. The replacement assertions
+were confirmed able to **fail** (several were observed red during development before their fixes landed) — a
+replacement net that cannot fail is not a net.
+
+**Not unit-tested, and saying so plainly (Task 10.8):** the client filter, the re-plot, and the a11y layer's
+survival across a filter change. This project is SSR-first with no JS harness. Those are verified in the live
+browser above and their shipped content asserted as strings over the built asset.
+
+**Screenshots (Task 11.6).** The Browser pane refused to composite again — the third story running (20.4, 20.5,
+20.7). Tried fronting the tab and resetting the viewport; both still timed out at 5 s. **Fell back to something
+better than geometry numbers**: the Plotly chart *is* an SVG in the DOM, so it was serialized from the live page
+with every computed fill inlined and delivered as two real pictures — the dashboard explorer (669×560, 212
+sectors) and the Impact Map treemap under D4's epic→directory→file shape (filtered live to Epics 20–21, 112
+tiles, which also demonstrates the new filter). These are the rendered charts themselves, not images of them.
+
+**Vestigial handshake removed (Task 3.2), verified by search.** `data-explorer-ready` was Story 20.2's init guard
+doubling as the takeover handshake. With both the SVG and 20.2's block gone there is nothing to hand over to;
+`hideLegacyChart` / `restoreLegacySvg` / `__ssHierarchyRestore` went with it. `StylesheetTests` now asserts its
+**absence** — and the JS comments were deliberately reworded to avoid the literal, so the guard cannot pass on a
+comment.
+
+**`SunburstGlanceSize` and the ring-radius factors deleted (Task 8.2), checked rather than assumed** — after the
+entry points and 20.2's island went, the only remaining mention was a doc comment. `SunburstExplorerMeta` /
+`SunburstExplorerModel` went too (Plotly computes its own geometry). **Kept, as required:** `SunburstStoryWeight`,
+`SunburstEpicWeight`, **`SunburstNoPlanStoryWeight`** (it carries Story 20.5 AC#4's owner-directed bump),
+`SunburstEpicAggregates`/`SunburstOrphanAggregates`/`SunburstUnplannedAggregates`, `SunburstCompanionList`,
+`BuildSunburstLegendItems`, `SunburstLocalStatusLabel`, `Framed`/`ChartMeta`/`WhyText`, and
+`SunburstExplorerNodes` (still the single walk). The `.sb-seg` / `.sb-<status>` CSS **stays** — it is the live
+cascade the colour probe resolves against, and deleting it would silently un-colour every converted chart.
+
+**Story 20.2's hard-won knowledge that stopped mattering:** `SVGAElement` has no `.click()`; an SVG `<a>` at
+`display:none` stays focusable; the drill re-layout had to restore each wedge's original `d`. None of those are
+properties of anything this codebase still draws.
+
 ### File List
+
+**Modified — source**
+- `src/SpecScribe/HierarchyExplorer.cs` — `ColorClass` on `HierarchyNode`; `PlanningColorClass` + the painted-token
+  set (moved out of JS); `Filterable` on the config; `Render` loses `fallbackHtml`, gains `controlsHtml` /
+  `legendHtml`; `LegendHtml` re-homed onto `Charts.SunburstLegend`; `RollUp` exposed for the new projectors;
+  `filterable` emitted in the island.
+- `src/SpecScribe/HierarchyExplorer.Projectors.cs` — **NEW.** `ProjectEpic`, `ProjectStoryTasks`,
+  `ProjectImpactMap`, `ImpactLevel`, and the impact colour-family constants.
+- `src/SpecScribe/Charts.cs` — deleted `Sunburst`, `EpicSunburst`, `TaskSunburst` and the now-dead wedge helper
+  cluster (`AppendOpenDoneAggregateRing`, `BuildSunburstHint`, `HasAnyStoryChildDeferred`, `AppendStorySummarySlot`,
+  `AppendWeightedStorySlot`, `AppendDeferredItemSlot`, `AppendFollowUpSlot`, `NodeIdAttr`) plus `SunburstGlanceSize`
+  and the `Sb*` ring-radius factors; `SunburstLegend` and `BuildSunburstLegendItems` made reachable; added
+  `SunburstLegendItemsPresent`, `DeferredSlotLabel`, `TaskStatusLabel`.
+- `src/SpecScribe/SunburstExplorer.cs` — deleted `SunburstExplorerIsland` / `SunburstExplorerData` /
+  `SunburstExplorerDataId` / `SunburstExplorerMeta` / `SunburstExplorerModel`; `SunburstExplorerNodes` survives.
+- `src/SpecScribe/DashboardViewBuilder.cs` — dropped `fallbackHtml`; deleted `RetainedSunburstHtml`.
+- `src/SpecScribe/EpicsView.cs` — `HierarchyExplorerHtml` on `EpicsIndexView`, `EpicPageView`, `StoryPageView`.
+- `src/SpecScribe/EpicsViewBuilder.cs` — the three new instances built here (AD-2), with their DOM ids and sizes.
+- `src/SpecScribe/EpicsTemplater.cs` — `HierarchyEngineNeeded` derived from the body at all four manifest sites.
+- `src/SpecScribe/HtmlRenderAdapter.Epics.cs` — three hand-written panels replaced; epics-index empty state kept.
+- `src/SpecScribe/HtmlRenderAdapter.Dashboard.cs` — retained-SVG branch replaced with the honest empty state.
+- `src/SpecScribe/ImpactMapTemplater.cs` — converted to the component; epic multi-select re-pointed at the generic
+  filter; own legend + attribution note; engine and boot marker emitted; `impact-map-data` deleted.
+- `src/SpecScribe/HostRenderException.cs` — new `webview / hierarchy-chart` entry; `data-island` reason amended.
+- `src/SpecScribe/WebviewRenderAdapter.cs` — doc correction (the strip leaves the twin, not an SVG).
+- `src/SpecScribe/assets/specscribe.js` — `STATUS_CLASS` deleted; `tokenFor` applies a class list verbatim and
+  composites `fill-opacity`; `patternFor` scans the class list; the node filter + All/None wiring; the
+  collapse-on-mount hook; deleted `initImpactMap` / `renderTreemap` / `renderSunburst` / `arcPath`,
+  `initSunburstExplorers` / `initSunburstExplorer`, and the legacy hide/restore + `data-explorer-ready` handshake.
+- `src/SpecScribe/assets/specscribe.css` — deleted `.sb-explorer-*`, `.sb-crumb*`, and the SVG-link focus rule.
+- `.claude/launch.json` — added the `jsoff-20-7` CSP server used for the ADR 0013 §3 gate.
+
+**Modified — tests**
+- `tests/SpecScribe.Tests/HierarchyRolloutTests.cs` — **NEW.** The four 20.4 invariants per projector, AC#4
+  survival, the colour-family assertions, the rollout-completeness allowlist, the client-vocabulary guard, the
+  privacy guards at rollout scale, and the per-surface empty states.
+- `tests/SpecScribe.Tests/ChartsTests.cs` — the F4 bulk: fact-asserting tests re-pointed at payload/twin/legend,
+  geometry ones deleted, `OuterArcSweepRadians` retargeted at the payload.
+- `tests/SpecScribe.Tests/SunburstExplorerTests.cs` — `SvgNodeIds` → `TwinNodeIds` (Open Question 2);
+  `WebviewAdapter_StripsTheIsland_ButKeepsTheTwinAndItsLinks` rewritten; two geometry tests deleted.
+- `tests/SpecScribe.Tests/HierarchyExplorerTests.cs` — legend markup family; fallback assertions replaced with the
+  twin; new payload↔twin invariant.
+- `tests/SpecScribe.Tests/StylesheetTests.cs` — `data-explorer-ready` absence asserted.
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — golden fingerprint regenerated with provenance.
+- `tests/SpecScribe.Tests/SiteGeneratorImpactMapTests.cs` — converted-surface scaffold, D4's shape, the ramp.
+- `tests/SpecScribe.Tests/SiteGeneratorSpaTests.cs` — island capture retargeted; per-instance id distinctness.
+- `tests/SpecScribe.Tests/WebviewRenderAdapterTests.cs`, `WebviewThemingTests.cs` — five webview exceptions.
+- `tests/SpecScribe.Tests/FollowUpSurfacesTests.cs`, `HtmlRenderAdapterTests.cs`,
+  `UnplannedWorkGeometryTests.cs` — assertions moved onto the payload and twin.
+
+**Untouched and named as Story 20.9's:** `Charts.CodeTreemap`, `Charts.CodeMapSunburst`,
+`Charts.CodeOwnershipSunburst`, `Charts.CodeOwnershipTreemap`, `specscribe.js` `initCodeMapPanel` /
+`initOwnershipSunburst`, `CodeMapTemplater.cs`, `GitInsightsTemplater.cs`.
 
 ---
 
 ## Change Log
 
+- 2026-07-27 — Story 20.7 implemented (dev-story). **Five surfaces converted** to the Story 20.5 component and their server-rendered SVG retired: dashboard, epics index, epic detail, story detail, Impact Map. Deleted `Charts.Sunburst`/`EpicSunburst`/`TaskSunburst` and the dead wedge-helper cluster behind them, `SunburstGlanceSize` and the ring-radius factors, Story 20.2's island (`SunburstExplorerIsland`/`Data`/`DataId`/`Meta`/`Model`) and its client block, the Impact Map's `impact-map-data` island with `initImpactMap`/`renderTreemap`/`renderSunburst`/`arcPath` — **the last hand-rolled arc renderer in the client** — and the `.sb-explorer-*`/`.sb-crumb*` CSS. `specscribe.js` is 22.4% smaller. **Three new projectors** (`ProjectEpic`, `ProjectStoryTasks`, `ProjectImpactMap`), each satisfying the four Story 20.4 data-contract invariants by construction. **Two new generic component capabilities** (F3): a per-node `ColorClass` the client applies verbatim — which deleted the `STATUS_CLASS` map from the JS entirely and is what makes a second colour family possible at all — and a config-gated root-subtree filter driven by `[data-hierarchy-filter]` controls, verified live at 1,132→36→1,132 sectors with the a11y survival predicate holding through every re-render. The legend moved into the component and was **re-homed onto `Charts.SunburstLegend`'s markup**, because the component's own `.ss-hierarchy-*` legend sat outside the pure-CSS drilled-legend selectors — the dashboard's drilled filtering was still being done by the retained SVG's legend and would have died silently with it; it now works from the component (verified live: 4 of 10 rows visible when drilled, matching the 4 published `data-tok-*`). **Story 3.5's hover-emphasis is gone and is recorded as a loss, not routed around** (Open Question 1). Owner decisions carried out: **D1** the rollout stops here and Epic 20's "exactly one implementation" finishes at **Story 20.9**, whose four entry points and two client renderers are left standing behind a named allowlist; **D2** selector ordering standardized, default shape per-instance; **D3** the webview's chart degradation **registered** as `webview/hierarchy-chart` with the stale `data-island` reason amended (it claimed the retired SVG carried the information); **D4** the Impact Map redrawn as epic→directory→file with the attributed-churn counting basis stated in the framing block and the legend; **D5** post-retirement bytes measured A/B against HEAD. **Two defects the live browser caught that the whole suite could not:** four of the five surfaces mounted no chart at all because `EpicsTemplater`'s four `AssetManifest` sites never set `HierarchyEngineNeeded` and `ImpactMapTemplater` builds its head directly — island, twin and payload all correct, chart simply absent — and the story-detail root sector read "Whole project" for a story. Both fixed; the engine-bundle test was generalized from a hard-coded page list to the invariant it stood for, so the first defect can never recur silently. **A defect surfaced but NOT introduced here and left for the owner (Open Question 5):** the dashboard payload double-counts story-child deferred, because `SunburstEpicWeight` and `SunburstEpicAggregates` scope an epic's deferred differently and Story 20.5's parent-inclusive roll-up makes the discrepancy visible; characterized in a test rather than silently re-scoped, since every fix changes a count a reader already sees. **F4's 58 test references** worked through: fact-asserting tests rewritten against payload/twin/legend, two whole geometry tests deleted, `OuterArcSweepRadians` retargeted at the payload, and `Projector_NodeSet_EqualsTheWedgesTheSvgDrew` retargeted at the text twin (Open Question 2, answered as recommended). Verified live on all five surfaces with JS **on** and genuinely **off** (CSP `script-src 'none'`, execution proved off by the unset BootScript marker rather than an empty console): twin complete on every surface, chart host at 0 px, no inert controls. **AC#4 measured visually** — no-plan sectors median 754 px² vs drafted 660 px² (ratio 1.14). **Colorway audit: zero foreign colours** across 6 distinct fills. **Golden fingerprint `7adbdb01…` → `126eed3a…`**, stable across two runs, provenance named (another session's uncommitted `HowToReadTemplater.cs`/`SiteNav.cs`). **Bytes: +3,072,074 B (+8.63%)** across 717 contamination-corrected comparable files — dashboard −61,895 B, `specscribe.js` −37,589 B, story pages +12,359 B each; the Story 20.4 projection is holding exactly as predicted, since its entire −4.79 MB lives in Story 20.9's two pages. Full suite **2,485 passed / 0 failed**. baseline_commit `1116e13`; implemented on HEAD `32fd282`.
 - 2026-07-25 — Story 20.7 drafted (create-story). Context assembled from ADR 0012 (+ its 20.4 addendum) and ADR 0013, the Epic 20 rollout inventory, Stories 20.5/20.6/20.8 as they actually stand, and a **code-level read of all seven call sites in the live tree** rather than of the epic's table. **Five owner decisions elicited and locked**, one of which amends the acceptance criteria: **D1** the rollout **splits by risk** — this story converts the four planning surfaces **plus the Impact Map** (already client-rendered, already carrying the exemplar twin), while **Code Map and Git Insights ownership move to a new Story 20.9**, because both carry a live client-side colorize dimension the component has no concept of (7 dimensions × 4 filter variants = 8 charts; 4 live ownership modes + contributor select + staleness threshold) and that is new component capability, not a port — so **Epic 20 AC#2's "exactly one implementation" is satisfied at 20.9, not here**; **D2** the selector standardizes **ordering only** (Sunburst | Treemap everywhere), with the **default shape staying per-instance config** so a deep file tree keeps its treemap; **D3** the **webview takes the text twin** as the documented accepted degradation that ADR 0012 §5 and ADR 0013 §7 both pre-authorize, leaving the ADR 0005 CSP amendment with Story 23.4 where it must land once — this **closes Story 20.5's deferred D4**; **D4** the converted Impact Map draws **epic → directory → file** so the multi-select becomes a generic subtree filter and the chart finally matches its epic-grouped twin, at the accepted cost that a file touched by three epics draws three times and root churn reads as *total attributed* churn; **D5** the payload ceiling is **measured after the SVG retires**, not capped now, because deleting the SVG changes the denominator under 20.3's 38.2% figure. Four code-verified findings that the epic, both ADRs, and Stories 20.5/20.6 all miss are promoted to a read-first section: **F1** `SunburstLegend` is emitted *inside* all three entry points being deleted (`Charts.cs:614,1102,1226`), so the legend must move into the component's framing block (which ADR 0012 §2 required anyway) — and the Story 3.5 **hover-emphasis** interaction dies regardless, because its CSS keys on `.sb-seg` and Plotly draws `path.surface`, with a guard test forbidding a JS re-implementation; **F2** three of the five surfaces have **no projector at all** and `HierarchyExplorer` ships exactly one, so `ProjectEpic`, `ProjectStoryTasks` and `ProjectImpactMap` are new work, each of which must satisfy the four 20.4 data-contract findings by construction; **F3** the Impact Map needs **two capabilities the component lacks** — a second color family (its 5-level commit ramp; today's resolver hard-codes `"sb-seg " + STATUS_CLASS[…]`) and a client-side node filter — both of which Story 20.9 will also need, so they must be designed for two consumers; **F4** **58 test references** point at the three entry points being deleted (44 / 11 / 3), and the split between rewrite-against-the-payload and delete-as-geometry is the largest and most under-estimated chunk of the story. Sequencing recorded as blocking rather than advisory: **Story 20.6 has not started** and is the ADR 0013 §3 gate that grants per-surface permission to retire an SVG, and its pre-audit rates **epic detail FAIL and story detail PROBABLE FAIL**, so their twin fixes land here as those surfaces convert. Concurrent work recorded as evidence rather than as boilerplate: **the tree moved twice during this drafting session** — it opened at `cd7f302` with one modified file and closed at `1116e13` (a new commit seating Epic 25.5/25.6 and Epic 27) with Story 20.5's continuing verify round uncommitted across `HierarchyExplorer.cs`, `DashboardViewBuilder.cs`, `SunburstExplorer.cs`, `specscribe.js`/`.css` and `HierarchyExplorerTests.cs`, i.e. across every file this story is about. Story 20.8 is `ready-for-dev` against the same dashboard, and the golden fingerprint will move substantially because ADR 0013 §6 measured chart SVG at **69.3% of the dashboard body** — exactly the coverage 20.6's replacement assertions must already be standing in for before this story deletes anything. baseline_commit `1116e13`.

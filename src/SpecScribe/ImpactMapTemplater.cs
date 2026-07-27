@@ -23,12 +23,61 @@ public static class ImpactMapTemplater
         var outputPath = SiteNav.ImpactMapOutputPath;
         var prefix = PathUtil.RelativePrefix(outputPath); // "" — impact-map.html is at the output root.
 
+        var ranking = data.TotalAnalyzedCommits > 0
+            ? $"{data.AttributedCommitCount.ToString("N0", CultureInfo.InvariantCulture)} of {data.TotalAnalyzedCommits.ToString("N0", CultureInfo.InvariantCulture)} analyzed commits correlated to a story or epic"
+            : null;
+
+        var meta = new Charts.ChartMeta(
+            Title: "Code Areas Touched",
+            Ranking: ranking,
+            Why: Charts.WhyText(Charts.ChartMetric.PlanningCodeImpact),
+            // Owner decision D4's counting basis, stated in the framing block a reader actually reads. The chart
+            // is now grouped BY EPIC, so a file touched by three epics contributes to three subtrees and the
+            // totals are attributed churn rather than distinct-file churn. Without this sentence the chart and the
+            // epic-grouped list below it appear to disagree about how much changed. [Story 20.7 Task 7.3]
+            Note: $"{ImpactAttributionNote} {Charts.PlanningCodeImpactNote}");
+
+        var config = new HierarchyExplorerConfig(
+            DomId: HierarchyDomId,
+            // Owner decision D2: the SELECTOR ORDERING standardizes site-wide (Sunburst | Treemap), the DEFAULT
+            // SHAPE stays per-instance. A deep file tree reads better as rectangles, and demoting that to match
+            // the planning surfaces would be a regression dressed as consistency.
+            Shape: "treemap",
+            Mode: HierarchyMode.Navigate,
+            HashKey: "impact",
+            Size: HierarchySize,
+            Labels: true,
+            Meta: meta,
+            // The epic-grouped <details> list below IS this surface's twin — Story 20.6 audited it at 993/993 and
+            // called it the reference implementation, and 20.6 D1 keeps it rather than replacing it with the
+            // component's generic nested list. So the component's own twin is the accessibility-tree copy, not a
+            // third visible listing.
+            TwinDisplay: HierarchyTwinDisplay.ScreenReaderOnly,
+            Filterable: true);
+
+        var model = HierarchyExplorer.ProjectImpactMap(epics, data, prefix, config);
+        var explorerHtml = HierarchyExplorer.Render(
+            model,
+            panelClass: "chart-panel impact-panel",
+            panelAttributes: " data-explorer",
+            controlsHtml: BuildEpicFilterControls(epics, data),
+            // This surface does not speak `--status-*`, so it keeps its own size/colour legend rather than a
+            // lifecycle legend that would describe nothing on screen.
+            legendHtml: BuildImpactLegend());
+
+        // The document is assembled only now, because the anti-flash boot marker has to be in <head> — it must run
+        // while the body is still parsing, which is the only moment it can suppress the swap the reader would
+        // otherwise watch. This page builds its own head rather than going through PageView, so the marker rides
+        // `extraHead`; the adapter emits the same script on the same terms for every other converted surface.
+        var hasChart = HierarchyExplorer.ContainsHost(explorerHtml);
+
         var sb = new StringBuilder();
         sb.Append(PathUtil.RenderHeadOpen(
             $"Impact Map — {nav.SiteTitle}",
             prefix + ForgeOptions.StylesheetName,
             prefix + ForgeOptions.ScriptName,
-            $"Planning-to-code impact map for {nav.SiteTitle} — an interactive treemap of which code areas each epic's commits touched, sized by churn and colored by commit activity."));
+            $"Planning-to-code impact map for {nav.SiteTitle} — an interactive treemap of which code areas each epic's commits touched, sized by churn and colored by commit activity.",
+            extraHead: hasChart ? HierarchyExplorer.BootScript : null));
         sb.Append(nav.RenderNavBar(outputPath, nav.BuildDeliveryLocalContext(outputPath)));
         sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[] { ("Home", "index.html"), ("Impact Map", null) }));
 
@@ -36,17 +85,9 @@ public static class ImpactMapTemplater
         sb.Append("<h1>Planning &#8596; Code Impact Map</h1>\n");
         sb.Append($"<p class=\"doc-subtitle\">{PathUtil.Html(nav.SiteTitle)} &middot; the code areas each epic's work actually touched</p>\n\n");
 
-        var ranking = data.TotalAnalyzedCommits > 0
-            ? $"{data.AttributedCommitCount.ToString("N0", CultureInfo.InvariantCulture)} of {data.TotalAnalyzedCommits.ToString("N0", CultureInfo.InvariantCulture)} analyzed commits correlated to a story or epic"
-            : null;
-
-        sb.Append(Charts.Framed(
-            new Charts.ChartMeta(
-                Title: "Code Areas Touched",
-                Ranking: ranking,
-                Why: Charts.WhyText(Charts.ChartMetric.PlanningCodeImpact),
-                Note: Charts.PlanningCodeImpactNote),
-            BuildInteractiveBody(epics, data, prefix)));
+        sb.Append(hasChart
+            ? explorerHtml
+            : Charts.Framed(meta, "<div class=\"chart-empty\">No commits could be correlated to a story or epic yet.</div>\n"));
 
         // The epic-grouped text list is the accessible text-equivalent + no-JS fallback (it IS the whole content
         // with the script off). Open by default so a no-JS visitor sees it; the script collapses it once the
@@ -55,7 +96,11 @@ public static class ImpactMapTemplater
         // wrapper was pure duplication. [Story 21.3; a11y text-twin discipline] [Review][Patch]
         if (data.HasAnyFiles)
         {
-            sb.Append("<details class=\"chart-panel impact-fallback\" id=\"impact-fallback\" open>\n");
+            // `data-hierarchy-collapse-on-mount`: the component closes this once its chart is live, which is
+            // exactly what the retired `initImpactMap` did. `open` in the served HTML is the load-bearing half —
+            // a JS-off visitor gets the full listing with no interaction at all (ADR 0013 §2), and Story 20.6
+            // audited THIS list at 993/993 as the reference twin, so it is kept rather than replaced.
+            sb.Append("<details class=\"chart-panel impact-fallback\" id=\"impact-fallback\" data-hierarchy-collapse-on-mount open>\n");
             sb.Append("  <summary>All touched files, grouped by epic</summary>\n");
             sb.Append(Charts.ImpactMapBody(epics, data, prefix));
             sb.Append("</details>\n\n");
@@ -63,36 +108,51 @@ public static class ImpactMapTemplater
 
         sb.Append("</main>\n\n");
         sb.Append(PathUtil.RenderFooter());
+        // The vendored plotly.js hierarchy engine. This page builds its own document rather than going through
+        // PageView/AssetManifest, so the flag-driven emission in HtmlRenderAdapter never reaches it — the engine
+        // is appended here on the same terms: AFTER the body, a local file reference, never a CDN (NFR-3).
+        // Conditional on the block actually carrying a host, so a deep-git-less run that renders the honest empty
+        // note ships no engine it cannot use. [Story 20.7 Task 7]
+        if (hasChart)
+        {
+            sb.Append($"<script src=\"{prefix}{ForgeOptions.HierarchyEngineScriptName}\"></script>\n");
+        }
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
     }
 
-    /// <summary>The framed body: the interactive controls (epic multi-select + legend) the script reveals, the
-    /// treemap mount point the script fills, and the embedded JSON payload it reads. All progressive-enhancement —
-    /// emitted <c>hidden</c> / empty so a no-JS visitor sees nothing broken here and falls through to the text list.</summary>
-    private static string BuildInteractiveBody(EpicsModel epics, PlanningCodeImpactData data, string prefix)
+    /// <summary>DOM id of this page's Hierarchy Explorer instance.</summary>
+    internal const string HierarchyDomId = "impact-hierarchy";
+
+    /// <summary>Chart size. Larger than the planning surfaces': this is a file tree, and its treemap default has
+    /// far more leaves to label.</summary>
+    internal const int HierarchySize = 620;
+
+    /// <summary>Owner decision D4's counting basis, in the reader's own words. See the call site.</summary>
+    internal const string ImpactAttributionNote =
+        "Grouped by epic, so a file touched by several epics appears under each — totals are attributed churn, not distinct-file churn.";
+
+    /// <summary>The epic multi-select, unchanged in markup from Story 21.3 — the SAME sprint-board dropdown
+    /// component, the same classes, the same wording. What changed is only what it drives: it used to feed a
+    /// bespoke merge-and-relayout in <c>initImpactMap</c>, and now it feeds the component's generic root-subtree
+    /// filter.
+    ///
+    /// <para>Each checkbox gains <c>data-hierarchy-filter</c> and a <c>value</c> that IS the node id of the epic it
+    /// controls. That pairing is the whole contract: the component knows nothing about epics, only that a checked
+    /// filter control names a root child to keep. <see cref="HierarchyExplorerConfig.Filterable"/> gates it.</para>
+    ///
+    /// <para>It rides inside the component's own <c>hidden</c> control bar, so it is revealed by the same
+    /// successful mount as the shape selector — a JS-off visitor still never sees a dead control.
+    /// [Story 20.7 Task 7.2]</para></summary>
+    private static string BuildEpicFilterControls(EpicsModel epics, PlanningCodeImpactData data)
     {
         var attributedEpics = epics.Epics
             .Where(e => data.FilesByEpic.ContainsKey(e.Number))
             .OrderBy(e => e.Number)
             .ToList();
-
-        if (attributedEpics.Count == 0)
-        {
-            // Deep-git ran but nothing correlated → honest empty note (mirrors ImpactMapBody's own degrade).
-            return "<div class=\"chart-empty\">No commits could be correlated to a story or epic yet.</div>\n";
-        }
+        if (attributedEpics.Count == 0) return string.Empty;
 
         var sb = new StringBuilder();
-
-        // Controls: an epic multi-select dropdown (the SAME sprint-epic-filter <details> component the sprint board
-        // uses), a Treemap|Sunburst view toggle (the board-tabs pure-CSS radio toggle used on the Code Map/Ownership
-        // pages), and a size/color legend. Hidden until the script confirms it can drive the shapes (a no-JS visitor
-        // never sees dead controls — the risk-quadrant pager's reveal pattern; the text list below is the fallback).
-        sb.Append("<div class=\"impact-controls\" hidden>\n");
-
-        // Epic multi-select — reuse the sprint board's dropdown markup + styles so it reads identically. Server-
-        // rendered (we know the epic roster at build time) and wired to the treemap/sunburst by the script.
         sb.Append("  <details class=\"sprint-epic-filter impact-epic-filter\">\n");
         sb.Append("    <summary class=\"sprint-epic-filter-summary\" aria-label=\"Choose which epics to include\">\n");
         sb.Append("      <span class=\"sprint-epic-filter-label\">Epics</span>\n");
@@ -103,53 +163,24 @@ public static class ImpactMapTemplater
         foreach (var epic in attributedEpics)
         {
             var title = PathUtil.Html(PathUtil.StripHtmlTags(epic.Title));
-            sb.Append($"      <label class=\"sprint-epic-filter-opt\"><input type=\"checkbox\" class=\"impact-epic-toggle\" value=\"{epic.Number}\" checked> Epic {epic.Number} &middot; {title}</label>\n");
+            sb.Append($"      <label class=\"sprint-epic-filter-opt\"><input type=\"checkbox\" class=\"impact-epic-toggle\" data-hierarchy-filter value=\"epic-{epic.Number}\" checked> Epic {epic.Number} &middot; {title}</label>\n");
         }
         sb.Append("    </div>\n");
         sb.Append("  </details>\n");
+        return sb.ToString();
+    }
 
-        sb.Append("  <div class=\"impact-legend\">\n");
-        sb.Append("    <span class=\"impact-legend-item\"><span class=\"impact-legend-size\"></span> Size = lines changed (churn)</span>\n");
-        sb.Append("    <span class=\"impact-legend-item impact-legend-color\">Color = commits touching the area <span class=\"impact-legend-ramp\"><i class=\"impact-level-1\"></i><i class=\"impact-level-2\"></i><i class=\"impact-level-3\"></i><i class=\"impact-level-4\"></i><i class=\"impact-level-5\"></i></span> few &rarr; many</span>\n");
-        sb.Append("  </div>\n");
+    /// <summary>This surface's own legend — size and the five-level commit ramp — kept verbatim from Story 21.3.
+    /// The component's status legend would have described a `--status-*` vocabulary no sector on this page carries.
+    /// [Story 20.7 Task 7.3]</summary>
+    private static string BuildImpactLegend()
+    {
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"impact-legend\">\n");
+        sb.Append("  <span class=\"impact-legend-item\"><span class=\"impact-legend-size\"></span> Size = lines changed (churn)</span>\n");
+        sb.Append("  <span class=\"impact-legend-item impact-legend-color\">Color = commits touching the area <span class=\"impact-legend-ramp\"><i class=\"impact-level-1\"></i><i class=\"impact-level-2\"></i><i class=\"impact-level-3\"></i><i class=\"impact-level-4\"></i><i class=\"impact-level-5\"></i></span> few &rarr; many</span>\n");
+        sb.Append($"  <span class=\"impact-legend-item impact-legend-basis\">{ImpactAttributionNote}</span>\n");
         sb.Append("</div>\n");
-
-        // The two shape mount points, preceded by the Treemap|Sunburst view toggle. The toggle's radios live INSIDE
-        // this wrapper so the pure-CSS `:has(:checked)` visibility swap can see them (the Code Map's exact pattern —
-        // the radios must be a descendant of the element whose children they show/hide). The script renders an SVG
-        // into each mount; empty (with role/aria) without JS. [Story 21.3]
-        sb.Append("<div class=\"impact-shapes\">\n");
-        sb.Append("  <div class=\"board-tabs impact-shape-tabs\">\n");
-        sb.Append("    <input type=\"radio\" id=\"impact-view-treemap\" name=\"impact-view\" class=\"board-tab-radio\" checked>\n");
-        sb.Append("    <input type=\"radio\" id=\"impact-view-sunburst\" name=\"impact-view\" class=\"board-tab-radio impact-sunburst-radio\">\n");
-        sb.Append("    <div class=\"board-tabbar\">\n");
-        sb.Append("      <label for=\"impact-view-treemap\" class=\"board-tab\">Treemap</label>\n");
-        sb.Append("      <label for=\"impact-view-sunburst\" class=\"board-tab\">Sunburst</label>\n");
-        sb.Append("    </div>\n");
-        sb.Append("  </div>\n");
-        sb.Append("  <div class=\"impact-shape impact-shape-treemap\" id=\"impact-treemap\" role=\"img\" aria-label=\"Interactive treemap of code files touched, sized by lines changed and colored by commit count. The full list of files by epic is below.\"></div>\n");
-        sb.Append("  <div class=\"impact-shape impact-shape-sunburst\" id=\"impact-sunburst\" role=\"img\" aria-label=\"Interactive sunburst of code files touched, arcs sized by lines changed and colored by commit count. The full list of files by epic is below.\"></div>\n");
-        sb.Append("</div>\n");
-
-        // The data payload the script reads. System.Text.Json's default encoder escapes <, >, & to \u00xx, so this
-        // is safe to embed inside a <script> without breaking on a stray tag-like path. [Story 21.3]
-        var payload = new
-        {
-            epics = attributedEpics.Select(e => new
-            {
-                n = e.Number,
-                f = data.FilesByEpic[e.Number].Select(file => new
-                {
-                    p = file.Path,
-                    h = file.CodePageHref is { Length: > 0 } href ? prefix + href : file.CodePageHref,
-                    c = file.Churn,
-                    k = file.Commits,
-                }),
-            }),
-        };
-        var json = JsonSerializer.Serialize(payload);
-        sb.Append($"<script type=\"application/json\" id=\"impact-map-data\">{json}</script>\n");
-
         return sb.ToString();
     }
 }

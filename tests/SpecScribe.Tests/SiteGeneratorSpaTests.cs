@@ -155,29 +155,45 @@ public class SiteGeneratorSpaTests : IDisposable
     }
 
     [Fact]
-    public void SunburstExplorerIsland_SurvivesSpaContentRegionCapture()
+    public void HierarchyExplorerIsland_SurvivesSpaContentRegionCapture()
     {
-        // Story 20.2 AC #2 / parity: the dashboard's explorer root marker + inline JSON island are mounted INSIDE
+        // Parity: the dashboard's explorer root marker + inline JSON island are mounted INSIDE
         // <main id="main-content">, so the SPA content-region slice must carry them byte-for-byte.
         // SCOPE OF THIS TEST: it pins the MARKUP surviving the capture — nothing more. Whether the client actually
         // re-enhances that markup after an innerHTML swap is a runtime concern this SSR test cannot observe; the
-        // swap fires `specscribe:content-swapped` and specscribe.js re-runs `initSunburstExplorers` against the
-        // fresh region (guarded by `data-explorer-ready`). Do not read a green here as proof of live SPA parity.
+        // swap fires `specscribe:content-swapped` and specscribe.js re-runs `initHierarchyExplorers` against the
+        // fresh region. Do not read a green here as proof of live SPA parity.
         // [comment corrected by the Story 20.2 review — it previously claimed the behavior this cannot test]
+        //
+        // STORY 20.7: retargeted from Story 20.2's `sunburst-explorer-data` island and its `data-node-id` join
+        // hooks — both retired with the SVG — onto the component's island. The question is unchanged and now
+        // matters MORE: with the SVG gone there is no second copy of this information on the page, so an island or
+        // twin lost at the capture boundary is information lost outright. Up to five distinct instances exist
+        // across the site and two pages can be in one SPA session, so the ids are checked as distinct too.
         var gen = GeneratedSite();
 
         var staticIndex = File.ReadAllText(Path.Combine(Site, "index.html"));
         Assert.Contains("data-explorer", staticIndex);
-        Assert.Contains("id=\"sunburst-explorer-data\"", staticIndex);
-        Assert.Contains("data-node-id=\"epic-1\"", staticIndex);
+        Assert.Contains("id=\"dashboard-hierarchy-data\"", staticIndex);
+        // 20.2's island and its join hooks are gone from the shipped page, not merely unread.
+        Assert.DoesNotContain("id=\"sunburst-explorer-data\"", staticIndex);
+        Assert.DoesNotContain("data-node-id=", staticIndex);
 
         var spaIndex = gen.RenderSpaBundle().Pages.Single(p => p.OutputRelativePath == "index.html").ContentHtml;
         Assert.Contains("data-explorer", spaIndex);
-        Assert.Contains("id=\"sunburst-explorer-data\"", spaIndex);
-        Assert.Contains("data-node-id=\"epic-1\"", spaIndex);
+        Assert.Contains("id=\"dashboard-hierarchy-data\"", spaIndex);
         // The island is INSIDE the captured <main> region (not stranded before it).
         var mainStart = spaIndex.IndexOf("<main id=\"main-content\"", StringComparison.Ordinal);
-        Assert.True(mainStart >= 0 && spaIndex.IndexOf("id=\"sunburst-explorer-data\"", StringComparison.Ordinal) > mainStart);
+        Assert.True(mainStart >= 0 && spaIndex.IndexOf("id=\"dashboard-hierarchy-data\"", StringComparison.Ordinal) > mainStart);
+
+        // The epics index carries its OWN instance, with its own ids — a collision would make one of the two
+        // unmountable in an SPA session that visited both.
+        var spaEpics = gen.RenderSpaBundle().Pages.SingleOrDefault(p => p.OutputRelativePath == "epics/index.html");
+        if (spaEpics is not null)
+        {
+            Assert.Contains("id=\"epics-index-hierarchy-data\"", spaEpics.ContentHtml);
+            Assert.DoesNotContain("id=\"dashboard-hierarchy-data\"", spaEpics.ContentHtml);
+        }
 
         // Story 20.5: the Hierarchy Explorer's own island and its TEXT TWIN ride the same capture. The twin
         // matters more than the island here — under ADR 0013 it is the no-JS contract, and an SPA visitor whose
@@ -220,16 +236,37 @@ public class SiteGeneratorSpaTests : IDisposable
 
         Assert.Equal(hostsChart, File.Exists(bundle));
 
+        // STORY 20.7 generalized this from a hard-coded page list to the INVARIANT that list was standing in for,
+        // which is what the previous comment here anticipated ("Story 20.7 converts the other six call sites").
+        // The engine tag must appear on exactly the pages that host a chart — no more, and crucially NO FEWER.
+        //
+        // The "no fewer" half is not hypothetical. Story 20.7's four new instances all shipped their island and
+        // their twin but mounted NOTHING, because `EpicsTemplater` builds its own AssetManifests and none of them
+        // set `HierarchyEngineNeeded`. Every layer below the browser was green: the page rendered, the payload was
+        // correct, the twin stood in, and the chart simply never arrived. A hard-coded `["index.html"]` could not
+        // have caught it — it would have gone on passing while four surfaces were silently chartless.
         var tag = $"{ForgeOptions.HierarchyEngineScriptName}\"></script>";
-        var pagesWithTag = Directory.EnumerateFiles(Site, "*.html", SearchOption.AllDirectories)
-            .Where(p => File.ReadAllText(p).Contains(tag, StringComparison.Ordinal))
-            .Select(p => PathUtil.NormalizeSlashes(Path.GetRelativePath(Site, p)))
+        var pages = Directory.EnumerateFiles(Site, "*.html", SearchOption.AllDirectories)
+            .Select(p => (Path: PathUtil.NormalizeSlashes(Path.GetRelativePath(Site, p)), Html: File.ReadAllText(p)))
+            .Where(p => p.Path != SpaDelivery.EntryFileName)
             .ToList();
+
+        var pagesWithTag = pages.Where(p => p.Html.Contains(tag, StringComparison.Ordinal))
+            .Select(p => p.Path).OrderBy(p => p, StringComparer.Ordinal).ToList();
+        var pagesHostingChart = pages.Where(p => HierarchyExplorer.ContainsHost(p.Html))
+            .Select(p => p.Path).OrderBy(p => p, StringComparer.Ordinal).ToList();
+
+        Assert.Equal(pagesHostingChart, pagesWithTag);
 
         if (hostsChart)
         {
-            // Exactly one mount in this story (owner decision D1); Story 20.7 converts the other six call sites.
-            Assert.Equal(new[] { "index.html" }, pagesWithTag);
+            // Guard against a vacuous green: this fixture HAS epics, so the converted family really is exercised.
+            Assert.Contains("index.html", pagesWithTag);
+            Assert.Contains("epics.html", pagesWithTag);
+            Assert.Contains(pagesWithTag, p => p.StartsWith("epics/epic-", StringComparison.Ordinal));
+            Assert.Contains(pagesWithTag, p => p.StartsWith("epics/story-", StringComparison.Ordinal));
+            // And a page with no chart still ships no 1.2 MB bundle reference.
+            Assert.DoesNotContain("about.html", pagesWithTag);
         }
         else
         {
@@ -450,7 +487,7 @@ public class SiteGeneratorSpaTests : IDisposable
         // Guard against a vacuous green: the dashboard really does carry islands to declare.
         var home = root.GetProperty("pages").GetProperty("index.html").GetProperty("scriptIslands").EnumerateArray().ToList();
         Assert.NotEmpty(home);
-        Assert.Contains(home, i => i.GetProperty("id").GetString() == "sunburst-explorer-data"
+        Assert.Contains(home, i => i.GetProperty("id").GetString() == "dashboard-hierarchy-data"
             && i.GetProperty("kind").GetString() == SpaDelivery.DataIslandKind);
     }
 

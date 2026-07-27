@@ -59,7 +59,7 @@ public static class HowToReadTemplater
         }
         else
         {
-            sb.Append("  <div class=\"doc-subtitle\">Orientation for a first visit — and how to generate this site yourself.</div>\n");
+            sb.Append("  <div class=\"doc-subtitle\">Orientation for a first visit — including how to generate this site yourself.</div>\n");
         }
         sb.Append("</header>\n\n");
 

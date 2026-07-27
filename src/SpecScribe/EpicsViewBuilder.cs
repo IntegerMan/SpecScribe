@@ -43,8 +43,57 @@ public static class EpicsViewBuilder
             FurtherDevelopmentChips = model.Epics.Where(e => e.Section == EpicSection.FurtherDevelopment).Select(BuildChip).ToList(),
             FollowUps = geometry,
             UnplannedWork = unplanned ?? UnplannedWorkGeometry.Empty,
+            HierarchyExplorerHtml = BuildIndexHierarchyExplorerHtml(
+                model, nav.SiteTitle, geometry, unplanned ?? UnplannedWorkGeometry.Empty),
         };
     }
+
+    /// <summary>The epics index's Hierarchy Explorer instance.
+    ///
+    /// <para><b>It reuses <see cref="HierarchyExplorer.ProjectDashboard"/> rather than forking it</b>, because this
+    /// surface has always drawn from the SAME datasource as the dashboard — <c>Charts.Sunburst(model, followUps,
+    /// unplanned)</c>, identically parameterised. A second projection over one datasource is the drift this epic
+    /// exists to end, so what differs is CONFIGURATION only: its own <c>DomId</c> (two instances can be in one SPA
+    /// session), its own <c>HashKey</c> (so a drilled deep link on this page does not resolve against the
+    /// dashboard's), and <see cref="HierarchyMode.Navigate"/> — this page carries no details rail, so a selection
+    /// with nowhere to go would be an affordance that does nothing.</para>
+    ///
+    /// <para>The twin presents as <c>&lt;details&gt;</c>, not screen-reader-only. Story 20.6 audited this surface
+    /// and recorded it as KEEPING ITS SVG: its 87-node story ring and 39-node follow-up ring are stated nowhere on
+    /// the page, and the <c>SunburstCompanionList</c> tile grid beside it is epic-level only and omits done epics
+    /// with no open follow-ups. The visible disclosure IS this surface's twin fix, which 20.6 D2 assigned here.
+    /// [Story 20.7 Task 4.1/4.2]</para></summary>
+    private static string BuildIndexHierarchyExplorerHtml(
+        EpicsModel model, string siteTitle, FollowUpGeometry followUps, UnplannedWorkGeometry unplanned)
+    {
+        if (model.Epics.Count == 0) return string.Empty;
+
+        var config = new HierarchyExplorerConfig(
+            DomId: EpicsIndexHierarchyDomId,
+            Shape: "sunburst",
+            Mode: HierarchyMode.Navigate,
+            HashKey: "glance",
+            Size: EpicsIndexHierarchySize,
+            Labels: true,
+            Meta: new Charts.ChartMeta(
+                Title: "Project at a Glance",
+                Why: Charts.WhyText(Charts.ChartMetric.WorkHierarchy)));
+
+        var model2 = HierarchyExplorer.ProjectDashboard(model, siteTitle, config, followUps, unplanned);
+        return HierarchyExplorer.Render(
+            model2,
+            panelClass: "chart-panel sunburst-panel",
+            panelAttributes: " data-explorer");
+    }
+
+    /// <summary>DOM id of the epics index's Hierarchy Explorer instance. Distinct from the dashboard's because the
+    /// SPA can hold both pages in one session and two instances must not collide on host id, island id, radio
+    /// names or twin id.</summary>
+    internal const string EpicsIndexHierarchyDomId = "epics-index-hierarchy";
+
+    /// <summary>Chart size for the epics index instance. Smaller than the dashboard's 560 because this panel shares
+    /// its row with the progress panel and the companion tile grid rather than a details rail.</summary>
+    internal const int EpicsIndexHierarchySize = 460;
 
     private static EpicChip BuildChip(EpicInfo epic) =>
         new(epic.Number, epic.Title, StatusStyles.ForEpicWithRetrospective(epic), $"epics/epic-{epic.Number}.html");
@@ -136,10 +185,55 @@ public static class EpicsViewBuilder
             StoryCards = epic.Stories.Select(s => BuildStoryCard(s, prefix, commands, consolidated)).ToList(),
             FollowUps = epicFollowUps,
             UnplannedWork = epicUnplanned,
+            HierarchyExplorerHtml = BuildEpicHierarchyExplorerHtml(epic, prefix, epicFollowUps, epicUnplanned),
             RetiredNoticesHtml = epic.RetiredNoticesHtml,
             WorkGraph = workGraph,
         };
     }
+
+    /// <summary>The epic page's Hierarchy Explorer instance.
+    ///
+    /// <para>The per-story destination is the EXISTING expression, lifted verbatim from the call site
+    /// (<c>prefix + (story.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(story.Id))</c>): always the
+    /// story's own page — drafted detail or undrafted placeholder — never an in-page <c>#story-N-M</c> card jump.
+    /// It matches the story card's <c>TitleHref</c> and the project chart's own fallback, so a click always leaves
+    /// the epic page for the story surface. Story 9.13's contract, not a second one.</para>
+    ///
+    /// <para><see cref="HierarchyMode.Navigate"/>: this page has no details rail. The twin presents as
+    /// <c>&lt;details&gt;</c> — Story 20.6 recorded this surface as KEEPING ITS SVG because only 4 of 9 stories
+    /// stated their task count anywhere on the page and the deferred-item grouping was stated nowhere, so the
+    /// visible, complete disclosure IS the twin fix 20.6 D2 handed to this story.</para>
+    ///
+    /// <para>Size is raised from the SVG's 320. That number was chosen for a static chart that neither labelled
+    /// nor drilled; this one does both, and a ported constant would be a constraint carried past the thing that
+    /// caused it. [Story 20.7 Task 5.1/5.3, Open Question 3]</para></summary>
+    private static string BuildEpicHierarchyExplorerHtml(
+        EpicInfo epic, string prefix, FollowUpGeometry followUps, UnplannedWorkGeometry unplanned)
+    {
+        var config = new HierarchyExplorerConfig(
+            DomId: $"epic-{epic.Number}-hierarchy",
+            Shape: "sunburst",
+            Mode: HierarchyMode.Navigate,
+            HashKey: "epic",
+            Size: EpicDetailHierarchySize,
+            Labels: true,
+            Meta: new Charts.ChartMeta(
+                Title: "Story Breakdown",
+                Why: Charts.WhyText(Charts.ChartMetric.WorkHierarchy)));
+
+        var model = HierarchyExplorer.ProjectEpic(
+            epic,
+            story => prefix + (story.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(story.Id)),
+            config, followUps, unplanned);
+        return HierarchyExplorer.Render(
+            model,
+            panelClass: "chart-panel sunburst-panel",
+            panelAttributes: " data-explorer");
+    }
+
+    /// <summary>Chart size for the epic-detail instance. See <see cref="BuildEpicHierarchyExplorerHtml"/> for why
+    /// it is not the SVG's 320.</summary>
+    internal const int EpicDetailHierarchySize = 440;
 
     private static StoryCardView BuildStoryCard(StoryInfo story, string prefix, CommandCatalog commands, bool consolidated)
     {
@@ -230,9 +324,46 @@ public static class EpicsViewBuilder
                 prefix),
             DeferredFromThis = deferred,
             DeferredListHref = deferredListHref,
+            HierarchyExplorerHtml = BuildStoryHierarchyExplorerHtml(story, tasks, deferred),
             WorkGraph = workGraph,
         };
     }
+
+    /// <summary>The story page's Hierarchy Explorer instance — task → subtask plus the Deferred parent.
+    ///
+    /// <para><see cref="HierarchyMode.Navigate"/> so deferred segments keep the click-through they have today
+    /// (tasks and subtasks carry no destination and simply have none — an honest gap, and the twin renders them as
+    /// plain text rather than dead links). Story 20.6 CLEARED this surface for retirement at 38/38: the story
+    /// document's own task list is already a complete natural twin, which is why its predicted FAIL turned out to
+    /// be a markdown-backtick normalization artifact.</para>
+    ///
+    /// <para>Size is raised from the SVG's 280 for the same reason as the epic page's — that number sized a chart
+    /// that neither labelled nor drilled. [Story 20.7 Task 6.1/6.4]</para></summary>
+    private static string BuildStoryHierarchyExplorerHtml(
+        StoryInfo story, IReadOnlyList<TaskItem> tasks, IReadOnlyList<FollowUpDeferredSlot> deferred)
+    {
+        var config = new HierarchyExplorerConfig(
+            DomId: $"story-{story.Id.Replace('.', '-')}-hierarchy",
+            Shape: "sunburst",
+            Mode: HierarchyMode.Navigate,
+            HashKey: "tasks",
+            Size: StoryDetailHierarchySize,
+            Labels: true,
+            Meta: new Charts.ChartMeta(
+                Title: "Task Breakdown",
+                Why: Charts.WhyText(Charts.ChartMetric.WorkHierarchy)));
+
+        var model = HierarchyExplorer.ProjectStoryTasks(
+            story.Id, PathUtil.StripHtmlTags(story.Title), tasks, config, deferred,
+            storyStatusClass: StatusStyles.ForStory(story));
+        return HierarchyExplorer.Render(
+            model,
+            panelClass: "chart-panel sunburst-panel",
+            panelAttributes: " data-explorer id=\"sec-task-breakdown\"");
+    }
+
+    /// <summary>Chart size for the story-detail instance. See <see cref="BuildStoryHierarchyExplorerHtml"/>.</summary>
+    internal const int StoryDetailHierarchySize = 400;
 
     // ----- Code-areas widget (Story 21.3) -------------------------------------------------------------------
 

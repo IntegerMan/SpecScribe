@@ -101,10 +101,9 @@ public static class DashboardViewBuilder
             RelatedWorkHtml = BuildRelatedWorkHtml(
                 workGraph, epicsModel, commands, geometry, unplannedGeometry, ledger, nav.SiteTitle),
             // Story 20.5's Hierarchy Explorer — the ONE standardized sunburst/treemap component (ADR 0012). Built
-            // here, not in the adapter, for the AD-2 reason its siblings above are. The server-rendered
-            // Charts.Sunburst SVG stays exactly where it is (owner decision D1): the component hides it only on a
-            // SUCCESSFUL mount, so the fallback is real rather than theoretical and Story 20.7's deletion becomes
-            // a clean subtraction. [Story 20.5]
+            // here, not in the adapter, for the AD-2 reason its siblings above are. Story 20.7 retired the
+            // server-rendered Charts.Sunburst SVG it used to sit on top of; the text twin inside this block is now
+            // what a JS-off (or failed-mount) visitor reads. [Story 20.5; Story 20.7]
             HierarchyExplorerHtml = BuildHierarchyExplorerHtml(
                 epicsModel, geometry, unplannedGeometry, nav.SiteTitle),
         };
@@ -119,7 +118,7 @@ public static class DashboardViewBuilder
     /// recommends for Story 20.8.</para>
     ///
     /// <para>The hash key stays <c>sb</c> so deep links already shared keep resolving; it is config-driven so
-    /// Story 20.7's other instances can differ. The size is well above <see cref="Charts.SunburstGlanceSize"/>
+    /// Story 20.7's other instances can differ. The size is generous
     /// (380) because owner decision D3 chose the "Labelled explorer" direction — in-sector labels need radius —
     /// and it is config-driven so no literal lands in the JS.</para></summary>
     private static string BuildHierarchyExplorerHtml(
@@ -151,35 +150,16 @@ public static class DashboardViewBuilder
 
         var model = HierarchyExplorer.ProjectDashboard(
             epicsModel, siteTitle, config, geometry, unplannedGeometry);
-        // `sunburst-panel` MUST survive: the Story 3.5 legend-emphasis CSS keys on
-        // `.sunburst-panel:has(.sb-<status>-item:hover)`, and dropping it silently kills the emphasis behaviour
-        // (and three StylesheetTests assertions). `data-explorer` is 20.2's opt-in hook and the root the
-        // component's takeover handshake writes `data-explorer-ready` to. [Story 20.5 Task 6.1]
+        // `sunburst-panel` MUST survive, and after Story 20.7 for a DIFFERENT reason than before. It no longer
+        // carries the Story 3.5 hover-emphasis (those rules key on `.sb-seg`, which nothing emits once the SVG is
+        // retired — see HierarchyExplorer.LegendHtml); it carries the DRILLED-LEGEND scope rules
+        // `[data-explorer][data-sb-scope] .sunburst-legend .sb-legend-item`, which are the half of the legend
+        // behaviour that survives, plus three StylesheetTests assertions. `data-explorer` is the root the
+        // component resolves its panel from and the root the 20.3 rail re-syncs off `data-sb-scope`.
         return HierarchyExplorer.Render(
             model,
             panelClass: "chart-panel sunburst-panel wm-panel wm-show-overview wm-show-track",
-            panelAttributes: " data-explorer",
-            fallbackHtml: RetainedSunburstHtml(epicsModel, geometry, unplannedGeometry));
-    }
-
-    /// <summary>The Story 20.2 explorer scaffold exactly as it shipped — inert drill bar, the server-rendered
-    /// <see cref="Charts.Sunburst"/> with its <c>data-node-id</c> join hooks, the live region, and 20.2's island.
-    /// <b>Nothing here is new or changed.</b> It is lifted into one named helper only so the Hierarchy Explorer
-    /// can carry it as its <c>fallbackHtml</c> (owner decision D1) and Story 20.7 can delete one call rather than
-    /// unpick a block. Story 20.7 deletes this method. [Story 20.5]</summary>
-    internal static string RetainedSunburstHtml(
-        EpicsModel epicsModel, FollowUpGeometry geometry, UnplannedWorkGeometry unplannedGeometry)
-    {
-        var sb = new StringBuilder();
-        sb.Append("<div class=\"sb-explorer-drill\" hidden><ol class=\"sb-explorer-breadcrumb\" aria-label=\"Zoom scope\"></ol></div>\n");
-        // Both calls take the SAME size const: the client re-lays drilled arcs against the island's radii, so the
-        // chart and its payload must never default independently. [Story 20.2 review]
-        sb.Append(Charts.Sunburst(epicsModel, Charts.SunburstGlanceSize,
-            followUps: geometry, unplanned: unplannedGeometry, nodeIds: true));
-        sb.Append("<div class=\"sb-explorer-live sr-only\" aria-live=\"polite\"></div>\n");
-        sb.Append(Charts.SunburstExplorerIsland(epicsModel, Charts.SunburstGlanceSize,
-            followUps: geometry, unplanned: unplannedGeometry));
-        return sb.ToString();
+            panelAttributes: " data-explorer");
     }
 
     /// <summary>DOM id of the dashboard's Hierarchy Explorer instance. Deliberately NOT

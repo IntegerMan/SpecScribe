@@ -41,7 +41,7 @@ public class SiteNavTests
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe");
 
         var link = Assert.Single(nav.QuickLinks, q => q.Label == "How to use SpecScribe");
-        Assert.Equal("Reading order, glossary, and how to generate the site.", link.Description);
+        Assert.Equal("Reading order, how to generate the site, and glossary.", link.Description);
     }
 
     [Fact]

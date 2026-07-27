@@ -266,10 +266,43 @@ public class HierarchyExplorerTests
         Assert.Equal(summaryWeight, stories.Sum(s => nodes[s.Id].Value));
     }
 
+    /// <summary>The node set the retired SVG drew. It used to be parsed out of <c>Charts.Sunburst</c>'s
+    /// <c>data-node-id</c> attributes; Story 20.7 deleted that chart, so it is taken from the SAME shared walk the
+    /// SVG built itself from, with <c>expandDenseEpics: false</c> — which is precisely the collapse the SVG applied.
+    ///
+    /// <para>This is a RETARGET, not a weakening, and it is deliberate: the guard's job is that the component's
+    /// payload never claims or omits a node the shared walk does not have, and that job outlives the SVG.
+    /// Deleting it because its counterpart went away would remove the anti-drift net at the moment it matters
+    /// most. The reader-visible half of the same question is now
+    /// <see cref="Twin_EnumeratesExactlyThePayload_SoNeitherCanDriftFromTheOther"/>. [Story 20.7, Open Question 2]</para></summary>
     private static HashSet<string> SvgNodeIds(EpicsModel model) =>
-        Regex.Matches(Charts.Sunburst(model, nodeIds: true), "data-node-id=\"(?<id>[^\"]+)\"")
-            .Select(m => m.Groups["id"].Value)
+        Charts.SunburstExplorerNodes(model, expandDenseEpics: false)
+            .Select(n => n.Id)
             .ToHashSet(StringComparer.Ordinal);
+
+    [Fact]
+    public void Twin_EnumeratesExactlyThePayload_SoNeitherCanDriftFromTheOther()
+    {
+        // The invariant `Projector_NodeSet_EqualsTheWedgesTheSvgDrew` used to hold, retargeted at the surface that
+        // is now the reader-visible one (ADR 0013 §2: the twin is THE no-JS contract). It is not tautological —
+        // TextTwinHtml walks by parentId under a depth cap and a cycle guard, either of which can silently drop a
+        // node, and a dropped node is exactly the "the chart shows something the listing does not" failure the
+        // twin exists to prevent.
+        var model = Model(
+            Epic(1, "Alpha", Story("1.1", "One", "done", 2, 2), Story("1.2", "Two", "in progress", 1, 3)),
+            Epic(2, "Beta", Story("2.1", "Three", "drafted", 0, 0)));
+
+        var built = Build(model);
+        var payloadIds = built.Nodes.Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
+        var twinLabels = Regex.Matches(HierarchyExplorer.TextTwinHtml(built), "<li>(?:<a [^>]*>)?(?<label>[^<]+)")
+            .Select(m => m.Groups["label"].Value)
+            .ToList();
+
+        Assert.Equal(payloadIds.Count, twinLabels.Count);
+        // Every payload node's LABEL appears once, so the listing is complete by count and by content.
+        foreach (var node in built.Nodes)
+            Assert.Contains(twinLabels, l => l == PathUtil.Html(node.Label));
+    }
 
     // ---- Status prose, not CSS classes --------------------------------------------------------------------
 
@@ -385,11 +418,18 @@ public class HierarchyExplorerTests
         // Charts.SunburstLegend INSIDE Charts.Sunburst — i.e. inside the D1 fallback Story 20.7 deletes. The bug was
         // invisible precisely because D1 kept that fallback on the page.
         //
-        // Asserted over Render's OWN output with no fallbackHtml, which is exactly the post-20.7 shape.
+        // Asserted over Render's OWN output, which after Story 20.7 is the ONLY output — there is no fallback.
+        //
+        // STORY 20.7 changed the MARKUP FAMILY, and that is load-bearing rather than cosmetic. The component's
+        // first legend used its own `.ss-hierarchy-*` classes, which sat outside the pure-CSS drilled-legend
+        // selectors — so the dashboard's drilled filtering was in fact still being done by the retained SVG's
+        // legend, and would have died silently with it. It now renders through the SAME Charts.SunburstLegend, so
+        // `[data-explorer][data-sb-scope] .sunburst-legend .sb-legend-item` keeps matching. [Task 2.2]
         var html = HierarchyExplorer.Render(Build(SampleModel()));
 
-        Assert.Contains("ss-hierarchy-legend", html);
-        Assert.DoesNotContain("sunburst-legend", html);
+        Assert.Contains("<div class=\"sunburst-legend\">", html);
+        Assert.Contains("sb-legend-item", html);
+        Assert.DoesNotContain("ss-hierarchy-legend-item", html);
     }
 
     [Fact]
@@ -457,14 +497,15 @@ public class HierarchyExplorerTests
     [Fact]
     public void Island_DoesNotReuseStory202sIslandId_AndTwoInstancesGetDistinctIds()
     {
-        // Story 20.2's island is still live and still read by its own JS block until Story 20.7 retires it, so this
-        // one must not collide with it — nor with a second instance of this component on the same page.
+        // Story 20.2's island (`sunburst-explorer-data`) was retired by Story 20.7, but the id must stay distinct
+        // for the reason that outlives it: this story puts up to five instances in one SPA session, and two on one
+        // page must not collide on island id, host id, radio names or twin id.
         var a = HierarchyExplorer.IslandHtml(Build(SampleModel(), Config(domId: "first")));
         var b = HierarchyExplorer.IslandHtml(Build(SampleModel(), Config(domId: "second")));
 
         Assert.Contains("id=\"first-data\"", a);
         Assert.Contains("id=\"second-data\"", b);
-        Assert.DoesNotContain(Charts.SunburstExplorerDataId, a);
+        Assert.DoesNotContain("sunburst-explorer-data", a);
         Assert.NotEqual(a, b);
     }
 
@@ -497,18 +538,25 @@ public class HierarchyExplorerTests
     }
 
     [Fact]
-    public void Render_KeepsTheRetainedServerChartInsideTheSamePanel()
+    public void Render_ShipsNoServerChart_AndTheTwinIsWhatStandsBehindAFailedMount()
     {
-        // Owner decision D1: the server SVG is the LIVE fallback, kept beneath the (hidden) host and hidden only on
-        // a successful mount. It must be inside the component's panel, not orphaned outside it.
-        var html = HierarchyExplorer.Render(Build(SampleModel()), fallbackHtml: "<svg class=\"sunburst\"></svg>\n");
+        // Story 20.7 retired the SVG that used to ride inside this panel as `fallbackHtml`, and the parameter went
+        // with it. This is the replacement assertion, and it is the stronger one: what a JS-off (or failed-mount)
+        // visitor gets is the TEXT TWIN, which is complete, navigable and needs no script — where the retained SVG
+        // needed specscribe.js to be reachable in order to be drilled at all. Rewritten rather than deleted,
+        // because "there is still something here when the chart does not arrive" is the fact worth pinning, and it
+        // is the fact ADR 0013 §2 turns into a contract.
+        var html = HierarchyExplorer.Render(Build(SampleModel()), "chart-panel sunburst-panel", " data-explorer");
+
+        Assert.DoesNotContain("<svg class=\"sunburst\"", html);
+        Assert.DoesNotContain("sb-explorer-", html);
 
         var hostAt = html.IndexOf("data-hierarchy>", StringComparison.Ordinal);
-        var svgAt = html.IndexOf("<svg class=\"sunburst\">", StringComparison.Ordinal);
+        var twinAt = html.IndexOf("ss-hierarchy-twin", StringComparison.Ordinal);
         var closeAt = html.LastIndexOf("</div>", StringComparison.Ordinal);
 
-        Assert.True(hostAt > 0 && svgAt > hostAt, "the retained SVG renders after the chart host");
-        Assert.True(svgAt < closeAt, "the retained SVG must stay inside the component's panel");
+        Assert.True(hostAt > 0 && twinAt > hostAt, "the twin renders after the chart host");
+        Assert.True(twinAt < closeAt, "the twin must stay inside the component's panel");
     }
 
     [Fact]
@@ -577,18 +625,16 @@ public class HierarchyExplorerTests
         // differently-organized chart. The placeholder is the visible half of the fix and lives in the body; the
         // MARKER that reveals it is emitted on the chrome seam (see BootScript), because the webview and SPA
         // surfaces consume this body directly and must carry no script at all.
-        var html = HierarchyExplorer.Render(Build(SampleModel()), fallbackHtml: "<svg class=\"sunburst\"></svg>\n");
+        var html = HierarchyExplorer.Render(Build(SampleModel()));
 
         Assert.Contains("ss-hierarchy-booting", html);
         Assert.Contains("Initializing", html);
         Assert.DoesNotContain("<script>", html);
 
-        // The placeholder must precede the chart host it stands in for, and both must precede the SVG.
+        // The placeholder must precede the chart host it stands in for.
         var placeholderAt = html.IndexOf("ss-hierarchy-booting", StringComparison.Ordinal);
         var hostAt = html.IndexOf(HierarchyExplorer.HostMarker + ">", StringComparison.Ordinal);
-        var svgAt = html.IndexOf("<svg class=\"sunburst\">", StringComparison.Ordinal);
-        Assert.True(placeholderAt < hostAt && hostAt < svgAt,
-            "the placeholder must precede the chart host and the SVG it stands in for");
+        Assert.True(placeholderAt < hostAt, "the placeholder must precede the chart host it stands in for");
     }
 
     [Fact]

@@ -122,7 +122,15 @@
     {
       "name": "web-dev-23-3",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "web", "run", "dev", "--", "--port", "3033"],
+      "runtimeArgs": [
+        "--prefix",
+        "web",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "3033"
+      ],
       "port": 3033
     },
     {
@@ -172,6 +180,16 @@
         "C:/Users/MattE/AppData/Local/Temp/claude/C--Dev-SpecScribe/87c0719e-0306-427a-84f0-695619c89683/scratchpad/verify-site"
       ],
       "port": 8098
+    },
+    {
+      "name": "jsoff-20-7",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "C:/Users/MattE/AppData/Local/Temp/claude/C--Dev-SpecScribe/1313ce23-a150-444b-88ce-ee8512288770/scratchpad/jsoff_server.py",
+        "8109",
+        "C:/Dev/SpecScribe/SpecScribeOutput"
+      ],
+      "port": 8109
     }
   ]
 }

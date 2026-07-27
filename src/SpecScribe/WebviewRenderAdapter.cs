@@ -65,13 +65,19 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
         var sb = new StringBuilder();
         sb.Append(HtmlRenderAdapter.Shared.RenderNavMarkup(page.Nav));
         sb.Append(HtmlRenderAdapter.Shared.RenderWayfinding(page.OutputRelativePath, page.Breadcrumb, page.Pager));
-        // Drop any inline JSON data island (e.g. the Story 20.2 sunburst-explorer payload). NOT a CSP matter: a
+        // Drop any inline JSON data island (the Hierarchy Explorer payload). NOT a CSP matter: a
         // <script type="application/json"> block is data, never executed, so script-src does not apply and the CSP
         // would not have blocked it. It is dropped because it is dead weight HERE — this surface deliberately ships
         // no specscribe.js (the `asset.js` host exception), so nothing can ever read the island, and the webview
         // inlines its document. Registered as the `data-island` webview exception in HostRenderExceptions — an
-        // unregistered divergence is a bug. The static SVG chart + its Story 9.13 links stay fully intact.
-        // [Story 20.2; rationale corrected + registered by the 20.2 review]
+        // unregistered divergence is a bug.
+        //
+        // CORRECTED BY STORY 20.7: this comment used to end "the static SVG chart + its Story 9.13 links stay
+        // fully intact". 20.7 retired that SVG. What survives the strip and carries the information here is the
+        // TEXT TWIN — <details>/<div>/<ul> markup, matched by no part of the regex below — and its links resolve
+        // under this adapter's path rewriting like any other. The absent chart PICTURE is its own registered
+        // exception (`hierarchy-chart`), the ADR 0012 §5 / ADR 0013 §7 fallback owner decision D3 accepted.
+        // [Story 20.2; rationale corrected + registered by the 20.2 review; amended Story 20.7]
         sb.Append(JsonDataIsland.Replace(page.BodyHtml, string.Empty));
         return sb.ToString();
     }

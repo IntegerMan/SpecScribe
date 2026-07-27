@@ -590,14 +590,20 @@ public class StylesheetTests
     [Fact]
     public void Script_AdoptsTheExistingSeams_RatherThanMintingParallelOnes()
     {
-        // Four contracts this component must ADOPT: Story 20.3's selection event, the SPA re-init seam, Story
-        // 20.2's own init guard (which is the takeover handshake), and the scope attribute the rail re-syncs from
-        // on init. Minting a second of any of them is the drift ADR 0012 exists to end.
+        // The contracts this component must ADOPT rather than re-mint: Story 20.3's selection event, the SPA
+        // re-init seam, and the scope attribute the rail re-syncs from on init. Minting a second of any of them is
+        // the drift ADR 0012 exists to end.
+        //
+        // `data-explorer-ready` was a FOURTH entry here — Story 20.2's own init guard, doubling as the takeover
+        // handshake between this component and 20.2's drill-in over a shared SVG. Story 20.7 deleted the SVG and
+        // 20.2's block, so there is nothing left to hand over to and no guard to honour; asserting its presence
+        // would now pin a string with no consumer. Its absence is asserted instead, because a re-introduced
+        // handshake would mean someone had brought a second renderer back. [Story 20.7 Task 3.2]
         var js = ReadScript();
         Assert.Contains("specscribe:explorer-select", js);
         Assert.Contains("specscribe:content-swapped", js);
-        Assert.Contains("data-explorer-ready", js);
         Assert.Contains("data-sb-scope", js);
+        Assert.DoesNotContain("data-explorer-ready", js);
     }
 
     [Fact]

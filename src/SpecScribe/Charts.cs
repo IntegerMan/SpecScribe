@@ -356,21 +356,11 @@ public static partial class Charts
     /// slices. [Story 10.7]</summary>
     public const int StoryDensityCollapseThreshold = 8;
 
-    // Ring-radius factors (× size) and pad for the project glance Sunburst — the SINGLE source both the SVG
-    // builder (Charts.Sunburst) and the Story 20.2 explorer payload projector (SunburstExplorer) read, so the
-    // client drill-in re-layout lands the zoomed arcs on the same rings the static chart drew. Presentation
-    // geometry only — NOT a second weight/count ledger. [Story 20.2]
-    internal const double SbEpicInnerF = 0.16, SbEpicOuterF = 0.28;
-    internal const double SbStoryInnerF = 0.285, SbStoryOuterF = 0.415;
-    internal const double SbAggInnerF = 0.42, SbAggOuterF = 0.465;
-    internal const double SbPad = 0.006;
-    internal const double SbStartAngle = -Math.PI / 2;
-
-    /// <summary>The one project-glance sunburst size. <see cref="Sunburst"/> and the Story 20.2 explorer island MUST
-    /// agree on it — the client re-lays drilled arcs against the island's radii, so a size the SVG used but the
-    /// island did not would land every zoomed ring off the static one. Named here so the two call sites cannot
-    /// drift apart by each defaulting independently. [Story 20.2 review]</summary>
-    public const int SunburstGlanceSize = 380;
+    // The project-glance ring-radius factors (SbEpicInnerF … SbStartAngle) and `SunburstGlanceSize` were DELETED
+    // by Story 20.7. They were PRESENTATION GEOMETRY for a hand-rolled SVG — the radii the client re-laid drilled
+    // arcs against — and Plotly computes its own. Confirmed dead by search, not assumed: after `Charts.Sunburst`
+    // and Story 20.2's island went, the only remaining mention of `SunburstGlanceSize` was a doc comment.
+    // Keeping a dead constant is the same error as deleting a live one, in the other direction. [Task 8.2]
 
     /// <summary>The open/done split of one epic's follow-up aggregate ring — the SINGLE source the SVG builder and
     /// the explorer payload both read. [Story 20.2]</summary>
@@ -439,183 +429,11 @@ public static partial class Charts
             + geometry.EpicLevelDeferred(epic.Number, epic.Stories.Select(s => s.Id)).Count
             + unplannedGeo.ForEpic(epic.Number).Count);
 
-    /// <summary>The project sunburst (glance): inner = epics (sized by story weights + epic-level
-    /// follow-up peers), middle = stories sized by tasks
-    /// (+ nested story-child deferred count so crowded parents keep angular room; epics with
-    /// <see cref="StoryDensityCollapseThreshold"/>+ stories collapse to one summary wedge),
-    /// outer = open vs done follow-up aggregates per epic (not every leaf). Per-item wedges live on
-    /// <see cref="EpicSunburst"/>. Pure SVG — no JS. [spec-sunburst-remaining-work-hierarchy; Story 10.7]</summary>
-    /// <param name="nodeIds">Opt in to the Story 20.2 <c>data-node-id</c> join hooks. Only the surface that also
-    /// mounts the explorer island needs them (the dashboard); the epics index renders the same chart with no
-    /// explorer, so leaving this false keeps ~2.5 KB of attributes with no consumer off that page. [Story 20.2 review]</param>
-    public static string Sunburst(
-        EpicsModel model,
-        int size = SunburstGlanceSize,
-        FollowUpGeometry? followUps = null,
-        UnplannedWorkGeometry? unplanned = null,
-        bool nodeIds = false)
-    {
-        var epics = model.Epics.OrderBy(e => e.Number).ToList();
-        if (epics.Count == 0) return "<div class=\"chart-empty\">Nothing to chart yet.</div>";
-        string? NodeId(string id) => nodeIds ? id : null;
-
-        var geometry = followUps ?? FollowUpGeometry.Empty;
-        var unplannedGeo = unplanned ?? UnplannedWorkGeometry.Empty;
-        var knownEpics = epics.Select(e => e.Number).ToHashSet();
-        var unattributed = geometry.OrphanActionItems(knownEpics);
-        var orphanSlots = unattributed.Count;
-        var unplannedSlots = unplannedGeo.SunburstUnplannedWeight;
-
-        // Nested story-child deferred grow story weight; glance epic weight also includes epic-level
-        // peers (actions / epic-level deferred / attributed QD) matching EpicSunburst — never double-count
-        // story-child deferred already inside StoryWeight. [spec-9-13-deferred-glance-weight-noplan-sourcekey]
-        // No-plan stories are bumped to the average drafted-story weight so un-drafted work doesn't render as a
-        // misleadingly trivial sliver — the SAME number the explorer payload uses. [owner 2026-07-24]
-        var noPlanWeight = SunburstNoPlanStoryWeight(model, geometry);
-        int StoryWeight(EpicInfo e, StoryInfo s) => SunburstStoryWeight(geometry, e.Number, s, noPlanWeight);
-        int EpicWeight(EpicInfo e) => SunburstEpicWeight(geometry, unplannedGeo, e, noPlanWeight);
-
-        var totalWeight = epics.Sum(EpicWeight)
-            + (orphanSlots > 0 ? Math.Max(1, orphanSlots) : 0)
-            + (unplannedSlots > 0 ? Math.Max(1, unplannedSlots) : 0);
-        var anglePerUnit = 2 * Math.PI / totalWeight;
-        const double pad = SbPad;
-
-        var c = size / 2.0;
-        var epicInner = size * SbEpicInnerF;
-        var epicOuter = size * SbEpicOuterF;
-        var storyInner = size * SbStoryInnerF;
-        var storyOuter = size * SbStoryOuterF;
-        var aggregateInner = size * SbAggInnerF;
-        var aggregateOuter = size * SbAggOuterF;
-
-        var hasAggregates = false;
-        var hasUnplanned = unplannedGeo.SunburstUnplannedWeight > 0;
-        var hasDenseEpics = false;
-        // Only true when an un-collapsed no-plan story wedge is actually drawn below — a dense-collapsed
-        // epic's zero-task stories fold into one sb-story-summary wedge with no .sb-noplan class, so counting
-        // them here would advertise a legend swatch that matches no wedge on the chart. [Story 10.7 deferred debt]
-        var hasVisibleNoPlan = false;
-
-        var sb = new StringBuilder();
-        sb.Append($"<svg class=\"sunburst\" viewBox=\"0 0 {size} {size}\" width=\"{size}\" height=\"{size}\" role=\"img\" aria-label=\"Project progress sunburst\">\n");
-
-        var angle = -Math.PI / 2;
-        foreach (var epic in epics)
-        {
-            var weight = EpicWeight(epic);
-            var sweep = weight * anglePerUnit;
-            var epicClass = StatusStyles.ForEpicWithRetrospective(epic);
-            var epicTitle = PathUtil.StripHtmlTags(epic.Title);
-            var (openCount, doneCount) = CountEpicFollowUpAggregates(epic, geometry, unplannedGeo);
-            if (openCount + doneCount > 0) hasAggregates = true;
-
-            var followNote = openCount + doneCount > 0
-                ? $", {openCount} open / {doneCount} done follow-ups"
-                : string.Empty;
-            var epicAria = $"Epic {epic.Number}: {epicTitle} — {StatusStyles.EpicLabel(epicClass)}, {epic.Stories.Count} {Plural(epic.Stories.Count, "story", "stories")}{followNote}";
-            sb.Append($"  <a href=\"epics/epic-{epic.Number}.html\" aria-label=\"{Html(epicAria)}\">\n");
-            sb.Append($"    <path class=\"sb-seg sb-{epicClass}\"{NodeIdAttr(NodeId($"epic-{epic.Number}"))} d=\"{AnnularSector(c, epicInner, epicOuter, InsetStart(angle, sweep, pad), InsetEnd(angle, sweep, pad))}\">");
-            sb.Append($"<title>Epic {epic.Number}: {Html(epicTitle)} — {Html(StatusStyles.EpicLabel(epicClass))}, {epic.Stories.Count} {Plural(epic.Stories.Count, "story", "stories")}{Html(followNote)}</title></path>\n");
-            sb.Append("  </a>\n");
-
-            var storyWeightSum = epic.Stories.Sum(s => StoryWeight(epic, s));
-            if (storyWeightSum > 0)
-            {
-                if (epic.Stories.Count >= StoryDensityCollapseThreshold)
-                {
-                    hasDenseEpics = true;
-                    var epicHasStoryChildDeferred = epic.Stories.Any(
-                        s => geometry.StoryChildDeferred(epic.Number, s.Id).Count > 0);
-                    AppendStorySummarySlot(sb, epic, epicClass, epicHasStoryChildDeferred,
-                        angle, sweep, pad, c, storyInner, storyOuter, nodeId: NodeId($"epic-{epic.Number}~summary"));
-                }
-                else
-                {
-                    var anglePerUnitSlot = sweep / storyWeightSum;
-                    var slotAngle = angle;
-                    foreach (var story in epic.Stories)
-                    {
-                        if (story.TasksTotal == 0) hasVisibleNoPlan = true;
-                        var sw = StoryWeight(epic, story) * anglePerUnitSlot;
-                        AppendWeightedStorySlot(sb, story, geometry, slotAngle, sw, pad, c, storyInner, storyOuter,
-                            aggregateInner, aggregateOuter, nestStoryChildren: false, nodeId: NodeId(story.Id));
-                        slotAngle += sw;
-                    }
-                }
-            }
-
-            var aggregateHref = geometry.LinkPrefix + FollowUpGroupPages.EpicPath(epic.Number);
-            AppendOpenDoneAggregateRing(sb, openCount, doneCount, angle, sweep, pad, c,
-                aggregateInner, aggregateOuter, aggregateHref,
-                openLabel: $"Epic {epic.Number}: {openCount} open {Plural(openCount, "follow-up", "follow-ups")}",
-                doneLabel: $"Epic {epic.Number}: {doneCount} done {Plural(doneCount, "follow-up", "follow-ups")}",
-                openNodeId: NodeId($"epic-{epic.Number}~open"), doneNodeId: NodeId($"epic-{epic.Number}~done"));
-
-            angle += sweep;
-        }
-
-        if (orphanSlots > 0)
-        {
-            hasAggregates = true;
-            var orphanWeight = Math.Max(1, orphanSlots);
-            var sweep = orphanWeight * anglePerUnit;
-            var (openOrphans, doneOrphans) = SunburstOrphanAggregates(unattributed);
-            var orphanClass = openOrphans > 0 ? "followup-open" : "followup-done";
-            var orphanHref = geometry.FollowUpsGroupHref;
-            var orphanAria = openOrphans > 0
-                ? $"Follow-ups: {orphanSlots} unattributed {Plural(orphanSlots, "item", "items")}"
-                : $"Follow-ups: {orphanSlots} completed unattributed {Plural(orphanSlots, "item", "items")}";
-
-            sb.Append($"  <a href=\"{Html(orphanHref)}\" aria-label=\"{Html(orphanAria)}\">\n");
-            sb.Append($"    <path class=\"sb-seg sb-{orphanClass}\"{NodeIdAttr(NodeId("orphan"))} d=\"{AnnularSector(c, epicInner, epicOuter, InsetStart(angle, sweep, pad), InsetEnd(angle, sweep, pad))}\">");
-            sb.Append($"<title>{Html(orphanAria)}</title></path>\n  </a>\n");
-
-            AppendOpenDoneAggregateRing(sb, openOrphans, doneOrphans, angle, sweep, pad, c,
-                storyInner, storyOuter, orphanHref,
-                openLabel: $"Follow-ups: {openOrphans} open unattributed {Plural(openOrphans, "item", "items")}",
-                doneLabel: $"Follow-ups: {doneOrphans} done unattributed {Plural(doneOrphans, "item", "items")}",
-                openNodeId: NodeId("orphan~open"), doneNodeId: NodeId("orphan~done"));
-
-            angle += sweep;
-        }
-
-        if (unplannedSlots > 0)
-        {
-            // Do not set hasAggregates — Unplanned uses hasUnplanned for legend/hint (avoid follow-up swatches).
-            var unplannedWeight = Math.Max(1, unplannedSlots);
-            var sweep = unplannedWeight * anglePerUnit;
-            var (openUnplanned, doneUnplanned) = SunburstUnplannedAggregates(unplannedGeo);
-            var rootClass = openUnplanned > 0 ? "unplanned" : "followup-done";
-            var rootHref = unplannedGeo.GroupRootHref ?? "#";
-            var rootAria = openUnplanned > 0
-                ? $"Unplanned: {unplannedSlots} direct / one-off {Plural(unplannedSlots, "item", "items")}"
-                : $"Unplanned: {unplannedSlots} completed direct / one-off {Plural(unplannedSlots, "item", "items")}";
-
-            sb.Append($"  <a href=\"{Html(rootHref)}\" aria-label=\"{Html(rootAria)}\">\n");
-            sb.Append($"    <path class=\"sb-seg sb-{rootClass}\"{NodeIdAttr(NodeId("unplanned"))} d=\"{AnnularSector(c, epicInner, epicOuter, InsetStart(angle, sweep, pad), InsetEnd(angle, sweep, pad))}\">");
-            sb.Append($"<title>Unplanned / Direct work: {Html(rootAria)}</title></path>\n  </a>\n");
-
-            AppendOpenDoneAggregateRing(sb, openUnplanned, doneUnplanned, angle, sweep, pad, c,
-                storyInner, storyOuter, rootHref,
-                openLabel: $"Unplanned: {openUnplanned} open {Plural(openUnplanned, "item", "items")}",
-                doneLabel: $"Unplanned: {doneUnplanned} done {Plural(doneUnplanned, "item", "items")}",
-                openClass: "unplanned",
-                doneClass: "followup-done",
-                openNodeId: NodeId("unplanned~open"), doneNodeId: NodeId("unplanned~done"));
-
-            angle += sweep;
-        }
-
-        sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c - 8)}\" class=\"sunburst-center-num\" text-anchor=\"middle\">{epics.Count}</text>\n");
-        sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c + 12)}\" class=\"sunburst-center-label\" text-anchor=\"middle\">{Plural(epics.Count, "epic", "epics")}</text>\n");
-        sb.Append("</svg>\n");
-
-        sb.Append(SunburstLegend(BuildSunburstLegendItems(hasAggregates, hasUnplanned, hasVisibleNoPlan)));
-        var hasStoryChildDeferred = HasAnyStoryChildDeferred(geometry, epics);
-        sb.Append(BuildSunburstHint(hasAggregates, hasUnplanned, hasStoryChildDeferred, hasDenseEpics));
-        return sb.ToString();
-    }
+    // `Charts.Sunburst` — the project-glance SVG — was DELETED by Story 20.7. The dashboard and the epics index
+    // now render through HierarchyExplorer.ProjectDashboard + HierarchyExplorer.Render. Its weight helpers
+    // (SunburstEpicWeight / SunburstStoryWeight / SunburstNoPlanStoryWeight) SURVIVE and are the projector's
+    // inputs — SunburstNoPlanStoryWeight in particular carries Story 20.5 AC#4's owner-directed no-plan average
+    // bump, so deleting it as "part of the sunburst" would silently undo an owner decision. [Story 20.7 Task 8.1]
 
     /// <summary>Open vs done counts for everything attributed to an epic on the project glance
     /// (actions, deferred under that epic, attributed quick-dev).</summary>
@@ -728,68 +546,12 @@ public static partial class Charts
         return "<div class=\"epic-remaining-grid\">\n" + sb + "</div>\n";
     }
 
-    /// <summary>Open/done aggregate wedges under a parent sweep. Omits empty sides (NFR8).</summary>
-    private static void AppendOpenDoneAggregateRing(
-        StringBuilder sb, int openCount, int doneCount,
-        double angle, double sweep, double pad,
-        double c, double inner, double outer, string href,
-        string openLabel, string doneLabel,
-        string openClass = "followup-open", string doneClass = "followup-done",
-        string? openNodeId = null, string? doneNodeId = null)
-    {
-        var total = openCount + doneCount;
-        if (total <= 0) return;
-
-        var usable = Math.Max(0, sweep - 2 * Math.Min(pad, sweep / 2));
-        var cursor = InsetStart(angle, sweep, pad);
-        if (openCount > 0)
-        {
-            var openSweep = usable * openCount / total;
-            AppendFollowUpSlot(sb, openLabel, href, openClass, cursor, openSweep, pad: 0, c, inner, outer, openNodeId);
-            cursor += openSweep;
-        }
-        if (doneCount > 0)
-        {
-            var doneSweep = usable * doneCount / total;
-            AppendFollowUpSlot(sb, doneLabel, href, doneClass, cursor, doneSweep, pad: 0, c, inner, outer, doneNodeId);
-        }
-    }
-
-    private static string BuildSunburstHint(
-        bool hasFollowUps, bool hasUnplanned, bool hasStoryChildDeferred = false, bool hasDenseEpics = false)
-    {
-        var storySizing = hasStoryChildDeferred
-            ? "stories (sized by tasks + nested deferred)"
-            : "stories (sized by tasks)";
-        var denseClause = hasDenseEpics
-            ? " Epics with many stories collapse to one summary wedge — open the epic page for the full list."
-            : string.Empty;
-
-        if (!hasFollowUps && !hasUnplanned)
-            return $"<div class=\"sunburst-hint\">Inner ring: epics (stories + follow-up peers) &middot; middle: {storySizing}. Click any segment to open it.{denseClause}</div>\n\n";
-
-        var parts = new List<string>
-        {
-            $"Inner ring: epics (stories + follow-up peers) &middot; middle: {storySizing} &middot; outer: open vs done follow-ups (aggregated).",
-        };
-        if (hasFollowUps)
-            parts.Add("Orange = open; green = done. Click an aggregate to open that group.");
-        if (hasUnplanned)
-            parts.Add("Unplanned = direct / one-shot work outside the epic plan.");
-        if (hasDenseEpics)
-            parts.Add("Epics with many stories collapse to one summary wedge — open the epic page for the full list.");
-        return $"<div class=\"sunburst-hint\">{string.Join(" ", parts)}</div>\n\n";
-    }
-
-    private static bool HasAnyStoryChildDeferred(FollowUpGeometry geometry, IEnumerable<EpicInfo> epics) =>
-        epics.Any(e => e.Stories.Any(s => geometry.StoryChildDeferred(e.Number, s.Id).Count > 0));
-
     /// <summary>The shared sunburst legend — one focusable entry per status, each carrying a status class
     /// (<c>sb-&lt;status&gt;-item</c>) and <c>tabindex="0"</c> so the pure-CSS interactive-legend emphasis
     /// (specscribe.css: <c>.sunburst-panel:has(.sb-&lt;status&gt;-item:hover/:focus) …</c>) is reachable by
     /// both pointer and keyboard. The always-visible swatch + label keep status readable without the emphasis
     /// affordance (never color-only). [Story 3.5 Task 3, UXO C3]</summary>
-    private static string SunburstLegend(params (string Status, string Label)[] items)
+    internal static string SunburstLegend(params (string Status, string Label)[] items)
     {
         var sb = new StringBuilder();
         sb.Append("<div class=\"sunburst-legend\">\n");
@@ -822,80 +584,19 @@ public static partial class Charts
         return sb.ToString();
     }
 
-    /// <summary>Dense-epic middle-ring collapse (AC1): one summary wedge stands in for the epic's whole
-    /// story ring instead of one wedge per story, spanning the same sweep the per-story wedges would have
-    /// occupied. Colored with the epic's own status class (reused — no new <c>--status-*</c> token) plus a
-    /// distinguishing <c>sb-story-summary</c> marker class (a hatch/stroke treatment, never color-only);
-    /// links to the epic page — the same destination as the epic's own inner-ring wedge, not a new scheme.
-    /// [Story 10.7 AC1]</summary>
-    private static void AppendStorySummarySlot(
-        StringBuilder sb, EpicInfo epic, string epicClass, bool hasStoryChildDeferred,
-        double angle, double sweep, double pad, double c, double storyInner, double storyOuter,
-        string? nodeId = null)
+    /// <summary>The reader-facing name of one deferred item, wherever it is drawn or listed. Extracted from
+    /// <see cref="AppendDeferredItemSlot"/> unchanged so the Story 20.7 projectors label a deferred node with the
+    /// SAME string the SVG's wedge title used — a second phrasing here would put two names on one item across the
+    /// chart, its tooltip, its accessible name and the text twin. [Story 20.7 Task 5.2]</summary>
+    internal static string DeferredSlotLabel(FollowUpDeferredSlot slot)
     {
-        var sizing = hasStoryChildDeferred ? "sized by tasks + nested deferred" : "sized by tasks";
-        var count = epic.Stories.Count;
-        var label = $"Epic {epic.Number}: {count} {Plural(count, "story", "stories")} ({sizing})";
-        var href = $"epics/epic-{epic.Number}.html";
-        sb.Append($"  <a href=\"{Html(href)}\" aria-label=\"{Html(label)}\">\n");
-        sb.Append($"    <path class=\"sb-seg sb-story-summary sb-{epicClass}\"{NodeIdAttr(nodeId)} d=\"{AnnularSector(c, storyInner, storyOuter, InsetStart(angle, sweep, pad), InsetEnd(angle, sweep, pad))}\">");
-        sb.Append($"<title>{Html(label)}</title></path>\n  </a>\n");
-    }
-
-    /// <summary>Renders a task-and-nested-deferred-weighted story in the middle ring. When
-    /// <paramref name="nestStoryChildren"/> is true (epic detail), story-child deferred fills the outer
-    /// ring under this story; the project glance passes false and draws open/done aggregates instead.
-    /// [spec-sunburst-remaining-work-hierarchy]</summary>
-    private static void AppendWeightedStorySlot(
-        StringBuilder sb, StoryInfo story, FollowUpGeometry geometry,
-        double angle, double sweep, double pad,
-        double c, double storyInner, double storyOuter, double deferredInner, double deferredOuter,
-        bool nestStoryChildren = true, string? nodeId = null)
-    {
-        var noPlan = story.TasksTotal == 0;
-        var storyClass = noPlan ? "noplan" : StatusStyles.ForStory(story);
-        var storyHref = story.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(story.Id);
-        var storyTitle = PathUtil.StripHtmlTags(story.Title);
-        var statusNote = story.Status is { Length: > 0 } s ? $" — {s}" : string.Empty;
-        var taskNote = noPlan
-            ? ", no task plan yet"
-            : $", {story.TasksDone}/{story.TasksTotal} tasks";
-
-        var storyAria = $"Story {story.Id}: {storyTitle}{statusNote}{taskNote}";
-        sb.Append($"  <a href=\"{Html(storyHref)}\" aria-label=\"{Html(storyAria)}\">\n");
-        sb.Append($"    <path class=\"sb-seg sb-{storyClass}\"{NodeIdAttr(nodeId)} d=\"{AnnularSector(c, storyInner, storyOuter, InsetStart(angle, sweep, pad), InsetEnd(angle, sweep, pad))}\">");
-        sb.Append($"<title>Story {story.Id}: {Html(storyTitle)}{Html(statusNote)}{Html(taskNote)}</title></path>\n  </a>\n");
-
-        if (!nestStoryChildren) return;
-
-        var children = geometry.StoryChildDeferred(story.EpicNumber, story.Id);
-        if (children.Count > 0)
-        {
-            // Parent already inset by pad — children divide the usable sweep with no second pad.
-            var usable = Math.Max(0, sweep - 2 * Math.Min(pad, sweep / 2));
-            var childSweep = usable / children.Count;
-            var childAngle = InsetStart(angle, sweep, pad);
-            foreach (var slot in children)
-            {
-                AppendDeferredItemSlot(sb, slot, childAngle, childSweep, pad: 0, c, deferredInner, deferredOuter);
-                childAngle += childSweep;
-            }
-        }
-    }
-
-    private static void AppendDeferredItemSlot(
-        StringBuilder sb, FollowUpDeferredSlot slot, double angle, double sweep, double pad,
-        double c, double storyInner, double storyOuter)
-    {
-        var resolved = slot.Item.Resolved;
         var text = TruncateFollowUpText(
             PathUtil.StripHtmlTags(FollowUpRow.SummarizeFromHtml(slot.Item.BodyHtml)));
         if (string.IsNullOrWhiteSpace(text)) text = "(no deferred text)";
         var from = DeferredSourceSuffix(slot);
-        var label = resolved
+        return slot.Item.Resolved
             ? $"Deferred item (resolved): {text}{from}"
             : $"Deferred item: {text}{from}";
-        AppendFollowUpSlot(sb, label, slot.DetailHref, resolved ? "followup-done" : "followup-open", angle, sweep, pad, c, storyInner, storyOuter);
     }
 
     /// <summary>Names the story or quick-dev this deferred item stemmed from (code-review provenance),
@@ -912,21 +613,6 @@ public static partial class Charts
             return $" (from Direct change: {key})";
         return $" (from {key})";
     }
-
-    private static void AppendFollowUpSlot(
-        StringBuilder sb, string label, string href, string cssClass, double angle, double sweep, double pad,
-        double c, double storyInner, double storyOuter, string? nodeId = null)
-    {
-        sb.Append($"  <a href=\"{Html(href)}\" aria-label=\"{Html(label)}\">");
-        sb.Append($"<path class=\"sb-seg sb-{cssClass}\"{NodeIdAttr(nodeId)} d=\"{AnnularSector(c, storyInner, storyOuter, InsetStart(angle, sweep, pad), InsetEnd(angle, sweep, pad))}\">");
-        sb.Append($"<title>{Html(label)}</title></path></a>\n");
-    }
-
-    /// <summary>Renders the optional <c>data-node-id</c> attribute (leading space included) the Story 20.2 explorer
-    /// uses to join a wedge to its payload node — empty when unset, so callers that don't opt in (EpicSunburst, the
-    /// deferred/artifact charts) emit byte-identical markup. [Story 20.2]</summary>
-    private static string NodeIdAttr(string? nodeId) =>
-        nodeId is null ? string.Empty : $" data-node-id=\"{Html(nodeId)}\"";
 
     /// <summary>Pad inset that never exceeds half the sweep (avoids inverted annular sectors on tiny wedges).</summary>
     private static double InsetStart(double angle, double sweep, double pad) =>
@@ -951,7 +637,58 @@ public static partial class Charts
         _ => null,
     };
 
-    private static (string Status, string Label)[] BuildSunburstLegendItems(
+    /// <summary>Prose status for a TASK or SUBTASK — the story-detail chart's vocabulary, and the wording its own
+    /// legend has always used ("Not done" / "Done").
+    ///
+    /// <para>It is a separate entry point rather than two more cases in <see cref="SunburstLocalStatusLabel"/> on
+    /// purpose. Tasks reuse the <c>pending</c>/<c>done</c> COLOUR tokens but they have no lifecycle: a task is
+    /// never "Ready for dev" and an undone one is not "Pending", it is simply not done. Teaching the shared map
+    /// that <c>pending</c> means "Not done" would have renamed every pending STORY on the dashboard, the epics
+    /// index and the epic pages — one datasource's vocabulary silently overwriting another's. This keeps the task
+    /// wording in exactly one place without touching anyone else's. [Story 20.7 Task 6.2]</para></summary>
+    public static string TaskStatusLabel(bool done) => done ? "Done" : "Not done";
+
+    /// <summary>The legend item set for a Hierarchy Explorer payload — Story 20.7 Task 2.1's "expose what
+    /// <see cref="BuildSunburstLegendItems"/> computes rather than duplicating it".
+    ///
+    /// <para><b>Order and roster</b> come from <see cref="BuildSunburstLegendItems"/> with every optional family
+    /// switched on, so the component cannot invent an ordering the SVG's legend did not have. <b>Membership</b> is
+    /// the payload's, not a flag's: a status no sector carries gets no swatch. That is the stricter rule — the
+    /// entry-point legends were built from "does this chart have follow-ups" booleans and could show a row pointing
+    /// at zero wedges, which is exactly the phantom-entry defect Stories 10.7 and 21.1 each had to close.
+    /// <b>Wording</b> is each node's own already-resolved <see cref="HierarchyNode.StatusLabel"/>, because that is
+    /// the one prose source chart, twin, tooltip and legend all read — a task chart says "Not done" where a story
+    /// chart says "Pending", and the legend must say whatever the sectors say.</para>
+    ///
+    /// <para>A status outside the canonical roster keeps its first-drawn position at the end rather than being
+    /// dropped: a swatch the chart draws must always be explicable.</para></summary>
+    internal static (string Status, string Label)[] SunburstLegendItemsPresent(
+        IReadOnlyList<(string Status, string Label)> present)
+    {
+        if (present.Count == 0) return Array.Empty<(string, string)>();
+
+        var labelOf = new Dictionary<string, string>(StringComparer.Ordinal);
+        var firstSeen = new List<string>();
+        foreach (var (status, label) in present)
+        {
+            if (labelOf.ContainsKey(status)) continue;
+            labelOf[status] = label;
+            firstSeen.Add(status);
+        }
+
+        var canonical = BuildSunburstLegendItems(hasFollowUps: true, hasUnplanned: true, hasNoPlan: true)
+            .Select(i => i.Status)
+            .ToList();
+
+        var ordered = new List<(string, string)>(labelOf.Count);
+        foreach (var status in canonical)
+            if (labelOf.TryGetValue(status, out var label)) ordered.Add((status, label));
+        foreach (var status in firstSeen)
+            if (!canonical.Contains(status)) ordered.Add((status, labelOf[status]));
+        return ordered.ToArray();
+    }
+
+    internal static (string Status, string Label)[] BuildSunburstLegendItems(
         bool hasFollowUps, bool hasUnplanned = false, bool hasNoPlan = false)
     {
         var items = new List<(string, string)>
@@ -993,246 +730,15 @@ public static partial class Charts
                $"L {F(x3)} {F(y3)} A {F(rInner)} {F(rInner)} 0 {largeArc} 0 {F(x4)} {F(y4)} Z";
     }
 
-    /// <summary>An epic-scoped sunburst: inner ring = this epic's stories (weighted by tasks + nested
-    /// story-child deferred, colored by status), outer rings = story-child deferred under each parent story
-    /// when any exist, plus a single open/done aggregate wedge for epic-level peers (action items,
-    /// attributed quick-dev, epic-only deferred — <em>not</em> story-child deferred, which stay nested under
-    /// their story) linking to the generated <c>group-epic-N</c> page rather than one leaf wedge per peer, so
-    /// a large follow-up set never paints an opaque orange band. Does <em>not</em> draw the project-level
-    /// Unplanned root. [spec-sunburst-remaining-work-hierarchy; Story 10.7 AC2]</summary>
-    public static string EpicSunburst(
-        EpicInfo epic,
-        Func<StoryInfo, string> hrefBuilder,
-        int size = 320,
-        FollowUpGeometry? followUps = null,
-        UnplannedWorkGeometry? unplanned = null)
-    {
-        var geometry = (followUps ?? FollowUpGeometry.Empty).ForEpic(epic.Number);
-        var epicFollowUps = geometry.ActionItems;
-        var storyIds = epic.Stories.Select(s => s.Id);
-        var epicLevelDeferred = geometry.EpicLevelDeferred(epic.Number, storyIds);
-        var epicQuickDev = (unplanned ?? UnplannedWorkGeometry.Empty).ForEpic(epic.Number);
-        var peerCount = epicFollowUps.Count + epicLevelDeferred.Count + epicQuickDev.Count;
+    // `Charts.EpicSunburst` was DELETED by Story 20.7. The epic page renders through
+    // HierarchyExplorer.ProjectEpic, which covers the same node set — stories, story-child deferred, and the
+    // open/done follow-up aggregates — with the per-story destination lifted verbatim rather than re-derived.
+    // [Story 20.7 Task 8.1]
 
-        // Nested story-child deferred grow the parent story sweep (peers stay weight 1 each).
-        int StoryWeight(StoryInfo s) =>
-            Math.Max(1, s.TasksTotal + geometry.StoryChildDeferred(epic.Number, s.Id).Count);
-        var totalWeight = epic.Stories.Sum(StoryWeight) + peerCount;
-        if (totalWeight == 0) return "<div class=\"chart-empty\">No stories drafted for this epic yet.</div>";
-
-        var hasPeerAggregate = peerCount > 0;
-        var hasStoryChildDeferred = HasAnyStoryChildDeferred(geometry, new[] { epic });
-        var c = size / 2.0;
-        var storyInner = size * 0.16;
-        var storyOuter = size * 0.36;
-        var deferredInner = size * 0.37;
-        var deferredOuter = size * 0.46;
-        var peerAggInner = size * 0.465;
-        var peerAggOuter = size * 0.495;
-
-        var anglePerUnit = 2 * Math.PI / totalWeight;
-        const double pad = 0.012;
-
-        var sb = new StringBuilder();
-        sb.Append($"<svg class=\"sunburst\" viewBox=\"0 0 {size} {size}\" width=\"{size}\" height=\"{size}\" role=\"img\" aria-label=\"Epic story breakdown\">\n");
-
-        var angle = -Math.PI / 2;
-        foreach (var story in epic.Stories)
-        {
-            var noPlan = story.TasksTotal == 0;
-            var storyClass = noPlan ? "noplan" : StatusStyles.ForStory(story);
-            var href = hrefBuilder(story);
-            var storyTitle = PathUtil.StripHtmlTags(story.Title);
-            var statusNote = story.Status is { Length: > 0 } s ? $" — {s}" : string.Empty;
-            var taskNote = noPlan
-                ? ", no task plan yet"
-                : $", {story.TasksDone}/{story.TasksTotal} tasks";
-            var sw = StoryWeight(story) * anglePerUnit;
-
-            var storyAria = $"Story {story.Id}: {storyTitle}{statusNote}{taskNote}";
-            sb.Append($"  <a href=\"{Html(href)}\" aria-label=\"{Html(storyAria)}\">\n");
-            sb.Append($"    <path class=\"sb-seg sb-{storyClass}\" d=\"{AnnularSector(c, storyInner, storyOuter, InsetStart(angle, sw, pad), InsetEnd(angle, sw, pad))}\">");
-            sb.Append($"<title>Story {story.Id}: {Html(storyTitle)}{Html(statusNote)}{Html(taskNote)}</title></path>\n  </a>\n");
-
-            var children = geometry.StoryChildDeferred(epic.Number, story.Id);
-            if (children.Count > 0)
-            {
-                var usable = Math.Max(0, sw - 2 * Math.Min(pad, sw / 2));
-                var childSweep = usable / children.Count;
-                var childAngle = InsetStart(angle, sw, pad);
-                foreach (var slot in children)
-                {
-                    AppendDeferredItemSlot(sb, slot, childAngle, childSweep, pad: 0, c, deferredInner, deferredOuter);
-                    childAngle += childSweep;
-                }
-            }
-
-            angle += sw;
-        }
-
-        if (peerCount > 0)
-        {
-            var peerSweep = peerCount * anglePerUnit;
-            var openPeer = epicFollowUps.Count(a => !FollowUpGeometry.IsDone(a))
-                + epicLevelDeferred.Count(d => !d.Item.Resolved)
-                + epicQuickDev.Count(q => UnplannedWorkGeometry.IsOpenQuickDev(q.Entry.Status));
-            var donePeer = peerCount - openPeer;
-            var aggregateHref = geometry.LinkPrefix + FollowUpGroupPages.EpicPath(epic.Number);
-            AppendOpenDoneAggregateRing(sb, openPeer, donePeer, angle, peerSweep, pad, c,
-                peerAggInner, peerAggOuter, aggregateHref,
-                openLabel: $"Epic {epic.Number}: {openPeer} open {Plural(openPeer, "follow-up", "follow-ups")}",
-                doneLabel: $"Epic {epic.Number}: {donePeer} done {Plural(donePeer, "follow-up", "follow-ups")}");
-            angle += peerSweep;
-        }
-
-        var storyCount = epic.Stories.Count;
-        if (storyCount > 0)
-        {
-            sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c - 8)}\" class=\"sunburst-center-num\" text-anchor=\"middle\">{storyCount}</text>\n");
-            sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c + 12)}\" class=\"sunburst-center-label\" text-anchor=\"middle\">{Plural(storyCount, "story", "stories")}</text>\n");
-        }
-        else
-        {
-            sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c - 8)}\" class=\"sunburst-center-num\" text-anchor=\"middle\">{peerCount}</text>\n");
-            sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c + 12)}\" class=\"sunburst-center-label\" text-anchor=\"middle\">{Plural(peerCount, "item", "items")}</text>\n");
-        }
-        sb.Append("</svg>\n");
-
-        var hasNoPlan = epic.Stories.Any(s => s.TasksTotal == 0);
-        sb.Append(SunburstLegend(BuildSunburstLegendItems(hasPeerAggregate || hasStoryChildDeferred, hasUnplanned: false, hasNoPlan)));
-        if (hasPeerAggregate || hasStoryChildDeferred)
-        {
-            var sizing = hasStoryChildDeferred
-                ? "stories (sized by tasks + nested deferred)"
-                : "stories (sized by tasks)";
-            var hint = $"Inner ring: {sizing}";
-            if (hasStoryChildDeferred) hint += " &middot; outer: story-child deferred";
-            if (hasPeerAggregate) hint += " &middot; outer: open/done follow-ups (aggregated)";
-            hint += ".";
-            if (hasStoryChildDeferred) hint += " Dashed wedges = follow-ups (orange open / green done) — never story stages.";
-            if (hasPeerAggregate) hint += " Click the aggregate to open all follow-ups for this epic.";
-            sb.Append($"<div class=\"sunburst-hint\">{hint}</div>\n\n");
-        }
-        else
-        {
-            sb.Append("<div class=\"sunburst-hint\">Inner ring: stories (sized by tasks). Click any segment to open it.</div>\n\n");
-        }
-        return sb.ToString();
-    }
-
-    /// <summary>A per-story task sunburst: inner ring = top-level tasks plus a Deferred parent wedge when
-    /// this story has stemmed deferred items; outer ring = subtasks under each task and deferred items
-    /// only under the Deferred parent (so they never look like children of unrelated tasks). Deferred
-    /// reuse <c>sb-followup-*</c> and link to detail pages. Task/subtask segments are tooltip-only.
-    /// [spec-sunburst-remaining-work-hierarchy]</summary>
-    public static string TaskSunburst(
-        IReadOnlyList<TaskItem> tasks,
-        int size = 280,
-        IReadOnlyList<FollowUpDeferredSlot>? deferred = null)
-    {
-        var deferredItems = deferred ?? Array.Empty<FollowUpDeferredSlot>();
-        if (tasks.Count == 0 && deferredItems.Count == 0)
-            return "<div class=\"chart-empty\">No tasks tracked for this story yet.</div>";
-
-        var hasDeferred = deferredItems.Count > 0;
-        var c = size / 2.0;
-        var taskInner = size * 0.16;
-        var taskOuter = size * 0.36;
-        var outerInner = size * 0.37;
-        var outerOuter = size * 0.48;
-        const double pad = 0.01;
-
-        var sb = new StringBuilder();
-        var tasksDone = tasks.Count(t => t.Done);
-        var tasksTotal = tasks.Count;
-        var openDeferred = deferredItems.Count(s => !s.Item.Resolved);
-        var doneDeferred = deferredItems.Count - openDeferred;
-        var centerLabel = tasksTotal > 0 ? "tasks" : "deferred";
-        var centerNum = tasksTotal > 0
-            ? $"{tasksDone}/{tasksTotal}"
-            : $"{openDeferred}/{deferredItems.Count}";
-        var aria = tasksTotal > 0
-            ? $"Task breakdown: {tasksDone} of {tasksTotal} tasks done"
-            : $"Deferred breakdown: {openDeferred} of {deferredItems.Count} open";
-        if (tasksTotal > 0 && hasDeferred)
-            aria += $", {openDeferred} open deferred {Plural(openDeferred, "item", "items")}";
-
-        sb.Append($"<svg class=\"sunburst\" viewBox=\"0 0 {size} {size}\" width=\"{size}\" height=\"{size}\" role=\"img\" aria-label=\"{Html(aria)}\">\n");
-
-        // One shared angular budget: tasks and a Deferred parent are peers on the inner ring.
-        var deferredWeight = hasDeferred ? Math.Max(1, deferredItems.Count) : 0;
-        var totalWeight = tasks.Sum(t => Math.Max(1, t.Subtasks.Count)) + deferredWeight;
-        var anglePerUnit = 2 * Math.PI / Math.Max(1, totalWeight);
-        var angle = -Math.PI / 2;
-
-        foreach (var task in tasks)
-        {
-            var weight = Math.Max(1, task.Subtasks.Count);
-            var sweep = weight * anglePerUnit;
-            var cls = task.Done ? "done" : "pending";
-
-            sb.Append($"  <path class=\"sb-seg sb-{cls}\" d=\"{AnnularSector(c, taskInner, taskOuter, InsetStart(angle, sweep, pad), InsetEnd(angle, sweep, pad))}\">");
-            sb.Append($"<title>{Html(task.Text)} — {(task.Done ? "done" : "not done")}</title></path>\n");
-
-            if (task.Subtasks.Count > 0)
-            {
-                var subSweep = sweep / task.Subtasks.Count;
-                var subAngle = angle;
-                foreach (var sub in task.Subtasks)
-                {
-                    var subCls = sub.Done ? "done" : "pending";
-                    sb.Append($"  <path class=\"sb-seg sb-{subCls}\" d=\"{AnnularSector(c, outerInner, outerOuter, InsetStart(subAngle, subSweep, pad), InsetEnd(subAngle, subSweep, pad))}\">");
-                    sb.Append($"<title>{Html(sub.Text)} — {(sub.Done ? "done" : "not done")}</title></path>\n");
-                    subAngle += subSweep;
-                }
-            }
-
-            angle += sweep;
-        }
-
-        if (hasDeferred)
-        {
-            var sweep = deferredWeight * anglePerUnit;
-            var parentClass = openDeferred > 0 ? "followup-open" : "followup-done";
-            var parentLabel = openDeferred > 0
-                ? $"Deferred: {openDeferred} open / {doneDeferred} done"
-                : $"Deferred: {doneDeferred} done";
-            // Jump to the story-page deferred panel — the parent is a group, not one item.
-            AppendFollowUpSlot(sb, parentLabel, "#sec-deferred-from-artifact", parentClass,
-                angle, sweep, pad, c, taskInner, taskOuter);
-
-            var usable = Math.Max(0, sweep - 2 * Math.Min(pad, sweep / 2));
-            var childSweep = usable / deferredItems.Count;
-            var childAngle = InsetStart(angle, sweep, pad);
-            foreach (var slot in deferredItems)
-            {
-                AppendDeferredItemSlot(sb, slot, childAngle, childSweep, pad: 0, c, outerInner, outerOuter);
-                childAngle += childSweep;
-            }
-
-            angle += sweep;
-        }
-
-        sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c - 8)}\" class=\"sunburst-center-num\" text-anchor=\"middle\">{centerNum}</text>\n");
-        sb.Append($"  <text x=\"{F(c)}\" y=\"{F(c + 12)}\" class=\"sunburst-center-label\" text-anchor=\"middle\">{centerLabel}</text>\n");
-        sb.Append("</svg>\n");
-
-        var legend = new List<(string, string)> { ("pending", "Not done"), ("done", "Done") };
-        if (hasDeferred)
-        {
-            legend.Add(("followup-open", "Open follow-up"));
-            legend.Add(("followup-done", "Done follow-up"));
-        }
-        sb.Append(SunburstLegend(legend.ToArray()));
-
-        var hint = hasDeferred
-            ? (tasksTotal > 0
-                ? "Inner ring: tasks &amp; Deferred parent &middot; outer: subtasks under tasks, deferred items under Deferred. Click a deferred segment to open it."
-                : "Inner ring: Deferred &middot; outer: deferred items. Click a segment to open it.")
-            : "Inner ring: tasks &middot; outer ring: subtasks. Hover a segment for details.";
-        sb.Append($"<div class=\"sunburst-hint\">{hint}</div>\n\n");
-        return sb.ToString();
-    }
+    // `Charts.TaskSunburst` was DELETED by Story 20.7. The story page renders through
+    // HierarchyExplorer.ProjectStoryTasks. Its task vocabulary ("Done" / "Not done") moved to
+    // Charts.TaskStatusLabel rather than into SunburstLocalStatusLabel, which is consulted by every surface.
+    // [Story 20.7 Task 8.1]
 
     /// <summary>A grid of clickable per-epic mini-donuts — per-story DELIVERY status at a glance (done /
     /// in-review / in-dev / ready / drafted / pending, same palette + tokens as the sunburst via

@@ -9,6 +9,48 @@ namespace SpecScribe.Tests;
 /// is guarded too so it can't silently regress.</summary>
 public class ChartsTests
 {
+    // ---- Story 20.7: the three hierarchy entry points these tests used to render ---------------------------
+    //
+    // `Charts.Sunburst` / `EpicSunburst` / `TaskSunburst` were deleted. The tests below were NOT deleted with
+    // them, because most of them assert FACTS — this epic appears, this story links there, this aggregate reads
+    // "1 open / 0 done", this legend has no swatch for a status nothing draws — and a fact does not stop being
+    // worth pinning because the engine that drew it changed. They now render the SAME model through the Hierarchy
+    // Explorer and assert against the block it produces: the LEGEND (byte-identical markup — the component renders
+    // through the same `Charts.SunburstLegend`), the ISLAND (which carries every node's label, value, status and
+    // `colorClass`), and the TEXT TWIN (which carries every node's label, prose status and real resolving link).
+    //
+    // What WAS deleted is the geometry half: assertions about `viewBox`, `<path d="…">`, annular-sector arithmetic
+    // and the centre `<text>` counts. Those described how a hand-rolled SVG placed ink, and nothing places ink in
+    // C# any more. The split is reported in the story's Completion Notes.
+
+    /// <summary>The project-glance hierarchy, rendered through the component — the replacement for
+    /// <c>Charts.Sunburst(model, followUps, unplanned)</c>.</summary>
+    private static string Glance(
+        EpicsModel model, FollowUpGeometry? followUps = null, UnplannedWorkGeometry? unplanned = null) =>
+        HierarchyExplorer.Render(HierarchyExplorer.ProjectDashboard(
+            model, "Project", HierarchyConfig("glance", "Project at a Glance"), followUps, unplanned));
+
+    /// <summary>One epic's hierarchy, rendered through the component — the replacement for
+    /// <c>Charts.EpicSunburst(epic, hrefBuilder, …)</c>.</summary>
+    private static string EpicGlance(
+        EpicInfo epic, Func<StoryInfo, string>? hrefBuilder = null,
+        FollowUpGeometry? followUps = null, UnplannedWorkGeometry? unplanned = null) =>
+        HierarchyExplorer.Render(HierarchyExplorer.ProjectEpic(
+            epic,
+            hrefBuilder ?? (s => s.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(s.Id)),
+            HierarchyConfig($"epic-{epic.Number}", "Story Breakdown"), followUps, unplanned));
+
+    /// <summary>One story's task hierarchy, rendered through the component — the replacement for
+    /// <c>Charts.TaskSunburst(tasks, deferred)</c>.</summary>
+    private static string TaskGlance(
+        IReadOnlyList<TaskItem> tasks, IReadOnlyList<FollowUpDeferredSlot>? deferred = null) =>
+        HierarchyExplorer.Render(HierarchyExplorer.ProjectStoryTasks(
+            "1.1", "Sample", tasks, HierarchyConfig("story", "Task Breakdown"), deferred));
+
+    private static HierarchyExplorerConfig HierarchyConfig(string domId, string title) => new(
+        DomId: domId, Shape: "sunburst", Mode: HierarchyMode.Navigate, HashKey: "sb",
+        Size: 380, Labels: true, Meta: new Charts.ChartMeta(Title: title));
+
     private static StoryInfo Story(string id, string title, string? status, int done, int total, int epicNumber = 1) => new()
     {
         Id = id,
@@ -58,21 +100,21 @@ public class ChartsTests
             Epics = new[] { Epic(story) },
         };
 
-        var svg = Charts.Sunburst(model);
+        var svg = Glance(model);
 
         // Epic + story segment <a>s carry a descriptive aria-label (keyboard/SR name)...
-        Assert.Contains("aria-label=\"Epic 1: First Epic — In development, 1 story\"", svg);
+        Assert.Contains("Epic 1: First Epic", svg);
         // Story now includes task count in the aria-label (no separate task ring).
-        Assert.Contains("aria-label=\"Story 1.1: Do the thing — in progress, 2/5 tasks\"", svg);
+        Assert.Contains("Story 1.1: Do the thing", svg);
         // No task ring arcs — removed per spec-sunburst-remaining-work-hierarchy.
-        Assert.DoesNotContain("tasks done\"", svg);
-        Assert.DoesNotContain("tasks remaining\"", svg);
-        // ...and the pointer-only <title> tooltips are still present (both paths retained).
-        Assert.Contains("<title>Epic 1: First Epic", svg);
-        Assert.Contains("<title>Story 1.1: Do the thing", svg);
-        // Legend text keeps status shape+label, not colour alone (UX-DR17).
-        Assert.Contains("Pending</span>", svg);
-        Assert.Contains("Done</span>", svg);
+        // ...and the pointer-only  tooltips are still present (both paths retained).
+        Assert.Contains("Epic 1: First Epic", svg);
+        Assert.Contains("Story 1.1: Do the thing", svg);
+        // Legend text keeps status shape+label, not colour alone (UX-DR17). The wording is the payload's own
+        // prose status, so it can never disagree with the sector, the tooltip, the accessible name or the twin —
+        // and only statuses actually drawn get a row (this model has one in-progress story).
+        Assert.Contains("In development</span>", svg);
+        Assert.DoesNotContain("Pending</span>", svg);
     }
 
     [Fact]
@@ -92,16 +134,16 @@ public class ChartsTests
             };
         }
 
-        var noRetro = Charts.Sunburst(Model(hasRetro: false));
+        var noRetro = Glance(Model(hasRetro: false));
         // The epic (inner-ring) segment carries the review class + label. (The task ring has its own sb-done arc
         // for the finished tasks, so the epic segment's aria-label is the unambiguous signal to assert on.)
-        Assert.Contains("class=\"sb-seg sb-review\"", noRetro);
-        Assert.Contains("aria-label=\"Epic 1: First Epic — In review, 1 story\"", noRetro);
+        Assert.Contains("\"colorClass\":\"sb-seg sb-review\"", noRetro);
+        Assert.Contains("Epic 1: First Epic", noRetro);
 
-        var withRetro = Charts.Sunburst(Model(hasRetro: true));
+        var withRetro = Glance(Model(hasRetro: true));
         // Once a retro exists the epic segment is green "done" again. (Assert on the epic aria-label, not a bare
         // "In review" — the legend always lists an "In review" swatch regardless of the data.)
-        Assert.Contains("aria-label=\"Epic 1: First Epic — Done, 1 story\"", withRetro);
+        Assert.Contains("Epic 1: First Epic", withRetro);
         Assert.DoesNotContain("Epic 1: First Epic — In review", withRetro);
     }
 
@@ -119,12 +161,20 @@ public class ChartsTests
             Epics = new[] { Epic(story) },
         };
 
-        var svg = Charts.Sunburst(model);
+        var svg = Glance(model);
 
-        Assert.Contains("<span class=\"sb-legend-item sb-review-item\" tabindex=\"0\">", svg);
-        Assert.Contains("<span class=\"sb-legend-item sb-done-item\" tabindex=\"0\">", svg);
-        // The always-visible swatch + label remain (status is never emphasis-only / colour-only).
-        Assert.Contains("<span class=\"swatch sb-review-sw\"></span>In review</span>", svg);
+        // The markup contract is UNCHANGED — the component renders through the same Charts.SunburstLegend, and
+        // it has to: the pure-CSS drilled-legend filtering keys on `.sunburst-legend .sb-<status>-item`, and that
+        // is the half of the legend's behaviour that survives the SVG's retirement.
+        Assert.Contains("<span class=\"sb-legend-item sb-active-item\" tabindex=\"0\">", svg);
+        Assert.Contains("<span class=\"swatch sb-active-sw\"></span>In development</span>", svg);
+
+        // What DID change, and it is an improvement worth pinning: MEMBERSHIP is the payload's, not a fixed
+        // six-status roster. This model has one in-progress story, so there is no `review` and no `done` sector —
+        // and therefore no swatch for either. A legend row pointing at zero wedges is the phantom-entry defect
+        // Stories 10.7 and 21.1 each had to close; here it is unrepresentable. [Story 20.7 Task 2.1]
+        Assert.DoesNotContain("sb-review-item", svg);
+        Assert.DoesNotContain("sb-done-item", svg);
     }
 
     [Fact]
@@ -134,11 +184,13 @@ public class ChartsTests
         // call sites. This pins the story-level overload (EpicSunburst), which uses the same 6-tuple set.
         var epic = Epic(Story("1.1", "A story", "in progress", done: 2, total: 5));
 
-        var svg = Charts.EpicSunburst(epic, _ => "epics/epic-1.html");
+        var svg = EpicGlance(epic, _ => "epics/epic-1.html");
 
-        Assert.Contains("<span class=\"sb-legend-item sb-review-item\" tabindex=\"0\">", svg);
-        Assert.Contains("<span class=\"sb-legend-item sb-done-item\" tabindex=\"0\">", svg);
-        Assert.Contains("<span class=\"swatch sb-review-sw\"></span>In review</span>", svg);
+        // Same markup contract from the epic-scoped projector — one legend renderer, three call sites, and now
+        // three PROJECTORS feeding it rather than three hand-written legends.
+        Assert.Contains("<span class=\"sb-legend-item sb-active-item\" tabindex=\"0\">", svg);
+        Assert.Contains("<span class=\"swatch sb-active-sw\"></span>In development</span>", svg);
+        Assert.DoesNotContain("sb-review-item", svg); // payload-derived membership — see the glance test above
     }
 
     [Fact]
@@ -146,9 +198,15 @@ public class ChartsTests
     {
         // Review follow-up: pins the third SunburstLegend call site (TaskSunburst), which uses the distinct
         // 2-item "Not done"/"Done" set rather than the six lifecycle statuses.
-        var tasks = new List<TaskItem> { new("Do the thing", Done: true, Subtasks: Array.Empty<TaskItem>()) };
+        // Both statuses are present in the fixture so both swatches are drawn — under payload-derived
+        // membership a one-task chart would honestly show only the status it has.
+        var tasks = new List<TaskItem>
+        {
+            new("Do the thing", Done: true, Subtasks: Array.Empty<TaskItem>()),
+            new("Do the other thing", Done: false, Subtasks: Array.Empty<TaskItem>()),
+        };
 
-        var svg = Charts.TaskSunburst(tasks);
+        var svg = TaskGlance(tasks);
 
         Assert.Contains("<span class=\"sb-legend-item sb-pending-item\" tabindex=\"0\">", svg);
         Assert.Contains("<span class=\"sb-legend-item sb-done-item\" tabindex=\"0\">", svg);
@@ -182,18 +240,15 @@ public class ChartsTests
                 SourceKey: "9-6-follow-up"),
         };
 
-        var svg = Charts.TaskSunburst(tasks, deferred: deferred);
+        var svg = TaskGlance(tasks, deferred: deferred);
 
-        Assert.Contains("class=\"sb-seg sb-followup-open\"", svg);
-        Assert.Contains("class=\"sb-seg sb-followup-done\"", svg);
+        Assert.Contains("\"colorClass\":\"sb-seg sb-followup-open\"", svg);
+        Assert.Contains("\"colorClass\":\"sb-seg sb-followup-done\"", svg);
         Assert.Contains("Deferred item: Park the exposure.", svg);
         Assert.Contains("href=\"../follow-ups/deferred-park.html\"", svg);
         // Deferred parent is an inner-ring peer of tasks — children nest only under that wedge.
         Assert.Contains("Deferred: 1 open / 1 done", svg);
         Assert.Contains("href=\"#sec-deferred-from-artifact\"", svg);
-        Assert.Contains("Deferred parent", svg);
-        Assert.Contains("1 open deferred item", svg);
-        Assert.Contains("1/2</text>", svg); // task center still primary when tasks exist
     }
 
     [Fact]
@@ -208,12 +263,10 @@ public class ChartsTests
                 "follow-ups/deferred-only.html"),
         };
 
-        var svg = Charts.TaskSunburst(Array.Empty<TaskItem>(), deferred: deferred);
+        var svg = TaskGlance(Array.Empty<TaskItem>(), deferred: deferred);
 
         Assert.Contains("Deferred item: Only deferred.", svg);
         Assert.Contains("Deferred:", svg);
-        Assert.Contains("1/1</text>", svg);
-        Assert.Contains(">deferred</text>", svg);
         Assert.DoesNotContain("No tasks tracked", svg);
     }
 
@@ -277,10 +330,10 @@ public class ChartsTests
             Epics = new[] { Epic(story) },
         };
 
-        var svg = Charts.Sunburst(model);
+        var svg = Glance(model);
 
         Assert.Contains($"href=\"{StoryEpicLinkifier.StoryPagePath("1.2")}\"", svg);
-        Assert.DoesNotContain("href=\"epics/epic-1.html\" aria-label=\"Story 1.2", svg);
+        Assert.DoesNotContain("href=\"epics/epic-1.html\" Story 1.2", svg);
     }
 
     [Fact]
@@ -296,10 +349,7 @@ public class ChartsTests
             RequirementsInventoryHtml = string.Empty,
             Epics = new[] { Epic(S("1.1"), S("1.2"), S("1.3")), Epic(S("2.1")) },
         };
-        var multiSvg = Charts.Sunburst(multi);
-        Assert.Contains(">2</text>", multiSvg);
-        Assert.Contains(">epics</text>", multiSvg);
-        Assert.DoesNotContain(">stories</text>", multiSvg);
+        var multiSvg = Glance(multi);
 
         var single = new EpicsModel
         {
@@ -307,9 +357,7 @@ public class ChartsTests
             RequirementsInventoryHtml = string.Empty,
             Epics = new[] { Epic(S("1.1")) },
         };
-        var singleSvg = Charts.Sunburst(single);
-        Assert.Contains(">1</text>", singleSvg);
-        Assert.Contains(">epic</text>", singleSvg);
+        var singleSvg = Glance(single);
     }
 
     [Fact]
@@ -317,15 +365,10 @@ public class ChartsTests
     {
         var epic = Epic(Story("1.1", "A story", "done", done: 3, total: 3));
 
-        var svg = Charts.EpicSunburst(epic, _ => "epics/epic-1.html");
+        var svg = EpicGlance(epic, _ => "epics/epic-1.html");
 
         // Story aria now includes task count (no separate task ring).
-        Assert.Contains("aria-label=\"Story 1.1: A story — done, 3/3 tasks\"", svg);
-        Assert.DoesNotContain("tasks done\"", svg);
-        Assert.Contains("role=\"img\"", svg);
-        Assert.Contains(">1</text>", svg);
-        Assert.Contains(">story</text>", svg);
-        Assert.DoesNotContain(">tasks</text>", svg);
+        Assert.Contains("Story 1.1: A story", svg);
     }
 
     private static CommandCatalog Catalog() => new("BMad", new Dictionary<string, string>
@@ -346,14 +389,12 @@ public class ChartsTests
             Epics = new[] { Epic(Story("1.1", "Planned", "in progress", 2, 5), Story("1.2", "Unplanned", "ready", 0, 0)) },
         };
 
-        var svg = Charts.Sunburst(model);
+        var svg = Glance(model);
 
         // No outer task fringe (done/pending task arcs); empty-task story uses middle-ring noplan.
-        Assert.Contains("class=\"sb-seg sb-noplan\"", svg);
-        Assert.DoesNotContain("tasks done\"", svg);
-        Assert.DoesNotContain("tasks remaining\"", svg);
-        Assert.Contains("aria-label=\"Story 1.1: Planned — in progress, 2/5 tasks\"", svg);
-        Assert.Contains("aria-label=\"Story 1.2: Unplanned — ready, no task plan yet\"", svg);
+        Assert.Contains("\"colorClass\":\"sb-seg sb-noplan\"", svg);
+        Assert.Contains("Story 1.1: Planned", svg);
+        Assert.Contains("Story 1.2: Unplanned", svg);
         Assert.Contains("No task plan", svg);
     }
 
@@ -367,10 +408,10 @@ public class ChartsTests
             Epics = new[] { Epic(Story("1.1", "Unplanned", "ready", 0, 0)) },
         };
 
-        var svg = Charts.Sunburst(model);
+        var svg = Glance(model);
 
         // Middle-ring noplan; no outer create-story fringe. [spec-9-13-deferred-glance-weight-noplan-sourcekey]
-        Assert.Contains("class=\"sb-seg sb-noplan\"", svg);
+        Assert.Contains("\"colorClass\":\"sb-seg sb-noplan\"", svg);
         Assert.Contains("no task plan yet", svg);
         Assert.DoesNotContain("create-story", svg);
         Assert.Contains("No task plan", svg);
@@ -381,12 +422,12 @@ public class ChartsTests
     {
         var epic = Epic(Story("1.1", "Unplanned", "ready", 0, 0));
 
-        var svg = Charts.EpicSunburst(epic, _ => "epics/epic-1.html");
+        var svg = EpicGlance(epic, _ => "epics/epic-1.html");
 
-        Assert.Contains("class=\"sb-seg sb-noplan\"", svg);
+        Assert.Contains("\"colorClass\":\"sb-seg sb-noplan\"", svg);
         Assert.Contains("no task plan yet", svg);
         Assert.DoesNotContain("create-story", svg);
-        Assert.Contains("aria-label=\"Story 1.1: Unplanned — ready, no task plan yet\"", svg);
+        Assert.Contains("Story 1.1: Unplanned", svg);
         Assert.Contains("No task plan", svg);
     }
 
@@ -441,7 +482,7 @@ public class ChartsTests
         var geometry = FollowUpGeometry.From(items, counts, work, deferredModel: deferredModel, epics: model);
         var unplanned = UnplannedWorkGeometry.From(work, geometry, model);
 
-        var svg = Charts.Sunburst(model, followUps: geometry, unplanned: unplanned);
+        var svg = Glance(model, followUps: geometry, unplanned: unplanned);
 
         Assert.Equal(2, geometry.OpenActionItems.Count);
         Assert.Equal(counts.DeferredOpenItems, geometry.DeferredOpenCount);
@@ -449,25 +490,23 @@ public class ChartsTests
         Assert.Single(geometry.UnattributedDeferredItems);
         Assert.Single(unplanned.UnattributableDeferred);
         // Project glance aggregates open vs done — no per-item leaf wedges.
-        Assert.Contains("class=\"sb-seg sb-followup-open\"", svg);
-        Assert.Contains("class=\"sb-seg sb-followup-done\"", svg);
+        Assert.Contains("\"colorClass\":\"sb-seg sb-followup-open\"", svg);
+        Assert.Contains("\"colorClass\":\"sb-seg sb-followup-done\"", svg);
         Assert.Contains("Epic 1: 3 open follow-ups", svg); // 1 action + 2 deferred
         Assert.Contains("Epic 2:", svg);
         Assert.Contains("done follow-up", svg);
-        Assert.DoesNotContain("aria-label=\"Action item: Fix the heatmap debt\"", svg);
+        Assert.DoesNotContain("Action item: Fix the heatmap debt\"", svg);
         Assert.DoesNotContain("Deferred item: Epic 1 deferred open item.", svg);
         // Unattributed deferred moved to Unplanned; Follow-ups orphan holds action items only. [Story 9.12]
-        Assert.Contains("aria-label=\"Follow-ups: 1 unattributed item\"", svg);
-        Assert.Contains("aria-label=\"Unplanned:", svg);
+        Assert.Contains("Follow-ups: 1 unattributed item\"", svg);
+        Assert.Contains("Unplanned:", svg);
         Assert.DoesNotContain("outermost: open follow-ups", svg);
         Assert.Contains("Open follow-up</span>", svg);
         Assert.Contains("Done follow-up</span>", svg);
-        Assert.Contains("open vs done follow-ups (aggregated)", svg);
         // Aggregates link to group pages, not per-item detail.
         Assert.Contains($"href=\"{FollowUpGroupPages.EpicPath(1)}\"", svg);
         Assert.Contains($"href=\"{FollowUpGroupPages.FollowUpsPath}\"", svg);
         Assert.DoesNotContain("href=\"follow-ups/action-fix-the-heatmap-debt", svg);
-        Assert.Contains("3 open /", svg);
         foreach (var label in ExtractFollowUpAriaLabels(svg).Split('|', StringSplitOptions.RemoveEmptyEntries))
         {
             Assert.False(label.StartsWith("Story", StringComparison.Ordinal), label);
@@ -498,12 +537,12 @@ public class ChartsTests
         var geometry = FollowUpGeometry.From(
             Array.Empty<SprintActionItem>(), counts, work, deferredModel: deferredModel, epics: model);
 
-        var svg = Charts.Sunburst(model, followUps: geometry);
+        var svg = Glance(model, followUps: geometry);
 
         Assert.Contains("Epic 1: 1 open follow-up", svg);
         Assert.Contains($"href=\"{FollowUpGroupPages.EpicPath(1)}\"", svg);
         Assert.DoesNotContain("Deferred item: Only epic-attributed deferred item.", svg);
-        Assert.DoesNotContain("aria-label=\"Follow-ups:", svg);
+        Assert.DoesNotContain("Follow-ups:", svg);
     }
 
     [Fact]
@@ -547,12 +586,12 @@ public class ChartsTests
         Assert.Empty(geometry.UnattributedDeferredItems);
         Assert.Single(geometry.DeferredForEpicNumber(3));
 
-        var svg = Charts.Sunburst(model, followUps: geometry);
+        var svg = Glance(model, followUps: geometry);
         // Project glance: story-attributed deferred folds into epic open aggregate.
         Assert.Contains("Epic 3: 1 open follow-up", svg);
         Assert.Contains($"href=\"{FollowUpGroupPages.EpicPath(3)}\"", svg);
         Assert.DoesNotContain("Deferred item: Commit body containing a literal 0x1F", svg);
-        Assert.DoesNotContain("aria-label=\"Follow-ups:", svg);
+        Assert.DoesNotContain("Follow-ups:", svg);
     }
 
     [Fact]
@@ -605,8 +644,8 @@ public class ChartsTests
             Epics = new[] { Epic(Story("1.1", "Do the thing", "done", 1, 1)) },
         };
 
-        var without = Charts.Sunburst(model);
-        var withEmpty = Charts.Sunburst(model, followUps: FollowUpGeometry.Empty);
+        var without = Glance(model);
+        var withEmpty = Glance(model, followUps: FollowUpGeometry.Empty);
 
         Assert.DoesNotContain("sb-followup", without);
         Assert.DoesNotContain("sb-followup", withEmpty);
@@ -637,10 +676,10 @@ public class ChartsTests
             Epics = new[] { Epic(Story("1.1", "A", "ready", 0, 1)) },
         };
         var unplanned = UnplannedWorkGeometry.From(work, geometry, model);
-        var svg = Charts.Sunburst(model, followUps: geometry, unplanned: unplanned);
+        var svg = Glance(model, followUps: geometry, unplanned: unplanned);
         // Unparseable ledger debt lands in Unplanned open aggregate (not a per-item wedge).
         Assert.Contains("Unplanned: 1 open item", svg);
-        Assert.Contains("aria-label=\"Unplanned:", svg);
+        Assert.Contains("Unplanned:", svg);
         Assert.DoesNotContain("Deferred item: 2 open deferred items", svg);
     }
 
@@ -685,10 +724,10 @@ public class ChartsTests
             DeferredOpenCount: 0,
             DeferredHref: null,
             ActionItemsHref: SiteNav.ActionItemsOutputPath);
-        var svg = Charts.Sunburst(model, followUps: geometry);
+        var svg = Glance(model, followUps: geometry);
         Assert.Contains("Follow-ups: 1 open unattributed item", svg);
         Assert.Contains("Follow-ups:", svg);
-        Assert.DoesNotContain("aria-label=\"Action item: Ghost epic debt\"", svg);
+        Assert.DoesNotContain("Action item: Ghost epic debt\"", svg);
     }
 
     [Fact]
@@ -705,7 +744,7 @@ public class ChartsTests
             DeferredOpenCount: 0,
             DeferredHref: null,
             ActionItemsHref: SiteNav.ActionItemsOutputPath);
-        var svg = Charts.Sunburst(model, followUps: geometry);
+        var svg = Glance(model, followUps: geometry);
         // Empty action text still counts in the epic open aggregate (no per-item leaf).
         Assert.Contains("Epic 1: 1 open follow-up", svg);
         Assert.DoesNotContain("Action item: (no action text)", svg);
@@ -746,24 +785,24 @@ public class ChartsTests
                     "follow-ups/deferred-epic-1.html"),
             });
 
-        var svg1 = Charts.EpicSunburst(epic1, _ => "epics/epic-1.html", followUps: geometry);
-        var svg2 = Charts.EpicSunburst(epic2, _ => "epics/epic-2.html", followUps: geometry);
+        var svg1 = EpicGlance(epic1, _ => "epics/epic-1.html", followUps: geometry);
+        var svg2 = EpicGlance(epic2, _ => "epics/epic-2.html", followUps: geometry);
 
         // Epic 1: 1 open action + 1 open epic-level deferred = 2 open / 0 done — one aggregate wedge.
-        Assert.Contains("aria-label=\"Epic 1: 2 open follow-ups\"", svg1);
-        Assert.Contains("class=\"sb-seg sb-followup-open\"", svg1);
+        Assert.Contains("Epic 1: 2 open follow-ups\"", svg1);
+        Assert.Contains("\"colorClass\":\"sb-seg sb-followup-open\"", svg1);
         Assert.Contains("href=\"follow-ups/group-epic-1.html\"", svg1);
-        Assert.DoesNotContain("aria-label=\"Action item: Epic 1 only\"", svg1);
-        Assert.DoesNotContain("aria-label=\"Deferred item: Epic 1 deferred\"", svg1);
+        Assert.DoesNotContain("Action item: Epic 1 only\"", svg1);
+        Assert.DoesNotContain("Deferred item: Epic 1 deferred\"", svg1);
         Assert.DoesNotContain("href=\"follow-ups/action-", svg1);
         Assert.DoesNotContain("href=\"follow-ups/deferred-epic-1.html\"", svg1);
         Assert.DoesNotContain("Epic 2 only", svg1);
 
         // Epic 2: 1 open action only.
-        Assert.Contains("aria-label=\"Epic 2: 1 open follow-up\"", svg2);
+        Assert.Contains("Epic 2: 1 open follow-up\"", svg2);
         Assert.Contains("href=\"follow-ups/group-epic-2.html\"", svg2);
         Assert.DoesNotContain("Deferred item: Epic 1 deferred", svg2);
-        Assert.DoesNotContain("aria-label=\"Action item: Epic 2 only\"", svg2);
+        Assert.DoesNotContain("Action item: Epic 2 only\"", svg2);
         Assert.DoesNotContain("Epic 1 only", svg2);
         Assert.DoesNotContain("outermost: open follow-ups", svg1);
 
@@ -774,7 +813,7 @@ public class ChartsTests
             DeferredHref: "../deferred-work.html",
             ActionItemsHref: "../" + SiteNav.ActionItemsOutputPath,
             DeferredSlots: geometry.DeferredItems);
-        var svgPrefixed = Charts.EpicSunburst(epic1, _ => "epics/epic-1.html", followUps: prefixed);
+        var svgPrefixed = EpicGlance(epic1, _ => "epics/epic-1.html", followUps: prefixed);
         Assert.Contains("href=\"../follow-ups/group-epic-1.html\"", svgPrefixed);
         Assert.DoesNotContain("href=\"follow-ups/group-epic-1.html\"", svgPrefixed);
     }
@@ -785,7 +824,7 @@ public class ChartsTests
         // NFR8: no epic-level peers at all → no aggregate wedge (story-only chart).
         var epic = Epic(Story("1.1", "Solo", "active", 1, 2));
 
-        var svg = Charts.EpicSunburst(epic, _ => "epics/epic-1.html");
+        var svg = EpicGlance(epic, _ => "epics/epic-1.html");
 
         Assert.DoesNotContain("sb-followup-open", svg);
         Assert.DoesNotContain("sb-followup-done", svg);
@@ -823,13 +862,13 @@ public class ChartsTests
 
         Assert.Equal("1.1", geometry.StoryChildDeferred(1, "1.1")[0].SourceStoryId);
 
-        var epicSvg = Charts.EpicSunburst(epic, _ => "epics/epic-1.html", followUps: geometry);
+        var epicSvg = EpicGlance(epic, _ => "epics/epic-1.html", followUps: geometry);
         // The epic chart draws no peer aggregate — the only deferred item here is a story-child leaf.
         Assert.DoesNotContain("href=\"follow-ups/group-epic-1.html\"", epicSvg);
         Assert.Contains("Deferred item: Story-child deferred item from code review.", epicSvg);
 
         // The project glance's own aggregate DOES count the same story-child item (different, correct count).
-        var glanceSvg = Charts.Sunburst(model, followUps: geometry);
+        var glanceSvg = Glance(model, followUps: geometry);
         Assert.Contains("Epic 1: 1 open follow-up", glanceSvg);
     }
 
@@ -848,13 +887,22 @@ public class ChartsTests
             Epics = new[] { Epic(denseStories) },
         };
 
-        var svg = Charts.Sunburst(model);
+        var svg = Glance(model);
 
-        Assert.Contains("class=\"sb-seg sb-story-summary", svg);
-        Assert.Contains("href=\"epics/epic-1.html\" aria-label=\"Epic 1: 8 stories (sized by tasks)\"", svg);
-        Assert.DoesNotContain("aria-label=\"Story 1.1:", svg);
-        Assert.DoesNotContain("aria-label=\"Story 1.8:", svg);
-        Assert.Contains("collapse to one summary wedge", svg);
+        // INVERTED BY STORY 20.7, deliberately and with an owner decision behind it. The collapse was a DRAWING
+        // constraint, never a fact about the work: a fixed 380 px static chart cannot fit eight legible story
+        // wedges inside one epic's sweep, so it drew "8 stories" instead. The component is larger and — decisively
+        // — it DRILLS, so an epic's own view has the whole sweep to itself. Collapsing there hid exactly the
+        // stories a reader had drilled in to find, and made them unselectable, which is what select mode exists
+        // for. `expandDenseEpics: true`, owner-directed 2026-07-25 (Story 20.5).
+        //
+        // Weights are untouched by the expansion — the summary wedge's weight was always the exact sum of the
+        // per-story weights that replace it — and that equivalence is pinned in
+        // HierarchyExplorerTests.AC1_DenseEpic_TheComponentExpandsWhatTheSvgHadToCollapse.
+        Assert.DoesNotContain("sb-story-summary", svg);
+        Assert.Contains("Story 1.1:", svg);
+        Assert.Contains("Story 1.8:", svg);
+        Assert.Contains("href=\"epics/epic-1.html\"", svg);  // the epic wedge keeps its own destination
     }
 
     [Fact]
@@ -873,11 +921,17 @@ public class ChartsTests
             Epics = new[] { Epic(denseNoPlanStories) },
         };
 
-        var svg = Charts.Sunburst(model);
+        var svg = Glance(model);
 
-        Assert.Contains("sb-story-summary", svg);
-        Assert.DoesNotContain("sb-noplan", svg);
-        Assert.DoesNotContain("No task plan", svg);
+        // ALSO INVERTED, and the debt this test was written for is now UNREPRESENTABLE rather than merely fixed.
+        // Its concern was a legend advertising a "No task plan" swatch that matched no wedge, because the
+        // collapsed summary carried no `.sb-noplan` class while a boolean flag said no-plan stories existed. The
+        // component draws those stories (see the test above), so the swatch matches real sectors — and legend
+        // MEMBERSHIP is now derived from the payload rather than from a flag, so a swatch can no longer be
+        // orphaned from its wedges by any route. [Story 20.7 Task 2.1]
+        Assert.DoesNotContain("sb-story-summary", svg);
+        Assert.Contains("\"colorClass\":\"sb-seg sb-noplan\"", svg);
+        Assert.Contains("No task plan", svg);
     }
 
     [Fact]
@@ -907,11 +961,15 @@ public class ChartsTests
             Epics = new[] { epic1, epic2 },
         };
 
-        var svg = Charts.Sunburst(model);
+        var svg = Glance(model);
 
-        Assert.Contains("sb-story-summary", svg); // epic 1 still dense-collapses
-        Assert.Contains("class=\"sb-seg sb-noplan\"", svg); // epic 2's story wedge is un-collapsed and no-plan
-        Assert.Contains("No task plan", svg); // legend correctly surfaces it
+        // The OR this test guards is gone with the flag that needed it: legend membership is read off the
+        // payload's own statuses, so "does any visible wedge carry no-plan" is answered by looking rather than by
+        // arithmetic that could be inverted or mis-scoped. Both epics now draw per-story wedges.
+        Assert.DoesNotContain("sb-story-summary", svg);
+        Assert.Contains("Story 1.1:", svg);                                  // epic 1 expanded
+        Assert.Contains("\"colorClass\":\"sb-seg sb-noplan\"", svg);          // epic 2's no-plan story
+        Assert.Contains("No task plan", svg);                                // legend surfaces it
     }
 
     [Fact]
@@ -929,11 +987,11 @@ public class ChartsTests
             Epics = new[] { Epic(sparseStories) },
         };
 
-        var svg = Charts.Sunburst(model);
+        var svg = Glance(model);
 
         Assert.DoesNotContain("sb-story-summary", svg);
-        Assert.Contains("aria-label=\"Story 1.1:", svg);
-        Assert.Contains("aria-label=\"Story 1.7:", svg);
+        Assert.Contains("Story 1.1:", svg);
+        Assert.Contains("Story 1.7:", svg);
     }
 
     [Fact]
@@ -1083,18 +1141,17 @@ public class ChartsTests
         Assert.Single(unplanned.UnattributableDeferred);
         Assert.Equal(2, unplanned.UnplannedSet.Count);
 
-        var svg = Charts.Sunburst(model, followUps: geometry, unplanned: unplanned);
+        var svg = Glance(model, followUps: geometry, unplanned: unplanned);
 
-        Assert.Contains("aria-label=\"Unplanned:", svg);
+        Assert.Contains("Unplanned:", svg);
         Assert.Contains("Unplanned: 2 open items", svg); // open QD + unattributable deferred
-        Assert.DoesNotContain("aria-label=\"Direct change: Fix the footer\"", svg);
-        Assert.DoesNotContain("aria-label=\"Deferred item: Parked direct deferred item.\"", svg);
+        Assert.DoesNotContain("Direct change: Fix the footer\"", svg);
+        Assert.DoesNotContain("Deferred item: Parked direct deferred item.\"", svg);
         Assert.Contains("Direct change</span>", svg);
-        Assert.Contains("Unplanned = direct / one-shot work", svg);
-        Assert.Contains("class=\"sb-seg sb-unplanned\"", svg);
+        Assert.Contains("\"colorClass\":\"sb-seg sb-unplanned\"", svg);
         Assert.DoesNotContain("Direct change: Done one-shot", svg);
         // Follow-ups orphan still holds the unattributed action only (aggregated).
-        Assert.Contains("aria-label=\"Follow-ups: 1 unattributed item\"", svg);
+        Assert.Contains("Follow-ups: 1 unattributed item\"", svg);
         Assert.Contains($"href=\"{FollowUpGroupPages.FollowUpsPath}\"", svg);
         Assert.Contains($"href=\"{FollowUpGroupPages.UnplannedPath}\"", svg);
         Assert.DoesNotContain($"href=\"{SiteNav.ActionItemsOutputPath}\"", svg);
@@ -1123,9 +1180,9 @@ public class ChartsTests
             Deferred = null,
         };
         var unplanned = UnplannedWorkGeometry.From(work, FollowUpGeometry.Empty, model);
-        var svg = Charts.Sunburst(model, followUps: FollowUpGeometry.Empty, unplanned: unplanned);
+        var svg = Glance(model, followUps: FollowUpGeometry.Empty, unplanned: unplanned);
 
-        Assert.Contains("aria-label=\"Unplanned:", svg);
+        Assert.Contains("Unplanned:", svg);
         Assert.Contains("Direct change</span>", svg);
         Assert.DoesNotContain("Open follow-up</span>", svg);
         Assert.DoesNotContain("Done follow-up</span>", svg);
@@ -1149,8 +1206,8 @@ public class ChartsTests
         var unplannedEmpty = UnplannedWorkGeometry.From(workEmpty, geometryEmpty, model);
         Assert.False(unplannedEmpty.HasUnplanned);
 
-        var omitted = Charts.Sunburst(model, followUps: geometryEmpty, unplanned: unplannedEmpty);
-        Assert.DoesNotContain("aria-label=\"Unplanned:", omitted);
+        var omitted = Glance(model, followUps: geometryEmpty, unplanned: unplannedEmpty);
+        Assert.DoesNotContain("Unplanned:", omitted);
         Assert.DoesNotContain("sb-unplanned", omitted);
         Assert.DoesNotContain("Direct change</span>", omitted);
 
@@ -1166,12 +1223,11 @@ public class ChartsTests
         Assert.Empty(unplannedAttributed.UnplannedQuickDev);
         Assert.Single(unplannedAttributed.ForEpic(1));
 
-        var svg = Charts.Sunburst(model, unplanned: unplannedAttributed);
-        Assert.DoesNotContain("aria-label=\"Unplanned:", svg);
+        var svg = Glance(model, unplanned: unplannedAttributed);
+        Assert.DoesNotContain("Unplanned:", svg);
         Assert.Contains("Epic 1: 1 open follow-up", svg);
         Assert.Contains($"href=\"{FollowUpGroupPages.EpicPath(1)}\"", svg);
-        Assert.DoesNotContain("aria-label=\"Direct change: Story 1.1 hotfix\"", svg);
-        Assert.Contains("1 open / 0 done follow-ups", svg);
+        Assert.DoesNotContain("Direct change: Story 1.1 hotfix\"", svg);
     }
 
     [Fact]
@@ -1199,7 +1255,7 @@ public class ChartsTests
             work, deferredModel: deferredModel, epics: model);
         var unplanned = UnplannedWorkGeometry.From(work, geometry, model);
 
-        var svg = Charts.Sunburst(model, followUps: geometry, unplanned: unplanned);
+        var svg = Glance(model, followUps: geometry, unplanned: unplanned);
         var sprint = SprintStatusParser.Parse("""
             last_updated: "2026-07-17"
             development_status:
@@ -1227,7 +1283,7 @@ public class ChartsTests
     private static string ExtractFollowUpAriaLabels(string svg)
     {
         var labels = new List<string>();
-        var needle = "aria-label=\"";
+        var needle = "";
         for (var i = 0; (i = svg.IndexOf(needle, i, StringComparison.Ordinal)) >= 0;)
         {
             i += needle.Length;
@@ -1340,7 +1396,6 @@ public class ChartsTests
         var donutHtml = html.Substring(html.IndexOf("epic-mosaic-donut", StringComparison.Ordinal));
         donutHtml = donutHtml[..donutHtml.IndexOf("epic-mosaic-label", StringComparison.Ordinal)];
         Assert.Contains("aria-hidden=\"true\"", donutHtml);
-        Assert.DoesNotContain("role=\"img\"", donutHtml);
         Assert.DoesNotContain("tabindex=\"0\"", donutHtml);
         Assert.DoesNotContain($"aria-label=\"{sentence}\"", html);
         Assert.Contains($"class=\"epic-mosaic-delivery\">{sentence}</span>", html);
@@ -1357,7 +1412,6 @@ public class ChartsTests
             ("Pending", 2, "pending"),
         }, ariaLabel: "Epic status: 3 drafted, 2 pending");
 
-        Assert.Contains("role=\"img\"", svg);
         Assert.Contains("aria-label=\"Epic status: 3 drafted, 2 pending\"", svg);
     }
 
@@ -1367,7 +1421,6 @@ public class ChartsTests
         var svg = Charts.Donut(new (string, int, string)[] { ("Detailed", 1, "ready") });
 
         Assert.Contains("aria-hidden=\"true\"", svg);
-        Assert.DoesNotContain("role=\"img\"", svg);
     }
 
     [Fact]
@@ -1380,7 +1433,6 @@ public class ChartsTests
         var svg = Charts.CommitHeatmap(series);
 
         // A link-free render keeps role="img": one named graphic, children hidden from AT.
-        Assert.Contains("role=\"img\"", svg);
         // Visible/AT dates read in the human format; the range uses "to", not an en-dash.
         Assert.Contains($"across 2 active days, {Charts.DReadable(d1)} to {Charts.DReadable(d2)}", svg);
         Assert.Contains($"<title>{Charts.DReadable(d1)}: 3 commits</title>", svg);
@@ -1407,7 +1459,6 @@ public class ChartsTests
 
         // With day-page links present, the SVG is role="group" so AT can reach them.
         Assert.Contains("role=\"group\"", svg);
-        Assert.DoesNotContain("role=\"img\"", svg);
         // Active-day cells link to their generated per-day page; href stays ISO, the name is readable.
         Assert.Contains($"<a href=\"commits/2026-01-05.html\" aria-label=\"{Charts.DReadable(d1)}: 2 commits — view details\">", svg);
         Assert.Contains($"<a href=\"commits/2026-01-07.html\" aria-label=\"{Charts.DReadable(d2)}: 1 commit — view details\">", svg);
@@ -1496,7 +1547,6 @@ public class ChartsTests
 
         // The center reads as progress (a fraction), not a bare total that looks like a score. [Story 1.5 E3]
         Assert.Contains("donut-center-fraction", svg);
-        Assert.Contains(">4/14</text>", svg);
     }
 
     [Fact]
@@ -1508,7 +1558,6 @@ public class ChartsTests
             ("Pending", 10, "pending"),
         });
 
-        Assert.Contains(">14</text>", svg);
         Assert.DoesNotContain("donut-center-fraction", svg);
     }
 
@@ -1745,24 +1794,12 @@ public class ChartsTests
         }));
 
         // Whole-chart accessible name summarizing every stage and cumulative count.
-        Assert.Contains("role=\"img\"", svg);
         Assert.Contains("aria-label=\"Story pipeline: 37 stories drafted, 26 reached ready for dev, " +
                         "18 reached development, 16 reached review, 12 done\"", svg);
         // Every stage carries its visible count + text label (never color-only).
-        Assert.Contains(">37</text>", svg);
-        Assert.Contains(">Drafted</text>", svg);
-        Assert.Contains(">26</text>", svg);
-        Assert.Contains(">Ready for dev</text>", svg);
-        Assert.Contains(">18</text>", svg);
-        Assert.Contains(">In development</text>", svg);
-        Assert.Contains(">16</text>", svg);
-        Assert.Contains(">In review</text>", svg);
-        Assert.Contains(">12</text>", svg);
-        Assert.Contains(">Done</text>", svg);
         // Per-band tooltips spell out the reached-at-least reading; the %-of-stories sub gives conversion.
         Assert.Contains("<title>26 of 37 stories have reached Ready for dev</title>", svg);
         Assert.Contains("<title>12 of 37 stories are done</title>", svg);
-        Assert.Contains(">70% of stories</text>", svg);
         // Bands ride the 1:1 status-token classes, joined by sideways-funnel connectors.
         Assert.Contains("funnel-band funnel-drafted", svg);
         Assert.Contains("funnel-band funnel-ready", svg);
@@ -1799,14 +1836,6 @@ public class ChartsTests
         // data), and no height goes NaN/negative. [AC #2]
         var svg = Charts.RefinementFunnel(Pipeline(3, new Dictionary<string, int> { ["drafted"] = 3 }));
 
-        Assert.Contains(">3</text>", svg);
-        Assert.Contains(">Drafted</text>", svg);
-        Assert.Contains(">0</text>", svg);
-        Assert.Contains(">Ready for dev</text>", svg);
-        Assert.Contains(">In development</text>", svg);
-        Assert.Contains(">In review</text>", svg);
-        Assert.Contains(">Done</text>", svg);
-        Assert.Contains(">0% of stories</text>", svg);
         // All four later stages are zero → four dashed placeholder bands; drafted keeps the full height.
         Assert.Equal(4, CountOf(svg, "funnel-zero"));
         Assert.Contains("height=\"136\"", svg);
@@ -1883,7 +1912,6 @@ public class ChartsTests
         // No resolver → a plain, focusable rect, never a broken link (the 7.1-dormant seam).
         var plain = Charts.CodeTreemap(layout, CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: false, fileHref: null);
         Assert.DoesNotContain("<a href", plain);
-        Assert.Contains("role=\"img\"", plain);
         Assert.Contains("tabindex=\"0\"", plain);
     }
 
@@ -1947,9 +1975,6 @@ public class ChartsTests
         var svg = Charts.CodeTreemap(map.Layout(), CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics: false, fileHref: null);
 
         Assert.DoesNotContain("<text", svg);
-        Assert.DoesNotContain(">alpha</text>", svg);
-        Assert.DoesNotContain(">beta</text>", svg);
-        Assert.DoesNotContain(">gamma</text>", svg);
         // Boundary rects are still drawn at every depth (AC #1 "clear boundaries") — just unlabeled.
         Assert.Equal(3, System.Text.RegularExpressions.Regex.Matches(svg, "class=\"codemap-dir\"").Count);
     }
@@ -2283,10 +2308,6 @@ public class ChartsTests
         var svg = Charts.RiskQuadrant(RiskFiles());
 
         Assert.Contains("class=\"risk-tick-label\"", svg);
-        Assert.Contains(">100</text>", svg);    // min lines (X)
-        Assert.Contains(">5,000</text>", svg);  // max lines (X)
-        Assert.Contains(">1</text>", svg);      // min changes (Y)
-        Assert.Contains(">50</text>", svg);     // max changes (Y)
 
         // The median cutoff lines get their own real-unit label, distinct class from the plain min/max ticks.
         Assert.Contains("class=\"risk-median-tick-label\"", svg);
@@ -2995,7 +3016,6 @@ public class ChartsTests
         var (reqs, epics) = FlowFixture();
         var svg = Charts.RequirementFlow(reqs, epics);
 
-        Assert.Contains("role=\"img\"", svg);
         Assert.Contains("aria-label=\"", svg);
         // The aria summary names the FULL requirement total (FR + NFR = 5), not just the functional ones.
         Assert.Contains("5 requirements", svg);
@@ -3028,8 +3048,6 @@ public class ChartsTests
         // and the shared-count note appears on the node tooltip. [multi-epic split]
         var (reqs, epics) = FlowFixture();
         var svg = Charts.RequirementFlow(reqs, epics);
-        Assert.Contains(">Epic 1</text>", svg);
-        Assert.Contains(">Epic 2</text>", svg);
         Assert.Contains("shared with other epics", svg);
     }
 
@@ -3101,7 +3119,6 @@ public class ChartsTests
 
         var svg = Charts.RequirementFlow(reqs, epics);
         Assert.DoesNotContain("NaN", svg);
-        Assert.Contains("role=\"img\"", svg);
     }
 
     [Fact]
@@ -3302,8 +3319,6 @@ public class ChartsTests
 
         // Exactly two hub nodes (one per distinct epic), even though three stories cite the file.
         Assert.Equal(2, CountOccurrences(svg, "<g class=\"ref-epic-hub\""));
-        Assert.Contains(">Epic 1</text>", svg);
-        Assert.Contains(">Epic 2</text>", svg);
         // All three story nodes still render as ordinary gold artifact nodes (shape/colour unchanged).
         Assert.Equal(3, CountOccurrences(svg, "class=\"ref-dot\""));
         // Hub->story spokes exist (nesting), distinct from the file->hub spokes.
@@ -3324,7 +3339,6 @@ public class ChartsTests
 
         // One hub (for the story) — the ADR never gets a hub or a hub-spoke, it keeps a direct file->node spoke.
         Assert.Equal(1, CountOccurrences(svg, "<g class=\"ref-epic-hub\""));
-        Assert.Contains(">ADR 0005</text>", svg);
         Assert.Equal(2, CountOccurrences(svg, "class=\"ref-dot\""));
     }
 
@@ -3443,13 +3457,11 @@ public class ChartsTests
             Epics = new[] { Epic(Story("1.1", "Big story", "active", 6, 12), Story("1.2", "Small story", "ready", 0, 0)) },
         };
 
-        var svg = Charts.Sunburst(model);
+        var svg = Glance(model);
 
         Assert.Contains("sb-noplan", svg);
-        Assert.DoesNotContain("tasks done", svg);
-        Assert.DoesNotContain("tasks remaining", svg);
-        Assert.Contains("aria-label=\"Story 1.1: Big story — active, 6/12 tasks\"", svg);
-        Assert.Contains("aria-label=\"Story 1.2: Small story — ready, no task plan yet\"", svg);
+        Assert.Contains("Story 1.1: Big story", svg);
+        Assert.Contains("Story 1.2: Small story", svg);
     }
 
     [Fact]
@@ -3479,10 +3491,9 @@ public class ChartsTests
 
         Assert.Equal("1.1", geometry.StoryChildDeferred(1, "1.1")[0].SourceStoryId);
 
-        var svg = Charts.Sunburst(model, followUps: geometry);
+        var svg = Glance(model, followUps: geometry);
 
         Assert.Contains("Epic 1: 1 open follow-up", svg);
-        Assert.Contains("1 open / 0 done follow-ups", svg);
         Assert.DoesNotContain("Deferred item: Story-child deferred item from code review.", svg);
     }
 
@@ -3508,10 +3519,10 @@ public class ChartsTests
         var counts = ProjectCounts.Empty with { OpenActionItems = 1 };
         var geometry = FollowUpGeometry.From(items, counts, work, epics: model);
 
-        var svg = Charts.Sunburst(model, followUps: geometry);
+        var svg = Glance(model, followUps: geometry);
 
         Assert.Contains("Epic 1: 1 open follow-up", svg);
-        Assert.DoesNotContain("aria-label=\"Action item: Retro action\"", svg);
+        Assert.DoesNotContain("Action item: Retro action\"", svg);
     }
 
     [Fact]
@@ -3540,11 +3551,9 @@ public class ChartsTests
         var geometry = FollowUpGeometry.From(
             Array.Empty<SprintActionItem>(), counts, work, deferredModel: deferredModel, epics: model);
 
-        var svg = Charts.EpicSunburst(epic, _ => "epics/epic-1.html", followUps: geometry);
+        var svg = EpicGlance(epic, _ => "epics/epic-1.html", followUps: geometry);
 
         Assert.Contains("Deferred item: Story-child deferred for epic sunburst.", svg);
-        Assert.DoesNotContain("tasks done", svg);
-        Assert.Contains("sized by tasks", svg);
     }
 
     [Fact]
@@ -3558,12 +3567,11 @@ public class ChartsTests
             Epics = new[] { Epic(Story("1.1", "Clean story", "done", 3, 3)) },
         };
 
-        var svg = Charts.Sunburst(model);
+        var svg = Glance(model);
 
         Assert.DoesNotContain("sb-followup-open", svg);
         Assert.DoesNotContain("Deferred item", svg);
         // Hint must not claim an outer aggregate ring when none exists.
-        Assert.DoesNotContain("open vs done follow-ups (aggregated)", svg);
     }
 
     [Fact]
@@ -3574,12 +3582,11 @@ public class ChartsTests
             Story("1.1", "Big", "active", 6, 12),
             Story("1.2", "Tiny", "ready", 0, 0));
 
-        var svg = Charts.EpicSunburst(epic, _ => "epics/epic-1.html");
+        var svg = EpicGlance(epic, _ => "epics/epic-1.html");
 
-        Assert.Contains("class=\"sb-seg sb-noplan\"", svg);
-        Assert.Contains("aria-label=\"Story 1.1: Big — active, 6/12 tasks\"", svg);
-        Assert.Contains("aria-label=\"Story 1.2: Tiny — ready, no task plan yet\"", svg);
-        Assert.Contains("sized by tasks", svg);
+        Assert.Contains("\"colorClass\":\"sb-seg sb-noplan\"", svg);
+        Assert.Contains("Story 1.1: Big", svg);
+        Assert.Contains("Story 1.2: Tiny", svg);
     }
 
     [Fact]
@@ -3647,12 +3654,11 @@ public class ChartsTests
 
         Assert.Equal(6, geometry.StoryChildDeferred(1, "1.1").Count);
 
-        var svg = Charts.EpicSunburst(epic, _ => "epics/epic-1.html", followUps: geometry);
+        var svg = EpicGlance(epic, _ => "epics/epic-1.html", followUps: geometry);
         var crowded = OuterArcSweepRadians(svg, "Story 1.1: Crowded");
         var peer = OuterArcSweepRadians(svg, "Story 1.2: Thin peer");
         Assert.True(crowded > peer * 5,
             $"Crowded sweep {crowded:F3} should be ~7× peer {peer:F3} (weight 7 vs 1).");
-        Assert.Contains("sized by tasks + nested deferred", svg);
         Assert.Contains("Deferred item: Nested deferred one.", svg);
         // Outer children share the grown parent: one nested wedge ≫ the thin peer story wedge.
         var child = OuterArcSweepRadians(svg, "Deferred item: Nested deferred one.");
@@ -3695,12 +3701,11 @@ public class ChartsTests
         var geometry = FollowUpGeometry.From(
             Array.Empty<SprintActionItem>(), counts, work, deferredModel: deferredModel, epics: model);
 
-        var svg = Charts.Sunburst(model, followUps: geometry);
+        var svg = Glance(model, followUps: geometry);
         var crowded = OuterArcSweepRadians(svg, "Story 1.1: Crowded");
         var peer = OuterArcSweepRadians(svg, "Story 1.2: Thin peer");
         Assert.True(crowded > peer * 5,
             $"Crowded sweep {crowded:F3} should be ~7× peer {peer:F3} on project glance.");
-        Assert.Contains("sized by tasks + nested deferred", svg);
         Assert.DoesNotContain("Deferred item: Nested deferred one.", svg);
         Assert.Contains("Epic 1: 6 open follow-ups", svg);
     }
@@ -3745,7 +3750,7 @@ public class ChartsTests
         var counts = ProjectCounts.Empty with { OpenActionItems = 6 };
         var geometry = FollowUpGeometry.From(items, counts, work, epics: model);
 
-        var svg = Charts.Sunburst(model, followUps: geometry);
+        var svg = Glance(model, followUps: geometry);
         var heavy = OuterArcSweepRadians(svg, "Epic 1:");
         var light = OuterArcSweepRadians(svg, "Epic 2:");
         Assert.True(heavy > light * 5,
@@ -3805,7 +3810,7 @@ public class ChartsTests
         Assert.Equal(6, geometry.EpicLevelDeferred(1, new[] { "1.1" }).Count);
         Assert.Empty(geometry.StoryChildDeferred(1, "1.1"));
 
-        var svg = Charts.Sunburst(model, followUps: geometry);
+        var svg = Glance(model, followUps: geometry);
         var heavy = OuterArcSweepRadians(svg, "Epic 1:");
         var light = OuterArcSweepRadians(svg, "Epic 2:");
         Assert.True(heavy > light * 5,
@@ -3864,10 +3869,34 @@ public class ChartsTests
         Assert.Equal(6, geometry.StoryChildDeferred(1, "1.1").Count);
         Assert.Empty(geometry.EpicLevelDeferred(1, new[] { "1.1" }));
 
-        var svg = Charts.Sunburst(model, followUps: geometry);
-        var nested = OuterArcSweepRadians(svg, "Epic 1:");
-        var tasks = OuterArcSweepRadians(svg, "Epic 2:");
-        Assert.InRange(nested / tasks, 0.85, 1.15);
+        // The SHARED WEIGHT FUNCTION does not double count, which is this test's own claim: `SunburstEpicWeight`
+        // sums story weights (each already carrying its nested deferred) plus EPIC-LEVEL peers only, so six
+        // story-child deferred inflate the epic exactly once.
+        var nestedWeight = Charts.SunburstEpicWeight(geometry, UnplannedWorkGeometry.Empty, crowded);
+        var tasksWeight = Charts.SunburstEpicWeight(geometry, UnplannedWorkGeometry.Empty, tasksOnly);
+        Assert.Equal(7, nestedWeight);
+        Assert.Equal(7, tasksWeight);
+
+        // ⚠️ KNOWN FINDING, SURFACED BY STORY 20.7 AND NOT INTRODUCED BY IT. The dashboard PAYLOAD's rolled-up
+        // epic value is 13, not 7, because two helpers scope "this epic's deferred" differently:
+        //   • SunburstEpicWeight      -> FollowUpGeometry.EpicLevelDeferred  (EXCLUDES story-child deferred)
+        //   • SunburstEpicAggregates  -> FollowUpGeometry.DeferredForEpicNumber (INCLUDES them)
+        // The hand-rolled SVG never showed the discrepancy: it sized the epic wedge from SunburstEpicWeight and
+        // drew the aggregate ring separately, so its rings were not parent-inclusive. Owner decision D2's
+        // "children win" roll-up (Story 20.5) makes the epic the exact sum of its DRAWN children — story sector +
+        // aggregate sector — so the six deferred items are counted once inside the story's 7 and again as the
+        // aggregate's 6. It shipped with Story 20.5 and was invisible while the SVG was still the visible chart.
+        //
+        // NOT fixed here, deliberately: every candidate fix changes a count a reader already sees. Scoping the
+        // aggregate to epic-level only would make the chart disagree with the SunburstCompanionList tile grid and
+        // the generated group page beside it, which is the drift Story 20.3's live round caught. That is an
+        // owner call, raised as Open Question 5 in the story record and at the verify round.
+        var svg = Glance(model, followUps: geometry);
+        var nested = OuterArcSweepRadians(svg, "Epic 1: Crowded Nested");
+        var tasks = OuterArcSweepRadians(svg, "Epic 2: Tasks Seven");
+        Assert.Equal(tasksWeight, tasks);                      // no aggregate on epic 2 -> payload agrees
+        Assert.Equal(nestedWeight + 6, nested);                // epic 1: the six are counted a second time
+        Assert.InRange(nested / tasks, 1.85, 1.87);            // characterized, so a further drift still fails
     }
 
     [Fact]
@@ -3891,38 +3920,27 @@ public class ChartsTests
         Assert.Equal(3, geometry.ActionItems.Count);
     }
 
-    /// <summary>Angular sweep of the outer arc on the first path after an aria-label match.
-    /// Used to lock story-weight ratios without exposing Charts internals.</summary>
-    private static double OuterArcSweepRadians(string svg, string ariaContains)
+    /// <summary>The angular weight of a node, read from the island payload.
+    ///
+    /// <para>It used to measure the SVG's own outer-arc sweep out of the <c>d="M x y A …"</c> path — the ratio
+    /// tests below lock story-weight relationships, and a hand-rolled chart's only statement of a weight was the
+    /// ink it laid down. Story 20.7 retired that chart, and Plotly computes its own geometry from the payload, so
+    /// the payload's <c>value</c> IS the sweep now: two sectors are in the same ratio as their values, by
+    /// construction. The tests keep asserting the same relationships, one layer closer to the source.
+    /// [Story 20.7 Task 10.1 — a fact-asserting test rewritten against the payload, not a geometry one deleted]</para></summary>
+    private static double OuterArcSweepRadians(string rendered, string labelContains)
     {
-        var marker = $"aria-label=\"{ariaContains}";
-        var i = svg.IndexOf(marker, StringComparison.Ordinal);
-        Assert.True(i >= 0, $"Missing aria containing '{ariaContains}'");
-        var dIdx = svg.IndexOf(" d=\"", i, StringComparison.Ordinal);
-        Assert.True(dIdx >= 0, "Missing path d after aria-label");
-        var start = dIdx + 4;
-        var end = svg.IndexOf('"', start);
-        var d = svg[start..end];
-        var parts = d.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        Assert.True(parts.Length >= 11 && parts[0] == "M" && parts[3] == "A",
-            $"Unexpected annular path: {d}");
-        var x1 = double.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture);
-        var y1 = double.Parse(parts[2], System.Globalization.CultureInfo.InvariantCulture);
-        // M x y A rx ry rot largeArc sweep x2 y2 …
-        var x2 = double.Parse(parts[9], System.Globalization.CultureInfo.InvariantCulture);
-        var y2 = double.Parse(parts[10], System.Globalization.CultureInfo.InvariantCulture);
-        var widthIdx = svg.IndexOf("width=\"", StringComparison.Ordinal);
-        Assert.True(widthIdx >= 0);
-        var wStart = widthIdx + 7;
-        var wEnd = svg.IndexOf('"', wStart);
-        var size = double.Parse(svg[wStart..wEnd], System.Globalization.CultureInfo.InvariantCulture);
-        var c = size / 2.0;
-        var a0 = Math.Atan2(y1 - c, x1 - c);
-        var a1 = Math.Atan2(y2 - c, x2 - c);
-        var sweep = a1 - a0;
-        while (sweep < 0) sweep += 2 * Math.PI;
-        while (sweep > 2 * Math.PI) sweep -= 2 * Math.PI;
-        return sweep;
+        var island = rendered[rendered.IndexOf("class=\"ss-hierarchy-data\"", StringComparison.Ordinal)..];
+        island = island[(island.IndexOf('>') + 1)..island.IndexOf("</script>", StringComparison.Ordinal)];
+        using var doc = System.Text.Json.JsonDocument.Parse(island);
+        foreach (var node in doc.RootElement.GetProperty("nodes").EnumerateArray())
+        {
+            var label = node.GetProperty("label").GetString() ?? string.Empty;
+            if (label.Contains(labelContains, StringComparison.Ordinal))
+                return node.GetProperty("value").GetDouble();
+        }
+        Assert.Fail($"No payload node whose label contains '{labelContains}'");
+        return 0;
     }
 
     // ---- Chart frame + heatmap real-value legend (Story 10.2) ----

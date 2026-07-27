@@ -497,7 +497,10 @@ public class FollowUpSurfacesTests : IDisposable
 
         var index = File.ReadAllText(Path.Combine(Site, "index.html"));
         Assert.Contains("sb-followup-open", index);
-        Assert.Contains("open vs done follow-ups (aggregated)", index);
+        // The `.sunburst-hint` ring explainer that used to state this went with Charts.Sunburst (Story 20.7).
+        // The fact survives in the payload and the twin, where the aggregate is one node per open/done bucket
+        // linking to the group page — never one leaf per item.
+        Assert.Contains("open follow-up", index);
         Assert.DoesNotContain("outermost: open follow-ups", index);
         Assert.Contains("href=\"follow-ups/group-", index);
         Assert.Contains("Open follow-up</span>", index);
@@ -593,9 +596,12 @@ public class FollowUpSurfacesTests : IDisposable
         // related-work pane now also sits on index.html and links each related node to its OWN detail page, which
         // its AC #1 requires; a document-wide assertion would read that correct behavior as a chart regression.
         Assert.DoesNotContain("href=\"follow-ups/action-", SunburstPanelOf(index));
-        // Orphan root must not dump into the whole-site action-items index.
-        var orphanIdx = index.IndexOf("aria-label=\"Follow-ups:", StringComparison.Ordinal);
-        Assert.True(orphanIdx >= 0);
+        // Orphan root must not dump into the whole-site action-items index. Story 20.7: read off the TEXT TWIN's
+        // link rather than the retired SVG wedge's `<a aria-label="Follow-ups: …">`. Same destination contract,
+        // asserted on the surface that now carries it — and the twin is the stricter place to ask, because it is
+        // what a JS-off visitor actually follows.
+        var orphanIdx = index.IndexOf(">Follow-ups: ", StringComparison.Ordinal);
+        Assert.True(orphanIdx >= 0, "the orphan follow-ups root must appear in the text twin");
         var orphanAnchorStart = index.LastIndexOf("<a ", orphanIdx, StringComparison.Ordinal);
         var orphanAnchorEnd = index.IndexOf("</a>", orphanIdx, StringComparison.Ordinal);
         var orphanAnchor = index[orphanAnchorStart..orphanAnchorEnd];

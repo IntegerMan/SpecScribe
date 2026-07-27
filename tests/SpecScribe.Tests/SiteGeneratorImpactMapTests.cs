@@ -147,25 +147,42 @@ public class SiteGeneratorImpactMapTests : IDisposable
         GenerateSite(deepGit: true);
 
         var impact = File.ReadAllText(ImpactMapPage);
-        // The interactive scaffold: the JSON data island the script reads, the epic multi-select, and the mounts.
-        Assert.Contains("id=\"impact-map-data\"", impact);
+        // STORY 20.7 converted this surface to the Hierarchy Explorer. The scaffold is the component's — ONE
+        // island, ONE host, one selector — replacing the bespoke `impact-map-data` island and the two hand-rolled
+        // mounts that `renderTreemap`/`renderSunburst` filled. Two islands on one page was the drift, not the fix.
+        Assert.DoesNotContain("id=\"impact-map-data\"", impact);
+        Assert.DoesNotContain("id=\"impact-treemap\"", impact);
+        Assert.DoesNotContain("id=\"impact-sunburst\"", impact);
+        Assert.Contains("id=\"impact-hierarchy-data\"", impact);
         Assert.Contains("application/json", impact);
         Assert.Contains("impact-epic-toggle", impact);
-        Assert.Contains("id=\"impact-treemap\"", impact);
-        // The payload carries the weight fields the shapes draw with (churn 'c' + commits 'k').
-        Assert.Matches(new Regex("\"p\":\"src/Sample/Widget\\.cs\".*\"c\":\\d+.*\"k\":\\d+"), impact);
-        // The epic selector reuses the sprint board's multi-select dropdown component.
+
+        // The payload carries the same facts the shapes draw with: the file's path, its churn as the layout value,
+        // and its commit count in the reader-facing Detail sentence — which is the ramp's non-colour channel, so
+        // the level is never signalled by fill alone (UX-DR17).
+        Assert.Contains("src/Sample/Widget.cs", impact);
+        Assert.Matches(new Regex("\"detail\":\"[0-9,]+ lines? changed across [0-9,]+ commits?\""), impact);
+        // Owner D4: epic -> directory -> file, with the SHIPPED commit ramp as the leaf colour family.
+        Assert.Matches(new Regex("\"colorClass\":\"impact-tm-tile impact-level-[1-5]\""), impact);
+        Assert.Contains("attributed churn", impact);   // D4's counting basis, stated where a reader sees it
+
+        // The epic selector keeps the sprint board's multi-select dropdown markup — this story changed what drives
+        // the chart, not the control vocabulary — and now carries the component's generic filter hook.
         Assert.Contains("sprint-epic-filter impact-epic-filter", impact);
         Assert.Contains("sprint-epic-filter-count", impact);
-        // The Treemap | Sunburst view toggle (board-tabs) + the sunburst mount both exist; the toggle radios sit
-        // inside .impact-shapes so the pure-CSS :has() visibility swap can reach them.
-        Assert.Contains("id=\"impact-view-treemap\"", impact);
-        Assert.Contains("id=\"impact-view-sunburst\"", impact);
-        Assert.Contains("id=\"impact-sunburst\"", impact);
-        Assert.Matches(new Regex("<div class=\"impact-shapes\">\\s*<div class=\"board-tabs impact-shape-tabs\">"), impact);
-        // The no-JS / accessible text-equivalent fallback list is present (and the controls start hidden).
+        Assert.Contains("data-hierarchy-filter", impact);
+        // The shape selector is the component's, ordered Sunburst-then-Treemap site-wide (owner D2) while this
+        // instance still DEFAULTS to treemap — a deep file tree reads better as rectangles, and demoting that to
+        // match the planning surfaces would be a regression dressed as consistency.
+        Assert.Contains("id=\"impact-hierarchy-shape-sunburst\"", impact);
+        Assert.Contains("id=\"impact-hierarchy-shape-treemap\"", impact);
+        Assert.Matches(new Regex("value=\"treemap\" checked"), impact);
+
+        // The no-JS / accessible text-equivalent fallback list is present, and every control still starts hidden —
+        // now inside the component's own control bar, so a surface's controls inherit the mount handshake rather
+        // than re-inventing it.
         Assert.Contains("impact-fallback", impact);
-        Assert.Contains("class=\"impact-controls\" hidden", impact);
+        Assert.Contains("class=\"ss-hierarchy-controls\" hidden", impact);
     }
 
     [Fact]

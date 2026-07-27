@@ -5,6 +5,12 @@ namespace SpecScribe.Tests;
 /// <summary>Pure-helper coverage for Story 9.12 Unplanned membership (open quick-dev + unattributable deferred).</summary>
 public class UnplannedWorkGeometryTests
 {
+    /// <summary>A minimal Hierarchy Explorer config for payload/twin assertions — the chart's presentation is not
+    /// what these tests are about, only what the payload claims. [Story 20.7]</summary>
+    private static HierarchyExplorerConfig HierarchyConfig() => new(
+        DomId: "test-hierarchy", Shape: "sunburst", Mode: HierarchyMode.Navigate, HashKey: "sb",
+        Size: 380, Labels: true, Meta: new Charts.ChartMeta(Title: "Project at a Glance"));
+
     private static EpicsModel OneEpic() => new()
     {
         OverviewHtml = string.Empty,
@@ -232,14 +238,19 @@ public class UnplannedWorkGeometryTests
         Assert.Equal(1, unplanned.SunburstUnplannedWeight);
 
         // Project glance aggregates Unplanned (no per-item leaves); weight excludes resurfaced done parent.
-        var svg = Charts.Sunburst(
-            OneEpic(),
-            followUps: followUps,
-            unplanned: unplanned);
-        Assert.Contains("aria-label=\"Unplanned:", svg);
-        Assert.Contains($"href=\"{FollowUpGroupPages.UnplannedPath}\"", svg);
-        Assert.Contains("Unplanned: 1 open item", svg);
-        Assert.DoesNotContain("Unplanned: 1 done item", svg);
+        // Asserted against the PAYLOAD and the TEXT TWIN now that Story 20.7 retired the SVG — the same facts, on
+        // the surfaces that carry them. The twin is the reader-visible one (ADR 0013 §2), so it is what the "does
+        // this say `1 open` and not `1 done`" question should be asked of.
+        var model = HierarchyExplorer.ProjectDashboard(
+            OneEpic(), "Test", HierarchyConfig(), followUps, unplanned);
+        var twin = HierarchyExplorer.TextTwinHtml(model);
+
+        Assert.Contains(model.Nodes, n => n.Id == "unplanned");
+        Assert.Contains(model.Nodes, n => n.Id == "unplanned~open" && n.Value == 1);
+        Assert.DoesNotContain(model.Nodes, n => n.Id == "unplanned~done");
+        Assert.Contains($"href=\"{FollowUpGroupPages.UnplannedPath}\"", twin);
+        Assert.Contains("Unplanned: 1 open item", twin);
+        Assert.DoesNotContain("Unplanned: 1 done item", twin);
     }
 
     [Fact]
