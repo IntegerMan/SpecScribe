@@ -14,6 +14,28 @@
       "port": 8099
     },
     {
+      "name": "twin-audit-20-6",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8104",
+        "--directory",
+        "SpecScribeOutput"
+      ],
+      "port": 8104
+    },
+    {
+      "name": "twin-audit-20-6-jsoff",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "C:/Users/MattE/AppData/Local/Temp/claude/C--Dev-SpecScribe/a8b7d26f-7cb1-4b4b-8511-0ea8cab706d6/scratchpad/jsoff_server.py",
+        "8105",
+        "C:/Users/MattE/AppData/Local/Temp/claude/C--Dev-SpecScribe/a8b7d26f-7cb1-4b4b-8511-0ea8cab706d6/scratchpad/audit-site"
+      ],
+      "port": 8105
+    },
+    {
       "name": "related-work-20-3",
       "runtimeExecutable": "python",
       "runtimeArgs": [
@@ -96,6 +118,48 @@
         "SpecScribeOutput"
       ],
       "port": 8103
+    },
+    {
+      "name": "web-dev-23-3",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "web", "run", "dev", "--", "--port", "3033"],
+      "port": 3033
+    },
+    {
+      "name": "web-prerender-23-3",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8106",
+        "--directory",
+        "web/.output/public"
+      ],
+      "port": 8106
+    },
+    {
+      "name": "golden-23-3",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8107",
+        "--directory",
+        "SpecScribeOutput"
+      ],
+      "port": 8107
+    },
+    {
+      "name": "tea-identity-18-2",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8108",
+        "--directory",
+        "C:/Users/MattE/AppData/Local/Temp/claude/C--Dev-SpecScribe/7bd4ec7d-0c63-4270-915a-4c2d07489710/scratchpad/tea-repo/SpecScribeOutput"
+      ],
+      "port": 8108
     },
     {
       "name": "verify-site",

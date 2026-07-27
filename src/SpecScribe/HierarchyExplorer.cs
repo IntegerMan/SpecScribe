@@ -50,6 +50,22 @@ public sealed record HierarchyNode(
     string? Href,
     string Kind);
 
+/// <summary>How the text twin PRESENTS. It never changes what the twin contains — ADR 0013 §2's completeness
+/// contract is identical in both modes — only whether a sighted reader sees a disclosure control for it.
+/// [Story 20.6, owner decisions D3/D4]</summary>
+public enum HierarchyTwinDisplay
+{
+    /// <summary>The default (owner D3): a closed <c>&lt;details&gt;</c>. <c>&lt;details&gt;</c> works with no
+    /// script, so a JS-off visitor reaches the full listing in one click.</summary>
+    Details,
+
+    /// <summary>Visually hidden, still in the accessibility tree (owner D4). For surfaces that ALREADY carry a
+    /// visible companion panel — the dashboard's <c>SunburstCompanionList</c> tile grid and the Story 20.3 rail —
+    /// where a second visible listing would be on-screen duplication. The twin still discharges the completeness
+    /// contract; the tile grid keeps its product value as a navigation aid.</summary>
+    ScreenReaderOnly,
+}
+
 /// <summary>The component's own configuration, embedded in the island beside the nodes. ADR 0013 §5: the IR
 /// carries chart <b>data + component configuration</b> — this is that shape, arriving early. Story 20.6's
 /// fingerprint-replacement assertions assert on it. [Story 20.5]</summary>
@@ -62,6 +78,9 @@ public sealed record HierarchyNode(
 /// <param name="Size">Chart size in px. Config-driven so no literal ever lands in the JS.</param>
 /// <param name="Labels">Whether to draw in-sector labels (owner decision D3, "Labelled explorer").</param>
 /// <param name="Meta">The Story 10.2 framing block — title + analysis window + framing sentence.</param>
+/// <param name="TwinDisplay">How the text twin presents (owner D3/D4). Config-driven, never a call-site literal
+/// and never a second twin builder — the same discipline that keeps <paramref name="Size"/> out of the JS.
+/// Trailing and defaulted so every existing call site keeps compiling and keeps the D3 default.</param>
 public sealed record HierarchyExplorerConfig(
     string DomId,
     string Shape,
@@ -69,7 +88,8 @@ public sealed record HierarchyExplorerConfig(
     string HashKey,
     int Size,
     bool Labels,
-    Charts.ChartMeta Meta);
+    Charts.ChartMeta Meta,
+    HierarchyTwinDisplay TwinDisplay = HierarchyTwinDisplay.Details);
 
 /// <summary>The whole payload: component configuration + the node hierarchy. One datasource, both shapes — the
 /// selector re-types the trace, it never re-derives geometry, re-counts against <see cref="ProjectCounts"/>, or
@@ -475,12 +495,25 @@ public static class HierarchyExplorer
     /// href is a real resolving link), non-color, and nested by <c>parentId</c> so the hierarchy itself is legible
     /// without the picture.
     ///
-    /// <para>Shipped inside <c>&lt;details&gt;</c> — visually collapsed is explicitly acceptable (ADR 0013 §2:
-    /// availability, not on-screen duplication). Class family is the component's own <c>.ss-hierarchy-*</c>, never
-    /// 20.2's <c>.sb-explorer-*</c>, so Story 20.7 can delete 20.2's markup and CSS cleanly.</para>
+    /// <para>Presentation is <see cref="HierarchyExplorerConfig.TwinDisplay"/>'s call, and it changes ONLY the
+    /// wrapper — the listing inside is byte-identical in both modes, because ADR 0013 §2's completeness contract
+    /// does not vary by surface. <see cref="HierarchyTwinDisplay.Details"/> (owner D3, the default) ships a closed
+    /// <c>&lt;details&gt;</c>: visually collapsed is explicitly acceptable (ADR 0013 §2 — availability, not
+    /// on-screen duplication) and it opens with no script. <see cref="HierarchyTwinDisplay.ScreenReaderOnly"/>
+    /// (owner D4) is for surfaces that already carry a visible companion listing.</para>
     ///
-    /// <para>This story retires no SVG, so the twin is not yet load-bearing. Building it correctly now is what
-    /// makes Story 20.6's per-surface audit a check rather than a rescue.</para></summary>
+    /// <para><b>Why the sr-only variant is a <c>&lt;section&gt;</c> with an accessible name, and why the CSS
+    /// reveals it on focus.</b> <c>.sr-only</c> is the clip-rect technique, so it deliberately stays in the
+    /// accessibility tree — which is the whole point, and also a hazard: the dashboard's listing carries 200+
+    /// links, and a clipped-but-focusable run of that size is an invisible tab tunnel for a SIGHTED keyboard user.
+    /// Story 20.2's review caught the mirror-image bug live (an SVG <c>&lt;a&gt;</c> at <c>display:none</c> stays
+    /// focusable) and the suite could not see it. So the twin keeps its links reachable — removing them from the
+    /// tab order would break the navigation half of NFR-5 — and <c>.ss-hierarchy-twin.sr-only:focus-within</c>
+    /// un-clips the container the moment focus enters it, the same pattern skip links use. Nothing is hidden from
+    /// anyone; it simply stops being invisible once you are in it.</para>
+    ///
+    /// <para>Class family is the component's own <c>.ss-hierarchy-*</c>, never 20.2's <c>.sb-explorer-*</c>, so
+    /// Story 20.7 can delete 20.2's markup and CSS cleanly.</para></summary>
     public static string TextTwinHtml(HierarchyExplorerModel model)
     {
         if (model.Nodes.Count == 0) return string.Empty;
@@ -494,11 +527,28 @@ public static class HierarchyExplorer
             list.Add(n);
         }
 
+        var id = PathUtil.Html(model.Config.DomId);
+        var heading = $"{PathUtil.Html(model.Config.Meta.Title)} — full text listing";
+        var srOnly = model.Config.TwinDisplay == HierarchyTwinDisplay.ScreenReaderOnly;
+
         var sb = new StringBuilder();
-        sb.Append($"<details class=\"ss-hierarchy-twin\" id=\"{PathUtil.Html(model.Config.DomId)}-twin\">\n");
-        sb.Append($"<summary>{PathUtil.Html(model.Config.Meta.Title)} — full text listing</summary>\n");
-        AppendTwinLevel(sb, roots, childrenOf, new HashSet<string>(StringComparer.Ordinal), 1);
-        sb.Append("</details>\n");
+        if (srOnly)
+        {
+            // A <section> with aria-labelledby rather than a bare <div>: a landmark with an accessible name is how
+            // a screen-reader user FINDS this listing without tabbing to it, which matters more here than in the
+            // <details> mode where a visible summary already advertises it.
+            sb.Append($"<section class=\"ss-hierarchy-twin sr-only\" id=\"{id}-twin\" aria-labelledby=\"{id}-twin-title\">\n");
+            sb.Append($"<h3 class=\"ss-hierarchy-twin-title\" id=\"{id}-twin-title\">{heading}</h3>\n");
+            AppendTwinLevel(sb, roots, childrenOf, new HashSet<string>(StringComparer.Ordinal), 1);
+            sb.Append("</section>\n");
+        }
+        else
+        {
+            sb.Append($"<details class=\"ss-hierarchy-twin\" id=\"{id}-twin\">\n");
+            sb.Append($"<summary>{heading}</summary>\n");
+            AppendTwinLevel(sb, roots, childrenOf, new HashSet<string>(StringComparer.Ordinal), 1);
+            sb.Append("</details>\n");
+        }
         return sb.ToString();
     }
 

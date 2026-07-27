@@ -11,13 +11,24 @@ namespace SpecScribe;
 /// earlier plain ranked ownership table; see this file's Change Log for that history). A synthesized page (no
 /// markdown source), so it builds its own shell the way <see cref="CommitDayTemplater"/> does rather than
 /// going through <see cref="HtmlTemplater.RenderPage"/>.
-/// <para>Progressive enhancement contract (NFR-5, reinterpreted by ADR 0010 for this opt-in surface): a real,
-/// useful default-mode chart (dominant-author share %) renders and works with JS off; JS only adds the live mode
-/// selector (top contributors / individual-author spotlight / staleness threshold) on top — see
-/// <c>specscribe.js</c>'s <c>initOwnershipSunburst</c>. Author information stays descriptive attribution in every
-/// mode, never a cross-repo ranked scoreboard (FR-10). Outgoing file links are guarded on target existence via the
-/// <c>fileHref</c> resolver (Stories 7.1/7.4 seam): no resolver or no target → plain escaped text, never a dead
-/// link. [Story 3.8; Story 7.11 rewrite]</para></summary>
+/// <para><b>No-JS contract — ADR 0013 §4, which SUPERSEDES the ADR 0010 §2 reading this comment used to state.</b>
+/// The superseded wording claimed the default-mode chart "renders and works with JS off" and treated that as the
+/// surface's whole no-JS story. Under ADR 0013 the contract is a server-rendered <b>text twin</b>: JS-off may lose
+/// the visualization, but it must never lose the <b>information</b> or the <b>navigation</b>.
+/// <b>This page does not satisfy that contract today.</b> Story 20.6's audit measured it live with JavaScript
+/// disabled: the ownership charts carry 1,115 file nodes and 224 directory nodes, only 6 of those files are linked
+/// anywhere outside an <c>&lt;svg&gt;</c>, the page contains zero tables or lists enumerating them (Story 7.11
+/// deleted both prior ownership tables), the treemap emits no per-node <c>&lt;title&gt;</c> at all, and both charts
+/// are <c>role="img"</c> — which prunes their in-chart links from the accessibility tree. A non-visual or JS-off
+/// visitor receives two summary sentences and a colour legend.
+/// <b>Consequence: this surface KEEPS its server-rendered SVG.</b> Story 20.7 must not retire it until a twin
+/// exists. The per-surface verdict and the enumerated missing facts are in
+/// <c>_bmad-output/implementation-artifacts/20-6-text-twin-audit.md</c> (surface 6).</para>
+/// <para>JS adds the live mode selector (top contributors / individual-author spotlight / staleness threshold) —
+/// see <c>specscribe.js</c>'s <c>initOwnershipSunburst</c>. Author information stays descriptive attribution in
+/// every mode, never a cross-repo ranked scoreboard (FR-10). Outgoing file links are guarded on target existence
+/// via the <c>fileHref</c> resolver (Stories 7.1/7.4 seam): no resolver or no target → plain escaped text, never a
+/// dead link. [Story 3.8; Story 7.11 rewrite; Story 20.6 contract correction]</para></summary>
 public static class GitInsightsTemplater
 {
     public static string RenderPage(
@@ -72,7 +83,9 @@ public static class GitInsightsTemplater
     /// whole-tree, interactive sunburst/treemap TOGGLE (owner feedback — mirrors Story 7.12's own Sunburst/
     /// Treemap pure-CSS radio toggle) over EVERY source file (not a top-N subset — <paramref name="codeMap"/>
     /// comes from the same uncapped <see cref="CodeMap.Build"/> walk the Code Map and Risk Quadrant pages use),
-    /// pre-colored server-side by dominant-author commit share % (the required no-JS default, ADR 0010) with a
+    /// pre-colored server-side by dominant-author commit share % (ADR 0010 §2's "pre-rendered default mode" — a
+    /// reading ADR 0013 §4 supersedes: a rendered chart is no longer accepted AS the no-JS contract, see this
+    /// class's summary and Story 20.6's audit) with a
     /// client-side mode selector for top contributors / an individual-author spotlight / a configurable staleness
     /// threshold that recolors WHICHEVER view is toggled visible (<c>specscribe.js</c>'s
     /// <c>initOwnershipSunburst</c> queries both <c>.ownership-wedge</c> and <c>.ownership-cell</c>). Every file

@@ -6,5 +6,15 @@
 .cache/
 dist/
 
-# assets/tokens.css is GENERATED but deliberately COMMITTED — `npm run check:tokens` needs a committed
-# artifact to diff the C# source against, which is the whole mechanism of the drift gate.
+# Runtime assets COPIED from src/SpecScribe/assets/ by `npm run sync:assets` (Story 23.3 Task 7).
+# 1.4 MB whose authoritative source sits in this same repo — a committed second copy would add weight
+# without adding a guarantee, and `npm run check:assets` diffs against the SOURCE, not against a committed
+# artifact, so the gate loses nothing.
+public/
+
+# measurements/ is deliberately NOT ignored. Story 23.1's report claimed "every number is reproducible"
+# and it was not true at review time; committing the harness output is what makes the claim checkable.
+
+# assets/tokens.css and assets/ir-content.css(.manifest.json) are GENERATED but deliberately COMMITTED —
+# `npm run check:tokens` / `check:ir-content` need a committed artifact to diff the C# source against,
+# which is the whole mechanism of the drift gates.

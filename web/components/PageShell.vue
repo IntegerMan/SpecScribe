@@ -6,37 +6,57 @@
  * the first focusable element, and a `#main-content` landmark for it to target (UX-DR16). Putting them in
  * the shell means a new route cannot forget them.
  *
- * `<main>` sits OUTSIDE the scoped-style boundary problem 23.3 will hit: content injected there with
- * `v-html` is not stamped with this SFC's `data-v-*` attribute, so the rules below will not reach it.
+ * `<main>` sits OUTSIDE the scoped-style boundary problem 23.3 hit: content injected there with `v-html` is
+ * not stamped with this SFC's `data-v-*` attribute, so the rules below will not reach it.
  * See CONVENTIONS.md, "Styling injected content".
  */
 withDefaults(
   defineProps<{
-    /** The page's h1. */
+    /**
+     * The page's title. Rendered as the h1 under `chrome: 'full'`; under `chrome: 'nav-only'` the injected
+     * IR content owns the h1 and this is used only by the caller's head projection.
+     */
     title: string
-    /** One-line orientation under the title. */
+    /** One-line orientation under the title. Ignored under `chrome: 'nav-only'`. */
     subtitle?: string
-    /** The kicker above the title — the site/brand line. */
+    /** The kicker above the title — the site/brand line. Ignored under `chrome: 'nav-only'`. */
     brand?: string
+    /**
+     * How much chrome the shell supplies. [Story 23.3]
+     *
+     * `full` — the app's own routes: brand, h1, subtitle, and a reading-width column.
+     * `nav-only` — an IR-backed route: the injected content already carries the site nav, its own h1 and
+     *   its own layout, so the shell contributes only the skip link and gets out of the way. Adding a
+     *   second h1 and a 64rem column on top of a full-bleed dashboard would be a regression dressed as
+     *   consistency.
+     *
+     * Under `nav-only` the shell also does NOT emit `<main>` — the caller supplies it through `IrMain`,
+     * which reproduces the golden page's open tag exactly. A `<main>` authored HERE would carry this SFC's
+     * `data-v-*` attribute and bracket its slot content in Vue's `<!--[-->` fragment anchors: 32 bytes of
+     * hydration bookkeeping inside the one region Story 23.3 compares byte-for-byte. See `IrMain.ts`.
+     */
+    chrome?: 'full' | 'nav-only'
   }>(),
-  { subtitle: undefined, brand: 'SpecScribe' },
+  { subtitle: undefined, brand: 'SpecScribe', chrome: 'full' },
 )
 </script>
 
 <template>
-  <div class="shell">
+  <div class="shell" :class="{ 'shell-bare': chrome === 'nav-only' }">
     <a class="skip-link" href="#main-content">Skip to main content</a>
 
-    <header class="shell-head">
+    <header v-if="chrome === 'full'" class="shell-head">
       <p class="shell-brand">{{ brand }}</p>
       <h1 class="shell-title">{{ title }}</h1>
       <p v-if="subtitle" class="shell-subtitle">{{ subtitle }}</p>
       <slot name="nav" />
     </header>
+    <slot v-else name="nav" />
 
-    <main id="main-content" class="shell-main">
+    <main v-if="chrome === 'full'" id="main-content">
       <slot />
     </main>
+    <slot v-else />
 
     <footer class="shell-foot">
       <slot name="footer">
@@ -102,11 +122,22 @@ withDefaults(
   text-wrap: pretty;
 }
 
-.shell-main {
+/* Selected by ELEMENT, not by a `shell-main` class, so the rule reads the same for both chrome modes. An
+   IR route's `<main>` comes from `IrMain` and carries no `data-v-*`, so this scoped rule does NOT reach it
+   — `assets/base.css` carries the equivalent for `.shell-bare > main`. */
+.shell > main {
   flex: 1 0 auto;
   /* The entrance every surface shares, expressed only through motion tokens. The global reduce block in
      base.css neutralises it — this component declares no second reduced-motion rule of its own. */
   animation: shell-fade var(--motion-entrance) var(--motion-ease) both;
+}
+
+/* An IR-backed route: no reading-width column, no page padding. The injected content is a whole page's
+   worth of layout authored against the portal's own stylesheet, and constraining it here would collapse
+   full-bleed surfaces like the dashboard. */
+.shell-bare {
+  max-width: none;
+  padding: 0;
 }
 
 .shell-foot {

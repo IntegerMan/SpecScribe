@@ -40,4 +40,14 @@ public enum AdapterDiagnosticCategory
 /// <param name="RelativePath">The offending artifact, relative to the source root (matching the relative
 /// paths <see cref="GenerationEvent"/> already reports).</param>
 /// <param name="Message">Human-readable detail, e.g. the parser exception message.</param>
-public sealed record AdapterDiagnostic(AdapterDiagnosticCategory Category, string RelativePath, string Message);
+/// <param name="Anchor">Which real root <paramref name="RelativePath"/> is relative to. Defaults to
+/// <see cref="DiagnosticAnchorRoot.Source"/> — the contract every artifact diagnostic follows — and is
+/// overridden only by the module-identity notices, whose subject (<c>_bmad/{code}/module-help.csv</c>) lives
+/// beside the source tree rather than in it. Carried through <c>SiteGenerator.MapDiagnostics</c> onto the
+/// <see cref="GenerationEvent"/> so the diagnostics page and the webview Problems channel resolve one shared
+/// answer. [Story 18.2; ADR 0015 Decision 2d]</param>
+public sealed record AdapterDiagnostic(
+    AdapterDiagnosticCategory Category,
+    string RelativePath,
+    string Message,
+    DiagnosticAnchorRoot Anchor = DiagnosticAnchorRoot.Source);

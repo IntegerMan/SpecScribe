@@ -445,6 +445,30 @@ body {
 .ss-hierarchy-twin-list li { margin: 0.15rem 0; }
 .ss-hierarchy-twin-meta { color: var(--ink-faded); font-size: 0.72rem; }
 
+/* Story 20.6 / owner D4: the sr-only twin, used on surfaces that already carry a visible companion listing (the
+   dashboard's "Remaining Work by Epic" tile grid + the 20.3 rail). `.sr-only` is the clip-rect technique, so the
+   listing stays in the accessibility tree AND its 200+ links stay focusable — which is the contract (NFR-5 keeps
+   navigation) and also a hazard: clipped-but-focusable content is an invisible tab tunnel for a SIGHTED keyboard
+   user. Story 20.2's review caught the mirror-image defect live (an SVG <a> at display:none stays focusable) and
+   the suite could not see it. So rather than drop the links out of the tab order, un-clip the container the moment
+   focus enters it — the same pattern skip links use. Every property `.sr-only` set must be undone here, or the
+   revealed panel inherits a 1px clipped box. */
+.ss-hierarchy-twin.sr-only:focus-within {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: 0.6rem 0.8rem;
+  margin: 0.8rem 0 0;
+  overflow: visible;
+  clip: auto;
+  clip-path: none;
+  white-space: normal;
+  border: 1px solid var(--teal);
+  border-radius: 4px;
+  background: var(--surface, #fff);
+}
+.ss-hierarchy-twin-title { margin: 0 0 0.35rem; font-size: 0.8rem; color: var(--ink-light); }
+
 /* ---- Story 20.3: related-work details rail (a card beside the explorer) ----
    The explorer chart and this rail sit side by side on wide viewports (rail to the RIGHT), stacking on narrow ones.
    Every card is server-rendered; the CSS at the end of this block collapses the JS-off "all cards + expanded

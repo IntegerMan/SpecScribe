@@ -170,6 +170,136 @@ a rendered badge, and confirm scoped styles are containing where you expect them
 
 ---
 
+## 8. Routes are the IR's paths, verbatim. Nothing rewrites an href.
+
+Ratified shape: [ADR 0017](../docs/adrs/0017-projection-routes-mirror-ir-paths.md) (Proposed).
+
+A page's route is its IR `outputRelativePath` with a leading slash — `/index.html`, `/epics/epic-23.html`,
+`.html` and all. The IR carries whole rendered markup (ADR 0016), and that markup contains the site's entire
+link graph as relative hrefs: **88,695 internal links across 1,049 pages** on this repo. Mirroring the
+emitter's path space means every one of them resolves unchanged.
+
+**So no href is ever rewritten.** If a link dangles, it dangles in the generated portal too and the fix
+belongs to the emitter. `npm run check:links` enforces exactly that distinction — it walks both trees and
+gates on links that resolve in the golden site and dangle here, reporting inherited breakage separately
+rather than blaming the migration for it.
+
+Two consequences that look like bugs and are not:
+
+- **All IR routing goes through one `pages/[...path].vue` catch-all.** Nuxt's file-based routing cannot
+  express a route with a `.html` extension (there is no valid `pages/epics.html.vue`). The catch-all
+  resolves `route.params.path` against the manifest and branches to a surface component by path.
+- **Nitro silently refuses to write a route whose path contains `..`** — its `canWriteToDisk` guard is a
+  substring test, not a path-segment test. SpecScribe emits a code page per repository file, so a source
+  file with two consecutive dots in its name is rendered, logged `(skipped)`, and never written. The
+  `nitro:init` hook in `nuxt.config.ts` writes those pages itself.
+
+---
+
+## 9. Splitting the IR's content region — the nested-`<main>` trap
+
+`SpaDelivery.ExtractContentRegion` returns `navMarkup + [wayfinding] + <main id="main-content">…</main>` —
+the `<main>` **element**, not just its body. `PageShell` emits its own. Injecting the region whole gives you
+a nested `<main>`, a duplicate `id`, and two navs.
+
+`ir/adapter.ts` splits the region back into `{ navHtml, wayfindingHtml, mainAttributes, mainAttrs,
+mainInnerHtml }` using the same markers the emitter concatenated with, and fails loudly on a page it cannot
+account for. Three things it taught, all of which cost a build to learn:
+
+- **The IR carries TWO region shapes.** The 187 dashboard/epics-family pages are re-rendered from their view
+  models, so their region carries the whole wayfinding band, wrapper and all. The 853 captured pages go
+  through `ExtractContentRegion`, which slices from `<div class="breadcrumb"` — *inside* the wrapper — so
+  their region carries the wrapper's closing `</div>` without its opener. Treating those as one shape
+  double-opened the wrapper and nested `<main>` and `<footer>` inside the breadcrumb band on every migrated
+  page. **The `<main>` region stayed byte-identical, so parity, link resolution and every a11y assertion
+  passed.** It was visible only as real DOM geometry in a browser. `npm run check:a11y` now asserts the
+  structure so it cannot come back quietly.
+- **`<main>` must not be a template-authored element.** An SFC with `<style scoped>` stamps `data-v-*` onto
+  every element in its template, and slot content renders as a fragment bracketed by Vue's `<!--[-->`
+  hydration anchors. Both land inside the compared region. `IrMain.ts` is a render function in a
+  style-less component for exactly this reason; `PageShell` yields `<main>` to it under `chrome="nav-only"`.
+- **Injected runs need no wrapper element.** `IrHtml.ts` uses `createStaticVNode`, so nav, wayfinding and
+  main body are spliced in with no host `<div>` of ours — which matters because the portal's stylesheet has
+  direct-child selectors a wrapper would silently break.
+
+---
+
+## 10. Styling injected content: the `ir-content.css` layer (transitional)
+
+Ratified shape: [ADR 0018](../docs/adrs/0018-transitional-ir-content-style-layer.md) (Proposed).
+
+`tokens.css` styles **none** of the injected markup — the IR's prose is authored against the 7,041-line C#
+monolith this app deliberately does not import (§1). Without a second layer every migrated page renders
+structurally correct and visually bare.
+
+```bash
+npm run extract:ir-content   # regenerate after ANY change to specscribe.css OR to what the surfaces render
+npm run check:ir-content     # drift gate — proven red three ways, not only green
+```
+
+What makes it a transition rather than a re-import: it is **bounded** by measured selector usage across the
+migrated families (897 rules + 4 keyframes, 62 % smaller than source), **generated** and gated, **scoped**
+under `.ir-content` so it cannot reach a template-authored component, and **enumerated** in
+`assets/ir-content.manifest.json` — that list is what Story 23.4 retires. Pass-through pages get whatever
+overlap the migrated families already paid for; the extractor prints that coverage (48 % here) as a number
+rather than leaving it implied.
+
+Attribute selectors deliberately do **not** bound the extraction. Nearly every one expresses runtime state
+(`[data-ss-hierarchy-boot]`, `[data-hierarchy-ready]`, `[open]`) that is absent from server-rendered markup,
+so requiring them drops the Hierarchy Explorer's anti-flash CSS — silently, with the page still rendering.
+
+---
+
+## 11. Runtime assets are COPIED. Never forked, never reimplemented.
+
+```bash
+npm run sync:assets    # copy specscribe.js, plotly-hierarchy.min.js, prism.{css,js} into public/
+npm run check:assets   # drift gate against the source in src/SpecScribe/assets/
+```
+
+ADR 0012 §Decision 2 makes "one Hierarchy Explorer component is the only route to a sunburst or treemap" an
+invariant — after ADR 0010 §6 asked for one shared engine and got three arc renderers instead. A Vue
+re-implementation of the explorer would be precisely the second implementation that ADR exists to prevent.
+
+So the Nuxt app **hosts** the shipped implementation rather than porting it: `IrSurface.vue` loads
+`specscribe.js`, which calls `initHierarchyExplorers(document)` at load and re-runs on the existing
+`specscribe:content-swapped` event. No new API was needed and none was added.
+
+Two things that are easy to lose:
+
+- **`v-html` never executes injected `<script>`.** Fine for the explorer's data island, which is inert
+  `type="application/json"` the component reads out of the DOM — but it means nothing executable can arrive
+  through IR content, so the boot must come from the Nuxt layer. The adapter surfaces
+  `hasExecutableIsland`, and `IrSurface` throws on it rather than shipping a page that quietly does nothing.
+- **The anti-flash boot marker is chrome-level.** `HierarchyExplorer.cs` emits it just before `<main>`,
+  deliberately outside the captured region, so it is absent under Nuxt and its absence degrades silently to
+  a visible flash-then-swap. It is re-emitted from the head, with the script body **copied** off the
+  generated site rather than re-typed.
+
+`web/public/` is gitignored: 1.4 MB whose authoritative source is in this same repo. The gate compares
+against that source, not against a committed copy, so nothing is lost by not committing one.
+
+---
+
+## 12. IR-backed routes ship no Nuxt runtime
+
+`routeRules` sets `noScripts: true` for everything except the app's own routes. These pages are fully
+prerendered content whose only interactivity is the portal's own vanilla `specscribe.js`; there is nothing
+for Vue to hydrate, and hydrating would be actively wrong — the IR is resolved at build time and is
+deliberately absent from the client bundle, so a hydration pass would find no data and blank the page.
+
+That absence is structural, not conventional. App code reaches the IR only through the `#ir` specifier, and
+a Vite plugin resolves it per build environment: the real adapter for SSR/prerender, a throwing stub for the
+browser. `#ir` is **not** a Nuxt `alias` — Vite's own alias plugin runs ahead of every user plugin, so an
+alias entry resolves it to the server adapter before the environment-aware plugin sees it, and drags
+`node:fs` into the browser bundle. The alias exists in `tsconfig` paths only, for the editor.
+
+Measured consequence: **zero `_payload.json` files** for the 1,043 IR routes, and zero Nuxt `<script>` tags
+on any of them. The whole prerendered site is **64.3 MB across 1,079 files** against the generated portal's
+65.9 MB across 1,049 — smaller than the thing it projects, against the 23.1 spike's 2.26×.
+
+---
+
 ## Status of this app
 
 `web/` is production-intent but **not shipped yet**: it is not in `SpecScribe.slnx` and not wired into

@@ -51,10 +51,21 @@ public class SiteGeneratorHowToReadTests : IDisposable
         BMad Method,bmad-create-story,Create Story,CS,Prepare the next story,create,,4-implementation,,,true,implementation_artifacts,story
         """;
 
+    // Verbatim upstream rows, pinned exactly as in ModuleContextTests — see the provenance block there for
+    // repositories and commit SHAs. A synthetic prefix here would let a prefix-keyed identity regression pass
+    // unnoticed. [Story 18.2 Task 6; ADR 0015 Decision 7]
     private const string GdsCsv = """
         module,skill,display-name,menu-code,description,action,args,phase,preceded-by,followed-by,required,output-location,outputs
-        Game Dev Studio,_meta,,,,,,,,,false,url,
-        Game Dev Studio,gds-create-story,Create Story,CS,Prepare the next story,create,,4-implementation,,,true,implementation_artifacts,story
+        Game Dev Studio,_meta,,,,,,,,,false,https://game-dev-studio-docs.bmad-method.org/llms.txt,
+        Game Dev Studio,gds-create-story,Create Story,CS,Create Story with comprehensive context for developer agent implementation.,,,4-production,gds-sprint-planning,,true,implementation_artifacts,story
+        """;
+
+    /// <summary>Test Architect's real <c>module-help.csv</c>: every skill is <c>bmad-*</c> prefixed, so this is
+    /// the fixture that used to be misidentified as BMad Method and served BMM's whole glossary. [Story 18.2]</summary>
+    private const string TeaCsv = """
+        module,skill,display-name,menu-code,description,action,args,phase,preceded-by,followed-by,required,output-location,outputs
+        Test Architecture Enterprise,_meta,,,,,,,,,false,https://bmad-code-org.github.io/bmad-method-test-architecture-enterprise/llms.txt,
+        Test Architecture Enterprise,bmad-testarch-trace,Traceability,TR,Coverage traceability and gate,,,4-implementation,bmad-testarch-test-review,,false,test_artifacts,traceability matrix|gate decision
         """;
 
     public SiteGeneratorHowToReadTests()
@@ -516,6 +527,104 @@ public class SiteGeneratorHowToReadTests : IDisposable
         var end = next >= 0 ? next : html.IndexOf("</section>", start, StringComparison.Ordinal);
         Assert.True(end > start, "Generate section should have an end boundary");
         return html[start..end];
+    }
+
+    // ---- Story 18.2: a detected-but-unmodeled module is NAMED, never silently given BMM's vocabulary ----
+
+    /// <summary>Swaps this fixture's BMM install for one whose code SpecScribe doesn't model, keeping every
+    /// other source artifact identical so the only variable is module identity.</summary>
+    private void InstallOnly(string code, string csv)
+    {
+        Directory.Delete(Path.Combine(_root, "_bmad", "bmm"), recursive: true);
+        File.WriteAllText(Path.Combine(_root, "_bmad", "_config", "manifest.yaml"),
+            $"modules:\n  - name: core\n    version: 6.0.0\n  - name: {code}\n    version: 6.0.0");
+        var dir = Path.Combine(_root, "_bmad", code);
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, "module-help.csv"), csv);
+    }
+
+    [Fact]
+    public void HowToRead_UnmodeledModule_NamesTheModuleWhereTheGlossaryWouldBe()
+    {
+        InstallOnly("tea", TeaCsv);
+
+        new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
+        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+
+        // The heading and its anchor survive so in-page links to #glossary still resolve...
+        Assert.Contains("<h2 id=\"glossary\">Glossary</h2>", html);
+        // ...but the body is the owner's named acknowledgement, not a definition list.
+        Assert.Contains("Test Architecture Enterprise", html);
+        Assert.Contains("SpecScribe doesn't publish a glossary for it yet.", html);
+        Assert.DoesNotContain("howtoread-glossary", html);
+
+        // And emphatically NOT BMad Method's vocabulary.
+        Assert.DoesNotContain("<dt>FR</dt>", html);
+        Assert.DoesNotContain("<dt>PRD</dt>", html);
+        Assert.DoesNotContain("spec kernel", html);
+    }
+
+    [Fact]
+    public void ContentPages_UnmodeledModule_NoBmadMethodAbbreviationExpansion()
+    {
+        InstallOnly("tea", TeaCsv);
+
+        new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
+        var epics = File.ReadAllText(Path.Combine(Site, "epics.html"));
+
+        // epics.md deliberately uses bare FR/NFR/AC/ADR/PRD tokens — with no glossary there is nothing to
+        // expand, so the site-wide AbbreviationExpander must leave every one of them plain.
+        Assert.DoesNotContain("<abbr", epics);
+        Assert.Contains("FR and NFR items", epics);
+    }
+
+    [Fact]
+    public void HowToRead_UnmodeledModule_OmitsCommandLegend_AndSkipsModuleDocReadingOrder()
+    {
+        InstallOnly("tea", TeaCsv);
+
+        new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
+        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+
+        // The catalog parses fine, but the legend promises commands "captioned on story and epic pages" —
+        // surfaces that only exist for a modeled module. It renders only for a MODELED primary.
+        Assert.DoesNotContain("<h2 id=\"commands\">Commands you'll see</h2>", html);
+
+        // No module docs are published for it, so the reading order carries none — even though this fixture
+        // has prd.md/ARCHITECTURE-SPINE.md on disk (they render, they're just not module docs here).
+        var start = html.IndexOf("<h2 id=\"reading-order\">", StringComparison.Ordinal);
+        var end = html.IndexOf("</ol>", start, StringComparison.Ordinal);
+        var order = html[start..end];
+        Assert.DoesNotContain("href=\"prd.html\"", order);
+        Assert.DoesNotContain("href=\"ARCHITECTURE-SPINE.html\"", order);
+        Assert.Contains("href=\"epics.html\"", order);
+    }
+
+    [Fact]
+    public void Diagnostics_UnmodeledModule_ReportsOneInformationalNoticeNamingCodeAndLabel()
+    {
+        InstallOnly("tea", TeaCsv);
+
+        var events = new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
+
+        var notices = events
+            .Where(e => e.Message is not null && e.Message.Contains("Detected BMad module", StringComparison.Ordinal))
+            .ToList();
+
+        var notice = Assert.Single(notices);
+        Assert.Equal(GenerationOutcome.Skipped, notice.Outcome); // non-fatal
+        Assert.Contains("[Informational]", notice.Message!);
+        Assert.Contains("'tea'", notice.Message!);
+        Assert.Contains("Test Architecture Enterprise", notice.Message!);
+    }
+
+    [Fact]
+    public void Diagnostics_ModeledModule_EmitsNoUnmodeledNotice()
+    {
+        var events = new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
+
+        Assert.DoesNotContain(events,
+            e => e.Message is not null && e.Message.Contains("Detected BMad module", StringComparison.Ordinal));
     }
 
     [Fact]

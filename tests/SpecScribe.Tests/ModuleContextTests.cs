@@ -33,11 +33,22 @@ public class ModuleContextTests : IDisposable
 
     private void WriteModule(string moduleName, string csv, params string[] installedModules)
     {
+        WriteManifest(installedModules);
+        WriteModuleDir(moduleName, csv);
+    }
+
+    /// <summary>Writes the installed-module manifest in the order given — the order IS the fixture for the
+    /// primary-selection tests, since manifest order is what used to decide the winner. [Story 18.2]</summary>
+    private void WriteManifest(params string[] installedModules)
+    {
         var configDir = Path.Combine(_repo, "_bmad", "_config");
         Directory.CreateDirectory(configDir);
         var manifest = "modules:\n" + string.Join("\n", installedModules.Select(m => $"  - name: {m}\n    version: 6.0.0"));
         File.WriteAllText(Path.Combine(configDir, "manifest.yaml"), manifest);
+    }
 
+    private void WriteModuleDir(string moduleName, string csv)
+    {
         var moduleDir = Path.Combine(_repo, "_bmad", moduleName);
         Directory.CreateDirectory(moduleDir);
         File.WriteAllText(Path.Combine(moduleDir, "module-help.csv"), csv);
@@ -51,11 +62,52 @@ public class ModuleContextTests : IDisposable
         BMad Method,bmad-code-review,Code Review,CR,Review the changes,,,4-implementation,,,false,,
         """;
 
+    // ---- Upstream-pinned module fixtures [Story 18.2 Task 6; ADR 0015 Decision 7] --------------------
+    //
+    // Every constant below is VERBATIM content (header, `_meta` row, and a representative subset of the
+    // data rows) from the module's own `src/module-help.csv` in the `bmad-code-org` GitHub organization,
+    // re-fetched 2026-07-26 and pinned to the commit that last touched each file:
+    //
+    //   Game Dev Studio  bmad-module-game-dev-studio             9f947c9611cedf01f220796f65bf41a96100be0a
+    //   Test Architect   bmad-method-test-architecture-enterprise 4a7522664ad4bf1c5338a1819144de458eaebecd
+    //   Creative Intel.  bmad-module-creative-intelligence-suite  0a3413af3a4dc3ef9c06da79c671958b59b3b46c
+    //   BMad Builder     bmad-builder (skills/module-help.csv)    a4a8483defb54ca3f42c76b6e80eed05279ed3a2
+    //
+    // Rows are subset, never edited: the module label, the skill ids and the `_meta` row's docs-URL
+    // output-location are exactly what ships. This matters — synthetic `gds-*` rows are precisely why the
+    // skill-prefix identity bug went unnoticed, since BMad's docs advertise GDS commands as `/bmgd-*` and
+    // the suite would have passed had that been the on-disk reality. It is not: GDS really does use `gds-*`
+    // (BMGD is branding), and every OTHER first-party module really is `bmad-*` prefixed.
+
     private const string GdsCsv = """
         module,skill,display-name,menu-code,description,action,args,phase,preceded-by,followed-by,required,output-location,outputs
-        Game Dev Studio,_meta,,,,,,,,,false,url,
-        Game Dev Studio,gds-create-story,Create Story,CS,Prepare the next story,create,,4-implementation,,,true,implementation_artifacts,story
-        Game Dev Studio,gds-dev-story,Dev Story,DS,Execute the story,,,4-implementation,,,true,,
+        Game Dev Studio,_meta,,,,,,,,,false,https://game-dev-studio-docs.bmad-method.org/llms.txt,
+        Game Dev Studio,gds-gdd,Game Design Document,GDD,"Create, update, or validate a game's GDD — the primary design artifact covering pillars, mechanics, progression, levels, art, audio, and development epics.",,,2-design,,,false,planning_artifacts,gdd
+        Game Dev Studio,gds-create-story,Create Story,CS,Create Story with comprehensive context for developer agent implementation.,,,4-production,gds-sprint-planning,,true,implementation_artifacts,story
+        Game Dev Studio,gds-dev-story,Dev Story,DS,Execute Dev Story workflow implementing tasks and tests.,,,4-production,gds-create-story,,true,,
+        """;
+
+    private const string TeaCsv = """
+        module,skill,display-name,menu-code,description,action,args,phase,preceded-by,followed-by,required,output-location,outputs
+        Test Architecture Enterprise,_meta,,,,,,,,,false,https://bmad-code-org.github.io/bmad-method-test-architecture-enterprise/llms.txt,
+        Test Architecture Enterprise,bmad-testarch-nfr,NFR Evidence Audit,NR,Audit non-functional requirement evidence,,,4-implementation,bmad-testarch-automate,,false,test_artifacts,nfr report
+        Test Architecture Enterprise,bmad-testarch-trace,Traceability,TR,Coverage traceability and gate,,,4-implementation,bmad-testarch-test-review,,false,test_artifacts,traceability matrix|gate decision
+        """;
+
+    private const string CisCsv = """
+        module,skill,display-name,menu-code,description,action,args,phase,preceded-by,followed-by,required,output-location,outputs
+        Creative Intelligence Suite,_meta,,,,,,,,,false,https://cis-docs.bmad-method.org/llms.txt,
+        Creative Intelligence Suite,bmad-cis-innovation-strategy,Innovation Strategy,IS,Identify disruption opportunities and architect business model innovation.,,,anytime,,,false,output_folder,innovation strategy
+        Creative Intelligence Suite,bmad-brainstorming,Brainstorming,BS,Facilitate brainstorming sessions using one or more techniques.,,,anytime,,,false,output_folder,brainstorming session results
+        Creative Intelligence Suite,bmad-cis-storytelling,Storytelling,ST,Craft compelling narratives using proven story frameworks and techniques.,,,anytime,,,false,output_folder,narrative/story
+        """;
+
+    private const string BmbCsv = """
+        module,skill,display-name,menu-code,description,action,args,phase,preceded-by,followed-by,required,output-location,outputs
+        BMad Builder,_meta,,,,,,,,,false,https://bmad-builder-docs.bmad-method.org/llms.txt,
+        BMad Builder,bmad-bmb-setup,Setup Builder Module,SB,"Install or update BMad Builder module config and help entries.",configure,"{-H: headless mode}|{inline values: skip prompts with provided values}",anytime,,,false,{project-root}/_bmad,config.yaml and config.user.yaml
+        BMad Builder,bmad-module-builder,Ideate Module,IM,"Brainstorm and plan a BMad module — explore ideas, decide architecture, and produce a build plan.",ideate-module,"{description: initial module idea}",anytime,,bmad-module-builder:create-module,false,bmad_builder_reports,module plan
+        BMad Builder,bmad-module-builder,Create Module,CM,"Scaffold module infrastructure into built skills, making them an installable BMad module.",create-module,"{-H: headless mode}|{path: skills folder or single SKILL.md}",anytime,bmad-module-builder:ideate-module,,false,bmad_builder_output_folder,setup skill
         """;
 
     [Fact]
@@ -197,6 +249,305 @@ public class ModuleContextTests : IDisposable
         Assert.True(ModuleContext.IsMethodPresent(_repo));
         Assert.False(ModuleContext.IsGdsPresent(_repo));
     }
+
+    // ---- Story 18.2 / ADR 0015: identity comes from the module CODE, never the skill prefix -----------
+    // Defect A (false presence): every first-party BMad module except GDS prefixes its skills `bmad-`, so
+    // CIS/TEA/BMB used to be identified as BmadMethod and served BMM's entire glossary. These fixtures use
+    // the modules' REAL skill ids on purpose — inventing `cis-*`/`tea-*` ids would make them pass for the
+    // wrong reason and hide the bug.
+
+    [Theory]
+    [InlineData("cis", "Creative Intelligence Suite")]
+    [InlineData("tea", "Test Architecture Enterprise")]
+    [InlineData("bmb", "BMad Builder")]
+    public void Detect_ModuleWithBmadSkillPrefix_IsUnmodeled_NotBmadMethod(string code, string label)
+    {
+        WriteModule(code, CsvFor(code), "core", code);
+
+        var ctx = ModuleContext.Detect(_repo, Array.Empty<string>());
+
+        // The identity itself: unmodeled, and emphatically NOT a BmadMethod fallback. Unmodeled is its own
+        // case, NOT a reuse of Unknown — Unknown means detection FAILED and prints "Unknown (not detected)"
+        // on the diagnostics page, which for this repo would replace a true label with a false one.
+        Assert.NotEqual(BmadModule.BmadMethod, ctx.Module);
+        Assert.NotEqual(BmadModule.Unknown, ctx.Module);
+        Assert.Equal(BmadModule.Unmodeled, ctx.Module);
+        Assert.False(ctx.IsModeled);
+        Assert.Equal(code, ctx.Code);
+
+        // Populated-but-unmodeled: the real label and the parsed catalog survive; docs and glossary do not.
+        Assert.Equal(label, ctx.Commands.ModuleLabel);
+        Assert.False(ctx.Commands.IsEmpty);
+        Assert.Empty(ctx.Docs);
+        Assert.Empty(ctx.Glossary);
+        Assert.True(ctx.IsUnmodeled);
+    }
+
+    /// <summary>The regression pin for ADR 0015 Decision 1: TEA's skills are ALL <c>bmad-*</c>, so this fails
+    /// the moment identity keys off the skill prefix again.</summary>
+    [Fact]
+    public void Detect_TeaSkillsAreAllBmadPrefixed_StillDoesNotInheritBmadMethodVocabulary()
+    {
+        WriteModule("tea", TeaCsv, "core", "tea");
+
+        var ctx = ModuleContext.Detect(_repo, Array.Empty<string>());
+
+        Assert.StartsWith("/bmad-", ctx.Commands.Command("testarch-trace")!);
+        Assert.DoesNotContain(ctx.Glossary, g => g.Term is "FR" or "NFR" or "AC" or "ADR" or "PRD");
+        Assert.DoesNotContain(ctx.Docs, d => d.FileName == "prd.md");
+    }
+
+    [Fact]
+    public void Detect_KnownModules_CarryTheirCode()
+    {
+        WriteModule("bmm", BmmCsv, "core", "bmm");
+        Assert.Equal("bmm", ModuleContext.Detect(_repo, Array.Empty<string>()).Code);
+        Assert.False(ModuleContext.Detect(_repo, Array.Empty<string>()).IsUnmodeled);
+    }
+
+    [Fact]
+    public void None_HasNoCode_AndIsNotUnmodeled()
+    {
+        // No module at all is a DIFFERENT state from "a module we don't model" — how-to-read renders a named
+        // acknowledgement for the latter and omits the section entirely for the former.
+        Assert.Null(ModuleContext.None.Code);
+        Assert.False(ModuleContext.None.IsUnmodeled);
+    }
+
+    // Defect B (live regression to shipped BMM support): with an auxiliary module ahead of bmm in the
+    // installed manifest, ChoosePrimary used to return the manifest-first candidate, demoting BMM and
+    // stripping EVERY BMM command suggestion portal-wide — while IsMethodPresent still reported True.
+
+    [Theory]
+    [InlineData("cis")]
+    [InlineData("tea")]
+    [InlineData("bmb")]
+    public void Detect_AuxiliaryModuleAheadOfBmmInManifest_KeepsBmadMethodPrimary(string aux)
+    {
+        WriteManifest("core", aux, "bmm");
+        WriteModuleDir(aux, CsvFor(aux));
+        WriteModuleDir("bmm", BmmCsv);
+
+        var ctx = ModuleContext.Detect(_repo, Array.Empty<string>());
+
+        Assert.Equal(BmadModule.BmadMethod, ctx.Module);
+        Assert.Equal("/bmad-create-story", ctx.Commands.Command("create-story"));
+        Assert.Contains(ctx.Glossary, g => g.Term == "FR");
+        Assert.Contains(ctx.Docs, d => d.FileName == "prd.md");
+
+        // AC #2's consistency clause: "Detected" and the selected primary must agree.
+        Assert.True(ModuleContext.IsMethodPresent(_repo));
+    }
+
+    [Fact]
+    public void Detect_AuxiliaryModuleAheadOfGds_KeepsGameDevStudioPrimary()
+    {
+        WriteManifest("core", "tea", "gds");
+        WriteModuleDir("tea", TeaCsv);
+        WriteModuleDir("gds", GdsCsv);
+
+        var ctx = ModuleContext.Detect(_repo, Array.Empty<string>());
+
+        Assert.Equal(BmadModule.GameDevStudio, ctx.Module);
+        Assert.Equal("/gds-dev-story", ctx.Commands.Command("dev-story"));
+        Assert.True(ModuleContext.IsGdsPresent(_repo));
+    }
+
+    [Fact]
+    public void Detect_BmmAndGds_SourceShapeStillBreaksTheTie_NotManifestOrder()
+    {
+        // The looksLikeGame tie-break BETWEEN the two modeled modules is separate and correct — it must
+        // survive the ranking change, in both directions.
+        WriteManifest("core", "bmm", "gds");
+        WriteModuleDir("bmm", BmmCsv);
+        WriteModuleDir("gds", GdsCsv);
+
+        var gameish = ModuleContext.Detect(_repo, new[] { Path.Combine("planning-artifacts", "gdd.md") });
+        Assert.Equal(BmadModule.GameDevStudio, gameish.Module);
+
+        var planningish = ModuleContext.Detect(_repo, new[] { Path.Combine("planning-artifacts", "prd.md") });
+        Assert.Equal(BmadModule.BmadMethod, planningish.Module);
+    }
+
+    [Fact]
+    public void Detect_TeaBeforeBmmAndGds_NeitherModeledModuleIsDemoted()
+    {
+        WriteManifest("core", "tea", "gds", "bmm");
+        WriteModuleDir("tea", TeaCsv);
+        WriteModuleDir("gds", GdsCsv);
+        WriteModuleDir("bmm", BmmCsv);
+
+        var ctx = ModuleContext.Detect(_repo, new[] { Path.Combine("planning-artifacts", "gdd.md") });
+
+        Assert.Equal(BmadModule.GameDevStudio, ctx.Module);
+        Assert.True(ModuleContext.IsMethodPresent(_repo));
+        Assert.True(ModuleContext.IsGdsPresent(_repo));
+    }
+
+    /// <summary>Install dirs are matched the way the rest of the file matches module codes — case-insensitively.</summary>
+    [Fact]
+    public void Detect_ModuleDirectoryCasing_DoesNotChangeIdentity()
+    {
+        WriteModule("BMM", BmmCsv, "core", "BMM");
+
+        var ctx = ModuleContext.Detect(_repo, Array.Empty<string>());
+
+        Assert.Equal(BmadModule.BmadMethod, ctx.Module);
+        Assert.Contains(ctx.Glossary, g => g.Term == "FR");
+    }
+
+    // ---- Story 18.2 / ADR 0015: the open-world guards ------------------------------------------------
+
+    [Theory]
+    [InlineData("scripts")]
+    [InlineData("custom")]
+    [InlineData("_config")]
+    public void Detect_ReservedBmadChild_IsNeverAModule_EvenCarryingAModuleHelpCsv(string reserved)
+    {
+        // "The directory name IS the module code" would otherwise GUARANTEE accepting _bmad/scripts/ as a
+        // module the instant anything dropped a module-help.csv there. Skipped silently — not an error.
+        WriteManifest("core", "bmm");
+        WriteModuleDir("bmm", BmmCsv);
+        WriteModuleDir(reserved, TeaCsv);
+
+        var diagnostics = new List<AdapterDiagnostic>();
+        var ctx = ModuleContext.Detect(_repo, Array.Empty<string>(), diagnostics);
+
+        Assert.Equal(BmadModule.BmadMethod, ctx.Module);
+        Assert.Equal("bmm", ctx.Code);
+        Assert.Empty(diagnostics); // silent: a reserved name is not a diagnosable condition
+    }
+
+    [Fact]
+    public void Detect_MintedModuleSquattingAModeledCode_IsDemotedToUnmodeled_AndReported()
+    {
+        // Nothing stops a BMad Builder-minted module installing at _bmad/gds/. Without the label cross-check
+        // it would silently inherit Game Dev Studio's docs and glossary.
+        const string squatter = """
+            module,skill,display-name,menu-code,description,action,args,phase,preceded-by,followed-by,required,output-location,outputs
+            Totally Not GDS,_meta,,,,,,,,,false,url,
+            Totally Not GDS,gds-something,Something,SO,Do a thing,,,,,,false,output_folder,
+            """;
+        WriteModule("gds", squatter, "core", "gds");
+
+        var diagnostics = new List<AdapterDiagnostic>();
+        var ctx = ModuleContext.Detect(_repo, Array.Empty<string>(), diagnostics);
+
+        Assert.Equal(BmadModule.Unmodeled, ctx.Module);
+        Assert.Empty(ctx.Docs);
+        Assert.Empty(ctx.Glossary);
+        Assert.DoesNotContain(ctx.Glossary, g => g.Term == "GDD");
+
+        var mismatch = Assert.Single(diagnostics, d => d.Category == AdapterDiagnosticCategory.Unsupported);
+        Assert.Contains("Totally Not GDS", mismatch.Message);
+        Assert.Contains("Game Dev Studio", mismatch.Message);
+        Assert.Equal(DiagnosticAnchorRoot.Repo, mismatch.Anchor);
+    }
+
+    [Fact]
+    public void Detect_ManifestAndDiskDisagree_TheSetIsTheirUnion()
+    {
+        // The disk scan used to fire ONLY when the manifest produced zero candidates, so a manifest naming
+        // bmm beside an installed _bmad/tea/ never saw TEA — while IsModulePresent (OR semantics) said it
+        // was present. Two answers to one question; now the disk scan is not a fallback.
+        WriteManifest("core", "bmm");
+        WriteModuleDir("bmm", BmmCsv);
+        WriteModuleDir("tea", TeaCsv);
+
+        var diagnostics = new List<AdapterDiagnostic>();
+        var ctx = ModuleContext.Detect(_repo, Array.Empty<string>(), diagnostics);
+
+        // BMM still wins the primary slot (rank, not discovery order)...
+        Assert.Equal(BmadModule.BmadMethod, ctx.Module);
+        // ...but TEA is now visible, and is reported rather than invisible.
+        var skipped = Assert.Single(diagnostics, d => d.Category == AdapterDiagnosticCategory.Skipped);
+        Assert.Contains("tea", skipped.Message);
+        Assert.Equal(DiagnosticAnchorRoot.Repo, skipped.Anchor);
+    }
+
+    [Fact]
+    public void Detect_AuxiliaryOnlyRepo_PicksTheSameWinnerRegardlessOfManifestOrder()
+    {
+        // No modeled module installed: the winner must still be reproducible, so it is ordinal by CODE.
+        // Discovery order (manifest order, or the platform-dependent Directory.EnumerateDirectories order on
+        // the disk path) is never a tiebreak.
+        WriteManifest("core", "tea", "cis");
+        WriteModuleDir("tea", TeaCsv);
+        WriteModuleDir("cis", CisCsv);
+        var first = ModuleContext.Detect(_repo, Array.Empty<string>());
+
+        WriteManifest("core", "cis", "tea");
+        var second = ModuleContext.Detect(_repo, Array.Empty<string>());
+
+        Assert.Equal("cis", first.Code); // ordinal: "cis" < "tea"
+        Assert.Equal(first.Code, second.Code);
+        Assert.Equal(BmadModule.Unmodeled, first.Module);
+    }
+
+    [Fact]
+    public void Detect_UnparseableHigherRankedModule_IsReported_AndNeverPromotesALowerRankedOne()
+    {
+        // BMM outranks TEA. If BMM's CSV won't parse, TEA inherits the slot only because BMM is GONE, not
+        // because the rank changed — and the unreadable module is reported rather than silently dropped.
+        WriteManifest("core", "bmm", "tea");
+        WriteModuleDir("bmm", "not,a,valid\ncatalog");
+        WriteModuleDir("tea", TeaCsv);
+
+        var diagnostics = new List<AdapterDiagnostic>();
+        var ctx = ModuleContext.Detect(_repo, Array.Empty<string>(), diagnostics);
+
+        Assert.Equal("tea", ctx.Code);
+        var malformed = Assert.Single(diagnostics, d => d.Category == AdapterDiagnosticCategory.Malformed);
+        Assert.Contains("bmm", malformed.RelativePath);
+        Assert.Equal(DiagnosticAnchorRoot.Repo, malformed.Anchor);
+    }
+
+    [Fact]
+    public void Detect_UnmodeledPrimary_EmitsExactlyOneInformationalNamingCodeAndLabel()
+    {
+        WriteModule("tea", TeaCsv, "core", "tea");
+
+        var diagnostics = new List<AdapterDiagnostic>();
+        ModuleContext.Detect(_repo, Array.Empty<string>(), diagnostics);
+
+        var info = Assert.Single(diagnostics, d => d.Category == AdapterDiagnosticCategory.Informational);
+        Assert.Contains("'tea'", info.Message);
+        Assert.Contains("Test Architecture Enterprise", info.Message);
+        Assert.Equal("_bmad/tea/module-help.csv", info.RelativePath);
+        Assert.Equal(DiagnosticAnchorRoot.Repo, info.Anchor);
+    }
+
+    [Fact]
+    public void Detect_ModeledPrimary_EmitsNoInformationalNotice()
+    {
+        WriteModule("bmm", BmmCsv, "core", "bmm");
+
+        var diagnostics = new List<AdapterDiagnostic>();
+        ModuleContext.Detect(_repo, Array.Empty<string>(), diagnostics);
+
+        Assert.DoesNotContain(diagnostics, d => d.Category == AdapterDiagnosticCategory.Informational);
+    }
+
+    [Fact]
+    public void CommandCatalogEmpty_CarriesNoLabel_SoNoSurfaceCanNameAModuleThatIsNotThere()
+    {
+        // It used to carry the placeholder "BMad". ModuleContext.None IS this instance, so any surface that
+        // names the module would have announced "This project uses the BMad module" on a repo with no
+        // _bmad/ install at all — a worse false claim than saying nothing.
+        Assert.Equal(string.Empty, CommandCatalog.Empty.ModuleLabel);
+        Assert.False(CommandCatalog.Empty.HasLabel);
+        Assert.False(ModuleContext.None.Commands.HasLabel);
+    }
+
+    private static string CsvFor(string code) => code switch
+    {
+        "cis" => CisCsv,
+        "tea" => TeaCsv,
+        "bmb" => BmbCsv,
+        "gds" => GdsCsv,
+        "_config" or "custom" or "scripts" => TeaCsv,
+        _ => BmmCsv,
+    };
 
     [Fact]
     public void IsMethodPresent_TrueWhenManifestListsBmmWithoutCsv()

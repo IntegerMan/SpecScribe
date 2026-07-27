@@ -4,13 +4,21 @@
   "type": "module",
   "description": "SpecScribe's Vue/Nuxt 3 presentation layer (Epic 23). Production-intent, but NOT in SpecScribe.slnx and NOT wired into `specscribe generate` — packaging is Story 23.5.",
   "scripts": {
-    "dev": "nuxt dev",
-    "build": "nuxt build",
-    "generate": "nuxt generate",
+    "dev": "node scripts/sync-runtime-assets.mjs && nuxt dev",
+    "build": "node scripts/sync-runtime-assets.mjs && nuxt build",
+    "generate": "node scripts/sync-runtime-assets.mjs && nuxt generate",
     "postinstall": "nuxt prepare",
     "extract:tokens": "node scripts/extract-tokens.mjs",
     "check:tokens": "node scripts/check-tokens.mjs",
-    "measure:payload": "node scripts/measure-payload.mjs"
+    "extract:ir-content": "node scripts/extract-ir-content.mjs",
+    "check:ir-content": "node scripts/check-ir-content.mjs",
+    "sync:assets": "node scripts/sync-runtime-assets.mjs",
+    "check:assets": "node scripts/sync-runtime-assets.mjs --check",
+    "check:links": "node scripts/check-links.mjs",
+    "check:a11y": "node scripts/check-a11y.mjs",
+    "measure:payload": "node scripts/measure-payload.mjs",
+    "measure:parity": "node scripts/measure-parity.mjs",
+    "check": "npm run check:tokens && npm run check:ir-content && npm run check:assets"
   },
   "devDependencies": {
     "nuxt": "^3.14.0",

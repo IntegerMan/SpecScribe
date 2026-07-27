@@ -139,7 +139,15 @@ public static class DashboardViewBuilder
             Labels: true,
             Meta: new Charts.ChartMeta(
                 Title: "Project at a Glance",
-                Why: Charts.WhyText(Charts.ChartMetric.WorkHierarchy)));
+                Why: Charts.WhyText(Charts.ChartMetric.WorkHierarchy)),
+            // Owner decision D4 (Story 20.6): the dashboard ALREADY carries two visible listings — the
+            // `SunburstCompanionList` tile grid ("Remaining Work by Epic") and the Story 20.3 rail — so a third
+            // visible listing would be on-screen duplication. The twin still discharges ADR 0013 §2's completeness
+            // contract, which neither of those two can: the tile grid is epic-level only and deliberately omits
+            // done epics with no open follow-ups (`Charts.cs:668`), and the rail is a selection detail pane.
+            // Audited 2026-07-26 (20-6-text-twin-audit.md, surface 1): the twin's node set matches the payload
+            // 212/212 and is a strict superset of the 138 real nodes the SVG draws.
+            TwinDisplay: HierarchyTwinDisplay.ScreenReaderOnly);
 
         var model = HierarchyExplorer.ProjectDashboard(
             epicsModel, siteTitle, config, geometry, unplannedGeometry);

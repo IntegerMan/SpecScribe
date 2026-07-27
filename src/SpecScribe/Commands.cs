@@ -265,6 +265,10 @@ public sealed class WebviewCommand : Command<SiteSettings>
                     Path.GetRelativePath(resolved.RepoRoot, Path.Combine(resolved.SourceRoot, notice.SourcePath)).Replace('\\', '/'),
                 DiagnosticAnchorRoot.Adr =>
                     Path.GetRelativePath(resolved.RepoRoot, Path.Combine(resolved.AdrSourceRoot, StripAdrOutputPrefix(notice.SourcePath))).Replace('\\', '/'),
+                // Already repo-relative (the module-identity notices name `_bmad/{code}/module-help.csv`, a
+                // sibling of the source tree), so it needs no re-rooting — only slash normalization.
+                // [Story 18.2; ADR 0015 Decision 2d]
+                DiagnosticAnchorRoot.Repo => notice.SourcePath.Replace('\\', '/'),
                 _ => notice.SourcePath.Replace('\\', '/'),
             };
             // Self-describing single-line Problems entry: prefix the category so a bare skip (null Message) still

@@ -84,7 +84,10 @@ public sealed class BmadArtifactAdapter : IArtifactAdapter
         var sourceRelatives = files.Select(f => ToSourceRelative(options, f)).ToList();
         var diagnostics = new List<AdapterDiagnostic>();
 
-        var module = ModuleContext.Detect(options.RepoRoot, sourceRelatives);
+        // The diagnostics sink is what makes an open-world module identity REPORTABLE: an unmodeled primary,
+        // a module that lost the primary slot, or a candidate whose module-help.csv wouldn't parse all ride
+        // the same non-fatal channel as every other ingest notice. [Story 18.2; ADR 0015 Decision 2d]
+        var module = ModuleContext.Detect(options.RepoRoot, sourceRelatives, diagnostics);
         var sprint = IngestSprint(options, diagnostics);
 
         var consumed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

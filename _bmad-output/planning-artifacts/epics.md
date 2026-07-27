@@ -4012,6 +4012,22 @@ So that migration risk is proven on high-traffic surfaces before the remaining p
 **When** the migrated surfaces render
 **Then** those conventions are preserved without regression.
 
+> **Scope drift recorded 2026-07-27 (create-story 23.3 → dev-story 23.3).** The story file's ACs **extend**
+> the two above to eight. ACs 1–2 are these, sharpened with the harness that proves them; ACs 3–8 are the
+> concrete scope the story was seeded with — the 23.1 spike gate's two additions (a **head projection**;
+> **route-mapping the in-content link graph**) plus the six owner decisions locked at elicitation. The
+> surface set is stated explicitly: **`index.html` + `epics.html` + `epics/epic-{N}.html` +
+> `epics/story-{id}.html`** (189 pages), with every remaining page prerendered as a **pass-through** so the
+> link graph is provable end to end — pass-throughs are Story 23.4's and are not a migration claim.
+> Two ADRs came out of the implementation and both bind later stories:
+> [**ADR 0017**](../../docs/adrs/0017-projection-routes-mirror-ir-paths.md) — a projected page's route IS
+> its IR `outputRelativePath` verbatim, and **no href inside IR content is ever rewritten** (this
+> constrains Epic 22's path scheme, 23.4's surfaces and 23.5's packaging); and
+> [**ADR 0018**](../../docs/adrs/0018-transitional-ir-content-style-layer.md) — `ir-content.css`, a
+> generated, bounded, scoped, **enumerated** monolith extract for injected markup, whose manifest is
+> literally the list **Story 23.4 has to retire**. Full detail in the story file's Dev Agent Record; the
+> same drift is recorded on the `23-3` key in `sprint-status.yaml`.
+
 ### Story 23.4: Migrate Remaining Surfaces + Retire the C# HtmlRenderAdapter for Content
 
 As a maintainer completing the presentation-layer migration,

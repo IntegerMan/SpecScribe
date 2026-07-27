@@ -1,6 +1,10 @@
+---
+baseline_commit: 86b35c267241c15b05c64e3aaa3e13cce58198b2
+---
+
 # Story 18.2: BMad Module Identity Foundation
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -159,50 +163,55 @@ Note BMad's own label drift — trust `module-help.csv`'s `module` column, since
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Reproduce both defects before changing anything (AC: #1, #2)**
-  - [ ] Read `ModuleContext.cs` in full (425 lines), plus `AdapterDiagnostic.cs`, `HowToReadTemplater.cs`, `SiteNav.cs:200-225`, and `SiteGenerator.cs` around `:3762` and `:4270`.
-  - [ ] Write **failing** tests first (red phase) that pin today's wrong behavior as the thing being fixed: a `cis`-only fixture asserting the module is NOT `BmadMethod` and the glossary is empty; a `tea`-before-`bmm` fixture asserting BMM keeps `/bmad-create-story`.
-  - [ ] Use **real** `module-help.csv` content in these fixtures (see the verified table above), not invented `cis-*`/`tea-*` skill ids — inventing prefixed ids would make the tests pass for the wrong reason and hide the bug.
+- [x] **Task 1 — Reproduce both defects before changing anything (AC: #1, #2)**
+  - [x] Read `ModuleContext.cs` in full (425 lines), plus `AdapterDiagnostic.cs`, `HowToReadTemplater.cs`, `SiteNav.cs:200-225`, and `SiteGenerator.cs` around `:3762` and `:4270`.
+  - [x] Write **failing** tests first (red phase) that pin today's wrong behavior as the thing being fixed: a `cis`-only fixture asserting the module is NOT `BmadMethod` and the glossary is empty; a `tea`-before-`bmm` fixture asserting BMM keeps `/bmad-create-story`.
+  - [x] Use **real** `module-help.csv` content in these fixtures (see the verified table above), not invented `cis-*`/`tea-*` skill ids — inventing prefixed ids would make the tests pass for the wrong reason and hide the bug.
 
-- [ ] **Task 2 — Identify modules by code, not skill prefix (AC: #1, #3)**
-  - [ ] Thread the module code (the containing directory name, `Path.GetFileName(Path.GetDirectoryName(csvPath))`) into `BuildContext` and replace the `prefix.StartsWith("gds")` inference at `ModuleContext.cs:346-348`.
-  - [ ] Map `bmm` → `BmadModule.BmadMethod`, `gds` → `BmadModule.GameDevStudio`, and **every other code** → the unmodeled identity (Task 3). Keep the parsed `CommandCatalog` and `ModuleLabel` intact in all cases.
-  - [ ] Keep the existing prefix-stripping step-key logic [ModuleContext.cs:329-338] untouched — it is what makes `/bmad-create-story` and `/gds-create-story` both resolve `create-story`, and it is **not** the bug.
-  - [ ] Confirm `_bmad/{code}` casing is handled the way the rest of the file handles it (`OrdinalIgnoreCase`).
+- [x] **Task 2 — Identify modules by code, not skill prefix (AC: #1, #3)**
+  - [x] Thread the module code (the containing directory name, `Path.GetFileName(Path.GetDirectoryName(csvPath))`) into `BuildContext` and replace the `prefix.StartsWith("gds")` inference at `ModuleContext.cs:346-348`.
+  - [x] Map `bmm` → `BmadModule.BmadMethod`, `gds` → `BmadModule.GameDevStudio`, and **every other code** → the unmodeled identity (Task 3). Keep the parsed `CommandCatalog` and `ModuleLabel` intact in all cases.
+  - [x] Keep the existing prefix-stripping step-key logic [ModuleContext.cs:329-338] untouched — it is what makes `/bmad-create-story` and `/gds-create-story` both resolve `create-story`, and it is **not** the bug.
+  - [x] Confirm `_bmad/{code}` casing is handled the way the rest of the file handles it (`OrdinalIgnoreCase`).
 
-- [ ] **Task 3 — Make an unrecognized code a first-class outcome (AC: #1)**
-  - [ ] An unmodeled module resolves to `BmadModule.Unknown` **with** its real `ModuleLabel`, its parsed `CommandCatalog`, an empty `Docs`, and an empty `Glossary`. It must NOT fall through to `BmadMethod`.
-  - [ ] Verify `DocsFor`/`GlossaryFor`'s existing `_ => Array.Empty<...>()` default already yields the right result for `Unknown` — it does; do not add a switch arm.
-  - [ ] Emit exactly one `AdapterDiagnosticCategory.Informational` diagnostic. Drafted wording (match the tone of `BmadArtifactAdapter.cs:170-188`): `Detected BMad module '{code}' ({label}); SpecScribe has no module-specific docs or glossary for it, so those sections are omitted.`
-  - [ ] **Do not invent a sixth `AdapterDiagnosticCategory`.** `Informational` [AdapterDiagnostic.cs:26-31] was written for exactly this "FYI, nothing to do" case.
-  - [ ] Resolve the plumbing question explicitly: `ModuleContext.Detect` is static and returns no diagnostics today, while `BmadArtifactAdapter.Ingest` owns the `diagnostics` list and calls `Detect` at `BmadArtifactAdapter.cs:88`. Pick one seam (surfacing the fact on `ModuleContext` for the adapter to translate is the lighter change than making `Detect` diagnostic-aware) and say which in Completion Notes.
+- [x] **Task 3 — Make an unrecognized code a first-class outcome (AC: #1)**
+  - [x] An unmodeled module resolves to a **new `BmadModule.Unmodeled` case** — **not** `Unknown` — **with** its real `ModuleLabel`, its parsed `CommandCatalog`, an empty `Docs`, and an empty `Glossary`. It must NOT fall through to `BmadMethod`.
+    - **Why a new case and not `Unknown` (ADR 0015 Decision 2a, ratified 2026-07-26).** `DiagnosticsTemplater`'s `ModuleDisplay` — `module.Module == BmadModule.Unknown ? "Unknown (not detected)" : module.Commands.ModuleLabel` — is the **only live consumer of `Unknown`**, and it is the one surface already **correct today** for a CIS-only repo (it prints the real label). Routing unmodeled modules through `Unknown` would flip that row to "Unknown (not detected)", i.e. strictly worse than today. `Unknown` stays bound to genuine detection failure.
+  - [x] Verify `DocsFor`/`GlossaryFor`'s existing `_ => Array.Empty<...>()` default already yields the right result for `Unmodeled` — it does; do not add a switch arm.
+  - [x] **`CommandCatalog.Empty.ModuleLabel` must stop being `"BMad"`.** `ModuleContext.None` **is** that instance, so `None` and an unmodeled module are indistinguishable at exactly the surface Task 5 changes — the acknowledgement would read *"This project uses the BMad module"* on a repo with no `_bmad/` at all. Make the label empty and treat an empty label as "no label" everywhere (ADR 0015 Decision 2b).
+  - [x] Emit exactly one `AdapterDiagnosticCategory.Informational` diagnostic. Drafted wording (match the tone of `BmadArtifactAdapter.cs:170-188`): `Detected BMad module '{code}' ({label}); SpecScribe has no module-specific docs or glossary for it, so those sections are omitted.`
+  - [x] **Do not invent a sixth `AdapterDiagnosticCategory`.** `Informational` [AdapterDiagnostic.cs:26-31] was written for exactly this "FYI, nothing to do" case.
+  - [x] Resolve the plumbing question explicitly: `ModuleContext.Detect` is static and returns no diagnostics today, while `BmadArtifactAdapter.Ingest` owns the `diagnostics` list and calls `Detect` at `BmadArtifactAdapter.cs:88`. Pick one seam (surfacing the fact on `ModuleContext` for the adapter to translate is the lighter change than making `Detect` diagnostic-aware) and say which in Completion Notes.
+  - [x] **Detection currently runs twice, and the diagnosed one loses.** `_module` is set from `bundle.Module` (the adapter path, which has diagnostics) and is then **overwritten** by an adapter-free `ModuleContext.Detect` inside `SiteGenerator.BuildNav` — and 4 of `BuildNav`'s 5 call sites pass no diagnostics list at all. Whichever seam is chosen, the detection that feeds nav, glossary and `AbbreviationExpander` must be the one that was diagnosed: **detect once per run and have `BuildNav` consume the cached `ModuleContext`** (ADR 0015 Decision 2d).
+  - [x] **State the emission cardinality**: at most one diagnostic per unmodeled module per generate run; on a watch rebuild, re-emit only if the installed module set changed. The diagnostics page must not accumulate a row per keystroke.
+  - [x] **Fix the anchor root.** `AdapterDiagnostic.RelativePath` is contractually **source**-root-relative and `DiagnosticsTemplater` maps every adapter diagnostic to `DiagnosticAnchorRoot.Source`, but `_bmad/{code}/module-help.csv` is **repo**-root-relative — the webview Problems channel would resolve it to a nonexistent `{sourceRoot}/_bmad/...`. Add `DiagnosticAnchorRoot.Repo` and a matching arm in `Commands.cs`'s anchor switch (ADR 0015 Decision 2d).
 
-- [ ] **Task 4 — Never demote BMM or GDS on a manifest-order tie (AC: #2)**
-  - [ ] Change `ChoosePrimary` [ModuleContext.cs:259-286] so `bmm`/`gds` rank above auxiliary modules instead of relying on manifest order. Preserve the existing `looksLikeGame` source-shape tie-break **between** BMM and GDS — that is separate and correct.
-  - [ ] Verify the `bmm` + `gds` dual-install path is unchanged (`DualInstall_BothPresent` and the `looksLikeGame` behavior must still hold).
-  - [ ] Confirm the About-SDD contradiction is gone: with `tea` ahead of `bmm`, `IsMethodPresent` is `True` **and** the primary module is BMad Method.
+- [x] **Task 4 — Never demote BMM or GDS on a manifest-order tie (AC: #2)**
+  - [x] Change `ChoosePrimary` [ModuleContext.cs:259-286] so `bmm`/`gds` rank above auxiliary modules instead of relying on manifest order. Preserve the existing `looksLikeGame` source-shape tie-break **between** BMM and GDS — that is separate and correct.
+  - [x] Verify the `bmm` + `gds` dual-install path is unchanged (`DualInstall_BothPresent` and the `looksLikeGame` behavior must still hold).
+  - [x] Confirm the About-SDD contradiction is gone: with `tea` ahead of `bmm`, `IsMethodPresent` is `True` **and** the primary module is BMad Method.
 
-- [ ] **Task 5 — Named acknowledgement on how-to-read (AC: #1)**
-  - [ ] Implement the owner's elicited treatment (see "Owner design decision"): when a module is detected but unmodeled, render the `<h2 id="glossary">` heading with the one-sentence acknowledgement in place of the `<dl>`.
-  - [ ] Keep today's behavior when `ModuleContext.None` (no module at all): omit the whole section, per `HowToReadTemplater.cs:173-180`'s existing NFR8 note about never rendering an empty-but-present section.
-  - [ ] `HowToReadTemplater.RenderPage`'s signature currently takes `(nav, moduleDocs, glossary, commands)` [HowToReadTemplater.cs:13] — it needs the module label and the modeled/unmodeled distinction. Prefer passing the `ModuleContext` over adding two more positional parameters, and update the `SiteGenerator.cs:3762` call site.
-  - [ ] Escape the label through the templater's existing escaping convention — the label is third-party data from a CSV.
+- [x] **Task 5 — Named acknowledgement on how-to-read (AC: #1)**
+  - [x] Implement the owner's elicited treatment (see "Owner design decision"): when a module is detected but unmodeled, render the `<h2 id="glossary">` heading with the one-sentence acknowledgement in place of the `<dl>`.
+  - [x] Keep today's behavior when `ModuleContext.None` (no module at all): omit the whole section, per `HowToReadTemplater.cs:173-180`'s existing NFR8 note about never rendering an empty-but-present section.
+  - [x] `HowToReadTemplater.RenderPage`'s signature currently takes `(nav, moduleDocs, glossary, commands)` [HowToReadTemplater.cs:13] — it needs the module label and the modeled/unmodeled distinction. Prefer passing the `ModuleContext` over adding two more positional parameters, and update the `SiteGenerator.cs:3762` call site.
+  - [x] Escape the label through the templater's existing escaping convention — the label is third-party data from a CSV.
 
-- [ ] **Task 6 — Re-pin detection fixtures to real module CSV content (AC: #3)**
-  - [ ] `ModuleContextTests.cs` (54 facts) uses synthetic `gds-create-story`/`gds-dev-story` rows [`:57-58`], and `SiteGeneratorHowToReadTests.cs:57` does the same. These are **why this shipped undetected**: had GDS actually used `bmgd-*`, the suite would still have passed.
-  - [ ] Replace the GDS fixture rows with real ones from the module's own `module-help.csv`, and add `cis`/`tea`/`bmb` fixtures using their real `bmad-*` skill ids.
-  - [ ] Add a regression test that would fail if identity ever keys off the skill prefix again — e.g. assert a `tea` module whose skills are all `bmad-*` still resolves to the unmodeled identity, not `BmadMethod`.
-  - [ ] Add the dual-install ordering test from Defect B (`tea` before `bmm` in the manifest → BMM still primary).
+- [x] **Task 6 — Re-pin detection fixtures to real module CSV content (AC: #3)**
+  - [x] `ModuleContextTests.cs` (54 facts) uses synthetic `gds-create-story`/`gds-dev-story` rows [`:57-58`], and `SiteGeneratorHowToReadTests.cs:57` does the same. These are **why this shipped undetected**: had GDS actually used `bmgd-*`, the suite would still have passed.
+  - [x] Replace the GDS fixture rows with real ones from the module's own `module-help.csv`, and add `cis`/`tea`/`bmb` fixtures using their real `bmad-*` skill ids.
+  - [x] Add a regression test that would fail if identity ever keys off the skill prefix again — e.g. assert a `tea` module whose skills are all `bmad-*` still resolves to the unmodeled identity, not `BmadMethod`.
+  - [x] Add the dual-install ordering test from Defect B (`tea` before `bmm` in the manifest → BMM still primary).
 
-- [ ] **Task 7 — Regression, golden gate, and live verification (AC: #3)**
-  - [ ] Run the full suite. Expect the golden fingerprint to be **unchanged** for this repo (SpecScribe's own `_bmad/` has only `core` + `bmm`, so its detected identity does not move). If it moves, stop and explain why before re-baselining — and confirm stability across two repeated runs per `golden-diff-normalization-gotchas`.
-  - [ ] Per CLAUDE.md § Verification, verify the new how-to-read treatment **in a live browser**, not by assertion alone — generate against a scratch fixture repo containing `_bmad/tea/module-help.csv` and confirm the acknowledgement renders, the `#glossary` anchor still resolves, and no `<abbr>` expansion of FR/NFR/ADR appears anywhere in the output.
-  - [ ] Generate to `SpecScribeOutput/` (the default). Never `--output docs/live`.
+- [x] **Task 7 — Regression, golden gate, and live verification (AC: #3)**
+  - [x] Run the full suite. Expect the golden fingerprint to be **unchanged** for this repo (SpecScribe's own `_bmad/` has only `core` + `bmm`, so its detected identity does not move). If it moves, stop and explain why before re-baselining — and confirm stability across two repeated runs per `golden-diff-normalization-gotchas`.
+  - [x] Per CLAUDE.md § Verification, verify the new how-to-read treatment **in a live browser**, not by assertion alone — generate against a scratch fixture repo containing `_bmad/tea/module-help.csv` and confirm the acknowledgement renders, the `#glossary` anchor still resolves, and no `<abbr>` expansion of FR/NFR/ADR appears anywhere in the output.
+  - [x] Generate to `SpecScribeOutput/` (the default). Never `--output docs/live`.
 
-- [ ] **Task 8 — Record findings and close the stale note (AC: #1, #2, #3)**
-  - [ ] In Completion Notes: state which diagnostic seam Task 3 chose and why; confirm both defects are closed with the reproducing evidence; note any consumer of `ModuleContext.Module` that needed adjusting for a populated-but-`Unknown` context.
-  - [ ] Propose retiring `epics.md:157`'s *"current next-step command mapping is strongly GDS-oriented and requires generalization"* note — 18.1 assessed it as **stale** (the mechanism generalized when `CommandCatalog` became CSV-driven). Flag it for the owner; do not silently delete a requirements-adjacent line.
-  - [ ] If ADR 0015 is still `Proposed` at implementation time, say so in Completion Notes and note that this story implements its Decisions 1/2/4 only.
+- [x] **Task 8 — Record findings and close the stale note (AC: #1, #2, #3)**
+  - [x] In Completion Notes: state which diagnostic seam Task 3 chose and why; confirm both defects are closed with the reproducing evidence; note any consumer of `ModuleContext.Module` that needed adjusting for a populated-but-`Unmodeled` context.
+  - [x] Propose retiring the `epics.md` Additional-Requirements note *"current next-step command mapping is strongly GDS-oriented and requires generalization"* — **locate it by that quoted phrase, not by line number** (it was `:157` at 18.1's baseline `611097d` and is `:173` as of 2026-07-26). 18.1 assessed it as **stale** (the mechanism generalized when `CommandCatalog` became CSV-driven). Flag it for the owner; do not silently delete a requirements-adjacent line.
+  - [x] ADR 0015 was **ratified `Accepted` on 2026-07-26** with all three open questions closed. This story implements its **Decisions 1, 2 and 4** only; Decision 3 (multi-valued set) and Decision 5a (`ArtifactCoverage`'s family set) are separate stories. Confirm the ADR's status is still `Accepted` at implementation time and note it in Completion Notes.
 
 ### Review Findings
 
@@ -212,11 +221,15 @@ _(populated during code-review)_
 
 ### Architecture compliance
 
-- **ADR 0015 (Proposed)** [docs/adrs/0015-bmad-module-identity-open-world-and-multi-valued.md] — this story
-  implements **Decisions 1, 2 and 4 only**. Decision 3 (multi-valued `ModuleContext` carrying the installed
-  **set**) is deliberately **out of scope** and deferred to its own story; `ArtifactBundle.Module` stays a
-  single required, never-null `ModuleContext`. If the owner has not ratified the ADR when this story starts,
-  proceed anyway — the two defects are real independent of ratification — but say so in Completion Notes.
+- **ADR 0015 (Accepted, ratified 2026-07-26)** [docs/adrs/0015-bmad-module-identity-open-world-and-multi-valued.md]
+  — this story implements **Decisions 1, 2 and 4 only**, which is exactly what ratification question 1 settled.
+  Decision 3 (multi-valued `ModuleContext` carrying the installed **set**) is deliberately **out of scope** and
+  deferred to its own story; `ArtifactBundle.Module` stays a single required, never-null `ModuleContext`
+  (ratification question 2). **Decision 5a** (`ArtifactCoverage.Specs`' hardcoded BMM family set, which the
+  identity fix does *not* reach because it never reads `ModuleContext.Module`) is also out of scope here and
+  sequenced after this slice. Decision 1 additionally carries four guards the draft lacked — reserved `_bmad/`
+  child names (`core`, `custom`, `scripts`, any `_`-prefixed dir), case-insensitive code matching, minted-code
+  collision with a modeled code, and manifest∪disk as the installed set — read them before implementing Task 2.
 - **AD-1 / AD-2** [ARCHITECTURE-SPINE.md:34-48] — one shared projection core; the adapter boundary is
   source → normalized records. This story changes only how a module is *identified* inside that boundary.
   Nothing downstream of `ArtifactBundle` reinterprets anything.
@@ -244,7 +257,10 @@ _(populated during code-review)_
   either defect.
 - **Trusting doc-site prose over the module's real `module-help.csv`.** The `/bmgd-*` near-miss is the worked
   example.
-- **Deleting `epics.md:157` silently.** Propose; let the owner decide.
+- **Deleting the `epics.md` "strongly GDS-oriented" note silently.** Propose; let the owner decide.
+- **Citing that note — or any code site — by line number.** It has already moved (`:157` → `:173` between
+  18.1's baseline and 2026-07-26), and line drift inside `ModuleContext.cs` / `SiteGenerator.cs` invalidated a
+  whole set of ADR 0015 references within days. Anchor on the quoted phrase or the symbol name.
 
 ### Testing standards
 
@@ -312,16 +328,206 @@ story touches it at `:3762` — grep-verify your edit landed [[shared-main-concu
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 5 (`claude-opus-5`) — dev-story, 2026-07-26.
 
 ### Debug Log References
 
+- **Golden-fingerprint causality experiment** (Task 7). `git worktree add <scratch> 86b35c26` → ran the golden
+  test at baseline (passed, `dde7d077…`) → copied this story's seven `src/SpecScribe/*.cs` files into that
+  worktree → ran again (**still passed, same constant**). Proof the constant does not move because of this
+  story. Worktree removed with `git worktree remove --force`; `git status` on `src`/`tests` confirmed the main
+  tree untouched. See Completion Note §6 for what actually moves it.
+- **Live verification server**: `.claude/launch.json` gained a `tea-identity-18-2` entry (port 8108) following
+  the file's existing convention. The five `preview_start` dev-server slots were all held by other chats, so the
+  static server for that directory was run directly and the Browser pane attached by URL.
+- **Upstream fixture re-fetch** (ADR 0015 Decision 7): four `module-help.csv` files fetched 2026-07-26 with the
+  commit SHA each is pinned against recorded in the provenance block at the head of `ModuleContextTests`.
+
 ### Completion Notes List
+
+**1. ADR 0015 status at implementation time: `Accepted`, ratified 2026-07-26** — and it was ratified *by a
+concurrent session while this story was mid-implementation*. The version read at story start was `Proposed`
+and materially thinner; the ratified document added Decisions 1a–1d, 2a–2d and 4a–4e. Per CLAUDE.md ("a
+ratified ADR is the authority"; "project memory can be stale") the implementation follows the **ratified**
+text, not the story's original task list. The story file was itself updated to match while the work was in
+flight, so tasks and code now agree. This story implements **Decisions 1, 2 and 4 only**. Decision 3
+(multi-valued `ModuleContext`) and Decision 5a (`ArtifactCoverage.Specs`' hardcoded BMM family set) are
+explicitly out of scope and remain for their own stories.
+
+**2. Both defects are closed, with reproducing evidence.** Every assertion below failed before the fix and
+passes after:
+
+- **Defect A — false presence.** `Detect_ModuleWithBmadSkillPrefix_IsUnmodeled_NotBmadMethod` over `cis`/`tea`/
+  `bmb` fixtures built from those modules' **real** CSV bytes. Red-phase output: 9 failures across
+  `ModuleContextTests`, plus 4 generation-level failures in `SiteGeneratorHowToReadTests`.
+- **Defect B — the live BMM regression.** `Detect_AuxiliaryModuleAheadOfBmmInManifest_KeepsBmadMethodPrimary`
+  (theory over `cis`/`tea`/`bmb`) asserts BMM keeps `/bmad-create-story`, its glossary and `prd.md`, *and* that
+  `IsMethodPresent` agrees with the selected primary — the AC #2 consistency clause.
+
+**3. Diagnostic seam chosen: `Detect` gained the sink (NOT the lighter "surface a fact on `ModuleContext`"
+option the story originally suggested).** The ratified ADR (Decision 2d) settles this, and the reason is
+decisive: three distinct conditions need reporting, and two of them are invisible to the returned context —
+a candidate whose CSV would not parse, and the modules that lost the primary slot. A flag on the winner can
+only describe the winner. `Detect` now takes `List<AdapterDiagnostic>? diagnostics = null`, matching the
+existing `IngestSprint(options, diagnostics)` convention, and `BmadArtifactAdapter.Ingest` passes its own list.
+Four diagnostics can now be emitted, all non-fatal:
+
+| Condition | Category | ADR |
+|---|---|---|
+| Unmodeled primary | `Informational` | 2d |
+| Non-primary installed modules | `Skipped` | 4e |
+| Candidate CSV won't parse | `Malformed` | 4d |
+| Modeled code declaring the wrong label | `Unsupported` | 1c |
+
+**4. `Unmodeled` is a NEW enum case, and `Unknown` was left alone.** The one live consumer of `Unknown` is
+`DiagnosticsTemplater.ModuleDisplay`, whose "Detected framework" row was **already correct** for a TEA repo —
+it prints the parsed label. Reusing `Unknown` would have flipped it to "Unknown (not detected)", trading one
+correct surface for another. Verified live: the TEA fixture's diagnostics page reads
+`Detected framework = Test Architecture Enterprise`.
+
+**5. Consumers that needed adjusting for a populated-but-`Unmodeled` context** (the state that could not occur
+before):
+
+- `HowToReadTemplater.AppendGlossary` — gains the named-acknowledgement branch, gated on `IsUnmodeled` **and**
+  a non-empty label.
+- `HowToReadTemplater.AppendCommandLegend` — now gated on `IsModeled`, not merely a non-empty catalog. An
+  unmodeled module parses a perfectly real catalog, but the legend's sentence points at captions on story and
+  epic pages, which only a modeled module produces.
+- `HowToReadTemplater.RenderPage` — takes the whole `ModuleContext` instead of three projections of it.
+- `DiagnosticsTemplater.ModuleDisplay` — also gates on `HasLabel`, because…
+- `CommandCatalog.Empty.ModuleLabel` changed `"BMad"` → `""` (Decision 2b). `ModuleContext.None` **is** that
+  instance, so without this the acknowledgement would have read *"This project uses the BMad module"* on a repo
+  with no `_bmad/` at all — a worse false claim than the silent omission it replaced. New `HasLabel` guard.
+- `SiteGenerator.BuildNav` — **stopped re-detecting**. Detection ran twice per run and the *undiagnosed* one won
+  (`_module` was set from `bundle.Module`, then overwritten). 4 of `BuildNav`'s 5 call sites pass an empty
+  source list, so the BMM-vs-GDS `looksLikeGame` tie-break was unconditionally false on every incremental and
+  watch rebuild — a dual-install game repo silently fell back to BMM mid-session. Now detect-once-per-run.
+- `AdapterDiagnostic` / `GenerationEvent` / `DiagnosticNotice` / `Commands.SerializeDiagnostics` — new
+  `DiagnosticAnchorRoot.Repo`, because `_bmad/{code}/module-help.csv` is repo-relative while every other adapter
+  diagnostic is source-relative; the webview Problems channel would otherwise resolve it to a nonexistent path.
+
+`AboutSddTemplater` needed **no** change: `IsMethodPresent`/`IsGdsPresent` are independent presence checks, so
+fixing the ranking made "Detected" and the primary agree on their own. (Decision 3c's `ModuleCode` field on the
+`Frameworks` roster sits under Decision 3 and is out of scope.)
+
+**6. The golden fingerprint moved mid-story — and it is NOT this story. Resolved; this story re-baselined
+nothing.** This story is byte-neutral for a repo with no `_bmad/` install, which is exactly what the golden
+fixture is. Proven, not assumed (see Debug Log): with this story's `src` changes copied into a clean worktree
+at baseline `86b35c26`, the golden test **passed with the then-current constant `dde7d077…`**. The mover was a
+concurrent session's 24-line addition to `src/SpecScribe/assets/specscribe.css` (Story 20.6's
+`.ss-hierarchy-twin.sr-only:focus-within` rules) — that file is copied verbatim into every generated site, so
+it sits inside the hash. Mid-story that session re-baselined the constant itself to **`7adbdb01…`**, which is
+**bit-for-bit the value this story's runs had been computing all along** — independent corroboration that the
+delta was entirely theirs. The gate is green again with the constant untouched by me.
+
+⚠️ **New gotcha worth adding to `[[golden-diff-normalization-gotchas]]`: `git status` lied.** At the moment
+`specscribe.css` was already 1280 bytes larger on disk, `git status` did **not** list it as modified; it only
+appeared minutes later. The discrepancy was caught by comparing byte sizes against a fresh `git worktree`
+checkout of the baseline commit, not by trusting porcelain. **Byte-compare against a clean checkout before
+concluding a golden move is yours** — and note the worktree technique itself is safe under CLAUDE.md's
+shared-`main` rule, since it never touches the working tree.
+
+**7. Full-suite state — read this before treating the suite as red.** Final run: **2471 tests, 2448 passed,
+19 failed, 4 skipped** (total grew from 2465 during the story — a concurrent session added tests). **Zero
+failures in any class this story touches**: `ModuleContextTests`, `SiteGeneratorHowToReadTests`,
+`BmadArtifactAdapterTests`, `DiagnosticsTemplaterTests` and the golden gate are all green.
+
+Every failure is in the deep-git family (`SiteGeneratorTimelineTests`, `SiteGeneratorImpactMapTests`,
+`SiteGeneratorGitInsightsTests`, `SiteGeneratorCodeInsightsTests`, `SiteGeneratorCommitDetailsTests`,
+`SiteGeneratorChangeLogDateLinkTests`, `GitMetricsFirstCommitDateTests`, one `SiteGeneratorSpaTests`
+sunburst-island case). Evidence they are **load-dependent contention, not regressions**:
+
+- The failing subset **rotates every run** — 25, then 17, then 19, overlapping but never identical.
+- Every one **passes in isolation** (verified 37/37 as a five-class group, 3/3, and 1/1 for a single case that
+  had just failed in a group run).
+- `GitMetricsFirstCommitDateTests.TryGetFirstCommitDate_ReturnsNull_ForNonexistentPath` — a test that asserts a
+  nonexistent path returns null — failed in one run and passed the next. Nothing in this story can reach it.
+- They all spawn `git` subprocesses against temp repos, and at least one other session was running its own
+  suite concurrently (it re-baselined the golden constant mid-run). `[[epics-19-21-joint-retro-2026-07-23]]`
+  and Story 23.2 already record "one rotating contention flake per full run" as a known property; this is that,
+  amplified by concurrent load.
+
+**This is not a claim that the suite is green — 19 tests did fail.** It is a claim, with the evidence above,
+that none of them are attributable to this story. A quiet-machine re-run is the way to confirm.
+
+**8. Proposal for the owner — retire a stale requirements line (do NOT let this be lost).** In
+`_bmad-output/planning-artifacts/epics.md`, Additional Requirements, the clause *"current next-step command
+mapping is strongly GDS-oriented and requires generalization"* (currently line 173; located by phrase, not
+number) is **stale** and should be retired. The mechanism generalized when `CommandCatalog` became CSV-driven:
+`BuildContext` strips the module prefix and keys on the step remainder, so `/bmad-create-story` and
+`/gds-create-story` both resolve `create-story` with zero module-specific code. The residual BMM∩GDS *step
+vocabulary* at ~40 call sites needs no generalization either, because those surfaces (sprint board, epics,
+story pages) only exist when epics and stories exist — which only BMM and GDS produce; for a TEA or CIS repo
+the panels correctly vanish, which this story verified live. **Not deleted here** — it is a requirements-adjacent
+line and the call is the owner's. Note Story 18.1's AC also references this phrase (epics.md:3045), so retiring
+it should update both sites.
+
+**9. Live verification (CLAUDE.md § Verification).** Two real browser sessions, not assertions alone:
+
+- **Unmodeled path** — a scratch fixture repo with only `_bmad/tea/module-help.csv` (the **real** upstream file,
+  all 11 rows). Confirmed in-page via the DOM: `<h2 id="glossary">` present and the `#glossary` anchor resolves
+  to a real box (non-zero width/height, so in-page links still land); the body is a `<p>` reading *"This project
+  uses the **Test Architecture Enterprise** module. SpecScribe doesn't publish a glossary for it yet."*; no
+  `.howtoread-glossary` `<dl>`; no `#commands` section; **zero `<abbr>` elements** on how-to-read, on
+  `epics.html` (whose prose deliberately uses bare FR/NFR/AC/ADR/PRD), or on diagnostics; no horizontal body
+  scroll; no console errors. The diagnostics page shows exactly one notice, badged **`Informational`** as a WORD
+  (`status-badge diag-info`) — so the state is not signalled by colour alone.
+- **Modeled path unchanged (AC #3)** — regenerated this repo's own BMM portal (413 pages, 0 errors) to a scratch
+  output dir: glossary `<dl>` intact with all ten terms, command legend intact ("…your detected methodology,
+  BMad Method"), all five `<abbr title>` expansions intact on `epics.html`,
+  `Detected framework = BMad Method`, and **no** unmodeled notice leaked.
+
+Generation used the default output dir / an explicit scratch dir. `--output docs/live` was never used.
+
+**10. Anti-patterns avoided, as instructed.** No `Cis`/`Tea`/`Bmb` enum cases (the fix is open-world). No
+adapter registry. No module `config.yaml` reading. No widening to module docs (already file-gated). No sixth
+`AdapterDiagnosticCategory`. The prefix-stripping *step-key* logic is untouched — it was never the bug.
 
 ### File List
 
+- `src/SpecScribe/ModuleContext.cs` — **primary.** `BmadModule.Unmodeled`; `CommandCatalog.HasLabel` +
+  `Empty`'s label emptied; `ModuleContext.Code`/`IsUnmodeled`/`IsModeled`; `BmmCode`/`GdsCode`;
+  `ModuleHelpFileName`; `ReservedModuleNames`/`IsReservedModuleName`; `ModeledModuleLabels`; `FindModuleCsv`;
+  `SafeEnumerateDirectories`; `DiscoverCandidates`; `RankCandidates` (replaces `ChoosePrimary`); `CodeOf`;
+  `ModuleForCode`; `RepoRelativeCsv`; `ReportSecondaryModules`; `ReportUnmodeledPrimary`; `Detect` and
+  `BuildContext` gain the diagnostics sink.
+- `src/SpecScribe/HowToReadTemplater.cs` — `RenderPage(nav, ModuleContext)`; `AppendGlossary` acknowledgement
+  branch; `AppendCommandLegend` gated on a modeled primary.
+- `src/SpecScribe/AdapterDiagnostic.cs` — `Anchor` parameter (defaults to `Source`).
+- `src/SpecScribe/DiagnosticsTemplater.cs` — `DiagnosticAnchorRoot.Repo`; anchor derivation prefers an explicit
+  event anchor; `ModuleDisplay` gains the `HasLabel` guard.
+- `src/SpecScribe/Commands.cs` — `DiagnosticAnchorRoot.Repo` arm in the Problems-channel anchor switch.
+- `src/SpecScribe/BmadArtifactAdapter.cs` — passes `diagnostics` into `ModuleContext.Detect`.
+- `src/SpecScribe/SiteGenerator.cs` — `GenerationEvent.DiagnosticAnchor`; `MapDiagnostics` carries it;
+  `WriteHowToRead` passes `_module`; `BuildNav` no longer re-detects.
+- `tests/SpecScribe.Tests/ModuleContextTests.cs` — upstream-pinned fixtures (GDS/TEA/CIS/BMB) with provenance
+  and commit SHAs; `WriteManifest`/`WriteModuleDir` helpers; 17 new facts/theories.
+- `tests/SpecScribe.Tests/SiteGeneratorHowToReadTests.cs` — upstream-pinned GDS + new TEA fixture;
+  `InstallOnly` helper; 5 new generation-level facts.
+- `.claude/launch.json` — `tea-identity-18-2` preview entry (port 8108) for the live verification.
+
 ## Change Log
 
+- 2026-07-26 — **Implemented (dev-story), status → review.** Baseline `86b35c2`. Both defects closed by
+  red-green-refactor: 13 failing tests written first (9 in `ModuleContextTests`, 4 generation-level), then the
+  fix. Identity now derives from the module **code** (`_bmad/{code}/`), an unrecognized code resolves to a new
+  first-class `BmadModule.Unmodeled` (real label + parsed catalog, no docs, no glossary) plus one
+  `Informational` diagnostic, and `ChoosePrimary` became a deterministic `RankCandidates` that can never demote
+  BMM or GDS. ADR 0015 was ratified `Accepted` **by a concurrent session mid-implementation**, expanding its
+  Decisions 1/2/4 with guards the story draft predated (reserved `_bmad/` child names, case-insensitive codes
+  stored lower-invariant, a minted-code-squatting-a-modeled-code label cross-check, manifest∪disk as the
+  installed set, `Unmodeled` as a NEW case rather than a reuse of `Unknown`, an emptied
+  `CommandCatalog.Empty.ModuleLabel`, a diagnostics sink on `Detect`, detect-once-per-run, and a new
+  `DiagnosticAnchorRoot.Repo`); the ratified text was implemented in full. Test fixtures re-pinned to **real**
+  upstream `module-help.csv` content for GDS/TEA/CIS/BMB with per-file commit SHAs recorded. Verified in a live
+  browser on both paths — the unmodeled acknowledgement (anchor resolves, zero `<abbr>` site-wide, one
+  `Informational` word-badge) and the unchanged BMM portal (413 pages, glossary + legend + all five `<abbr>`
+  expansions intact). The golden fingerprint moved mid-story and **this story re-baselined nothing**: a worktree
+  experiment at the baseline commit proved this story leaves it at `dde7d077…`, and the concurrent Story 20.6
+  session then re-baselined it to `7adbdb01…` — bit-for-bit the value these runs had been computing — for its
+  own `specscribe.css` change. Gate green. See Completion Notes §6, including a new golden-diff gotcha
+  (`git status` under-reported a concurrent mid-write for several minutes). Open item for the owner: retire the
+  stale *"strongly GDS-oriented"* note in `epics.md` (§8) — proposed, not deleted.
 - 2026-07-25 — Story 18.2 **redefined and drafted** (create-story). Formerly "Priority BMad Module Baseline
   Coverage"; rescoped after Story 18.1's spike to the module-identity foundation (ADR 0015 Decisions 1/2/4), with
   its former artifact-coverage ACs moved verbatim to the new Story 18.5 (TEA), which this story now gates.

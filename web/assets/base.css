@@ -40,6 +40,14 @@ pre {
   font-family: 'Courier New', Courier, monospace;
 }
 
+/* An IR-backed route's `<main>` is rendered by `IrMain`, deliberately without a `data-v-*` scope attribute
+   so its open tag matches the golden page byte-for-byte (Story 23.3 AC #1). PageShell's own scoped rule
+   therefore cannot reach it, and the sticky-footer growth rule has to live here instead. It is the shell's
+   layout, not the injected content's — no monolith rule is being duplicated. */
+.shell-bare > main {
+  flex: 1 0 auto;
+}
+
 /* Focus ring — UX-DR16. Never removed, only restyled: a keyboard user must always be able to see where
    they are. Mirrors the portal's own visible-focus contract. */
 :focus-visible {

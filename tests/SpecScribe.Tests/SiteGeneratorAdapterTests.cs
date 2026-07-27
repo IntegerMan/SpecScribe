@@ -1069,7 +1069,42 @@ public class SiteGeneratorAdapterTests : IDisposable
         // is no known reason it should differ elsewhere — but that is an expectation, not a measurement.
         // RE-RUN THE CROSS-ENVIRONMENT CHECK before treating it as portable.
         // [Story 20.5 close-out; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
-        const string expected = "dde7d0778e95cc6a60d345a2209cca616c19b456962538f39a7ca6629bdf150e";
+        // Regenerated for Story 20.6 (2026-07-26) — the text-twin audit and fingerprint replacement.
+        //
+        // WHAT CHANGED, and why it is a deliberate reviewed rendering change. Owner decision D4: the dashboard
+        // already carries two visible listings (the `SunburstCompanionList` tile grid and the Story 20.3 rail), so
+        // its Hierarchy Explorer text twin now presents as `sr-only` instead of a closed `<details>`. Concretely the
+        // fixture's dashboard swapped `<details class="ss-hierarchy-twin">` + `<summary>` for
+        // `<section class="ss-hierarchy-twin sr-only" aria-labelledby>` + `<h3>`. `specscribe.css` also gained the
+        // `.ss-hierarchy-twin.sr-only:focus-within` reveal and `.ss-hierarchy-twin-title`, and it is copied to the
+        // output verbatim, so those bytes are in the hash too.
+        //
+        // WHAT DID NOT CHANGE — deliberately, and worth stating because it bounds the review surface:
+        //   • The twin's LISTING is byte-identical in both presentations. Only the wrapper differs, and
+        //     HierarchyExplorerTests.TwinDisplay_ChangesPresentationOnly_TheListingIsByteIdenticalInBothModes pins
+        //     that, so a surface can never get a LESS complete twin by choosing a different presentation.
+        //   • No chart SVG was retired. Story 20.6 is the GATE, not the retirement — every surface still ships its
+        //     server-rendered chart, so this constant still carries the SVG-derived signal it always did. That
+        //     coverage evaporates in Story 20.7, which is exactly why the replacement assertions landed first
+        //     (ADR 0013 §6, HierarchyExplorerTests "Replacement_*").
+        //   • The payload, the island and the node set are untouched.
+        //
+        // PROVENANCE (shared main) — REQUIRED BY AC#2, and it is NOT this story's work alone. Captured on a tree
+        // carrying two other sessions' uncommitted work:
+        //   1. Story 18.x / ADR 0015 BMad module identity — AdapterDiagnostic.cs, BmadArtifactAdapter.cs,
+        //      Commands.cs, DiagnosticsTemplater.cs, ModuleContext.cs, SiteGenerator.cs, HowToReadTemplater.cs.
+        //      `diagnostics.html` and `how-to-read.html` are both in GoldenOutputInventory, so this work IS
+        //      rendering-visible in this fixture and part of this constant.
+        //   2. Story 23.3's Nuxt `web/` tree — outside the fixture, cannot reach the hash.
+        // The two could not be separated without destroying uncommitted work (CLAUDE.md forbids reset/checkout/
+        // clean here, and rightly). Note the previous value read `dde7d077…`, not the `9288bf55…` Story 20.6's own
+        // task text cited at draft time — the constant had already moved under this story before it started, which
+        // is precisely the condition Task 5.1 predicted.
+        //
+        // VERIFICATION: confirmed stable across two repeated full runs before locking in. Single-box only — the
+        // cross-environment caveat above still stands and has NOT been re-measured for this value.
+        // [Story 20.6; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
+        const string expected = "7adbdb016cf9bb7d6be3193ee27cad8f7888066d2d0f407eee98ea95f74b0c42";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

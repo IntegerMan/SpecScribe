@@ -611,4 +611,175 @@ public class HierarchyExplorerTests
         Assert.True(HierarchyExplorer.ContainsHost(HierarchyExplorer.Render(Build(SampleModel()))));
         Assert.False(HierarchyExplorer.ContainsHost("<div class=\"chart-panel\"><svg class=\"sunburst\"></svg></div>"));
     }
+
+    // =============================================================================================================
+    // Story 20.6 — the golden-fingerprint REPLACEMENT assertions (ADR 0013 §6).
+    //
+    // WHY THEY EXIST. GoldenContentFingerprint currently draws most of its dashboard signal from chart SVG (69.3%
+    // of the body, measured by the Story 23.1 spike). When Story 20.7 retires that SVG, the coverage evaporates.
+    // ADR 0013 §6 requires the replacement to land BEFORE the first retirement, over the three things that are
+    // still server-rendered once the chart is client-drawn: the embedded PAYLOAD, the component CONFIGURATION, and
+    // the TEXT TWIN. These run ALONGSIDE the existing fingerprint test through the transition (Task 4.4) — nothing
+    // here weakens or replaces it, because SVG is still server-rendered on every surface at this point.
+    //
+    // ⚠️ HONEST SCOPE LIMIT — do not read these as portfolio-wide chart coverage, which the fingerprint has never
+    // had. The golden fixture is NOT a git repo and cites no real repo files, so the git-derived surfaces never
+    // render in it: `git-insights.html`, `impact-map.html` and `timeline.html`/`commits/` are all absent from
+    // GoldenOutputInventory. (`code-map.html` and `risk-quadrant.html` DO render there — they ride the fixture's
+    // repo-root markdown walk, not deep-git. Story 20.6's own task text asserted otherwise; verified against
+    // SiteGeneratorAdapterTests' inventory on 2026-07-26 and corrected here.) The fingerprint is therefore the net
+    // for the PLANNING hierarchy surfaces; the git surfaces are netted by their own templater tests, and the JS-off
+    // behaviour of any surface has no test-suite equivalent at all — it is a live-browser activity, recorded in
+    // `_bmad-output/implementation-artifacts/20-6-text-twin-audit.md`.
+    //
+    // Task 4.3 (folding vendored assets out of FingerprintTree) is NOT re-done here: it already landed with Story
+    // 20.5 and was hardened by Story 25.1's review into the shared `KnownStaticAssets` map, which covers plotly AND
+    // both prism assets — i.e. already the single predicate Task 4.3 asked for rather than a plotly special case.
+    // =============================================================================================================
+
+    [Fact]
+    public void Replacement_TheEmbeddedPayload_CarriesEveryFieldTheClientReads()
+    {
+        // The island is the component's ONLY datasource. If a field silently stops being emitted the chart draws
+        // wrong (or blank) with no error — so the shape is pinned, not assumed.
+        var built = Build(SampleModel());
+        var html = HierarchyExplorer.IslandHtml(built);
+
+        Assert.Contains("<script type=\"application/json\" class=\"ss-hierarchy-data\" id=\"test-hierarchy-data\">", html);
+
+        var nodes = IslandJson(built).GetProperty("nodes");
+        Assert.Equal(built.Nodes.Count, nodes.GetArrayLength());
+
+        foreach (var node in nodes.EnumerateArray())
+        {
+            foreach (var field in new[] { "id", "parentId", "label", "value", "statusClass", "statusLabel", "href", "kind" })
+            {
+                Assert.True(node.TryGetProperty(field, out _), $"payload node is missing '{field}'");
+            }
+            // `value` must be a NUMBER and never null: one null anywhere in Plotly's values array collapses
+            // calcdata to a single point and renders nothing — no error, no console warning (20.4 Finding B).
+            Assert.Equal(JsonValueKind.Number, node.GetProperty("value").ValueKind);
+            // statusLabel is PROSE, never the CSS class — the twin's and the accessible name's non-color reading.
+            Assert.NotEqual(node.GetProperty("statusClass").GetString(), node.GetProperty("statusLabel").GetString());
+        }
+    }
+
+    [Fact]
+    public void Replacement_TheComponentConfiguration_IsEmittedAndMatchesThePayloadsActualShape()
+    {
+        var built = Build(SampleModel());
+        var config = IslandJson(built).GetProperty("config");
+
+        foreach (var field in new[] { "domId", "shape", "mode", "hashKey", "size", "labels", "branchvalues" })
+        {
+            Assert.True(config.TryGetProperty(field, out _), $"component config is missing '{field}'");
+        }
+        Assert.Equal("test-hierarchy", config.GetProperty("domId").GetString());
+        Assert.Equal("sunburst", config.GetProperty("shape").GetString());
+        Assert.Equal("select", config.GetProperty("mode").GetString());
+        Assert.Equal("sb", config.GetProperty("hashKey").GetString());
+        Assert.Equal(560, config.GetProperty("size").GetInt32());
+        Assert.True(config.GetProperty("labels").GetBoolean());
+
+        // Assert against the CONSTANT, never a literal "total" — the constant is the contract both sides read.
+        Assert.Equal(HierarchyExplorer.BranchValues, config.GetProperty("branchvalues").GetString());
+
+        // …and the payload must genuinely BE what `branchvalues` claims. A payload/branchvalues mismatch renders a
+        // blank or wrong chart with only a console warning, so "parent-inclusive" is verified rather than trusted:
+        // under `total`, every parent's value is the exact sum of its emitted children.
+        Assert.Equal("total", HierarchyExplorer.BranchValues);
+        var byParent = built.Nodes
+            .Where(n => n.ParentId is not null)
+            .GroupBy(n => n.ParentId!)
+            .ToDictionary(g => g.Key, g => g.Sum(n => n.Value));
+        foreach (var parent in built.Nodes.Where(n => byParent.ContainsKey(n.Id)))
+        {
+            Assert.Equal(byParent[parent.Id], parent.Value);
+        }
+        Assert.NotEmpty(byParent);
+    }
+
+    [Fact]
+    public void Replacement_TheTextTwin_StatesEveryPayloadNodeInProseWithAResolvingLink()
+    {
+        // The durable half of AC#1: this is what makes the JS-off audit REPEATABLE instead of a one-time
+        // inspection. Every node the chart would draw is stated in the twin, as words, with a real link.
+        var built = Build(SampleModel());
+        var twin = HierarchyExplorer.TextTwinHtml(built);
+
+        Assert.Equal(built.Nodes.Count, Regex.Matches(twin, "<li>").Count);
+
+        foreach (var node in built.Nodes)
+        {
+            Assert.Contains($"<a href=\"{PathUtil.Html(node.Href!)}\">{PathUtil.Html(node.Label)}</a>", twin);
+            // A WORD, not a CSS class. Guarding both directions is the point: `statusClass` leaking into the twin
+            // is exactly the defect the 20.4 probe hit, where accessible names read "— done, weight 44".
+            Assert.Contains(PathUtil.Html(node.StatusLabel), twin);
+        }
+        var statusClasses = built.Nodes.Select(n => n.StatusClass).Distinct();
+        foreach (var cls in statusClasses)
+        {
+            Assert.DoesNotContain($"twin-meta\">{PathUtil.Html(cls)}<", twin);
+        }
+    }
+
+    // ---- Story 20.6 Task 3: the twin-presentation knob (owner D3/D4) ----------------------------------------
+
+    [Fact]
+    public void TwinDisplay_DefaultsToDetails_SoAJsOffVisitorReachesItInOneClick()
+    {
+        // Owner D3. <details> needs no script, which is the whole reason it is the default.
+        Assert.Equal(HierarchyTwinDisplay.Details, Config().TwinDisplay);
+
+        var twin = HierarchyExplorer.TextTwinHtml(Build(SampleModel()));
+        Assert.StartsWith("<details class=\"ss-hierarchy-twin\" id=\"test-hierarchy-twin\">", twin);
+        Assert.Contains("<summary>Project at a Glance — full text listing</summary>", twin);
+        Assert.DoesNotContain("sr-only", twin);
+        // Closed: availability, not on-screen duplication (ADR 0013 §2).
+        Assert.DoesNotContain("<details open", twin);
+    }
+
+    [Fact]
+    public void TwinDisplay_ScreenReaderOnly_HidesThePresentationAndNothingElse()
+    {
+        // Owner D4, for surfaces that already carry a visible companion listing (the dashboard's tile grid + the
+        // 20.3 rail). The CONTRACT does not vary by surface — only the wrapper does.
+        var built = Build(SampleModel(), Config() with { TwinDisplay = HierarchyTwinDisplay.ScreenReaderOnly });
+        var twin = HierarchyExplorer.TextTwinHtml(built);
+
+        Assert.StartsWith("<section class=\"ss-hierarchy-twin sr-only\" id=\"test-hierarchy-twin\"", twin);
+        // A landmark with an accessible NAME — how a screen-reader user finds the listing without tabbing to it.
+        Assert.Contains("aria-labelledby=\"test-hierarchy-twin-title\"", twin);
+        Assert.Contains("id=\"test-hierarchy-twin-title\">Project at a Glance — full text listing</h3>", twin);
+        Assert.DoesNotContain("<details", twin);
+
+        // `sr-only` is the clip-rect technique, NOT display:none — the links must stay real anchors so they remain
+        // focusable and in the accessibility tree. Removing them would break the NAVIGATION half of NFR-5, which
+        // ADR 0013 says may never be lost. (Story 20.2's review caught the mirror-image bug live: an SVG <a> at
+        // display:none stays focusable. Only a browser shows which you got; this pins the markup half.)
+        foreach (var node in built.Nodes)
+        {
+            Assert.Contains($"<a href=\"{PathUtil.Html(node.Href!)}\">{PathUtil.Html(node.Label)}</a>", twin);
+        }
+    }
+
+    [Fact]
+    public void TwinDisplay_ChangesPresentationOnly_TheListingIsByteIdenticalInBothModes()
+    {
+        // The load-bearing guarantee behind the whole D3/D4 split: a surface cannot quietly get a LESS complete
+        // twin by choosing a different presentation. Strip the wrapper and the two must be identical.
+        var details = HierarchyExplorer.TextTwinHtml(Build(SampleModel()));
+        var srOnly = HierarchyExplorer.TextTwinHtml(
+            Build(SampleModel(), Config() with { TwinDisplay = HierarchyTwinDisplay.ScreenReaderOnly }));
+
+        static string Listing(string twin)
+        {
+            var start = twin.IndexOf("<ul class=\"ss-hierarchy-twin-list\">", StringComparison.Ordinal);
+            var end = twin.LastIndexOf("</ul>", StringComparison.Ordinal);
+            Assert.True(start >= 0 && end > start, "both modes must emit the nested listing");
+            return twin[start..(end + "</ul>".Length)];
+        }
+
+        Assert.Equal(Listing(details), Listing(srOnly));
+    }
 }

@@ -183,14 +183,26 @@ public class SiteGeneratorSpaTests : IDisposable
         // matters more than the island here — under ADR 0013 it is the no-JS contract, and an SPA visitor whose
         // scripting is blocked mid-session must get the same server-rendered truth as a static-site one.
         // SAME SCOPE CAVEAT as above: this pins markup surviving the capture, never live SPA re-enhancement.
+        // Story 20.6: keyed on the twin's stable IDENTITY (`id="{domId}-twin"`), not on its wrapper element. The
+        // dashboard now presents its twin as `<section class="ss-hierarchy-twin sr-only">` rather than `<details>`
+        // (owner D4 — the page already carries the SunburstCompanionList tile grid and the 20.3 rail, so a third
+        // VISIBLE listing would be on-screen duplication), and this assertion previously pinned the `<details>`
+        // literal. What this test is actually about is that the twin SURVIVES the capture and lands inside <main>;
+        // which wrapper carries it is a per-surface presentation choice the component owns. The completeness
+        // contract itself does not vary by presentation — HierarchyExplorerTests
+        // .TwinDisplay_ChangesPresentationOnly_TheListingIsByteIdenticalInBothModes pins that separately.
+        const string twinId = "id=\"dashboard-hierarchy-twin\"";
         foreach (var html in new[] { staticIndex, spaIndex })
         {
             Assert.Contains("class=\"ss-hierarchy-data\"", html);
-            Assert.Contains("<details class=\"ss-hierarchy-twin\"", html);
+            Assert.Contains("class=\"ss-hierarchy-twin", html);
+            Assert.Contains(twinId, html);
+            // The twin is the no-JS contract, so its LISTING — not just its wrapper — must ride the capture.
+            Assert.Contains("<ul class=\"ss-hierarchy-twin-list\">", html);
             Assert.Contains("data-hierarchy", html);
         }
         Assert.True(spaIndex.IndexOf("class=\"ss-hierarchy-data\"", StringComparison.Ordinal) > mainStart);
-        Assert.True(spaIndex.IndexOf("<details class=\"ss-hierarchy-twin\"", StringComparison.Ordinal) > mainStart);
+        Assert.True(spaIndex.IndexOf(twinId, StringComparison.Ordinal) > mainStart);
     }
 
     [Fact]

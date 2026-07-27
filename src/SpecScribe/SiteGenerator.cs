@@ -16,7 +16,7 @@ public enum GenerationOutcome { Generated, Updated, Removed, Skipped, Error }
 /// unnumbered-ADR notice), rather than the source root — the "which root do I anchor to" bit
 /// <see cref="DiagnosticNotice"/> needs so the <c>webview</c> command's Problems-panel channel resolves the real
 /// file instead of combining an ADR-relative path with <c>SourceRoot</c>. [Story 6.12] [Review][Patch]</param>
-public sealed record GenerationEvent(GenerationOutcome Outcome, string RelativePath, TimeSpan Elapsed, string? Message = null, bool FromAdapterDiagnostic = false, bool FromAdrDiagnostic = false);
+public sealed record GenerationEvent(GenerationOutcome Outcome, string RelativePath, TimeSpan Elapsed, string? Message = null, bool FromAdapterDiagnostic = false, bool FromAdrDiagnostic = false, DiagnosticAnchorRoot? DiagnosticAnchor = null);
 
 /// <summary>Owns the mapping from _bmad-output/*.md to SpecScribeOutput/*.html, and keeps the generated index,
 /// nav, and epics/story pages in sync.</summary>
@@ -3350,7 +3350,10 @@ public sealed class SiteGenerator
             d.Category is AdapterDiagnosticCategory.Malformed or AdapterDiagnosticCategory.Error
                 ? GenerationOutcome.Error
                 : GenerationOutcome.Skipped,
-            d.RelativePath, TimeSpan.Zero, $"[{d.Category}] {d.Message}", FromAdapterDiagnostic: true, FromAdrDiagnostic: fromAdr));
+            d.RelativePath, TimeSpan.Zero, $"[{d.Category}] {d.Message}", FromAdapterDiagnostic: true, FromAdrDiagnostic: fromAdr,
+            // A diagnostic that declares a non-default anchor keeps it; everything else stays on the
+            // source-root contract via DiagnosticNotice's existing derivation. [Story 18.2]
+            DiagnosticAnchor: d.Anchor == DiagnosticAnchorRoot.Source ? null : d.Anchor));
 
     /// <summary>Appends the Story 8.3 Unsupported count-divergence notice when the ledger is divergent.
     /// Shared by <see cref="GenerateAll"/> and <see cref="RegenerateEpics"/> so watch rebuilds re-emit.
@@ -3836,7 +3839,7 @@ public sealed class SiteGenerator
     private GenerationEvent WriteHowToRead(SiteNav nav)
     {
         var sw = Stopwatch.StartNew();
-        var html = HowToReadTemplater.RenderPage(nav, _module.Docs, _module.Glossary, _module.Commands);
+        var html = HowToReadTemplater.RenderPage(nav, _module);
         WriteOutput(SiteNav.HowToReadOutputPath, html);
         return new GenerationEvent(GenerationOutcome.Generated, SiteNav.HowToReadOutputPath, sw.Elapsed);
     }
@@ -4605,7 +4608,13 @@ public sealed class SiteGenerator
     /// [spec-epic2-deferred-debt-cleanup]</param>
     private SiteNav BuildNav(IReadOnlyList<string> sourceRelatives, List<AdapterDiagnostic>? diagnostics = null)
     {
-        _module = ModuleContext.Detect(_options.RepoRoot, sourceRelatives);
+        // Detection runs ONCE per run, in the adapter's Ingest, and _module holds the result. It used to be
+        // re-derived here as well — and this second, adapter-free detection is the one that actually fed nav,
+        // the glossary and AbbreviationExpander, while the bundle's (diagnosed) detection was overwritten.
+        // Worse, 4 of this method's 5 call sites pass an EMPTY source list, so the BMM-vs-GDS source-shape
+        // tie-break was unconditionally false on every incremental and watch rebuild: a dual-install game repo
+        // silently fell back to BMM mid-session. Consuming the cached context fixes both.
+        // [Story 18.2; ADR 0015 Decisions 2d, 4c]
         // CodeMapAvailable = the cached source-code walk is non-empty — the SINGLE signal that gates both the nav
         // item/quick link here and the WriteCodeMap page write, so a Code Map link is never emitted to a page that
         // wasn't produced. The incremental watch paths that call BuildNav reuse the last full run's _codeFiles (the

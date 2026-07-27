@@ -10,8 +10,13 @@ namespace SpecScribe;
 /// defines. [Story 10.3; Story 5.6; Help nav; How to use SpecScribe]</summary>
 public static class HowToReadTemplater
 {
-    public static string RenderPage(SiteNav nav, IReadOnlyList<ModuleDoc> moduleDocs, IReadOnlyList<GlossaryTerm> glossary, CommandCatalog commands)
+    /// <param name="module">The detected module context, passed WHOLE rather than as its three projections:
+    /// since Story 18.2 the glossary and command-legend sections need the module's identity state and label,
+    /// not just its term list, and threading two more positional parameters through would have made the
+    /// signature a list of facts that must be kept mutually consistent by every caller. [Story 18.2]</param>
+    public static string RenderPage(SiteNav nav, ModuleContext module)
     {
+        var moduleDocs = module.Docs;
         var outputPath = SiteNav.HowToReadOutputPath;
 
         var sb = new StringBuilder();
@@ -38,8 +43,8 @@ public static class HowToReadTemplater
         AppendReadingOrder(readingOrder, nav, moduleDocs);
 
         var reference = new StringBuilder();
-        AppendGlossary(reference, glossary);
-        AppendCommandLegend(reference, commands);
+        AppendGlossary(reference, module);
+        AppendCommandLegend(reference, module);
 
         var hasModuleContent = readingOrder.Length > 0 || reference.Length > 0;
 
@@ -170,9 +175,25 @@ public static class HowToReadTemplater
 
     /// <summary>The module's vocabulary as a definition list, acronyms first (stable sort preserves each
     /// group's declared order). Omitted entirely — not rendered empty — when the module publishes no
-    /// glossary (an undetected framework), so AC2/NFR8 never renders an empty-but-present section.</summary>
-    private static void AppendGlossary(StringBuilder sb, IReadOnlyList<GlossaryTerm> glossary)
+    /// glossary (an undetected framework), so AC2/NFR8 never renders an empty-but-present section.
+    /// <para>Between those two states sits a third: a module SpecScribe recognized but does not model. That
+    /// gets a NAMED acknowledgement rather than silent omission (owner design call) — an invisible section
+    /// leaves a Test Architect user unable to tell whether the portal is honest or broken. The heading and its
+    /// <c>#glossary</c> anchor still render so in-page links don't break; only the <c>&lt;dl&gt;</c> is
+    /// replaced. Gated on BOTH the unmodeled state and a real label: <see cref="CommandCatalog.Empty"/> is
+    /// <see cref="ModuleContext.None"/>'s catalog, so a state-only gate would have announced a module on a
+    /// repo with no BMad install at all. [Story 18.2; ADR 0015 Decision 2c]</para></summary>
+    private static void AppendGlossary(StringBuilder sb, ModuleContext module)
     {
+        if (module.IsUnmodeled && module.Commands.HasLabel)
+        {
+            sb.Append("  <h2 id=\"glossary\">Glossary</h2>\n");
+            sb.Append($"  <p>This project uses the <strong>{PathUtil.Html(module.Commands.ModuleLabel)}</strong> ");
+            sb.Append("module. SpecScribe doesn't publish a glossary for it yet.</p>\n");
+            return;
+        }
+
+        var glossary = module.Glossary;
         if (glossary.Count == 0)
         {
             return;
@@ -189,15 +210,20 @@ public static class HowToReadTemplater
 
     /// <summary>A light-touch note that the slash commands seen on story/epic pages come from the detected
     /// methodology — not a full command enumeration (the story pages already caption each one). Omitted
-    /// when no module was detected, so an undetected framework never claims a methodology it doesn't have.</summary>
-    private static void AppendCommandLegend(StringBuilder sb, CommandCatalog commands)
+    /// when no module was detected, so an undetected framework never claims a methodology it doesn't have.
+    /// <para>Gated on a MODELED primary, not merely a non-empty catalog. The sentence promises commands "like
+    /// the ones captioned on story and epic pages", and those captions come from surfaces (story pages, epic
+    /// pages, the sprint board) that only exist when epics and stories do — which only the two modeled modules
+    /// produce. An unmodeled module parses a perfectly real catalog whose commands are captioned nowhere, so
+    /// the legend would point at pages the reader will never see. [Story 18.2; ADR 0015 Decision 2c]</para></summary>
+    private static void AppendCommandLegend(StringBuilder sb, ModuleContext module)
     {
-        if (commands.IsEmpty)
+        if (!module.IsModeled || module.Commands.IsEmpty || !module.Commands.HasLabel)
         {
             return;
         }
 
         sb.Append("  <h2 id=\"commands\">Commands you'll see</h2>\n");
-        sb.Append($"  <p>Slash commands like the ones captioned on story and epic pages come from your detected methodology, {PathUtil.Html(commands.ModuleLabel)}.</p>\n");
+        sb.Append($"  <p>Slash commands like the ones captioned on story and epic pages come from your detected methodology, {PathUtil.Html(module.Commands.ModuleLabel)}.</p>\n");
     }
 }

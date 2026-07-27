@@ -17,8 +17,12 @@ public enum DiagnosticSeverity { Error, Warning, Info }
 /// source root (<c>SiteGenerator.MapDiagnostics</c> for source artifacts) <em>or</em> the ADR root (the
 /// unnumbered-ADR notice, whose path is relative to <c>AdrSourceRoot</c>/the ADR output subdir, not
 /// <c>SourceRoot</c>) — combining an ADR-relative path with <c>SourceRoot</c> silently resolves to a
-/// nonexistent file. [Story 6.12] [Review][Patch]</summary>
-public enum DiagnosticAnchorRoot { None, Source, Adr }
+/// nonexistent file. [Story 6.12] [Review][Patch]
+/// <para><see cref="Repo"/> joined the set for the module-identity notices: their subject is
+/// <c>_bmad/{code}/module-help.csv</c>, which is a sibling of the source tree rather than inside it, so
+/// resolving it against <c>SourceRoot</c> would point the Problems panel at a file that does not exist.
+/// [Story 18.2; ADR 0015 Decision 2d]</para></summary>
+public enum DiagnosticAnchorRoot { None, Source, Adr, Repo }
 
 /// <summary>One row on the Story 4.8 diagnostics page: a single non-fatal notice from the run, projected off
 /// the unified <see cref="GenerationEvent"/> channel. <see cref="Category"/> is the fine
@@ -65,9 +69,12 @@ public sealed record DiagnosticNotice(
             // FromAdapterDiagnostic/FromAdrDiagnostic are the exact "is this a real source artifact, and which
             // root" bits MapDiagnostics already set — carry them verbatim (rather than re-deriving from the path
             // string) so the Problems channel (Story 6.12) and this page derive from one type. [Story 6.12] [Review][Patch]
-            var anchorRoot = e.FromAdrDiagnostic ? DiagnosticAnchorRoot.Adr
-                : e.FromAdapterDiagnostic ? DiagnosticAnchorRoot.Source
-                : DiagnosticAnchorRoot.None;
+            // An explicit anchor on the event wins (the module-identity notices are repo-anchored); otherwise
+            // the two provenance bits derive it exactly as before. [Story 18.2]
+            var anchorRoot = e.DiagnosticAnchor
+                ?? (e.FromAdrDiagnostic ? DiagnosticAnchorRoot.Adr
+                    : e.FromAdapterDiagnostic ? DiagnosticAnchorRoot.Source
+                    : DiagnosticAnchorRoot.None);
             notices.Add(new DiagnosticNotice(category, e.RelativePath, message, severity, anchorRoot));
         }
 
@@ -128,7 +135,10 @@ public sealed record DiagnosticsConfig
     public required DatePolicy DatePolicy { get; init; }
 
     /// <summary>The detected framework/module label (e.g. "BMad Method"), or "Unknown (not detected)" when no
-    /// methodology module resolved — the AC #2 "detected framework/module" line.</summary>
+    /// methodology module resolved — the AC #2 "detected framework/module" line. A module SpecScribe does not
+    /// model still prints its REAL label here (this row was already correct for such a repo before Story 18.2,
+    /// and keeping it correct is why <see cref="BmadModule.Unmodeled"/> is a separate case from
+    /// <see cref="BmadModule.Unknown"/> rather than a reuse of it). [ADR 0015 Decision 2a]</summary>
     public required string ModuleDisplay { get; init; }
 
     /// <summary>Builds the model from a run's resolved options and detected module. Local-first by construction:
@@ -146,7 +156,10 @@ public sealed record DiagnosticsConfig
         IncludeReadme = options.IncludeReadme,
         CodeSourceDisplay = options.CodeSourceBaseUrl is { Length: > 0 } url ? url : "in-portal only",
         DatePolicy = options.DatePolicy,
-        ModuleDisplay = module.Module == BmadModule.Unknown
+        // Label-gated as well as state-gated: CommandCatalog.Empty's label is now EMPTY rather than the
+        // placeholder "BMad", so a labelless context must fall back to the honest phrase instead of rendering
+        // a blank row. [Story 18.2; ADR 0015 Decision 2b]
+        ModuleDisplay = module.Module == BmadModule.Unknown || !module.Commands.HasLabel
             ? "Unknown (not detected)"
             : module.Commands.ModuleLabel,
     };

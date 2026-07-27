@@ -4,7 +4,7 @@ baseline_commit: 611097d63ff1f8fa6b71c8d58158dd6e303e6991
 
 # Story 18.1: BMad Module Landscape and Coverage Spike
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -18,7 +18,14 @@ so that baseline coverage starts with a defined scope, a prioritized target modu
 
 Epic 4 (`done`) built the framework-agnostic **foundation** — the `IArtifactAdapter` contract, `ArtifactBundle` projection carrier, and `BmadArtifactAdapter` as the one concrete implementation — but deliberately deferred all per-framework coverage. Its original Stories 4.3–4.7 were extracted 2026-07-10 into five appended, spike-led epics (11–15; one per **third-party** framework: Spec Kit, GSD/GSD-Pi, SpecFlow, Squad, Superpowers). **Epic 18 is a sixth, distinct exploration seated separately** (SCP 2026-07-11, correct-course): BMad's own **module and expansion ecosystem** beyond the BMM core that this very project already runs on. This is NOT another third-party-framework spike — it is asking "what else does the framework SpecScribe is built with/on top of ship, that SpecScribe doesn't yet render?"
 
-**The one-line test for "is this in scope?":** if the change *surveys* BMad's own module ecosystem (BMad Builder, Test Architect, Creative Intelligence Suite, and confirms Game Dev Studio's already-supported status), *classifies* each module's distinctive observable artifacts against the existing `ArtifactBundle`/model shapes, or *writes* a coverage map + priority recommendation + non-goals list → in. If it *builds* a new adapter, parses a real module-specific file into a real model, extends `ModuleContext`/`BmadModule` with a new enum case, or lands any `src/`/`tests/` change → out; that is Story 18.2 (Priority BMad Module Baseline Coverage, not yet created — already seeded in epics.md but not detailed).
+**The one-line test for "is this in scope?":** if the change *surveys* BMad's own module ecosystem (BMad Builder, Test Architect, Creative Intelligence Suite, and confirms Game Dev Studio's already-supported status), *classifies* each module's distinctive observable artifacts against the existing `ArtifactBundle`/model shapes, or *writes* a coverage map + priority recommendation + non-goals list → in. If it *builds* a new adapter, parses a real module-specific file into a real model, extends `ModuleContext`/`BmadModule` with a new enum case, or lands any `src/`/`tests/` change → out; that is downstream coverage work, not this spike.
+
+> **Updated 2026-07-25 (post-spike).** At drafting, "downstream" meant a single seeded story,
+> `18-2-priority-bmad-module-baseline-coverage`. This spike's findings drove an owner-approved split into
+> **`18-2-bmad-module-identity-foundation`** (`ready-for-dev` — the identity fix, ADR 0015 Decisions 1/2/4,
+> which now *gates* coverage) and **`18-5-priority-bmad-module-baseline-coverage`** (`backlog` — the original
+> ACs verbatim, retargeted to TEA). The scope test above is unchanged in substance; only the name of what
+> "out" routes to has changed. See Project Structure Notes.
 
 **Precedent for this shape — read all three, but do not just copy their answers:** Story 11.1 (`11-1-spec-kit-integration-spike.md`, `ready-for-dev`), Story 15.1 (`15-1-superpowers-integration-spike.md`, `ready-for-dev`) and Story 19.1 (`19-1-work-graph-model-and-coverage-spike.md`, `ready-for-dev`) are the closest siblings for the "coverage map, no production code" spike shape and its Completion-Notes-as-deliverable convention. **But this story is structurally different from all of them**: 11.1–15.1 each survey ONE third-party framework that is entirely absent from this repo's own tooling. Story 18.1 surveys BMad's OWN module family — and this repo already has two of BMad's modules installed (`core`, `bmm` — see `_bmad/_config/manifest.yaml`) and already fully supports two BMad modules in the rendered site (BMad Method and BMad GDS, both `Supported: true` in `AboutSddTemplater.Frameworks` — see Context & Scope below). The spike's job is to find and classify the modules NOT yet in that supported set.
 
@@ -127,7 +134,8 @@ Confirm whether Story 11.1/12.1/13.1/14.1/15.1 have reached `done` with a landed
   - [x] Assess whether `ChoosePrimary`'s tie-breaking heuristic [ModuleContext.cs:259-286] needs a third branch for the prioritized module, or whether it's fine for a niche module to lose ties to BMM/GDS by default.
 
 - [x] **Task 4 — Classify every discovered artifact type per candidate module (AC: #1)**
-  - [x] For each of BMad Builder, Test Architect, and Creative Intelligence Suite (plus any additional module found in Task 2), classify its distinctive artifacts as **mappable** (name the exact target: `ArtifactBundle` field + model type, or the `ModuleContext` doc/glossary extension point), **partially-mappable** (name what maps and what doesn't), or **unsupported** (name why) — noting explicitly that BMad Method and GDS are already covered, not re-classified.
+  - [~] For each of BMad Builder, Test Architect, and Creative Intelligence Suite (plus any additional module found in Task 2), classify its distinctive artifacts as **mappable** (name the exact target: `ArtifactBundle` field + model type, or the `ModuleContext` doc/glossary extension point), **partially-mappable** (name what maps and what doesn't), or **unsupported** (name why) — noting explicitly that BMad Method and GDS are already covered, not re-classified.
+    - **Partially complete, deliberately.** BMB, TEA and CIS are classified in §5. The "plus any additional module found in Task 2" clause is **not** done: Task 2 surfaced eight more (`bmad-loop`, `bmad-automator`, `bmad-manticore`, `bmad-method-ui`, `bmad-method-wds-expansion`, `bmad-utility-skills`, `bmad-module-template`, `bmad-plugins-marketplace`) and §5 states plainly that "these were **not** classified here" — they fall outside the ACs' named scope and several are plugins/marketplace entries rather than installed modules. Their *existence* is used as evidence for the open-world conclusion, which is the load-bearing use. Marked `[~]` rather than `[x]` so the record does not claim work it declined. *(Annotated 2026-07-26.)*
   - [x] Resolve whether any candidate module's output is close enough to `EpicsModel`/`RequirementsModel`/`SprintStatus`/`RetroModel` shape to reuse those models directly, or whether it's better modeled as pure `ModuleContext` doc/glossary/command additions with `Epics`/`Sprint`/`Requirements`/`Retros` staying null/empty (per NFR8, honest absence) — this is the central modeling question, mirroring 15.1's "does this map to StoryInfo, EpicInfo, or neither" puzzle but for BMad-native modules.
   - [x] Recommend the single priority module to cover first (AC #1's "recommends a priority module (or modules)") with rationale (e.g. likelihood of real adoption, richness of distinctive on-disk artifacts, size of Story 18.2's resulting scope).
 
@@ -159,41 +167,94 @@ merits. 2 findings dismissed as noise._
 sibling spikes really are `ready-for-dev` with empty Completion Notes. The findings below are about the
 deliverable's **completeness and accuracy**, not its central conclusion.
 
-- [ ] [Review][Patch] **RESOLVED (owner, 2026-07-26): ratify ADR 0015.** The finding: ADR 0015 was `Proposed` with Open Question #1 unanswered, yet `18-2-bmad-module-identity-foundation` was already `ready-for-dev` scoped verbatim as "ADR 0015 (Proposed) Decisions 1/2/4" — *which is OQ#1's answer* — and its sprint note had adopted "first-class **unmodeled** identity", OQ#3's undecided rename. The ratification gate was decorative. **Owner decision: flip ADR 0015 to `Accepted` and close all three open questions.** OQ#1 → yes, Decisions 1/2/4 land in 18-2 as the prerequisite slice, Decision 3 (multi-valued `ModuleContext`) deferred to its own story. OQ#2 → yes as proposed, `ArtifactBundle.Module` stays singular and the set lives inside `ModuleContext`. OQ#3 → rename, **forced** by the `DiagnosticsTemplater.cs:149` finding below (shipped code has already bound `Unknown` to "detection failed"). 18-2 stays `ready-for-dev`. Update the ADR's Status line, its `docs/adrs/README.md` entry, and record the ratification date.
+---
 
-- [ ] [Review][Patch] **`docs/adrs/README.md` edit destroyed ADR 0014's index entry and grafted its description onto ADR 0015** [docs/adrs/README.md:25-26] — 0014 is now bare `— **Accepted**`, unique among all 15 entries; its full parenthetical (`extends ADR 0003's on-disk shape: .specscribe becomes a folder…`) is appended verbatim to the **end** of 0015's entry, so the index now tells a reader that ADR 0015 is about `.specscribe` config storage. Data loss plus an active misstatement in the one file whose job is orientation. The File List records it only as "(modified — ADR 0015 index entry)".
+#### Patch round — 2026-07-26
 
-- [ ] [Review][Patch] **Decision 2's `Informational` diagnostic has no emission seam — the NFR8 remedy depends on a channel that does not exist** [src/SpecScribe/ModuleContext.cs:194] — `Detect` takes no diagnostics sink and swallows everything in `catch { return None; }` (`:239-244`), unlike sibling ingest paths (`IngestSprint(options, diagnostics)`). Worse, detection runs **twice on two different paths**: `_module` is set from `bundle.Module` (adapter path, has diagnostics) and then **overwritten** by an adapter-free `ModuleContext.Detect` in `BuildNav` (`SiteGenerator.cs:4589`) — and 3 of `BuildNav`'s 5 call sites (`:486, :518, :950`) pass no diagnostics list. So the detection that actually feeds nav, glossary and `AbbreviationExpander` is not the one the bundle diagnosed. Also unstated: emission cardinality (per-module / per-run / per-watch-rebuild), and the `RelativePath` anchor root — the subject `_bmad/{code}/module-help.csv` is **repo**-root-relative while `AdapterDiagnostic.RelativePath` is contractually **source**-root-relative (`AdapterDiagnostic.cs:40-41`) and gets `DiagnosticAnchorRoot.Source`, so the webview Problems channel would resolve it to a nonexistent `_bmad-output/_bmad/cis/module-help.csv`. Neither the story's six "exact, verified" extension points nor the ADR's Consequences names any of this.
+**All 18 `[Review][Patch]` items applied.** The one `[Review][Defer]` item stays deferred by design. Each
+finding was re-verified against HEAD before being fixed; **none had gone stale** — ADR 0015 was still
+`Proposed`, `docs/adrs/README.md:25` still carried the blanked ADR 0014 entry, and `HowToReadTemplater`'s
+`AppendCommandLegend` still gated on `commands.IsEmpty`. Line-number drift was *worse* than the review found:
+it had also moved inside `ModuleContext.cs` itself (`ChoosePrimary`, `DocsFor`/`GlossaryFor`, and the identity
+line, now `:361-362`), which is why the ADR's citations were converted wholesale to **symbol anchors** rather
+than re-pinned.
 
-- [ ] [Review][Patch] **`DiagnosticsTemplater.cs:149` is the only live `BmadModule.Unknown` consumer — both documents miss it, and Decision 2 regresses it** [src/SpecScribe/DiagnosticsTemplater.cs:149] — `ModuleDisplay = module.Module == BmadModule.Unknown ? "Unknown (not detected)" : module.Commands.ModuleLabel`, rendered as the "Detected framework" row. This is the one surface that is **correct today** for a CIS-only repo (it prints "Creative Intelligence Suite" from `ModuleLabel`). Decision 2 flips such a repo to `Unknown` and therefore flips this row to "Unknown (not detected)" — strictly worse than today. It also means **ADR Open Question #3 is not genuinely open**: shipped code has already bound `Unknown` to "detection failed", so the `Unmodeled` rename is forced, not optional.
+Where the fixes landed:
 
-- [ ] [Review][Patch] **`ArtifactCoverage` is a fourth un-gated BMM-vocabulary surface, absent from both blast-radius tables — and Decisions 1/2 do not close it** [src/SpecScribe/ArtifactCoverage.cs:85-108] — `Specs` hardcodes PRD / Product Brief / Architecture / UX / Spec Kernel / Epics / Stories / Requirements, keyed off `ModuleContext.WellKnownDocs`, and is built from `sourceRelatives` alone with **no reference to `ModuleContext.Module`**. A TEA/CIS-only repo gets a dashboard panel asserting eight missing BMM families — the same "asserts a vocabulary the project does not use" defect the ADR is about — and because it never consults module identity, the identity fix does not reach it. Both tables present the blast radius as enumerated and closed by Decisions 1/2. Compounding: Task 1 subtask 1 is checked `[x]` claiming `ArtifactCoverage.cs` was read in full, and the story's own References flag it as a conflation hazard, yet it appears nowhere in the deliverable.
+| Finding | Fix |
+|---|---|
+| Ratify ADR 0015 | ADR `Status: Accepted`, ratified 2026-07-26; a new **Ratification** section closes all three open questions; index entry updated. |
+| `docs/adrs/README.md` data loss | ADR 0014's `.specscribe` parenthetical restored to its own entry and removed from the end of 0015's. |
+| No emission seam for the `Informational` diagnostic | New ADR **Decision 2d**: diagnostics sink on `Detect`, detect-once-per-run so `BuildNav` stops overwriting the diagnosed context, explicit cardinality, and a new `DiagnosticAnchorRoot.Repo`. Mirrored into 18-2's Task 3. |
+| `DiagnosticsTemplater` is the only live `Unknown` consumer | ADR **Decision 2a** + a three-state table; `Unknown` → a **new `Unmodeled` case**, recorded as *forced by shipped code*, not a naming preference. Extension point 7 added to §4. |
+| `ArtifactCoverage` is a fourth un-gated surface | Row added to Finding 3b's table; new ADR **Decision 5a** making it its own slice; extension point 9 added. |
+| AC #2 unmet for the four non-goals | §7's non-goal list rebuilt as a table with a category and drafted notice per non-goal — three `Skipped`, one explicitly **None** with the reason. Emission caveat added. |
+| "Command panels degrade correctly" falsified | Finding 3b's row rewritten (legend vs. suggestions); §7's command-generalization assessment given an explicit carve-out; ADR §2 table and Consequences corrected. |
+| Record contradicts itself about the ADR | Status trail added to §8; Change Log entry corrected; `sprint-status.yaml`'s "PROPOSED NOT WRITTEN" replaced with the ratified outcome. |
+| `git status` claim falsified by the File List | Debug Log correction added; the claim narrowed to the accurate one (**no `src/**`/`tests/**` change**, verified by diff against the File List) and the test-failure attribution re-grounded on it. |
+| Citation drift | ADR converted to symbol anchors + a stated citation policy; the wrong `epics.md:99` NFR8 ref replaced with a quoted anchor; the `epics.md:157` ref fixed in this story, in the ADR, in `sprint-status.yaml`, and in **18-2's actionable task**. |
+| ADR under-specifies its decisions (10 cases) | Decisions 1a–1d, 2a–2d, 3a–3c and 4a–4e added — reserved names, casing, minted/modeled collision, manifest∪disk, set semantics + collision rule, `IsPresent` OR-semantics, `Frameworks.Id` ≠ module code, deterministic ordering, parse-failure demotion. |
+| `None` vs unmodeled indistinguishable | ADR **Decision 2b** (`CommandCatalog.Empty` label emptied) and **2c** (gate on `Unmodeled` **and** a non-empty label, covering the third collapsed state); extension point 8; mirrored into 18-2's Task 3. |
+| Owner design call only in `sprint-status.yaml` | Folded into ADR **Decision 2c** and removed from the sprint comment, which now points at it. |
+| Empirical basis unreproducible | ADR gained an **Upstream evidence provenance** table (repos, paths, retrieval date) + an explicit unverifiability statement; Debug Log records the gap; 18-2 must re-fetch and pin a SHA. |
+| Scope test names a defunct 18.2 | Line 21 rewritten with the 18-2/18-5 split called out inline. |
+| Task 4 subtask 1 overclaimed | Downgraded `[x]` → `[~]` with the eight unclassified modules named and the reasoning stated. |
+| `IsModulePresent` described as available | §1's seam table corrected — it is **`private`**, so `IsPresent(code)` is new public surface; ADR §5 and Consequences updated to match. |
+| ADR §2 table drops the About-SDD row | Restored, with the note that its independence from `ChoosePrimary` is exactly what makes §3 self-contradictory. |
 
-- [ ] [Review][Patch] **AC #2 partially unmet — no `AdapterDiagnosticCategory` or drafted wording for ANY of the four declared non-goals** — AC #2 requires "deliberately-unsupported conventions are listed with rationale **and the non-fatal notice they will emit**"; Task 5 subtask 2 (marked `[x]`) requires naming the exact category and drafting the wording. §7 lists four non-goals (BMB scaffolding; CIS/TEA reference datasets; TEA test code/CI YAML; new authoring schema) with rationale but **no category and no wording for any**. The five-row notice table underneath covers only module-code situations, and `Skipped` — defined as "deliberately not ingested" — is spent on "additional installed module(s) not used for command suggestions" rather than on any declared non-goal.
+**Concurrency note — the outcome was convergence, not conflict.** `18-2-bmad-module-identity-foundation` moved
+to `in-progress` (dev-story started 2026-07-26, baseline `86b35c2`) **while this patch round was running**, and
+several of the fixes above are material to what that story builds. Its in-flight uncommitted code was inspected
+(read-only, per CLAUDE.md — nothing of that session's work was touched) and **it had already reached the same
+conclusions independently**:
 
-- [ ] [Review][Patch] **"Command panels — No — degrades correctly" is falsified** [src/SpecScribe/HowToReadTemplater.cs:195] — `AppendCommandLegend` gates on `commands.IsEmpty`, **not** on a `Command()` miss. A CIS/TEA/BMB repo has a *non-empty* catalog, so `how-to-read.html` (always rendered) emits "Slash commands like the ones captioned on story and epic pages come from your detected methodology, **{ModuleLabel}**" on a site with no story or epic pages. In the dual-install case it names the **losing** module while About-SDD says "BMad — Detected" — a third mutually-contradicting surface. This directly contradicts ADR §Consequences' "For a TEA or CIS repo the panels correctly vanish." (The `~40 call sites` figure itself checks out: 43 `.Command(` sites across exactly the six named files.)
+| Ratified decision | In-flight 18-2 code |
+|---|---|
+| `Unmodeled` as a **new** case, `Unknown` reserved for detection failure (Decision 2a) | `BmadModule { Unknown, BmadMethod, GameDevStudio, Unmodeled }` — with `Unknown` documented as "Detection failed … Carries no label" and `Unmodeled` citing *ADR 0015 Decision 2* |
+| `CommandCatalog.Empty` must stop carrying `"BMad"` (Decision 2b) | `Empty = new(string.Empty, …)`, plus a new `HasLabel` |
+| Gate the legend on a **modeled** primary, not `IsEmpty` (Decision 2c) | `AppendCommandLegend` now gates on `!module.IsModeled \|\| module.Commands.IsEmpty \|\| !module.Commands.HasLabel` |
+| `DiagnosticsTemplater` must not regress (Decision 2a) | `ModuleDisplay` now tests `Unknown \|\| !HasLabel` |
+| Repo-anchored diagnostics (Decision 2d) | `DiagnosticAnchorRoot { None, Source, Adr, Repo }` |
 
-- [ ] [Review][Patch] **The record contradicts itself about whether ADR 0015 exists** — §8's heading still reads "Architecture fork found — ADR **proposed, not written**" and the dev-story Change Log entry says "**proposed, not written** … flagged for owner decision", while the File List, the later Change Log entry, `docs/adrs/README.md` and the ADR file itself all say it was drafted and indexed. Worse, `sprint-status.yaml`'s 18-1 note still ends "ONE architecture fork found, **PROPOSED NOT WRITTEN** … awaiting owner decision" — so anyone reading the sprint board for 18-1's outcome will not learn a ratifiable ADR was authored under this key. CLAUDE.md requires these artifacts to move together.
+So the ADR ratified as `Accepted` describes what is actually being built, and 18-2's story file and sprint note
+now match both. The parts of this patch round that story has **not** yet reached — Decision 1's four guards,
+Decision 4's determinism rules, and Decision 5a (`ArtifactCoverage`) — are the ones to check at its review.
 
-- [ ] [Review][Patch] **The Debug Log and Change Log assert a `git status` verification the story's own File List falsifies** — "`git status` confirms the only file this story modified is the story file itself" and "(`git status` clean apart from this file)". The File List four lines later names **four** files including a new ADR, and the same Debug Log paragraph describes a concurrent session's uncommitted `HierarchyExplorer.cs`/`specscribe.css`/`specscribe.js` in that same tree. That clean-tree claim is also the sole basis for dismissing all three test failures as unattributable.
+- [x] [Review][Patch] **RESOLVED (owner, 2026-07-26): ratify ADR 0015.** The finding: ADR 0015 was `Proposed` with Open Question #1 unanswered, yet `18-2-bmad-module-identity-foundation` was already `ready-for-dev` scoped verbatim as "ADR 0015 (Proposed) Decisions 1/2/4" — *which is OQ#1's answer* — and its sprint note had adopted "first-class **unmodeled** identity", OQ#3's undecided rename. The ratification gate was decorative. **Owner decision: flip ADR 0015 to `Accepted` and close all three open questions.** OQ#1 → yes, Decisions 1/2/4 land in 18-2 as the prerequisite slice, Decision 3 (multi-valued `ModuleContext`) deferred to its own story. OQ#2 → yes as proposed, `ArtifactBundle.Module` stays singular and the set lives inside `ModuleContext`. OQ#3 → rename, **forced** by the `DiagnosticsTemplater.cs:149` finding below (shipped code has already bound `Unknown` to "detection failed"). 18-2 stays `ready-for-dev`. Update the ADR's Status line, its `docs/adrs/README.md` entry, and record the ratification date.
 
-- [ ] [Review][Patch] **Citation drift — the story is defensible (it pins `baseline_commit`); ADR 0015 is not, and it is the living, ratifiable document** [docs/adrs/0015-bmad-module-identity-open-world-and-multi-valued.md:219-231] — correct at `611097d`, wrong at HEAD: `SiteGenerator.cs:4270` → **4352** (and moving — a concurrent session has `SiteGenerator.cs` open right now; it measured 4321 mid-review), `SiteNav.cs:206-215` → **217-226**, `epics.md:157` → **173**, `AboutSddTemplater.cs:66-70` → **66-71** (truncates the closing `};`). Separately, **`epics.md:99` for NFR8 is wrong at *every* commit in the range** — NFR8 is at `:121` baseline and `:137` at HEAD; line 99 is blank at baseline — and it is labelled "**PRD** NFR8" while pointing into `epics.md`, the known-unresolved PRD-vs-epics NFR numbering collision. NFR8 is the requirement the entire "false presence, not honest absence" argument hangs on. The `epics.md:157` ref is propagated into an **actionable task**: `18-2-…-identity-foundation.md:204` says "Propose retiring `epics.md:157`'s note", which now points at an unrelated HTML comment. Prefer symbol/quote anchors over line numbers in the ADR, or pin its own baseline.
+- [x] [Review][Patch] **`docs/adrs/README.md` edit destroyed ADR 0014's index entry and grafted its description onto ADR 0015** [docs/adrs/README.md:25-26] — 0014 is now bare `— **Accepted**`, unique among all 15 entries; its full parenthetical (`extends ADR 0003's on-disk shape: .specscribe becomes a folder…`) is appended verbatim to the **end** of 0015's entry, so the index now tells a reader that ADR 0015 is about `.specscribe` config storage. Data loss plus an active misstatement in the one file whose job is orientation. The File List records it only as "(modified — ADR 0015 index entry)".
 
-- [ ] [Review][Patch] **ADR 0015 under-specifies its own decisions — ten unhandled boundary cases** [docs/adrs/0015-bmad-module-identity-open-world-and-multi-valued.md:115-160] — one editing pass covers all of them: (1) **Decision 1 has no reserved-name handling** — `Detect` excludes only `core` (`ModuleContext.cs:205,214`), yet this very repo's `_bmad/` contains `_config/`, `custom/` and `scripts/`; under "the directory name **is** the module code" any of them becomes a module the instant it carries a `module-help.csv`, and Decision 2 guarantees acceptance rather than rejection. (2) **Casing is unspecified and the code is already inconsistent** — manifest matching is `OrdinalIgnoreCase` (`:182,205,214`) but `IsModulePresent`'s `File.Exists` (`:185`) is case-sensitive on Linux, so `_bmad/BMM/` yields `IsMethodPresent == false` while `Detect`'s disk fallback still finds it. (3) **A BMB-minted code can collide with a modeled one** — nothing stops a custom module installing at `_bmad/gds/` and inheriting GDS's docs + glossary; the CSV's `module` label is available and would disambiguate. (4) **Manifest-vs-disk: which one *is* "the set"?** — the disk fallback fires only on zero manifest candidates (`:211-218`), so a manifest listing `bmm` alongside an installed `_bmad/tea/` never sees TEA, while `IsModulePresent` (OR semantics) reports it present. (5) **Decision 4 leaves BMM-vs-GDS undefined**, and the only existing tiebreak (`looksLikeGame`, `:268-282`) is unconditionally false on 3 of 5 `BuildNav` call sites, so a dual-install *game* repo silently falls to BMM on every incremental/watch rebuild. (6) **"manifest order" is only half the story** — on the fallback path candidate order comes from `Directory.EnumerateDirectories` (`:213`), i.e. filesystem order, platform-dependent. (7) **Parse-failure fallthrough demotes BMM by a path Decision 4 does not constrain** — `Detect` advances to the next candidate whenever `BuildContext` returns null (`:294-305, :341-344`) and emits no diagnostic. (8) **Decision 3 never states `Commands`/`Docs`/`Glossary` semantics for a set** (primary-only or merged) nor a **cross-module skill-id collision rule** — the story flags it as a bonus finding (CIS ships Core's `bmad-brainstorming`; BMM and GDS both define `create-story`) and the ADR drops it. (9) **`IsPresent(code)` over the set silently narrows `IsMethodPresent`** — the wrapper returns true on a manifest entry alone (`:182-184`) but the set requires `module-help.csv` on disk (`:206-207`), flipping a manifest-only BMM install to not-Detected on the surface Decision 3 calls "the only reason the About-SDD matrix is correct". (10) **`AboutSddTemplater.Frameworks.Id` is not the module code** — `"bmad"` vs `bmm` — an unreconciled second key that both `detected` switches use, and `RenderFrameworkPage`'s `Frameworks.First(f => f.Id == frameworkId)` (`:65`) throws rather than degrades.
+- [x] [Review][Patch] **Decision 2's `Informational` diagnostic has no emission seam — the NFR8 remedy depends on a channel that does not exist** [src/SpecScribe/ModuleContext.cs:194] — `Detect` takes no diagnostics sink and swallows everything in `catch { return None; }` (`:239-244`), unlike sibling ingest paths (`IngestSprint(options, diagnostics)`). Worse, detection runs **twice on two different paths**: `_module` is set from `bundle.Module` (adapter path, has diagnostics) and then **overwritten** by an adapter-free `ModuleContext.Detect` in `BuildNav` (`SiteGenerator.cs:4589`) — and 3 of `BuildNav`'s 5 call sites (`:486, :518, :950`) pass no diagnostics list. So the detection that actually feeds nav, glossary and `AbbreviationExpander` is not the one the bundle diagnosed. Also unstated: emission cardinality (per-module / per-run / per-watch-rebuild), and the `RelativePath` anchor root — the subject `_bmad/{code}/module-help.csv` is **repo**-root-relative while `AdapterDiagnostic.RelativePath` is contractually **source**-root-relative (`AdapterDiagnostic.cs:40-41`) and gets `DiagnosticAnchorRoot.Source`, so the webview Problems channel would resolve it to a nonexistent `_bmad-output/_bmad/cis/module-help.csv`. Neither the story's six "exact, verified" extension points nor the ADR's Consequences names any of this.
 
-- [ ] [Review][Patch] **`ModuleContext.None` and unmodeled-`Unknown` are indistinguishable at the exact surface 18-2 is changing** [src/SpecScribe/ModuleContext.cs:45,74] — `CommandCatalog.Empty` carries the sentinel label `"BMad"` and `None.Commands` **is** that instance. Story 18-2's owner-elicited acknowledgement — "This project uses the {label} module. SpecScribe doesn't publish a glossary for it yet." — keyed off `Module == Unknown` would render **"This project uses the BMad module"** on a repo with no `_bmad/` and no detection at all: a worse false claim than today's silent omission. A **third** state collapses into the same branch: a *modeled* module with a legitimately empty glossary (Decision 5 makes glossaries opt-in, and the spike says CIS/TEA/BMB publish no fixed-filename docs), because `AppendGlossary` gates only on `glossary.Count == 0`.
+- [x] [Review][Patch] **`DiagnosticsTemplater.cs:149` is the only live `BmadModule.Unknown` consumer — both documents miss it, and Decision 2 regresses it** [src/SpecScribe/DiagnosticsTemplater.cs:149] — `ModuleDisplay = module.Module == BmadModule.Unknown ? "Unknown (not detected)" : module.Commands.ModuleLabel`, rendered as the "Detected framework" row. This is the one surface that is **correct today** for a CIS-only repo (it prints "Creative Intelligence Suite" from `ModuleLabel`). Decision 2 flips such a repo to `Unknown` and therefore flips this row to "Unknown (not detected)" — strictly worse than today. It also means **ADR Open Question #3 is not genuinely open**: shipped code has already bound `Unknown` to "detection failed", so the `Unmodeled` rename is forced, not optional.
 
-- [ ] [Review][Patch] **An owner design call lives only in a `sprint-status.yaml` comment — the exact pattern CLAUDE.md's decision-records rule names** — the 18-2 entry carries "OWNER DESIGN CALL … the unmodeled state is NOT a silent omission — how-to-read renders a named acknowledgement where the glossary would be". ADR 0015 Decision 2 specifies only an empty glossary plus a build-time `Informational` diagnostic — a *rendered user-visible surface* decision is not in the decision record at all, and partly contradicts it. Fold it into Decision 2.
+- [x] [Review][Patch] **`ArtifactCoverage` is a fourth un-gated BMM-vocabulary surface, absent from both blast-radius tables — and Decisions 1/2 do not close it** [src/SpecScribe/ArtifactCoverage.cs:85-108] — `Specs` hardcodes PRD / Product Brief / Architecture / UX / Spec Kernel / Epics / Stories / Requirements, keyed off `ModuleContext.WellKnownDocs`, and is built from `sourceRelatives` alone with **no reference to `ModuleContext.Module`**. A TEA/CIS-only repo gets a dashboard panel asserting eight missing BMM families — the same "asserts a vocabulary the project does not use" defect the ADR is about — and because it never consults module identity, the identity fix does not reach it. Both tables present the blast radius as enumerated and closed by Decisions 1/2. Compounding: Task 1 subtask 1 is checked `[x]` claiming `ArtifactCoverage.cs` was read in full, and the story's own References flag it as a conflation hazard, yet it appears nowhere in the deliverable.
 
-- [ ] [Review][Patch] **The empirical basis is unreproducible while Decision 7 mandates pinning fixtures to it** — the probe was written to a session scratchpad and deleted; fixtures lived in OS temp; and **no** fetched `module-help.csv`/`module.yaml` bytes, source URLs, upstream commit SHAs or retrieval dates were retained anywhere in the repo. Every external load-bearing claim — CIS/TEA/BMB skill prefixes, CIS shipping `bmad-brainstorming`, TEA's `test_artifacts` key, CIS's bare `output_folder`, "BMGD is branding" — is unfalsifiable by a reviewer, and 18.2 must re-fetch from an ecosystem the story itself calls fast-moving. Record the repo URLs + retrieval date + commit SHAs so Decision 7 is actionable.
+- [x] [Review][Patch] **AC #2 partially unmet — no `AdapterDiagnosticCategory` or drafted wording for ANY of the four declared non-goals** — AC #2 requires "deliberately-unsupported conventions are listed with rationale **and the non-fatal notice they will emit**"; Task 5 subtask 2 (marked `[x]`) requires naming the exact category and drafting the wording. §7 lists four non-goals (BMB scaffolding; CIS/TEA reference datasets; TEA test code/CI YAML; new authoring schema) with rationale but **no category and no wording for any**. The five-row notice table underneath covers only module-code situations, and `Skipped` — defined as "deliberately not ingested" — is spent on "additional installed module(s) not used for command suggestions" rather than on any declared non-goal.
 
-- [ ] [Review][Patch] **The story's own scope test still describes an 18.2 that no longer exists** [18-1-bmad-module-landscape-and-coverage-spike.md:21] — line 21 reads "that is Story 18.2 (Priority BMad Module Baseline Coverage, **not yet created**…)" while the retroactively-updated Project Structure Notes (`:184-188`) record the split into `18-2-bmad-module-identity-foundation` (created, `ready-for-dev`) and `18-5-…`. The spec now disagrees with itself about what 18.2 is.
+- [x] [Review][Patch] **"Command panels — No — degrades correctly" is falsified** [src/SpecScribe/HowToReadTemplater.cs:195] — `AppendCommandLegend` gates on `commands.IsEmpty`, **not** on a `Command()` miss. A CIS/TEA/BMB repo has a *non-empty* catalog, so `how-to-read.html` (always rendered) emits "Slash commands like the ones captioned on story and epic pages come from your detected methodology, **{ModuleLabel}**" on a site with no story or epic pages. In the dual-install case it names the **losing** module while About-SDD says "BMad — Detected" — a third mutually-contradicting surface. This directly contradicts ADR §Consequences' "For a TEA or CIS repo the panels correctly vanish." (The `~40 call sites` figure itself checks out: 43 `.Command(` sites across exactly the six named files.)
 
-- [ ] [Review][Patch] **Task 4 subtask 1 is checked `[x]` while §5 explicitly declines the work it required** — the subtask covers "plus any additional module found in Task 2"; Task 2 found eight more (`bmad-loop`, `bmad-automator`, `bmad-manticore`, `bmad-method-ui`, `bmad-method-wds-expansion`, `bmad-utility-skills`, `bmad-module-template`, `bmad-plugins-marketplace`) and §5 states "These were **not** classified here." The omission is transparent and reasoned — annotate the subtask rather than claim it complete.
+- [x] [Review][Patch] **The record contradicts itself about whether ADR 0015 exists** — §8's heading still reads "Architecture fork found — ADR **proposed, not written**" and the dev-story Change Log entry says "**proposed, not written** … flagged for owner decision", while the File List, the later Change Log entry, `docs/adrs/README.md` and the ADR file itself all say it was drafted and indexed. Worse, `sprint-status.yaml`'s 18-1 note still ends "ONE architecture fork found, **PROPOSED NOT WRITTEN** … awaiting owner decision" — so anyone reading the sprint board for 18-1's outcome will not learn a ratifiable ADR was authored under this key. CLAUDE.md requires these artifacts to move together.
 
-- [ ] [Review][Patch] **`IsModulePresent` is described as an available generic API; it is `private`** [src/SpecScribe/ModuleContext.cs:174] — story §1 and ADR §5 both say "already takes an arbitrary code — only its two public wrappers are hardcoded", implying the wrappers are removable. Decision 3's `IsPresent(code)` is therefore **new public surface**, not the removal of a wrapper — a real (if small) difference in the cost the ADR presents as trivial.
+- [x] [Review][Patch] **The Debug Log and Change Log assert a `git status` verification the story's own File List falsifies** — "`git status` confirms the only file this story modified is the story file itself" and "(`git status` clean apart from this file)". The File List four lines later names **four** files including a new ADR, and the same Debug Log paragraph describes a concurrent session's uncommitted `HierarchyExplorer.cs`/`specscribe.css`/`specscribe.js` in that same tree. That clean-tree claim is also the sole basis for dismissing all three test failures as unattributable.
 
-- [ ] [Review][Patch] **ADR §2's blast-radius table drops the row its own headline finding rests on** [docs/adrs/0015-bmad-module-identity-open-world-and-multi-valued.md:56-61] — the story's table has five rows including "About-SDD 'Detected' badge — **Partly**"; the ADR's has four and omits it. That row is the mechanism behind §3's most severe claim ("`IsMethodPresent` still returns `True`, so the About-SDD page says Detected"), so the ratifiable document drops the evidence for its own worst finding.
+- [x] [Review][Patch] **Citation drift — the story is defensible (it pins `baseline_commit`); ADR 0015 is not, and it is the living, ratifiable document** [docs/adrs/0015-bmad-module-identity-open-world-and-multi-valued.md:219-231] — correct at `611097d`, wrong at HEAD: `SiteGenerator.cs:4270` → **4352** (and moving — a concurrent session has `SiteGenerator.cs` open right now; it measured 4321 mid-review), `SiteNav.cs:206-215` → **217-226**, `epics.md:157` → **173**, `AboutSddTemplater.cs:66-70` → **66-71** (truncates the closing `};`). Separately, **`epics.md:99` for NFR8 is wrong at *every* commit in the range** — NFR8 is at `:121` baseline and `:137` at HEAD; line 99 is blank at baseline — and it is labelled "**PRD** NFR8" while pointing into `epics.md`, the known-unresolved PRD-vs-epics NFR numbering collision. NFR8 is the requirement the entire "false presence, not honest absence" argument hangs on. The `epics.md:157` ref is propagated into an **actionable task**: `18-2-…-identity-foundation.md:204` says "Propose retiring `epics.md:157`'s note", which now points at an unrelated HTML comment. Prefer symbol/quote anchors over line numbers in the ADR, or pin its own baseline.
+
+- [x] [Review][Patch] **ADR 0015 under-specifies its own decisions — ten unhandled boundary cases** [docs/adrs/0015-bmad-module-identity-open-world-and-multi-valued.md:115-160] — one editing pass covers all of them: (1) **Decision 1 has no reserved-name handling** — `Detect` excludes only `core` (`ModuleContext.cs:205,214`), yet this very repo's `_bmad/` contains `_config/`, `custom/` and `scripts/`; under "the directory name **is** the module code" any of them becomes a module the instant it carries a `module-help.csv`, and Decision 2 guarantees acceptance rather than rejection. (2) **Casing is unspecified and the code is already inconsistent** — manifest matching is `OrdinalIgnoreCase` (`:182,205,214`) but `IsModulePresent`'s `File.Exists` (`:185`) is case-sensitive on Linux, so `_bmad/BMM/` yields `IsMethodPresent == false` while `Detect`'s disk fallback still finds it. (3) **A BMB-minted code can collide with a modeled one** — nothing stops a custom module installing at `_bmad/gds/` and inheriting GDS's docs + glossary; the CSV's `module` label is available and would disambiguate. (4) **Manifest-vs-disk: which one *is* "the set"?** — the disk fallback fires only on zero manifest candidates (`:211-218`), so a manifest listing `bmm` alongside an installed `_bmad/tea/` never sees TEA, while `IsModulePresent` (OR semantics) reports it present. (5) **Decision 4 leaves BMM-vs-GDS undefined**, and the only existing tiebreak (`looksLikeGame`, `:268-282`) is unconditionally false on 3 of 5 `BuildNav` call sites, so a dual-install *game* repo silently falls to BMM on every incremental/watch rebuild. (6) **"manifest order" is only half the story** — on the fallback path candidate order comes from `Directory.EnumerateDirectories` (`:213`), i.e. filesystem order, platform-dependent. (7) **Parse-failure fallthrough demotes BMM by a path Decision 4 does not constrain** — `Detect` advances to the next candidate whenever `BuildContext` returns null (`:294-305, :341-344`) and emits no diagnostic. (8) **Decision 3 never states `Commands`/`Docs`/`Glossary` semantics for a set** (primary-only or merged) nor a **cross-module skill-id collision rule** — the story flags it as a bonus finding (CIS ships Core's `bmad-brainstorming`; BMM and GDS both define `create-story`) and the ADR drops it. (9) **`IsPresent(code)` over the set silently narrows `IsMethodPresent`** — the wrapper returns true on a manifest entry alone (`:182-184`) but the set requires `module-help.csv` on disk (`:206-207`), flipping a manifest-only BMM install to not-Detected on the surface Decision 3 calls "the only reason the About-SDD matrix is correct". (10) **`AboutSddTemplater.Frameworks.Id` is not the module code** — `"bmad"` vs `bmm` — an unreconciled second key that both `detected` switches use, and `RenderFrameworkPage`'s `Frameworks.First(f => f.Id == frameworkId)` (`:65`) throws rather than degrades.
+
+- [x] [Review][Patch] **`ModuleContext.None` and unmodeled-`Unknown` are indistinguishable at the exact surface 18-2 is changing** [src/SpecScribe/ModuleContext.cs:45,74] — `CommandCatalog.Empty` carries the sentinel label `"BMad"` and `None.Commands` **is** that instance. Story 18-2's owner-elicited acknowledgement — "This project uses the {label} module. SpecScribe doesn't publish a glossary for it yet." — keyed off `Module == Unknown` would render **"This project uses the BMad module"** on a repo with no `_bmad/` and no detection at all: a worse false claim than today's silent omission. A **third** state collapses into the same branch: a *modeled* module with a legitimately empty glossary (Decision 5 makes glossaries opt-in, and the spike says CIS/TEA/BMB publish no fixed-filename docs), because `AppendGlossary` gates only on `glossary.Count == 0`.
+
+- [x] [Review][Patch] **An owner design call lives only in a `sprint-status.yaml` comment — the exact pattern CLAUDE.md's decision-records rule names** — the 18-2 entry carries "OWNER DESIGN CALL … the unmodeled state is NOT a silent omission — how-to-read renders a named acknowledgement where the glossary would be". ADR 0015 Decision 2 specifies only an empty glossary plus a build-time `Informational` diagnostic — a *rendered user-visible surface* decision is not in the decision record at all, and partly contradicts it. Fold it into Decision 2.
+
+- [x] [Review][Patch] **The empirical basis is unreproducible while Decision 7 mandates pinning fixtures to it** — the probe was written to a session scratchpad and deleted; fixtures lived in OS temp; and **no** fetched `module-help.csv`/`module.yaml` bytes, source URLs, upstream commit SHAs or retrieval dates were retained anywhere in the repo. Every external load-bearing claim — CIS/TEA/BMB skill prefixes, CIS shipping `bmad-brainstorming`, TEA's `test_artifacts` key, CIS's bare `output_folder`, "BMGD is branding" — is unfalsifiable by a reviewer, and 18.2 must re-fetch from an ecosystem the story itself calls fast-moving. Record the repo URLs + retrieval date + commit SHAs so Decision 7 is actionable.
+
+- [x] [Review][Patch] **The story's own scope test still describes an 18.2 that no longer exists** [18-1-bmad-module-landscape-and-coverage-spike.md:21] — line 21 reads "that is Story 18.2 (Priority BMad Module Baseline Coverage, **not yet created**…)" while the retroactively-updated Project Structure Notes (`:184-188`) record the split into `18-2-bmad-module-identity-foundation` (created, `ready-for-dev`) and `18-5-…`. The spec now disagrees with itself about what 18.2 is.
+
+- [x] [Review][Patch] **Task 4 subtask 1 is checked `[x]` while §5 explicitly declines the work it required** — the subtask covers "plus any additional module found in Task 2"; Task 2 found eight more (`bmad-loop`, `bmad-automator`, `bmad-manticore`, `bmad-method-ui`, `bmad-method-wds-expansion`, `bmad-utility-skills`, `bmad-module-template`, `bmad-plugins-marketplace`) and §5 states "These were **not** classified here." The omission is transparent and reasoned — annotate the subtask rather than claim it complete.
+
+- [x] [Review][Patch] **`IsModulePresent` is described as an available generic API; it is `private`** [src/SpecScribe/ModuleContext.cs:174] — story §1 and ADR §5 both say "already takes an arbitrary code — only its two public wrappers are hardcoded", implying the wrappers are removable. Decision 3's `IsPresent(code)` is therefore **new public surface**, not the removal of a wrapper — a real (if small) difference in the cost the ADR presents as trivial.
+
+- [x] [Review][Patch] **ADR §2's blast-radius table drops the row its own headline finding rests on** [docs/adrs/0015-bmad-module-identity-open-world-and-multi-valued.md:56-61] — the story's table has five rows including "About-SDD 'Detected' badge — **Partly**"; the ADR's has four and omits it. That row is the mechanism behind §3's most severe claim ("`IsMethodPresent` still returns `True`, so the About-SDD page says Detected"), so the ratifiable document drops the evidence for its own worst finding.
 
 - [x] [Review][Defer] **`epics.md` is absent from the File List though the Dev Notes assert the 18.2/18.5 split landed there** [_bmad-output/planning-artifacts/epics.md:3047-3142] — deferred, belongs to create-story 18.2's review. The split genuinely did land (verified), and attributing the edit to that session is defensible; but CLAUDE.md requires `epics.md` and `sprint-status.yaml` to move together, and a review scoped by this story's File List would never see it.
 
@@ -275,8 +336,26 @@ the session scratchpad (never in the repo; deleted after the run) referencing `s
 which constructed eight synthetic repo fixtures under the OS temp dir — each with a real
 `_bmad/_config/manifest.yaml` plus verbatim first rows of each module's **real** `module-help.csv` (fetched
 from the module repos) — and called `ModuleContext.Detect` / `IsMethodPresent` / `IsGdsPresent` on each.
-`git status` confirms the only file this story modified is the story file itself. The probe's raw output is
-reproduced in Finding 3 below.
+The probe's raw output is reproduced in Finding 3 below.
+
+> **Correction (2026-07-26).** This paragraph originally asserted that "`git status` confirms the only file this
+> story modified is the story file itself." That is **false as written** and the File List below contradicts it:
+> this story modified **four** files, including a new ADR, and the same paragraph goes on to describe a
+> concurrent session's uncommitted `HierarchyExplorer.cs` / `specscribe.css` / `specscribe.js` in the same tree.
+> The accurate claim — and the one actually load-bearing — is narrower: **this story modified no `src/**` or
+> `tests/**` file.** Verified on the merits rather than by a clean-tree assertion:
+> `git diff --stat {baseline} HEAD -- src tests` lists only sibling stories' files, none of them named in this
+> story's File List. The three test failures below are attributed to a concurrent session's uncommitted work on
+> that evidence, **not** on a clean-tree claim — which never held.
+
+**Probe reproducibility — a known gap.** The probe was written to a session scratchpad and deleted after the
+run; its fixtures lived in the OS temp dir; and **no** fetched `module-help.csv` / `module.yaml` bytes, source
+URLs, upstream commit SHAs or retrieval dates were retained in the repo. Every external load-bearing claim
+(module skill prefixes, CIS shipping Core's `bmad-brainstorming`, TEA's `test_artifacts` output key, CIS's bare
+`output_folder`, "BMGD is branding") is therefore **not independently falsifiable from this repo**, while ADR
+0015 Decision 7 mandates pinning test fixtures to exactly that content. The repositories and paths are now
+recorded in the ADR's **Upstream evidence provenance** table (retrieval date 2026-07-25); the downstream story
+must re-fetch from those, record the commit SHA it pins against, and commit the fixture bytes.
 
 **Regression run — 3 pre-existing failures, none attributable to this story.** `dotnet test` reported
 **2384 passed / 3 failed / 3 skipped (2390 total)**. This story changed **no** compiled code or assets (its only
@@ -329,7 +408,7 @@ Sharper than the story's description. The boundary is *inside* `BuildContext`, n
 | Layer | Mechanism | Generic? |
 |---|---|---|
 | Install discovery | `ReadInstalledModules` reads `_bmad/_config/manifest.yaml`; disk fallback scans `_bmad/*/module-help.csv` (`ModuleContext.cs:204-218`) | ✅ **Fully generic** — any module code works, `core` correctly excluded |
-| Presence checks | `IsModulePresent(repoRoot, code)` (`ModuleContext.cs:174-188`) | ✅ **Fully generic** — takes an arbitrary code; only the two public wrappers are hardcoded |
+| Presence checks | `IsModulePresent(repoRoot, code)` (`ModuleContext.IsModulePresent`) | ⚠️ **Generic in body, not reachable** — takes an arbitrary code, but is **`private`**. Only the hardcoded `IsMethodPresent`/`IsGdsPresent` wrappers are public, so a generic `IsPresent(code)` is **new public surface**, not a wrapper removal. *(Corrected 2026-07-26; the original row said "only its two public wrappers are hardcoded", which implied the wrappers were removable.)* Also case-sensitive on Linux (`File.Exists` on a constructed path) while manifest matching is `OrdinalIgnoreCase` — see ADR 0015 Decision 1b |
 | CSV parse → `byStep` + `ModuleLabel` | `BuildContext` rows 291-345 | ✅ **Generic** — `ModuleLabel` comes through correctly for CIS/TEA/BMB (probe-verified) |
 | **Module identification** | `BuildContext` **lines 346-348**: `prefix.StartsWith("gds") ? GameDevStudio : BmadMethod` | ❌ **Not generic — and not a graceful default.** A closed binary with no `Unknown` branch |
 | Docs / glossary | `DocsFor` / `GlossaryFor` switches (`ModuleContext.cs:118-123, 151-156`) | ❌ Hardcoded per enum case (as the story said) |
@@ -417,13 +496,15 @@ current two-case switch has worked so far. **`prefix` is a coincidence, not a co
 
 | Surface | Affected? | Why |
 |---|---|---|
-| Nav / quick-link **module docs** | **No** | `SiteNav.cs:206-215` skips any `ModuleDoc` with no filename match in the source tree. A CIS repo has no `prd.md`, so no phantom links. Self-limiting. |
-| **Command panels** ("Next Steps") | **No — degrades correctly** | Every `Command()` lookup misses → `null` → ~40 call sites omit the suggestion. Honest NFR8 absence. |
-| **Glossary** on `how-to-read.html` | **YES — unconditional** | `HowToReadTemplater.AppendGlossary` gates only on `glossary.Count == 0` (`:176`). BMM's 10 terms render for a module that publishes none of them. |
-| **Every rendered page** | **YES — unconditional** | `SiteGenerator.cs:4270` runs `AbbreviationExpander.Expand(html, _module.Glossary)`, wrapping FR/NFR/AC/ADR/PRD in `<abbr>` site-wide. |
-| About-SDD "Detected" badge | Partly | `IsMethodPresent`/`IsGdsPresent` are independent and correct — a CIS-only repo shows neither as Detected. Consistent. |
+| Nav / quick-link **module docs** | **No** | `SiteNav`'s `moduleDocs` loop skips any `ModuleDoc` with no filename match in the source tree. A CIS repo has no `prd.md`, so no phantom links. Self-limiting. |
+| **Command suggestions** ("Next Steps" captions) | **No — degrades correctly** | Every `Command()` lookup misses → `null` → the ~43 call sites omit the suggestion. Honest NFR8 absence. |
+| **Command legend** on `how-to-read.html` | **YES — unconditional** *(corrected 2026-07-26)* | `AppendCommandLegend` gates on `commands.IsEmpty`, **not** on a `Command()` miss. A CIS/TEA/BMB repo has a *non-empty* catalog, so the always-rendered `how-to-read.html` states that slash commands "come from your detected methodology, **{ModuleLabel}**" on a site with no story or epic pages — and in the dual-install case names the **losing** module while About-SDD says "BMad — Detected". The original row's "No — degrades correctly" was wrong: it reasoned from the suggestion call sites and missed the legend. |
+| **Glossary** on `how-to-read.html` | **YES — unconditional** | `AppendGlossary` gates only on `glossary.Count == 0`. BMM's 10 terms render for a module that publishes none of them. |
+| **Every rendered page** | **YES — unconditional** | `SiteGenerator` runs `AbbreviationExpander.Expand(html, _module.Glossary)`, wrapping FR/NFR/AC/ADR/PRD in `<abbr>` site-wide. |
+| Dashboard **artifact-coverage** panel | **YES — and not closed by the identity fix** *(added 2026-07-26)* | `ArtifactCoverage.Specs` hardcodes eight BMM families (PRD / Product Brief / Architecture / UX / Spec Kernel / Epics / Stories / Requirements) keyed off `ModuleContext.WellKnownDocs`, and is built from `sourceRelatives` alone with **no reference to `ModuleContext.Module` at all**. A TEA/CIS-only repo gets a panel asserting eight missing BMM families — the same defect — and because it never consults module identity, fixing identity does not reach it. Needs its own slice: ADR 0015 **Decision 5a**. |
+| About-SDD "Detected" badge | Partly | `IsMethodPresent`/`IsGdsPresent` are independent of `ChoosePrimary` and individually correct — a CIS-only repo shows neither as Detected. But that same independence is what makes Finding 3c self-contradictory: the badge says "BMad — Detected" while the primary is CIS. |
 
-So the defect is **narrower than "the portal lies everywhere"** but is a genuine NFR8 violation on the two
+So the defect is **narrower than "the portal lies everywhere"** but is a genuine NFR8 violation on the four
 surfaces that are not file-gated: SpecScribe asserts a vocabulary the project does not use.
 
 #### 3c. The dual-install regression (sharpest consequence)
@@ -465,7 +546,8 @@ defer wholly to whichever of 11.1-15.1 lands that decision first.
    containing directory name** (`Path.GetFileName(Path.GetDirectoryName(csvPath))`), which is already how
    `ChoosePrimary` and `IsModulePresent` identify modules and is the value that actually equals the module
    code (`bmm`/`gds`/`cis`/`tea`/`bmb`). **This one change is the fix for Finding 3.** An unrecognized code must
-   map to `BmadModule.Unknown` with an empty doc/glossary set, not fall through to `BmadMethod`.
+   map to a **new `BmadModule.Unmodeled`** case with an empty doc/glossary set, not fall through to
+   `BmadMethod` — and *not* to `Unknown` either; see extension point 7.
 3. `DocsFor` switch (`:118-123`) + a new `ModuleDoc[]` array — *only if* the module publishes well-known docs.
    CIS/TEA/BMB publish **none** with fixed filenames, so for all three this array is legitimately empty.
 4. `GlossaryFor` switch (`:151-156`) + a new `GlossaryTerm[]` array.
@@ -473,7 +555,31 @@ defer wholly to whichever of 11.1-15.1 lands that decision first.
 6. `AboutSddTemplater.Frameworks` (`:10-18`) + its `detected` switches (`:38-43`, `:66-70`) + `SiteNav` output
    paths + the `README.md:19-24` table — these are **per-module hardcoded rosters** the story did not list as
    extension points, but any new module needs a row in each. `AboutSddTemplater`'s `detected` switch takes only
-   two bools (`methodPresent`, `gdsPresent`) and its signature must widen.
+   two bools (`methodPresent`, `gdsPresent`) and its signature must widen. Note also that `Frameworks.Id` is
+   **not** the module code (`"bmad"` vs `bmm`) — an unreconciled second key — and `RenderFrameworkPage`'s
+   `Frameworks.First(f => f.Id == frameworkId)` **throws** on an unknown id rather than degrading.
+
+*Three further extension points, added 2026-07-26 — the original list of six missed them:*
+
+7. **`DiagnosticsTemplater`'s `ModuleDisplay`** — `module.Module == BmadModule.Unknown ? "Unknown (not
+   detected)" : module.Commands.ModuleLabel`, rendered as the diagnostics page's "Detected framework" row.
+   This is the **only live consumer of `BmadModule.Unknown`**, and it is the one surface that is already
+   **correct today** for a CIS-only repo: it prints "Creative Intelligence Suite" from `ModuleLabel`. Routing
+   unmodeled modules through `Unknown` would flip it to "Unknown (not detected)" — *strictly worse than
+   today*. This makes the `Unknown` → `Unmodeled` rename **forced rather than cosmetic**: shipped code has
+   already bound `Unknown` to "detection failed". (ADR 0015 Decision 2a; this is what closed its Open
+   Question #3.)
+8. **`CommandCatalog.Empty`'s sentinel label `"BMad"`**, and the fact that `ModuleContext.None` **is** that
+   instance. `None` and an unmodeled module are therefore **indistinguishable** at exactly the surface the
+   identity story changes: an acknowledgement keyed on module state alone would render *"This project uses the
+   BMad module"* on a repo with **no `_bmad/` and no detection at all** — a worse false claim than today's
+   silent omission. A *third* state collapses into the same branch: a
+   **modeled** module with a legitimately empty glossary, because `AppendGlossary` gates only on
+   `glossary.Count == 0`. The label must become empty and the gate must test `Unmodeled` **and** a non-empty
+   label. (ADR 0015 Decision 2b/2c.)
+9. **`ArtifactCoverage.Specs`** — the eight hardcoded BMM families. Not an identity extension point at all:
+   it never reads `ModuleContext.Module`, so Finding 3's fix does not reach it. It needs its own slice
+   (ADR 0015 Decision 5a). See the added row in Finding 3b's table.
 
 **`ChoosePrimary` (Task 3, third subtask):** it needs more than "a third branch." Its current contract —
 return exactly one winner — is the thing that breaks (Finding 3c). Minimum viable fix for 18.2: make
@@ -590,32 +696,50 @@ concrete output filenames therefore remain the largest unverified area of this m
 - **Per-module output-path config** — reading `_bmad/{code}/config.yaml` for keys like `test_artifacts`.
 - **Multi-module `ModuleContext`** — see the ADR proposal in §8.
 
-**Explicit non-goals with rationale:**
-- BMB-generated scaffolding (`module.yaml`, `SKILL.md`, `customize.toml`, workflow steps) — tool internals, not
-  project artifacts.
-- CIS/TEA reference datasets (`design-methods.csv`, `innovation-frameworks.csv`, `solving-methods.csv`,
-  `story-types.csv`, `tea-index.csv`) — ship with the skills, not project output.
-- TEA-generated test code, CI YAML, framework scaffolds — executable output; the repo's own code surfaces
-  already cover source files.
-- Any new authoring schema — unchanged project rule.
+**Explicit non-goals — with rationale, category and drafted notice** *(the category/wording columns were added
+2026-07-26; the original list carried rationale only, which left AC #2's "and the non-fatal notice they will
+emit" clause unmet for every declared non-goal).*
 
-**Non-fatal notices, mapped onto the five-value vocabulary** (no sixth invented), drafted in the tone of
-`BmadArtifactAdapter.cs:170-188, 219-224, 262-276`:
+AC #2 asks for the notice a deliberately-unsupported convention **will emit**. Three of the four below are
+`Skipped` — the category defined as "the artifact was deliberately not ingested", which is precisely what a
+declared non-goal is. The fourth emits nothing, and that is stated rather than left implicit.
+
+| Non-goal | Rationale | Category | Drafted notice |
+|---|---|---|---|
+| BMB-generated scaffolding — `module.yaml`, `SKILL.md`, `customize.toml`, workflow step files | Tool internals, not project artifacts. BMB's output *is* another module's source. | `Skipped` | `"'{path}' is BMad Builder module scaffolding, not a project artifact; SpecScribe does not render module sources."` |
+| CIS/TEA reference datasets — `design-methods.csv`, `innovation-frameworks.csv`, `solving-methods.csv`, `story-types.csv`, `tea-index.csv` | Ship *with the skills* under `.claude/skills/`, not as project output. Rendering them would surface tool internals as project content. | `Skipped` | `"'{path}' is a module reference dataset shipped with the skill, not project output; not ingested."` |
+| TEA-generated test code, CI YAML, framework scaffolds | Executable output; the repo's own code surfaces already cover source files. | `Skipped` | `"'{path}' is generated test/CI output; source files are covered by the code surfaces instead."` |
+| Any new authoring schema | Unchanged project rule — SpecScribe reads each module's own conventions as-is. | **None** | Emits nothing by design. There is no artifact to categorize: this non-goal forecloses a *request* SpecScribe will not make of users, not a file it will decline to read. Recording "no notice, and why" is the honest answer to AC #2 here. |
+
+> **Emission caveat carried into 18.5.** All three `Skipped` notices are per-file and fire only if such a file
+> falls inside the scanned source root. BMB scaffolding and skill-shipped datasets normally live under
+> `_bmad/` or `.claude/skills/`, *outside* it — so in the common case these notices are latent. That is correct
+> (nothing was skipped, because nothing was seen) but it means the notices cannot be relied on as the user's
+> only signal, and they must not be emitted speculatively for files that were never encountered.
+
+**Notices for module-code situations, mapped onto the same five-value vocabulary** (no sixth invented), drafted
+in the tone of `BmadArtifactAdapter`'s existing diagnostic messages:
 
 | Situation | Category | Drafted message |
 |---|---|---|
 | A `_bmad/{code}/module-help.csv` parses but `{code}` is not a module SpecScribe models | `Informational` | `"Detected BMad module '{code}' ({label}); SpecScribe has no module-specific docs or glossary for it, so those sections are omitted."` |
+| A modeled code whose CSV `module` label contradicts it (e.g. a minted module installed at `_bmad/gds/`) | `Unsupported` | `"_bmad/{code}/ declares module label '{label}', which does not match the '{expected}' module SpecScribe models for that code; treating it as an unmodeled module."` |
 | Module CSV present but no usable `skill` column | `Unsupported` | `"module-help.csv has no 'skill' column; command suggestions for this module are omitted."` |
 | Module CSV unreadable / parse exception | `Malformed` | `"Could not read module-help.csv: {message}"` |
-| >1 non-GDS module installed; one chosen as primary | `Skipped` | `"{n} additional installed module(s) not used for command suggestions in favor of '{code}'."` |
-| `_bmad/` unreadable (permissions/IO) | `Error` | *(existing behavior — `Detect` swallows to `None`; 18.2 should surface it instead of silently degrading)* |
+| >1 module installed; one chosen as primary | `Skipped` | `"{n} additional installed module(s) not used for command suggestions in favor of '{code}'."` |
+| `_bmad/` unreadable (permissions/IO) | `Error` | *(existing behavior — `Detect` swallows to `None`; the identity story should surface it instead of silently degrading)* |
 
 The `Informational` row is the important one: it is exactly what turns Finding 3 from a silent lie into honest
-absence, and it uses the category `AdapterDiagnostic.cs:26-31` was written for.
+absence, and it uses the category `AdapterDiagnosticCategory.Informational` was written for. **But the emission
+seam for it does not exist** — `Detect` takes no diagnostics sink, detection runs twice on two different paths,
+and the subject path is repo-root-relative while `AdapterDiagnostic.RelativePath` is contractually
+source-root-relative. ADR 0015 Decision 2d specifies the plumbing; it is a prerequisite, not a detail.
 
-**Command-generalization assessment (AC #2, second clause).** The quoted note lives at
-`epics.md:157` (Additional Requirements): *"current next-step command mapping is strongly GDS-oriented and
-requires generalization."* **That note is now stale and should be retired.** The *mechanism* was generalized when
+**Command-generalization assessment (AC #2, second clause).** The quoted note lives in `epics.md`'s Additional
+Requirements — search the phrase *"strongly GDS-oriented"* (line 173 as of 2026-07-26; it was cited as `:157`
+against baseline `611097d` and has since moved, so prefer the quote anchor): *"current next-step command
+mapping is strongly GDS-oriented and requires generalization."* **That note is now stale and should be
+retired.** The *mechanism* was generalized when
 `CommandCatalog`/`BuildContext` became CSV-driven: `ModuleContext.cs:329-338` strips the prefix and keys on the
 step remainder, so `/bmad-create-story` and `/gds-create-story` both resolve `create-story` with zero
 module-specific code, and `Command()` returning `null` makes ~40 call sites omit cleanly. The residue is
@@ -625,15 +749,31 @@ hardcode a **step vocabulary** — `create-story`, `dev-story`, `code-review`, `
 `retrospective`, `correct-course`, `quick-dev`, `create-epics-and-stories`,
 `check-implementation-readiness` — which is the BMM∩GDS planning vocabulary. CIS/TEA/BMB share **none** of it.
 
-**Assessment: no generalization work is required for Epic 18.** Those call sites live on surfaces
-(sprint board, epics, story pages) that only exist when there *are* epics/stories — which only BMM and GDS
-produce. For a TEA/CIS repo the panels correctly vanish. Recommend **replacing** `epics.md:157`'s note with the
-accurate residual statement rather than carrying a stale "GDS-oriented" claim forward. **Agreed scope boundary
-for 18.2: command generalization is explicitly OUT.**
+**Assessment: no generalization work is required for Epic 18 — with one carve-out.** Those call sites live on
+surfaces (sprint board, epics, story pages) that only exist when there *are* epics/stories, which only BMM and
+GDS produce, so for a TEA/CIS repo the **suggestion captions** correctly vanish.
+
+> **Carve-out, corrected 2026-07-26.** This originally read "the panels correctly vanish", full stop. That is
+> **false for the command legend on `how-to-read.html`**, which always renders and gates on `commands.IsEmpty`
+> rather than on a `Command()` miss — so a CIS/TEA/BMB repo *does* get a panel naming its module as the source
+> of slash commands that appear nowhere on the site. That is not a *generalization* problem (the mechanism is
+> already module-neutral); it is an identity/gating problem, and it is handled by ADR 0015 Decision 2c, which
+> gates both `AppendGlossary` and `AppendCommandLegend` on a **modeled** primary. Scope boundary unchanged.
+
+Recommend **replacing** the `epics.md` "strongly GDS-oriented" note with the accurate residual statement rather
+than carrying a stale claim forward. **Agreed scope boundary: command vocabulary generalization is explicitly
+OUT of the identity and coverage stories.**
 
 ---
 
-### 8. Architecture fork found — ADR proposed, not written (Tasks 3, 6)
+### 8. Architecture fork found — ADR 0015, drafted and now ratified (Tasks 3, 6)
+
+> **Status trail, so this section stops contradicting itself.** The spike itself concluded a fork existed and
+> *proposed* an ADR without writing one (that was the state this heading originally described). The owner then
+> asked for the draft on **2026-07-25**, and it landed as
+> [`docs/adrs/0015-…`](../../docs/adrs/0015-bmad-module-identity-open-world-and-multi-valued.md) with
+> `Status: Proposed`. It was **ratified `Accepted` on 2026-07-26** with all three open questions closed.
+> The "proposed, not written" phrasing below and in the Change Log describes the spike's own output only.
 
 Per this project's ADR-creation-trigger discipline, a genuine fork surfaced. It is **distinct from** the
 adapter-registry question owned by 11.1-15.1, so proposing it does not duplicate or compete with theirs.
@@ -650,15 +790,29 @@ adapter-registry question owned by 11.1-15.1, so proposing it does not duplicate
 > **Consequence.** Touches a cross-cutting contract (`ArtifactBundle.Module`), which is why it warrants an ADR
 > rather than an owner-locked story note.
 
-**Now drafted, at the owner's explicit request (2026-07-25), as
-[`docs/adrs/0015-bmad-module-identity-open-world-and-multi-valued.md`](../../docs/adrs/0015-bmad-module-identity-open-world-and-multi-valued.md)
-— `Status: Proposed`, awaiting ratification.** The spike itself did not author it; the owner asked for the draft
-after reviewing these findings. It carries seven decisions (identify by module **code**; first-class `Unknown`
-with an `Informational` diagnostic; multi-valued `ModuleContext`; BMM/GDS never demoted by a manifest-order tie;
-per-module coverage stays an explicit act; Epic 18 extends rather than registers; detection fixtures pinned to
-real module CSVs), an explicit non-goal that it must **not** become a sixth competing registry proposal, and
-three open questions for ratification — chiefly whether Decisions 1/2/4 land in 18.2 as a prerequisite slice
-with Decision 3 (the multi-valued contract change) deferred to its own story. The spike recommends that split.
+**Drafted at the owner's explicit request (2026-07-25) as
+[`docs/adrs/0015-bmad-module-identity-open-world-and-multi-valued.md`](../../docs/adrs/0015-bmad-module-identity-open-world-and-multi-valued.md),
+and ratified `Accepted` on 2026-07-26.** The spike itself did not author it; the owner asked for the draft after
+reviewing these findings. It carries seven decisions (identify by module **code**; a first-class **`Unmodeled`**
+state with an `Informational` diagnostic; multi-valued `ModuleContext`; BMM/GDS never demoted by a
+manifest-order tie; per-module coverage — including `ArtifactCoverage`'s family set — stays an explicit act;
+Epic 18 extends rather than registers; detection fixtures pinned to real module CSVs), and an explicit non-goal
+that it must **not** become a sixth competing registry proposal.
+
+**Ratification outcome (2026-07-26)** — all three open questions closed:
+
+1. **Scope split — yes.** Decisions 1/2/4 land in `18-2-bmad-module-identity-foundation` as the prerequisite
+   slice; Decision 3 (the multi-valued contract change) defers to its own story; Decision 5a
+   (`ArtifactCoverage`) is sequenced after the identity slice. 18-2 stays `ready-for-dev`.
+2. **`ArtifactBundle.Module` stays singular** — the set lives inside `ModuleContext`.
+3. **`Unknown` is renamed — as a new `Unmodeled` case, with `Unknown` retained for genuine detection failure.**
+   This was **not** a discretionary naming call: `DiagnosticsTemplater` has already bound `Unknown` to
+   "Unknown (not detected)", so reusing it would regress the one surface that is correct today. See extension
+   point 7 above.
+
+The ADR also grew, at ratification, the boundary-case handling its draft left open — reserved `_bmad/` child
+names, module-code casing, minted-vs-modeled code collisions, manifest-vs-disk set semantics, deterministic
+primary ordering, parse-failure demotion, and the diagnostic emission seam (Decision 2d).
 
 ### File List
 
@@ -668,11 +822,35 @@ its deliverable is the coverage map in Completion Notes above._
 - `_bmad-output/implementation-artifacts/18-1-bmad-module-landscape-and-coverage-spike.md` (modified)
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` (modified — 18-1 → `review`, plus `last_updated`)
 - `docs/adrs/0015-bmad-module-identity-open-world-and-multi-valued.md` (**added**) — drafted at the owner's
-  explicit request after the spike completed, per §8. `Status: Proposed`; not ratified.
-- `docs/adrs/README.md` (modified — ADR 0015 index entry)
+  explicit request after the spike completed, per §8. Ratified `Status: Accepted` 2026-07-26 in the review-patch
+  round.
+- `docs/adrs/README.md` (modified — ADR 0015 index entry **and**, in the 2026-07-26 patch round, repair of
+  ADR 0014's entry, which the original edit had blanked)
+- `_bmad-output/implementation-artifacts/18-2-bmad-module-identity-foundation.md` (modified — 2026-07-26 patch
+  round only: ADR status references, and a stale `epics.md:157` line reference inside an actionable task)
 
 ## Change Log
 
+- 2026-07-26 — **Code-review findings applied** (`/bmad-code-review 18.1`, patch round). All 17 open
+  `[Review][Patch]` items closed; the one `[Review][Defer]` item stays deferred to create-story 18.2's review.
+  **ADR 0015 ratified `Accepted`** with all three open questions closed (Decisions 1/2/4 → 18-2 as the
+  prerequisite slice; `ArtifactBundle.Module` stays singular; `Unknown` → a new **`Unmodeled`** case, forced by
+  `DiagnosticsTemplater`'s existing "Unknown (not detected)" binding). **`docs/adrs/README.md` repaired** — the
+  earlier edit had blanked ADR 0014's index entry and grafted its `.specscribe` description onto ADR 0015's.
+  Substantive corrections to the deliverable, not just bookkeeping: the "command panels degrade correctly" row
+  in Finding 3b was **falsified** (the always-rendered command *legend* gates on `commands.IsEmpty`, not on a
+  `Command()` miss) and rewritten; **`ArtifactCoverage` added as a fourth un-gated BMM-vocabulary surface**
+  that the identity fix does *not* reach, with its own ADR decision (5a); three extension points added
+  (`DiagnosticsTemplater`'s sole `Unknown` consumer, `CommandCatalog.Empty`'s `"BMad"` sentinel colliding
+  `None` with the unmodeled state, `ArtifactCoverage.Specs`); AC #2's missing **category + drafted wording for
+  every declared non-goal** supplied; the `Informational` diagnostic's **missing emission seam** specified (no
+  diagnostics sink on `Detect`, detection running twice with the un-diagnosed path winning, repo-vs-source
+  anchor-root mismatch); ten under-specified ADR boundary cases resolved; the owner's rendered-acknowledgement
+  design call folded out of a `sprint-status.yaml` comment and into ADR Decision 2c; upstream evidence
+  provenance recorded so Decision 7 is actionable; ADR citations converted to **symbol anchors** after line
+  drift was confirmed inside `ModuleContext.cs` and `SiteGenerator.cs`, and the wrong `NFR8` line reference
+  replaced with a quote anchor; and two overclaims retracted — the Debug Log's `git status`-clean assertion and
+  Task 4 subtask 1's `[x]`.
 - 2026-07-25 — **ADR 0015 drafted at owner request** (post-completion follow-up, not spike scope):
   `docs/adrs/0015-bmad-module-identity-open-world-and-multi-valued.md`, `Status: Proposed`, plus its
   `docs/adrs/README.md` index entry. Formalizes §8's proposal. Still **no** `src/`/`tests/` changes. Explicit
@@ -680,8 +858,9 @@ its deliverable is the coverage map in Completion Notes above._
   stays with Epics 11-15, and per its Decision 6 Epic 18 does not need it. Three open questions left for
   ratification, chiefly the recommended scope split (Decisions 1/2/4 as an 18.2 prerequisite slice; Decision 3,
   the multi-valued `ModuleContext` contract change, deferred to its own story).
-- 2026-07-25 — Story 18.1 executed (dev-story) → `review`. Spike only; **no `src/`/`tests/` changes** (`git status`
-  clean apart from this file). Coverage map written to Completion Notes. Headline outcome: the central deliverable
+- 2026-07-25 — Story 18.1 executed (dev-story) → `review`. Spike only; **no `src/`/`tests/` changes** (verified by
+  `git diff --stat {baseline} HEAD -- src tests` against this story's File List, *not* by a clean-tree claim — the
+  tree was not clean; see the Debug Log correction of 2026-07-26). Coverage map written to Completion Notes. Headline outcome: the central deliverable
   turned out **not** to be an artifact-coverage table but a live module-**identity** defect —
   `ModuleContext.BuildContext:346-348` infers the module from the *skill prefix*, and every first-party BMad module
   except GDS prefixes its skills `bmad-`, so CIS/TEA/BMB (and any BMB-generated custom module) are silently
@@ -702,7 +881,7 @@ its deliverable is the coverage map in Completion Notes above._
   table. Two gaps recorded for 18.2: TEA writes to a `test_artifacts` config key SpecScribe never reads (it reads
   no module `config.yaml` at all), and `epics.md:157`'s "strongly GDS-oriented … requires generalization" note is
   now **stale** — the mechanism was generalized when `CommandCatalog` became CSV-driven, so command generalization
-  is explicitly OUT of 18.2's scope. One genuine architecture fork found and **proposed, not written** (ADR:
-  "BMad module identity is open-world and multi-valued") — distinct from 11.1-15.1's registry question, flagged
-  for owner decision.
+  is explicitly OUT of 18.2's scope. One genuine architecture fork found — distinct from 11.1-15.1's registry
+  question. **The spike proposed it without writing it and flagged it for owner decision; the owner then
+  requested the draft the same day (see the entry above) and it was ratified as ADR 0015 on 2026-07-26.**
 - 2026-07-21 — Story 18.1 drafted (create-story). Ultimate context engine analysis completed — comprehensive developer guide created. Spike-only: coverage map of BMad's own module ecosystem (BMad Builder, Test Architect, Creative Intelligence Suite) beyond the already-supported BMad Method/GDS, an explicit extend-vs-registry architectural finding (likely differs from the third-party spikes' assumption), a command-generalization assessment, and an 18.2 scope recommendation; no production code. First story of Epic 18 (BMad-native module exploration), distinct from the third-party-framework Epics 11-15; moves Epic 18 from `backlog` to `in-progress`.
