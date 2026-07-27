@@ -495,6 +495,22 @@ body {
 .related-card-more:hover { text-decoration: underline; }
 .related-card-more:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
 
+/* Story 20.8 D2 — the rest of the story's status-gated command set, behind a COLLAPSED native <details>, and its
+   open deferred children by name. Both are in flow rather than in a .cmd-menu popout: that popout is
+   `position:absolute; min-width:22rem`, wider than this rail's own minmax(240px,320px) column.
+   Deliberately NO [data-related-ready] hide rule to match .related-card-full's below — the relationship block is
+   hidden with JS on because the "View details" link carries the reader to the same content, but nothing else on
+   this page carries these commands, so hiding them would lose information rather than de-duplicate it. */
+.related-card-commands { margin: 0 0 0.5rem; font-size: 0.82rem; }
+.related-card-commands > summary { cursor: pointer; color: var(--ink-light); font-weight: 600; }
+.related-card-commands > summary:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
+.related-cmd-list { list-style: none; margin: 0.35rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.45rem; }
+/* Column, so a badge sizes to its command text instead of stretching the 320px rail (the .cmd-menu-list rule's
+   own reason, applied to the narrower container). */
+.related-cmd-list li { display: flex; flex-direction: column; align-items: flex-start; gap: 0.15rem; }
+.related-cmd-desc { font-size: 0.74rem; color: var(--ink-faded); }
+.related-card-children { margin: 0 0 0.5rem; }
+
 /* The relationship groups — the JS-off relationship block (AC #2 / NFR8). A native <details>. */
 .related-card-full { margin: 0.5rem 0 0; font-size: 0.82rem; }
 .related-card-full > summary { cursor: pointer; color: var(--ink-light); font-weight: 600; }
@@ -7330,4 +7346,124 @@ a.deferred-item-resolving:hover { color: var(--rust); }
 .sdd-commands code {
   font-weight: 600;
   color: var(--teal-deep);
+}
+
+/* ====================== FORGED IDEAS (Story 18.4) ======================
+   Two surfaces: the grouped ideas.html list and each idea's ideas/{slug}.html detail page. The list reuses the
+   shared ListRow grammar wholesale, so only the section chrome around it is new. Every verdict carries its WORD
+   (StatusStyles.FreeTextBadge) and its left accent bar (--status-* via .list-row-accent-*) — colour is never the
+   signal, only the reinforcement (UX-DR17). No rule here depends on JS. */
+.ideas-intro {
+  max-width: 62ch;
+  color: var(--ink-light);
+  margin-bottom: 2rem;
+}
+
+.ideas-section { margin: 0 0 2.5rem; }
+
+.ideas-section-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 0.65rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.4rem;
+  margin-bottom: 0.9rem;
+}
+
+/* The per-section count is a plain pill, not a badge: it counts, it does not classify. */
+.ideas-section-count {
+  font-size: 0.68rem;
+  color: var(--ink-faded);
+}
+
+/* Fallback vocabulary for the two verdict words that are not sprint-lifecycle words, so FreeTextBadge's slugged
+   degradation still reads as a deliberate state rather than an unstyled default. `clarified` shares the settled
+   moss tone at reduced weight — it is complete, just not a hand-off. */
+.pill.status-hardened { border-color: var(--moss-light); color: var(--moss); }
+.pill.status-clarified { border-color: var(--teal); color: var(--teal-deep); }
+.pill.status-killed { border-color: var(--border); color: var(--ink-light); text-decoration: line-through; }
+
+.idea-outcome {
+  max-width: 66ch;
+  border-left: 3px solid var(--border);
+  padding-left: 0.9rem;
+  color: var(--ink);
+}
+
+.idea-downstream-list {
+  list-style: disc;
+  padding-left: 1.4rem;
+  margin: 0.4rem 0 1.5rem;
+}
+
+.idea-handoff {
+  background: var(--parchment);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.9rem 1.2rem;
+  margin-bottom: 1.5rem;
+}
+
+.idea-handoff > :first-child { margin-top: 0; }
+.idea-handoff > :last-child { margin-bottom: 0; }
+
+/* The chronology is the memlog verbatim, in order. It is an <ol> because the ORDER is the meaning — the log is
+   append-only and its sequence is the record of how the thinking moved. */
+.idea-chronology {
+  list-style: none;
+  padding: 0;
+  margin: 0.4rem 0 1.5rem;
+  counter-reset: idea-entry;
+}
+
+.idea-entry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.55rem;
+  padding: 0.45rem 0 0.45rem 0.85rem;
+  border-left: 3px solid var(--border);
+  line-height: 1.55;
+}
+
+.idea-entry + .idea-entry { border-top: 1px solid var(--border); }
+
+/* The kind is spelled out; the tint only reinforces a label that is already a word. */
+.idea-entry-type {
+  font-family: 'Courier New', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-faded);
+  flex: 0 0 auto;
+}
+
+.idea-entry-text { flex: 1 1 18rem; }
+
+.idea-entry-lock { border-left-color: var(--status-done); }
+.idea-entry-lock .idea-entry-type { color: var(--moss); }
+.idea-entry-decision { border-left-color: var(--status-review); }
+.idea-entry-decision .idea-entry-type { color: var(--teal-deep); }
+.idea-entry-kill { border-left-color: var(--status-deferred); }
+.idea-entry-kill .idea-entry-type { color: var(--rust); }
+.idea-entry-crack { border-left-color: var(--status-ready); }
+.idea-entry-crack .idea-entry-type { color: var(--gold); }
+
+.idea-chronology-empty { color: var(--ink-light); }
+
+/* The carried report is a foreign document with its own chrome and no way back into the portal — say so beside
+   the link rather than letting a reader discover it by getting stranded. */
+.idea-report-note {
+  max-width: 62ch;
+  color: var(--ink-light);
+  font-size: 0.92rem;
+}
+
+.idea-report-link { margin: 0.6rem 0 1.5rem; }
+
+/* A hand-off link whose target produced no page: the author's words survive, the dead affordance does not. */
+.idea-link-unresolved {
+  text-decoration: underline dotted var(--border);
+  text-underline-offset: 2px;
+  color: var(--ink-light);
 }

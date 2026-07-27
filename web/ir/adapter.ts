@@ -93,7 +93,39 @@ interface RawManifest {
 
 // ── Loading ──────────────────────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Package-build mode: build the RENDERER, bind it to no project. [Story 23.5 AC #4/#5]
+ *
+ * `nuxt.config.ts` imports this module at CONFIG-LOAD time to compute `nitro.prerender.routes`, which is
+ * the one genuine build-time coupling between the artefact and a specific project — the render path itself
+ * reads `IR_DIR` at module scope and is runtime-resolvable (verified in the built bundle, not inferred).
+ * Without this flag the coupling has two costs that Story 23.5 measured:
+ *
+ *   · the artefact CANNOT BE BUILT AT ALL without an IR present, so a release pipeline would have to
+ *     generate somebody's portal first just to produce a project-independent renderer; and
+ *   · `nuxt build` prerenders the declared routes, so `.output/public` ships 1,060 of project A's baked
+ *     HTML pages (68.0 MB) — and Nitro serves those static files AHEAD of the SSR route, so a prebuilt
+ *     artefact pointed at project B silently returned project A's dashboard for `/index.html`. That is a
+ *     WRONG ANSWER WITH A 200, which is the failure mode worth engineering against.
+ *
+ * With `SPECSCRIBE_PACKAGE_BUILD=1` the manifest is stubbed empty, the prerender route table collapses to
+ * nothing, and the build emits the renderer plus its static assets and no project's pages. Nothing else in
+ * this module changes: at SERVER RUNTIME the flag is absent, so the real IR loads from `SPECSCRIBE_IR_DIR`
+ * exactly as it always has.
+ */
+export const PACKAGE_BUILD = process.env.SPECSCRIBE_PACKAGE_BUILD === '1'
+
+/** The empty manifest a package build renders against. Schema-current so the version check stays quiet. */
+const EMPTY_MANIFEST: RawManifest = {
+  schemaVersion: EXPECTED_SCHEMA_VERSION,
+  siteTitle: '',
+  entry: '',
+  nav: [],
+  pages: {},
+}
+
 function loadManifest(): RawManifest {
+  if (PACKAGE_BUILD) return EMPTY_MANIFEST
   const file = join(IR_DIR, 'spa', 'manifest.json')
   let text: string
   try {
@@ -104,7 +136,8 @@ function loadManifest(): RawManifest {
       throw new Error(
         `IR not found at ${file}.\n` +
           `Generate it first:  dotnet run --project src/SpecScribe -- generate --spa\n` +
-          `Or point SPECSCRIBE_IR_DIR at an output root that already has one.`,
+          `Or point SPECSCRIBE_IR_DIR at an output root that already has one.\n` +
+          `To build the project-independent RENDERER instead, set SPECSCRIBE_PACKAGE_BUILD=1.`,
       )
     }
     throw err

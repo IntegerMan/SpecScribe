@@ -39,7 +39,8 @@ public static class RelatedWorkTemplater
 
         RenderProjectCard(sb, model.Project);
 
-        // Scope cards (epics + the orphan/unplanned roots) render flat; STORY cards go behind one disclosure.
+        // Scope cards (epics, the orphan/unplanned roots, and — since Story 20.8 D3 — the follow-up aggregates)
+        // render flat; STORY cards go behind one disclosure.
         //
         // Why: with JS off — or before this script runs, or when the chart engine is blocked — there is no
         // selection, so `[data-related-ready]`'s single-card CSS never applies and EVERY card renders stacked in a
@@ -50,6 +51,11 @@ public static class RelatedWorkTemplater
         // that is not in the document is a selection that shows nothing — and ADR 0013's availability contract is
         // satisfied by a disclosure the reader can open. With JS on the script opens this and the CSS hides its
         // summary, so the single-card behaviour is byte-for-byte what it was. [Story 20.5 review]
+        //
+        // This disclosure remains the right answer after Story 20.8 D1 restored the fold: D1 attacks the rail's
+        // BYTES (each relationship set rendered once, not twice), while this attacks the JS-off reader's SCROLL
+        // HEIGHT. The card count is unchanged by D1 — every selectable node still owes a card — so removing this
+        // would put ~160 story cards back in one column. Two different problems, two different fixes.
         var scopeCards = model.Cards.Where(c => !IsStoryCard(c)).ToList();
         var storyCards = model.Cards.Where(IsStoryCard).ToList();
 
@@ -101,13 +107,21 @@ public static class RelatedWorkTemplater
 
     private static void RenderCard(StringBuilder sb, RelatedCard card, string? workGraphHref)
     {
-        sb.Append($"<article class=\"related-card\" data-related-node=\"{PathUtil.Html(card.IslandId)}\">\n");
+        sb.Append($"<article class=\"related-card\" data-related-node=\"{PathUtil.Html(card.IslandId)}\"");
+        // The ids that resolve to THIS card rather than one of their own (Story 20.8 D3 — today only
+        // `epic-N~summary` → `epic-N`). Space-separated, decided in C# by RelatedWorkCards.CanonicalIslandId, so
+        // the script matches on published data instead of re-deriving the redirect with a second string rule.
+        if (card.Aliases is { Count: > 0 } aliases)
+            sb.Append($" data-related-alias=\"{PathUtil.Html(string.Join(" ", aliases))}\"");
+        sb.Append(">\n");
         // Name. The KindWord leads as a muted eyebrow (stated in words, never colour) so an epic vs story reads at a
         // glance without a coloured badge.
         sb.Append($"  <p class=\"related-card-kind\">{PathUtil.Html(card.KindWord)}</p>\n");
         sb.Append($"  <h4 class=\"related-card-title\">{PathUtil.Html(card.Title)}</h4>\n");
         sb.Append($"  <p class=\"related-card-summary\">{PathUtil.Html(card.Summary)}</p>\n");
         AppendAction(sb, card.PrimaryCommand);
+        AppendMoreCommands(sb, card.MoreCommands);
+        AppendChildren(sb, card);
         // The "more details" link — a distinct button to the node's own page, where its full work-graph tab lives.
         if (card.DetailHref is { Length: > 0 } href)
             sb.Append($"  <a class=\"related-card-more\" href=\"{PathUtil.Html(href)}\">View details &rarr;</a>\n");
@@ -147,6 +161,70 @@ public static class RelatedWorkTemplater
         sb.Append("  <div class=\"related-card-action\">");
         sb.Append(badge);
         sb.Append("</div>\n");
+    }
+
+    /// <summary>The rest of the story's status-gated command set, behind a COLLAPSED native
+    /// <c>&lt;details&gt;</c> (Story 20.8 D2).
+    ///
+    /// <para><b>Native, and no JS-on hide rule.</b> A JS-only disclosure would hide these commands from exactly the
+    /// reader AC #2 protects, so it is a real <c>&lt;details&gt;</c> — openable with the script blocked. It also
+    /// gets no <c>[data-related-ready]</c> counterpart to <c>.related-card-full</c>'s hide: unlike the relationship
+    /// block, nothing else on the page carries these commands, so hiding them with JS on would LOSE information
+    /// rather than de-duplicate it.</para>
+    ///
+    /// <para><b>Not <see cref="BmadCommands.RenderCommandMenu"/>.</b> That helper's <c>.cmd-menu-pop</c> is an
+    /// absolutely-positioned popout with <c>min-width: 22rem</c> — wider than the rail's own
+    /// <c>minmax(240px, 320px)</c> column, so it would overhang the panel it lives in. This renders in flow and
+    /// reuses the same command badge, which is the part that must not be re-authored (AD-2).</para>
+    ///
+    /// <para>The primary is already removed upstream (<c>RelatedWorkCards.MoreCommandsFor</c>): repeating it here
+    /// is the "EpicEpic 19" / "Story Story 19.1" duplication class Story 20.3's live round caught. An empty set
+    /// renders nothing at all rather than an empty control.</para></summary>
+    private static void AppendMoreCommands(StringBuilder sb, IReadOnlyList<OutlineStoryCommand>? more)
+    {
+        if (more is not { Count: > 0 }) return;
+
+        sb.Append("  <details class=\"related-card-commands\">\n");
+        sb.Append($"    <summary>More actions ({more.Count})</summary>\n");
+        sb.Append("    <ul class=\"related-cmd-list\">\n");
+        foreach (var entry in more)
+        {
+            sb.Append("      <li>");
+            sb.Append(BmadCommands.RenderPrimaryActionBadge(entry.Command));
+            sb.Append($"<span class=\"related-cmd-desc\">{PathUtil.Html(entry.Description)}</span></li>\n");
+        }
+        sb.Append("    </ul>\n");
+        sb.Append("  </details>\n");
+    }
+
+    /// <summary>The story's OPEN deferred children, by name (Story 20.8 D2). Each is a real link where the slot has
+    /// a detail page and plain text where it does not — never a dead <c>&lt;a&gt;</c>. A capped list STATES its
+    /// remainder in the shipped <c>+N more</c> idiom rather than truncating silently (NFR8).</summary>
+    private static void AppendChildren(StringBuilder sb, RelatedCard card)
+    {
+        if (card.Children is not { Count: > 0 } children) return;
+
+        sb.Append("  <div class=\"related-card-children\">\n");
+        sb.Append($"    <p class=\"related-group-title\">Open follow-ups ({children.Count + card.HiddenChildren})</p>\n");
+        sb.Append("    <ul class=\"related-list\">\n");
+        foreach (var child in children)
+        {
+            sb.Append("      <li class=\"related-row\">");
+            if (child.Href is { Length: > 0 } href)
+                sb.Append($"<a href=\"{PathUtil.Html(href)}\">{PathUtil.Html(child.Label)}</a>");
+            else
+                sb.Append($"<span class=\"related-chip\">{PathUtil.Html(child.Label)}</span>");
+            sb.Append("</li>\n");
+        }
+        sb.Append("    </ul>\n");
+        if (card.HiddenChildren > 0)
+        {
+            var link = card.DetailHref is { Length: > 0 } detail
+                ? $" <a href=\"{PathUtil.Html(detail)}\">See them all &rarr;</a>"
+                : string.Empty;
+            sb.Append($"    <p class=\"related-more\">+{card.HiddenChildren} more not shown.{link}</p>\n");
+        }
+        sb.Append("  </div>\n");
     }
 
     private static void AppendGroups(

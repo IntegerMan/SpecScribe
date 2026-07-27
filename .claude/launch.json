@@ -190,6 +190,40 @@
         "C:/Dev/SpecScribe/SpecScribeOutput"
       ],
       "port": 8109
+    },
+    {
+      "name": "details-pane-20-8",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8110",
+        "--directory",
+        "SpecScribeOutput"
+      ],
+      "port": 8110
+    },
+    {
+      "name": "ideas-18-4",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8111",
+        "--directory",
+        "C:/Users/MattE/AppData/Local/Temp/claude/C--Dev-SpecScribe/5ad0c685-cee8-4926-9e2e-33e1842641ed/scratchpad/forge-repo/SpecScribeOutput"
+      ],
+      "port": 8111
+    },
+    {
+      "name": "ideas-18-4-jsoff",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "C:/Users/MattE/AppData/Local/Temp/claude/C--Dev-SpecScribe/5ad0c685-cee8-4926-9e2e-33e1842641ed/scratchpad/jsoff_server.py",
+        "8112",
+        "C:/Users/MattE/AppData/Local/Temp/claude/C--Dev-SpecScribe/5ad0c685-cee8-4926-9e2e-33e1842641ed/scratchpad/forge-repo/SpecScribeOutput"
+      ],
+      "port": 8112
     }
   ]
 }

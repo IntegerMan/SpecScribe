@@ -3082,8 +3082,22 @@ So that the portal never asserts a vocabulary my project does not use, and insta
 **And** the existing test suite and the golden byte-parity gate stay green (or any intentional change is re-baselined).
 
 <!-- Stories 18.3–18.4 added 2026-07-19: BMad-authoring-tool integrations explored in chat (bmad-index-docs,
-     bmad-forge-idea). 18.3 spike-led per the Epics 11–15/18.1 pattern. 18.4 depends on 18.3's pinned contract
-     for its blurb-metadata half but stands alone for the Ideas list surface. Run create-story when scheduled. -->
+     bmad-forge-idea). 18.3 spike-led per the Epics 11–15/18.1 pattern. Run create-story when scheduled.
+
+     CORRECTED 2026-07-27 (dev-story 18.4): the original seating claimed "18.4 depends on 18.3's pinned contract
+     for its blurb-metadata half". IT DOES NOT, and 18.4 shipped without it. 18.3 is about `bmad-index-docs`'
+     `index.md`; a forge workspace carries its OWN `goal:` in its own `.memlog.md` frontmatter, so the blurb half
+     is satisfiable with no external contract. 18.4 was gated by nothing — not by 18.3, and not by 18.2 either
+     (`bmad-forge-idea` ships in BMad's `core`, the one module `ModuleContext.Detect` excludes, so ideas never
+     route through module identity — the same finding 18.3 records for `bmad-index-docs`). If the index.md
+     follow-on ever lands, ideas may adopt it as OPTIONAL enrichment.
+
+     FR COVERAGE, resolved 2026-07-27 (dev-story 18.4, Open Question 2 — owner default (c) taken, unanswered):
+     FR36 covers BMad's "module and expansion ecosystem beyond the BMM core", but BOTH 18.3 and 18.4 target
+     skills that ship in `core`, not in a module. The stretch is ACCEPTED AND NOTED rather than closed by
+     widening FR36 or minting a new FR: the work is genuinely Epic 18's ("explore and baseline-cover BMad's own
+     authoring surface"), and re-cutting a requirement to fit two delivered stories buys nothing. Revisit if a
+     third core-skill surface lands — at that point core-skill artifact coverage is its own FR, not a stretch. -->
 
 ### Story 18.3: BMad Index-Docs Contract Spike
 
@@ -3127,6 +3141,28 @@ So that idea-stage lineage and rationale are visible alongside requirements/epic
 **When** generation runs
 **Then** the Ideas page/nav entry is omitted entirely rather than showing an empty page, matching existing optional-surface conventions elsewhere in the portal.
 
+<!-- AC #4/#5/#6 seated 2026-07-27 (dev-story 18.4) from the four owner decisions elicited at create-story. They
+     EXTEND AC #1 rather than replacing it, and are recorded here per CLAUDE.md's "structural scope changes land in
+     epics.md AND sprint-status.yaml in the same change" rule. -->
+
+4. **(extends AC #1 — owner decision D1)**
+**Given** a discovered forge session workspace
+**When** generation runs
+**Then** the idea also gets a **synthesized detail page** built from `.memlog.md`'s chronology plus `forged-idea.md` when present, **and** the forge's own `forge-report.html` is carried into the output **verbatim** and linked from that detail page as "the original report".
+**Rationale:** linking to `forged-idea.md` alone would leave every killed, clarified and in-progress idea with no destination at all — that file exists only on a hardened exit.
+
+5. **(extends AC #1 — owner decision D3)**
+**Given** two or more discovered ideas
+**When** the list page renders
+**Then** it is **grouped by verdict** — a section per verdict with a heading and a count, ordered Hardened → In progress → Killed — rather than one flat list
+**And** a verdict with zero ideas emits **no section at all**, never an empty heading (NFR8).
+
+6. **(new, safety)**
+**Given** a `forge-report.html` in a discovered workspace
+**When** generation carries it into the portal output
+**Then** it is written **only** if it is self-contained and script-free; a report containing a script (or an inline event handler, `javascript:` URL, or embedding element), an external-origin subresource, or one exceeding the carry size cap is **not written**, the detail page renders without the report link, and exactly one `Skipped` diagnostic names which half of the gate it failed.
+**Rationale:** the report is LLM-authored HTML landing verbatim inside the portal's own output directory; `SKILL.md` contracts it as self-contained but nothing enforces that. This also keeps the site inside ADR 0013 / NFR-5's JS-optional posture.
+
 <!-- Story 18.5 added 2026-07-25 (post-18.1 spike, owner-approved scope split): carries the ORIGINAL Story 18.2
      acceptance criteria verbatim — only the story number and the now-resolved priority module changed. 18.1's
      coverage map selects Test Architect (TEA) as that priority module: it is the only candidate with structured,
@@ -3158,6 +3194,34 @@ So that I can track progress without switching tools or losing module-specific w
 **When** they are discovered
 **Then** they surface as explicit non-fatal notices (coverage-tier labeling where partial) and never block full-site generation
 **And** any module-specific next-step-command vocabulary flows through the adapter contract rather than being hard-coded (NFR8).
+
+<!-- Story 18.6 added 2026-07-27 (create-story 18.5, owner decision D4): ADR 0015 Decision 5a was left out of
+     Story 18.2 (identity) and deliberately kept out of Story 18.5 (TEA coverage) so neither story grew a second
+     concern. It is the last un-closed surface from the Story 18.1 spike's Finding 3b table: ArtifactCoverage.Specs
+     hardcodes eight BMM families keyed off ModuleContext.WellKnownDocs and is built from sourceRelatives ALONE,
+     with no reference to ModuleContext.Module at all — so the identity fix does not reach it and a non-BMM repo's
+     dashboard asserts eight missing BMM artifact families it was never supposed to have. Sequenced after 18.5
+     because 18.5 establishes the per-module coverage model this story swaps the family set against. -->
+
+### Story 18.6: Module-Aware Artifact Coverage Families
+
+As a team using a BMad module other than BMM,
+I want the dashboard's artifact-coverage panel to reflect my module's artifact families rather than BMad Method's,
+So that the portal stops reporting eight missing artifacts my methodology never produces.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a repository whose primary BMad module is not BMad Method or Game Dev Studio
+**When** the dashboard's artifact-coverage panel renders
+**Then** the canonical family set is resolved from the detected module rather than from the hardcoded BMM list, so families the module does not produce are never reported as missing
+**And** a module with no modeled family set omits the panel entirely rather than showing an empty or all-missing one (NFR8: absent, not misleadingly empty).
+
+2.
+**Given** a BMad Method or Game Dev Studio repository
+**When** the change lands
+**Then** the existing eight-family panel, its create-command affordances, and its freshness/staleness behavior are unchanged
+**And** the existing test suite and the golden byte-parity gate stay green (or any intentional change is re-baselined).
 
 <!-- Epic 19 added 2026-07-17: directed work graph across epics/stories/quick-dev/deferred/reviews/code.
      Spike-led. Exploratory — not release-blocking. Run create-story when scheduled. -->
@@ -3636,6 +3700,39 @@ So that I can survey the project's structure and read about each part without lo
      href; the rail: summary, command badge, view-more link), and the Dev Agent Record must say which surface
      carries which rather than claiming the twin carries the details. -->
 
+<!-- 2026-07-27 (dev-story 20.8): D1, D2 and D3 all IMPLEMENTED as locked; all three ACs met and re-verified live.
+     Two findings that change what a future reader should believe about this story, recorded here because both
+     contradict text above.
+
+     (1) **D1's PREMISE DID NOT SURVIVE MEASUREMENT, and D1's own number was stale.** The note above says the rail
+     is 283,263 B of 742,107 B (38.2%) and that "removing the duplication is the honest fix". Measured on the real
+     portal at dev-story start it was already **443,137 B of 878,971 B — 50.4%**, 187 cards, 372 relationship rows
+     (the 38.2% predates 20.5's review round and a portal that has since grown to 27 epics). More importantly the
+     duplication D1 targets was **worth ~9.7 KB, not ~200 KB**: dropping the fold in 20.5 did not render every
+     relationship twice, it RELOCATED each set from the epic card to the story card and added one restated
+     "Part of → Epic N" group per story. So D1 is right on design (one home per relationship set, 90 → 17
+     relationship blocks, 0 on story cards) but it is NOT a payload-ceiling answer, and the ceiling question the
+     amendment assigns to this story is therefore still OPEN.
+
+     (2) **The net is UP, and by a lot — reported as required rather than smoothed.** Final rail: **604,948 B of a
+     1,042,036 B dashboard (58.1%)**, 212 cards. Decomposed: D1 −9.7 KB, D3 +~9 KB (25 aggregate/root cards), D2
+     **+162,470 B** — 144,726 B of it the 108 command disclosures alone, because every entry renders the shared
+     `RenderCommandBadge` (copy button + inline SVG icon + a `send-menu` <details>) at ~1,340 B per disclosure.
+     D2 costs ~17× what D1 saves. The rail is now the majority of the dashboard.
+
+     LEVERS FOR THE OWNER'S VERIFY ROUND, none pulled here because all three are the owner's call and two are
+     other stories' contracts: (a) `RelatedWork.MaxEntriesPerGroup` 12 → 8, still the stated lever, still unpulled
+     per D1; (b) render the disclosure's entries with a LIGHTER affordance than the full command badge — the badge
+     is a shared helper (AD-2, anti-pattern 2) so this is a `BmadCommands` decision, not a rail one; (c) drop the
+     deferred-children list, the cheaper half of D2 at 17,744 B. Recommended: (b), which is where the bytes are.
+
+     ALSO OBSERVED LIVE, out of scope and unfixed: on a story whose primary is the Address-deferred prompt, the
+     badge's visible `<code>` is 744 characters clipped to a 213 px box inside a 320 px rail — the reader sees a
+     fragment of what they are copying. `BmadCommands.RenderLabeledCommand` exists for exactly this and the story
+     page already uses it for long prompts; switching the rail's PRIMARY badge is Story 20.5's contract, not this
+     story's. And `RelatedWork.BuildGroups` dedupes by node id, so two distinct deferred items whose first 90
+     summarized characters are identical render as two identical rows (one occurrence on this portal). -->
+
 <!-- Story 20.9 ADDED 2026-07-25 (create-story 20.7, owner decision D1). It is the OTHER HALF of the rollout, not
      a new feature: the two surfaces whose conversion needs component capability that does not exist yet. Epic 20's
      "exactly one implementation of a hierarchy chart" finishes HERE. Also inherits Story 20.6's per-surface twin
@@ -3962,7 +4059,7 @@ Replace SpecScribe's C# presentation/templating layer (~4,691 LOC templaters) wi
 - **Story 23.2 — Component library + design-token bridge.** Port the shared presentation tokens (status/motion families, AD-7) into scoped Vue components; establish the CSS module conventions.
 - **Story 23.3 — Migrate baseline surfaces (dashboard, epics) to Vue/Nuxt over the IR**, proving parity with the golden output.
 - **Story 23.5 — Packaging reconciliation** — Node build step in distribution (Epic 16 touchpoint); resolve the self-contained-binary vs. Node-toolchain story. **⚠️ RESEQUENCED AHEAD OF 23.4** by the Story 23.1 spike gate — see the note below.
-- **Story 23.4 — Migrate remaining surfaces + retire the C# `HtmlRenderAdapter` for content** (charts remain C#-SVG in the IR). **Blocked until 23.5 lands.**
+- **Story 23.4 — Migrate remaining surfaces + retire the C# `HtmlRenderAdapter` for content** (charts remain C#-SVG in the IR). ~~**Blocked until 23.5 lands.**~~ **UNBLOCKED 2026-07-27** — Story 23.5 is complete and [ADR 0022](../../docs/adrs/0022-node-is-a-build-toolchain-and-a-generate-time-runtime.md) settles packaging: the Node toolchain is build/CI-time only, the shipped artefact is a project-independent 3.78 MB prebuilt `.output/` that renders any project's IR at server runtime, and the standalone binary takes a documented Node prerequisite. The 23.1 gate's binary ("client-rendered SPA *or* Node at run time") was **false** — see the [packaging strategy report](../implementation-artifacts/23-5-packaging-strategy-report.md).
 
 <!-- 2026-07-23 (Story 23.1 spike gate, owner-confirmed in code review): EXECUTION ORDER IS 23.2 → 23.3 → 23.5 → 23.4.
      23.5 is promoted from an end-of-epic tidy-up to the epic's load-bearing unknown: prerendering is inherently
@@ -4120,6 +4217,41 @@ So that Epic 16's packaging/release story isn't broken by the presentation-layer
 **Given** the npx channel (Story 16.8) and VS Code Marketplace packaging (Story 16.5/FR33)
 **When** packaging is reconciled
 **Then** both existing distribution channels continue to function without new runtime dependencies for end users.
+
+<!-- 2026-07-27 (dev-story 23.5, baseline 86b35c2): STORY COMPLETE. The two ACs above are the epic's originals;
+     the story file carries ACs 3-9, which are the concrete scope it was seeded with.
+
+     DECISION: [ADR 0022](../../docs/adrs/0022-node-is-a-build-toolchain-and-a-generate-time-runtime.md) — Proposed.
+     Node is a build-time toolchain and a generate-time runtime, never a shipped toolchain. Full measured basis in
+     the [packaging strategy report](../implementation-artifacts/23-5-packaging-strategy-report.md).
+
+     THE 23.1 GATE'S BINARY WAS FALSE. It conflated the toolchain that BUILDS the projection layer with the runtime
+     that RENDERS with it. Measured: build toolchain 201.9 MB with 14 native `.node` bindings requiring dlopen;
+     shipped artefact 3.78 MB of PURE JS with ZERO native bindings. The two-IR experiment nobody had run — one
+     artefact, built with NO IR present, isolated to a directory holding only `.output/` — rendered 1,056/1,056
+     routes of this repo and 32/33 of a DIFFERENT project via SPECSCRIBE_IR_DIR, at ~4 ms/route (full pass 6.3 s vs
+     `nuxt generate` 25-30 s vs the spike's ~130 s cold). Net new shipped bytes ~2.40 MB.
+
+     AC #2 CORRECTION: it names two channels and ADR 0012's formula has three; npx and the extension host BOTH run
+     on Node by construction, so the standalone binary (16.3) is the only channel a Node dependency breaks. It takes
+     a documented Node prerequisite (owner decision). And no Epic 16 channel is built yet — every `16-*` key is
+     backlog — so "continue to function" is a design constraint on unbuilt channels, not a non-regression check.
+
+     ALSO LANDED HERE (owner decisions 2026-07-27): Nuxt 3.21.9 -> 4.5.1 absorbed (EOL 2026-07-31), holding 23.3's
+     contract exactly at 190/190 byte-identical `<main>`, 190/190 verbatim, 0 link regressions; `web/` wired into
+     build-test-analyze.yml with setup-node + npm ci + the three drift gates + Vitest (80 tests, lcov to Sonar);
+     asset URLs rewritten page-relative so the portal loads from `file://` (verified in a live browser at depth 0
+     and depth 3) — `app.baseURL: './'` was evaluated and REJECTED because the correct prefix is per-page-depth.
+
+     TWO FINDINGS RECORDED RATHER THAN SMOOTHED: (1) an artefact carrying prerendered pages returned PROJECT A'S
+     DASHBOARD FOR PROJECT B with HTTP 200, because Nitro serves `public/` ahead of the SSR route -- fixed
+     structurally by SPECSCRIBE_PACKAGE_BUILD=1 emptying the route table; (2) `DashboardSurface.vue` hard-throws on
+     any project whose dashboard has no Hierarchy Explorer -- a real project-independence defect, RAISED to Story
+     23.3 rather than patched here, per this story's scope instruction.
+
+     AMENDS ADR 0006 §Decision: its "self-contained packaging ... stand[s]" clause no longer stands unqualified.
+     The binary is still self-contained w.r.t. .NET, but acquires an external Node runtime prerequisite. ADR 0006's
+     NFR6 ruling is UPHELD IN FULL -- nothing client-renders. -->
 
 ## Epic 24: File Relationship & Change-Coupling Insights — Directional Metric + Multi-Form Coupling Graphs
 

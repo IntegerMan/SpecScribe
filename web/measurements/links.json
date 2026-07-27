@@ -1,25 +1,25 @@
 {
   "generatedBy": "web/scripts/check-links.mjs",
   "nuxt": {
-    "pages": 1053,
-    "files": 1083,
+    "pages": 1063,
+    "files": 1100,
     "counts": {
-      "total": 100343,
-      "skipped": 11063,
-      "internal": 89280,
-      "resolved": 88271,
-      "dangling": 1009
+      "total": 102588,
+      "skipped": 11720,
+      "internal": 90868,
+      "resolved": 89816,
+      "dangling": 1052
     }
   },
   "golden": {
-    "pages": 1047,
-    "files": 1106,
+    "pages": 1057,
+    "files": 1119,
     "counts": {
-      "total": 104101,
-      "skipped": 12213,
-      "internal": 91888,
-      "resolved": 90861,
-      "dangling": 1027
+      "total": 106455,
+      "skipped": 12992,
+      "internal": 93463,
+      "resolved": 92393,
+      "dangling": 1070
     }
   },
   "regressions": [],
@@ -68,6 +68,8 @@
     "../../docs/adrs/0012-plotly-hierarchy-chart-engine-and-standardized-explorer-component.md",
     "../../docs/adrs/0013-text-twin-is-the-no-js-contract.md",
     "../../docs/adrs/0016-ir-carries-rendered-prose-html.md",
+    "../../docs/adrs/0017-projection-routes-mirror-ir-paths.md",
+    "../../docs/adrs/0018-transitional-ir-content-style-layer.md",
     "../../docs/adrs/README.md",
     "../../extension/README.md",
     "../../extension/README.md#L150",
@@ -93,6 +95,9 @@
     "../../web/CONVENTIONS.md",
     "../epics/story-2026-7.html",
     "../implementation-artifacts/22-2-canonical-ir-schema-and-versioning.md",
+    "../implementation-artifacts/22-3-static-html-rendered-from-the-ir.md",
+    "../implementation-artifacts/23-3-migrate-baseline-surfaces-dashboard-epics.md",
+    "../implementation-artifacts/23-4-migrate-remaining-surfaces-retire-c-sharp-html-adapter.md",
     "../implementation-artifacts/5-2-directory-scoped-settings-with-interactive-and-cli-parity.html",
     "../implementation-artifacts/6-6-delivery-architecture-and-distribution-spike.md",
     "../implementation-artifacts/7-11-code-ownership-and-bus-factor-insights.md",
@@ -155,9 +160,11 @@
     "20-6-text-twin-audit.md",
     "22-1-spike-incremental-recompute-and-ir-delta-transport.md",
     "22-1-spike-report.md",
+    "22-2-canonical-ir-schema-and-versioning.md",
     "23-1-spike-report.md",
     "23-2-component-library-and-design-token-bridge.md",
     "23-3-migrate-baseline-surfaces-dashboard-epics.md",
+    "23-5-packaging-reconciliation-node-build-step.md",
     "25-1-sonarcloud-onboarding-and-ci-analysis.md",
     "3-1-baseline-git-pulse-insights-on-dashboard.md",
     "3-2-optional-deep-git-analytics-controls.md",

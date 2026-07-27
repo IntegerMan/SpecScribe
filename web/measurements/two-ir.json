@@ -1,0 +1,40 @@
+{
+  "verdict": "REFUTED",
+  "server": "C:\\Users\\MattE\\AppData\\Local\\Temp\\claude\\C--Dev-SpecScribe\\16516aa4-3768-45e4-8485-782346ac442f\\scratchpad\\isolated",
+  "results": [
+    {
+      "label": "A",
+      "irDir": "C:\\Users\\MattE\\AppData\\Local\\Temp\\claude\\C--Dev-SpecScribe\\16516aa4-3768-45e4-8485-782346ac442f\\scratchpad\\ir-A",
+      "siteTitle": "SpecScribe",
+      "routesInManifest": 1056,
+      "routesRequested": 1056,
+      "sampled": false,
+      "ok": 1056,
+      "failures": [],
+      "bootMs": 540.0516,
+      "wallMs": 6216.8749,
+      "medianMs": 3.6989000000003216,
+      "p95Ms": 13.196200000000317
+    },
+    {
+      "label": "B",
+      "irDir": "C:\\Users\\MattE\\AppData\\Local\\Temp\\claude\\C--Dev-SpecScribe\\16516aa4-3768-45e4-8485-782346ac442f\\scratchpad\\ir-B",
+      "siteTitle": "CORA",
+      "routesInManifest": 33,
+      "routesRequested": 33,
+      "sampled": false,
+      "ok": 32,
+      "failures": [
+        {
+          "path": "index.html",
+          "kind": "status",
+          "why": "HTTP 500"
+        }
+      ],
+      "bootMs": 528.3722,
+      "wallMs": 1066.7896,
+      "medianMs": 5.896199999999908,
+      "p95Ms": 17.586599999999976
+    }
+  ]
+}

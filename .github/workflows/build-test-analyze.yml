@@ -6,8 +6,11 @@
 #
 #     build-test-analyze
 #
-# The quality gate itself is Story 25.2's: `sonar.qualitygate.wait` is
-# deliberately NOT set here, so a failing gate does not fail this build yet.
+# The quality gate itself is Story 25.2's, and 25.2 decided it: the applied gate
+# is SonarCloud's built-in `Sonar way` (id 9), kept rather than replaced, and
+# `sonar.qualitygate.wait` remains deliberately NOT set, so a failing gate does
+# not fail this build. That is a decision with a written precondition for
+# reversing it, not an omission — see docs/SonarCloudSetup.md § Quality gate.
 name: Build, Test & Analyze
 
 on:
@@ -79,6 +82,21 @@ jobs:
             src/SpecScribe/SpecScribe.csproj
             tests/SpecScribe.Tests/SpecScribe.Tests.csproj
 
+      - name: Setup Node
+        # Story 23.5 AC #8. Until this step existed, NOTHING built or checked `web/` anywhere — not CI, not
+        # an MSBuild target, not an npm lifecycle hook — and the consequence was measurable rather than
+        # theoretical: `npm run check:ir-content` and `npm run check:assets` were both RED at HEAD when
+        # 23.5 first ran them, drifted by a concurrent story and caught by nobody.
+        #
+        # The version comes from web/.nvmrc (24.11.1), which 23.5 added because the repo pinned Node
+        # NOWHERE — no .nvmrc, no engines field, no global.json — while web/CONVENTIONS.md named a version
+        # in prose. Nuxt 4 requires ^22.19 || ^24.11 || >=26, so an unpinned runner was a live risk.
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
       - name: Setup Java
         # SonarQube Cloud stopped supporting scanner runtimes below Java 21 on
         # 2026-07-20 — analyses on Java 17 now FAIL rather than warn. JRE
@@ -125,6 +143,41 @@ jobs:
         # failure here must not fail this job — Story 16.2 is about to make it a required check, and AC #1 only
         # requires this job to fail on a Build or Test failure. Build and Test below are untouched by this and
         # still gate normally.
+        #
+        # sonar.coverage.exclusions — NARROWED by Story 23.5 (AC #8), amending Story 25.2's decision 1b.
+        #
+        # 25.2 excluded the whole of `web/**` from the COVERAGE denominator, and was right to: the only
+        # report being uploaded was C#-only OpenCover, which structurally cannot reach a Nuxt/Node subtree,
+        # so `web/**` contributed 918 new lines-to-cover, all 918 uncovered, and dragged new_coverage to
+        # 59.4% against an 80% threshold while the C# side sat at 94.9%. That exclusion was a workaround
+        # for a MISSING REPORT, and 25.2 said so.
+        #
+        # The report is no longer missing. Story 23.5 stood up Vitest under `web/` (80 tests) and wires
+        # `sonar.javascript.lcov.reportPaths` below, so the honest move is to measure `web/` rather than
+        # keep hiding it. What remains excluded is only what genuinely cannot be unit-tested, and the list
+        # deliberately mirrors `web/vitest.config.ts`'s own coverage `exclude` so the two cannot drift:
+        #
+        #   web/scripts/**       dev-time HARNESSES. They spawn servers, walk `.output/`, and assert on a
+        #                        full site generate — they are integration drivers, not units. The three
+        #                        pure LIBRARIES they share (`harness-lib`, `ir-content-lib`, `tokens-lib`)
+        #                        are NOT excluded and are covered by `web/test/`.
+        #   web/server/plugins/** Nitro plugins. `defineNitroPlugin` is a Nitro auto-import that does not
+        #                        exist outside the Nitro build, so these modules cannot even be IMPORTED by
+        #                        a unit test. 23.5 moved the one piece of real logic out of a plugin into
+        #                        `web/server/utils/relative-prefix.ts` precisely so it could be tested, and
+        #                        it is at 100%.
+        #   web/**/*.vue         no component tests yet. This is the honest gap and it has an owner: it is
+        #                        named in Story 23.5's report as the follow-up that would lift `web/`
+        #                        coverage past the threshold.
+        #
+        # BE CLEAR ABOUT THE CONSEQUENCE: measured `web/` coverage is ~51% statements / ~53% lines, well
+        # under `Sonar way`'s 80% new-code condition, so this change is EXPECTED to show new_coverage red
+        # on the first scan that includes it. That is the correct signal and it is not blocking —
+        # `sonar.qualitygate.wait` remains unset (25.2), so a red gate does not fail this build. Do not
+        # "fix" it by widening the exclusion back to `web/**`; fix it with component tests.
+        #
+        # `extension/src/**` is still deliberately NOT excluded (508 lines to cover, 0% covered) — shipped
+        # first-party product code whose 0% this project wants visible.
         if: env.SONAR_TOKEN != ''
         continue-on-error: true
         run: |
@@ -133,7 +186,9 @@ jobs:
             /k:"IntegerMan_SpecScribe" `
             /d:sonar.token="$env:SONAR_TOKEN" `
             /d:sonar.cs.opencover.reportsPaths="**/TestResults/**/coverage.opencover.xml" `
-            /d:sonar.exclusions="src/SpecScribe/assets/prism.js,src/SpecScribe/assets/prism.css,src/SpecScribe/assets/plotly-hierarchy.min.js,spike/**,tools/**,extension/node_modules/**,extension/dist/**,extension/bin/**,SpecScribeOutput/**,docs/live/**,artifacts/**,_bmad-output/**,_bmad/**,.claude/**,.agents/**,chat.json"
+            /d:sonar.javascript.lcov.reportPaths="web/coverage/lcov.info" `
+            /d:sonar.coverage.exclusions="web/scripts/**,web/server/plugins/**,web/**/*.vue" `
+            /d:sonar.exclusions="src/SpecScribe/assets/prism.js,src/SpecScribe/assets/prism.css,src/SpecScribe/assets/plotly-hierarchy.min.js,spike/**,tools/**,extension/node_modules/**,extension/dist/**,extension/bin/**,web/node_modules/**,web/.output/**,web/.nuxt/**,web/public/**,web/coverage/**,web/measurements/**,web/assets/tokens.css,web/assets/ir-content.css,SpecScribeOutput/**,docs/live/**,artifacts/**,_bmad-output/**,_bmad/**,.claude/**,.agents/**,chat.json"
 
       - name: Build
         # --no-incremental: an incremental build can skip compilation entirely
@@ -151,6 +206,49 @@ jobs:
         # not document Cobertura support for C#. Produced here — after `build`,
         # before `end` — because a report written after `end` is silently ignored.
         run: dotnet test SpecScribe.slnx --no-build --collect:"XPlat Code Coverage;Format=opencover"
+
+      # ---------------------------------------------------------------------
+      # web/ — the Nuxt projection layer (Epic 23). Runs AFTER dotnet test and
+      # BEFORE `end`, because SonarScanner ignores any report written after it.
+      #
+      # Ordering is not arbitrary: `check:ir-content` derives the generated CSS
+      # layer from the C# stylesheet AND the emitted IR, so a portal has to
+      # exist first. That ordering is inherent to the design (Story 23.3), not
+      # an artifact of this workflow.
+      # ---------------------------------------------------------------------
+
+      - name: Generate the IR
+        # `--spa` emits spa/manifest.json + spa/pages-*.json, which IS the canonical IR (ADR 0016) and the
+        # input both the drift gate below and the Nuxt build read. --no-build reuses the Build step's output.
+        #
+        # MUST run BEFORE `npm ci`. web/package.json declares `"postinstall": "nuxt prepare"`, and `npm ci`
+        # runs lifecycle scripts — so the install itself loads web/nuxt.config.ts, which calls
+        # loadManifest() in web/ir/adapter.ts and HARD-FAILS with "IR not found at
+        # SpecScribeOutput/spa/manifest.json" when the IR is absent. On a fresh CI checkout it always is:
+        # SpecScribeOutput/ is gitignored. Reproduced locally, then verified fixed by this ordering.
+        run: dotnet run --project src/SpecScribe --no-build -- generate --spa
+
+      - name: Install web dependencies
+        working-directory: web
+        # `npm ci`, not `npm install`: the lockfile is the pin, and a lockfile-
+        # drifting install in CI would make the build unreproducible.
+        run: npm ci
+
+      - name: Check web drift gates
+        working-directory: web
+        # The three generated-artifact gates Story 23.2/23.3 wrote and which, until now, nothing ran:
+        #   check:tokens      — web/assets/tokens.css vs the C# :root block
+        #   check:ir-content  — web/assets/ir-content.css vs the C# stylesheet
+        #   check:assets      — web/public/ vs src/SpecScribe/assets/
+        # No continue-on-error: a drifted generated artifact is a real failure, and the whole point of
+        # wiring these is that they now stop a build instead of rotting.
+        run: npm run check
+
+      - name: Test web
+        working-directory: web
+        # Vitest + v8 coverage -> web/coverage/lcov.info, consumed by
+        # sonar.javascript.lcov.reportPaths in the `begin` step above.
+        run: npm run test:coverage
 
       - name: SonarScanner end
         # continue-on-error: see the same note on "SonarScanner begin" above — a scanner-side failure here must

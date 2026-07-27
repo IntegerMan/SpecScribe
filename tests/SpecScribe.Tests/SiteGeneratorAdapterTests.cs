@@ -1130,7 +1130,36 @@ public class SiteGeneratorAdapterTests : IDisposable
         // VERIFICATION: confirmed stable across two repeated full runs before locking in. Single-box only — the
         // cross-environment caveat above still stands and has NOT been re-measured for this value.
         // [Story 20.7 Task 11.7; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
-        const string expected = "126eed3a87632a5e583b04cc9706fe85c389cf44929f1967258eb9d384d3585c";
+        // ── STORY 20.8 REGENERATION ──────────────────────────────────────────────────────────────────────────
+        // 126eed3a… -> 3171cf5c…. The dashboard's related-work rail changed shape three ways: the story→epic
+        // relationship fold was RESTORED (D1 — a story card now carries no relationship block at all and its
+        // groups render once, as a labelled subject on its epic's card), story cards gained a collapsed native
+        // `<details class="related-card-commands">` plus a named list of their open deferred children (D2), and
+        // the follow-up aggregates and the `unplanned` root gained cards of their own (D3). specscribe.css gained
+        // the `.related-card-commands` / `.related-cmd-list` / `.related-card-children` rules and specscribe.js
+        // gained `cardAnswersFor` (the `data-related-alias` redirect match).
+        //
+        // ⚠ THE PREVIOUS CANDIDATE VALUE WAS A STALE-BUILD ARTIFACT. A first run produced 59a2bda9…, taken against
+        // a binary built BEFORE another session's concurrent src/ edits landed. Rebuilding moved it to 3171cf5c…
+        // with no further change of mine. That is the stale-build hash trap in golden-diff-normalization-gotchas,
+        // caught here only because the two-run stability check was done AFTER a fresh build rather than before it.
+        // Always rebuild first, then run twice.
+        //
+        // PROVENANCE (shared main) — this hash is NOT this story's work alone. `git status` at capture time showed
+        // another session mid-flight on Stories 18.4/18.5 and 23.5, and its rendering-visible parts are baked in:
+        //   • SiteNav.cs (+26 lines: a new "Ideas" nav entry) and DashboardViewBuilder's KnownIndexGroups gaining
+        //     `IdeaDiscovery.WorkspaceRootDirName` — nav markup is on EVERY page in this fixture.
+        //   • StatusStyles.cs — a new `IdeaAccentToken` (additive, unreachable here) AND a `SprintLabel`
+        //     kebab-normalization fix, which IS rendering-visible on the sprint page. Neither touches
+        //     `StoryLabel`/`ForStory`, which is what this story's rail reads.
+        //   • MarkdownConverter.cs (+6 lines), and new untracked IdeaDiscovery/IdeasModel/IdeasTemplater/Memlog.
+        // Their build was transiently broken twice while this story ran (`_ideas`, then `WriteIdeas`, both
+        // undeclared mid-write); the story waited rather than resetting, per CLAUDE.md § Concurrent work.
+        //
+        // VERIFICATION: rebuilt, then confirmed byte-identical across two consecutive full runs, with
+        // `git diff --stat src/` identical before and after both. Single-box only.
+        // [Story 20.8 Task 6.8; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
+        const string expected = "3171cf5c7b389640606ccdd4fa763cdf0af38237d7d7a1ddd3077bc0a415e8c4";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

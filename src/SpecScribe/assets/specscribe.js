@@ -2406,7 +2406,7 @@
 
     var match = null;
     Array.prototype.forEach.call(cards, function (c) {
-      var hit = selecting && c.getAttribute("data-related-node") === nodeId;
+      var hit = selecting && cardAnswersFor(c, nodeId);
       if (hit) match = c;
       // `.is-related-current` is the CSS hook (display is CSS's job via [data-related-ready]); `hidden` on the
       // NON-current cards additionally drops their links from the a11y tree and tab order, so a card that isn't
@@ -2446,6 +2446,17 @@
       var name = label || nodeId;
       say(live, "No related work items for " + name + ".");
     }
+  }
+
+  // Does this card answer for `nodeId`? Its own id, or one of the REDIRECTS the server published on
+  // `data-related-alias` (Story 20.8 D3 — `epic-N~summary` resolves to `epic-N`, whose page it already links to).
+  // The alias list is data the C# decided (RelatedWorkCards.CanonicalIslandId); this function only reads it, so
+  // there is no second place that knows one id can stand for another.
+  function cardAnswersFor(card, nodeId) {
+    if (card.getAttribute("data-related-node") === nodeId) return true;
+    var alias = card.getAttribute("data-related-alias");
+    if (!alias) return false;
+    return (" " + alias + " ").indexOf(" " + nodeId + " ") !== -1;
   }
 
   // The nearest ancestor card (or null) containing el, if any.

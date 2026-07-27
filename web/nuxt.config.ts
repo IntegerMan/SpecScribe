@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url'
 // The ONE sanctioned relative import of the adapter: config runs in Node, before any alias exists, and the
 // route table has to come from the IR manifest (Story 23.3 AC #4). App code imports `#ir` instead — see the
 // alias block below for why that distinction is load-bearing rather than stylistic.
-import { site } from './ir/adapter'
+import { PACKAGE_BUILD, site } from './ir/adapter'
 
 const IR_ADAPTER = fileURLToPath(new URL('./ir/adapter.ts', import.meta.url))
 const IR_ADAPTER_CLIENT = fileURLToPath(new URL('./ir/adapter.client.ts', import.meta.url))
@@ -137,18 +137,29 @@ export default defineNuxtConfig({
       // the rendered HTML — including links inside v-html'd IR content — and aborts the build on the first
       // 404. The route table is declared from the manifest instead, which is the correct design anyway.
       crawlLinks: false,
-      routes: [
-        // The site root resolves to the manifest's entry page. Both `/` and `/index.html` are emitted: they
-        // write the same file, and the second form is what the IR's own hrefs link to.
-        '/',
-        ...prerenderIrRoutes,
-        // The app's own routes (not IR-backed).
-        '/component-library',
-        '/design-system',
-        '/measure/async',
-        '/measure/island',
-        '/measure/static',
-      ],
+      /**
+       * EMPTY under `SPECSCRIBE_PACKAGE_BUILD=1`. [Story 23.5 AC #5]
+       *
+       * A package build produces the project-INDEPENDENT renderer: no project's routes are baked in, and
+       * `.output/public` therefore carries only real static assets. This matters for correctness, not just
+       * weight — Nitro serves `public/` static files AHEAD of the SSR route, so a prebuilt artefact that
+       * shipped project A's `/index.html` returned A's dashboard when pointed at project B, with a 200.
+       * Story 23.5 measured exactly that before this branch existed.
+       */
+      routes: PACKAGE_BUILD
+        ? []
+        : [
+            // The site root resolves to the manifest's entry page. Both `/` and `/index.html` are emitted: they
+            // write the same file, and the second form is what the IR's own hrefs link to.
+            '/',
+            ...prerenderIrRoutes,
+            // The app's own routes (not IR-backed).
+            '/component-library',
+            '/design-system',
+            '/measure/async',
+            '/measure/island',
+            '/measure/static',
+          ],
     },
   },
 

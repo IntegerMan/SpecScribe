@@ -11,8 +11,10 @@ touches: [".github/workflows/**", ".gitignore", "README.md"] # NOT src/** and NO
 
 # Story 25.1: SonarCloud Onboarding and Automated Analysis on Every Push to `main`
 
-Status: done <!-- 2026-07-26: both owner actions landed; analysis is live and green end to end.
-See Dev Agent Record -> Completion Notes section 0. One known blind spot is in Open items item 5.
+Status: done
+
+<!-- 2026-07-26: both owner actions landed; analysis is live and green end to end. See Dev Agent Record ->
+Completion Notes section 0. One known blind spot is in Open items item 5.
 2026-07-26: code review complete — 2 decision-needed resolved by owner, 5 patch applied, 1 deferred to 17.2,
 12 dismissed. See § Review Findings. -->
 

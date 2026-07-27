@@ -247,6 +247,25 @@ public static class StatusStyles
         };
     }
 
+    /// <summary>Maps a forged idea's verdict onto a canonical stage token for the list-row LEFT ACCENT bar — the
+    /// exact three-way shape <see cref="AdrAccentToken"/> already uses, kept as its own method rather than
+    /// overloading that one because the two read DIFFERENT vocabularies (an ADR's free-text status line vs. the
+    /// closed <c>IdeaVerdict</c> set) and neither should start tolerating the other's words. Hardened decisions
+    /// read <c>done</c> (settled), open/clarified sessions read <c>pending</c>, and killed ideas read
+    /// <c>deferred</c> (shelved history). Never the sole signal — the row's badge still carries the word (UX-DR17,
+    /// "no state signalled by colour alone"). [Story 18.4]</summary>
+    public static string? IdeaAccentToken(string? verdictWord)
+    {
+        var n = Normalize(verdictWord).Replace(' ', '-');
+        return n switch
+        {
+            "hardened" => "done",
+            "killed" => "deferred",
+            "in-progress" or "clarified" => "pending",
+            _ => null,
+        };
+    }
+
     /// <summary>Maps a <c>sprint-status.yaml</c> lifecycle value onto the SAME six-stage color vocabulary as
     /// stories/epics — the yaml is the authoritative <em>tracking</em> ledger (distinct from the derived
     /// artifact status), but a reader who learned the colors on the sunburst must read the sprint page for
@@ -277,8 +296,12 @@ public static class StatusStyles
 
     /// <summary>Human, on-brand label for a sprint lifecycle value — the visible badge text. Every status is a
     /// word (UX-DR17), color is reinforcement only. Unknown values are title-cased so a forward-compat status
-    /// (e.g. <c>blocked</c>) still reads as a real word rather than a raw token. [Story 2.3 Task 2]</summary>
-    public static string SprintLabel(string? status) => Normalize(status) switch
+    /// (e.g. <c>blocked</c>) still reads as a real word rather than a raw token. [Story 2.3 Task 2]
+    /// <para>Normalizes spaced aliases to kebab exactly as <see cref="ForSprint"/> already does, so the two can
+    /// never disagree about the same word: before Story 18.4 a caller passing <c>"In progress"</c> got the CANONICAL
+    /// colour from <see cref="ForSprint"/> but a TitleCased <c>"In Progress"</c> label from here. No
+    /// <c>sprint-status.yaml</c> value is spaced, so this changes nothing for the existing callers.</para></summary>
+    public static string SprintLabel(string? status) => Normalize(status).Replace(' ', '-') switch
     {
         "done" => "Done",
         "review" => "In review",

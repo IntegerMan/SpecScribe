@@ -10,283 +10,14 @@
     "epics/story-{id}.html"
   ],
   "stats": {
-    "sourceRules": 1775,
-    "carriedRules": 898,
-    "carriedSelectors": 1039,
-    "droppedUnused": 873,
+    "sourceRules": 1799,
+    "carriedRules": 863,
+    "carriedSelectors": 984,
+    "droppedUnused": 932,
     "droppedRoot": 4,
     "carriedKeyframes": 4,
-    "migratedPages": 189,
-    "totalPages": 1046,
-    "sourceBytes": 306398,
-    "generatedBytes": 115657,
-    "passThroughUncoveredClasses": [
-      "about-diagnostics-link",
-      "about-panel",
-      "about-sdd-panel",
-      "action-item-deferred",
-      "action-items-group",
-      "action-items-list",
-      "action-items-wrap",
-      "board-view",
-      "board-view-epic",
-      "board-view-status",
-      "cadence-lede",
-      "cadence-log",
-      "cadence-log-count",
-      "cadence-log-date",
-      "cadence-log-details",
-      "cadence-log-row",
-      "cadence-log-stories",
-      "cadence-log-summary",
-      "cap-row",
-      "capabilities",
-      "capability",
-      "capability-detail",
-      "capability-id",
-      "chart-empty",
-      "chart-frame-note",
-      "chart-lead",
-      "cmd-menu",
-      "cmd-menu-desc",
-      "cmd-menu-list",
-      "cmd-menu-pop",
-      "cmd-menu-toggle",
-      "code-external-link",
-      "code-file",
-      "code-line",
-      "code-page",
-      "code-relationships",
-      "code-relationships-note",
-      "code-source-head",
-      "code-source-section",
-      "code-tab",
-      "code-tab--relationships",
-      "code-tab--source",
-      "code-tab-input",
-      "code-tablist",
-      "code-tabpanel",
-      "code-tabpanel--relationships",
-      "code-tabpanel--source",
-      "code-tabs",
-      "codemap",
-      "codemap-breadcrumb",
-      "codemap-cell",
-      "codemap-controls",
-      "codemap-controls-label",
-      "codemap-crumb",
-      "codemap-dim-select",
-      "codemap-dir",
-      "codemap-dir-sunburst",
-      "codemap-drill",
-      "codemap-filter-checkbox",
-      "codemap-filter-label",
-      "codemap-legend",
-      "codemap-legend-dim",
-      "codemap-legend-discrete",
-      "codemap-legend-label",
-      "codemap-legend-ramp",
-      "codemap-legend-swatch",
-      "codemap-notice",
-      "codemap-notice-secondary",
-      "codemap-panel",
-      "codemap-shape",
-      "codemap-shape-sunburst",
-      "codemap-shape-tabs",
-      "codemap-shape-treemap",
-      "codemap-sunburst",
-      "codemap-sunburst-wrap",
-      "codemap-table",
-      "codemap-table-pager",
-      "codemap-table-pager-next",
-      "codemap-table-pager-prev",
-      "codemap-table-pager-status",
-      "codemap-table-row",
-      "codemap-view",
-      "codemap-view-note",
-      "codemap-viewport",
-      "commit-author",
-      "commit-day-item",
-      "commit-day-list",
-      "commit-hash",
-      "commit-subject",
-      "commit-time",
-      "companion-docs",
-      "companion-label",
-      "coverage-cards",
-      "coverage-group",
-      "coverage-note",
-      "coverage-story-card",
-      "coverage-story-cards",
-      "covered",
-      "cs-sunburst-radio",
-      "cycle-time-histogram",
-      "deferred-group",
-      "deferred-group-title",
-      "deferred-item-body",
-      "deferred-item-resolving",
-      "deferred-items-list",
-      "deferred-resolved-mark",
-      "deferred-work-preamble",
-      "deferred-work-wrap",
-      "diag-config",
-      "diag-warn",
-      "diagnostics-config",
-      "diagnostics-panel",
-      "diagnostics-source",
-      "diagnostics-table",
-      "dn-active-item",
-      "dn-deferred-item",
-      "dn-done-item",
-      "dn-ready-item",
-      "doc-lede",
-      "follow-up-ref",
-      "followup-detail-back",
-      "followup-detail-body",
-      "followup-detail-fulltext",
-      "followup-detail-provenance",
-      "followup-group-all",
-      "followup-group-wrap",
-      "heatmap-headline",
-      "heatmap-legend-caption",
-      "host-icon",
-      "howtoread-glossary",
-      "howtoread-order",
-      "howtoread-panel",
-      "index-card",
-      "index-card-path",
-      "index-grid",
-      "insight-panels",
-      "js-listable",
-      "language-css",
-      "language-javascript",
-      "language-json",
-      "language-markup",
-      "language-typescript",
-      "language-xml",
-      "language-yaml",
-      "list-batch-actions",
-      "list-row",
-      "list-row-accent-deferred",
-      "list-row-chip",
-      "list-row-meta",
-      "list-row-primary",
-      "list-row-scan",
-      "list-row-summary",
-      "list-rows-list",
-      "meta-pills",
-      "next-step-command-group",
-      "next-step-command-item",
-      "nfr-uxdr-coverage",
-      "nfr-uxdr-epic-card",
-      "nfr-uxdr-epic-list",
-      "nfr-uxdr-epic-num",
-      "nfr-uxdr-epic-title",
-      "nfr-uxdr-epics",
-      "nfr-uxdr-epics-label",
-      "nfr-uxdr-epics-note",
-      "nfr-uxdr-row",
-      "nfr-uxdr-subgroup-title",
-      "preview-badge",
-      "quick-link-pill",
-      "quick-link-pills",
-      "ref-center",
-      "ref-center-box",
-      "ref-center-label",
-      "ref-dot",
-      "ref-edge",
-      "ref-epic-hub",
-      "ref-epic-hub-box",
-      "ref-epic-hub-label",
-      "ref-graph",
-      "ref-graph-view",
-      "ref-graph-wrap",
-      "ref-hub-spoke",
-      "ref-label",
-      "ref-list",
-      "ref-node",
-      "ref-overflow",
-      "refgraph-toggle",
-      "refgraph-toggle-epic",
-      "refgraph-toggle-label",
-      "refgraph-toggle-rel",
-      "req-card",
-      "req-card-head",
-      "req-epic",
-      "req-group-card",
-      "req-group-grid",
-      "req-id-link",
-      "req-text",
-      "retro-header",
-      "retro-stories",
-      "retro-story-grid",
-      "risk-quadrant-empty",
-      "satisfaction-band",
-      "satisfaction-note",
-      "sdd-absent-info",
-      "sdd-check",
-      "sdd-check--no",
-      "sdd-commands",
-      "sdd-detected",
-      "sdd-detected-banner",
-      "sdd-framework-links",
-      "sdd-install",
-      "sdd-support-matrix",
-      "sdd-support-matrix--compact",
-      "sdd-support-soon",
-      "sdd-support-yes",
-      "sprint-cards-row",
-      "sprint-epic-head",
-      "sprint-epic-lane",
-      "sprint-epic-title",
-      "sprint-flag",
-      "sprint-retro-note",
-      "sprint-topbar",
-      "sprint-topbar-aside",
-      "sprint-topbar-head",
-      "status-accepted",
-      "status-accepted**",
-      "status-applied",
-      "status-draft",
-      "status-final",
-      "status-in-review",
-      "status-proposed",
-      "table-scroll",
-      "timeline-date",
-      "timeline-heatmap",
-      "timeline-list",
-      "timeline-row",
-      "timeline-summary",
-      "trace-cell",
-      "trace-cell-link",
-      "trace-corner",
-      "trace-legend",
-      "trace-matrix",
-      "trace-matrix-wrap",
-      "trace-row-head",
-      "type-config",
-      "type-csharp",
-      "type-markup",
-      "type-other",
-      "type-python",
-      "type-script",
-      "type-styles",
-      "wg-key",
-      "wg-key-action",
-      "wg-key-deferred",
-      "wg-key-edge",
-      "wg-key-edge-soft",
-      "wg-key-epic",
-      "wg-key-spec",
-      "wg-key-story",
-      "work-graph-legend",
-      "work-graph-legend-item",
-      "work-graph-scope",
-      "work-graph-scope-label",
-      "work-graph-scope-select",
-      "work-graph-section",
-      "work-node--chip"
-    ]
+    "sourceBytes": 310966,
+    "generatedBytes": 109719
   },
   "rules": [
     {
@@ -323,4568 +54,4394 @@
       "carried": true
     },
     {
-      "selector": ".sunburst a:focus-visible",
-      "lines": "153-153",
-      "carried": true
-    },
-    {
-      "selector": ".sunburst a:focus-visible .sb-seg",
-      "lines": "154-157",
-      "carried": true
-    },
-    {
-      "selector": ".sb-explorer-drill",
-      "lines": "162-162",
-      "carried": true
-    },
-    {
-      "selector": ".sb-explorer-breadcrumb",
-      "lines": "163-163",
-      "carried": true
-    },
-    {
-      "selector": ".sb-explorer-breadcrumb li",
-      "lines": "164-164",
-      "carried": true
-    },
-    {
-      "selector": ".sb-explorer-breadcrumb li + li::before",
-      "lines": "165-165",
-      "carried": true
-    },
-    {
       "selector": "[data-explorer][data-sb-scope] .sunburst-legend .sb-legend-item",
-      "lines": "195-195",
+      "lines": "173-173",
       "carried": true
     },
     {
       "selector": "[data-explorer][data-sb-scope][data-tok-pending] .sunburst-legend .sb-pending-item, [data-explorer][data-sb-scope][data-tok-drafted] .sunburst-legend .sb-drafted-item, [data-explorer][data-sb-scope][data-tok-ready] .sunburst-legend .sb-ready-item, [data-explorer][data-sb-scope][data-tok-active] .sunburst-legend .sb-active-item, [data-explorer][data-sb-scope][data-tok-review] .sunburst-legend .sb-review-item, [data-explorer][data-sb-scope][data-tok-done] .sunburst-legend .sb-done-item, [data-explorer][data-sb-scope][data-tok-noplan] .sunburst-legend .sb-noplan-item, [data-explorer][data-sb-scope][data-tok-followup-open] .sunburst-legend .sb-followup-open-item, [data-explorer][data-sb-scope][data-tok-followup-done] .sunburst-legend .sb-followup-done-item, [data-explorer][data-sb-scope][data-tok-unplanned] .sunburst-legend .sb-unplanned-item",
-      "lines": "196-205",
+      "lines": "174-183",
       "carried": true
     },
     {
       "selector": ".ss-hierarchy",
-      "lines": "223-223",
+      "lines": "201-201",
       "carried": true
     },
     {
       "selector": ".ss-hierarchy[data-hierarchy-ready]",
-      "lines": "224-224",
+      "lines": "202-202",
       "carried": true
     },
     {
       "selector": ".ss-hierarchy-booting",
-      "lines": "235-235",
+      "lines": "213-213",
       "carried": true
     },
     {
       "selector": ":root[data-ss-hierarchy-boot] .chart-panel:has(.ss-hierarchy) .ss-hierarchy-booting",
-      "lines": "236-243",
-      "carried": true
-    },
-    {
-      "selector": ":root[data-ss-hierarchy-boot] .chart-panel:has(.ss-hierarchy) svg.sunburst",
-      "lines": "246-246",
+      "lines": "214-221",
       "carried": true
     },
     {
       "selector": ":root[data-ss-hierarchy-boot] .chart-panel[data-hierarchy-mounted] .ss-hierarchy-booting, :root[data-ss-hierarchy-boot] .chart-panel[data-hierarchy-failed] .ss-hierarchy-booting",
-      "lines": "250-251",
-      "carried": true
-    },
-    {
-      "selector": ":root[data-ss-hierarchy-boot] .chart-panel[data-hierarchy-failed] svg.sunburst",
-      "lines": "252-252",
-      "carried": true
-    },
-    {
-      "selector": ":root[data-ss-hierarchy-boot] .chart-panel[data-hierarchy-failed] .sunburst-hint",
-      "lines": "256-256",
+      "lines": "228-229",
       "carried": true
     },
     {
       "selector": ".ss-hierarchy defs pattern > path",
-      "lines": "262-262",
+      "lines": "240-240",
       "carried": true
     },
     {
       "selector": ".ss-hierarchy-controls",
-      "lines": "309-309",
+      "lines": "287-287",
       "carried": true
     },
     {
       "selector": ".ss-hierarchy-controls[hidden]",
-      "lines": "316-316",
+      "lines": "294-294",
       "carried": true
     },
     {
       "selector": ".ss-hierarchy-drill",
-      "lines": "331-331",
+      "lines": "309-309",
       "carried": true
     },
     {
       "selector": ".ss-hierarchy-breadcrumb",
-      "lines": "332-341",
+      "lines": "310-319",
       "carried": true
     },
     {
       "selector": ".ss-hierarchy-breadcrumb li",
-      "lines": "342-342",
+      "lines": "320-320",
       "carried": true
     },
     {
       "selector": ".ss-hierarchy-breadcrumb li + li::before",
-      "lines": "343-343",
-      "carried": true
-    },
-    {
-      "selector": ".ss-hierarchy-legend",
-      "lines": "373-381",
-      "carried": true
-    },
-    {
-      "selector": ".ss-hierarchy-legend-item",
-      "lines": "382-382",
+      "lines": "321-321",
       "carried": true
     },
     {
       "selector": ".ss-hierarchy-legend-note",
-      "lines": "383-388",
-      "carried": true
-    },
-    {
-      "selector": ".ss-hierarchy-sw",
-      "lines": "389-396",
-      "carried": true
-    },
-    {
-      "selector": ".ss-hierarchy-sw.sb-pending",
-      "lines": "397-397",
-      "carried": true
-    },
-    {
-      "selector": ".ss-hierarchy-sw.sb-drafted",
-      "lines": "398-398",
-      "carried": true
-    },
-    {
-      "selector": ".ss-hierarchy-sw.sb-ready",
-      "lines": "399-399",
-      "carried": true
-    },
-    {
-      "selector": ".ss-hierarchy-sw.sb-active",
-      "lines": "400-400",
-      "carried": true
-    },
-    {
-      "selector": ".ss-hierarchy-sw.sb-review",
-      "lines": "401-401",
-      "carried": true
-    },
-    {
-      "selector": ".ss-hierarchy-sw.sb-done",
-      "lines": "402-402",
-      "carried": true
-    },
-    {
-      "selector": ".ss-hierarchy-sw.sb-unrecognized",
-      "lines": "403-403",
-      "carried": true
-    },
-    {
-      "selector": ".ss-hierarchy-sw.sb-noplan",
-      "lines": "407-412",
-      "carried": true
-    },
-    {
-      "selector": ".ss-hierarchy-sw.sb-followup-open",
-      "lines": "413-417",
-      "carried": true
-    },
-    {
-      "selector": ".ss-hierarchy-sw.sb-followup-done",
-      "lines": "418-422",
-      "carried": true
-    },
-    {
-      "selector": ".ss-hierarchy-sw.sb-unplanned",
-      "lines": "423-428",
+      "lines": "361-366",
       "carried": true
     },
     {
       "selector": ".ss-hierarchy-twin",
-      "lines": "440-440",
+      "lines": "418-418",
       "carried": true
     },
     {
       "selector": ".ss-hierarchy-twin > summary",
-      "lines": "441-441",
+      "lines": "419-419",
       "carried": true
     },
     {
       "selector": ".ss-hierarchy-twin > summary:focus-visible",
-      "lines": "442-442",
+      "lines": "420-420",
       "carried": true
     },
     {
       "selector": ".ss-hierarchy-twin-list",
-      "lines": "443-443",
+      "lines": "421-421",
       "carried": true
     },
     {
       "selector": ".ss-hierarchy-twin-list .ss-hierarchy-twin-list",
-      "lines": "444-444",
+      "lines": "422-422",
       "carried": true
     },
     {
       "selector": ".ss-hierarchy-twin-list li",
-      "lines": "445-445",
+      "lines": "423-423",
       "carried": true
     },
     {
       "selector": ".ss-hierarchy-twin-meta",
-      "lines": "446-446",
+      "lines": "424-424",
       "carried": true
     },
     {
       "selector": ".ss-hierarchy-twin.sr-only:focus-within",
-      "lines": "456-469",
+      "lines": "434-447",
       "carried": true
     },
     {
       "selector": ".ss-hierarchy-twin-title",
-      "lines": "470-470",
+      "lines": "448-448",
       "carried": true
     },
     {
       "selector": ".explorer-layout",
-      "lines": "476-481",
+      "lines": "454-459",
       "carried": true
     },
     {
       "selector": ".explorer-layout",
-      "lines": "483-483",
+      "lines": "461-461",
       "carried": true,
       "within": "@media (max-width: 900px)"
     },
     {
       "selector": ".explorer-layout-labelled",
-      "lines": "492-492",
+      "lines": "470-470",
       "carried": true,
       "within": "@media (max-width: 1100px)"
     },
     {
       "selector": ".related-work-panel",
-      "lines": "494-494",
+      "lines": "472-472",
       "carried": true
     },
     {
       "selector": ".related-card",
-      "lines": "496-496",
+      "lines": "474-474",
       "carried": true
     },
     {
       "selector": ".related-card + .related-card",
-      "lines": "497-497",
+      "lines": "475-475",
       "carried": true
     },
     {
       "selector": ".related-card-kind",
-      "lines": "498-505",
+      "lines": "476-483",
       "carried": true
     },
     {
       "selector": ".related-card-title",
-      "lines": "506-506",
+      "lines": "484-484",
       "carried": true
     },
     {
       "selector": ".related-card-summary",
-      "lines": "507-507",
+      "lines": "485-485",
       "carried": true
     },
     {
       "selector": ".related-card-hint",
-      "lines": "508-508",
+      "lines": "486-486",
       "carried": true
     },
     {
       "selector": ".related-card-action",
-      "lines": "509-509",
+      "lines": "487-487",
       "carried": true
     },
     {
       "selector": ".related-card-more",
-      "lines": "510-516",
+      "lines": "488-494",
       "carried": true
     },
     {
       "selector": ".related-card-more:hover",
-      "lines": "517-517",
+      "lines": "495-495",
       "carried": true
     },
     {
       "selector": ".related-card-more:focus-visible",
-      "lines": "518-518",
+      "lines": "496-496",
+      "carried": true
+    },
+    {
+      "selector": ".related-card-commands",
+      "lines": "504-504",
+      "carried": true
+    },
+    {
+      "selector": ".related-card-commands > summary",
+      "lines": "505-505",
+      "carried": true
+    },
+    {
+      "selector": ".related-card-commands > summary:focus-visible",
+      "lines": "506-506",
+      "carried": true
+    },
+    {
+      "selector": ".related-cmd-list",
+      "lines": "507-507",
+      "carried": true
+    },
+    {
+      "selector": ".related-cmd-list li",
+      "lines": "510-510",
+      "carried": true
+    },
+    {
+      "selector": ".related-cmd-desc",
+      "lines": "511-511",
+      "carried": true
+    },
+    {
+      "selector": ".related-card-children",
+      "lines": "512-512",
       "carried": true
     },
     {
       "selector": ".related-card-full",
-      "lines": "521-521",
+      "lines": "515-515",
       "carried": true
     },
     {
       "selector": ".related-card-full > summary",
-      "lines": "522-522",
+      "lines": "516-516",
       "carried": true
     },
     {
       "selector": ".related-card-full > summary:focus-visible",
-      "lines": "523-523",
+      "lines": "517-517",
       "carried": true
     },
     {
       "selector": ".related-group",
-      "lines": "524-524",
+      "lines": "518-518",
+      "carried": true
+    },
+    {
+      "selector": ".related-subject",
+      "lines": "519-519",
+      "carried": true
+    },
+    {
+      "selector": ".related-subject-title",
+      "lines": "520-520",
       "carried": true
     },
     {
       "selector": ".related-group-title",
-      "lines": "528-535",
+      "lines": "522-529",
       "carried": true
     },
     {
       "selector": ".related-list",
-      "lines": "536-536",
+      "lines": "530-530",
       "carried": true
     },
     {
       "selector": ".related-row",
-      "lines": "537-537",
+      "lines": "531-531",
       "carried": true
     },
     {
       "selector": ".related-row a:focus-visible",
-      "lines": "538-538",
+      "lines": "532-532",
       "carried": true
     },
     {
       "selector": ".related-more, .related-work-empty, .related-work-overflow",
-      "lines": "541-543",
+      "lines": "535-537",
       "carried": true
     },
     {
       "selector": ".related-work-more",
-      "lines": "552-552",
+      "lines": "546-546",
       "carried": true
     },
     {
       "selector": ".related-work-more > summary",
-      "lines": "553-558",
+      "lines": "547-552",
       "carried": true
     },
     {
       "selector": ".related-work-more > summary:focus-visible",
-      "lines": "559-559",
+      "lines": "553-553",
       "carried": true
     },
     {
       "selector": "[data-related-ready] .related-work-more > summary",
-      "lines": "560-560",
+      "lines": "554-554",
       "carried": true
     },
     {
       "selector": "[data-related-ready] .related-card-full",
-      "lines": "562-562",
+      "lines": "556-556",
       "carried": true
     },
     {
       "selector": "[data-related-ready] .related-card[data-related-node]",
-      "lines": "563-563",
+      "lines": "557-557",
       "carried": true
     },
     {
       "selector": "[data-related-ready][data-related-scope] .related-card-project",
-      "lines": "564-564",
+      "lines": "558-558",
       "carried": true
     },
     {
       "selector": ".site-nav",
-      "lines": "571-580",
+      "lines": "565-574",
       "carried": true
     },
     {
       "selector": ".site-nav-inner",
-      "lines": "583-593",
+      "lines": "577-587",
       "carried": true
     },
     {
       "selector": ".site-nav-brand",
-      "lines": "595-602",
+      "lines": "589-596",
       "carried": true
     },
     {
       "selector": ".site-nav-mark",
-      "lines": "607-613",
+      "lines": "601-607",
       "carried": true
     },
     {
       "selector": ".site-nav-attribution",
-      "lines": "616-624",
+      "lines": "610-618",
       "carried": true
     },
     {
       "selector": ".site-nav-attribution-by",
-      "lines": "625-625",
+      "lines": "619-619",
       "carried": true
     },
     {
       "selector": ".specscribe-badge",
-      "lines": "626-635",
+      "lines": "620-629",
       "carried": true
     },
     {
       "selector": ".site-nav-attribution:hover .specscribe-badge",
-      "lines": "636-636",
+      "lines": "630-630",
       "carried": true
     },
     {
       "selector": ".site-nav-attribution:focus-visible",
-      "lines": "637-637",
+      "lines": "631-631",
       "carried": true
     },
     {
       "selector": ".specscribe-badge-mark",
-      "lines": "638-638",
+      "lines": "632-632",
       "carried": true
     },
     {
       "selector": ".specscribe-badge-text",
-      "lines": "639-639",
+      "lines": "633-633",
       "carried": true
     },
     {
       "selector": ".site-nav-toggle",
-      "lines": "641-653",
+      "lines": "635-647",
       "carried": true
     },
     {
       "selector": ".site-nav-toggle:hover, .site-nav-toggle:focus-visible",
-      "lines": "655-660",
+      "lines": "649-654",
       "carried": true
     },
     {
       "selector": ".site-nav-links",
-      "lines": "663-669",
+      "lines": "657-663",
       "carried": true
     },
     {
       "selector": ".site-menu-link, .site-nav-group-summary",
-      "lines": "672-688",
+      "lines": "666-682",
       "carried": true
     },
     {
       "selector": ".site-nav-group-summary::-webkit-details-marker",
-      "lines": "689-689",
+      "lines": "683-683",
       "carried": true
     },
     {
       "selector": ".site-menu-link:hover, .site-nav-group-summary:hover, .site-menu-link.active, .site-nav-group.has-active > .site-nav-group-summary",
-      "lines": "690-693",
+      "lines": "684-687",
       "carried": true
     },
     {
       "selector": ".site-nav-group.family-planning > .site-nav-group-summary",
-      "lines": "695-695",
+      "lines": "689-689",
       "carried": true
     },
     {
       "selector": ".site-nav-group.family-architecture > .site-nav-group-summary",
-      "lines": "696-696",
+      "lines": "690-690",
       "carried": true
     },
     {
       "selector": ".site-nav-group.family-epics > .site-nav-group-summary",
-      "lines": "697-697",
+      "lines": "691-691",
       "carried": true
     },
     {
       "selector": ".site-nav-group.family-planning > .site-nav-group-summary:hover, .site-nav-group.family-planning.has-active > .site-nav-group-summary",
-      "lines": "698-699",
+      "lines": "692-693",
       "carried": true
     },
     {
       "selector": ".site-nav-group.family-architecture > .site-nav-group-summary:hover, .site-nav-group.family-architecture.has-active > .site-nav-group-summary",
-      "lines": "700-701",
+      "lines": "694-695",
       "carried": true
     },
     {
       "selector": ".site-nav-group.family-epics > .site-nav-group-summary:hover, .site-nav-group.family-epics.has-active > .site-nav-group-summary",
-      "lines": "702-703",
+      "lines": "696-697",
       "carried": true
     },
     {
       "selector": ".site-nav-group.family-followups > .site-nav-group-summary",
-      "lines": "704-704",
+      "lines": "698-698",
       "carried": true
     },
     {
       "selector": ".site-nav-group.family-followups > .site-nav-group-summary:hover, .site-nav-group.family-followups.has-active > .site-nav-group-summary",
-      "lines": "705-706",
+      "lines": "699-700",
       "carried": true
     },
     {
       "selector": ".site-nav-group.family-help > .site-nav-group-summary",
-      "lines": "707-707",
+      "lines": "701-701",
       "carried": true
     },
     {
       "selector": ".site-nav-group.family-help > .site-nav-group-summary:hover, .site-nav-group.family-help.has-active > .site-nav-group-summary",
-      "lines": "708-709",
+      "lines": "702-703",
       "carried": true
     },
     {
       "selector": ".site-menu-link:focus-visible, .site-nav-group-summary:focus-visible",
-      "lines": "710-711",
+      "lines": "704-705",
       "carried": true
     },
     {
       "selector": ".site-menu-link .ss-icon, .site-nav-group-summary .ss-icon, .site-menu-item .ss-icon",
-      "lines": "712-714",
+      "lines": "706-708",
       "carried": true
     },
     {
       "selector": ".site-menu-caret",
-      "lines": "715-715",
+      "lines": "709-709",
       "carried": true
     },
     {
       "selector": ".site-nav-group",
-      "lines": "718-718",
+      "lines": "712-712",
       "carried": true
     },
     {
       "selector": ".site-nav-group-panel",
-      "lines": "719-732",
+      "lines": "713-726",
       "carried": true
     },
     {
       "selector": ".site-nav-group[open] > .site-nav-group-panel, .site-nav-group:hover > .site-nav-group-panel, .site-nav-group:focus-within > .site-nav-group-panel",
-      "lines": "733-735",
+      "lines": "727-729",
       "carried": true
     },
     {
       "selector": ".site-menu-item",
-      "lines": "736-745",
+      "lines": "730-739",
       "carried": true
     },
     {
       "selector": ".site-menu-item:hover",
-      "lines": "746-746",
+      "lines": "740-740",
       "carried": true
     },
     {
       "selector": ".site-menu-item.active",
-      "lines": "747-747",
+      "lines": "741-741",
       "carried": true
     },
     {
       "selector": ".site-menu-item:focus-visible",
-      "lines": "748-748",
+      "lines": "742-742",
       "carried": true
     },
     {
       "selector": ".site-nav-key-views",
-      "lines": "751-754",
+      "lines": "745-748",
       "carried": true
     },
     {
       "selector": ".site-nav-local-context .local-context-pills",
-      "lines": "789-799",
+      "lines": "783-793",
       "carried": true
     },
     {
       "selector": ".local-context-label",
-      "lines": "800-807",
+      "lines": "794-801",
       "carried": true
     },
     {
       "selector": ".local-context-pill",
-      "lines": "808-821",
+      "lines": "802-815",
       "carried": true
     },
     {
       "selector": ".local-context-pill:hover",
-      "lines": "822-822",
+      "lines": "816-816",
       "carried": true
     },
     {
       "selector": ".local-context-pill.active",
-      "lines": "823-823",
+      "lines": "817-817",
       "carried": true
     },
     {
       "selector": ".local-context-pill:focus-visible",
-      "lines": "824-824",
+      "lines": "818-818",
       "carried": true
     },
     {
       "selector": ".local-context-pill .ss-icon",
-      "lines": "825-825",
+      "lines": "819-819",
       "carried": true
     },
     {
       "selector": ".key-view-group",
-      "lines": "828-828",
+      "lines": "822-822",
       "carried": true
     },
     {
       "selector": ".key-view-group.family-planning > .key-view-trigger",
-      "lines": "829-829",
+      "lines": "823-823",
       "carried": true
     },
     {
       "selector": ".key-view-group.family-architecture > .key-view-trigger",
-      "lines": "830-830",
+      "lines": "824-824",
       "carried": true
     },
     {
       "selector": ".key-view-group.family-epics > .key-view-trigger",
-      "lines": "831-831",
+      "lines": "825-825",
       "carried": true
     },
     {
       "selector": ".key-view-group.family-requirements > .key-view-trigger",
-      "lines": "832-832",
+      "lines": "826-826",
       "carried": true
     },
     {
       "selector": ".key-view-group.family-followups > .key-view-trigger",
-      "lines": "833-833",
+      "lines": "827-827",
       "carried": true
     },
     {
       "selector": ".key-view-group.family-help > .key-view-trigger",
-      "lines": "834-834",
+      "lines": "828-828",
       "carried": true
     },
     {
       "selector": ".key-view-trigger",
-      "lines": "835-844",
+      "lines": "829-838",
       "carried": true
     },
     {
       "selector": ".key-view-panel",
-      "lines": "845-859",
+      "lines": "839-853",
       "carried": true
     },
     {
       "selector": ".key-view-group:last-child > .key-view-panel",
-      "lines": "860-863",
+      "lines": "854-857",
       "carried": true
     },
     {
       "selector": ".key-view-group:hover > .key-view-panel, .key-view-group:focus-within > .key-view-panel",
-      "lines": "864-866",
+      "lines": "858-860",
       "carried": true,
       "note": "1 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": ".key-view-item",
-      "lines": "867-877",
+      "lines": "861-871",
       "carried": true
     },
     {
       "selector": ".key-view-item:hover",
-      "lines": "878-878",
+      "lines": "872-872",
       "carried": true
     },
     {
       "selector": ".key-view-item:focus-visible",
-      "lines": "879-879",
+      "lines": "873-873",
       "carried": true
     },
     {
       "selector": ".key-view-item .ss-icon, .key-view-trigger .ss-icon",
-      "lines": "880-881",
+      "lines": "874-875",
       "carried": true
     },
     {
       "selector": ".doc-header",
-      "lines": "884-889",
+      "lines": "878-883",
       "carried": true
     },
     {
       "selector": ".entity-pager",
-      "lines": "894-900",
+      "lines": "888-894",
       "carried": true
     },
     {
       "selector": ".entity-pager-link",
-      "lines": "901-901",
+      "lines": "895-895",
       "carried": true
     },
     {
       "selector": ".entity-pager-link:hover",
-      "lines": "902-902",
+      "lines": "896-896",
       "carried": true
     },
     {
       "selector": ".entity-pager-link:focus-visible",
-      "lines": "903-903",
+      "lines": "897-897",
       "carried": true
     },
     {
       "selector": ".entity-pager-link.is-disabled",
-      "lines": "904-904",
+      "lines": "898-898",
       "carried": true
     },
     {
       "selector": ".doc-header h1",
-      "lines": "906-910",
+      "lines": "900-904",
       "carried": true
     },
     {
       "selector": ".doc-header .doc-subtitle",
-      "lines": "912-916",
+      "lines": "906-910",
       "carried": true
     },
     {
       "selector": ".story-kicker",
-      "lines": "920-926",
+      "lines": "914-920",
       "carried": true
     },
     {
       "selector": ".kicker-row",
-      "lines": "928-935",
+      "lines": "922-929",
       "carried": true
     },
     {
       "selector": ".kicker-row .story-kicker",
-      "lines": "937-937",
+      "lines": "931-931",
       "carried": true
     },
     {
       "selector": ".evidence-block",
-      "lines": "940-946",
+      "lines": "934-940",
       "carried": true
     },
     {
       "selector": ".evidence-strip",
-      "lines": "948-954",
+      "lines": "942-948",
       "carried": true
     },
     {
       "selector": ".evidence-strip .status-badge.evidence-pill, .evidence-strip .status-badge.task-badge",
-      "lines": "956-963",
+      "lines": "950-957",
       "carried": true
     },
     {
       "selector": ".status-badge.evidence-pill.tests-pass",
-      "lines": "966-970",
+      "lines": "960-964",
       "carried": true
     },
     {
       "selector": ".status-badge.evidence-pill.empty",
-      "lines": "973-977",
+      "lines": "967-971",
       "carried": true
     },
     {
       "selector": ".evidence-dev-record-link",
-      "lines": "979-985",
+      "lines": "973-979",
       "carried": true
     },
     {
       "selector": ".evidence-dev-record-link:hover, .evidence-dev-record-link:focus-visible",
-      "lines": "987-990",
+      "lines": "981-984",
       "carried": true
     },
     {
       "selector": ".chart-panel.change-surface-panel",
-      "lines": "993-995",
+      "lines": "987-989",
       "carried": true
     },
     {
       "selector": ".change-surface-panel > summary",
-      "lines": "997-1005",
+      "lines": "991-999",
       "carried": true
     },
     {
       "selector": ".change-surface-panel > summary::-webkit-details-marker",
-      "lines": "1007-1007",
+      "lines": "1001-1001",
       "carried": true
     },
     {
       "selector": ".change-surface-panel > summary::before",
-      "lines": "1009-1012",
+      "lines": "1003-1006",
       "carried": true
     },
     {
       "selector": ".change-surface-panel[open] > summary::before",
-      "lines": "1014-1014",
+      "lines": "1008-1008",
       "carried": true
     },
     {
       "selector": ".change-surface-panel[open] > summary",
-      "lines": "1016-1016",
+      "lines": "1010-1010",
       "carried": true
     },
     {
       "selector": ".change-surface-title",
-      "lines": "1018-1020",
+      "lines": "1012-1014",
       "carried": true
     },
     {
       "selector": ".change-surface-panel .change-surface-class",
-      "lines": "1022-1028",
+      "lines": "1016-1022",
       "carried": true
     },
     {
       "selector": ".change-surface",
-      "lines": "1030-1039",
+      "lines": "1024-1033",
       "carried": true
     },
     {
       "selector": ".change-surface-class",
-      "lines": "1057-1061",
+      "lines": "1051-1055",
       "carried": true
     },
     {
       "selector": ".change-surface-section",
-      "lines": "1063-1065",
+      "lines": "1057-1059",
       "carried": true
     },
     {
       "selector": ".change-surface-section-label",
-      "lines": "1067-1074",
+      "lines": "1061-1068",
       "carried": true
     },
     {
       "selector": ".change-surface-section-sublabel",
-      "lines": "1076-1080",
+      "lines": "1070-1074",
       "carried": true
     },
     {
       "selector": ".change-surface-verify-manual",
-      "lines": "1082-1086",
+      "lines": "1076-1080",
       "carried": true
     },
     {
       "selector": ".change-surface-verify-manual p",
-      "lines": "1088-1090",
+      "lines": "1082-1084",
       "carried": true
     },
     {
       "selector": ".change-surface-verify-manual p:last-child",
-      "lines": "1092-1094",
+      "lines": "1086-1088",
       "carried": true
     },
     {
       "selector": ".change-surface-verify-manual code",
-      "lines": "1096-1098",
+      "lines": "1090-1092",
       "carried": true
     },
     {
       "selector": ".change-surface-verify",
-      "lines": "1100-1104",
+      "lines": "1094-1098",
       "carried": true
     },
     {
       "selector": ".change-surface-verify a",
-      "lines": "1106-1110",
+      "lines": "1100-1104",
       "carried": true
     },
     {
       "selector": ".change-surface-verify a:hover, .change-surface-verify a:focus-visible",
-      "lines": "1112-1115",
+      "lines": "1106-1109",
       "carried": true
     },
     {
       "selector": ".change-surface-files",
-      "lines": "1117-1125",
+      "lines": "1111-1119",
       "carried": true
     },
     {
       "selector": ".change-surface-files .touch-file a",
-      "lines": "1127-1132",
+      "lines": "1121-1126",
       "carried": true
     },
     {
       "selector": ".change-surface-files .touch-file a:hover, .change-surface-files .touch-file a:focus-visible",
-      "lines": "1134-1137",
+      "lines": "1128-1131",
       "carried": true
     },
     {
       "selector": ".change-surface-files .touch-file-new a",
-      "lines": "1139-1142",
+      "lines": "1133-1136",
       "carried": true
     },
     {
       "selector": ".change-surface-files .touch-file-sprint a",
-      "lines": "1144-1148",
+      "lines": "1138-1142",
       "carried": true
     },
     {
       "selector": ".change-surface-updated",
-      "lines": "1156-1161",
+      "lines": "1150-1155",
       "carried": true
     },
     {
       "selector": ".change-surface-chip",
-      "lines": "1164-1178",
+      "lines": "1158-1172",
       "carried": true
     },
     {
       "selector": ".change-surface-chip .ss-icon",
-      "lines": "1180-1184",
+      "lines": "1174-1178",
       "carried": true
     },
     {
       "selector": ".change-surface-chip-sprint",
-      "lines": "1186-1188",
+      "lines": "1180-1182",
       "carried": true
     },
     {
       "selector": ".change-surface-chip-story",
-      "lines": "1190-1192",
+      "lines": "1184-1186",
       "carried": true
     },
     {
       "selector": "a.change-surface-chip:hover, a.change-surface-chip:focus-visible",
-      "lines": "1194-1200",
+      "lines": "1188-1194",
       "carried": true
     },
     {
       "selector": ".change-surface-chip-label",
-      "lines": "1207-1209",
+      "lines": "1201-1203",
       "carried": true
     },
     {
       "selector": ".change-surface-empty",
-      "lines": "1211-1215",
+      "lines": "1205-1209",
       "carried": true
     },
     {
       "selector": ".change-surface-files",
-      "lines": "1218-1218",
+      "lines": "1212-1212",
       "carried": true,
       "within": "@media (max-width: 640px)"
     },
     {
       "selector": ".pill",
-      "lines": "1229-1238",
+      "lines": "1223-1232",
       "carried": true
     },
     {
       "selector": ".page-shell",
-      "lines": "1253-1261",
+      "lines": "1247-1255",
       "carried": true
     },
     {
       "selector": ".page-main",
-      "lines": "1265-1265",
+      "lines": "1259-1259",
       "carried": true
     },
     {
       "selector": ".page-rail",
-      "lines": "1272-1282",
+      "lines": "1266-1276",
       "carried": true
     },
     {
       "selector": ".toc-sidebar",
-      "lines": "1285-1293",
+      "lines": "1279-1287",
       "carried": true
     },
     {
       "selector": ".toc-sidebar .toc-label",
-      "lines": "1295-1301",
+      "lines": "1289-1295",
       "carried": true
     },
     {
       "selector": ".toc-sidebar a",
-      "lines": "1303-1309",
+      "lines": "1297-1303",
       "carried": true
     },
     {
       "selector": ".toc-sidebar a:hover",
-      "lines": "1311-1311",
+      "lines": "1305-1305",
       "carried": true
     },
     {
       "selector": ".toc-sidebar a.toc-h3",
-      "lines": "1312-1312",
+      "lines": "1306-1306",
       "carried": true
     },
     {
       "selector": ".toc-group",
-      "lines": "1333-1333",
+      "lines": "1327-1327",
       "carried": true
     },
     {
       "selector": ".toc-group > summary",
-      "lines": "1334-1340",
+      "lines": "1328-1334",
       "carried": true
     },
     {
       "selector": ".toc-group > summary::-webkit-details-marker",
-      "lines": "1341-1341",
+      "lines": "1335-1335",
       "carried": true
     },
     {
       "selector": ".toc-group > summary::before",
-      "lines": "1342-1342",
+      "lines": "1336-1336",
       "carried": true
     },
     {
       "selector": ".toc-group[open] > summary::before",
-      "lines": "1343-1343",
+      "lines": "1337-1337",
       "carried": true
     },
     {
       "selector": ".toc-group > summary > a",
-      "lines": "1344-1344",
+      "lines": "1338-1338",
       "carried": true
     },
     {
       "selector": ".doc-body h2[id], .doc-body h3[id], .page-main .chart-panel[id], .page-main section[id], .page-main .story-lead[id], .page-main .story-card[id], .page-main .epic-intro[id]",
-      "lines": "1347-1351",
+      "lines": "1341-1345",
       "carried": true
     },
     {
       "selector": ".page-shell",
-      "lines": "1356-1356",
+      "lines": "1350-1350",
       "carried": true,
       "within": "@media (max-width: 900px)"
     },
     {
       "selector": ".page-rail",
-      "lines": "1357-1364",
+      "lines": "1351-1358",
       "carried": true,
       "within": "@media (max-width: 900px)"
     },
     {
       "selector": ".toc-sidebar",
-      "lines": "1365-1370",
+      "lines": "1359-1364",
       "carried": true,
       "within": "@media (max-width: 900px)"
     },
     {
       "selector": ".toc-sidebar .toc-label",
+      "lines": "1365-1365",
+      "carried": true,
+      "within": "@media (max-width: 900px)"
+    },
+    {
+      "selector": ".toc-sidebar a",
+      "lines": "1367-1367",
+      "carried": true,
+      "within": "@media (max-width: 900px)"
+    },
+    {
+      "selector": ".toc-sidebar a.toc-h3",
+      "lines": "1368-1368",
+      "carried": true,
+      "within": "@media (max-width: 900px)"
+    },
+    {
+      "selector": ".toc-group",
       "lines": "1371-1371",
       "carried": true,
       "within": "@media (max-width: 900px)"
     },
     {
-      "selector": ".toc-sidebar a",
-      "lines": "1373-1373",
-      "carried": true,
-      "within": "@media (max-width: 900px)"
-    },
-    {
-      "selector": ".toc-sidebar a.toc-h3",
-      "lines": "1374-1374",
-      "carried": true,
-      "within": "@media (max-width: 900px)"
-    },
-    {
-      "selector": ".toc-group",
-      "lines": "1377-1377",
-      "carried": true,
-      "within": "@media (max-width: 900px)"
-    },
-    {
       "selector": ".toc-group > summary",
-      "lines": "1378-1378",
+      "lines": "1372-1372",
       "carried": true,
       "within": "@media (max-width: 900px)"
     },
     {
       "selector": ".doc-body",
-      "lines": "1382-1386",
+      "lines": "1376-1380",
       "carried": true
     },
     {
       "selector": ".doc-body h1, .doc-body h2, .doc-body h3, .doc-body h4",
-      "lines": "1388-1395",
+      "lines": "1382-1389",
       "carried": true
     },
     {
       "selector": ".doc-body h1",
-      "lines": "1397-1397",
+      "lines": "1391-1391",
       "carried": true
     },
     {
       "selector": ".doc-body h2",
-      "lines": "1398-1398",
+      "lines": "1392-1392",
       "carried": true
     },
     {
       "selector": ".doc-body h3",
-      "lines": "1399-1399",
+      "lines": "1393-1393",
       "carried": true
     },
     {
       "selector": ".doc-body h4",
-      "lines": "1400-1400",
+      "lines": "1394-1394",
       "carried": true
     },
     {
       "selector": ".doc-body p",
-      "lines": "1402-1402",
+      "lines": "1396-1396",
       "carried": true
     },
     {
       "selector": ".doc-body ul, .doc-body ol",
-      "lines": "1404-1405",
+      "lines": "1398-1399",
       "carried": true
     },
     {
       "selector": ".doc-body li",
-      "lines": "1406-1406",
+      "lines": "1400-1400",
       "carried": true
     },
     {
       "selector": ".doc-body a",
-      "lines": "1408-1408",
+      "lines": "1402-1402",
       "carried": true
     },
     {
       "selector": ".doc-body a:hover",
-      "lines": "1409-1409",
+      "lines": "1403-1403",
       "carried": true
     },
     {
       "selector": ".doc-body strong",
-      "lines": "1411-1411",
+      "lines": "1405-1405",
       "carried": true
     },
     {
       "selector": ".doc-body em",
-      "lines": "1412-1412",
+      "lines": "1406-1406",
       "carried": true
     },
     {
       "selector": ".doc-body blockquote",
-      "lines": "1414-1421",
+      "lines": "1408-1415",
       "carried": true
     },
     {
       "selector": ".md-comment",
-      "lines": "1430-1438",
+      "lines": "1424-1432",
       "carried": true
     },
     {
       "selector": ".md-comment-inline",
-      "lines": "1440-1444",
+      "lines": "1434-1438",
       "carried": true
     },
     {
       "selector": ".ref-chip",
-      "lines": "1449-1458",
+      "lines": "1443-1452",
       "carried": true
     },
     {
       "selector": ".assumption-tag strong",
-      "lines": "1462-1466",
+      "lines": "1456-1460",
       "carried": true
     },
     {
       "selector": ".doc-body code",
-      "lines": "1468-1479",
+      "lines": "1462-1473",
       "carried": true
     },
     {
       "selector": "code.color-swatch",
-      "lines": "1484-1486",
+      "lines": "1478-1480",
       "carried": true
     },
     {
       "selector": ".doc-body pre",
-      "lines": "1488-1495",
+      "lines": "1482-1489",
       "carried": true
     },
     {
       "selector": ".doc-body pre code",
-      "lines": "1497-1501",
+      "lines": "1491-1495",
       "carried": true
     },
     {
       "selector": ".sr-only",
-      "lines": "1798-1808",
+      "lines": "1792-1802",
       "carried": true
     },
     {
       "selector": ".ss-tabs",
-      "lines": "1983-1983",
+      "lines": "1977-1977",
       "carried": true
     },
     {
       "selector": ".ss-tablist",
-      "lines": "1985-1994",
+      "lines": "1979-1988",
       "carried": true
     },
     {
       "selector": ".ss-tab",
-      "lines": "1996-2007",
+      "lines": "1990-2001",
       "carried": true
     },
     {
       "selector": ".ss-tab .ss-icon",
-      "lines": "2009-2009",
+      "lines": "2003-2003",
       "carried": true
     },
     {
       "selector": ".ss-tab-input",
-      "lines": "2011-2017",
+      "lines": "2005-2011",
       "carried": true
     },
     {
       "selector": ".ss-tab:hover",
-      "lines": "2019-2019",
+      "lines": "2013-2013",
       "carried": true
     },
     {
       "selector": ".ss-tab:has(.ss-tab-input:checked)",
-      "lines": "2021-2024",
+      "lines": "2015-2018",
       "carried": true
     },
     {
       "selector": ".ss-tab:has(.ss-tab-input:focus-visible)",
-      "lines": "2026-2029",
+      "lines": "2020-2023",
       "carried": true
     },
     {
       "selector": ".ss-tabpanel",
-      "lines": "2032-2032",
+      "lines": "2026-2026",
       "carried": true
     },
     {
       "selector": ".ss-tabs:has(.ss-tab--overview .ss-tab-input:checked) .ss-tabpanel--overview, .ss-tabs:has(.ss-tab--graph .ss-tab-input:checked) .ss-tabpanel--graph",
-      "lines": "2033-2036",
+      "lines": "2027-2030",
       "carried": true
     },
     {
       "selector": ".work-graph-intro",
-      "lines": "2045-2048",
+      "lines": "2039-2042",
       "carried": true
     },
     {
       "selector": ".work-graph-wrap",
-      "lines": "2050-2053",
+      "lines": "2044-2047",
       "carried": true
     },
     {
       "selector": ".work-graph",
-      "lines": "2055-2058",
+      "lines": "2049-2052",
       "carried": true
     },
     {
       "selector": ".work-arrow path",
-      "lines": "2061-2061",
+      "lines": "2055-2055",
       "carried": true
     },
     {
       "selector": ".work-edge",
-      "lines": "2063-2067",
+      "lines": "2057-2061",
       "carried": true
     },
     {
       "selector": ".work-node-epic",
-      "lines": "2076-2080",
+      "lines": "2070-2074",
       "carried": true
     },
     {
       "selector": ".work-epic-label",
-      "lines": "2082-2086",
+      "lines": "2076-2080",
       "carried": true
     },
     {
       "selector": ".work-node-story",
-      "lines": "2088-2092",
+      "lines": "2082-2086",
       "carried": true
     },
     {
       "selector": ".work-node-deferred",
-      "lines": "2096-2100",
+      "lines": "2090-2094",
       "carried": true
     },
     {
       "selector": ".work-node-action",
-      "lines": "2102-2106",
+      "lines": "2096-2100",
       "carried": true
     },
     {
       "selector": ".work-node-spec",
-      "lines": "2109-2113",
+      "lines": "2103-2107",
       "carried": true
     },
     {
       "selector": ".work-label",
-      "lines": "2123-2126",
+      "lines": "2117-2120",
       "carried": true
     },
     {
       "selector": ".work-node",
-      "lines": "2128-2128",
+      "lines": "2122-2122",
       "carried": true
     },
     {
       "selector": "a.work-node:hover .work-node-story, a.work-node:focus-visible .work-node-story",
-      "lines": "2131-2132",
+      "lines": "2125-2126",
       "carried": true
     },
     {
       "selector": "a.work-node:hover .work-label, a.work-node:focus-visible .work-label",
-      "lines": "2134-2138",
+      "lines": "2128-2132",
       "carried": true
     },
     {
       "selector": "a.work-node:focus-visible",
-      "lines": "2140-2143",
+      "lines": "2134-2137",
       "carried": true
     },
     {
       "selector": ".work-graph-overflow, .work-graph-empty",
-      "lines": "2181-2185",
+      "lines": "2175-2179",
       "carried": true
     },
     {
       "selector": ".work-graph-query",
-      "lines": "2188-2193",
+      "lines": "2182-2187",
       "carried": true
     },
     {
       "selector": ".work-graph-query h3",
-      "lines": "2195-2195",
+      "lines": "2189-2189",
       "carried": true
     },
     {
       "selector": ".md-table",
-      "lines": "2422-2427",
+      "lines": "2416-2421",
       "carried": true
     },
     {
       "selector": ".md-table th, .md-table td",
-      "lines": "2429-2434",
+      "lines": "2423-2428",
       "carried": true
     },
     {
       "selector": ".md-table th",
-      "lines": "2436-2439",
+      "lines": "2430-2433",
       "carried": true
     },
     {
       "selector": ".md-table tr:nth-child(even) td",
-      "lines": "2441-2441",
+      "lines": "2435-2435",
       "carried": true
     },
     {
       "selector": ".doc-body hr",
-      "lines": "2443-2447",
+      "lines": "2437-2441",
       "carried": true
     },
     {
       "selector": ".doc-body img",
-      "lines": "2449-2449",
+      "lines": "2443-2443",
       "carried": true
     },
     {
       "selector": ".date-link",
-      "lines": "2695-2695",
+      "lines": "2689-2689",
       "carried": true
     },
     {
       "selector": ".date-link:hover, .date-link:focus",
-      "lines": "2696-2696",
+      "lines": "2690-2690",
       "carried": true
     },
     {
       "selector": ".git-pulse-zone-note",
-      "lines": "2700-2700",
+      "lines": "2694-2694",
       "carried": true
     },
     {
       "selector": ".breadcrumb",
-      "lines": "2765-2773",
+      "lines": "2759-2767",
       "carried": true
     },
     {
       "selector": ".breadcrumb a",
-      "lines": "2775-2775",
+      "lines": "2769-2769",
       "carried": true
     },
     {
       "selector": ".breadcrumb a:hover",
-      "lines": "2776-2776",
+      "lines": "2770-2770",
       "carried": true
     },
     {
       "selector": ".breadcrumb .crumb-sep",
-      "lines": "2777-2777",
+      "lines": "2771-2771",
       "carried": true
     },
     {
       "selector": ".breadcrumb .crumb-current",
-      "lines": "2778-2778",
+      "lines": "2772-2772",
       "carried": true
     },
     {
       "selector": ".page-wayfinding",
-      "lines": "2784-2793",
+      "lines": "2778-2787",
       "carried": true
     },
     {
       "selector": ".page-wayfinding .breadcrumb",
-      "lines": "2795-2800",
+      "lines": "2789-2794",
       "carried": true
     },
     {
       "selector": ".banner",
-      "lines": "2803-2813",
+      "lines": "2797-2807",
       "carried": true
     },
     {
       "selector": ".banner p",
-      "lines": "2815-2815",
+      "lines": "2809-2809",
       "carried": true
     },
     {
       "selector": ".banner p:first-child",
-      "lines": "2816-2816",
+      "lines": "2810-2810",
       "carried": true
     },
     {
       "selector": ".banner li",
-      "lines": "2817-2817",
+      "lines": "2811-2811",
       "carried": true
     },
     {
       "selector": ".epic-overview",
-      "lines": "2819-2826",
+      "lines": "2813-2820",
       "carried": true
     },
     {
       "selector": ".epic-chip",
-      "lines": "2828-2837",
+      "lines": "2822-2831",
       "carried": true
     },
     {
       "selector": ".epic-chip:hover",
-      "lines": "2839-2839",
+      "lines": "2833-2833",
       "carried": true
     },
     {
       "selector": ".epic-chip .num",
-      "lines": "2841-2846",
+      "lines": "2835-2840",
       "carried": true
     },
     {
       "selector": ".epic-chip.done",
-      "lines": "2849-2849",
+      "lines": "2843-2843",
       "carried": true
     },
     {
       "selector": ".epic-chip.review",
-      "lines": "2852-2852",
+      "lines": "2846-2846",
       "carried": true
     },
     {
       "selector": ".epic-chip.active",
-      "lines": "2853-2853",
+      "lines": "2847-2847",
       "carried": true
     },
     {
       "selector": ".epic-chip.ready, .epic-chip.drafted",
-      "lines": "2856-2857",
+      "lines": "2850-2851",
       "carried": true
     },
     {
       "selector": ".epic-chip.pending",
-      "lines": "2858-2858",
+      "lines": "2852-2852",
       "carried": true
     },
     {
       "selector": ".section-divider",
-      "lines": "2860-2869",
+      "lines": "2854-2863",
       "carried": true
     },
     {
       "selector": ".epic-card",
-      "lines": "2872-2880",
+      "lines": "2866-2874",
       "carried": true
     },
     {
       "selector": ".epic-card h2",
-      "lines": "2882-2890",
+      "lines": "2876-2884",
       "carried": true
     },
     {
       "selector": ".epic-num",
-      "lines": "2892-2896",
+      "lines": "2886-2890",
       "carried": true
     },
     {
       "selector": ".epic-status",
-      "lines": "2898-2905",
+      "lines": "2892-2899",
       "carried": true
     },
     {
       "selector": ".epic-status.done",
-      "lines": "2907-2907",
+      "lines": "2901-2901",
       "carried": true
     },
     {
       "selector": ".epic-status.review",
-      "lines": "2909-2909",
+      "lines": "2903-2903",
       "carried": true
     },
     {
       "selector": ".epic-status.active",
-      "lines": "2910-2910",
+      "lines": "2904-2904",
       "carried": true
     },
     {
       "selector": ".epic-status.ready, .epic-status.drafted",
-      "lines": "2911-2912",
+      "lines": "2905-2906",
       "carried": true
     },
     {
       "selector": ".epic-status.pending",
-      "lines": "2913-2913",
+      "lines": "2907-2907",
       "carried": true
     },
     {
       "selector": ".epic-status.unrecognized",
-      "lines": "2914-2924",
+      "lines": "2908-2918",
       "carried": true
     },
     {
       "selector": ".epic-goal",
-      "lines": "2926-2926",
+      "lines": "2920-2920",
       "carried": true
     },
     {
       "selector": ".epic-meta",
-      "lines": "2928-2933",
+      "lines": "2922-2927",
       "carried": true
     },
     {
       "selector": ".pending-note",
-      "lines": "2935-2935",
+      "lines": "2929-2929",
       "carried": true
     },
     {
       "selector": ".epic-undrafted-banner",
-      "lines": "2938-2949",
+      "lines": "2932-2943",
       "carried": true
     },
     {
       "selector": ".view-epic-link",
-      "lines": "2951-2958",
+      "lines": "2945-2952",
       "carried": true
     },
     {
       "selector": ".view-epic-link:hover",
-      "lines": "2960-2960",
+      "lines": "2954-2954",
       "carried": true
     },
     {
       "selector": ".story-body",
-      "lines": "3001-3005",
+      "lines": "2995-2999",
       "carried": true
     },
     {
       "selector": ".user-story",
-      "lines": "3007-3016",
+      "lines": "3001-3010",
       "carried": true
     },
     {
       "selector": ".user-story p",
-      "lines": "3018-3018",
+      "lines": "3012-3012",
       "carried": true
     },
     {
       "selector": ".story-lead",
-      "lines": "3022-3026",
+      "lines": "3016-3020",
       "carried": true
     },
     {
       "selector": ".story-lead.user-story",
-      "lines": "3028-3028",
+      "lines": "3022-3022",
       "carried": true
     },
     {
       "selector": ".ac-label",
-      "lines": "3030-3036",
+      "lines": "3024-3030",
       "carried": true
     },
     {
       "selector": ".ac-list",
-      "lines": "3038-3038",
+      "lines": "3032-3032",
       "carried": true
     },
     {
       "selector": ".ac-block",
-      "lines": "3042-3042",
+      "lines": "3036-3036",
       "carried": true
     },
     {
       "selector": ".ac-block-body",
-      "lines": "3043-3043",
+      "lines": "3037-3037",
       "carried": true
     },
     {
       "selector": ".ac-num",
-      "lines": "3045-3052",
+      "lines": "3039-3046",
       "carried": true
     },
     {
       "selector": ".gherkin-line",
-      "lines": "3060-3060",
+      "lines": "3054-3054",
       "carried": true
     },
     {
       "selector": ".gherkin-line + .gherkin-line",
-      "lines": "3061-3061",
+      "lines": "3055-3055",
       "carried": true
     },
     {
       "selector": ".gherkin-kw",
-      "lines": "3063-3078",
+      "lines": "3057-3072",
       "carried": true
     },
     {
       "selector": ".gherkin-kw.kw-given",
-      "lines": "3079-3079",
+      "lines": "3073-3073",
       "carried": true
     },
     {
       "selector": ".gherkin-kw.kw-when",
-      "lines": "3082-3082",
+      "lines": "3076-3076",
       "carried": true
     },
     {
       "selector": ".gherkin-kw.kw-then",
-      "lines": "3083-3083",
+      "lines": "3077-3077",
       "carried": true
     },
     {
       "selector": ".gherkin-kw.kw-and",
-      "lines": "3084-3085",
+      "lines": "3078-3079",
       "carried": true,
       "note": "1 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": ".ac-panel .ac-criteria",
-      "lines": "3093-3093",
+      "lines": "3087-3087",
       "carried": true
     },
     {
       "selector": ".ac-criterion",
-      "lines": "3095-3106",
+      "lines": "3089-3100",
       "carried": true
     },
     {
       "selector": ".ac-criterion:target",
-      "lines": "3110-3114",
+      "lines": "3104-3108",
       "carried": true
     },
     {
       "selector": ".ac-anchor",
-      "lines": "3116-3124",
+      "lines": "3110-3118",
       "carried": true
     },
     {
       "selector": ".ac-anchor:hover",
-      "lines": "3125-3125",
+      "lines": "3119-3119",
       "carried": true
     },
     {
       "selector": ".ac-criterion-body",
-      "lines": "3127-3127",
+      "lines": "3121-3121",
       "carried": true
     },
     {
       "selector": ".ac-criterion-body strong",
-      "lines": "3128-3128",
+      "lines": "3122-3122",
       "carried": true
     },
     {
       "selector": ".ac-criterion-body p",
-      "lines": "3131-3131",
+      "lines": "3125-3125",
       "carried": true
     },
     {
       "selector": ".ac-criterion-body p + p",
-      "lines": "3132-3132",
+      "lines": "3126-3126",
       "carried": true
     },
     {
       "selector": ".ac-ref",
-      "lines": "3135-3140",
+      "lines": "3129-3134",
       "carried": true
     },
     {
       "selector": ".ac-ref:hover",
-      "lines": "3141-3141",
+      "lines": "3135-3135",
       "carried": true
     },
     {
       "selector": ".requirements-inventory summary",
-      "lines": "3143-3149",
+      "lines": "3137-3143",
       "carried": true
     },
     {
       "selector": ".requirements-inventory summary::-webkit-details-marker",
-      "lines": "3151-3151",
+      "lines": "3145-3145",
       "carried": true
     },
     {
       "selector": ".requirements-inventory summary::before",
-      "lines": "3152-3152",
+      "lines": "3146-3146",
       "carried": true
     },
     {
       "selector": ".requirements-inventory[open] summary::before",
-      "lines": "3153-3153",
+      "lines": "3147-3147",
       "carried": true
     },
     {
       "selector": ".requirements-inventory .story-body",
-      "lines": "3154-3154",
+      "lines": "3148-3148",
       "carried": true
     },
     {
       "selector": ".requirements-inventory .story-body h3",
-      "lines": "3155-3155",
+      "lines": "3149-3149",
       "carried": true
     },
     {
       "selector": ".requirements-inventory .story-body p",
-      "lines": "3156-3156",
+      "lines": "3150-3150",
       "carried": true
     },
     {
       "selector": ".status-badge",
-      "lines": "3159-3170",
+      "lines": "3153-3164",
       "carried": true
     },
     {
       "selector": ".status-badge.done",
-      "lines": "3172-3172",
+      "lines": "3166-3166",
       "carried": true
     },
     {
       "selector": ".status-badge.active",
-      "lines": "3173-3173",
+      "lines": "3167-3167",
       "carried": true
     },
     {
       "selector": ".status-badge.review",
-      "lines": "3174-3174",
+      "lines": "3168-3168",
       "carried": true
     },
     {
       "selector": ".status-badge.ready, .status-badge.drafted",
-      "lines": "3175-3176",
+      "lines": "3169-3170",
       "carried": true
     },
     {
       "selector": ".status-badge.pending",
-      "lines": "3180-3180",
+      "lines": "3174-3174",
       "carried": true
     },
     {
       "selector": ".status-badge.retired",
-      "lines": "3182-3182",
+      "lines": "3176-3176",
       "carried": true
     },
     {
       "selector": ".status-badge.unrecognized",
-      "lines": "3184-3194",
+      "lines": "3178-3188",
       "carried": true
     },
     {
       "selector": ".status-badge.task-badge",
-      "lines": "3206-3211",
+      "lines": "3200-3205",
       "carried": true
     },
     {
       "selector": ".status-badge.task-badge.complete",
-      "lines": "3214-3214",
+      "lines": "3208-3208",
       "carried": true
     },
     {
       "selector": ".status-badge.task-badge.none-done",
-      "lines": "3215-3215",
+      "lines": "3209-3209",
       "carried": true
     },
     {
       "selector": ".story-status-pair",
-      "lines": "3218-3224",
+      "lines": "3212-3218",
       "carried": true
     },
     {
       "selector": ".story-status-pair-sep",
-      "lines": "3225-3229",
+      "lines": "3219-3223",
       "carried": true
     },
     {
       "selector": ".ss-icon",
-      "lines": "3235-3235",
+      "lines": "3229-3229",
       "carried": true
     },
     {
       "selector": ".story-title-link",
-      "lines": "3237-3237",
+      "lines": "3231-3231",
       "carried": true
     },
     {
       "selector": ".story-title-link:hover",
-      "lines": "3238-3238",
+      "lines": "3232-3232",
       "carried": true
     },
     {
       "selector": ".sunburst-panel",
-      "lines": "3241-3241",
+      "lines": "3235-3235",
       "carried": true
     },
     {
       "selector": ".chart-panel-header-row",
-      "lines": "3243-3250",
+      "lines": "3237-3244",
       "carried": true
     },
     {
       "selector": ".chart-panel-header-row h3",
-      "lines": "3252-3252",
+      "lines": "3246-3246",
       "carried": true
     },
     {
       "selector": ".chart-panel-header-row .view-epic-link",
-      "lines": "3253-3253",
-      "carried": true
-    },
-    {
-      "selector": ".sunburst",
-      "lines": "3254-3254",
-      "carried": true
-    },
-    {
-      "selector": ".sb-seg",
-      "lines": "3256-3256",
-      "carried": true
-    },
-    {
-      "selector": ".sunburst:hover .sb-seg",
-      "lines": "3260-3260",
-      "carried": true
-    },
-    {
-      "selector": ".sunburst .sb-seg:hover",
-      "lines": "3261-3261",
-      "carried": true
-    },
-    {
-      "selector": ".sb-done",
-      "lines": "3262-3262",
-      "carried": true
-    },
-    {
-      "selector": ".sb-active",
-      "lines": "3263-3263",
-      "carried": true
-    },
-    {
-      "selector": ".sb-review",
-      "lines": "3264-3264",
-      "carried": true
-    },
-    {
-      "selector": ".sb-ready",
-      "lines": "3265-3265",
-      "carried": true
-    },
-    {
-      "selector": ".sb-drafted",
-      "lines": "3266-3266",
-      "carried": true
-    },
-    {
-      "selector": ".sb-pending",
-      "lines": "3267-3267",
-      "carried": true
-    },
-    {
-      "selector": ".sb-unrecognized",
-      "lines": "3268-3268",
-      "carried": true
-    },
-    {
-      "selector": ".sb-noplan",
-      "lines": "3273-3279",
-      "carried": true
-    },
-    {
-      "selector": ".sunburst .sb-noplan:hover",
-      "lines": "3280-3280",
-      "carried": true
-    },
-    {
-      "selector": ".sb-followup-open",
-      "lines": "3285-3290",
-      "carried": true
-    },
-    {
-      "selector": ".sb-followup-done",
-      "lines": "3291-3296",
+      "lines": "3247-3247",
       "carried": true
     },
     {
       "selector": ".sunburst-legend .sb-followup-open-sw",
-      "lines": "3297-3297",
+      "lines": "3291-3291",
       "carried": true
     },
     {
       "selector": ".sunburst-legend .sb-followup-done-sw",
-      "lines": "3298-3308",
-      "carried": true
-    },
-    {
-      "selector": ".sb-unplanned",
-      "lines": "3310-3310",
+      "lines": "3292-3302",
       "carried": true
     },
     {
       "selector": ".sunburst-legend .sb-unplanned-sw",
-      "lines": "3311-3311",
-      "carried": true
-    },
-    {
-      "selector": ".sunburst-center-num",
-      "lines": "3313-3313",
-      "carried": true
-    },
-    {
-      "selector": ".sunburst-center-label",
-      "lines": "3314-3314",
+      "lines": "3305-3305",
       "carried": true
     },
     {
       "selector": ".sunburst-legend",
-      "lines": "3316-3324",
+      "lines": "3310-3318",
       "carried": true
     },
     {
       "selector": ".sunburst-legend .swatch",
-      "lines": "3326-3326",
+      "lines": "3320-3320",
       "carried": true
     },
     {
       "selector": ".sunburst-legend .sb-pending-sw",
-      "lines": "3327-3327",
+      "lines": "3321-3321",
       "carried": true
     },
     {
       "selector": ".sunburst-legend .sb-drafted-sw",
-      "lines": "3328-3328",
+      "lines": "3322-3322",
       "carried": true
     },
     {
       "selector": ".sunburst-legend .sb-ready-sw",
-      "lines": "3329-3329",
+      "lines": "3323-3323",
       "carried": true
     },
     {
       "selector": ".sunburst-legend .sb-active-sw",
-      "lines": "3330-3330",
+      "lines": "3324-3324",
       "carried": true
     },
     {
       "selector": ".sunburst-legend .sb-review-sw",
-      "lines": "3331-3331",
+      "lines": "3325-3325",
       "carried": true
     },
     {
       "selector": ".sunburst-legend .sb-done-sw",
-      "lines": "3332-3332",
+      "lines": "3326-3326",
       "carried": true
     },
     {
       "selector": ".sunburst-legend .sb-noplan-sw",
-      "lines": "3333-3344",
+      "lines": "3327-3338",
       "carried": true
     },
     {
       "selector": ".sunburst-legend .sb-legend-item",
-      "lines": "3357-3357",
+      "lines": "3351-3351",
       "carried": true
     },
     {
       "selector": ".sunburst-legend .sb-legend-item:focus-visible",
-      "lines": "3358-3358",
-      "carried": true
-    },
-    {
-      "selector": ".sunburst-panel:has(.sb-pending-item:hover) .sb-seg:not(.sb-pending), .sunburst-panel:has(.sb-pending-item:focus-visible) .sb-seg:not(.sb-pending), .sunburst-panel:has(.sb-drafted-item:hover) .sb-seg:not(.sb-drafted), .sunburst-panel:has(.sb-drafted-item:focus-visible) .sb-seg:not(.sb-drafted), .sunburst-panel:has(.sb-ready-item:hover) .sb-seg:not(.sb-ready), .sunburst-panel:has(.sb-ready-item:focus-visible) .sb-seg:not(.sb-ready), .sunburst-panel:has(.sb-active-item:hover) .sb-seg:not(.sb-active), .sunburst-panel:has(.sb-active-item:focus-visible) .sb-seg:not(.sb-active), .sunburst-panel:has(.sb-review-item:hover) .sb-seg:not(.sb-review), .sunburst-panel:has(.sb-review-item:focus-visible) .sb-seg:not(.sb-review), .sunburst-panel:has(.sb-done-item:hover) .sb-seg:not(.sb-done), .sunburst-panel:has(.sb-done-item:focus-visible) .sb-seg:not(.sb-done), .sunburst-panel:has(.sb-followup-open-item:hover) .sb-seg:not(.sb-followup-open), .sunburst-panel:has(.sb-followup-open-item:focus-visible) .sb-seg:not(.sb-followup-open), .sunburst-panel:has(.sb-followup-done-item:hover) .sb-seg:not(.sb-followup-done), .sunburst-panel:has(.sb-followup-done-item:focus-visible) .sb-seg:not(.sb-followup-done), .sunburst-panel:has(.sb-unplanned-item:hover) .sb-seg:not(.sb-unplanned), .sunburst-panel:has(.sb-unplanned-item:focus-visible) .sb-seg:not(.sb-unplanned), .sunburst-panel:has(.sb-noplan-item:hover) .sb-seg:not(.sb-noplan), .sunburst-panel:has(.sb-noplan-item:focus-visible) .sb-seg:not(.sb-noplan)",
-      "lines": "3360-3381",
+      "lines": "3352-3352",
       "carried": true
     },
     {
       "selector": ".donut-legend .dn-legend-item",
-      "lines": "3388-3388",
+      "lines": "3382-3382",
       "carried": true
     },
     {
       "selector": ".donut-legend .dn-legend-item:focus-visible",
-      "lines": "3389-3389",
+      "lines": "3383-3383",
       "carried": true
     },
     {
       "selector": ".donut-and-legend:has(.dn-pending-item:hover) .donut-seg:not(.pending), .donut-and-legend:has(.dn-pending-item:focus-visible) .donut-seg:not(.pending), .donut-and-legend:has(.dn-drafted-item:hover) .donut-seg:not(.drafted), .donut-and-legend:has(.dn-drafted-item:focus-visible) .donut-seg:not(.drafted), .donut-and-legend:has(.dn-ready-item:hover) .donut-seg:not(.ready), .donut-and-legend:has(.dn-ready-item:focus-visible) .donut-seg:not(.ready), .donut-and-legend:has(.dn-active-item:hover) .donut-seg:not(.active), .donut-and-legend:has(.dn-active-item:focus-visible) .donut-seg:not(.active), .donut-and-legend:has(.dn-review-item:hover) .donut-seg:not(.review), .donut-and-legend:has(.dn-review-item:focus-visible) .donut-seg:not(.review), .donut-and-legend:has(.dn-done-item:hover) .donut-seg:not(.done), .donut-and-legend:has(.dn-done-item:focus-visible) .donut-seg:not(.done), .donut-and-legend:has(.dn-deferred-item:hover) .donut-seg:not(.deferred), .donut-and-legend:has(.dn-deferred-item:focus-visible) .donut-seg:not(.deferred)",
-      "lines": "3391-3406",
-      "carried": true
-    },
-    {
-      "selector": ".sunburst-hint",
-      "lines": "3409-3409",
-      "carried": true
-    },
-    {
-      "selector": ".sb-story-summary",
-      "lines": "3415-3419",
-      "carried": true
-    },
-    {
-      "selector": ".sunburst .sb-story-summary:hover",
-      "lines": "3420-3420",
+      "lines": "3385-3400",
       "carried": true
     },
     {
       "selector": ".epic-remaining-grid",
-      "lines": "3428-3432",
+      "lines": "3422-3426",
       "carried": true
     },
     {
       "selector": ".epic-remaining-tile",
-      "lines": "3433-3446",
+      "lines": "3427-3440",
       "carried": true
     },
     {
       "selector": ".epic-remaining-tile:hover, .epic-remaining-tile:focus-visible",
-      "lines": "3447-3452",
+      "lines": "3441-3446",
       "carried": true
     },
     {
       "selector": ".epic-remaining-num",
-      "lines": "3453-3459",
+      "lines": "3447-3453",
       "carried": true
     },
     {
       "selector": ".epic-remaining-title",
-      "lines": "3460-3460",
+      "lines": "3454-3454",
       "carried": true
     },
     {
       "selector": ".epic-remaining-status",
-      "lines": "3463-3469",
+      "lines": "3457-3463",
       "carried": true
     },
     {
       "selector": ".epic-remaining-count",
-      "lines": "3470-3470",
+      "lines": "3464-3464",
       "carried": true
     },
     {
       "selector": ".epic-remaining-followups",
-      "lines": "3471-3471",
+      "lines": "3465-3465",
+      "carried": true
+    },
+    {
+      "selector": ".epic-remaining-review",
+      "lines": "3467-3467",
       "carried": true
     },
     {
       "selector": ".epic-remaining-active",
-      "lines": "3474-3474",
+      "lines": "3468-3468",
       "carried": true
     },
     {
       "selector": ".epic-remaining-ready",
-      "lines": "3475-3475",
+      "lines": "3469-3469",
       "carried": true
     },
     {
       "selector": ".epic-remaining-drafted",
-      "lines": "3476-3476",
+      "lines": "3470-3470",
       "carried": true
     },
     {
       "selector": ".epic-remaining-done",
-      "lines": "3478-3478",
+      "lines": "3472-3472",
       "carried": true
     },
     {
       "selector": ".epic-remaining-unplanned",
-      "lines": "3481-3481",
+      "lines": "3475-3475",
       "carried": true
     },
     {
       "selector": ".epic-remaining-grid",
-      "lines": "3484-3484",
+      "lines": "3478-3478",
       "carried": true,
       "within": "@media (max-width: 640px)"
     },
     {
       "selector": ".next-steps-cards",
-      "lines": "3489-3494",
+      "lines": "3483-3488",
       "carried": true
     },
     {
       "selector": ".next-step-card",
-      "lines": "3495-3506",
+      "lines": "3489-3500",
       "carried": true
     },
     {
       "selector": ".next-step-card:hover",
-      "lines": "3507-3511",
+      "lines": "3501-3505",
       "carried": true
     },
     {
       "selector": ".next-step-card-primary",
-      "lines": "3512-3516",
+      "lines": "3506-3510",
       "carried": true
     },
     {
       "selector": ".next-step-card.review",
-      "lines": "3517-3517",
+      "lines": "3511-3511",
       "carried": true
     },
     {
       "selector": ".next-step-card.active",
-      "lines": "3518-3518",
+      "lines": "3512-3512",
       "carried": true
     },
     {
       "selector": ".next-step-card.ready",
-      "lines": "3519-3519",
+      "lines": "3513-3513",
       "carried": true
     },
     {
       "selector": ".next-step-card.drafted",
-      "lines": "3520-3520",
+      "lines": "3514-3514",
       "carried": true
     },
     {
       "selector": ".next-step-card.pending",
-      "lines": "3521-3521",
+      "lines": "3515-3515",
       "carried": true
     },
     {
       "selector": ".next-step-kicker",
-      "lines": "3522-3528",
+      "lines": "3516-3522",
       "carried": true
     },
     {
       "selector": ".next-step-card-primary .next-step-kicker",
-      "lines": "3529-3529",
+      "lines": "3523-3523",
       "carried": true
     },
     {
       "selector": ".next-step-card.review .next-step-kicker",
-      "lines": "3530-3530",
+      "lines": "3524-3524",
       "carried": true
     },
     {
       "selector": ".next-step-card.active .next-step-kicker",
-      "lines": "3531-3531",
+      "lines": "3525-3525",
       "carried": true
     },
     {
       "selector": ".next-step-card.ready .next-step-kicker",
-      "lines": "3532-3532",
+      "lines": "3526-3526",
       "carried": true
     },
     {
       "selector": ".next-step-card.drafted .next-step-kicker",
-      "lines": "3533-3533",
+      "lines": "3527-3527",
       "carried": true
     },
     {
       "selector": ".next-step-command",
-      "lines": "3534-3534",
+      "lines": "3528-3528",
       "carried": true
     },
     {
       "selector": ".next-step-command .cmd-badge",
-      "lines": "3535-3535",
+      "lines": "3529-3529",
       "carried": true
     },
     {
       "selector": ".next-step-command .cmd-text",
-      "lines": "3536-3536",
+      "lines": "3530-3530",
       "carried": true
     },
     {
       "selector": ".next-step-desc",
-      "lines": "3537-3543",
+      "lines": "3531-3537",
       "carried": true
     },
     {
       "selector": ".next-steps-cards",
-      "lines": "3545-3545",
+      "lines": "3539-3539",
       "carried": true,
       "within": "@media (max-width: 960px)"
     },
     {
       "selector": ".next-steps-list",
-      "lines": "3571-3571",
+      "lines": "3565-3565",
       "carried": true
     },
     {
       "selector": ".next-steps-desc",
-      "lines": "3575-3575",
+      "lines": "3569-3569",
       "carried": true
     },
     {
       "selector": ".next-steps-alternates",
-      "lines": "3584-3584",
+      "lines": "3578-3578",
       "carried": true
     },
     {
       "selector": ".next-steps-alternates-label",
-      "lines": "3585-3592",
+      "lines": "3579-3586",
       "carried": true
     },
     {
       "selector": ".next-steps-alt",
-      "lines": "3593-3593",
+      "lines": "3587-3587",
       "carried": true
     },
     {
       "selector": ".next-steps-alt .cmd-badge",
-      "lines": "3594-3594",
+      "lines": "3588-3588",
       "carried": true
     },
     {
       "selector": ".next-steps.all-done",
-      "lines": "3598-3598",
+      "lines": "3592-3592",
       "carried": true
     },
     {
       "selector": ".all-done-complete",
-      "lines": "3599-3599",
+      "lines": "3593-3593",
       "carried": true
     },
     {
       "selector": ".all-done-icon",
-      "lines": "3600-3600",
+      "lines": "3594-3594",
       "carried": true
     },
     {
       "selector": ".all-done-icon .ss-icon",
-      "lines": "3601-3601",
+      "lines": "3595-3595",
       "carried": true
     },
     {
       "selector": ".dev-agent-details > summary",
-      "lines": "3606-3614",
+      "lines": "3600-3608",
       "carried": true
     },
     {
       "selector": ".dev-agent-details > summary::-webkit-details-marker",
-      "lines": "3615-3615",
+      "lines": "3609-3609",
       "carried": true
     },
     {
       "selector": ".dev-agent-details > summary::before",
-      "lines": "3616-3616",
+      "lines": "3610-3610",
       "carried": true
     },
     {
       "selector": ".dev-agent-details[open] > summary::before",
-      "lines": "3617-3617",
+      "lines": "3611-3611",
       "carried": true
     },
     {
       "selector": ".dev-agent-details[open] > summary",
-      "lines": "3618-3618",
+      "lines": "3612-3612",
       "carried": true
     },
     {
       "selector": ".collapsible-section > summary",
-      "lines": "3624-3631",
+      "lines": "3618-3625",
       "carried": true
     },
     {
       "selector": ".collapsible-section > summary::-webkit-details-marker",
-      "lines": "3632-3632",
+      "lines": "3626-3626",
       "carried": true
     },
     {
       "selector": ".collapsible-section > summary::before",
-      "lines": "3633-3639",
+      "lines": "3627-3633",
       "carried": true
     },
     {
       "selector": ".collapsible-section[open] > summary::before",
-      "lines": "3640-3640",
+      "lines": "3634-3634",
       "carried": true
     },
     {
       "selector": ".collapsible-section[open] > summary",
-      "lines": "3641-3641",
+      "lines": "3635-3635",
       "carried": true
     },
     {
       "selector": ".collapsible-section > summary > h2",
-      "lines": "3642-3650",
+      "lines": "3636-3644",
       "carried": true
     },
     {
       "selector": ".retired-section > summary",
-      "lines": "3655-3663",
+      "lines": "3649-3657",
       "carried": true
     },
     {
       "selector": ".retired-section > summary::-webkit-details-marker",
-      "lines": "3664-3664",
+      "lines": "3658-3658",
       "carried": true
     },
     {
       "selector": ".retired-section > summary::before",
-      "lines": "3665-3665",
+      "lines": "3659-3659",
       "carried": true
     },
     {
       "selector": ".retired-section[open] > summary::before",
-      "lines": "3666-3666",
+      "lines": "3660-3660",
       "carried": true
     },
     {
       "selector": ".retired-section[open] > summary",
-      "lines": "3667-3667",
+      "lines": "3661-3661",
       "carried": true
     },
     {
       "selector": ".dev-agent-table",
-      "lines": "3671-3671",
+      "lines": "3665-3665",
       "carried": true
     },
     {
       "selector": ".dev-agent-table th",
-      "lines": "3673-3683",
+      "lines": "3667-3677",
       "carried": true
     },
     {
       "selector": ".dev-agent-table td",
-      "lines": "3685-3690",
+      "lines": "3679-3684",
       "carried": true
     },
     {
       "selector": ".dev-agent-table tr:last-child th, .dev-agent-table tr:last-child td",
-      "lines": "3692-3693",
+      "lines": "3686-3687",
       "carried": true
     },
     {
       "selector": ".dev-agent-table td p",
-      "lines": "3695-3695",
+      "lines": "3689-3689",
       "carried": true
     },
     {
       "selector": ".dev-agent-empty",
-      "lines": "3696-3696",
+      "lines": "3690-3690",
       "carried": true
     },
     {
       "selector": ".chart-panel.review-findings",
-      "lines": "3702-3702",
+      "lines": "3696-3696",
       "carried": true
     },
     {
       "selector": ".chart-panel.change-log",
-      "lines": "3703-3703",
+      "lines": "3697-3697",
       "carried": true
     },
     {
       "selector": ".review-findings > .doc-body, .change-log > .doc-body",
-      "lines": "3705-3706",
+      "lines": "3699-3700",
       "carried": true
     },
     {
       "selector": ".review-findings > .doc-body > :first-child, .change-log > .doc-body > :first-child",
-      "lines": "3709-3710",
+      "lines": "3703-3704",
       "carried": true
     },
     {
       "selector": ".now-next-card",
-      "lines": "3719-3731",
+      "lines": "3713-3725",
       "carried": true
     },
     {
       "selector": ".now-next-card:hover",
+      "lines": "3729-3729",
+      "carried": true
+    },
+    {
+      "selector": ".now-next-card.active",
+      "lines": "3730-3730",
+      "carried": true
+    },
+    {
+      "selector": ".now-next-card.review",
+      "lines": "3731-3731",
+      "carried": true
+    },
+    {
+      "selector": ".now-next-card.ready",
+      "lines": "3732-3732",
+      "carried": true
+    },
+    {
+      "selector": ".now-next-card.drafted",
+      "lines": "3733-3733",
+      "carried": true
+    },
+    {
+      "selector": ".now-next-card.pending",
+      "lines": "3734-3734",
+      "carried": true
+    },
+    {
+      "selector": ".now-next-card.done",
       "lines": "3735-3735",
       "carried": true
     },
     {
       "selector": ".now-next-card.active",
-      "lines": "3736-3736",
-      "carried": true
-    },
-    {
-      "selector": ".now-next-card.review",
-      "lines": "3737-3737",
-      "carried": true
-    },
-    {
-      "selector": ".now-next-card.ready",
-      "lines": "3738-3738",
-      "carried": true
-    },
-    {
-      "selector": ".now-next-card.drafted",
-      "lines": "3739-3739",
-      "carried": true
-    },
-    {
-      "selector": ".now-next-card.pending",
-      "lines": "3740-3740",
-      "carried": true
-    },
-    {
-      "selector": ".now-next-card.done",
-      "lines": "3741-3741",
-      "carried": true
-    },
-    {
-      "selector": ".now-next-card.active",
-      "lines": "3745-3748",
+      "lines": "3739-3742",
       "carried": true
     },
     {
       "selector": ".now-next-kicker",
-      "lines": "3750-3750",
+      "lines": "3744-3744",
       "carried": true
     },
     {
       "selector": ".now-next-card.active .now-next-kicker",
-      "lines": "3751-3751",
+      "lines": "3745-3745",
       "carried": true
     },
     {
       "selector": ".now-next-card.review .now-next-kicker",
-      "lines": "3752-3752",
+      "lines": "3746-3746",
       "carried": true
     },
     {
       "selector": ".now-next-card.ready .now-next-kicker",
-      "lines": "3753-3753",
+      "lines": "3747-3747",
       "carried": true
     },
     {
       "selector": ".now-next-title",
-      "lines": "3754-3754",
+      "lines": "3748-3748",
       "carried": true
     },
     {
       "selector": ".all-done-note",
-      "lines": "3756-3756",
+      "lines": "3750-3750",
       "carried": true
     },
     {
       "selector": ".doc-body ul li input[type=\"checkbox\"]",
-      "lines": "3799-3809",
+      "lines": "3793-3803",
       "carried": true
     },
     {
       "selector": ".doc-body ul li input[type=\"checkbox\"]:checked",
-      "lines": "3811-3818",
+      "lines": "3805-3812",
       "carried": true
     },
     {
       "selector": ".dashboard",
-      "lines": "3821-3825",
+      "lines": "3815-3819",
       "carried": true
     },
     {
       "selector": ".dashboard-narrow",
-      "lines": "3832-3836",
+      "lines": "3826-3830",
       "carried": true
     },
     {
       "selector": ".stat-grid",
-      "lines": "3838-3843",
+      "lines": "3832-3837",
       "carried": true
     },
     {
       "selector": ".stat-card",
-      "lines": "3845-3852",
+      "lines": "3839-3846",
       "carried": true
     },
     {
       "selector": ".stat-card-link",
-      "lines": "3855-3860",
+      "lines": "3849-3854",
       "carried": true
     },
     {
       "selector": ".stat-card-link:hover",
-      "lines": "3861-3861",
+      "lines": "3855-3855",
       "carried": true
     },
     {
       "selector": ".stat-card-link:focus-visible",
-      "lines": "3862-3862",
+      "lines": "3856-3856",
       "carried": true
     },
     {
       "selector": ".stat-number",
-      "lines": "3864-3870",
+      "lines": "3858-3864",
       "carried": true
     },
     {
       "selector": ".stat-label",
-      "lines": "3872-3878",
+      "lines": "3866-3872",
       "carried": true
     },
     {
       "selector": ".stat-sub",
-      "lines": "3880-3880",
+      "lines": "3874-3874",
       "carried": true
     },
     {
       "selector": ".chart-panel",
-      "lines": "3882-3890",
+      "lines": "3876-3884",
       "carried": true
     },
     {
       "selector": ".chart-panel h3",
-      "lines": "3892-3898",
+      "lines": "3886-3892",
       "carried": true
     },
     {
       "selector": ".chart-panel h3:not(:first-child)",
-      "lines": "3902-3902",
+      "lines": "3896-3896",
       "carried": true
     },
     {
       "selector": ".chart-frame-head",
-      "lines": "3908-3915",
+      "lines": "3902-3909",
       "carried": true
     },
     {
       "selector": ".chart-frame-head h3, .chart-frame-head h2",
-      "lines": "3916-3919",
+      "lines": "3910-3913",
       "carried": true
     },
     {
       "selector": ".chart-frame-window",
-      "lines": "3920-3924",
+      "lines": "3914-3918",
       "carried": true
     },
     {
       "selector": ".chart-frame-ranking",
-      "lines": "3925-3930",
+      "lines": "3919-3924",
       "carried": true
     },
     {
       "selector": ".chart-frame-why",
-      "lines": "3931-3937",
+      "lines": "3925-3931",
       "carried": true
     },
     {
       "selector": ".chart-row",
-      "lines": "3949-3957",
+      "lines": "3943-3951",
       "carried": true
     },
     {
       "selector": ".chart-col",
-      "lines": "3961-3961",
+      "lines": "3955-3955",
       "carried": true
     },
     {
       "selector": ".chart-row .chart-panel",
-      "lines": "3963-3963",
+      "lines": "3957-3957",
       "carried": true
     },
     {
       "selector": ".donut-and-legend",
-      "lines": "3965-3965",
+      "lines": "3959-3959",
       "carried": true
     },
     {
       "selector": ".donut-legend",
-      "lines": "3966-3966",
+      "lines": "3960-3960",
       "carried": true
     },
     {
       "selector": ".donut-legend .swatch",
-      "lines": "3967-3967",
+      "lines": "3961-3961",
       "carried": true
     },
     {
       "selector": ".donut-legend .swatch.done",
-      "lines": "3968-3968",
+      "lines": "3962-3962",
       "carried": true
     },
     {
       "selector": ".donut-legend .swatch.active",
-      "lines": "3969-3969",
+      "lines": "3963-3963",
       "carried": true
     },
     {
       "selector": ".donut-legend .swatch.review",
-      "lines": "3970-3970",
+      "lines": "3964-3964",
       "carried": true
     },
     {
       "selector": ".donut-legend .swatch.ready",
-      "lines": "3971-3971",
+      "lines": "3965-3965",
       "carried": true
     },
     {
       "selector": ".donut-legend .swatch.drafted",
-      "lines": "3972-3972",
+      "lines": "3966-3966",
       "carried": true
     },
     {
       "selector": ".donut-legend .swatch.pending",
-      "lines": "3973-3973",
+      "lines": "3967-3967",
       "carried": true
     },
     {
       "selector": ".refinement-funnel",
-      "lines": "3983-3983",
+      "lines": "3977-3977",
       "carried": true
     },
     {
       "selector": ".funnel",
-      "lines": "3984-3984",
+      "lines": "3978-3978",
       "carried": true
     },
     {
       "selector": ".funnel-band.funnel-drafted",
-      "lines": "3985-3985",
+      "lines": "3979-3979",
       "carried": true
     },
     {
       "selector": ".funnel-band.funnel-ready",
-      "lines": "3986-3986",
+      "lines": "3980-3980",
       "carried": true
     },
     {
       "selector": ".funnel-band.funnel-active",
-      "lines": "3987-3987",
+      "lines": "3981-3981",
       "carried": true
     },
     {
       "selector": ".funnel-band.funnel-review",
-      "lines": "3988-3988",
+      "lines": "3982-3982",
       "carried": true
     },
     {
       "selector": ".funnel-band.funnel-done",
-      "lines": "3989-3989",
+      "lines": "3983-3983",
       "carried": true
     },
     {
       "selector": ".funnel-connector",
-      "lines": "3996-3996",
+      "lines": "3990-3990",
       "carried": true
     },
     {
       "selector": ".funnel-stage-count",
-      "lines": "3997-3997",
+      "lines": "3991-3991",
       "carried": true
     },
     {
       "selector": ".funnel-stage-label",
-      "lines": "3998-3998",
+      "lines": "3992-3992",
       "carried": true
     },
     {
       "selector": ".funnel-stage-sub",
-      "lines": "3999-3999",
+      "lines": "3993-3993",
       "carried": true
     },
     {
       "selector": ".funnel-hint",
-      "lines": "4000-4000",
+      "lines": "3994-3994",
       "carried": true
     },
     {
       "selector": ".req-status-grid",
-      "lines": "4012-4012",
+      "lines": "4006-4006",
       "carried": true
     },
     {
       "selector": ".req-status-block",
-      "lines": "4013-4027",
+      "lines": "4007-4021",
       "carried": true
     },
     {
       "selector": ".req-status-block:hover",
-      "lines": "4028-4028",
+      "lines": "4022-4022",
       "carried": true
     },
     {
       "selector": ".req-status-block:focus-visible",
-      "lines": "4029-4029",
+      "lines": "4023-4023",
       "carried": true
     },
     {
       "selector": ".req-block-icon",
-      "lines": "4030-4030",
+      "lines": "4024-4024",
       "carried": true
     },
     {
       "selector": ".req-block-icon .ss-icon",
-      "lines": "4031-4031",
+      "lines": "4025-4025",
       "carried": true
     },
     {
       "selector": ".req-block-id",
-      "lines": "4032-4032",
+      "lines": "4026-4026",
       "carried": true
     },
     {
       "selector": ".req-status-block.done",
-      "lines": "4034-4034",
+      "lines": "4028-4028",
       "carried": true
     },
     {
       "selector": ".req-status-block.active",
-      "lines": "4035-4035",
+      "lines": "4029-4029",
       "carried": true
     },
     {
       "selector": ".req-status-block.ready",
-      "lines": "4036-4036",
+      "lines": "4030-4030",
       "carried": true
     },
     {
       "selector": ".req-status-block.pending",
-      "lines": "4037-4037",
+      "lines": "4031-4031",
       "carried": true
     },
     {
       "selector": ".req-status-block.deferred",
-      "lines": "4038-4038",
+      "lines": "4032-4032",
       "carried": true
     },
     {
       "selector": ".req-flow",
-      "lines": "4041-4041",
+      "lines": "4035-4035",
       "carried": true
     },
     {
       "selector": ".req-flow-svg",
-      "lines": "4042-4042",
+      "lines": "4036-4036",
       "carried": true
     },
     {
       "selector": ".req-flow-header",
-      "lines": "4043-4043",
+      "lines": "4037-4037",
       "carried": true
     },
     {
       "selector": ".req-flow-nodelabel",
-      "lines": "4044-4044",
+      "lines": "4038-4038",
       "carried": true
     },
     {
       "selector": ".req-flow-statelabel",
-      "lines": "4045-4045",
+      "lines": "4039-4039",
       "carried": true
     },
     {
       "selector": ".req-flow-def",
-      "lines": "4047-4047",
+      "lines": "4041-4041",
       "carried": true
     },
     {
       "selector": ".req-flow-epic",
-      "lines": "4048-4048",
+      "lines": "4042-4042",
       "carried": true
     },
     {
       "selector": ".req-flow-ribbon",
-      "lines": "4050-4050",
+      "lines": "4044-4044",
       "carried": true
     },
     {
       "selector": ".req-flow-state.done",
-      "lines": "4052-4052",
+      "lines": "4046-4046",
       "carried": true
     },
     {
       "selector": ".req-flow-state.active",
-      "lines": "4053-4053",
+      "lines": "4047-4047",
       "carried": true
     },
     {
       "selector": ".req-flow-state.ready",
-      "lines": "4054-4054",
+      "lines": "4048-4048",
       "carried": true
     },
     {
       "selector": ".req-flow-state.pending",
-      "lines": "4055-4055",
+      "lines": "4049-4049",
       "carried": true
     },
     {
       "selector": ".req-flow-state.unmapped",
-      "lines": "4058-4058",
+      "lines": "4052-4052",
       "carried": true
     },
     {
       "selector": ".req-flow-state.deferred",
-      "lines": "4059-4059",
+      "lines": "4053-4053",
       "carried": true
     },
     {
       "selector": ".req-flow-ribbon.done",
-      "lines": "4060-4060",
+      "lines": "4054-4054",
       "carried": true
     },
     {
       "selector": ".req-flow-ribbon.active",
-      "lines": "4061-4061",
+      "lines": "4055-4055",
       "carried": true
     },
     {
       "selector": ".req-flow-ribbon.ready",
-      "lines": "4062-4062",
+      "lines": "4056-4056",
       "carried": true
     },
     {
       "selector": ".req-flow-ribbon.pending",
-      "lines": "4063-4063",
+      "lines": "4057-4057",
       "carried": true
     },
     {
       "selector": ".req-flow-ribbon.unmapped",
-      "lines": "4064-4064",
+      "lines": "4058-4058",
       "carried": true
     },
     {
       "selector": ".req-flow-ribbon.deferred",
-      "lines": "4065-4065",
+      "lines": "4059-4059",
       "carried": true
     },
     {
       "selector": ".req-flow-hint",
-      "lines": "4066-4066",
+      "lines": "4060-4060",
       "carried": true
     },
     {
       "selector": ".progress-row",
-      "lines": "4069-4075",
+      "lines": "4063-4069",
       "carried": true
     },
     {
       "selector": ".progress-row:last-child",
-      "lines": "4077-4077",
+      "lines": "4071-4071",
       "carried": true
     },
     {
       "selector": ".progress-label",
-      "lines": "4079-4079",
+      "lines": "4073-4073",
       "carried": true
     },
     {
       "selector": ".progress-bar",
-      "lines": "4081-4087",
+      "lines": "4075-4081",
       "carried": true
     },
     {
       "selector": ".progress-fill",
-      "lines": "4089-4089",
+      "lines": "4083-4083",
       "carried": true
     },
     {
       "selector": ".progress-fill.done",
-      "lines": "4090-4090",
+      "lines": "4084-4084",
       "carried": true
     },
     {
       "selector": ".progress-fill.partial",
-      "lines": "4091-4091",
+      "lines": "4085-4085",
       "carried": true
     },
     {
       "selector": ".progress-fill.empty",
-      "lines": "4092-4092",
+      "lines": "4086-4086",
       "carried": true
     },
     {
       "selector": ".progress-value",
-      "lines": "4094-4099",
+      "lines": "4088-4093",
       "carried": true
     },
     {
       "selector": ".donut-track",
-      "lines": "4102-4102",
+      "lines": "4096-4096",
       "carried": true
     },
     {
       "selector": ".donut-seg",
-      "lines": "4103-4103",
+      "lines": "4097-4097",
       "carried": true
     },
     {
       "selector": ".donut-seg:hover",
-      "lines": "4105-4105",
+      "lines": "4099-4099",
       "carried": true
     },
     {
       "selector": ".donut-seg.done",
-      "lines": "4106-4106",
+      "lines": "4100-4100",
       "carried": true
     },
     {
       "selector": ".donut-seg.active",
-      "lines": "4107-4107",
+      "lines": "4101-4101",
       "carried": true
     },
     {
       "selector": ".donut-seg.review",
-      "lines": "4108-4108",
+      "lines": "4102-4102",
       "carried": true
     },
     {
       "selector": ".donut-seg.ready",
-      "lines": "4109-4109",
+      "lines": "4103-4103",
       "carried": true
     },
     {
       "selector": ".donut-seg.drafted",
-      "lines": "4110-4110",
+      "lines": "4104-4104",
       "carried": true
     },
     {
       "selector": ".donut-seg.pending",
-      "lines": "4111-4111",
+      "lines": "4105-4105",
       "carried": true
     },
     {
       "selector": ".donut-center-text",
-      "lines": "4112-4112",
+      "lines": "4106-4106",
       "carried": true
     },
     {
       "selector": ".donut-center-text.donut-center-fraction",
-      "lines": "4114-4114",
+      "lines": "4108-4108",
       "carried": true
     },
     {
       "selector": ".mini-donut",
-      "lines": "4116-4116",
+      "lines": "4110-4110",
       "carried": true
     },
     {
       "selector": ".mini-donut .donut-track, .mini-donut .donut-seg",
-      "lines": "4117-4118",
+      "lines": "4111-4112",
       "carried": true
     },
     {
       "selector": ".git-pulse",
-      "lines": "4127-4127",
+      "lines": "4121-4121",
       "carried": true
     },
     {
       "selector": ".git-pulse-signals",
-      "lines": "4128-4128",
+      "lines": "4122-4122",
       "carried": true
     },
     {
       "selector": ".git-pulse-signal",
-      "lines": "4129-4129",
+      "lines": "4123-4123",
       "carried": true
     },
     {
       "selector": ".git-pulse-num",
-      "lines": "4130-4136",
+      "lines": "4124-4130",
       "carried": true
     },
     {
       "selector": ".git-pulse-when",
-      "lines": "4137-4137",
+      "lines": "4131-4131",
       "carried": true
     },
     {
       "selector": ".git-pulse-caption",
-      "lines": "4138-4143",
+      "lines": "4132-4137",
       "carried": true
     },
     {
       "selector": ".git-pulse-body",
-      "lines": "4147-4147",
+      "lines": "4141-4141",
       "carried": true
     },
     {
       "selector": ".git-pulse-activity",
-      "lines": "4148-4148",
+      "lines": "4142-4142",
       "carried": true
     },
     {
       "selector": ".git-pulse-body",
-      "lines": "4150-4150",
+      "lines": "4144-4144",
       "carried": true,
       "within": "@media (min-width: 760px)"
     },
     {
       "selector": ".git-pulse-files-title",
-      "lines": "4153-4159",
+      "lines": "4147-4153",
       "carried": true
     },
     {
       "selector": ".git-pulse-bars",
-      "lines": "4162-4162",
+      "lines": "4156-4156",
       "carried": true
     },
     {
       "selector": ".git-pulse-bars li",
-      "lines": "4163-4168",
+      "lines": "4157-4162",
       "carried": true
     },
     {
       "selector": ".git-pulse-bar-label",
-      "lines": "4169-4176",
+      "lines": "4163-4170",
       "carried": true
     },
     {
       "selector": ".git-pulse-bar-track",
-      "lines": "4177-4177",
+      "lines": "4171-4171",
       "carried": true
     },
     {
       "selector": ".git-pulse-bar-fill",
-      "lines": "4178-4178",
+      "lines": "4172-4172",
       "carried": true
     },
     {
       "selector": ".git-pulse-bar-count",
-      "lines": "4179-4179",
+      "lines": "4173-4173",
       "carried": true
     },
     {
       "selector": ".coverage",
-      "lines": "4195-4195",
+      "lines": "4189-4189",
       "carried": true
     },
     {
       "selector": ".coverage-panel .chart-panel-header-row",
-      "lines": "4199-4199",
+      "lines": "4193-4193",
       "carried": true
     },
     {
       "selector": ".coverage-meter-group",
-      "lines": "4200-4200",
+      "lines": "4194-4194",
       "carried": true
     },
     {
       "selector": ".coverage-count",
-      "lines": "4201-4201",
+      "lines": "4195-4195",
       "carried": true
     },
     {
       "selector": ".coverage-count strong",
-      "lines": "4202-4202",
+      "lines": "4196-4196",
       "carried": true
     },
     {
       "selector": ".coverage-meter",
-      "lines": "4203-4203",
+      "lines": "4197-4197",
       "carried": true
     },
     {
       "selector": ".coverage-meter-fill",
-      "lines": "4204-4204",
+      "lines": "4198-4198",
       "carried": true
     },
     {
       "selector": ".coverage-pct",
-      "lines": "4205-4205",
+      "lines": "4199-4199",
       "carried": true
     },
     {
       "selector": ".coverage-intro",
-      "lines": "4207-4207",
+      "lines": "4201-4201",
       "carried": true
     },
     {
       "selector": ".coverage-grid",
-      "lines": "4210-4210",
+      "lines": "4204-4204",
       "carried": true
     },
     {
       "selector": ".coverage-grid",
-      "lines": "4211-4211",
+      "lines": "4205-4205",
       "carried": true,
       "within": "@media (min-width: 720px)"
     },
     {
       "selector": ".coverage-card",
-      "lines": "4213-4222",
+      "lines": "4207-4216",
       "carried": true
     },
     {
       "selector": ".coverage-card.family-planning",
-      "lines": "4225-4225",
+      "lines": "4219-4219",
       "carried": true
     },
     {
       "selector": ".coverage-card.family-architecture",
-      "lines": "4226-4226",
+      "lines": "4220-4220",
       "carried": true
     },
     {
       "selector": ".coverage-card.family-epics",
-      "lines": "4227-4227",
+      "lines": "4221-4221",
       "carried": true
     },
     {
       "selector": ".coverage-card.family-requirements",
-      "lines": "4228-4228",
+      "lines": "4222-4222",
       "carried": true
     },
     {
       "selector": "a.coverage-card",
-      "lines": "4232-4232",
+      "lines": "4226-4226",
       "carried": true
     },
     {
       "selector": "a.coverage-card:hover",
-      "lines": "4233-4233",
+      "lines": "4227-4227",
       "carried": true
     },
     {
       "selector": ".coverage-card-head",
-      "lines": "4235-4235",
+      "lines": "4229-4229",
       "carried": true
     },
     {
       "selector": ".coverage-family",
-      "lines": "4236-4236",
+      "lines": "4230-4230",
       "carried": true
     },
     {
       "selector": ".coverage-desc",
-      "lines": "4237-4237",
+      "lines": "4231-4231",
       "carried": true
     },
     {
       "selector": ".coverage-freshness",
-      "lines": "4238-4238",
+      "lines": "4232-4232",
       "carried": true
     },
     {
       "selector": ".epic-mosaic",
-      "lines": "4680-4684",
+      "lines": "4674-4678",
       "carried": true
     },
     {
       "selector": ".epic-mosaic-card",
-      "lines": "4686-4697",
+      "lines": "4680-4691",
       "carried": true
     },
     {
       "selector": ".epic-mosaic-card:hover",
-      "lines": "4699-4703",
+      "lines": "4693-4697",
       "carried": true
     },
     {
       "selector": ".epic-mosaic-donut",
-      "lines": "4705-4705",
+      "lines": "4699-4699",
       "carried": true
     },
     {
       "selector": ".epic-mosaic-label",
-      "lines": "4707-4707",
+      "lines": "4701-4701",
       "carried": true
     },
     {
       "selector": ".epic-mosaic-num",
-      "lines": "4709-4714",
+      "lines": "4703-4708",
       "carried": true
     },
     {
       "selector": ".epic-mosaic-title",
-      "lines": "4716-4721",
+      "lines": "4710-4715",
       "carried": true
     },
     {
       "selector": ".epic-mosaic-sub",
-      "lines": "4723-4723",
+      "lines": "4717-4717",
       "carried": true
     },
     {
       "selector": ".epic-mosaic-delivery",
-      "lines": "4726-4730",
+      "lines": "4720-4724",
       "carried": true
     },
     {
       "selector": ".heatmap",
-      "lines": "4735-4735",
+      "lines": "4729-4729",
       "carried": true
     },
     {
       "selector": ".heatmap-daylabel, .heatmap-monthlabel",
-      "lines": "4746-4751",
+      "lines": "4740-4745",
       "carried": true
     },
     {
       "selector": ".heatmap-cell.level-0",
-      "lines": "4755-4755",
+      "lines": "4749-4749",
       "carried": true
     },
     {
       "selector": ".heatmap-cell.level-1",
-      "lines": "4756-4756",
+      "lines": "4750-4750",
       "carried": true
     },
     {
       "selector": ".heatmap-cell.level-2",
-      "lines": "4757-4757",
+      "lines": "4751-4751",
       "carried": true
     },
     {
       "selector": ".heatmap-cell.level-3",
-      "lines": "4758-4758",
+      "lines": "4752-4752",
       "carried": true
     },
     {
       "selector": ".heatmap-cell.level-4",
-      "lines": "4759-4759",
+      "lines": "4753-4753",
       "carried": true
     },
     {
       "selector": ".heatmap a",
-      "lines": "4764-4764",
+      "lines": "4758-4758",
       "carried": true
     },
     {
       "selector": ".heatmap a:hover .heatmap-cell",
-      "lines": "4765-4765",
+      "lines": "4759-4759",
       "carried": true
     },
     {
       "selector": ".heatmap a:focus-visible",
-      "lines": "4768-4768",
+      "lines": "4762-4762",
       "carried": true
     },
     {
       "selector": ".heatmap a:focus-visible .heatmap-cell",
-      "lines": "4769-4772",
+      "lines": "4763-4766",
       "carried": true
     },
     {
       "selector": ".heatmap-first-commit-mark",
-      "lines": "4777-4777",
+      "lines": "4771-4771",
       "carried": true
     },
     {
       "selector": ".heatmap-first-commit",
-      "lines": "4778-4782",
+      "lines": "4772-4776",
       "carried": true
     },
     {
       "selector": ".heatmap-legend",
-      "lines": "4784-4791",
+      "lines": "4778-4785",
       "carried": true
     },
     {
       "selector": ".heatmap-meta",
-      "lines": "4793-4800",
+      "lines": "4787-4794",
       "carried": true
     },
     {
       "selector": ".heatmap-legend-item",
-      "lines": "4802-4806",
+      "lines": "4796-4800",
       "carried": true
     },
     {
       "selector": ".heatmap-legend-label",
-      "lines": "4808-4808",
+      "lines": "4802-4802",
       "carried": true
     },
     {
       "selector": ".heatmap-legend-swatch",
-      "lines": "4810-4810",
+      "lines": "4804-4804",
       "carried": true
     },
     {
       "selector": ".heatmap-legend-swatch.level-0",
-      "lines": "4813-4813",
+      "lines": "4807-4807",
       "carried": true
     },
     {
       "selector": ".heatmap-legend-swatch.level-1",
-      "lines": "4814-4814",
+      "lines": "4808-4808",
       "carried": true
     },
     {
       "selector": ".heatmap-legend-swatch.level-2",
-      "lines": "4815-4815",
+      "lines": "4809-4809",
       "carried": true
     },
     {
       "selector": ".heatmap-legend-swatch.level-3",
-      "lines": "4816-4816",
+      "lines": "4810-4810",
       "carried": true
     },
     {
       "selector": ".heatmap-legend-swatch.level-4",
-      "lines": "4817-4817",
+      "lines": "4811-4811",
       "carried": true
     },
     {
       "selector": ".heatmap-window",
-      "lines": "4822-4822",
+      "lines": "4816-4816",
       "carried": true
     },
     {
       "selector": ".mermaid",
-      "lines": "4955-4965",
+      "lines": "4949-4959",
       "carried": true
     },
     {
       "selector": ".story-card",
-      "lines": "4968-4975",
+      "lines": "4962-4969",
       "carried": true
     },
     {
       "selector": ".story-card-header",
-      "lines": "4977-4983",
+      "lines": "4971-4977",
       "carried": true
     },
     {
       "selector": ".story-card-header .story-id",
-      "lines": "4985-4989",
+      "lines": "4979-4983",
       "carried": true
     },
     {
       "selector": ".story-card-header .story-title",
-      "lines": "4991-4991",
+      "lines": "4985-4985",
       "carried": true
     },
     {
       "selector": ".story-card-header .status-badge",
-      "lines": "4996-4996",
+      "lines": "4990-4990",
       "carried": true
     },
     {
       "selector": ".story-card-header .story-card-updated",
-      "lines": "5000-5006",
+      "lines": "4994-5000",
       "carried": true
     },
     {
       "selector": ".story-card .not-detailed-note",
-      "lines": "5008-5013",
+      "lines": "5002-5007",
       "carried": true
     },
     {
       "selector": ".dashboard-tile-band",
-      "lines": "5035-5042",
+      "lines": "5029-5036",
       "carried": true
     },
     {
       "selector": "body:has(#wm-review:checked) .dashboard-tile-band",
-      "lines": "5044-5046",
+      "lines": "5038-5040",
       "carried": true
     },
     {
       "selector": ".dashboard-tile-band .stat-card, .dashboard-tile-band .tile-card",
-      "lines": "5047-5055",
+      "lines": "5041-5049",
       "carried": true
     },
     {
       "selector": ".dashboard-tile-band .stat-number",
-      "lines": "5056-5059",
+      "lines": "5050-5053",
       "carried": true
     },
     {
       "selector": ".dashboard-tile-band .stat-label",
-      "lines": "5060-5063",
+      "lines": "5054-5057",
       "carried": true
     },
     {
       "selector": ".dashboard-tile-band .stat-sub",
-      "lines": "5064-5067",
+      "lines": "5058-5061",
       "carried": true
     },
     {
       "selector": ".journey-card.journey-requirements",
-      "lines": "5068-5068",
+      "lines": "5062-5062",
       "carried": true
     },
     {
       "selector": ".journey-card.journey-epics",
-      "lines": "5069-5069",
+      "lines": "5063-5063",
       "carried": true
     },
     {
       "selector": ".journey-card.journey-execution",
-      "lines": "5070-5070",
+      "lines": "5064-5064",
       "carried": true
     },
     {
       "selector": ".journey-card.journey-followup",
-      "lines": "5071-5071",
+      "lines": "5065-5065",
       "carried": true
     },
     {
       "selector": ".journey-card.journey-insights",
-      "lines": "5072-5072",
+      "lines": "5066-5066",
       "carried": true
     },
     {
       "selector": ".journey-lead",
-      "lines": "5073-5075",
+      "lines": "5067-5069",
       "carried": true
     },
     {
       "selector": ".journey-lead .tile-journey-label",
-      "lines": "5076-5091",
+      "lines": "5070-5085",
       "carried": true
     },
     {
       "selector": ".dashboard-tile-band .tile-card",
-      "lines": "5094-5105",
+      "lines": "5088-5099",
       "carried": true
     },
     {
       "selector": ".dashboard-tile-band .tile-card-visual",
-      "lines": "5106-5111",
+      "lines": "5100-5105",
       "carried": true
     },
     {
       "selector": ".dashboard-tile-band .tile-card-visual > svg, .dashboard-tile-band .tile-card > svg",
-      "lines": "5112-5117",
+      "lines": "5106-5111",
       "carried": true
     },
     {
       "selector": ".dashboard-tile-band .tile-card .stat-label",
-      "lines": "5118-5121",
+      "lines": "5112-5115",
       "carried": true
     },
     {
       "selector": ".tile-card",
-      "lines": "5124-5136",
+      "lines": "5118-5130",
       "carried": true
     },
     {
       "selector": ".tile-card-visual",
-      "lines": "5137-5142",
+      "lines": "5131-5136",
       "carried": true
     },
     {
       "selector": ".tile-card-visual > svg, .tile-card > svg",
-      "lines": "5143-5144",
+      "lines": "5137-5138",
       "carried": true
     },
     {
       "selector": ".tile-card .stat-label",
-      "lines": "5145-5148",
+      "lines": "5139-5142",
       "carried": true
     },
     {
       "selector": ".req-ref",
-      "lines": "5189-5195",
+      "lines": "5183-5189",
       "carried": true
     },
     {
       "selector": ".req-ref:hover",
-      "lines": "5196-5196",
+      "lines": "5190-5190",
       "carried": true
     },
     {
       "selector": ".story-ref, .epic-ref",
-      "lines": "5200-5207",
+      "lines": "5194-5201",
       "carried": true
     },
     {
       "selector": ".story-ref:hover, .epic-ref:hover",
-      "lines": "5208-5209",
+      "lines": "5202-5203",
       "carried": true
     },
     {
       "selector": "abbr[title]",
-      "lines": "5212-5216",
+      "lines": "5206-5210",
       "carried": true
     },
     {
       "selector": ".satisfaction-bar",
-      "lines": "5325-5329",
+      "lines": "5319-5323",
       "carried": true
     },
     {
       "selector": ".satisfaction-bracket",
-      "lines": "5330-5338",
+      "lines": "5324-5332",
       "carried": true
     },
     {
       "selector": ".satisfaction-bracket .seg",
-      "lines": "5339-5339",
+      "lines": "5333-5333",
       "carried": true
     },
     {
       "selector": ".satisfaction-bracket .seg.done",
-      "lines": "5340-5340",
+      "lines": "5334-5334",
       "carried": true
     },
     {
       "selector": ".satisfaction-bracket .seg.active",
-      "lines": "5341-5341",
+      "lines": "5335-5335",
       "carried": true
     },
     {
       "selector": ".satisfaction-bracket .seg.ready",
-      "lines": "5342-5342",
+      "lines": "5336-5336",
       "carried": true
     },
     {
       "selector": ".satisfaction-bracket .seg.pending",
-      "lines": "5343-5343",
+      "lines": "5337-5337",
       "carried": true
     },
     {
       "selector": ".satisfaction-bracket .seg.deferred",
-      "lines": "5344-5344",
+      "lines": "5338-5338",
       "carried": true
     },
     {
       "selector": ".satisfaction-bracket .seg.unmapped",
-      "lines": "5346-5346",
+      "lines": "5340-5340",
       "carried": true
     },
     {
       "selector": ".satisfaction-chips",
-      "lines": "5354-5359",
+      "lines": "5348-5353",
       "carried": true
     },
     {
       "selector": ".satisfaction-chip",
-      "lines": "5360-5365",
+      "lines": "5354-5359",
       "carried": true
     },
     {
       "selector": "a.satisfaction-chip",
-      "lines": "5366-5366",
+      "lines": "5360-5360",
       "carried": true
     },
     {
       "selector": "a.satisfaction-chip:hover",
-      "lines": "5367-5367",
+      "lines": "5361-5361",
       "carried": true
     },
     {
       "selector": ".satisfaction-chip-word",
-      "lines": "5368-5368",
+      "lines": "5362-5362",
       "carried": true
     },
     {
       "selector": ".satisfaction-chip-count",
-      "lines": "5369-5373",
+      "lines": "5363-5367",
       "carried": true
     },
     {
       "selector": ".satisfaction-rollup",
-      "lines": "5374-5382",
+      "lines": "5368-5376",
       "carried": true
     },
     {
       "selector": ".satisfaction-rollup .satisfaction-bar",
-      "lines": "5383-5383",
+      "lines": "5377-5377",
       "carried": true
     },
     {
       "selector": ".satisfaction-rollup .satisfaction-chips",
-      "lines": "5384-5384",
+      "lines": "5378-5378",
       "carried": true
     },
     {
       "selector": ".satisfaction-rollup-label",
-      "lines": "5385-5391",
+      "lines": "5379-5385",
       "carried": true
     },
     {
       "selector": ".status-badge.deferred",
-      "lines": "5394-5394",
+      "lines": "5388-5388",
       "carried": true
     },
     {
       "selector": ".donut-seg.deferred",
-      "lines": "5395-5395",
+      "lines": "5389-5389",
       "carried": true
     },
     {
       "selector": ".donut-legend .swatch.deferred",
-      "lines": "5396-5396",
+      "lines": "5390-5390",
       "carried": true
     },
     {
       "selector": ".donut-seg.retired",
-      "lines": "5397-5397",
+      "lines": "5391-5391",
       "carried": true
     },
     {
       "selector": ".donut-legend .swatch.retired",
-      "lines": "5398-5398",
+      "lines": "5392-5392",
       "carried": true
     },
     {
       "selector": ".donut-seg.unrecognized",
-      "lines": "5399-5399",
+      "lines": "5393-5393",
       "carried": true
     },
     {
       "selector": ".donut-legend .swatch.unrecognized",
-      "lines": "5400-5400",
+      "lines": "5394-5394",
       "carried": true
     },
     {
       "selector": ".trace-strip",
-      "lines": "5411-5411",
+      "lines": "5405-5405",
       "carried": true
     },
     {
       "selector": ".trace-strip-chips",
-      "lines": "5412-5412",
+      "lines": "5406-5406",
       "carried": true
     },
     {
       "selector": ".trace-strip-link",
-      "lines": "5413-5413",
+      "lines": "5407-5407",
       "carried": true
     },
     {
       "selector": ".cadence-strip",
-      "lines": "5417-5417",
+      "lines": "5411-5411",
       "carried": true
     },
     {
       "selector": ".cadence-strip-link",
-      "lines": "5418-5418",
+      "lines": "5412-5412",
       "carried": true
     },
     {
       "selector": ":root",
-      "lines": "5533-5539",
+      "lines": "5527-5533",
       "carried": false,
       "reason": "root-level rule — no descendant to scope under .ir-content; see web/assets/base.css"
     },
     {
       "selector": ".status-legend",
-      "lines": "5627-5633",
+      "lines": "5621-5627",
       "carried": true
     },
     {
       "selector": ".status-legend-toggle",
-      "lines": "5634-5651",
+      "lines": "5628-5645",
       "carried": true
     },
     {
       "selector": ".status-legend-toggle::-webkit-details-marker",
-      "lines": "5652-5652",
+      "lines": "5646-5646",
       "carried": true
     },
     {
       "selector": ".status-legend-toggle::marker",
-      "lines": "5653-5653",
+      "lines": "5647-5647",
       "carried": true
     },
     {
       "selector": ".status-legend-toggle:hover, .status-legend[open] > .status-legend-toggle",
-      "lines": "5654-5659",
+      "lines": "5648-5653",
       "carried": true
     },
     {
       "selector": ".status-legend-toggle:focus-visible",
-      "lines": "5660-5663",
+      "lines": "5654-5657",
       "carried": true
     },
     {
       "selector": ".status-legend-panel",
-      "lines": "5664-5682",
+      "lines": "5658-5676",
       "carried": true
     },
     {
       "selector": ".sprint-board-header-aside .status-legend-panel",
-      "lines": "5683-5687",
+      "lines": "5677-5681",
       "carried": true,
       "note": "1 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": ".status-legend-key-title",
-      "lines": "5688-5695",
+      "lines": "5682-5689",
       "carried": true
     },
     {
       "selector": ".status-legend-key-list",
-      "lines": "5696-5703",
+      "lines": "5690-5697",
       "carried": true
     },
     {
       "selector": ".status-legend-key-row",
-      "lines": "5704-5710",
+      "lines": "5698-5704",
       "carried": true
     },
     {
       "selector": ".status-legend-key-swatch",
-      "lines": "5711-5718",
+      "lines": "5705-5712",
       "carried": true
     },
     {
       "selector": ".status-legend-key-swatch.pending",
-      "lines": "5719-5719",
+      "lines": "5713-5713",
       "carried": true
     },
     {
       "selector": ".status-legend-key-swatch.drafted",
-      "lines": "5720-5720",
+      "lines": "5714-5714",
       "carried": true
     },
     {
       "selector": ".status-legend-key-swatch.ready",
-      "lines": "5721-5721",
+      "lines": "5715-5715",
       "carried": true
     },
     {
       "selector": ".status-legend-key-swatch.active",
-      "lines": "5722-5722",
+      "lines": "5716-5716",
       "carried": true
     },
     {
       "selector": ".status-legend-key-swatch.review",
-      "lines": "5723-5723",
+      "lines": "5717-5717",
       "carried": true
     },
     {
       "selector": ".status-legend-key-swatch.done",
-      "lines": "5724-5724",
+      "lines": "5718-5718",
       "carried": true
     },
     {
       "selector": ".status-legend-key-swatch.deferred",
-      "lines": "5725-5725",
+      "lines": "5719-5719",
       "carried": true
     },
     {
       "selector": ".status-legend-key-swatch.retired",
-      "lines": "5726-5726",
+      "lines": "5720-5720",
       "carried": true
     },
     {
       "selector": ".status-legend-key-swatch.unrecognized",
-      "lines": "5727-5736",
+      "lines": "5721-5730",
       "carried": true
     },
     {
       "selector": ".status-legend-key-label",
-      "lines": "5737-5744",
+      "lines": "5731-5738",
       "carried": true
     },
     {
       "selector": ".status-legend-key-meaning",
-      "lines": "5745-5749",
+      "lines": "5739-5743",
       "carried": true
     },
     {
       "selector": "h1 .status-legend, h3 .status-legend, .chart-panel-header-row .status-legend, .kicker-row .status-legend",
-      "lines": "5750-5759",
+      "lines": "5744-5753",
       "carried": true,
       "note": "1 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": "h1:has(> .status-legend)",
-      "lines": "5760-5763",
+      "lines": "5754-5757",
       "carried": true
     },
     {
       "selector": "body:has(main.req-index) .doc-header, body:has(main.req-detail) .doc-header",
-      "lines": "5892-5895",
+      "lines": "5886-5889",
       "carried": true
     },
     {
       "selector": "body:has(main.req-index) .doc-header, body:has(main.req-detail) .doc-header",
-      "lines": "5900-5907",
+      "lines": "5894-5901",
       "carried": true,
       "within": "@media (max-width: 900px)",
       "note": "2 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": "body:has(main.req-index) .doc-header, body:has(main.req-detail) .doc-header",
-      "lines": "5919-5925",
+      "lines": "5913-5919",
       "carried": true,
       "within": "@media (max-width: 640px)",
       "note": "2 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": ".coverage-card",
-      "lines": "5940-5946",
+      "lines": "5934-5940",
       "carried": true
     },
     {
       "selector": ".coverage-card.done",
-      "lines": "5947-5947",
+      "lines": "5941-5941",
       "carried": true
     },
     {
       "selector": ".coverage-card.active",
-      "lines": "5948-5948",
+      "lines": "5942-5942",
       "carried": true
     },
     {
       "selector": ".coverage-card.drafted",
-      "lines": "5949-5949",
+      "lines": "5943-5943",
       "carried": true
     },
     {
       "selector": ".coverage-card.pending",
-      "lines": "5950-5950",
+      "lines": "5944-5944",
       "carried": true
     },
     {
       "selector": ".coverage-card .status-badge",
-      "lines": "5951-5951",
+      "lines": "5945-5945",
       "carried": true
     },
     {
       "selector": ":root",
-      "lines": "5969-5969",
+      "lines": "5963-5963",
       "carried": false,
       "reason": "root-level rule — no descendant to scope under .ir-content; see web/assets/base.css"
     },
     {
       "selector": ".site-nav",
-      "lines": "5970-5970",
+      "lines": "5964-5964",
       "carried": true,
       "within": "@media (max-width: 640px)"
     },
     {
       "selector": ".site-nav-inner",
-      "lines": "5971-5971",
+      "lines": "5965-5965",
       "carried": true,
       "within": "@media (max-width: 640px)"
     },
     {
       "selector": ".site-nav-toggle",
-      "lines": "5972-5972",
+      "lines": "5966-5966",
       "carried": true,
       "within": "@media (max-width: 640px)"
     },
     {
       "selector": ".site-nav-attribution-by",
-      "lines": "5973-5973",
+      "lines": "5967-5967",
       "carried": true,
       "within": "@media (max-width: 640px)"
     },
     {
       "selector": ".site-nav-links",
-      "lines": "5974-5979",
+      "lines": "5968-5973",
       "carried": true,
       "within": "@media (max-width: 640px)"
     },
     {
       "selector": ".site-menu-link, .site-nav-group-summary",
-      "lines": "5981-5981",
+      "lines": "5975-5975",
       "carried": true,
       "within": "@media (max-width: 640px)"
     },
     {
       "selector": ".site-nav-group",
-      "lines": "5982-5982",
+      "lines": "5976-5976",
       "carried": true,
       "within": "@media (max-width: 640px)"
     },
     {
       "selector": ".site-nav-group-panel",
-      "lines": "5983-5992",
+      "lines": "5977-5986",
       "carried": true,
       "within": "@media (max-width: 640px)"
     },
     {
       "selector": ".site-nav-local-context .local-context-pills",
-      "lines": "5994-5994",
+      "lines": "5988-5988",
       "carried": true,
       "within": "@media (max-width: 640px)"
     },
     {
       "selector": ".key-view-group",
-      "lines": "5996-5996",
+      "lines": "5990-5990",
       "carried": true,
       "within": "@media (max-width: 640px)"
     },
     {
       "selector": ".key-view-trigger",
-      "lines": "5997-5997",
+      "lines": "5991-5991",
       "carried": true,
       "within": "@media (max-width: 640px)"
     },
     {
       "selector": ".key-view-panel",
-      "lines": "5998-6010",
+      "lines": "5992-6004",
       "carried": true,
       "within": "@media (max-width: 640px)"
     },
     {
       "selector": ".doc-header h1",
-      "lines": "6011-6011",
+      "lines": "6005-6005",
       "carried": true,
       "within": "@media (max-width: 640px)"
     },
     {
       "selector": ".chart-row",
-      "lines": "6012-6012",
+      "lines": "6006-6006",
       "carried": true,
       "within": "@media (max-width: 640px)"
     },
     {
       "selector": ".stat-grid",
-      "lines": "6013-6013",
+      "lines": "6007-6007",
       "carried": true,
       "within": "@media (max-width: 640px)"
     },
     {
       "selector": ".dashboard-tile-band, body:has(#wm-review:checked) .dashboard-tile-band",
-      "lines": "6015-6018",
+      "lines": "6009-6012",
       "carried": true,
       "within": "@media (max-width: 640px)"
     },
     {
       "selector": ".dashboard-tile-band .stat-card, .dashboard-tile-band .tile-card",
-      "lines": "6019-6020",
+      "lines": "6013-6014",
       "carried": true,
       "within": "@media (max-width: 640px)"
     },
     {
       "selector": "[data-tooltip]",
-      "lines": "6029-6029",
+      "lines": "6023-6023",
       "carried": true
     },
     {
       "selector": "[data-tooltip]:hover::after, [data-tooltip]:focus-visible::after",
-      "lines": "6030-6052",
+      "lines": "6024-6046",
       "carried": true
     },
     {
       "selector": ".stat-card.js-tip:focus-visible, .donut-legend [data-tooltip]:focus-visible",
-      "lines": "6056-6061",
+      "lines": "6050-6055",
       "carried": true
     },
     {
       "selector": ".next-steps-list li",
-      "lines": "6101-6101",
+      "lines": "6095-6095",
       "carried": true
     },
     {
       "selector": ".next-steps-list li .cmd-badge",
-      "lines": "6102-6102",
+      "lines": "6096-6096",
       "carried": true
     },
     {
       "selector": ".next-steps-list li .next-steps-desc",
-      "lines": "6103-6103",
+      "lines": "6097-6097",
       "carried": true
     },
     {
       "selector": ".cmd-badge",
-      "lines": "6110-6121",
+      "lines": "6104-6115",
       "carried": true
     },
     {
       "selector": ".cmd-badge .cmd-copy",
-      "lines": "6124-6138",
+      "lines": "6118-6132",
       "carried": true
     },
     {
       "selector": ".cmd-badge .cmd-text",
-      "lines": "6139-6147",
+      "lines": "6133-6141",
       "carried": true
     },
     {
       "selector": ".cmd-copy .icon",
-      "lines": "6148-6148",
+      "lines": "6142-6142",
       "carried": true
     },
     {
       "selector": ".cmd-badge .cmd-copy:hover",
-      "lines": "6149-6149",
+      "lines": "6143-6143",
       "carried": true
     },
     {
       "selector": ".cmd-badge .cmd-copy:hover .icon",
-      "lines": "6150-6150",
+      "lines": "6144-6144",
       "carried": true
     },
     {
       "selector": ".cmd-badge .cmd-copy:focus-visible",
-      "lines": "6151-6151",
+      "lines": "6145-6145",
       "carried": true
     },
     {
       "selector": ".send-menu",
-      "lines": "6155-6155",
+      "lines": "6149-6149",
       "carried": true
     },
     {
       "selector": ".cmd-badge .send-toggle",
-      "lines": "6157-6170",
+      "lines": "6151-6164",
       "carried": true
     },
     {
       "selector": ".cmd-badge .send-toggle:hover, .cmd-badge .send-menu[open] .send-toggle",
-      "lines": "6171-6172",
+      "lines": "6165-6166",
       "carried": true
     },
     {
       "selector": ".cmd-badge .send-toggle:focus-visible",
-      "lines": "6173-6173",
+      "lines": "6167-6167",
       "carried": true
     },
     {
       "selector": ".send-toggle::-webkit-details-marker",
-      "lines": "6174-6174",
+      "lines": "6168-6168",
       "carried": true
     },
     {
       "selector": ".send-toggle::marker",
-      "lines": "6175-6175",
+      "lines": "6169-6169",
       "carried": true
     },
     {
       "selector": ".send-menu-list",
-      "lines": "6178-6192",
+      "lines": "6172-6186",
       "carried": true
     },
     {
       "selector": ".send-menu-list .send-item",
-      "lines": "6195-6214",
+      "lines": "6189-6208",
       "carried": true
     },
     {
       "selector": ".send-menu-list .send-item:hover",
-      "lines": "6215-6215",
+      "lines": "6209-6209",
       "carried": true
     },
     {
       "selector": ".send-menu-list .send-item:focus-visible",
-      "lines": "6216-6216",
+      "lines": "6210-6210",
       "carried": true
     },
     {
       "selector": ".chart-panel:has(.send-menu[open]), .chart-panel:has(.cmd-badge [data-tooltip]:hover), .chart-panel:has(.cmd-badge [data-tooltip]:focus-visible)",
-      "lines": "6223-6225",
+      "lines": "6217-6219",
       "carried": true
     },
     {
       "selector": ".chart-panel:has(.git-pulse-empty[data-tooltip]:hover), .chart-panel:has(.git-pulse-empty[data-tooltip]:focus-visible)",
-      "lines": "6229-6230",
+      "lines": "6223-6224",
       "carried": true
     },
     {
       "selector": ".git-pulse-header-links",
-      "lines": "6487-6487",
+      "lines": "6481-6481",
       "carried": true
     },
     {
       "selector": ".progress-fill",
-      "lines": "6497-6497",
+      "lines": "6491-6491",
       "carried": true,
       "within": "@media (prefers-reduced-motion: no-preference)"
     },
     {
-      "selector": ".donut, .sunburst",
-      "lines": "6501-6502",
+      "selector": ".donut",
+      "lines": "6495-6496",
       "carried": true,
-      "within": "@media (prefers-reduced-motion: no-preference)"
+      "within": "@media (prefers-reduced-motion: no-preference)",
+      "note": "1 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": ".heatmap .heatmap-cell",
-      "lines": "6529-6532",
+      "lines": "6523-6526",
       "carried": true,
       "within": "@media (prefers-reduced-motion: no-preference)"
     },
     {
       "selector": ".git-pulse, .coverage, .refinement-funnel, .req-flow",
-      "lines": "6542-6546",
+      "lines": "6536-6540",
       "carried": true,
       "within": "@media (prefers-reduced-motion: no-preference)",
       "note": "1 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": ".now-next-card:hover, .epic-mosaic-card:hover, .stat-card-link:hover, .site-nav-attribution:hover .specscribe-badge, .stat-card:hover",
-      "lines": "6568-6577",
+      "lines": "6562-6571",
       "carried": true,
       "within": "@media (prefers-reduced-motion: reduce)",
       "note": "3 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": ".heatmap .heatmap-cell, .git-pulse, .coverage, .refinement-funnel, .req-flow",
-      "lines": "6585-6594",
+      "lines": "6579-6588",
       "carried": true,
       "within": "@media (prefers-reduced-motion: reduce)",
       "note": "3 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": ".req-status-block:hover",
-      "lines": "6597-6597",
+      "lines": "6591-6591",
       "carried": true,
       "within": "@media (prefers-reduced-motion: reduce)"
     },
     {
       "selector": ".sprint-wheel",
-      "lines": "6625-6625",
+      "lines": "6619-6619",
       "carried": true
     },
     {
       "selector": ".sprint-wheel .donut",
-      "lines": "6626-6626",
+      "lines": "6620-6620",
       "carried": true
     },
     {
       "selector": ".sprint-wheel-label",
-      "lines": "6627-6627",
+      "lines": "6621-6621",
       "carried": true
     },
     {
       "selector": ".pill.pill-link",
-      "lines": "6652-6652",
+      "lines": "6646-6646",
       "carried": true
     },
     {
       "selector": ".pill.pill-link:hover",
-      "lines": "6653-6653",
+      "lines": "6647-6647",
       "carried": true
     },
     {
       "selector": ".panel-source-inline",
-      "lines": "6664-6664",
+      "lines": "6658-6658",
       "carried": true
     },
     {
       "selector": ".sprint-board-header, .req-panel-header",
-      "lines": "6668-6669",
+      "lines": "6662-6663",
       "carried": true
     },
     {
       "selector": ".sprint-board-header-aside, .req-panel-header-aside",
-      "lines": "6670-6671",
+      "lines": "6664-6665",
       "carried": true
     },
     {
       "selector": ".sprint-epic-filter-host",
-      "lines": "6673-6673",
+      "lines": "6667-6667",
       "carried": true
     },
     {
       "selector": ".sprint-filterable",
-      "lines": "6681-6681",
+      "lines": "6675-6675",
       "carried": true
     },
     {
       "selector": ".sprint-filter-empty",
-      "lines": "6758-6761",
+      "lines": "6752-6755",
       "carried": true
     },
     {
       "selector": ".sprint-card[hidden], .sprint-lane-empty[hidden], .sprint-lane-more[hidden], .sprint-filter-empty[hidden]",
-      "lines": "6764-6770",
+      "lines": "6758-6764",
       "carried": true,
       "note": "1 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": ".sprint-card",
-      "lines": "6774-6783",
+      "lines": "6768-6777",
       "carried": true
     },
     {
       "selector": "a.sprint-card:hover, div.sprint-card:hover",
-      "lines": "6784-6785",
+      "lines": "6778-6779",
       "carried": true
     },
     {
       "selector": ".sprint-card-source a.sprint-card-source-ref",
-      "lines": "6786-6786",
+      "lines": "6780-6780",
       "carried": true
     },
     {
       "selector": ".sprint-card-source a.sprint-card-source-ref:hover",
-      "lines": "6787-6787",
+      "lines": "6781-6781",
       "carried": true
     },
     {
       "selector": "a.sprint-card-title",
-      "lines": "6788-6788",
+      "lines": "6782-6782",
       "carried": true
     },
     {
       "selector": ".sprint-card.pending",
-      "lines": "6789-6789",
+      "lines": "6783-6783",
       "carried": true
     },
     {
       "selector": ".sprint-card.ready",
-      "lines": "6790-6790",
+      "lines": "6784-6784",
       "carried": true
     },
     {
       "selector": ".sprint-card.active",
-      "lines": "6791-6791",
+      "lines": "6785-6785",
       "carried": true
     },
     {
       "selector": ".sprint-card.review",
-      "lines": "6792-6792",
+      "lines": "6786-6786",
       "carried": true
     },
     {
       "selector": ".sprint-card.done",
-      "lines": "6793-6793",
+      "lines": "6787-6787",
       "carried": true
     },
     {
       "selector": ".sprint-card.retired",
-      "lines": "6794-6794",
+      "lines": "6788-6788",
       "carried": true
     },
     {
       "selector": ".sprint-card.no-plan",
-      "lines": "6796-6800",
+      "lines": "6790-6794",
       "carried": true
     },
     {
       "selector": ".sprint-lane-empty",
-      "lines": "6802-6815",
+      "lines": "6796-6809",
       "carried": true
     },
     {
       "selector": ".sprint-card-head",
-      "lines": "6816-6816",
+      "lines": "6810-6810",
       "carried": true
     },
     {
       "selector": ".sprint-card-id",
-      "lines": "6817-6817",
+      "lines": "6811-6811",
       "carried": true
     },
     {
       "selector": ".sprint-card-title",
-      "lines": "6818-6818",
+      "lines": "6812-6812",
       "carried": true
     },
     {
       "selector": ".sprint-card-progress",
-      "lines": "6820-6820",
+      "lines": "6814-6814",
       "carried": true
     },
     {
       "selector": ".sprint-card-progress-fill",
-      "lines": "6821-6821",
+      "lines": "6815-6815",
       "carried": true
     },
     {
       "selector": ".sprint-card-progress-fill.done",
-      "lines": "6822-6822",
+      "lines": "6816-6816",
       "carried": true
     },
     {
       "selector": ".sprint-card-progress-fill.partial",
-      "lines": "6823-6823",
+      "lines": "6817-6817",
       "carried": true
     },
     {
       "selector": ".sprint-card-progress-fill.empty",
-      "lines": "6824-6824",
+      "lines": "6818-6818",
       "carried": true
     },
     {
       "selector": ".sprint-board",
-      "lines": "6829-6835",
+      "lines": "6823-6829",
       "carried": true
     },
     {
       "selector": ".sprint-lane",
-      "lines": "6836-6842",
+      "lines": "6830-6836",
       "carried": true
     },
     {
       "selector": ".sprint-lane-head",
-      "lines": "6843-6852",
+      "lines": "6837-6846",
       "carried": true
     },
     {
       "selector": ".sprint-lane-head.js-tip",
-      "lines": "6854-6854",
+      "lines": "6848-6848",
       "carried": true
     },
     {
       "selector": ".sprint-lane-head.js-tip:focus-visible",
-      "lines": "6855-6859",
+      "lines": "6849-6853",
       "carried": true
     },
     {
       "selector": ".sprint-lane-label",
-      "lines": "6860-6868",
+      "lines": "6854-6862",
       "carried": true
     },
     {
       "selector": ".sprint-lane-count",
-      "lines": "6869-6878",
+      "lines": "6863-6872",
       "carried": true
     },
     {
       "selector": ".sprint-lane.pending .sprint-lane-head",
-      "lines": "6881-6881",
+      "lines": "6875-6875",
       "carried": true
     },
     {
       "selector": ".sprint-lane.ready .sprint-lane-head",
-      "lines": "6882-6882",
+      "lines": "6876-6876",
       "carried": true
     },
     {
       "selector": ".sprint-lane.active .sprint-lane-head",
-      "lines": "6883-6883",
+      "lines": "6877-6877",
       "carried": true
     },
     {
       "selector": ".sprint-lane.review .sprint-lane-head",
-      "lines": "6884-6884",
+      "lines": "6878-6878",
       "carried": true
     },
     {
       "selector": ".sprint-lane.done .sprint-lane-head",
-      "lines": "6885-6885",
+      "lines": "6879-6879",
       "carried": true
     },
     {
       "selector": ".sprint-lane.retired .sprint-lane-head",
-      "lines": "6886-6886",
+      "lines": "6880-6880",
       "carried": true
     },
     {
       "selector": ".sprint-lane.unplanned .sprint-lane-head",
-      "lines": "6887-6887",
+      "lines": "6881-6881",
       "carried": true
     },
     {
       "selector": ".sprint-card.unplanned",
-      "lines": "6888-6888",
+      "lines": "6882-6882",
       "carried": true
     },
     {
       "selector": ".sprint-card.unplanned-card .sprint-card-id",
-      "lines": "6889-6889",
+      "lines": "6883-6883",
       "carried": true
     },
     {
       "selector": ".sprint-card-source",
-      "lines": "6890-6896",
+      "lines": "6884-6890",
       "carried": true
     },
     {
       "selector": ".sprint-cards",
-      "lines": "6899-6899",
+      "lines": "6893-6893",
       "carried": true
     },
     {
       "selector": ".sprint-lane-more",
-      "lines": "6900-6906",
+      "lines": "6894-6900",
       "carried": true
     },
     {
       "selector": ".sprint-lane-more:hover",
-      "lines": "6907-6907",
+      "lines": "6901-6901",
       "carried": true
     },
     {
       "selector": ".board-tabs",
-      "lines": "6943-6943",
+      "lines": "6937-6937",
       "carried": true
     },
     {
       "selector": ".board-tab-radio",
-      "lines": "6944-6944",
+      "lines": "6938-6938",
       "carried": true
     },
     {
       "selector": ".board-tabbar",
-      "lines": "6945-6945",
+      "lines": "6939-6939",
       "carried": true
     },
     {
       "selector": ".board-tab",
-      "lines": "6946-6953",
+      "lines": "6940-6947",
       "carried": true
     },
     {
       "selector": ".board-tab:hover",
-      "lines": "6954-6954",
+      "lines": "6948-6948",
       "carried": true
     },
     {
       "selector": ".req-view-grid",
-      "lines": "6983-6983",
+      "lines": "6977-6977",
       "carried": true
     },
     {
       "selector": ".req-panel:has(#rv-grid:checked) .req-view-flow",
-      "lines": "6984-6984",
+      "lines": "6978-6978",
       "carried": true
     },
     {
       "selector": ".req-panel:has(#rv-grid:checked) .req-view-grid",
-      "lines": "6985-6985",
+      "lines": "6979-6979",
       "carried": true
     },
     {
       "selector": ".work-mode-jumps .work-mode-pills",
-      "lines": "6989-6998",
+      "lines": "6983-6992",
       "carried": true
     },
     {
       "selector": ".work-mode-pill",
-      "lines": "6999-7014",
+      "lines": "6993-7008",
       "carried": true
     },
     {
       "selector": ".work-mode-pill:hover",
-      "lines": "7015-7019",
+      "lines": "7009-7013",
       "carried": true
     },
     {
       "selector": "body:has(#wm-overview:checked) .dashboard .wm-panel:not(.wm-show-overview)",
-      "lines": "7042-7042",
+      "lines": "7036-7036",
       "carried": true
     },
     {
       "selector": "body:has(#wm-requirements:checked) .dashboard .wm-panel:not(.wm-show-requirements)",
-      "lines": "7043-7043",
+      "lines": "7037-7037",
       "carried": true
     },
     {
       "selector": "body:has(#wm-plan:checked) .dashboard .wm-panel:not(.wm-show-plan)",
-      "lines": "7044-7044",
+      "lines": "7038-7038",
       "carried": true
     },
     {
       "selector": "body:has(#wm-develop:checked) .dashboard .wm-panel:not(.wm-show-develop)",
-      "lines": "7045-7045",
+      "lines": "7039-7039",
       "carried": true
     },
     {
       "selector": "body:has(#wm-review:checked) .dashboard .wm-panel:not(.wm-show-review)",
-      "lines": "7046-7046",
+      "lines": "7040-7040",
       "carried": true
     },
     {
       "selector": "body:has(#wm-track:checked) .dashboard .wm-panel:not(.wm-show-track)",
-      "lines": "7047-7047",
+      "lines": "7041-7041",
       "carried": true
     },
     {
       "selector": "body:has(.action-items-wrap) .doc-header, body:has(.deferred-work-wrap) .doc-header, body:has(.followup-group-wrap) .doc-header",
-      "lines": "7071-7077",
+      "lines": "7065-7071",
       "carried": true
     },
     {
       "selector": ".followup-rows-list",
-      "lines": "7079-7082",
+      "lines": "7073-7076",
       "carried": true,
       "note": "3 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": ".followup-row",
-      "lines": "7088-7093",
+      "lines": "7082-7087",
       "carried": true,
       "note": "1 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": ".followup-row",
-      "lines": "7098-7098",
+      "lines": "7092-7092",
       "carried": true
     },
     {
       "selector": ".followup-row.resolved",
-      "lines": "7103-7107",
+      "lines": "7097-7101",
       "carried": true,
       "note": "1 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": ".followup-row-scan",
-      "lines": "7108-7112",
+      "lines": "7102-7106",
       "carried": true,
       "note": "1 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": ".followup-row-summary",
-      "lines": "7113-7118",
+      "lines": "7107-7112",
       "carried": true,
       "note": "1 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": ".followup-row-meta",
-      "lines": "7119-7123",
+      "lines": "7113-7117",
       "carried": true,
       "note": "1 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": ".followup-row-source",
-      "lines": "7124-7125",
+      "lines": "7118-7119",
       "carried": true,
       "note": "1 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": ".followup-row-primary",
-      "lines": "7126-7131",
+      "lines": "7120-7125",
       "carried": true,
       "note": "1 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": "a.followup-row-primary:hover",
-      "lines": "7132-7133",
+      "lines": "7126-7127",
       "carried": true,
       "note": "1 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": "body:has(main.followup-detail) .doc-header",
-      "lines": "7175-7181",
+      "lines": "7169-7175",
       "carried": true
     },
     {
       "selector": ".epic-retro-affordance",
-      "lines": "7246-7246",
+      "lines": "7240-7240",
       "carried": true
     },
     {
       "selector": ".epic-retro-link",
-      "lines": "7247-7247",
+      "lines": "7241-7241",
       "carried": true
     },
     {
       "selector": ".epic-retro-link:hover",
-      "lines": "7248-7248",
+      "lines": "7242-7242",
       "carried": true
     },
     {
       "selector": "@keyframes progress-grow",
-      "lines": "6498-6498",
+      "lines": "6492-6492",
       "carried": true,
       "within": "@media (prefers-reduced-motion: no-preference)"
     },
     {
       "selector": "@keyframes chart-enter",
-      "lines": "6514-6517",
+      "lines": "6508-6511",
       "carried": true,
       "within": "@media (prefers-reduced-motion: no-preference)"
     },
     {
       "selector": "@keyframes cell-fade",
-      "lines": "6533-6533",
+      "lines": "6527-6527",
       "carried": true,
       "within": "@media (prefers-reduced-motion: no-preference)"
     },
     {
       "selector": "@keyframes panel-reveal",
-      "lines": "6547-6550",
+      "lines": "6541-6544",
       "carried": true,
       "within": "@media (prefers-reduced-motion: no-preference)"
     }

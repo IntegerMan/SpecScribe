@@ -1,0 +1,23 @@
+
+Story 23.5 AC #4 — one prebuilt artefact, two different projects
+
+Prebuilt server: C:\Users\MattE\AppData\Local\Temp\claude\C--Dev-SpecScribe\16516aa4-3768-45e4-8485-782346ac442f\scratchpad\isolated\.output\server\index.mjs
+Isolation:       no node_modules, no source, no nuxt.config.ts, no prerendered HTML alongside .output/
+Routes driven:   externally, one request per route from each IR's OWN manifest (not `nuxt generate`)
+Oracle:          emitted page CONTAINS that IR's own <main> inner HTML verbatim
+
+IR   project               routes      pass        boot     median   p95      wall
+------------------------------------------------------------------------------------------
+A    SpecScribe            1056        1056/1056   540 ms   3.7 ms   13.2 ms  6.2 s
+B    CORA                  33          32/33       528 ms   5.9 ms   17.6 ms  1.1 s
+------------------------------------------------------------------------------------------
+
+✗ IR B (CORA) — 1 failing route(s):
+    [status] 1 route(s)
+      index.html
+        HTTP 500
+
+VERDICT: REFUTED — the prebuilt artefact did NOT render every route of every project. Read the
+         failure kinds above before concluding: a `status`/`ir` failure on ONE project is a
+         project-independence defect in a component, which is a narrower (and fixable) result than
+         "prebuilt artefacts cannot work".

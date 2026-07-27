@@ -4,7 +4,7 @@ baseline_commit: 32fd28237d42f9a558b716d46bb2ffd7b5dbf6a4
 
 # Story 18.4: Forged Ideas List Page
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -410,63 +410,63 @@ Story 10.9's client sort/filter enhances, and it is inert with JS off.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Read the emitter and the consumption sites in full (AC: #1, #3)**
-  - [ ] Read `.claude/skills/bmad-forge-idea/SKILL.md` and `_bmad/scripts/memlog.py` in full.
-  - [ ] `head -6` each of the four existing `.memlog.md` files (§2) and confirm they use `topic:` not `idea:` and have no sibling `forge-report.html`. This is the false-positive set your discovery must reject.
-  - [ ] Read `SiteGenerator.RegenerateAdrs`' synthesized-landing block, `AdrEntry`, `ListRow`, `StatusStyles.FreeTextBadge` / `AdrAccentToken` / `CanonicalRank`, `SiteNav.Build` (+ `HasWorkGraph`/`hasWorkGraph` as the gating template), `DashboardViewBuilder.KnownIndexGroups` / `IsWellKnownTopLevelFolder`, `SiteGenerator.UnrecognizedTopLevelFolders`, `BuildMemlogMap` / `SelectMemlogUpdatedByFamily` / `MemlogUpdatedPattern`, `PathUtil.IsIgnoredSourceFile`, `SiteGenerator.WriteOutput`, `EnumerateSourceFiles`, `AdapterDiagnostic`, `DiagnosticAnchorRoot`, `Frontmatter`, `MarkdownConverter.ExtractFirstH1` / `ReadAllTextShared`, `ForgeOptions` (§11).
-  - [ ] Grep every `SiteNav.Build(` call site and list them — the gate must be passed identically at each (§6).
+- [x] **Task 1 — Read the emitter and the consumption sites in full (AC: #1, #3)**
+  - [x] Read `.claude/skills/bmad-forge-idea/SKILL.md` and `_bmad/scripts/memlog.py` in full.
+  - [x] `head -6` each of the four existing `.memlog.md` files (§2) and confirm they use `topic:` not `idea:` and have no sibling `forge-report.html`. This is the false-positive set your discovery must reject.
+  - [x] Read `SiteGenerator.RegenerateAdrs`' synthesized-landing block, `AdrEntry`, `ListRow`, `StatusStyles.FreeTextBadge` / `AdrAccentToken` / `CanonicalRank`, `SiteNav.Build` (+ `HasWorkGraph`/`hasWorkGraph` as the gating template), `DashboardViewBuilder.KnownIndexGroups` / `IsWellKnownTopLevelFolder`, `SiteGenerator.UnrecognizedTopLevelFolders`, `BuildMemlogMap` / `SelectMemlogUpdatedByFamily` / `MemlogUpdatedPattern`, `PathUtil.IsIgnoredSourceFile`, `SiteGenerator.WriteOutput`, `EnumerateSourceFiles`, `AdapterDiagnostic`, `DiagnosticAnchorRoot`, `Frontmatter`, `MarkdownConverter.ExtractFirstH1` / `ReadAllTextShared`, `ForgeOptions` (§11).
+  - [x] Grep every `SiteNav.Build(` call site and list them — the gate must be passed identically at each (§6).
 
-- [ ] **Task 2 — Create a real fixture, and confirm today's behavior before changing it (AC: #1, #3)**
-  - [ ] Build a scratch repo (session scratchpad, **not** this repo's `main`) with `_bmad-output/forge/` workspaces covering all four states: in-progress (memlog only, no `status`), hardened (+`forged-idea.md`+report), killed (report + a `- (kill)` memlog entry), clarified (report, no kill entry, no `forged-idea.md`).
-  - [ ] Generate against it **before** any code change and record verbatim: the orphan `forged-idea` page, the absent report, and the `forge` unrecognized-structure notice. This is the baseline the ACs are measured against — 18.1's review named unrecorded/unreproducible evidence as fatal.
-  - [ ] Add the same shapes as test fixtures under `tests/`, pinned in-repo so the evidence survives the session.
+- [x] **Task 2 — Create a real fixture, and confirm today's behavior before changing it (AC: #1, #3)**
+  - [x] Build a scratch repo (session scratchpad, **not** this repo's `main`) with `_bmad-output/forge/` workspaces covering all four states: in-progress (memlog only, no `status`), hardened (+`forged-idea.md`+report), killed (report + a `- (kill)` memlog entry), clarified (report, no kill entry, no `forged-idea.md`).
+  - [x] Generate against it **before** any code change and record verbatim: the orphan `forged-idea` page, the absent report, and the `forge` unrecognized-structure notice. This is the baseline the ACs are measured against — 18.1's review named unrecorded/unreproducible evidence as fatal.
+  - [x] Add the same shapes as test fixtures under `tests/`, pinned in-repo so the evidence survives the session.
 
-- [ ] **Task 3 — Idea discovery and the domain model (AC: #1, #3)**
-  - [ ] Implement the §2 cascade: `{SourceRoot}/forge/**` path rule → `.memlog.md`+`forge-report.html` marker rule → `idea:` frontmatter corroboration. Recursive (nested `run_folder_pattern`).
-  - [ ] Reject every one of §2's four existing non-forge memlogs — assert this by test using the real frontmatter shapes.
-  - [ ] Derive title / verdict / date / summary per §3. Reuse `MemlogUpdatedPattern`; do not add a second `updated:` regex.
-  - [ ] Slugify + de-duplicate the workspace name into a page path (§5), first-wins in ordinal order with a `Skipped` diagnostic.
-  - [ ] Model it as a pure `Build` over already-gathered inputs with an `Empty` singleton and an `IsEmpty` flag, mirroring `ArtifactCoverage` / `WorkInventory` / `WorkGraphModel`. Never throws — any failure degrades to `Empty` so the surface omits and generation still succeeds (AD-4 / NFR2).
+- [x] **Task 3 — Idea discovery and the domain model (AC: #1, #3)**
+  - [x] Implement the §2 cascade: `{SourceRoot}/forge/**` path rule → `.memlog.md`+`forge-report.html` marker rule → `idea:` frontmatter corroboration. Recursive (nested `run_folder_pattern`).
+  - [x] Reject every one of §2's four existing non-forge memlogs — assert this by test using the real frontmatter shapes.
+  - [x] Derive title / verdict / date / summary per §3. Reuse `MemlogUpdatedPattern`; do not add a second `updated:` regex.
+  - [x] Slugify + de-duplicate the workspace name into a page path (§5), first-wins in ordinal order with a `Skipped` diagnostic.
+  - [x] Model it as a pure `Build` over already-gathered inputs with an `Empty` singleton and an `IsEmpty` flag, mirroring `ArtifactCoverage` / `WorkInventory` / `WorkGraphModel`. Never throws — any failure degrades to `Empty` so the surface omits and generation still succeeds (AD-4 / NFR2).
 
-- [ ] **Task 4 — The Ideas list page, grouped by verdict (AC: #1, #3; D3)**
-  - [ ] `IdeasTemplater` renders `ideas.html`: a section per verdict in the order **Hardened → In progress → Killed**, each with a heading, a count, and a `<ul class="list-rows-list js-listable">` of `ListRow.Render` rows.
-  - [ ] A verdict with zero ideas emits **no section** (NFR8) — never an empty heading, never "0 ideas".
-  - [ ] Row anatomy: `<strong>{title}</strong> — {summary}` · verdict badge via `StatusStyles.FreeTextBadge` · date chip via `ListRow.Chip(PortalDates.Day(...))` · `ListRow.PrimaryLink(detailHref, "View idea")` · `extraRowClass` accent per §12 · `sortName`/`sortDate`/`sortStatus` populated.
-  - [ ] Gate: no discovered ideas ⇒ **no page written and no nav entry** (AC #3). Verify the nav gate and the write gate read the same signal.
+- [x] **Task 4 — The Ideas list page, grouped by verdict (AC: #1, #3; D3)**
+  - [x] `IdeasTemplater` renders `ideas.html`: a section per verdict in the order **Hardened → In progress → Killed**, each with a heading, a count, and a `<ul class="list-rows-list js-listable">` of `ListRow.Render` rows.
+  - [x] A verdict with zero ideas emits **no section** (NFR8) — never an empty heading, never "0 ideas".
+  - [x] Row anatomy: `<strong>{title}</strong> — {summary}` · verdict badge via `StatusStyles.FreeTextBadge` · date chip via `ListRow.Chip(PortalDates.Day(...))` · `ListRow.PrimaryLink(detailHref, "View idea")` · `extraRowClass` accent per §12 · `sortName`/`sortDate`/`sortStatus` populated.
+  - [x] Gate: no discovered ideas ⇒ **no page written and no nav entry** (AC #3). Verify the nav gate and the write gate read the same signal.
 
-- [ ] **Task 5 — Idea detail pages + the carried report (AC: #1 ext. #4, #6; D1)**
-  - [ ] `ideas/{slug}.html`: the memlog chronology rendered as typed entries (decision / assumption / crack / kill / direction / lock / note), `forged-idea.md`'s content when present, and the **true exit word** including `Clarified` (§D2 mitigation).
-  - [ ] Carry `forge-report.html` to `ideas/{slug}-report.html` via `WriteOutput` (§4) and link it from the detail page as "the original report" — clearly labelled as a leaf artifact outside the portal chrome.
-  - [ ] Implement AC #6's gate: skip a report with `<script` or an external-origin `src=`/`href=`, and skip one over the size cap, each with the §10 `Skipped` diagnostic.
-  - [ ] **Never** wrap the report in `HtmlTemplater.RenderPage` — it has its own `<html>` (§4, nested-document defect class).
-  - [ ] Suppress the now-duplicate generic `forged-idea.md` page via the `consumedArtifacts` set (§6).
+- [x] **Task 5 — Idea detail pages + the carried report (AC: #1 ext. #4, #6; D1)**
+  - [x] `ideas/{slug}.html`: the memlog chronology rendered as typed entries (decision / assumption / crack / kill / direction / lock / note), `forged-idea.md`'s content when present, and the **true exit word** including `Clarified` (§D2 mitigation).
+  - [x] Carry `forge-report.html` to `ideas/{slug}-report.html` via `WriteOutput` (§4) and link it from the detail page as "the original report" — clearly labelled as a leaf artifact outside the portal chrome.
+  - [x] Implement AC #6's gate: skip a report with `<script` or an external-origin `src=`/`href=`, and skip one over the size cap, each with the §10 `Skipped` diagnostic.
+  - [x] **Never** wrap the report in `HtmlTemplater.RenderPage` — it has its own `<html>` (§4, nested-document defect class).
+  - [x] Suppress the now-duplicate generic `forged-idea.md` page via the `consumedArtifacts` set (§6).
 
-- [ ] **Task 6 — Forward links (AC: #2; D4)**
-  - [ ] Resolve markdown links inside `forged-idea.md` through the source-relative → output-relative chain, honouring special routing and dropping no-page targets with the §10 diagnostic.
-  - [ ] Check `Frontmatter.Sources` on downstream docs for a reference to the workspace path or `forged-idea.md`.
-  - [ ] **No** fuzzy matching. No evidence ⇒ no forward-link element at all. Assert the absence by test.
+- [x] **Task 6 — Forward links (AC: #2; D4)**
+  - [x] Resolve markdown links inside `forged-idea.md` through the source-relative → output-relative chain, honouring special routing and dropping no-page targets with the §10 diagnostic.
+  - [x] Check `Frontmatter.Sources` on downstream docs for a reference to the workspace path or `forged-idea.md`.
+  - [x] **No** fuzzy matching. No evidence ⇒ no forward-link element at all. Assert the absence by test.
 
-- [ ] **Task 7 — Registration, gating, and the two pre-existing behaviors (AC: #1, #3)**
-  - [ ] Work through §6's checklist in full: `SiteNav` const + `HasIdeas` + `Build` parameter + Project group + quick link + every call site + **not** in `EpicsFamilyPages`.
-  - [ ] Add `("Ideas", "forge")` to `KnownIndexGroups` with a code comment that names the do-not-extend warning and states why `forge` is categorically different (§6).
-  - [ ] Write the §7(a) regression test: a repo with a root `_bmad-output/.memlog.md` keeps its coverage-card dates after a forge workspace appears — or, if you decide to exclude forge memlogs from `BuildMemlogMap`, test that decision instead and **record which you chose and why**.
-  - [ ] Confirm §7(b) by test: a forge memlog never becomes a family's `MemlogUpdated`.
+- [x] **Task 7 — Registration, gating, and the two pre-existing behaviors (AC: #1, #3)**
+  - [x] Work through §6's checklist in full: `SiteNav` const + `HasIdeas` + `Build` parameter + Project group + quick link + every call site + **not** in `EpicsFamilyPages`.
+  - [x] Add `("Ideas", "forge")` to `KnownIndexGroups` with a code comment that names the do-not-extend warning and states why `forge` is categorically different (§6).
+  - [x] Write the §7(a) regression test: a repo with a root `_bmad-output/.memlog.md` keeps its coverage-card dates after a forge workspace appears — or, if you decide to exclude forge memlogs from `BuildMemlogMap`, test that decision instead and **record which you chose and why**.
+  - [x] Confirm §7(b) by test: a forge memlog never becomes a family's `MemlogUpdated`.
 
-- [ ] **Task 8 — Verify live, in a browser (CLAUDE.md verification rule)**
-  - [ ] Generate the Task 2 scratch repo to `SpecScribeOutput/` (**never** `--output docs/live`) and open `ideas.html`, one detail page, and one carried report in a real browser.
-  - [ ] Check: section grouping and counts, verdict badges legible **without colour**, accent bars, the report link, and that the carried report does not inherit or corrupt portal chrome.
-  - [ ] Check the **JS-off** path (CSP `script-src 'none'`, per [[story-20-6-text-twin-audit-done]]): the grouped list is plain HTML and must be fully readable — `js-listable` is enhancement only.
-  - [ ] Check the empty case: a repo with no forge workspace has **no** Ideas nav entry, **no** `ideas.html`, and **no** `forge` structure notice regression.
+- [x] **Task 8 — Verify live, in a browser (CLAUDE.md verification rule)**
+  - [x] Generate the Task 2 scratch repo to `SpecScribeOutput/` (**never** `--output docs/live`) and open `ideas.html`, one detail page, and one carried report in a real browser.
+  - [x] Check: section grouping and counts, verdict badges legible **without colour**, accent bars, the report link, and that the carried report does not inherit or corrupt portal chrome.
+  - [x] Check the **JS-off** path (CSP `script-src 'none'`, per [[story-20-6-text-twin-audit-done]]): the grouped list is plain HTML and must be fully readable — `js-listable` is enhancement only.
+  - [x] Check the empty case: a repo with no forge workspace has **no** Ideas nav entry, **no** `ideas.html`, and **no** `forge` structure notice regression.
 
-- [ ] **Task 9 — Suite, golden gate, and artifact reconciliation**
-  - [ ] Run the full suite. Expect the known rotating deep-git contention flakes ([[gitmetrics-3s-timeout-silent-deep-git-loss]]) — confirm any failure passes in isolation before calling it a regression.
-  - [ ] `GoldenContentFingerprint`: this story adds production code but the golden fixture has **no** forge workspace, so the fingerprint should **not** move. If it does, that is a signal — investigate before re-baselining, and byte-compare against a clean checkout first ([[story-18-2-module-identity-done]]'s gotcha: `git status` did not report a file already changed on disk).
-  - [ ] Amend `epics.md` **and** `sprint-status.yaml` in the same change (CLAUDE.md): seat AC #4/#5/#6, correct the "depends on 18.3's pinned contract" seating comment (§3), and record the FR resolution from Open Question 2.
+- [x] **Task 9 — Suite, golden gate, and artifact reconciliation**
+  - [x] Run the full suite. Expect the known rotating deep-git contention flakes ([[gitmetrics-3s-timeout-silent-deep-git-loss]]) — confirm any failure passes in isolation before calling it a regression.
+  - [x] `GoldenContentFingerprint`: this story adds production code but the golden fixture has **no** forge workspace, so the fingerprint should **not** move. If it does, that is a signal — investigate before re-baselining, and byte-compare against a clean checkout first ([[story-18-2-module-identity-done]]'s gotcha: `git status` did not report a file already changed on disk).
+  - [x] Amend `epics.md` **and** `sprint-status.yaml` in the same change (CLAUDE.md): seat AC #4/#5/#6, correct the "depends on 18.3's pinned contract" seating comment (§3), and record the FR resolution from Open Question 2.
 
-- [ ] **Task 10 — ADR check (CLAUDE.md ADR-trigger discipline)**
-  - [ ] Decide whether *"a foreign, externally-generated HTML artifact may be carried verbatim into the portal output"* is a cross-cutting architectural decision. Arguments in favour: every page in the site is C#-composed today; this adds a second, un-composed class of output; it interacts with AD-1/AD-2 (one shared rendering core, host-neutral view models) and with ADR 0013's text-twin contract. Argument against: AD-4 may already cover it as one more optional, additive provider.
-  - [ ] If it is a fork, **propose the ADR** rather than burying the decision here or in `sprint-status.yaml` prose ([[adr-creation-trigger-gap-epic-10-retro]]). If not, say so in one sentence and move on.
-  - [ ] Read `docs/adrs/` first — do not declare a rule-crossing without checking whether a ratified ADR already permits it ([[adr-consultation-gap-three-arc-renderers]]).
+- [x] **Task 10 — ADR check (CLAUDE.md ADR-trigger discipline)**
+  - [x] Decide whether *"a foreign, externally-generated HTML artifact may be carried verbatim into the portal output"* is a cross-cutting architectural decision. Arguments in favour: every page in the site is C#-composed today; this adds a second, un-composed class of output; it interacts with AD-1/AD-2 (one shared rendering core, host-neutral view models) and with ADR 0013's text-twin contract. Argument against: AD-4 may already cover it as one more optional, additive provider.
+  - [x] If it is a fork, **propose the ADR** rather than burying the decision here or in `sprint-status.yaml` prose ([[adr-creation-trigger-gap-epic-10-retro]]). If not, say so in one sentence and move on.
+  - [x] Read `docs/adrs/` first — do not declare a rule-crossing without checking whether a ratified ADR already permits it ([[adr-consultation-gap-three-arc-renderers]]).
 
 ## Dev Notes
 
@@ -590,11 +590,231 @@ tree** at `baseline_commit` by a concurrent Epic 20 session. Neither is this sto
 
 ### Agent Model Used
 
+Claude Opus 5 (`claude-opus-5`) — dev-story, 2026-07-27. Baseline `32fd282`; HEAD at start `40c7ee9`.
+
 ### Debug Log References
+
+**Task 2 baseline — today's undesigned behaviour, recorded verbatim before any code change.** Scratch repo with
+eight forge workspaces plus the false-positive set; generated with the `40c7ee9` binary:
+
+```
+SpecScribe: generated=16 updated=0 skipped=1 errors=0
+```
+
+- **3 orphan generic pages**: `forge/hardened-cache-layer/forged-idea.html`,
+  `forge/external-subresource-idea/forged-idea.html`,
+  `forge/2026-07-24/nested-observability-budget/forged-idea.html`. Reachable from **nothing** except the Code Map
+  treemap (`grep -rl forged-idea` → `code-map.html` + the pages themselves). No nav entry, no index card.
+- **0 reports carried.** `find … -name "*report*"` returned nothing under the output root — `forge-report.html` is
+  invisible to `EnumerateSourceFiles`' `*.md` glob.
+- **1 structure notice**, the only diagnostics row on the run:
+  `forge/ — unrecognized top-level folder; its documents render in their own home-index section`.
+- **The relocated (rule-2) workspace produced NOTHING AT ALL** — not even a notice. `idea-lab/` holds only a
+  dotfile-ignored `.memlog.md` and a non-`.md` report, so it never enters `sourceRelatives` and
+  `UnrecognizedTopLevelFolders` cannot see it. Worth stating: the create-story analysis predicted the notice for
+  `forge/` but this case is fully silent today.
+
+**After (same fixture, same command):** `generated=22 skipped=2 errors=0`; `ideas.html` + 8 detail pages + 5
+carried reports; the 3 orphan pages gone; the `forge/` notice gone; 2 `Skipped` diagnostics naming exactly the two
+reports that failed the AC #6 gate. Whole-site link audit: **778 hrefs checked, 0 dead.**
+
+**Two defects found by the live-browser round, not by the suite** (CLAUDE.md's verification rule earning its keep
+again — both would have passed every assertion I had written at the time):
+
+1. **The carried-report link was `../ideas/{slug}-report.html`.** The detail page is *already inside* `ideas/`, so
+   prefixing the root-relative path climbed out and back into a path that does not exist. Fixed to the bare
+   sibling filename; pinned by `RenderDetailPage_CarriedReport_LinksItAsASiblingLeaf`.
+2. **Both breadcrumb trails were double-prefixed** (`../../index.html` from a page one level deep).
+   `HtmlRenderAdapter.AppendCrumbs` applies `RelativePrefix` itself — crumb paths must be root-relative. Caught by
+   walking every href on every ideas page against the filesystem.
+
+**One regression I caused and then fixed, found by the same audit.** Suppressing the orphan `forged-idea.md` pages
+left `BuildReferenceMap` handing out `forge/{slug}/forged-idea.html` for a page that is now deliberately never
+written — 18 dead links on `code-map.html`. That method optimistically maps EVERY `*.md` source to
+`ToOutputRelative(rel)`; story artifacts were already fixed up afterwards, forge workspaces were not. Now routed to
+the idea's detail page, the same special-routing discipline `sprint-status.yaml` and `epics.md` already get.
+
+**Golden fingerprint — investigated, not re-baselined by this story.** It failed mid-run, so I bisected rather
+than regenerating (`git archive HEAD | tar -x` into a scratch tree — read-only, no working-tree risk):
+
+| Tree | Golden test |
+|---|---|
+| pristine `HEAD` | **PASS** |
+| pristine `HEAD` + only the concurrent session's uncommitted `specscribe.js` | **FAIL** |
+
+So the failure existed **without any of my code**. While I was finishing, the concurrent Story 20.8 session
+regenerated the constant to `3171cf5c…` and — correctly — named this story's in-flight changes in its own
+provenance note. I then confirmed the gate **stable across two consecutive runs after a fresh rebuild** with my
+final code in place (both `GoldenContentFingerprint` and `GoldenOutputInventory` green). Reciprocal attribution:
+`3171cf5c…` is Story 20.8's value and carries Story 18.4's `SiteNav`/`DashboardViewBuilder`/`StatusStyles`/CSS
+deltas inside it.
+
+**Suite flake.** Two full-suite runs each failed **one, different** `FileWatcherServiceTests` case
+(`WatchedSourceFileStaysWritableAndDeletableDuringRegeneration`, then
+`EditingAStoryFile_RegeneratesThroughTheOrdinaryMarkdownRoute`); each passed in isolation, the whole watcher class
+passed in isolation (8/8), and the third full run was green (**2538 passed, 0 failed, 3 skipped**). Rotating
+subset under load — the same contention class recorded for the deep-git family, with another session building the
+same repo concurrently. Not a regression: discovery adds no file locks (every read goes through
+`MarkdownConverter.ReadAllTextShared`, i.e. `FileShare.ReadWrite | Delete`).
 
 ### Completion Notes List
 
+**What shipped.** A gated, two-level Ideas surface over `bmad-forge-idea`: `ideas.html` grouped by verdict,
+`ideas/{slug}.html` per idea, and `ideas/{slug}-report.html` for each report that passed the AC #6 carry gate.
+All three original ACs and all three owner-decision extensions are satisfied; every task and subtask is checked.
+
+**Decisions made during implementation, each stated rather than discovered later:**
+
+1. **§7(a) resolved by EXCLUDING forge memlogs from `BuildMemlogMap`.** The alternative (keep them, accept the
+   behaviour) loses real information: `SelectMemlogUpdatedByFamily` demotes a root-level memlog from every-family
+   fallback the moment *any* scoped memlog exists, so in a repo whose only decision journal is
+   `_bmad-output/.memlog.md`, running the forge **once** would silently strip that date from every coverage card —
+   an unrelated surface changing because a different tool ran. A forge memlog could never legitimately *win* a
+   family anyway (§7(b), now asserted directly by test), so excluding it removes exactly the spurious flag flip and
+   adds nothing back. Both halves are pinned:
+   `GenerateAll_ForgeMemlog_DoesNotStripTheRootJournalDateFromCoverageCards` and
+   `SelectMemlogUpdatedByFamily_AForgeMemlogCouldNeverWinAFamilyAnyway`.
+2. **AC #6's gate reads "script-free" as its own words say, not only as `<script`.** It also rejects inline event
+   handlers, `javascript:` URLs, and `<iframe>`/`<object>`/`<embed>` (an `iframe srcdoc` executes). The
+   external-origin half is deliberately strict enough to catch an ordinary outbound `<a href="https://…">`, which
+   is not literally a subresource: a carried report must open offline from `file://` and inside the webview CSP, so
+   "no external origins at all" is the honest reading. Cost of a false reject is one absent link plus a diagnostic
+   that says why — stated here because it *is* a widening of the drafted rule.
+3. **The carried report is written with `capture: false`.** The create-story analysis said SPA/webview capture
+   "comes free"; **it does not, and taking it would have been a defect.** `SpaDelivery.ExtractContentRegion` slices
+   the universal `<main id="main-content">` landmark, and a foreign document has none — the extractor degrades a
+   landmark-less page to *nav-markup-only*, so capturing would have shipped a content-empty route in the bundle
+   while the real, readable file sat on disk beside it. `WriteOutput` gained an opt-out parameter; pinned by
+   `RenderSpaBundle_CarriedReport_IsOnDiskButNotAnSpaRoute`.
+4. **Page shell deviates from the story's stated precedent, deliberately.** The row model and `ListRow` grammar are
+   copied from `RegenerateAdrs`' synthesized ADR landing as instructed, but both pages use the
+   standalone-templater shell (`WorkGraphTemplater`/`TraceabilityTemplater`) rather than `HtmlTemplater.RenderPage`.
+   Reason: Ideas is a **two-level** surface and `RenderPage`'s crumbs are fixed at Home → title, which cannot
+   express Home → Ideas → {idea}.
+5. **Two shared seams were widened rather than duplicated**, per the one-classifier discipline. `Memlog` is new and
+   is now the ONE reader of the `.memlog.md` shape — `BuildMemlogMap`'s `updated:` regex moved into it and both
+   consumers share it, so no second regex exists. `SiteGenerator.CollapseSummary` and
+   `MarkdownConverter.ExtractFirstH1` went `private` → `internal` so the title/summary cascade reuses the ADR
+   cards' exact one-line treatment and the generic page-title H1 rule instead of growing rivals.
+6. **`StatusStyles.SprintLabel` gained `ForSprint`'s own kebab normalization** — a latent inconsistency this story
+   tripped over: a caller passing `"In progress"` got the CANONICAL colour from `ForSprint` but a TitleCased
+   `"In Progress"` label from `SprintLabel`. No `sprint-status.yaml` value is spaced, so no existing caller changes.
+7. **ADR 0021 proposed** (Task 10) — see below.
+
+**Honest limitations, stated rather than engineered around:**
+
+- **An in-progress session under an OVERRIDDEN `forge_output_path` is undiscoverable.** Both `forge_output_path`
+  and `run_folder_pattern` are overridable in `_bmad/custom/bmad-forge-idea.toml`, and **SpecScribe reads no BMad
+  skill/module TOML or `config.yaml` at all today** — the same gap Story 18.5 records for TEA's `test_artifacts`
+  key. Such a session becomes discoverable only once it completes and writes its report (the marker rule). Closing
+  this needs a cross-cutting TOML-reading decision, not a reader bolted on here. Non-goal, unchanged.
+- **Watch mode does not react to forge activity at all.** A `.memlog.md` is dotfile-ignored and a
+  `forge-report.html` is not `.md`, so neither reaches the watcher's dispatch; a full `generate` picks everything
+  up. `IsDataSource` is named in-code as the seam a follow-on would extend, with the reason a follow-on is not
+  trivial: a forge session writes continuously mid-conversation, so live-following it is a debounce/ordering
+  decision of its own. Non-goal, unchanged.
+- **The corrected 18.3 dependency.** epics.md's seating comment claimed 18.4 "depends on 18.3's pinned contract for
+  its blurb-metadata half". **It does not**, and this story shipped without it — a forge workspace carries its own
+  `goal:` in its own frontmatter. 18.4 was gated by nothing: not by 18.3, and not by 18.2 either
+  (`bmad-forge-idea` ships in `core`, the one module `ModuleContext.Detect` excludes, so ideas never touch module
+  identity). Corrected in `epics.md` in this same change.
+- **FR coverage (Open Question 2).** Unanswered, so the stated default **(c)** was taken: the FR36 stretch is
+  accepted and noted in `epics.md` rather than closed by widening FR36 or minting a new FR. Revisit if a third
+  core-skill surface lands.
+- **No screenshot.** The Browser pane was not displayed in this session, so `computer{action:"screenshot"}` could
+  not composite. Verification was done with the text/DOM tools instead — computed styles, DOM geometry, network
+  results and rendered text — which is what CLAUDE.md's rule actually asks for. Evidence below.
+
+**Live-browser verification (Task 8), fixture served over HTTP:**
+
+- **Grouping + counts**: three sections in D3 order (`ideas-hardened` 3 · `ideas-in-progress` 2 · `ideas-killed` 3),
+  each heading `display: flex` with its own count pill. `document.documentElement.scrollWidth >
+  clientWidth` → **false** (no horizontal body scroll).
+- **Legible without colour**: all eight rows carry their verdict as a WORD — Hardened ×3, Clarified ×1,
+  In progress ×1, Killed ×3 — and the accent bars resolve to real tokens (`--list-row-accent` → `#6b8f62` done /
+  pending / deferred), reinforcement only.
+- **JS-off under a real CSP.** Served with `Content-Security-Policy: script-src 'none'`; the network log shows
+  `specscribe.css → 304` and **`specscribe.js → FAILED`** (blocked), and the full grouped list and a detail page
+  both render complete and readable, zero console errors.
+- **The carried report does not corrupt or inherit portal chrome**: exactly **1** `<html>`, **0** `<main>`,
+  **0** `<footer>`, **0** portal stylesheets, **0** scripts, inline SVG seal intact.
+- **Empty case**: a repo with no forge workspace produces **no** `ideas.html`, **no** `ideas/` directory, **no**
+  nav entry, **no** quick link, and **zero** diagnostics rows — and `452` hrefs checked with `0` dead.
+
+**Task 10 — ADR check, done as asked.** I read `docs/adrs/` first. No ratified ADR covers this: 0012's vendored
+Plotly is the closest precedent but is an *asset*, not a page a reader navigates to. Carrying a foreign HTML
+document into the output is a genuine cross-cutting fork — it introduces a second class of output into a portal
+where every page had been C#-composed, and the next story that wants to surface a coverage report or a TEA
+`nfr-report` will cite it. **Proposed as [ADR 0021](../../docs/adrs/0021-carrying-foreign-artifacts-verbatim-into-the-portal.md)**
+and indexed in `docs/adrs/README.md`, rather than buried here. Numbering note: `0019` is claimed-but-unwritten by
+**two** stories (18.3 and 22.3) and `0020` is pre-claimed by 18.5, so `0021` is the first uncontested slot.
+
+**Left for the owner's verify round (nothing blocking):**
+
+- **Badge shape is inconsistent within the In progress section.** `StatusStyles.FreeTextBadge` routes a *known*
+  lifecycle word to the canonical `.status-badge` (icon + tooltip, rendered uppercase) and degrades an unknown one
+  to a slugged `.pill` — so "In progress" renders as a badge while "Hardened"/"Clarified"/"Killed" render as pills,
+  side by side. That is the shared seam's designed rule (§12 explicitly says to route through it), and every word
+  is legible either way, so I did not fork it. The two ways out both have costs worth your call: teach `ForSprint`
+  the three idea words (changes a shared sprint vocabulary), or render all four through `StatusStyles.Badge` with
+  the accent token (gains icons but inherits sprint-stage tooltip text that reads oddly for an idea).
+- **Open Question 1 (the `in-progress` heading's label) is still yours** — a one-line change if you want
+  "Open / clarified" while the verdict token stays `in-progress`.
+- **Open Question 3 (nav group)** — Ideas currently leads the **Project** group, right after Readme and before the
+  module docs, on the lifecycle argument that an idea precedes the brief/PRD it may produce.
+
 ### File List
+
+**New — production:**
+
+- `src/SpecScribe/Memlog.cs` — the ONE reader of the shared-core `.memlog.md` shape (`TrySplit`, `ParseEntries`,
+  `ParseUpdated`), mirroring `memlog.py`'s own `split()` exactly.
+- `src/SpecScribe/IdeasModel.cs` — `IdeaVerdict`, `IdeaEntry`, `IdeaForwardLink`, `IdeasModel` (Empty/IsEmpty), and
+  the pure `IdeaDerivation` (verdict / title / summary / slug rules).
+- `src/SpecScribe/IdeaDiscovery.cs` — the workspace-discovery cascade + the AC #6 carry gate. Never throws.
+- `src/SpecScribe/IdeasTemplater.cs` — the grouped list page and the synthesized detail page.
+
+**New — tests / decisions:**
+
+- `tests/SpecScribe.Tests/IdeasTests.cs` — 41 tests.
+- `docs/adrs/0021-carrying-foreign-artifacts-verbatim-into-the-portal.md` — proposed ADR (Task 10).
+
+**Modified — production:**
+
+- `src/SpecScribe/SiteGenerator.cs` — `_ideas` field; discovery before nav; `hasIdeas` at both `SiteNav.Build` call
+  sites in `GenerateAll` **and** in `BuildNav`; idea-workspace markdown added to `consumedArtifacts`; `WriteIdeas`
+  (list + detail + carried report); `ResolveForwardLinks` / `ResolveSourceRelativeToPage` / `RewriteHandoffLinks`;
+  `BuildReferenceMap` idea routing; `BuildMemlogMap` moved onto the `Memlog` seam + forge exclusion;
+  `WriteOutput` gained `capture`; `CollapseSummary` → `internal`; `IsDataSource` doc-comment states the watch
+  non-goal.
+- `src/SpecScribe/SiteNav.cs` — `IdeasOutputPath`, `HasIdeas`, the `hasIdeas` gate parameter, and the Project-group
+  entry + quick link.
+- `src/SpecScribe/StatusStyles.cs` — `IdeaAccentToken`; `SprintLabel` kebab normalization.
+- `src/SpecScribe/DashboardViewBuilder.cs` — `("Ideas", IdeaDiscovery.WorkspaceRootDirName)` in `KnownIndexGroups`,
+  with a comment answering the do-not-extend warning head-on.
+- `src/SpecScribe/MarkdownConverter.cs` — `ExtractFirstH1` → `internal`.
+- `src/SpecScribe/assets/specscribe.css` — Ideas section chrome, the three verdict pill fallbacks, the chronology
+  list, the report-link note, and `.idea-link-unresolved`. **Append-only — no existing selector was modified.**
+
+**Modified — planning / config:**
+
+- `_bmad-output/planning-artifacts/epics.md` — AC #4/#5/#6 seated; the 18.3-dependency claim corrected; the FR36
+  resolution recorded.
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — `18-4-…` → `review`.
+- `_bmad-output/implementation-artifacts/18-4-forged-ideas-list-page.md` — this record.
+- `docs/adrs/README.md` — ADR 0021 indexed.
+- `.claude/launch.json` — two verification servers (`ideas-18-4`, `ideas-18-4-jsoff`).
+
+**NOT this story's** (concurrent session, present in the same working tree): `src/SpecScribe/RelatedWork.cs`,
+`RelatedWorkCards.cs`, `RelatedWorkTemplater.cs`, `assets/specscribe.js`, the Story 20.8 half of
+`DashboardViewBuilder.cs`, `tests/SpecScribe.Tests/RelatedWorkTests.cs`, `SiteGeneratorSpaTests.cs`,
+`SiteGeneratorAdapterTests.cs` (the golden re-baseline), and everything under `web/`. Read, not tidied.
+
+## Change Log
+
+| Date | Change |
+|---|---|
+| 2026-07-27 | dev-story 18.4 complete (baseline `32fd282`; HEAD at start `40c7ee9`). Status `ready-for-dev` → `in-progress` → `review`. All 3 epics.md ACs plus the 3 owner-decision extensions satisfied; 48/48 tasks and subtasks checked; **41 new tests**, full suite **2538 passed / 0 failed / 3 skipped**. Ships `Memlog` + `IdeaDiscovery` + `IdeasModel`/`IdeaDerivation` + `IdeasTemplater`, a gated Project-group nav entry, `ideas.html` grouped by verdict, `ideas/{slug}.html` detail pages, and verbatim-carried `forge-report.html` leaves. §7(a) resolved by **excluding forge memlogs from `BuildMemlogMap`** (recorded + tested both ways). AC #6's gate reads "script-free" as inline handlers / `javascript:` / embedding elements too, and rejects ALL external origins — a stated widening. The create-story claim that SPA capture "comes free" was **wrong**: a landmark-less foreign page slices to nav-only, so the report is written with `capture: false`. Three defects found live and fixed: the report link climbed out of `ideas/`, both breadcrumbs were double-prefixed, and suppressing the orphan pages left 18 dead `code-map.html` links via `BuildReferenceMap`. Golden fingerprint failure **bisected to a concurrent session's uncommitted `specscribe.js`** (pristine HEAD passes; HEAD + that one file fails) — not re-baselined here; Story 20.8 regenerated it to `3171cf5c…` and named this story's deltas in its provenance. epics.md corrected: 18.4 was **NOT** gated by 18.3, and FR36's stretch is accepted-and-noted (Open Question 2 default (c)). **ADR 0021 proposed** — foreign artifacts may be carried verbatim as gated dead-end leaves. |
 
 ## Open Questions for the Owner
 

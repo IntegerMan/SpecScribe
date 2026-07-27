@@ -260,7 +260,11 @@ public static class MarkdownConverter
         return Array.Empty<string>();
     }
 
-    private static string? ExtractFirstH1(string body)
+    /// <summary>The document's first H1, or null. Internal (was private) so the Ideas title cascade can reuse the
+    /// SAME H1 rule the generic page-title cascade uses instead of growing a second one — a <c>forged-idea.md</c>
+    /// is never converted through <see cref="Convert"/>'s title path, since its own detail page supplies the
+    /// title. [Story 18.4]</summary>
+    internal static string? ExtractFirstH1(string body)
     {
         var m = Regex.Match(body, @"^#\s+(.+)$", RegexOptions.Multiline);
         return m.Success ? m.Groups[1].Value.Trim() : null;

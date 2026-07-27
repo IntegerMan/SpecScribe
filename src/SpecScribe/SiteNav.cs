@@ -81,6 +81,19 @@ public sealed class SiteNav
     /// [Story 19.2]</summary>
     public const string WorkGraphOutputPath = "work-graph.html";
 
+    /// <summary>The forged-ideas list page — every discovered <c>bmad-forge-idea</c> session workspace, grouped by
+    /// verdict. Written only when at least one workspace was discovered; the nav entry and quick link gate on the
+    /// SAME signal (a non-empty <see cref="IdeasModel"/>, surfaced by the caller since the workspaces are found by
+    /// a dotfile scan the <c>*.md</c> source list can't reveal) so the link can never dangle. Rides the Project nav
+    /// group: an idea is neither tracked work (Delivery) nor a derived metric (Insights) — it sits alongside
+    /// Readme / PRD / Brief / ADRs / Spec kernels, before requirements in the lifecycle.
+    /// <para>Deliberately a TOP-LEVEL <c>ideas.html</c> (like <c>traceability.html</c>/<c>cadence.html</c>/
+    /// <c>work-graph.html</c>) rather than <c>ideas/index.html</c>: the detail pages live under <c>ideas/</c>, and
+    /// keeping the landing OUT of that directory sidesteps the landing-slot collision
+    /// <c>SiteGenerator.RegenerateAdrs</c> has to guard with <c>landingPathAlreadyWritten</c> — no
+    /// <c>ideas/index.html</c> means nothing to collide with.</para> [Story 18.4]</summary>
+    public const string IdeasOutputPath = "ideas.html";
+
     /// <summary>The generation diagnostics (run-log) page: the run's non-fatal notices (unsupported/malformed/
     /// skipped artifacts + render-time errors) plus the effective configuration and detection results. Written on
     /// EVERY full run (the zero-notice case renders an all-clear state), so — unlike the git pages — its link can
@@ -150,6 +163,8 @@ public sealed class SiteNav
 
     public bool HasWorkGraph => Items.Any(i => i.Label == "Work Graph");
 
+    public bool HasIdeas => Items.Any(i => i.Label == "Ideas");
+
     /// <summary>Assembles the journey-organized top nav (Home · Delivery · Insights · Follow-ups · Project).
     /// Every child is added only when its availability signal is true; an empty group is omitted; a group with
     /// exactly one available child collapses to a flat top-level link. [Story 10.1]</summary>
@@ -175,6 +190,7 @@ public sealed class SiteNav
         bool hasActionItems = false,
         bool hasDeferredWork = false,
         bool hasWorkGraph = false,
+        bool hasIdeas = false,
         string? deferredWorkOutputPath = null,
         List<AdapterDiagnostic>? diagnostics = null)
     {
@@ -206,6 +222,16 @@ public sealed class SiteNav
         {
             project.Add(("Readme", ReadmeOutputPath));
             quickLinks.Add(("Readme", ReadmeOutputPath, "Read the project overview.", "Project"));
+        }
+
+        // Forged ideas sit at the very front of the Project lifecycle — before the brief/PRD an idea may go on to
+        // produce — so they lead the group right after the README. Gated on the caller's data signal (a non-empty
+        // IdeasModel) exactly like hasWorkGraph: no forge workspace ⇒ no nav entry, no quick link, and no page
+        // (AC #3 / NFR8 — absent, never an empty page). [Story 18.4]
+        if (hasIdeas)
+        {
+            project.Add(("Ideas", IdeasOutputPath));
+            quickLinks.Add(("Ideas", IdeasOutputPath, "Review forged ideas and how each one turned out.", "Project"));
         }
 
         // Module docs (PRD/Architecture, or GDD/Narrative/etc.) are matched by filename anywhere in the

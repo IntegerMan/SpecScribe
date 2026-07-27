@@ -3,9 +3,13 @@
   "private": true,
   "type": "module",
   "description": "SpecScribe's Vue/Nuxt 3 presentation layer (Epic 23). Production-intent, but NOT in SpecScribe.slnx and NOT wired into `specscribe generate` — packaging is Story 23.5.",
+  "engines": {
+    "node": "^22.19.0 || ^24.11.0 || >=26.0.0"
+  },
   "scripts": {
     "dev": "node scripts/sync-runtime-assets.mjs && nuxt dev",
     "build": "node scripts/sync-runtime-assets.mjs && nuxt build",
+    "build:package": "node scripts/build-package.mjs",
     "generate": "node scripts/sync-runtime-assets.mjs && nuxt generate",
     "postinstall": "nuxt prepare",
     "extract:tokens": "node scripts/extract-tokens.mjs",
@@ -18,11 +22,18 @@
     "check:a11y": "node scripts/check-a11y.mjs",
     "measure:payload": "node scripts/measure-payload.mjs",
     "measure:parity": "node scripts/measure-parity.mjs",
-    "check": "npm run check:tokens && npm run check:ir-content && npm run check:assets"
+    "check": "npm run check:tokens && npm run check:ir-content && npm run check:assets",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "prebuild": "node scripts/check-tokens.mjs",
+    "pregenerate": "node scripts/check-tokens.mjs",
+    "experiment:two-ir": "node scripts/experiment-two-ir.mjs"
   },
   "devDependencies": {
-    "nuxt": "^3.14.0",
-    "vue": "^3.5.0",
-    "vue-router": "^4.4.0"
+    "@vitest/coverage-v8": "^4.1.10",
+    "nuxt": "^4.5.1",
+    "vitest": "^4.1.10",
+    "vue": "^3.5.40",
+    "vue-router": "^4.6.4"
   }
 }

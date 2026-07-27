@@ -25,6 +25,14 @@ public static class DashboardViewBuilder
         ("Planning Artifacts", "planning-artifacts"),
         ("Spec Kernel", "specs"),
         ("Implementation Artifacts", BmadArtifactAdapter.ImplementationArtifactsDirName),
+        // Forged ideas. The do-not-extend warning above is about `adrs`/`retros`, and its stated rationale is that
+        // those are NOT SourceRoot tops — an ADR root lives at docs/adrs and retros live under
+        // implementation-artifacts/, so adding them would have papered over a misdiagnosis. `forge` is
+        // categorically different: it IS a SourceRoot top, written there by a CORE BMad skill
+        // (`bmad-forge-idea`'s forge_output_path is "{output_folder}/forge", and {output_folder} resolves to
+        // _bmad-output = SourceRoot), and Story 18.4 gives it a first-class rendered surface. The warning's
+        // rationale simply does not cover this case. [Story 18.4]
+        ("Ideas", IdeaDiscovery.WorkspaceRootDirName),
     };
 
     /// <summary>Whether a top-level <see cref="ForgeOptions.SourceRoot"/> folder is one of the well-known groups —
@@ -112,10 +120,11 @@ public static class DashboardViewBuilder
     /// <summary>The dashboard instance's Hierarchy Explorer configuration + payload, or "" when there are no epics.
     ///
     /// <para><b>Mode is <see cref="HierarchyMode.Select"/></b> (ADR 0012 §3: the dashboard drives a details pane).
-    /// Story 20.3's rail already renders cards only for <em>selectable scopes</em> (epics + the orphan/unplanned
-    /// roots), so activating a story leaf raises a selection with no card and the rail shows its designed empty
-    /// state — correct, already implemented, and exactly the "make story leaves selectable" narrowing 20.3's record
-    /// recommends for Story 20.8.</para>
+    /// Every id this payload can select now resolves to a card or to a stated redirect: epics and the roots from
+    /// Story 20.3, story leaves from Story 20.5, and the follow-up aggregates plus the <c>unplanned</c> root from
+    /// Story 20.8 D3 (<c>epic-N~summary</c> redirects to its parent epic; the synthesized project root to the
+    /// no-selection project card). <c>RelatedWorkTests</c>' completeness test pins that invariant, so a future
+    /// payload change cannot silently reintroduce a wedge that selects to the empty state. [Story 20.8]</para>
     ///
     /// <para>The hash key stays <c>sb</c> so deep links already shared keep resolving; it is config-driven so
     /// Story 20.7's other instances can differ. The size is generous
@@ -189,18 +198,20 @@ public static class DashboardViewBuilder
         // Same `expandDenseEpics: true` the Hierarchy Explorer uses, so the rail's selectable set is exactly what
         // the component can select — a story inside a dense epic included. Passing the collapsed set here would
         // give those stories a wedge to click and no card to show for it.
-        var islandIds = Charts.SunburstExplorerNodes(epicsModel, geometry, unplannedGeometry, expandDenseEpics: true)
-            .Select(n => n.Id)
-            .ToList();
+        var selectable = Charts.SunburstExplorerNodes(
+            epicsModel, geometry, unplannedGeometry, expandDenseEpics: true);
         // linkPrefix "" — the dashboard is at the site root, so WorkGraphEpic.Reprefixed is a no-op there. The rule
         // is applied rather than assumed away, so a nested host page stays correct. [Story 20.1 spike §1a rule 6]
-        var relationships = RelatedWork.Build(workGraph, islandIds, linkPrefix: string.Empty);
-        // `islandIds` goes on to the card builder too, in draw order: after Story 20.5 the rail owes a card to
-        // everything the chart can SELECT — including a story leaf with no work-graph edges at all, which used to
-        // fall through to the "no related work items" empty state and left the owner with nothing to act on.
+        var relationships = RelatedWork.Build(
+            workGraph, selectable.Select(n => n.Id).ToList(), linkPrefix: string.Empty);
+        // The payload NODES go on to the card builder, in draw order — not just their ids. After Story 20.5 the
+        // rail owes a card to everything the chart can SELECT, and Story 20.8 D3 extended that to the follow-up
+        // aggregates and the `unplanned` root, whose LABEL and HREF exist only on the payload. Taking them from
+        // there rather than re-composing them is what stops the rail and the explorer breadcrumb drifting into two
+        // names for one wedge. [Story 20.5; Story 20.8 D3]
         var pane = RelatedWorkCards.Build(
             relationships, epicsModel, commands, geometry, counts, projectTitle, SiteNav.WorkGraphOutputPath,
-            selectableIslandIds: islandIds);
+            selectableNodes: selectable);
         return RelatedWorkTemplater.RenderPane(pane);
     }
 

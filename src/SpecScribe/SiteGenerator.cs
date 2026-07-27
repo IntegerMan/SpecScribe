@@ -79,6 +79,13 @@ public sealed class SiteGenerator
     // and the page write share one gate (a non-empty model) — the link never dangles. Cached so the written page
     // is byte-identical to what the gate saw; watch-mode BuildNav reuses last full run's model like _progress.
     private WorkGraphModel _workGraph = WorkGraphModel.Empty;
+
+    // Forge session workspaces (Story 18.4), discovered once BEFORE nav.Build so the Project "Ideas" entry, the
+    // ideas.html write, and the detail pages all share one gate (a non-empty model) — the link never dangles.
+    // Also consumed by BuildMemlogMap, which excludes these workspaces' memlogs from the coverage panel's
+    // freshness enrichment (see that method for why). Watch-mode BuildNav reuses the last full run's model, like
+    // _workGraph/_progress: forge activity is invisible to the watcher by design (see IsDataSource).
+    private IdeasModel _ideas = IdeasModel.Empty;
     private List<CommitDayEntry> _commitDays = new();
 
     // Story 7.5: full %H commit hash -> per-commit detail page output-relative path (commit/{shortHash}.html).
@@ -230,6 +237,13 @@ public sealed class SiteGenerator
             // since _docs isn't populated yet; cached in _workGraph and reused verbatim by WriteWorkGraph.
             _workGraph = BuildWorkGraphModel(bundle.Epics, progress, bundle.Requirements, files);
             var hasWorkGraph = !_workGraph.IsEmpty;
+            // Discover forge session workspaces now (Story 18.4) — BEFORE nav — so the Project "Ideas" entry and the
+            // page write share one gate (a non-empty model). Workspaces are found by a `.memlog.md` dotfile scan,
+            // which the `*.md` source list cannot reveal, so the signal has to be surfaced by this caller exactly
+            // like hasSprint/hasWorkGraph. Its own diagnostics ride the shared adapter channel below.
+            var ideaDiagnostics = new List<AdapterDiagnostic>();
+            _ideas = IdeaDiscovery.Discover(_options.SourceRoot, ideaDiagnostics);
+            var hasIdeas = !_ideas.IsEmpty;
             var nav = SiteNav.Build(
                 sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), ReadmeAvailable, SprintAvailable,
                 hasCodeMap: _codeFiles.Count > 0,
@@ -238,6 +252,7 @@ public sealed class SiteGenerator
                 hasActionItems: hasActionItems,
                 hasDeferredWork: hasDeferredWork,
                 hasWorkGraph: hasWorkGraph,
+                hasIdeas: hasIdeas,
                 deferredWorkOutputPath: deferredWorkPath,
                 diagnostics: navDiagnostics);
             _nav = nav;
@@ -256,7 +271,7 @@ public sealed class SiteGenerator
                         hasSprint: SprintAvailable, hasCodeMap: _codeFiles.Count > 0,
                         hasGitInsights: hasGitInsights, hasDeepAnalytics: hasDeepAnalytics,
                         hasActionItems: hasActionItems, hasDeferredWork: hasDeferredWork,
-                        hasWorkGraph: hasWorkGraph,
+                        hasWorkGraph: hasWorkGraph, hasIdeas: hasIdeas,
                         deferredWorkOutputPath: deferredWorkPath, diagnostics: navDiagnostics);
                     _nav = nav;
                 }
@@ -266,6 +281,25 @@ public sealed class SiteGenerator
             // pages loop below must not also render them.
             var epicsSourceFile = bundle.EpicsSourceFullPath;
             var consumedArtifacts = new HashSet<string>(bundle.ConsumedSourceRelatives, StringComparer.OrdinalIgnoreCase);
+
+            // A discovered forge workspace's markdown (forged-idea.md, and anything else the session left there) is
+            // consumed by the idea's own ideas/{slug}.html detail page, so the generic pages loop must not ALSO
+            // render it — without this, a hardened idea would get two pages: the detail page and an orphan
+            // forge/{slug}/forged-idea.html linked from nowhere (exactly today's undesigned behavior). Extended at
+            // the generator level rather than through bundle.ConsumedSourceRelatives because Ideas discovery
+            // deliberately does not route through the framework adapter: `bmad-forge-idea` ships in BMad's `core`,
+            // the one module ModuleContext.Detect excludes, so ideas must never touch module identity. [Story 18.4]
+            foreach (var idea in _ideas.Ideas)
+            {
+                var workspacePrefix = idea.WorkspaceSourceRelative + "/";
+                foreach (var rel in sourceRelatives)
+                {
+                    if (PathUtil.NormalizeSlashes(rel).StartsWith(workspacePrefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        consumedArtifacts.Add(rel);
+                    }
+                }
+            }
 
             // Cache the ingested models with the same granularity the inline parse chain had: epics+progress
             // only once the projection enrichment ran to completion, requirements only when parsed — so a
@@ -294,6 +328,11 @@ public sealed class SiteGenerator
             // after a failed README render (above) replaces navDiagnostics wholesale rather than appending, so
             // this merge always reflects exactly the SiteNav actually in play. [spec-epic2-deferred-debt-cleanup]
             events.AddRange(MapDiagnostics(navDiagnostics));
+
+            // Forge-workspace discovery notices (unparseable memlog, duplicate slug, a report that failed the
+            // self-contained carry gate or the size cap) ride the same channel. Every one anchors to
+            // DiagnosticAnchorRoot.Source — every forge path is under the source root. [Story 18.4]
+            events.AddRange(MapDiagnostics(ideaDiagnostics));
 
             // Unrecognized top-level source folders render coherently (each gets its own home-index band, see
             // HtmlTemplater.RenderIndex) AND are reported as categorized non-fatal structure notices on the
@@ -440,6 +479,11 @@ public sealed class SiteGenerator
             // The epic-scoped work graph (Story 19.2) — the model was projected + gated before nav; writing the
             // SAME cached instance keeps the Insights entry and the page in lockstep.
             WriteWorkGraph(nav);
+            // The forged-ideas surface (Story 18.4) — the model was discovered + gated before nav; writing from the
+            // SAME cached instance keeps the Project entry and the pages in lockstep. Written HERE, after the pages
+            // phase, because AC #2's forward links can only be resolved once _docs knows which targets actually got
+            // a page (a target with no page is dropped, never emitted as a dead link).
+            events.AddRange(WriteIdeas(nav));
             // Delivery cadence (Story 21.2) — built ONCE here (after ProgressCalculator filled LastUpdatedDate),
             // then shared by WriteCadence and the dashboard strip (WriteIndex reads _cadence). The bounded
             // per-done-story first-touch git lookups happen exactly once, in this build.
@@ -542,7 +586,13 @@ public sealed class SiteGenerator
     /// <c>implementation-artifacts/</c>, so <see cref="IsEpicsRelated"/> would otherwise claim it and route to
     /// <see cref="RegenerateEpics"/>, which by design never re-parses sprint state (AD-5). Classifies via the shared
     /// <see cref="BmadArtifactAdapter.SprintStatusFileName"/> / <see cref="ForgeOptions.ConfigFileName"/> conventions,
-    /// never a second literal. [Story 6.11]</summary>
+    /// never a second literal. [Story 6.11]
+    /// <para><b>Forge activity is deliberately NOT routed here (Story 18.4 non-goal).</b> A forge session's
+    /// <c>.memlog.md</c> is dotfile-ignored and its <c>forge-report.html</c> is not <c>.md</c>, so watch mode does
+    /// not react to a session starting, progressing, or completing; a full <c>generate</c> picks everything up
+    /// (it wipes and rebuilds the output root). Extending THIS method is the mechanism a follow-on would use —
+    /// but a forge session writes continuously mid-conversation, so making the portal live-follow it is a
+    /// debounce/ordering decision of its own, not a line added here.</para></summary>
     public bool IsDataSource(string sourceFullPath) =>
         BmadArtifactAdapter.IsSprintStatusFile(sourceFullPath) || IsProjectConfigFile(sourceFullPath);
 
@@ -3014,13 +3064,20 @@ public sealed class SiteGenerator
     /// families deliberately do NOT route through here — the SPA re-renders them from their view models (strongest
     /// parity, see <see cref="BuildSpaBundle"/>). Bytes written are identical to the prior direct
     /// <c>File.WriteAllText</c>, so the golden gate is unaffected (AC #5). [Story 6.7]</summary>
-    private void WriteOutput(string outputRelativePath, string html)
+    /// <param name="capture">Whether the written page joins <see cref="_spaCapture"/>. True for every page this
+    /// generator COMPOSED — capture slices their universal <c>&lt;main id="main-content"&gt;</c> landmark. False for
+    /// a page carried in verbatim from outside (Story 18.4's <c>forge-report.html</c>): a foreign document has no
+    /// such landmark, and <see cref="SpaDelivery.ExtractContentRegion"/> degrades a landmark-less page to
+    /// nav-markup-only — so capturing it would put a CONTENT-EMPTY route in the SPA/webview bundle while the real
+    /// file sits perfectly readable on disk beside it. Excluded, the link resolves to that static file, which is
+    /// exactly right for a deliberate dead-end leaf. [Story 18.4]</param>
+    private void WriteOutput(string outputRelativePath, string html, bool capture = true)
     {
         var full = Path.Combine(_options.OutputRoot, outputRelativePath.Replace('/', Path.DirectorySeparatorChar));
         var dir = Path.GetDirectoryName(full);
         if (dir is { Length: > 0 }) Directory.CreateDirectory(dir);
         File.WriteAllText(full, html);
-        if (_spaCapture is not null)
+        if (capture && _spaCapture is not null)
         {
             _spaCapture[PathUtil.NormalizeSlashes(outputRelativePath)] = html;
         }
@@ -3626,6 +3683,190 @@ public sealed class SiteGenerator
     {
         if (_workGraph.IsEmpty) return;
         WriteOutput(SiteNav.WorkGraphOutputPath, WorkGraphTemplater.RenderPage(_workGraph, nav));
+    }
+
+    /// <summary>Writes <c>ideas.html</c>, one <c>ideas/{slug}.html</c> per discovered forge session, and each
+    /// idea's carried-over <c>ideas/{slug}-report.html</c>. Gated on the SAME non-empty
+    /// <see cref="_ideas"/> model the nav entry gates on, so no forge workspace ⇒ no page, no nav entry, no quick
+    /// link (AC #3 / NFR8 — absent, not an empty page).
+    /// <para>The carried report is written STRAIGHT through <see cref="WriteOutput"/> as a leaf: it is a complete
+    /// foreign <c>&lt;html&gt;</c> document with its own inline CSS, so wrapping it in
+    /// <see cref="HtmlTemplater.RenderPage"/> would nest documents. <see cref="WriteOutput"/> already takes a
+    /// <c>string</c> and creates the directory, so "carry the report" needs no new copy mechanism and no asset
+    /// pipeline — but it IS written with <c>capture: false</c>, because a foreign document carries no
+    /// <c>&lt;main id="main-content"&gt;</c> landmark for the SPA/webview slicer. Its safety gate (AC #6) and size
+    /// cap ran in <see cref="IdeaDiscovery"/>: a report that failed either has a null
+    /// <see cref="IdeaEntry.CarriedReportHtml"/> here, and the detail page simply omits the link.</para>
+    /// [Story 18.4]</summary>
+    private IReadOnlyList<GenerationEvent> WriteIdeas(SiteNav nav)
+    {
+        var events = new List<GenerationEvent>();
+        if (_ideas.IsEmpty) return events;
+
+        var linkDiagnostics = new List<AdapterDiagnostic>();
+        var resolved = new IdeasModel(
+            _ideas.Ideas.Select(i => i with
+            {
+                ForwardLinks = ResolveForwardLinks(i, linkDiagnostics),
+                ForgedIdeaHtml = i.ForgedIdeaHtml is { Length: > 0 } handoff
+                    ? RewriteHandoffLinks(handoff, i.WorkspaceSourceRelative)
+                    : i.ForgedIdeaHtml,
+            }).ToList());
+        _ideas = resolved;
+        events.AddRange(MapDiagnostics(linkDiagnostics));
+
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            WriteOutput(SiteNav.IdeasOutputPath,
+                ApplyReferenceLinks(IdeasTemplater.RenderListPage(resolved, nav), SiteNav.IdeasOutputPath));
+            events.Add(new GenerationEvent(GenerationOutcome.Generated, SiteNav.IdeasOutputPath, sw.Elapsed));
+        }
+        catch (Exception ex)
+        {
+            events.Add(new GenerationEvent(GenerationOutcome.Error, SiteNav.IdeasOutputPath, sw.Elapsed, ex.Message));
+        }
+
+        foreach (var idea in resolved.Ideas)
+        {
+            var detailSw = Stopwatch.StartNew();
+            try
+            {
+                // Report FIRST, so a failed carry can never leave the detail page linking a file that isn't there.
+                if (idea is { ReportOutputPath: { } reportPath, CarriedReportHtml: { } reportHtml })
+                {
+                    // capture: false — see WriteOutput's <param>. A foreign document has no <main id="main-content">
+                    // for the SPA/webview slicer to find, so capturing it would ship a content-empty route.
+                    WriteOutput(reportPath, reportHtml, capture: false);
+                }
+
+                WriteOutput(idea.DetailOutputPath,
+                    ApplyReferenceLinks(IdeasTemplater.RenderDetailPage(idea, nav), idea.DetailOutputPath));
+                events.Add(new GenerationEvent(GenerationOutcome.Generated, idea.DetailOutputPath, detailSw.Elapsed));
+            }
+            catch (Exception ex)
+            {
+                events.Add(new GenerationEvent(GenerationOutcome.Error, idea.DetailOutputPath, detailSw.Elapsed, ex.Message));
+            }
+        }
+
+        return events;
+    }
+
+    /// <summary>Completes AC #2's forward links from the ONLY two evidence sources §9 admits, in order:
+    /// (1) a markdown link inside <c>forged-idea.md</c> that resolves to a source file which actually HAS a
+    /// generated page, and (2) a downstream doc whose frontmatter <c>sources:</c> names this workspace or its
+    /// <c>forged-idea.md</c>. Anything else — slug-vs-title similarity, date proximity, folder-name resemblance —
+    /// is forbidden (owner decision D4): a false provenance chain is worse than none, and Story 21.1's review
+    /// already caught that class (a "phantom-covered" requirement counted covered and drawn blank). No evidence ⇒
+    /// an empty list ⇒ NO forward-link element at all (NFR8: absent, not "none found").</summary>
+    private IReadOnlyList<IdeaForwardLink> ResolveForwardLinks(IdeaEntry idea, List<AdapterDiagnostic> diagnostics)
+    {
+        var links = new List<IdeaForwardLink>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (sourceRelative, label) in idea.ForwardLinkCandidates)
+        {
+            if (ResolveSourceRelativeToPage(sourceRelative) is not { } outputPath)
+            {
+                diagnostics.Add(new AdapterDiagnostic(
+                    AdapterDiagnosticCategory.Skipped,
+                    $"{idea.WorkspaceSourceRelative}/{IdeaDiscovery.ForgedIdeaFileName}",
+                    $"Forward link '{sourceRelative}' from idea '{idea.Slug}' has no generated page; the link is omitted."));
+                continue;
+            }
+
+            if (seen.Add(outputPath))
+            {
+                links.Add(new IdeaForwardLink(label, outputPath, $"Linked from {IdeaDiscovery.ForgedIdeaFileName}"));
+            }
+        }
+
+        // (2) The reverse direction: a brief/PRD/spec that declares this workspace in its own `sources:` list.
+        // Frontmatter already models Sources, so this is a read of parsed state, never a new scan.
+        var workspaceKey = PathUtil.NormalizeSlashes(idea.WorkspaceSourceRelative);
+        foreach (var doc in _docs.Values.OrderBy(d => d.OutputRelativePath, StringComparer.Ordinal))
+        {
+            foreach (var source in doc.Frontmatter.Sources)
+            {
+                var normalized = PathUtil.NormalizeSlashes(source.Trim()).TrimStart('.', '/');
+                if (normalized.Length == 0) continue;
+                if (!normalized.Equals(workspaceKey, StringComparison.OrdinalIgnoreCase)
+                    && !normalized.StartsWith(workspaceKey + "/", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var outputPath = PathUtil.NormalizeSlashes(doc.OutputRelativePath);
+                if (seen.Add(outputPath))
+                {
+                    links.Add(new IdeaForwardLink(doc.Title, outputPath, $"Declared in this document's sources: {source.Trim()}"));
+                }
+                break;
+            }
+        }
+
+        return links;
+    }
+
+    private static readonly Regex HandoffAnchorPattern = new(
+        @"<a\s+href=""(?<href>[^""]*)""(?<rest>[^>]*)>(?<text>.*?)</a>",
+        RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.IgnoreCase);
+
+    /// <summary>Re-points every in-tree link inside a rendered <c>forged-idea.md</c> body at the page its target
+    /// actually produced, and UNWRAPS any link whose target has no page into plain text. Without this the hand-off
+    /// block would ship the author's raw <c>../../planning-artifacts/epics.md</c> hrefs verbatim — dead links on
+    /// every hardened idea's page. Links are resolved through
+    /// <see cref="IdeaDiscovery.TryResolveWorkspaceHref"/>, the SAME path math the forward-link harvest uses, and
+    /// keyed off the RENDERED href rather than the markdown source so a Markdig-normalized href still matches.
+    /// External URLs and in-page anchors pass through untouched. Detail pages live under <c>ideas/</c>, so a
+    /// resolved root-relative page path is emitted with a <c>../</c> prefix. [Story 18.4 §9]</summary>
+    private string RewriteHandoffLinks(string html, string workspaceRelative)
+    {
+        const string prefix = "../";
+        return HandoffAnchorPattern.Replace(html, m =>
+        {
+            var href = System.Net.WebUtility.HtmlDecode(m.Groups["href"].Value);
+            if (!IdeaDiscovery.TryResolveWorkspaceHref(workspaceRelative, href, out var sourceRelative))
+            {
+                return m.Value; // external / mailto / in-page anchor — not ours to touch
+            }
+
+            if (ResolveSourceRelativeToPage(sourceRelative) is { } outputPath)
+            {
+                return $"<a href=\"{PathUtil.Html(prefix + outputPath)}\"{m.Groups["rest"].Value}>{m.Groups["text"].Value}</a>";
+            }
+
+            // NFR8: the words the author wrote survive; only the dead affordance goes.
+            return $"<span class=\"idea-link-unresolved\">{m.Groups["text"].Value}</span>";
+        });
+    }
+
+    /// <summary>The output page for a source-relative path, or null when that source produced no page. Honours the
+    /// same special routing <see cref="ResolveFamilyHref"/> uses — epics.md and the requirements catalog are
+    /// rendered as curated pages, not generic ones — so a forward link into either lands where a reader expects
+    /// rather than on a 404. [Story 18.4 §9; reuses Story 18.3 §7's resolution chain]</summary>
+    private string? ResolveSourceRelativeToPage(string sourceRelative)
+    {
+        var normalized = PathUtil.NormalizeSlashes(sourceRelative);
+        if (BmadArtifactAdapter.IsEpicsFile(normalized))
+        {
+            return _epicsModel is not null ? SiteNav.EpicsOutputPath : null;
+        }
+
+        // A link INTO another idea's workspace routes to that idea's detail page — its workspace markdown was
+        // consumed by that page and has no generic page of its own.
+        foreach (var idea in _ideas.Ideas)
+        {
+            if (normalized.StartsWith(idea.WorkspaceSourceRelative + "/", StringComparison.OrdinalIgnoreCase))
+            {
+                return idea.DetailOutputPath;
+            }
+        }
+
+        return _docs.Keys.Any(k => string.Equals(PathUtil.NormalizeSlashes(k), normalized, StringComparison.OrdinalIgnoreCase))
+            ? PathUtil.NormalizeSlashes(PathUtil.ToOutputRelative(normalized))
+            : null;
     }
 
     /// <summary>Writes <c>cadence.html</c> — the delivery-cadence page (story-completion heatmap + cycle-time
@@ -4632,6 +4873,11 @@ public sealed class SiteGenerator
             // Reuse the last full run's projected model (the treemap/insights gates reuse last-run signals the same
             // way); the work graph only re-projects on a full rebuild. [Story 19.2]
             hasWorkGraph: !_workGraph.IsEmpty,
+            // Same reuse-the-last-full-run rule: forge workspaces are re-discovered only on a full rebuild, which
+            // is exactly right because watch mode cannot see forge activity at all (a `.memlog.md` is dotfile-
+            // ignored and a `forge-report.html` is not `.md`, so neither reaches the dispatch — see IsDataSource,
+            // the seam a follow-on would extend). [Story 18.4]
+            hasIdeas: !_ideas.IsEmpty,
             deferredWorkOutputPath: deferredWorkPath,
             diagnostics: diagnostics);
     }
@@ -4643,11 +4889,6 @@ public sealed class SiteGenerator
         = new Dictionary<DateOnly, IReadOnlyList<(string Label, string Href)>>();
     private static readonly IReadOnlyDictionary<DateOnly, IReadOnlyList<CommitInfo>> EmptyCommitsByDay
         = new Dictionary<DateOnly, IReadOnlyList<CommitInfo>>();
-
-    // The memlog frontmatter's single "updated: <date>" field — a one-line regex read (like ForgeOptions'
-    // project_name read), NOT a full YAML parse. Captures just the yyyy-MM-dd prefix of the timestamp.
-    private static readonly Regex MemlogUpdatedPattern = new(
-        @"^\s*updated:\s*(?<date>\d{4}-\d{2}-\d{2})", RegexOptions.Multiline | RegexOptions.Compiled);
 
     /// <summary>Gathers the inputs for and builds the cached <see cref="ArtifactCoverage"/> insight. IO lives
     /// here — source-file last-write-times (the primary freshness signal) and memlog discovery (the secondary
@@ -4737,25 +4978,34 @@ public sealed class SiteGenerator
     /// enumeration — scanned separately, like the adapter's sprint-file discovery), reads each one's
     /// <c>updated:</c> date, and associates it with the family whose canonical file sits in the closest
     /// ancestor directory (longest matching memlog dir wins). Strictly additive: no memlogs → an empty map, so
-    /// every family's primary Present/LastModified value is unchanged (AC #2). [Story 3.3 Subtask 2.3]</summary>
+    /// every family's primary Present/LastModified value is unchanged (AC #2). [Story 3.3 Subtask 2.3]
+    /// <para><b>Forge session memlogs are excluded</b> (Story 18.4, decision recorded). A forge workspace's memlog
+    /// is <em>scoped</em> (<c>forge/{slug}</c>), and <see cref="SelectMemlogUpdatedByFamily"/> demotes a root-level
+    /// memlog from every-family fallback the moment ANY scoped memlog exists. So in a repo whose only decision
+    /// journal is <c>_bmad-output/.memlog.md</c>, running the forge once would silently strip the journal date from
+    /// every coverage card — an unrelated surface changing because a different tool ran. A forge memlog also could
+    /// never legitimately WIN a family (no family's source path lives under <c>forge/{slug}/</c>), so excluding it
+    /// removes only that spurious flag flip and adds nothing back. Ideas have their own dedicated surface for this
+    /// same data now, so nothing is lost.</para></summary>
     private IReadOnlyDictionary<string, DateOnly> BuildMemlogMap(ArtifactCoverage discovered)
     {
         var result = new Dictionary<string, DateOnly>(StringComparer.OrdinalIgnoreCase);
         if (!Directory.Exists(_options.SourceRoot)) return result;
 
+        var ideaWorkspaces = new HashSet<string>(
+            _ideas.Ideas.Select(i => i.WorkspaceSourceRelative), StringComparer.OrdinalIgnoreCase);
+
         var memlogs = new List<(string Dir, DateOnly Updated)>();
-        foreach (var full in Directory.EnumerateFiles(_options.SourceRoot, ".memlog.md", SearchOption.AllDirectories))
+        foreach (var full in Directory.EnumerateFiles(_options.SourceRoot, Memlog.FileName, SearchOption.AllDirectories))
         {
             DateOnly updated;
             try
             {
-                var text = MarkdownConverter.ReadAllTextShared(full);
-                var m = MemlogUpdatedPattern.Match(text);
-                if (!m.Success || !DateOnly.TryParseExact(
-                        m.Groups["date"].Value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out updated))
+                if (Memlog.ParseUpdated(MarkdownConverter.ReadAllTextShared(full)) is not { } parsed)
                 {
                     continue; // no parseable updated: date → this memlog adds no enrichment
                 }
+                updated = parsed;
             }
             catch
             {
@@ -4763,6 +5013,7 @@ public sealed class SiteGenerator
             }
 
             var dir = PathUtil.NormalizeSlashes(Path.GetDirectoryName(ToSourceRelative(full)) ?? string.Empty);
+            if (ideaWorkspaces.Contains(dir)) continue; // see the forge-exclusion note above
             memlogs.Add((dir, updated));
         }
 
@@ -4933,8 +5184,11 @@ public sealed class SiteGenerator
 
     /// <summary>Strips markdown links/bold/backticks/leading structural markers and any HTML tags from a paragraph,
     /// collapses interior whitespace, and truncates to a single readable line for the ADR card. Empty ⇒ empty (caller
-    /// treats as absent).</summary>
-    private static string CollapseSummary(string text)
+    /// treats as absent).
+    /// <para>Internal (was private) so <see cref="IdeaDerivation"/> can put a forge memlog's free-text
+    /// <c>idea:</c>/<c>goal:</c> values through the SAME one-line treatment rather than inventing a second
+    /// truncator with its own cut length and its own grapheme handling. [Story 18.4]</para></summary>
+    internal static string CollapseSummary(string text)
     {
         var noLinks = MarkdownLinkPattern.Replace(text, "${text}");
         var plain = PathUtil.StripHtmlTags(noLinks).Replace("*", string.Empty).Replace("`", string.Empty);
@@ -4987,6 +5241,24 @@ public sealed class SiteGenerator
             map[rel] = string.Equals(rel, epicsSourceRelative, StringComparison.OrdinalIgnoreCase)
                 ? SiteNav.EpicsOutputPath
                 : PathUtil.NormalizeSlashes(PathUtil.ToOutputRelative(rel));
+        }
+
+        // The loop above optimistically assumes every *.md source gets a generic page at ToOutputRelative(rel).
+        // That holds for everything EXCEPT files a dedicated surface consumed — story artifacts (fixed up just
+        // below) and, since Story 18.4, a forge workspace's markdown, which renders as the idea's own
+        // ideas/{slug}.html instead. Without this fix-up every citation of a consumed forged-idea.md — including
+        // the Code Map / Risk Quadrant tiles, which reach this map through ArtifactHrefByRepoRel — would point at
+        // a forge/{slug}/forged-idea.html that is deliberately never written. Route them to the meaningful page,
+        // the same special-routing discipline sprint-status.yaml and epics.md already get. [Story 18.4]
+        foreach (var idea in _ideas.Ideas)
+        {
+            var workspacePrefix = idea.WorkspaceSourceRelative + "/";
+            foreach (var key in map.Keys
+                         .Where(k => k.StartsWith(workspacePrefix, StringComparison.OrdinalIgnoreCase))
+                         .ToList())
+            {
+                map[key] = idea.DetailOutputPath;
+            }
         }
 
         foreach (var epic in model.Epics)

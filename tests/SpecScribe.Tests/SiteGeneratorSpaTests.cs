@@ -298,6 +298,15 @@ public class SiteGeneratorSpaTests : IDisposable
         if (!inSpa) return;
         Assert.Contains("data-related-node=", spaIndex);
         Assert.Contains("No related work items for this selection.", spaIndex);
+        // Story 20.8 extended what the pane CARRIES (a per-story command disclosure, a deferred-children list, and
+        // the `~summary` redirect published as `data-related-alias`), so the parity claim has to move with it —
+        // extended here rather than given a parallel case, which would let the two drift. Each is asserted as
+        // "present in the SPA body iff present in the static one", so this stays fixture-independent: a fixture
+        // with no story commands proves nothing, but it also cannot pass by accident.
+        foreach (var marker in new[] { "related-card-commands", "related-card-children", "data-related-alias=" })
+            Assert.Equal(
+                staticIndex.Contains(marker, StringComparison.Ordinal),
+                spaIndex.Contains(marker, StringComparison.Ordinal));
         // Inside the captured <main> region, not stranded before it.
         var mainStart = spaIndex.IndexOf("<main id=\"main-content\"", StringComparison.Ordinal);
         Assert.True(mainStart >= 0

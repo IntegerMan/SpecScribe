@@ -4,7 +4,7 @@ baseline_commit: 86b35c267241c15b05c64e3aaa3e13cce58198b2
 
 # Story 23.5: Packaging Reconciliation — Where and When the Node/Nuxt Build Runs
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -119,112 +119,112 @@ corrected premises recorded on the `23-5-…` sprint-status key, and the code-ve
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Re-establish the factual baseline** (AC: #1, #3)
-  - [ ] Re-read `_bmad-output/implementation-artifacts/23-1-spike-report.md` — **it exists**; a research
+- [x] **Task 1 — Re-establish the factual baseline** (AC: #1, #3)
+  - [x] Re-read `_bmad-output/implementation-artifacts/23-1-spike-report.md` — **it exists**; a research
         pass during story creation wrongly reported it missing. Axis 4 and Findings 7/9 are the measured
         inputs. Treat the **cold** figures as the user-facing ones (Node cold path ~130 s: 112.5 s first-ever
         `nuxt generate` + 18.4 s `npm ci`), not the headlined warm +57 % / 37.1 s.
-  - [ ] Confirm the current state of `web/`: `nuxt 3.21.9`, `nitropack 2.13.4`, `vite 8.1.5`, `vue 3.5.40`,
+  - [x] Confirm the current state of `web/`: `nuxt 3.21.9`, `nitropack 2.13.4`, `vite 8.1.5`, `vue 3.5.40`,
         735 lockfile packages, **all three declared deps are `devDependencies` under `private: true`** — so
         `npm ci --omit=dev` installs nothing and a "production-only" install is not currently possible.
-  - [ ] ⚠️ **Nuxt 3 reaches end of life on 2026-07-31 — five days after this story was seeded.** Decide and
+  - [x] ⚠️ **Nuxt 3 reaches end of life on 2026-07-31 — five days after this story was seeded.** Decide and
         record whether 23.5 absorbs the Nuxt 3 → 4 upgrade or explicitly accepts running on an unsupported
         line. Do not leave this undecided. (Current stable at seeding: Nuxt 4.5.0, released 2026-07-18;
         `engines.node` `^22.19.0 || ^24.11.0 || >=26.0.0`.)
-  - [ ] Record the Node version actually used. The only Node version on record anywhere in the repo is
+  - [x] Record the Node version actually used. The only Node version on record anywhere in the repo is
         **24.11.1** in `web/CONVENTIONS.md:94`, and it is pinned nowhere — there is no `.nvmrc`, no
         `engines` field, no `global.json`.
 
-- [ ] **Task 2 — Run the two-IR experiment** (AC: #4) — _the load-bearing one; do this before writing any
+- [x] **Task 2 — Run the two-IR experiment** (AC: #4) — _the load-bearing one; do this before writing any
       strategy prose_
-  - [ ] Produce two distinct IRs: this repo's own
+  - [x] Produce two distinct IRs: this repo's own
         (`dotnet run --project src/SpecScribe -- generate --spa` into `SpecScribeOutput/` — the default;
         **never** `--output docs/live`), and a second from a different source tree.
-  - [ ] Build `web/` **once** (`npm run build`, not `generate`). Measure and record `.output/` size and file
+  - [x] Build `web/` **once** (`npm run build`, not `generate`). Measure and record `.output/` size and file
         count. The story-creation research measured **2.83 MB / 201 files** on the pre-23.3 build
         (`.output/server` 2.04 MB incl. a self-contained `server/node_modules` of 1.56 MB) against a
         **174.8 MB / 14,407-file** `node_modules`. Re-measure on the post-23.3 build — 23.3 adds
         `ir-content.css` and ~1.4 MB of synced runtime assets (`specscribe.js` 154 KB +
         `plotly-hierarchy.min.js` 1.22 MB).
-  - [ ] Copy **only** `.output/` to an isolated directory — no source, no `node_modules`. Boot
+  - [x] Copy **only** `.output/` to an isolated directory — no source, no `node_modules`. Boot
         `node .output/server/index.mjs` with `SPECSCRIBE_IR_DIR` pointed at IR **A**, render routes, then
         restart pointed at IR **B** and render again. Confirm both emit correct, fully-rendered HTML.
-  - [ ] ⚠️ **The route table is the known gap, and it is expected to fail — that is the point.**
+  - [x] ⚠️ **The route table is the known gap, and it is expected to fail — that is the point.**
         `nuxt.config.ts` computes `nitro.prerender.routes` from `import { site } from './ir/adapter'` at
         **config-load time**, so a prebuilt artefact carries project A's route list. The hypothesis under
         test is that this **does not matter** when SpecScribe drives the prerender itself — it already knows
         every route (it emitted the manifest) and can issue one request per route. Test *that* shape (drive
         the routes externally), not `nuxt generate`.
-  - [ ] Record per-route render latency and total wall-clock for a full-site pass, against the 23.1 spike's
+  - [x] Record per-route render latency and total wall-clock for a full-site pass, against the 23.1 spike's
         `nuxt generate` baselines (warm 37.1 s / cold ~130 s for ~918 routes). Report honestly whichever way
         it lands.
-  - [ ] Confirm no tracked file is modified by the experiment — `.output/`, `.nuxt/`, `dist/` are all
+  - [x] Confirm no tracked file is modified by the experiment — `.output/`, `.nuxt/`, `dist/` are all
         gitignored (`web/.gitignore:3-7`).
 
-- [ ] **Task 3 — Adjudicate the build-time ↔ runtime conflict** (AC: #5)
-  - [ ] Read `web/ir/adapter.ts` and `web/nuxt.config.ts` as they stand **at the time you run** — Story 23.3
+- [x] **Task 3 — Adjudicate the build-time ↔ runtime conflict** (AC: #5)
+  - [x] Read `web/ir/adapter.ts` and `web/nuxt.config.ts` as they stand **at the time you run** — Story 23.3
         is being implemented concurrently and these files are moving.
-  - [ ] Establish, by reading the built bundle (not by assumption), whether `readFileSync(IR_DIR, …)`
+  - [x] Establish, by reading the built bundle (not by assumption), whether `readFileSync(IR_DIR, …)`
         survives into `.output/server` as a runtime read or is inlined at build time. `IR_DIR` resolves from
         `process.env.SPECSCRIBE_IR_DIR` at module scope (`adapter.ts:142-143`), and the reads at `:188`,
         `:222`, `:339` take computed paths — so inlining should be impossible, but **verify it, don't infer
         it**.
-  - [ ] Write the adjudication: does the IR resolve at build time (payload-optimal, one build per project)
+  - [x] Write the adjudication: does the IR resolve at build time (payload-optimal, one build per project)
         or at server runtime (one build, many projects)? State which constraint yields and why.
-  - [ ] If the answer changes 23.3's shape, **raise it rather than editing 23.3's implementation** — 23.3 is
+  - [x] If the answer changes 23.3's shape, **raise it rather than editing 23.3's implementation** — 23.3 is
         in flight and mid-implementation.
 
-- [ ] **Task 4 — Evaluate the strategies against all three channels** (AC: #1, #2, #3)
-  - [ ] Build the comparison table over the candidates in Dev Notes → **Candidate strategies**, with real
+- [x] **Task 4 — Evaluate the strategies against all three channels** (AC: #1, #2, #3)
+  - [x] Build the comparison table over the candidates in Dev Notes → **Candidate strategies**, with real
         measurements from Task 2 replacing the seeded estimates wherever they differ.
-  - [ ] For each of the three channels — **standalone self-contained binary** (16.3), **npx** (16.8),
+  - [x] For each of the three channels — **standalone self-contained binary** (16.3), **npx** (16.8),
         **VSIX/Marketplace** (16.5/FR33) — state what the chosen strategy costs and what it forfeits.
-  - [ ] Answer the standalone-binary question explicitly: when Node is absent, does it (a) require Node,
+  - [x] Answer the standalone-binary question explicitly: when Node is absent, does it (a) require Node,
         (b) bundle a JS runtime, or (c) degrade to something else? Name the choice.
-  - [ ] Record the negative result on embedding a JS engine in .NET rather than re-deriving it: Vite 8 /
+  - [x] Record the negative result on embedding a JS engine in .NET rather than re-deriving it: Vite 8 /
         Rolldown and Oxc ship as platform-native `.node` bindings requiring `process.dlopen`, so **no pure-JS
         engine (Jint, ClearScript/V8) can run a Nuxt *build*** — the door is closed, not narrow.
         `Microsoft.JavaScript.NodeApi`/LibNode is the only architectural fit and is a preview package hosting
         an experimental subsystem pinned to Node 20.18, **EOL since 2026-04-30**.
 
-- [ ] **Task 5 — Resolve the asset-path / `file://` form** (AC: #7)
-  - [ ] Reproduce the defect on a real emitted page before fixing it — confirm the absolute `/_nuxt/…` refs
+- [x] **Task 5 — Resolve the asset-path / `file://` form** (AC: #7)
+  - [x] Reproduce the defect on a real emitted page before fixing it — confirm the absolute `/_nuxt/…` refs
         and confirm what actually breaks when the page is opened from `file://` and from a subdirectory.
-  - [ ] Evaluate `app.baseURL: './'` (and `app.cdnURL` if needed) against the parity contract: 23.3 AC #1
+  - [x] Evaluate `app.baseURL: './'` (and `app.cdnURL` if needed) against the parity contract: 23.3 AC #1
         compares the `<main>` region and AC #5 pins the head projection field-by-field against
         `PathUtil.RenderHeadOpen`. A baseURL change moves head/asset markup — check it does not break either.
-  - [ ] Verify in a live browser, per CLAUDE.md: the suite structurally cannot see this class of defect.
+  - [x] Verify in a live browser, per CLAUDE.md: the suite structurally cannot see this class of defect.
 
-- [ ] **Task 6 — Wire the pipeline** (AC: #8) — _confirm scope with the owner first (Q3)_
-  - [ ] Add the Node step to `.github/workflows/build-test-analyze.yml` (`actions/setup-node`, `npm ci` in
+- [x] **Task 6 — Wire the pipeline** (AC: #8) — _confirm scope with the owner first (Q3)_
+  - [x] Add the Node step to `.github/workflows/build-test-analyze.yml` (`actions/setup-node`, `npm ci` in
         `web/`), running the drift gates. Today CI has **no Node step at all** and the workflow deliberately
         carries **no `paths:` filter**, so it already runs on `web/`-only pushes and does nothing with them.
-  - [ ] Give `web/**` a deliberate Sonar posture — exclusion or `sonar.javascript.lcov.reportPaths` — and
+  - [x] Give `web/**` a deliberate Sonar posture — exclusion or `sonar.javascript.lcov.reportPaths` — and
         state which and why. Do **not** let the next scan decide by default.
-  - [ ] Add the npm lifecycle hook the gates lack: there is no `prebuild`/`pregenerate`, so
+  - [x] Add the npm lifecycle hook the gates lack: there is no `prebuild`/`pregenerate`, so
         `npm run check:tokens` does not gate a build even for a developer.
-  - [ ] Do **not** create a second build/test workflow. Story 16.2 as amended (epics.md:2720–2729) is
+  - [x] Do **not** create a second build/test workflow. Story 16.2 as amended (epics.md:2720–2729) is
         explicit: "two workflows that both build and test is the exact drift class this project has
         repeatedly paid for."
 
-- [ ] **Task 7 — Author the ADR** (AC: #6)
-  - [ ] Confirm the next free ADR number by listing `docs/adrs/` (0016 is the highest at seeding; 0015 and
+- [x] **Task 7 — Author the ADR** (AC: #6)
+  - [x] Confirm the next free ADR number by listing `docs/adrs/` (0016 is the highest at seeding; 0015 and
         0016 are both **Proposed**).
-  - [ ] Author it in the house form — Status/Context/Decision/Consequences/Ratified-decisions, with the
+  - [x] Author it in the house form — Status/Context/Decision/Consequences/Ratified-decisions, with the
         measured basis inline, following ADR 0012/0013's shape.
-  - [ ] Update `docs/adrs/README.md` in the same change.
-  - [ ] State the relationship to ADR 0006 §Decision (0006:214–219) explicitly. If the decision contradicts
+  - [x] Update `docs/adrs/README.md` in the same change.
+  - [x] State the relationship to ADR 0006 §Decision (0006:214–219) explicitly. If the decision contradicts
         "its self-contained packaging … stand[s]", say so in the ADR rather than letting it drift.
-  - [ ] Leave it **Proposed**. Ratification is the owner's, not the dev agent's (ADR 0016 §Ratified
+  - [x] Leave it **Proposed**. Ratification is the owner's, not the dev agent's (ADR 0016 §Ratified
         decisions is the precedent).
 
-- [ ] **Task 8 — Record the strategy and unblock 23.4** (AC: #1, #9)
-  - [ ] Write the durable packaging-strategy report. Mirror the 22.1 / 23.1 spike-report structure — measured
+- [x] **Task 8 — Record the strategy and unblock 23.4** (AC: #1, #9)
+  - [x] Write the durable packaging-strategy report. Mirror the 22.1 / 23.1 spike-report structure — measured
         evidence, findings, verdict — since this story's primary deliverable is a decision, not code.
-  - [ ] Update `epics.md` **and** `sprint-status.yaml` in the **same change** (CLAUDE.md: a structural change
+  - [x] Update `epics.md` **and** `sprint-status.yaml` in the **same change** (CLAUDE.md: a structural change
         recorded in only one artifact is a drift bug). Specifically: 23.4's "Blocked until 23.5 lands" note
         resolves, and its `backlog` key becomes actionable.
-  - [ ] Confirm the scope guard held: `git` confirms `src/SpecScribe/**` and `tests/**` untouched by this
+  - [x] Confirm the scope guard held: `git` confirms `src/SpecScribe/**` and `tests/**` untouched by this
         story's own work, `SpecScribe.slnx` still holds two projects, `HtmlRenderAdapter` intact.
 
 ## Dev Notes
@@ -461,8 +461,120 @@ and 7 proceed regardless.
 
 ### Agent Model Used
 
+claude-opus-5 (Claude Code, `bmad-dev-story`) — 2026-07-27.
+
 ### Debug Log References
+
+- Reproducible experiment: `web/scripts/experiment-two-ir.mjs` → `web/measurements/two-ir.{txt,json}`
+- Parity / links: `web/measurements/parity.{txt,json}`, `web/measurements/links.{txt,json}`
+- Durable report: [`23-5-packaging-strategy-report.md`](23-5-packaging-strategy-report.md)
+- Decision: [ADR 0022](../../docs/adrs/0022-node-is-a-build-toolchain-and-a-generate-time-runtime.md) — **Proposed**
 
 ### Completion Notes List
 
+**The verdict (AC #1, #4).** The 23.1 gate's binary — client-rendered SPA *or* Node at run time — is
+**false**. It conflates the toolchain that *builds* the projection layer with the runtime that *renders*
+with it. Measured: build toolchain **201.9 MB / 16,791 files / 14 native `.node` bindings** requiring
+`process.dlopen`; shipped artefact **3.78 MB / 185 files / zero native bindings**. Net new shipped bytes
+**~2.40 MB** (1.46 MB of the artefact is plotly/prism/`specscribe.js` the C# portal already ships).
+
+**The two-IR experiment CONFIRMED the hypothesis.** One artefact, built with **no IR present at all**,
+isolated to a directory containing only `.output/`, rendered **1,056/1,056** routes of this repo and
+**32/33** of a genuinely different project (CORA) via `SPECSCRIBE_IR_DIR`, at ~4 ms/route — a full pass in
+**6.3 s** against `nuxt generate`'s 25–30 s and the spike's ~130 s cold. The harness is **committed**,
+because 23.1's "every number is reproducible" claim was found false at review.
+
+**Three false results are recorded in the report**, two of them the harness's own fault (substring matching
+for hydration markers on a portal that renders its own source; comparing against the golden static page
+rather than the IR). The third was real and structural: an artefact carrying prerendered pages returned
+**project A's dashboard for project B with HTTP 200**, because Nitro serves `public/` *ahead of* the SSR
+route. Fixed structurally, not by instruction.
+
+**AC #5 adjudication: the two forces were never in conflict.** "Build time, module scope" means SSR render
+time *inside Nitro*, which in a prebuilt `.output/` **is** runtime — so 23.2's 1.00× payload measurement is
+preserved, not traded. Verified by **reading the built bundle**, not inferred: `process.env.SPECSCRIBE_IR_DIR`
+survives verbatim with all three `readFileSync` sites intact. Only the **route table** was a genuine
+build-time coupling, and `SPECSCRIBE_PACKAGE_BUILD=1` removes it.
+
+**AC #2/#3 correction.** AC #2 names two channels; ADR 0012's formula has three. npx and the extension host
+both run on Node **by construction**, so the standalone binary is the only channel a Node dependency breaks
+— and it takes a **documented prerequisite** (owner decision). No Epic 16 channel is built yet, so
+"continue to function" is a design constraint on unbuilt channels, not a non-regression check.
+
+**Owner decisions taken during the story (2026-07-27):** (a) absorb the Nuxt 3 → 4 upgrade here rather than
+defer it; (b) full CI scope including authoring a `web/` test suite; (c) the standalone binary requires Node
+as a documented prerequisite rather than bundling a runtime.
+
+**Nuxt 3.21.9 → 4.5.1 held 23.3's contract exactly**: 189/189 `<main>` byte-identical, 189/189 verbatim,
+0 link regressions — identical to the Nuxt 3 baseline captured immediately before the upgrade. Head
+projection survived unhead v2 intact. `npm audit` reports 11 highs, all one `brace-expansion` root cause,
+all build-toolchain `devDependencies` that this ADR's decision never distributes.
+
+**AC #7.** Defect reproduced first (`href="/_nuxt/…"`, root-absolute). `app.baseURL: './'` was **evaluated
+and rejected** — `baseURL` is one global string but the correct prefix is per-page-depth. Fixed with a
+Nitro `render:html` depth-aware rewrite and **verified in a live browser from `file://`** at depth 0 and
+depth 3: all stylesheets load, `body` computes to the portal parchment, zero absolute `/_nuxt/` remain.
+
+**AC #8 — two of the three drift gates were RED at `HEAD`** when first run (`check:ir-content`,
+`check:assets`), drifted by a concurrent story in `40c7ee9` and caught by nothing. That observation *is* the
+argument for AC #8. Also **fixed a gate that could never stay green**: `ir-content.manifest.json` carried
+whole-corpus statistics that changed on any docs commit; removed from the committed artifact and verified
+green across two different IR generates.
+
+⚠️ **The story's Sonar premise was stale.** It records `web/**` as absent from the exclusion list; Story
+25.2 (decision 1b) had since added `sonar.coverage.exclusions="web/**"`. Narrowed rather than removed, and
+`web/node_modules/**` — absent, and about to matter now that CI runs `npm ci` there — added to
+`sonar.exclusions`. `web/` coverage is **51.19% / 53.40%** and is **expected to show `new_coverage` red**
+(non-blocking); the fix is component tests, not re-widening the exclusion.
+
+**Raised, not patched.** `DashboardSurface.vue` hard-throws on any project whose dashboard carries no
+Hierarchy Explorer (CORA: zero occurrences). A real project-independence defect, and a deliberate ADR 0012
+§Decision 2 contract assertion — raised to Story 23.3 per this story's own scope instruction.
+
+**AC #9 scope guard held.** Zero C# touched; `HtmlRenderAdapter` intact; `SpecScribe.slnx` still 2 projects;
+full suite **2,538 passed / 0 failed / 3 skipped**, `GoldenContentFingerprint` **green**. The `src/` and
+`tests/` modifications visible in `git status` are **concurrent Epic 18 work**, not this story's — scope was
+verified by File List, never by a diff range.
+
+**Concurrency.** `SpecScribeOutput/spa/` was wiped **twice** mid-experiment by a concurrent session running
+`generate` without `--spa`; the experiment was moved onto scratch IRs so a concurrent regeneration could not
+invalidate a measurement in flight. `web/ir/adapter.ts` and `web/nuxt.config.ts` had both moved since
+seeding — `IR_DIR` now resolves from `process.cwd()`, not `import.meta.url`.
+
 ### File List
+
+**Modified**
+
+- `.github/workflows/build-test-analyze.yml` — setup-node, npm ci, IR generate, drift gates, Vitest; narrowed `sonar.coverage.exclusions`; added `sonar.javascript.lcov.reportPaths`; added `web/node_modules/**` et al. to `sonar.exclusions`
+- `web/package.json` — Nuxt 4, Vitest, `engines`, `build:package`, `test`, `test:coverage`, `experiment:two-ir`, `prebuild`/`pregenerate`
+- `web/package-lock.json`
+- `web/nuxt.config.ts` — `PACKAGE_BUILD` empties the prerender route table
+- `web/ir/adapter.ts` — `PACKAGE_BUILD` + `EMPTY_MANIFEST`; package-build hint in the not-found error
+- `web/scripts/ir-content-build.mjs` — whole-corpus statistics removed from the committed manifest
+- `web/assets/ir-content.css`, `web/assets/ir-content.manifest.json` — regenerated (resolves pre-existing drift)
+- `web/.gitignore` — ignore `coverage/`
+- `web/measurements/parity.{txt,json}`, `web/measurements/links.{txt,json}` — regenerated
+- `_bmad-output/planning-artifacts/epics.md` — 23.4 unblocked; 23.5 outcome recorded
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — 23.5 → review, 23.4 → ready-for-dev
+- `docs/adrs/README.md` — ADR 0022 index entry
+
+**Added**
+
+- `docs/adrs/0022-node-is-a-build-toolchain-and-a-generate-time-runtime.md`
+- `_bmad-output/implementation-artifacts/23-5-packaging-strategy-report.md`
+- `web/scripts/experiment-two-ir.mjs` — the AC #4 harness
+- `web/scripts/build-package.mjs` — `npm run build:package`
+- `web/server/plugins/relative-asset-urls.ts` — page-relative `/_nuxt/` rewrite
+- `web/server/utils/relative-prefix.ts` — the depth rule, extracted to be testable
+- `web/vitest.config.ts`
+- `web/test/relative-prefix.test.ts`, `web/test/region-split.test.ts`, `web/test/harness-lib.test.mjs`, `web/test/ir-content-lib.test.mjs`, `web/test/tokens-lib.test.mjs`
+- `web/.nvmrc` — 24.11.1
+- `web/measurements/two-ir.{txt,json}`
+
+**Not touched** (AC #9): every file under `src/` and `tests/`.
+
+### Change Log
+
+| date | change |
+|---|---|
+| 2026-07-27 | Story implemented. ADR 0022 proposed — Node is a build-time toolchain and a generate-time runtime. Two-IR experiment CONFIRMED (1,056/1,056 + 32/33 from one artefact built with no IR). Nuxt 3 → 4 absorbed, 23.3 parity held. `file://` asset paths fixed and browser-verified. `web/` wired into CI with 80 Vitest tests. Status → review; Story 23.4 unblocked. |
