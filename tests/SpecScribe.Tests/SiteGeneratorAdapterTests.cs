@@ -1051,7 +1051,25 @@ public class SiteGeneratorAdapterTests : IDisposable
         // inside this hash as well as mine; the two could not be separated without destroying uncommitted work
         // (CLAUDE.md forbids reset/checkout/clean here, and rightly). Stable across two repeated local runs.
         // [Story 23.2; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
-        const string expected = "2050b5862e2c9fa8fa94f832739900487f3c84b18f16bb10d7697250d492063a";
+        // Regenerated at the close of Story 20.5 (2026-07-26). Movers since the last value: 20.5's three owner
+        // rounds (the component legend, bold per-sector contrast labels, the portal's own tooltip, `Detail`
+        // replacing the raw layout number, a rail card per selectable node, dense-epic expansion, and the
+        // anti-flash boot script) plus the concurrent Design System page.
+        //
+        // PROVENANCE — READ BEFORE RE-BASELINING. This one line is currently CONTENDED BY THREE SESSIONS. Within a
+        // single hour it read 91c3aeb4 (Story 25.1), then 2050b586 (Story 23.2), while the value this fixture
+        // actually computes moved 2d9c29ae → d7d117db → 6c81a2ba → dde7d077 as the Design System page landed. Twice
+        // it moved with no edit of this story's in between. So: capture only when the tree is QUIET (checked here —
+        // no source file touched for 10 minutes, and that session's own tests green), and expect to find your value
+        // replaced rather than assuming you mis-measured. Confirmed stable across three consecutive runs.
+        //
+        // CAVEAT, a real regression in confidence: 91c3aeb4 was the first constant in this project verified on
+        // THREE environments (this box, GitHub windows-latest, GitHub ubuntu-latest). This one is single-box only.
+        // The checkout and date/timezone portability fixes are still in place (FoldToday / IsCopiedAsset), so there
+        // is no known reason it should differ elsewhere — but that is an expectation, not a measurement.
+        // RE-RUN THE CROSS-ENVIRONMENT CHECK before treating it as portable.
+        // [Story 20.5 close-out; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
+        const string expected = "dde7d0778e95cc6a60d345a2209cca616c19b456962538f39a7ca6629bdf150e";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
