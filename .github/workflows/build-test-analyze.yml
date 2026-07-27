@@ -234,6 +234,15 @@ jobs:
         # drifting install in CI would make the build unreproducible.
         run: npm ci
 
+      - name: Sync runtime assets into web/public
+        working-directory: web
+        # web/public/ is GITIGNORED by design (web/.gitignore: 1.4 MB of copies whose authoritative source
+        # is src/SpecScribe/assets/ in this same repo), so on a fresh CI checkout it does not exist at all
+        # and `check:assets` fails with "missing: prism.css / missing: prism.js". Populating it here is not
+        # a workaround — it is the same thing `npm run dev`, `npm run build`, and `npm run generate` each do
+        # via their own `sync-runtime-assets.mjs` prefix. Reproduced locally by deleting web/public/.
+        run: npm run sync:assets
+
       - name: Check web drift gates
         working-directory: web
         # The three generated-artifact gates Story 23.2/23.3 wrote and which, until now, nothing ran:
@@ -242,6 +251,12 @@ jobs:
         #   check:assets      — web/public/ vs src/SpecScribe/assets/
         # No continue-on-error: a drifted generated artifact is a real failure, and the whole point of
         # wiring these is that they now stop a build instead of rotting.
+        #
+        # BE HONEST ABOUT WHAT EACH ONE ASSERTS HERE. `check:tokens` and `check:ir-content` diff a COMMITTED
+        # artifact against the C# source, so they catch real drift in CI. `check:assets` cannot: its subject
+        # is gitignored and was recreated from that same source one step ago, making it a tautology in CI.
+        # Its real value is LOCAL, where a stale web/public/ can survive a stylesheet change indefinitely.
+        # It is left in the run so `npm run check` means the same thing for a developer and for CI.
         run: npm run check
 
       - name: Test web
