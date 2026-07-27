@@ -251,9 +251,14 @@ public static class RelatedWork
         islandId == OrphanIslandId ? "wg-unattributed" : $"wg-{islandId}";
 
     /// <summary>True for a node's own outgoing "Part of → Epic N" group — the shared test for "drop this group
-    /// because the section/subject it would sit under already states the relationship as its container." Used
-    /// both when a node owns its own section (here) and when <see cref="RelatedWorkCards"/> folds a story's
-    /// groups into its epic card, so the rule can't drift into two names for one thing.</summary>
+    /// because the section/subject it would sit under already states the relationship as its container."
+    ///
+    /// <para><b>One caller remains:</b> the folded-subject branch of <see cref="Build"/> below, where a node sits
+    /// inside its container's section and its own "Part of" group would restate the heading above it. The second
+    /// caller this doc used to name — <c>RelatedWorkCards</c> folding a story's groups into its epic card — was
+    /// removed when Story 20.5's <c>select</c> mode gave story leaves cards of their own, and a standalone story
+    /// card SHOULD state which epic it belongs to. Corrected rather than left describing a design that no longer
+    /// exists, which is the failure the Story 7.11/7.12 joint review recorded. [Story 20.5 review]</para></summary>
     internal static bool IsRestatedContainsGroup(RelatedWorkGroup g) =>
         g.Kind == WorkEdgeKind.Contains && g.Direction == RelatedWorkDirection.Outgoing;
 

@@ -608,7 +608,15 @@ public sealed class InteractiveCommand : Command<SiteSettings>
         // so there is nothing to typo. Seeded with the CURRENT policy as the first (pre-selected) choice so
         // re-running Configure paths never silently flips it — same discipline as the --deep-git prompt above.
         // [Story 5.5]
-        var currentPolicy = DatePolicies.TryParse(settings.TodayPolicy, out var parsed) ? parsed : DatePolicy.MachineLocal;
+        var todayPolicyParsed = DatePolicies.TryParse(settings.TodayPolicy, out var parsed);
+        if (!todayPolicyParsed && settings.TodayPolicy is { Length: > 0 } unrecognized)
+        {
+            // A restored .specscribe carried a TodayPolicy this build doesn't recognize (e.g. a hand-edit typo, or a
+            // newer version's spelling). Falling back silently would defeat the "never silently flips it" guarantee
+            // this prompt exists to give — say so, the same way the settings-save failure below does. [Review][Patch]
+            AnsiConsole.MarkupLine($"[yellow]![/] [yellow]Saved today-policy '{Markup.Escape(unrecognized)}' is not recognized[/] [grey](defaulting to machine-local below)[/]");
+        }
+        var currentPolicy = todayPolicyParsed ? parsed : DatePolicy.MachineLocal;
         var policyChoices = new[] { currentPolicy }
             .Concat(Enum.GetValues<DatePolicy>().Where(p => p != currentPolicy))
             .ToArray();

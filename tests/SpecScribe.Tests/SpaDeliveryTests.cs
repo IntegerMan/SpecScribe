@@ -205,6 +205,229 @@ public class SpaDeliveryTests
         Assert.Contains(byMembership, set => set.OrderBy(p => p, StringComparer.Ordinal).SequenceEqual(new[] { "root/a.html", "root/b.html" }));
     }
 
+    // ===== Story 22.2: byte-bounded chunking with no silent escape hatch (AC #2) ==============================
+
+    /// <summary>The chunk file is assembled from pre-encoded key/value tokens rather than by serializing a
+    /// <c>Dictionary&lt;string, string&gt;</c> — that is what lets the byte budget be measured against the EXACT
+    /// bytes that get written. Pins the equivalence directly so the two can never drift: the assembled file must
+    /// be byte-identical to what <see cref="System.Text.Json"/> would have produced for the same map in the same
+    /// order with the same options. Includes the escaping corner that matters (<c>&lt;</c>/<c>&gt;</c>/<c>&amp;</c>
+    /// each become a 6-byte <c>\uXXXX</c>) and a non-ASCII character. [Story 22.2]</summary>
+    [Fact]
+    public void BuildDataFiles_ChunkJson_IsByteIdenticalToSerializingTheEquivalentDictionary()
+    {
+        var pages = new List<SpaPage>
+        {
+            new("docs/a.html", "a", "<main id=\"main-content\"><p>a &amp; b &lt;tag&gt;</p></main>", Array.Empty<BreadcrumbCrumb>()),
+            new("docs/b.html", "b", "<main id=\"main-content\"><p>café — naïve \"quoted\"</p></main>", Array.Empty<BreadcrumbCrumb>()),
+            new("docs/c.html", "c", "<main id=\"main-content\"><p>line\nbreak\ttab</p></main>", Array.Empty<BreadcrumbCrumb>()),
+        };
+        var bundle = new SpaBundle("Test Site", "index.html", Array.Empty<(string, string)>(), pages);
+
+        var chunk = SpaDelivery.BuildDataFiles(bundle)
+            .Single(f => f.OutputRelativePath == $"{SpaDelivery.ChunkDir}/pages-docs.json");
+
+        // Same insertion order BuildDataFiles walks (ordinal by path, entry page first — none here is the entry).
+        var expectedMap = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var p in pages.OrderBy(p => p.OutputRelativePath, StringComparer.Ordinal))
+        {
+            expectedMap[p.OutputRelativePath] = p.ContentHtml;
+        }
+        var expected = JsonSerializer.Serialize(expectedMap, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        });
+
+        Assert.Equal(expected, chunk.Content);
+        Assert.Contains("\\u003C", chunk.Content); // the escaping really is in play
+    }
+
+    /// <summary>Story 22.2 AC #2, the case the pre-22.2 budget could not see: pages whose RAW UTF-8 size fits
+    /// comfortably under <see cref="SpaDelivery.MaxChunkBytes"/> but whose JSON-ESCAPED size does not, because
+    /// every <c>&lt;</c>/<c>&gt;</c>/<c>&amp;</c> balloons 1 byte → 6. Budgeting raw bytes (the old behavior) put
+    /// all of these in one chunk and wrote a file several times over the ceiling — the "approximation, not an
+    /// exact ceiling" caveat the old doc comment admitted. Budgeting the encoded tokens splits them, and NO
+    /// emitted multi-page chunk exceeds the ceiling.</summary>
+    [Fact]
+    public void BuildDataFiles_NoChunkExceedsTheCeiling_WhenJsonEscapingInflatesTheContent()
+    {
+        // Every "<&>" (3 raw bytes) escapes to "<&>" (18 bytes) — a 6x inflation. Sized so that
+        // each page is comfortably UNDER the ceiling on its own (120 KB raw / 720 KB encoded — this is not the
+        // isolated-oversized-page path), the four together fit the ceiling on RAW bytes (480 KB, so the pre-22.2
+        // budget put all four in ONE file), but exceed it on ENCODED bytes (2.88 MB) and so must split.
+        var inflating = string.Concat(Enumerable.Repeat("<&>", 40_000)); // 120 000 raw bytes → ~720 002 encoded
+        var pages = Enumerable.Range(1, 4)
+            .Select(i => new SpaPage($"docs/p{i}.html", $"p{i}", inflating, Array.Empty<BreadcrumbCrumb>()))
+            .ToList();
+        Assert.True(pages.Sum(p => System.Text.Encoding.UTF8.GetByteCount(p.ContentHtml)) < SpaDelivery.MaxChunkBytes,
+            "fixture invariant: the RAW total must fit the budget, or this proves nothing about escaping");
+        Assert.True(System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(inflating)) < SpaDelivery.MaxChunkBytes,
+            "fixture invariant: no SINGLE page may be over-cap, or this tests isolation instead of budgeting");
+
+        var bundle = new SpaBundle("Test Site", "index.html", Array.Empty<(string, string)>(), pages);
+        var files = SpaDelivery.BuildDataFiles(bundle);
+        var chunks = files.Where(f => f.OutputRelativePath != SpaDelivery.ManifestPath).ToList();
+
+        // More than one chunk (the raw budget would have produced exactly one)…
+        Assert.True(chunks.Count > 1, $"expected the encoded budget to split these pages; got {chunks.Count} chunk(s)");
+        // …and every emitted chunk file is genuinely at or under the ceiling.
+        foreach (var chunk in chunks)
+        {
+            var size = System.Text.Encoding.UTF8.GetByteCount(chunk.Content);
+            Assert.True(size <= SpaDelivery.MaxChunkBytes,
+                $"{chunk.OutputRelativePath} is {size} B, over the {SpaDelivery.MaxChunkBytes} B ceiling");
+        }
+        // No page was oversized ON ITS OWN, so nothing is declared.
+        Assert.DoesNotContain("\"oversizedPages\":[{", ManifestOf(files));
+    }
+
+    /// <summary>The ONE declared exception (Story 22.2 AC #2): a single page whose own encoded size exceeds the
+    /// ceiling cannot be split — its content region is atomic — so its dedicated chunk IS written over-cap. That
+    /// must never be silent: the manifest names the page and records the real size of the file it produces.
+    /// Story 22.1 measured exactly this shape live (a 3.08 MB chunk against a 2 MB guard).</summary>
+    [Fact]
+    public void BuildDataFiles_DeclaresAnUnavoidablyOversizedSinglePage_InTheManifest()
+    {
+        var huge = new string('h', SpaDelivery.MaxChunkBytes + 1);
+        var pages = new List<SpaPage>
+        {
+            new("root/a.html", "a", new string('n', 1_000), Array.Empty<BreadcrumbCrumb>()),
+            new("root/b-huge.html", "b", huge, Array.Empty<BreadcrumbCrumb>()),
+        };
+        var files = SpaDelivery.BuildDataFiles(
+            new SpaBundle("Test Site", "index.html", Array.Empty<(string, string)>(), pages));
+
+        using var manifest = JsonDocument.Parse(ManifestOf(files));
+        var declared = manifest.RootElement.GetProperty("oversizedPages").EnumerateArray().ToList();
+        var only = Assert.Single(declared);
+        Assert.Equal("root/b-huge.html", only.GetProperty("path").GetString());
+
+        // The declared size is the size of the FILE that actually gets written — not the raw content size, and
+        // not an estimate. A consumer can compare it against the ceiling itself.
+        var hugeChunk = files.Single(f =>
+            f.OutputRelativePath != SpaDelivery.ManifestPath &&
+            f.Content.Contains("root/b-huge.html", StringComparison.Ordinal));
+        Assert.Equal(System.Text.Encoding.UTF8.GetByteCount(hugeChunk.Content), only.GetProperty("chunkBytes").GetInt64());
+        Assert.True(only.GetProperty("chunkBytes").GetInt64() > SpaDelivery.MaxChunkBytes);
+
+        // The normal neighbour is untouched and under the ceiling — isolation still holds.
+        var normalChunk = files.Single(f =>
+            f.OutputRelativePath != SpaDelivery.ManifestPath &&
+            f.Content.Contains("root/a.html", StringComparison.Ordinal));
+        Assert.True(System.Text.Encoding.UTF8.GetByteCount(normalChunk.Content) <= SpaDelivery.MaxChunkBytes);
+    }
+
+    [Fact]
+    public void Manifest_CarriesTheSchemaVersion_AndAnEmptyOversizedListWhenNothingIsOverCap()
+    {
+        var files = SpaDelivery.BuildDataFiles(SyntheticBundle(new[] { "docs/a.html", "docs/b.html" }));
+
+        using var manifest = JsonDocument.Parse(ManifestOf(files));
+        Assert.Equal(SpaDelivery.SchemaVersion, manifest.RootElement.GetProperty("schemaVersion").GetInt32());
+        // Present-and-empty, not absent: "no page is over cap" is an assertion the IR makes, not a silence.
+        Assert.Empty(manifest.RootElement.GetProperty("oversizedPages").EnumerateArray());
+    }
+
+    private static string ManifestOf(IReadOnlyList<SpaDelivery.OutputFile> files) =>
+        files.Single(f => f.OutputRelativePath == SpaDelivery.ManifestPath).Content;
+
+    // ===== Story 22.2: the capture extractors (AC #5) ========================================================
+
+    /// <summary>The nav slice keeps the page's OWN nav — including the page-local context band the re-render
+    /// path cannot reproduce (there is no path → NavLocalContext resolver) — and stops at the nav element's own
+    /// closer, EXCLUDING the inline toggle script that follows it on the HTML surface. [Story 22.2 AC #5]</summary>
+    [Fact]
+    public void ExtractNavMarkup_TakesThePagesOwnNav_AndStopsBeforeTheInlineToggleScript()
+    {
+        var page = "<a class=\"skip-link\" href=\"#main-content\">Skip to content</a>\n"
+            + "<nav class=\"site-nav\" aria-label=\"Document navigation\">\n"
+            + "  <div class=\"site-nav-inner\"><a href=\"index.html\">Home</a></div>\n"
+            + "  <div class=\"site-nav-key-views site-nav-local-context\" aria-label=\"ADRs\">"
+            + "<a href=\"0001-a.html\">ADR 1</a></div>\n"
+            + "</nav>\n"
+            + "<script>NAV_TOGGLE()</script>\n"
+            + "<div class=\"breadcrumb\"><a href=\"../index.html\">Home</a></div>\n"
+            + "<main id=\"main-content\"><p>Body</p></main>\n";
+
+        var nav = SpaDelivery.ExtractNavMarkup(page);
+
+        Assert.NotNull(nav);
+        Assert.StartsWith("<nav class=\"site-nav\"", nav);
+        Assert.EndsWith("</nav>\n", nav);
+        Assert.Contains("site-nav-local-context", nav);
+        Assert.Contains("aria-label=\"ADRs\"", nav);
+        Assert.DoesNotContain("NAV_TOGGLE", nav);
+        Assert.DoesNotContain("<script", nav);
+    }
+
+    [Fact]
+    public void ExtractNavMarkup_IsNull_WhenThePageCarriesNoSiteNav()
+    {
+        Assert.Null(SpaDelivery.ExtractNavMarkup("<main id=\"main-content\">no nav</main>"));
+    }
+
+    [Fact]
+    public void ExtractMetaDescription_RecoversAndDecodes_OrReturnsNullWhenAbsent()
+    {
+        var page = "<head><title>T</title>\n"
+            + "<meta name=\"description\" content=\"Docs &amp; specs for &quot;SpecScribe&quot;\">\n"
+            + "<meta property=\"og:description\" content=\"ignored\">\n</head>";
+
+        Assert.Equal("Docs & specs for \"SpecScribe\"", SpaDelivery.ExtractMetaDescription(page));
+        Assert.Null(SpaDelivery.ExtractMetaDescription("<head><title>T</title></head>"));
+    }
+
+    /// <summary>The strip-or-nonce declaration (Story 22.2 AC #5). Both kinds that exist in SpecScribe output are
+    /// pinned here: the inert <c>application/json</c> islands (the sunburst/hierarchy/impact-map payloads), and an
+    /// EXECUTABLE bare <c>&lt;script&gt;</c>. The executable case is not hypothetical — Story 20.5's
+    /// anti-flash handshake (<c>HierarchyExplorer.BootScript</c>) is emitted on the CHROME seam between the
+    /// breadcrumb and <c>&lt;main&gt;</c>, which is inside the captured slice, so any captured page that gains a
+    /// hierarchy host (Stories 20.7/20.9) ships it into the IR. The webview's own <c>JsonDataIsland</c> regex
+    /// matches only the first kind, which is exactly why the IR declares both rather than leaving each consumer
+    /// to recognize them.</summary>
+    [Fact]
+    public void ExtractScriptIslands_SeparatesInertDataFromExecutableScript()
+    {
+        var region = "<nav class=\"site-nav\"></nav>\n"
+            + "<div class=\"breadcrumb\"></div>\n"
+            + "<script>(function(){var r=document.documentElement;r.setAttribute('data-ss-hierarchy-boot','1');})();</script>\n"
+            + "<main id=\"main-content\">\n"
+            + "<script type=\"application/json\" id=\"sunburst-explorer-data\">{}</script>\n"
+            + "<script type=\"application/json\" class=\"ss-hierarchy-data\" id=\"dashboard-hierarchy-data\">{}</script>\n"
+            + "<script type=\"module\" id=\"mermaid-init\">import 'x';</script>\n"
+            + "</main>";
+
+        var islands = SpaDelivery.ExtractScriptIslands(region);
+
+        Assert.Equal(4, islands.Count);
+        Assert.Equal(new (string?, string)[]
+        {
+            (null, SpaDelivery.ExecutableScriptKind),
+            ("sunburst-explorer-data", SpaDelivery.DataIslandKind),
+            ("dashboard-hierarchy-data", SpaDelivery.DataIslandKind),
+            ("mermaid-init", SpaDelivery.ExecutableScriptKind),
+        }, islands.Select(i => (i.Id, i.Kind)).ToArray());
+    }
+
+    [Fact]
+    public void ExtractScriptIslands_IsEmpty_ForAScriptFreeRegion()
+    {
+        Assert.Empty(SpaDelivery.ExtractScriptIslands("<main id=\"main-content\"><p>plain</p></main>"));
+    }
+
+    /// <summary>Story 22.2 AC #6: the hash is a pure function of the region's bytes — same content, same hash,
+    /// on any run and any machine (NFR9); one byte different, different hash. No clock, no RNG, no path.</summary>
+    [Fact]
+    public void ContentHash_IsDeterministicForTheSameContent_AndMovesWhenTheContentDoes()
+    {
+        const string region = "<main id=\"main-content\"><p>Stable</p></main>";
+
+        Assert.Equal(SpaDelivery.ContentHash(region), SpaDelivery.ContentHash(region));
+        Assert.Equal(SpaDelivery.ContentHash(region), SpaDelivery.ContentHash(string.Copy(region)));
+        Assert.NotEqual(SpaDelivery.ContentHash(region), SpaDelivery.ContentHash(region + " "));
+        Assert.Matches("^[0-9a-f]{16}$", SpaDelivery.ContentHash(region));
+    }
+
     /// <summary>Deferred item (Story 6.7 review): chunk-batch assignment was said to "depend on unstated stable
     /// enumeration order of _docs.Values" — but <see cref="SpaDelivery.BuildDataFiles"/> already sorts pages by
     /// <c>OutputRelativePath</c> (Ordinal) before assigning batch numbers, so the upstream enumeration order should

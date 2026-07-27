@@ -1116,8 +1116,22 @@ public class SiteGeneratorAdapterTests : IDisposable
     /// machine the next morning, with no code change behind it — read as a rendering regression, inviting a
     /// needless regeneration. Only rendered HTML can contain a GENERATED date, so only rendered HTML is folded.
     /// [Story 25.1 CI; golden-diff-normalization-gotchas]</para></summary>
+    /// <summary>Single source of truth for both <see cref="IsCopiedAsset"/> and <see cref="IsVendoredAsset"/>.
+    /// Story 25.1's review found the original shape — two independently hand-maintained boolean predicates —
+    /// let one list drift from the other with no error. A shared map cannot disagree with itself. [Review][Patch,
+    /// Story 25.1 code review]</summary>
+    private static readonly IReadOnlyDictionary<string, bool> KnownStaticAssets = new Dictionary<string, bool>
+    {
+        [ForgeOptions.HierarchyEngineScriptName] = true, // vendored
+        [ForgeOptions.CodeHighlightScriptName] = true, // vendored
+        [ForgeOptions.CodeHighlightStyleName] = true, // vendored
+        [ForgeOptions.StylesheetName] = false, // copied, first-party
+        [ForgeOptions.ScriptName] = false, // copied, first-party
+        [SpaDelivery.ScriptName] = false, // copied, first-party
+    };
+
     private static bool IsCopiedAsset(string relativePath) =>
-        relativePath is ForgeOptions.StylesheetName or ForgeOptions.ScriptName or SpaDelivery.ScriptName;
+        KnownStaticAssets.TryGetValue(relativePath, out var vendored) && !vendored;
 
     /// <summary>The one normalization a verbatim-copied asset still needs: this repo has no <c>.gitattributes</c>,
     /// so a checked-out text asset is CRLF wherever <c>core.autocrlf=true</c> and LF everywhere else (including
@@ -1125,9 +1139,7 @@ public class SiteGeneratorAdapterTests : IDisposable
     private static string FoldLineEndings(string content) => content.Replace("\r\n", "\n");
 
     private static bool IsVendoredAsset(string relativePath) =>
-        relativePath is ForgeOptions.HierarchyEngineScriptName
-            or ForgeOptions.CodeHighlightScriptName
-            or ForgeOptions.CodeHighlightStyleName;
+        KnownStaticAssets.TryGetValue(relativePath, out var vendored) && vendored;
 
     /// <summary>Identity token for a vendored asset: name, exact byte length, and a content hash — so a changed or
     /// re-vendored bundle still flips the fingerprint (a length-only token would let a same-size rebuild through),
@@ -1145,10 +1157,27 @@ public class SiteGeneratorAdapterTests : IDisposable
         // contradicted FingerprintTree's own contract ("portable across machines and CI, not pinned to this box").
         // The asset's IDENTITY is still fully pinned: a re-vendored or edited bundle changes its non-newline bytes
         // and still flips the token. [Story 25.1 CI]
-        var text = File.ReadAllText(fullPath).Replace("\r\n", "\n");
-        var bytes = Encoding.UTF8.GetBytes(text);
+        //
+        // The fold operates on the RAW bytes, not via File.ReadAllText — a text round-trip auto-detects and strips
+        // a BOM and silently replaces any invalid byte sequence with U+FFFD, which would let the token stay
+        // unchanged across an added/removed BOM or drift unpredictably for a non-UTF-8 vendored asset. Neither
+        // risk touches the file's actual identity. [Story 25.1 code review]
+        var bytes = FoldCrLfBytes(File.ReadAllBytes(fullPath));
         var sha = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
         return $"<vendored asset: {Path.GetFileName(fullPath)}, {bytes.Length} bytes, sha256:{sha[..16]}>";
+    }
+
+    /// <summary>Removes CRLF -> LF byte pairs without any text-encoding round-trip, so a BOM or a non-UTF-8 byte
+    /// sequence in a vendored asset passes through untouched.</summary>
+    private static byte[] FoldCrLfBytes(byte[] raw)
+    {
+        var result = new List<byte>(raw.Length);
+        for (var i = 0; i < raw.Length; i++)
+        {
+            if (raw[i] == (byte)'\r' && i + 1 < raw.Length && raw[i + 1] == (byte)'\n') continue;
+            result.Add(raw[i]);
+        }
+        return result.ToArray();
     }
 
     /// <summary>Folds today's date (the ISO filename/href form and the readable heading form) to stable

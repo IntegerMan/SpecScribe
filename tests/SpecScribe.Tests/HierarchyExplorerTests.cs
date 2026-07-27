@@ -374,6 +374,61 @@ public class HierarchyExplorerTests
         Assert.All(built.Nodes, n => Assert.DoesNotContain("weight", n.Detail, StringComparison.OrdinalIgnoreCase));
     }
 
+    // ---- The component's own legend (AC #1) [Story 20.5 review] ---------------------------------------------
+
+    [Fact]
+    public void Legend_IsSuppliedByTheComponent_SoStory207sDeletionCannotTakeItAway()
+    {
+        // AC #1: "it supplies one selector idiom, one Story 10.2 framing block (legend + analysis window + framing
+        // sentence) ... so no call site hand-writes any of them." Until the code review the component supplied no
+        // legend at all: Charts.Framed has no legend slot, and the only legend on the dashboard came from
+        // Charts.SunburstLegend INSIDE Charts.Sunburst — i.e. inside the D1 fallback Story 20.7 deletes. The bug was
+        // invisible precisely because D1 kept that fallback on the page.
+        //
+        // Asserted over Render's OWN output with no fallbackHtml, which is exactly the post-20.7 shape.
+        var html = HierarchyExplorer.Render(Build(SampleModel()));
+
+        Assert.Contains("ss-hierarchy-legend", html);
+        Assert.DoesNotContain("sunburst-legend", html);
+    }
+
+    [Fact]
+    public void Legend_ListsOnlyStatusesThePayloadActuallyCarries_AndNamesThemInProse()
+    {
+        // A legend row pointing at zero sectors is the phantom-entry class Stories 10.7 and 21.1 each closed. The
+        // entries are derived from the nodes themselves, and the prose is each node's ALREADY-RESOLVED StatusLabel
+        // rather than a second lookup — which is what makes chart, legend, tooltip, accessible name and twin
+        // incapable of disagreeing.
+        var built = Build(SampleModel());
+        var legend = HierarchyExplorer.LegendHtml(built);
+
+        var present = built.Nodes
+            .Where(n => n.Id != HierarchyExplorer.ProjectRootId && n.StatusClass.Length > 0)
+            .Select(n => n.StatusClass)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        Assert.NotEmpty(present);
+        foreach (var status in present)
+        {
+            Assert.Contains($"sb-{status}", legend);
+            var label = built.Nodes.First(n => n.StatusClass == status && n.Id != HierarchyExplorer.ProjectRootId).StatusLabel;
+            Assert.Contains(label, legend);
+        }
+
+        // The synthesized root is a SCOPE, not a lifecycle stage — "Whole project" must never appear as a legend
+        // entry, and its neutral colour must not be presented as a status.
+        Assert.DoesNotContain(HierarchyExplorer.ProjectRootStatusLabel, legend);
+    }
+
+    [Fact]
+    public void Legend_IsAbsentFromAnEmptyModel()
+    {
+        // Same NFR8 rule the rest of the scaffold follows: no nodes, no chrome.
+        Assert.Equal(string.Empty, HierarchyExplorer.LegendHtml(
+            new HierarchyExplorerModel(Build(SampleModel()).Config, Array.Empty<HierarchyNode>())));
+    }
+
     // ---- Island shape --------------------------------------------------------------------------------------
 
     [Fact]

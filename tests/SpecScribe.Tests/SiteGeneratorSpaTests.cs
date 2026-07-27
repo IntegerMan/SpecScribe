@@ -350,11 +350,177 @@ public class SiteGeneratorSpaTests : IDisposable
         Assert.Contains("epics/story-1-1.html", epic1Children);
     }
 
+    // ===== Story 22.2: the canonical IR's added guarantees ===================================================
+
+    /// <summary>Story 22.2 AC #4. The IR's dashboard region must be the SAME bytes the static page wrote — the
+    /// claim Story 23.1 found violated by exactly 277 bytes / 5 anchors, because <c>BuildSpaBundle</c>'s
+    /// <c>BuildIndexPage</c> call used named arguments starting at <c>counts:</c> and so silently skipped the
+    /// positional <c>codeItemHref</c>, degrading the Git Pulse top-changed-file labels from links to plain text.
+    /// Asserting the whole <c>&lt;main&gt;</c> block rather than an anchor count means ANY future argument
+    /// divergence at that call site fails here, not just this one.</summary>
+    [Fact]
+    public void DashboardIrRegion_CarriesTheSameMainBlock_AsTheStaticPage()
+    {
+        var gen = GeneratedSite();
+        var region = gen.RenderSpaBundle().Pages.Single(p => p.OutputRelativePath == "index.html").ContentHtml;
+        var staticIndex = File.ReadAllText(Path.Combine(Site, "index.html"));
+
+        Assert.Equal(MainBlock(staticIndex), MainBlock(region));
+    }
+
+    /// <summary>Story 22.2 AC #5: a captured page's IR region keeps the page-local context band the static
+    /// renderer computed for it, instead of the generic key-views nav the re-render path produced (Story 23.1's
+    /// enumerated difference #2). A page that genuinely HAS no local context is unchanged.</summary>
+    [Fact]
+    public void CapturedPage_KeepsItsOwnLocalContextNavBand_AndLeavesOthersUnchanged()
+    {
+        // A second ADR gives the band a navigable (non-active) sibling; with one ADR it is a degenerate self-link
+        // and AppendKeyViewsBand correctly falls back to the generic chips.
+        File.WriteAllText(Path.Combine(Adrs, "0002-another-decision.md"),
+            "# ADR 0002: Another Decision\n\n**Status:** Accepted\n\nBody.\n");
+        var gen = GeneratedSite();
+        var bundle = gen.RenderSpaBundle();
+
+        string NavOf(string s) => s[..(s.IndexOf("</nav>", StringComparison.Ordinal) + "</nav>".Length)];
+
+        var adrRegion = bundle.Pages.Single(p => p.OutputRelativePath == "adrs/0001-a-decision.html").ContentHtml;
+        var adrNav = NavOf(adrRegion);
+        Assert.Contains("site-nav-local-context", adrNav);
+        Assert.Contains("aria-label=\"ADRs\"", adrNav);
+        // It IS the static page's own nav, byte-for-byte — not a re-render that happens to look similar.
+        var staticAdr = File.ReadAllText(Path.Combine(Site, "adrs", "0001-a-decision.html"));
+        Assert.Equal(NavOf(staticAdr[staticAdr.IndexOf("<nav class=\"site-nav\"", StringComparison.Ordinal)..]), adrNav);
+        // The inline nav-toggle script that follows the nav on the HTML surface is excluded (the client owns the
+        // toggle through delegation, and an injected script never executes after an innerHTML swap).
+        Assert.DoesNotContain("<script", adrNav);
+
+        // A page with no local context keeps the generic band, unchanged.
+        var aboutNav = NavOf(bundle.Pages.Single(p => p.OutputRelativePath == "about.html").ContentHtml);
+        Assert.DoesNotContain("site-nav-local-context", aboutNav);
+        Assert.Contains("<nav class=\"site-nav\"", aboutNav);
+    }
+
+    /// <summary>Story 22.2 AC #1/#5/#6: the manifest carries the schema version and, per page, the head
+    /// projection, the script-island declaration, and the delta-addressing pair (content hash + byte size). Each
+    /// is checked against the region that actually shipped, so none can become a parallel, drifting truth.</summary>
+    [Fact]
+    public void Manifest_CarriesSchemaVersion_HeadProjection_ScriptIslands_AndPerPageHashAndBytes()
+    {
+        var gen = GeneratedSite();
+        var bundle = gen.RenderSpaBundle();
+        using var manifestDoc = JsonDocument.Parse(
+            File.ReadAllText(Path.Combine(Site, SpaDelivery.ManifestPath.Replace('/', Path.DirectorySeparatorChar))));
+        var root = manifestDoc.RootElement;
+
+        Assert.Equal(SpaDelivery.SchemaVersion, root.GetProperty("schemaVersion").GetInt32());
+
+        var regions = bundle.Pages.ToDictionary(p => p.OutputRelativePath, p => p.ContentHtml, StringComparer.Ordinal);
+        foreach (var page in root.GetProperty("pages").EnumerateObject())
+        {
+            var region = regions[page.Name];
+            var head = page.Value.GetProperty("head");
+            // Head projection: title + description, description resolved with the SAME fallback-to-title rule
+            // PathUtil.RenderHeadOpen applies, so a consumer never has to reproduce the fallback itself.
+            Assert.Equal(page.Value.GetProperty("title").GetString(), head.GetProperty("title").GetString());
+            Assert.False(string.IsNullOrWhiteSpace(head.GetProperty("description").GetString()));
+
+            // Delta addressing describes the region that shipped.
+            Assert.Equal(SpaDelivery.ContentHash(region), page.Value.GetProperty("contentHash").GetString());
+            Assert.Equal(System.Text.Encoding.UTF8.GetByteCount(region), page.Value.GetProperty("bytes").GetInt32());
+
+            // Every embedded <script> in the region is declared, with the strip-or-nonce kind a consumer needs.
+            var declared = page.Value.GetProperty("scriptIslands").EnumerateArray().ToList();
+            Assert.Equal(SpaDelivery.ExtractScriptIslands(region).Count, declared.Count);
+            Assert.All(declared, i => Assert.Contains(i.GetProperty("kind").GetString(),
+                new[] { SpaDelivery.DataIslandKind, SpaDelivery.ExecutableScriptKind }));
+        }
+
+        // Guard against a vacuous green: the dashboard really does carry islands to declare.
+        var home = root.GetProperty("pages").GetProperty("index.html").GetProperty("scriptIslands").EnumerateArray().ToList();
+        Assert.NotEmpty(home);
+        Assert.Contains(home, i => i.GetProperty("id").GetString() == "sunburst-explorer-data"
+            && i.GetProperty("kind").GetString() == SpaDelivery.DataIslandKind);
+    }
+
+    /// <summary>Story 22.2 AC #6, proved by REPEATED RUNS rather than asserted once: two consecutive generations
+    /// of unchanged input must emit a byte-identical manifest — otherwise the per-page hash reports a false change
+    /// on every build and is worthless to 22.5/22.6. NFR9 (reproducible CI) says the same thing about the chunk
+    /// files, so those are compared too.
+    /// <para>Both runs write to the SAME directory, because the diagnostics page echoes the configured output root
+    /// inside its own region — two different directories would (correctly) yield two different hashes for it.</para>
+    /// <para>And that directory sits OUTSIDE the repo root, which this class's default <c>Site</c> does not. On a
+    /// non-git fixture the code map falls back to <c>FallbackCodeWalk</c>, which walks the repo root and excludes
+    /// dot-dirs/<c>bin</c>/<c>obj</c>/<c>node_modules</c> but NOT the output directory — so a nested output feeds
+    /// run 1's generated <c>.html</c> files into run 2's code map and <c>code-map.html</c> legitimately changes.
+    /// That is a pre-existing property of the fallback walk (the real repo is a git checkout whose output dir is
+    /// gitignored, so it never hits it), not IR volatility, and putting the output outside the walked tree is what
+    /// makes this test measure the thing it claims to.</para></summary>
+    [Fact]
+    public void ManifestAndChunks_AreByteIdentical_AcrossTwoConsecutiveRunsOfUnchangedInput()
+    {
+        var isolatedOutput = Directory.CreateTempSubdirectory("specscribe-spa-det-").FullName;
+        try
+        {
+            AssertTwoRunsAgree(isolatedOutput);
+        }
+        finally
+        {
+            try { Directory.Delete(isolatedOutput, recursive: true); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+    }
+
+    private void AssertTwoRunsAgree(string outputRoot)
+    {
+        void Generate()
+        {
+            var gen = new SiteGenerator(ForgeOptions.Resolve(
+                source: Source, adrs: Adrs, output: outputRoot, projectName: "SpecScribe",
+                includeReadme: false, emitSpa: true));
+            Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+        }
+
+        string ManifestPathOnDisk() => Path.Combine(outputRoot, SpaDelivery.ManifestPath.Replace('/', Path.DirectorySeparatorChar));
+        Dictionary<string, string> ChunksOnDisk() => Directory
+            .EnumerateFiles(Path.Combine(outputRoot, SpaDelivery.ChunkDir), "pages-*.json")
+            .ToDictionary(Path.GetFileName!, File.ReadAllText, StringComparer.Ordinal);
+
+        Generate();
+        var firstManifest = File.ReadAllText(ManifestPathOnDisk());
+        var firstChunks = ChunksOnDisk();
+
+        Generate();
+        var secondManifest = File.ReadAllText(ManifestPathOnDisk());
+        if (firstManifest != secondManifest)
+        {
+            // Name the culprit rather than making the next reader diff two 100 KB strings by eye: a hash that
+            // moves on unchanged input means some volatile token lives INSIDE that page's content region.
+            using var a = JsonDocument.Parse(firstManifest);
+            using var b = JsonDocument.Parse(secondManifest);
+            var bPages = b.RootElement.GetProperty("pages");
+            var moved = a.RootElement.GetProperty("pages").EnumerateObject()
+                .Where(p => p.Value.GetProperty("contentHash").GetString()
+                    != bPages.GetProperty(p.Name).GetProperty("contentHash").GetString())
+                .Select(p => p.Name)
+                .ToList();
+            Assert.Fail($"content hash moved across two runs of unchanged input for: {string.Join(", ", moved)}");
+        }
+
+        var secondChunks = ChunksOnDisk();
+        Assert.Equal(firstChunks.Keys.OrderBy(k => k, StringComparer.Ordinal), secondChunks.Keys.OrderBy(k => k, StringComparer.Ordinal));
+        Assert.All(firstChunks, kv => Assert.Equal(kv.Value, secondChunks[kv.Key]));
+    }
+
     [Fact]
     public void LongTailRegion_IsTheSameCSharpRenderedContent_AsTheStaticPageMainBlock()
     {
         // AC #1: no re-render. A long-tail page's SPA content region carries the EXACT <main> block the static page
         // wrote (sliced from the render pipeline's own output, not a re-parse) — byte-for-byte.
+        // SCOPE, stated plainly (Story 22.2): this compares ONLY the <main> block and the presence of a nav
+        // element. It was therefore blind to the page-local nav-context divergence Story 23.1 found — that lived
+        // in the nav, which this never inspected. CapturedPage_KeepsItsOwnLocalContextNavBand above is what pins
+        // the nav; do not read this test as covering it.
         var gen = GeneratedSite();
         var bundle = gen.RenderSpaBundle();
 

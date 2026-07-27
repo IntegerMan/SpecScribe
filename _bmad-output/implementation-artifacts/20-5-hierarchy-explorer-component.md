@@ -4,7 +4,7 @@ baseline_commit: 92fa58149253105a08dc458cfed05a95a989229b
 
 # Story 20.5: The Hierarchy Explorer Component — One Datasource, One Selector, One Mode Contract
 
-Status: review
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -217,7 +217,7 @@ The 20.4 spike found four defects between the shipped 20.2 island and Plotly's h
 - [x] 8.2 Verify, in the browser, with evidence recorded in the Debug Log: the chart renders; **un-drafted stories are typically sized and clickable, not hairlines** (AC#4 — this is a *visual* assertion, measure a sector's real sweep); the selector switches shape in place; drill-in / breadcrumb / drill-up / Escape work; the hash round-trips and Back behaves; the rail follows the selection; **zero console errors**; and the ten-step survival predicate from 5.5 holds.
 - [x] 8.3 **Tab through the whole panel** and confirm there is no phantom tab stop on the hidden SVG (4.3). This is the specific defect class the suite cannot see.
 - [x] 8.4 **Colorway audit over computed styles, not config.** Build the allowlist at runtime from the shipped `.sb-*` cascade (never type a token value), resolve `url(#pattern)` fills to the colors inside their `<pattern>` defs, and confirm **zero foreign colors** including text fills. The spike's `window.__probe.audit()` in `spike/plotly/probe-src/explorer.js` is the working implementation of this audit — read it before writing your own.
-- [x] 8.5 **Take a screenshot.** The spike could not composite a frame and explicitly owes the owner a pixel view of this chart; D3 was chosen without one. If the pane again refuses to composite, say so and fall back to computed-geometry evidence — but try.
+- [ ] 8.5 **Take a screenshot.** The spike could not composite a frame and explicitly owes the owner a pixel view of this chart; D3 was chosen without one. If the pane again refuses to composite, say so and fall back to computed-geometry evidence — but try. **UNCHECKED at code review 2026-07-26:** the Dev Agent Record's own outcome for this subtask is "NOT obtained, and it is still owed" after four attempts. The prose was honest; the checkbox contradicted it. It stays open until a pixel exists.
 - [x] 8.6 **`file://` run — owed by the spike, cheap here.** Open the generated `index.html` directly from disk with networking disabled and confirm the chart renders and makes zero requests. Structural evidence is strong (zero `fetch`, zero ESM imports, zero external origins) but the run itself has never happened.
 - [x] 8.7 **Golden fingerprint WILL move** (dashboard markup changes; the fixture has epics, so it gains the island, the twin, and the bundle). Regenerate, **confirm the hash is stable across two repeated runs**, and name **whose concurrent changes it sits on top of** (CLAUDE.md § Concurrent work). **Note for 20.6:** `FingerprintTree` (`SiteGeneratorAdapterTests.cs:1003`) `File.ReadAllText`s *every* file in the output tree, so the 1.2 MB minified bundle now flows through `NormalizeVolatile`'s regexes and into the hash. Recommend folding vendored assets to a `<vendored asset: name, N bytes>` token; 20.6 owns the broader replacement, but record the cost either way.
 - [x] 8.8 Run the full suite and report the real numbers. Two git-fixture tests are known to flake under parallel load (a different one each run, green in isolation, pre-existing and unclaimed) — distinguish them from anything you caused.
@@ -226,7 +226,88 @@ The 20.4 spike found four defects between the shipped 20.2 island and Plotly's h
 
 ### Review Findings
 
-*(populated by code-review at epic end — Epic 20's review runs once every story is complete and the owner is satisfied)*
+*Code review 2026-07-26. Three parallel adversarial layers (Blind Hunter, Edge Case Hunter, Acceptance Auditor),
+each run blind to the others. **Scoped by this story's File List and declared symbols, never by a commit range** —
+the range `92fa581..261b300` bundles Stories 20.7, 22.2, 23.2, 18.1, 18.2, 5.3 and a concurrent Design System page,
+all excluded. Two files were reviewed that the File List omits (see `[Review][Patch] Dev Agent Record`), because the
+diff attributes them to this story in its own comments: `RelatedWorkCards.cs` and `SunburstExplorer.cs`.
+Every finding below was re-verified against the live source before rating; hunter-assigned severities were discarded.*
+
+**Decisions needed (2) — both resolved by the owner 2026-07-26, now patches**
+
+- [x] [Review][Decision→Patch] **RESOLVED: the component owns its legend, patched in this story.** Give the component its own `.ss-hierarchy-legend`, sourced from the same `StatusStyles` / `Charts.SunburstLocalStatusLabel` path the twin and accessible names already use, so chart, twin and legend cannot disagree. It must describe the channel actually on screen — `marker.pattern.shape` hatching, not stroke-dash — and account for the no-plan fill collision and the synthesized root's colour. This satisfies AC#1 as written and removes the landmine from Story 20.7's path instead of handing it one. Detail of the original finding follows.
+- [x] [Review][Decision→Patch] **RESOLVED: cap cards, not entries.** `RelatedWork.MaxEntriesPerGroup` stays at 12. Instead, bound what the rail *renders visibly* so the JS-off stack stops being a full project dump. **Constraint that shapes the fix:** select mode forbids a fetch (`file://`-safe, AC#1), so every selectable node's card must stay in the DOM — the cap must therefore be on visible height, not on card existence. Implementation assumption, stated rather than assumed away: keep every card in the DOM, and in the no-`[data-related-ready]` view show the top-level scope cards (epics + orphan/unplanned roots + the project card) expanded, with each epic's story cards nested inside a collapsed `<details>`. Nothing becomes unreachable, ADR 0013's availability contract holds, and the stacked page becomes navigable instead of tens of thousands of pixels tall. Detail of the original finding follows.
+
+**Original decision detail (retained for the record)**
+
+- [ ] [Review][Decision] **The mounted chart has no legend of its own, and the legend on screen describes the other chart.** AC#1 requires the component to supply "one Story 10.2 framing block (**legend** + analysis window + framing sentence), so no call site hand-writes any of them." It does not. `Charts.Framed` (`Charts.cs:165`) has no legend slot at all — `ChartMeta` is `Title/Window/Ranking/Why/Note` — and the only legend on the panel comes from `Charts.SunburstLegend`, emitted at `Charts.cs:614` **inside `Charts.Sunburst`**, i.e. inside `RetainedSunburstHtml`, the D1 fallback Story 20.7 deletes. Today D1 masks this completely; at 20.7 the dashboard loses its legend outright. Three consequences are already visible on the live page: (a) the retained legend's swatches encode fill + **stroke-dash**, but Plotly's non-colour channel is `marker.pattern.shape` hatching (`specscribe.js` `PATTERN_SHAPE`) — nothing on the page tells a reader what a hatch means (UX-DR17); (b) `fillFor()` falls back to `stroke` for a transparent fill, and `.sb-noplan` is `fill:transparent; stroke:var(--status-pending)` (`specscribe.css:3143`), so a no-plan sector is painted **byte-identical to pending** while its legend swatch is a pale hatched transparent chip — the legend↔chart correspondence is broken (the pattern still keeps it from being colour-alone); (c) the synthesized root carries `statusClass "unrecognized"` (`HierarchyExplorer.cs:201`), a colour `BuildSunburstLegendItems` never lists. **The decision:** does the legend become the component's (a `Charts.Framed` legend slot, or component-local `.ss-hierarchy-legend` markup that knows about hatch), or is this handed to 20.6's twin audit / 20.7's rollout — and does the ratified ADR 0012 §2 need amending either way?
+- [ ] [Review][Decision] **The JS-off rail now stacks ~190 cards — open question #3 is no longer theoretical.** The single-card view is CSS-gated on `[data-related-ready]` (`specscribe.css:432-435`), which only `specscribe.js` sets. With JS off, before the script runs, or when the engine is blocked, every card renders stacked in a 320px column. Round 2 removed the story→epic fold and gave every selectable node a card; round 3's `expandDenseEpics` added 66 more nodes. The story's own numbers: the rail is **416,433 B — 45.7% of a 910,383 B dashboard** across **179 cards** (was 101,435 B / 21.5% / ~30 cards before this story). The lever is `RelatedWork.MaxEntriesPerGroup` (currently 12) and Story 20.3's record says explicitly it is the owner's to pull. **The decision:** pull the lever (and to what), cap cards per rail, or accept the size as the cost of select mode.
+
+**Patches (13)**
+
+- [x] [Review][Patch] Missing `[hidden]` override lets the shape selector render live with JS off [`src/SpecScribe/assets/specscribe.css:301`] — `.ss-hierarchy-controls { display: flex; … }` beats the UA `[hidden] { display: none }` rule (author CSS always wins that tie), and no companion override exists. Task 3.2 requires the opposite in as many words. Every JS-off, webview, SPA and engine-blocked reader sees a live-looking "Sunburst | Treemap" tab bar that does nothing. **This codebase has fixed this identical bug six times** and each fix is an explicit override with a comment saying why — `:4413` `.risk-grid-item[hidden]`, `:6222` `.ownership-controls[hidden]`, `:6329` `.ownership-legend[hidden]`, `:4251`, `:4300`, `:6150`. `.ss-hierarchy-drill` is safe (no `display` rule of its own); only the controls are affected. Fix: add `.ss-hierarchy-controls[hidden] { display: none; }`.
+- [x] [Review][Patch] Treemap tiles print the raw layout weight — the number the owner rejected [`src/SpecScribe/assets/specscribe.js:1940`] — `t.textinfo = cfg.labels ? "label+value" : "none"`. Round 2 point 5 removed "weight" from the tooltip, the accessible name and the twin, and added `RenderedSurfaces_NeverShowTheWordWeightToAReader`. Switching to Treemap puts the bare layout integer on **every tile** — a more prominent placement than the one it was removed from. The guard test does not cover the trace config. Fix: `"label"`.
+- [x] [Review][Patch] The retained `.sunburst-hint` survives takeover and now states four things that are false about the chart in front of the reader [`src/SpecScribe/Charts.cs:769,781`; suppression missing in `specscribe.js` takeover and `specscribe.css:242-249`] — the JS hides only `svg.sunburst` and the boot CSS suppresses only `svg.sunburst`, but `BuildSunburstHint` renders `.sunburst-hint` **outside** the `<svg>` (appended at `Charts.cs:616`) and the hierarchy block never touches it. Live beside the Plotly chart it says: *"Click any segment to open it"* (contradicts `select` mode and the AC#3 grammar — a leaf selects, a parent drills); *"Epics with many stories collapse to one summary wedge"* (false since round 3's `expandDenseEpics: true`); *"Inner ring: epics (stories + follow-up peers)"* (contradicts D2 — epic value is Σ **drawn children**, which is why epic-1 reads 50 not 42); *"Orange = open; green = done"* (colour-only phrasing, UX-DR17). This is the same phantom/misdescribing-text class Stories 10.7 and 21.1 each closed, and that 20.2's own review closed for the legend. Fix: hide it on takeover exactly as the SVG is, and restore it on the failure path.
+- [x] [Review][Patch] Probe host and two window listeners leak on every SPA content swap [`src/SpecScribe/assets/specscribe.js:1794-1797,2354-2355`] — all three review layers found this independently. The purge loop (`:1713-1718`) calls `Plotly.purge` and nothing else, so each `specscribe:content-swapped` leaves behind one orphaned `probeHost` `<div>` plus `hashchange` and `popstate` listeners that close over the whole `NODES` payload. Task 4.11 names this exact failure ("leaks one per swap") and it was only half-fixed. Fix: store a cleanup closure on the root and call it beside `Plotly.purge`.
+- [x] [Review][Patch] A throw after `newPlot` succeeds leaves the panel both mounted and failed, unpurged and permanently un-reinitable [`src/SpecScribe/assets/specscribe.js:1731-1736`, `:2303-2311`] — `initHierarchyExplorer` handles a **synchronous** `newPlot` throw correctly. But `data-hierarchy-ready` is set at `:2303` and anything that throws afterwards (`root.on`, the controls loop, `applyState`) lands in the outer catch, which sets `data-hierarchy-failed` and stops: `data-hierarchy-ready` stays set (so re-init skips this root forever), the root was never pushed to `hierarchyMounts` (so it is never purged on a later swap), and the CSS re-shows `svg.sunburst` **while the Plotly chart is already mounted** — two charts stacked. Separately, `Plotly.newPlot` returns a promise, so an **async** rejection bypasses the try/catch entirely and the component reports a successful mount over an empty panel. Fix: in the catch, remove `data-hierarchy-ready` and purge; add a `.catch()` on `newPlot`.
+- [x] [Review][Patch] The drawn selection ring and `state.selected` can disagree, and activating the root is a silent no-op [`src/SpecScribe/assets/specscribe.js:2106-2139`] — two paths. (a) `drillTo` never clears `state.selected`, so Escape / a crumb click / a hashchange leaves the 4px ring painted on a sector while the rail has already fallen back to the project card. (b) `activate(ROOT_ID)` at top level: `id === state.level` is false (level is `null`, id is `__project__`), `hasChildren` is true, so it clears `state.selected` and calls `drillTo(ROOT_ID)` — which normalizes the id to `null`, finds it equal to the current level, and returns early **without redrawing**. Net: the selection state is cleared, the ring stays drawn, nothing is announced, and the first keyboard-reachable sector appears dead. Fix: clear `state.selected` inside `drillTo`; announce on the root no-op.
+- [x] [Review][Patch] `_pendingAssetEvents` is unbounded and replays stale errors into a later run [`src/SpecScribe/SiteGenerator.cs:3267-3303`] — appended at `:3303`, drained only from `GenerateAll` (`:456`). `EnsureHierarchyEngine` is reached from `WriteIndex`, which every incremental path calls (`GenerateOne`, `RemoveFor`, `RegenerateEpics`, `RegenerateAdrs`). A persistent copy failure in a watch session (locked output root, read-only disk) appends one record per debounced save, forever, and the next full `generate` emits all of them onto its diagnostics page as though they happened in that run. Fix: dedupe by path, or drain on the incremental paths too.
+- [x] [Review][Patch] `panelAttributes` defaults to `""`, so a 20.7 call site silently loses flash suppression and failure recording [`src/SpecScribe/HierarchyExplorer.cs:306`] — all four boot rules are scoped to `[data-explorer]` (`specscribe.css:232,242,246-248`) and both the decline and catch branches resolve the panel with `root.closest("[data-explorer]")` (`specscribe.js:1728,1734`). A call site that renders the component without ` data-explorer` gets no anti-flash handshake and, on a declined or failed mount, `closest` returns `null` so **nothing records the failure**. This is a latent trap in the one component the whole epic exists to make hard to misuse. Fix: mark failure on the resolved panel using the `|| root.parentNode` fallback the mount path already computes (`:1752`), and key the boot CSS on the host rather than the opt-in hook.
+- [x] [Review][Patch] The chart host is pinned to 560px tall on every viewport [`src/SpecScribe/assets/specscribe.js:2301`] — `root.style.height = (cfg.size || 380) + "px"` with no height in `.ss-hierarchy[data-hierarchy-ready]` (`specscribe.css:224`). `responsive: true` adjusts width only. On a 375px phone the sunburst is drawn at ~375px diameter inside a 375×560 box, leaving ~185px of dead canvas; the treemap is stretched to an aspect it was not sized for. Round 3's `.explorer-layout-labelled` breakpoint fixed the **rail** stacking, not the chart's own box.
+- [x] [Review][Patch] A tooltip left showing when a redraw replaces its sector never hides [`src/SpecScribe/assets/specscribe.js:2289`] — `redraw()` is `Plotly.react`, which replaces every `path.surface`. The shared tooltip hides on delegated `mouseout` (`:116-123`), which never fires for a node removed from the document. `focusout` and `scroll` cover the keyboard and scroll paths, so this is the mouse-drill case only. Fix: `hideTip()` before `redraw()`.
+- [x] [Review][Patch] `IsRestatedContainsGroup`'s doc comment names a caller that no longer exists [`src/SpecScribe/RelatedWork.cs:253-258`] — it says the rule is used "both when a node owns its own section (here) and when `RelatedWorkCards` folds a story's groups into its epic card." Round 2 deleted that fold; `grep` confirms the only remaining uses are `RelatedWork.cs:209` and the declaration. A doc describing a design that was removed is the precise failure this project recorded in the Story 7.11/7.12 joint review.
+- [x] [Review][Patch] **Dev Agent Record and File List corrections (6).** (1) The File List omits **`src/SpecScribe/RelatedWorkCards.cs`** (+88/−52) — the largest behavioural change in the diff (story cards, `SynthesizeNode`, removal of the story→epic fold), explicitly commented `[Story 20.5, owner-directed 2026-07-25]`. Under CLAUDE.md's File-List scoping rule it would have been invisible to this review. (2) It also omits **`src/SpecScribe/SunburstExplorer.cs`** (+24, round 3's `expandDenseEpics`), listed only as "READ, extend carefully" in Dev Notes. (3) "`HierarchyExplorerTests.cs` — 19 tests" — the actual count is **25**. (4) "*Not this story's:* `epics.md`" contradicts round 2's own "recorded in `epics.md` in the same change"; `epics.md` **was** amended (the Story 20.8 early-delivery block). (5) Task 8.5 is checked `[x]` while its recorded outcome is "NOT obtained, and it is still owed" — the prose is honest, the checkbox is not. (6) Round 2's "Guarded by a test that fails if the word reaches a rendered surface" overstates `RenderedSurfaces_NeverShowTheWordWeightToAReader` (`HierarchyExplorerTests.cs:366`), which asserts only over `TextTwinHtml` and `HierarchyNode.Detail` — the treemap finding above is exactly the surface it does not cover. Also: the `SiteGeneratorEpicsRemovalTests` change swapped the driven document, not only the assertion message.
+- [x] [Review][Patch] `WriteTextWithRetry` claims parity with `CopyEmbeddedAsset` it does not have, and guards only one of five write sites [`src/SpecScribe/SiteGenerator.cs:4439-4454`] — **routed to this review by the Story 23.2 code review**, which found it annotated `[Story 20.5 owner round]` and absent from 23.2's File List; re-verified here. Three parts. (a) Its doc says it uses "the same brief transient-contention retry `CopyEmbeddedAsset` uses", but `CopyEmbeddedAsset` writes to `dest + ".tmp"` and then `File.Move(tempDest, dest, overwrite: true)` (`:4380,4392`) — an atomic swap a Story 5.3 review-fix added precisely so a failure can never leave a corrupt file. `WriteTextWithRetry` calls bare `File.WriteAllText` (`:4445`), which truncates first, so a sharing violation *mid-write* on the final attempt leaves a truncated `index.html` — the one file the doc calls the most-rewritten in a watch session. (b) The `IOException or UnauthorizedAccessException` filter draws no transient/permanent distinction, so a genuinely read-only target burns all four attempts before throwing (the 23.2 review's stronger claim that this "destroys the previously-good page" does not hold — a read-only file throws on open, before truncation). (c) Only `WriteIndex` (`:3228`) was converted. `WriteOutput` (`:3022`), `:3205`, and the four epics/story writes (`:2571-2605`) still call bare `File.WriteAllText`, so the contention race the retry exists for is unguarded on every page except `index.html` — including the concurrent Design System page.
+- [x] [Review][Patch] `expandDenseEpics` is a product decision recorded in only one artifact [`src/SpecScribe/SunburstExplorer.cs`, `_bmad-output/planning-artifacts/epics.md`] — round 3 makes the component's node set deliberately diverge from the SVG's. It is honestly implemented (`default false` preserves `Projector_NodeSet_EqualsTheWedgesTheSvgDrew`) and reconciled by a real test, but it appears in neither `epics.md` nor `sprint-status.yaml`. CLAUDE.md § Decision records: a decision like this must not live only in the story file.
+
+**All 16 patches applied and verified live — 2026-07-26**
+
+Suite after: **2433 passed / 3 skipped / 1 failed**, the single failure being the golden fingerprint (below).
+Five new guard tests were added so these regressions cannot silently return, since the suite could see none of
+them: `Stylesheet_KeepsTheHiddenShapeSelectorActuallyHidden`, `Stylesheet_BootRulesAreNotKeyedOnTheOptInExplorerHook`,
+`Stylesheet_HasTheComponentsOwnLegend_WithHatchedNonLifecycleSwatches`, `Script_NeverDrawsTheLayoutNumberOnAChartSector`,
+and three `Legend_*` cases in `HierarchyExplorerTests`.
+
+**Live-browser evidence** (`specscribe-output-review`, port 8097, over a real 411-page `--output SpecScribeOutput`
+run, 0 errors). Measured, not inferred:
+
+- **Legend (AC #1)** — server-rendered, **10 entries + the hatch note**, present in a genuinely script-blocked
+  sandbox iframe. The no-plan collision is gone: chart fill `rgb(232,213,176)` vs pending `rgb(184,178,168)`, and
+  the legend swatch background is **byte-identical to the chart fill**. Colorway audit re-run with the allowlist
+  built at runtime from the `.sb-*` cascade: **zero foreign colours**, 73 patterned sectors.
+- **Inert selector (JS off)** — `computed display: none`. Before the patch it was `flex`.
+- **The misdescribing hint** — `display: none` once mounted; still **visible with JS off**, which is correct, since
+  there the SVG it describes *is* the page.
+- **JS-off rail** — page height **45,695 px → 9,710 px** (rail 43,230 → 7,244, −83%). All **187 cards remain in the
+  DOM** and 160 are reachable through the disclosure, so availability is preserved (ADR 0013) rather than traded away.
+- **Treemap** — 212 tiles, **0 bare layout numbers** drawn.
+- **Height cap** — at a 375 px viewport, dead canvas **280 px → 0** with the a11y layer surviving the re-render.
+- **Selection/scope agreement** — drilled to `epic-20`, selected Story 20.1 (ring 1, rail on the story); Escape →
+  scope `null`, hash cleared, **ring 0**, rail back to the project default. Previously the ring survived.
+- **Tooltip** — shown before a redraw, `hidden` after it.
+- **Survival predicate after all of the above** — 212 sectors, 212 `role="treeitem"`, 212 non-empty `aria-label`,
+  exactly **one** `tabindex="0"`, **zero** window errors.
+
+**Two things remain owed, and neither is glossed:**
+
+1. **The golden fingerprint is NOT re-baselined, deliberately — and the test is red.** The regenerated value is
+   `dde7d0778e95cc6a60d345a2209cca616c19b456962538f39a7ca6629bdf150e`, **confirmed stable across two repeated runs**.
+   It is not committed, for exactly the reason round 3 gave and which is now stronger: this tree carries a large
+   amount of another session's in-flight uncommitted work (ADR 0016, Story 23.3, Story 25.2, Story 20.9,
+   `CanonicalIrSerializationTests`, SPA and settings changes). Baking that into the constant would capture someone
+   else's unfinished tree. **It needs re-capturing on a clean tree, and Story 25.1's cross-environment check re-run.**
+2. **Task 8.5's screenshot is still owed.** Two further attempts this session; the Browser pane still refuses to
+   composite frames. The checkbox has been un-ticked to match the prose. **The owner has still never seen a pixel of
+   this chart.** Everything above is computed-style and computed-geometry evidence over the live DOM.
+
+**Deferred (2)**
+
+- [x] [Review][Defer] Story 3.5's pure-CSS legend hover-emphasis is dead on the mounted chart [`src/SpecScribe/assets/specscribe.css:3230-3249`] — deferred, structural and already known. The rules are `.sunburst-panel:has(.sb-<status>-item:hover) .sb-seg:not(.sb-<status>)`, and `.sb-seg` exists only inside the SVG the component hides; Plotly draws `g.slice path.surface` and the a11y layer adds only `ss-hierarchy-sector`. This is recorded in project memory as dying at 20.7 regardless of what this story does. **However**, the comment in `DashboardViewBuilder.BuildHierarchyExplorerHtml` claims keeping `.sunburst-panel` preserves the behaviour — it preserves a selector whose subject is hidden, and should say so.
+- [x] [Review][Defer] Epic cards lose their stories' relationships in the engine-blocked-but-JS-on path [`src/SpecScribe/RelatedWorkCards.cs:71-112`] — deferred, exists only while both implementations coexist. With Plotly blocked but `specscribe.js` running, 20.2 drives the rail and its SVG **navigates** on a story click rather than selecting, so the new story cards are unreachable — while the epic card no longer carries the folded story subjects it used to. Nothing is lost with JS fully off (all cards stack). The path disappears when 20.7 deletes 20.2's block.
+
+**Dismissed as noise (2)** — the boot/mounted/failed CSS rules tie on specificity with the suppression rule rather than out-specifying it, but source order resolves them correctly and the comment's claim is harmless; and story cards retaining their own "Part of → Epic N" group is correct on a standalone card (only the stale doc comment survives, as a patch above).
+
+**Verified clean — what the layers checked and found sound.** AC#2 (`navigate` follows `href`, `select` publishes and does not navigate, announced through `aria-live`); AC#3 (Plotly's drill cancelled by `return false`, exactly one action per activation, hash round-trip, hostile-hash safe, other fragment pairs preserved, SPA `replaceState` with the router's real keys, reduced motion by construction); AC#4 (leaf weights taken straight from `SunburstExplorerNodes`, `RollUpParentValues` provably rewrites only nodes with children); all four blocking data-contract findings A–D fixed **and asserted**, with `branchvalues:"total"` genuinely matching a parent-inclusive payload; D1's handshake including **both** halves of the phantom-tab-stop fix (`display:none` + `aria-hidden` + `tabindex="-1"` on every `svg.sunburst a`); D4 — `WebviewRenderAdapter.cs` genuinely untouched, its last commit an ancestor of the baseline; all nine seams adopted and none re-minted; anti-patterns 1–12 none committed; nothing forbidden retired (three arc renderers, seven `Charts.cs` entry points, `SunburstCompanionList` and the 20.3 rail all still standing); privacy/offline guards green. Story 20.8 AC#1 landing here is **sanctioned**, not a scope violation — the owner directed it and `epics.md:3531-3543` records it.
 
 ---
 
@@ -523,7 +604,8 @@ the twin is a second reading rather than the only one. Worth revisiting in 20.6 
   A/B/C), the framed scaffold, the island, the text twin
 - `src/SpecScribe/assets/plotly-hierarchy.min.js` — vendored plotly.js 3.7.0 custom bundle (1,223,515 B)
 - `tools/plotly-vendor/{README.md,package.json,.gitignore,build.mjs}` — the hand-run vendoring tool + supply-chain record
-- `tests/SpecScribe.Tests/HierarchyExplorerTests.cs` — 19 tests
+- `tests/SpecScribe.Tests/HierarchyExplorerTests.cs` — 25 tests *(corrected at code review 2026-07-26; the record
+  said 19, which was the count before the round-2 and round-3 additions)*
 
 **Modified**
 - `src/SpecScribe/Charts.cs` — `SunburstLocalStatusLabel` (one source for the four chart-local status words, now
@@ -545,12 +627,37 @@ the twin is a second reading rather than the only one. Worth revisiting in 20.6 
 - `tests/SpecScribe.Tests/SiteGeneratorEpicsRemovalTests.cs` — named symmetric-difference failure message
 - `.claude/launch.json` — removed the four `plotly-csp-*` spike entries
 
+**Modified — added at code review 2026-07-26 (were missing from this list)**
+- `src/SpecScribe/RelatedWorkCards.cs` — **the largest behavioural change in the story** and absent from the File
+  List until the review found it: round 2's card-per-selectable-node, `SynthesizeNode`, and the removal of the
+  story→epic subject fold. Its own comments attribute it `[Story 20.5, owner-directed 2026-07-25]`. Under
+  CLAUDE.md's File-List scoping rule, a review scoped as instructed would never have seen it.
+- `src/SpecScribe/SunburstExplorer.cs` — round 3's `expandDenseEpics` parameter (listed in Dev Notes only as
+  "READ, extend carefully")
+
+**Modified — by the code review itself (2026-07-26)**
+- `src/SpecScribe/HierarchyExplorer.cs` — `LegendHtml`: the component's own legend (AC #1)
+- `src/SpecScribe/RelatedWorkTemplater.cs` — story-tier cards behind one disclosure, so the JS-off rail stops
+  stacking 179 cards
+- `src/SpecScribe/RelatedWork.cs` — corrected the `IsRestatedContainsGroup` doc, which named a caller round 2 deleted
+- `src/SpecScribe/SiteGenerator.cs` — `_pendingAssetEvents` deduped by path; `WriteTextWithRetry` given the
+  temp-file + atomic-`File.Move` half its doc already claimed
+- `src/SpecScribe/assets/specscribe.js` — treemap label fix, selection/ring divergence, root no-op, tooltip
+  invalidation, leak cleanup, async-rejection exit, panel-resolution fallback, no-plan fill probe, height cap
+- `src/SpecScribe/assets/specscribe.css` — `[hidden]` override, component legend + swatch hatches, boot rules
+  re-keyed off `[data-explorer]`, story-disclosure rules
+
 **Deleted**
 - `spike/plotly/**` (Task 1.6 — the durable outputs are `20-4-spike-report.md` and the ADR 0012 addendum)
 
-*Not this story's:* `epics.md`, `Commands.cs`, `ConsoleUi.cs`, `SettingsResolver.cs`, `SettingsStore.cs`,
+*Not this story's:* `Commands.cs`, `ConsoleUi.cs`, `SettingsResolver.cs`, `SettingsStore.cs`,
 `HowToReadTemplater.cs`, `docs/adrs/0014-*` and their tests are a concurrent session's Story 5.2 / ADR 0014 work,
 present in this tree but not touched here.
+
+*Correction (code review 2026-07-26):* `epics.md` **was** removed from that list, because it is not accurate —
+this story amended it twice. Round 2 recorded Story 20.8 AC #1's early delivery there (`epics.md:3531-3543`), and
+the review added the round-3 `expandDenseEpics` decision. The "not this story's" line and round 2's own "recorded
+in `epics.md` in the same change" directly contradicted each other.
 
 ---
 

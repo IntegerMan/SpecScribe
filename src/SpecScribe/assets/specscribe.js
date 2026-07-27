@@ -1713,6 +1713,10 @@
     for (var i = hierarchyMounts.length - 1; i >= 0; i--) {
       if (!document.contains(hierarchyMounts[i])) {
         try { if (window.Plotly && Plotly.purge) Plotly.purge(hierarchyMounts[i]); } catch (e) { /* already gone */ }
+        // Plotly.purge releases Plotly's OWN listener; the probe host and this instance's window listeners are ours
+        // to release, and they retain the whole node payload until we do. [Story 20.5 review]
+        var cleanup = hierarchyMounts[i].__ssHierarchyCleanup;
+        if (typeof cleanup === "function") { try { cleanup(); } catch (e) { /* best effort */ } }
         hierarchyMounts.splice(i, 1);
       }
     }
@@ -1725,14 +1729,37 @@
         } else {
           // Declined rather than threw (no engine, no island) — same outcome for the reader, so release the
           // placeholder immediately and let the server SVG be the page.
-          var declined = root.closest("[data-explorer]");
-          if (declined) declined.setAttribute("data-hierarchy-failed", "1");
+          //
+          // `|| root.parentNode` matters: `data-explorer` is an OPT-IN hook the dashboard call site happens to pass
+          // via `panelAttributes`, which defaults to "". A Story 20.7 call site that omits it got `closest(...)` ===
+          // null here, so nothing recorded the failure at all and the boot placeholder sat there until the inline
+          // script's 5 s expiry. The mount path already resolves its panel with exactly this fallback. [20.5 review]
+          var declined = root.closest("[data-explorer]") || root.parentNode;
+          if (declined && declined.setAttribute) declined.setAttribute("data-hierarchy-failed", "1");
         }
       } catch (err) {
         // Degrade to the untouched server chart, and do it NOW rather than leaving the visitor watching a
         // placeholder until the inline script's timer expires. Per root, so one bad instance cannot down the page.
-        var failed = root.closest("[data-explorer]");
-        if (failed) failed.setAttribute("data-hierarchy-failed", "1");
+        //
+        // A throw can land here AFTER Plotly.newPlot has already succeeded — `data-hierarchy-ready` is set before
+        // plotting, and `root.on`, the controls loop and applyState all run after it. Marking the panel failed and
+        // stopping there left the reader with BOTH charts (the CSS re-shows svg.sunburst while the Plotly chart is
+        // still mounted), the instance absent from `hierarchyMounts` so it was never purged on a later swap, and
+        // `data-hierarchy-ready` still set so re-init skipped this root forever. Unwind properly instead.
+        // [Story 20.5 review]
+        try { if (window.Plotly && Plotly.purge) Plotly.purge(root); } catch (e) { /* nothing plotted */ }
+        root.removeAttribute("data-hierarchy-ready");
+        root.style.height = "";
+        var restore = root.__ssHierarchyRestore;
+        if (typeof restore === "function") { try { restore(); } catch (e) { /* best effort */ } }
+        var cleanup = root.__ssHierarchyCleanup;
+        if (typeof cleanup === "function") { try { cleanup(); } catch (e) { /* best effort */ } }
+        var failed = root.closest("[data-explorer]") || root.parentNode;
+        if (failed && failed.setAttribute) {
+          failed.removeAttribute("data-explorer-ready");
+          failed.removeAttribute("data-hierarchy-mounted");
+          failed.setAttribute("data-hierarchy-failed", "1");
+        }
       }
     });
   }
@@ -1799,7 +1826,10 @@
     function tokenFor(cls) {
       if (tokenCache[cls]) return tokenCache[cls];
       var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      svg.setAttribute("class", "sunburst");
+      // `ss-hierarchy-probe` lets the stylesheet give this component a chart fill where the SVG's own rule is
+      // `fill: transparent` — today that is `.sb-noplan`, which is drawn as a dashed OUTLINE in the SVG and so had
+      // no fill to resolve. Still the live cascade, still no token typed in this file. [Story 20.5 review]
+      svg.setAttribute("class", "sunburst ss-hierarchy-probe");
       var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
       path.setAttribute("class", "sb-seg " + cls);
       svg.appendChild(path);
@@ -1811,8 +1841,12 @@
     function fillFor(statusClass) {
       var t = tokenFor(STATUS_CLASS[statusClass] || "sb-unrecognized");
       var f = t.fill;
-      // `.sb-noplan` is fill:transparent in the shipped chart, and Plotly needs a real paint per sector — so fall
-      // back to the token that rule uses for its STROKE. Still a shipped token, still no literal.
+      // Last-resort fallback for a status whose shipped rule paints no fill at all. It is deliberately NOT how
+      // no-plan is resolved any more: falling back to the STROKE token gave `.sb-noplan` the value of
+      // `--status-pending`, so a no-plan sector came out byte-identical to a Pending one while the legend showed a
+      // pale hatched chip — the correspondence was simply broken. `.ss-hierarchy-probe .sb-noplan` in the
+      // stylesheet now gives it a real chart fill, so this branch is reached only by a status nobody has styled.
+      // [Story 20.5 review]
       if (!f || f === "none" || f === "transparent" || f === "rgba(0, 0, 0, 0)") return t.stroke;
       return f;
     }
@@ -1937,7 +1971,11 @@
         t.textinfo = cfg.labels ? "label" : "none";
         t.insidetextorientation = "radial";
       } else {
-        t.textinfo = cfg.labels ? "label+value" : "none";
+        // `label` only — NEVER `label+value`. `value` is the layout number Plotly sizes sectors by, and the owner's
+        // verify round called it "a confusing value ... not helpful or intuitive for the reader" and had it removed
+        // from the tooltip, the accessible name and the text twin. `label+value` put it straight back, printed on
+        // every tile — a strictly MORE prominent placement than the one it was removed from. [Story 20.5 review]
+        t.textinfo = cfg.labels ? "label" : "none";
       }
       if (state.level) t.level = state.level;
       return t;
@@ -2107,7 +2145,12 @@
       var n = id ? byId[id] : null;
       if (!n) return;
       if (id === state.level) { drillUp(); return; }
-      if (hasChildren(id)) { state.selected = null; drillTo(id, true); return; }
+      // The synthesized root at top level is already the whole view: `drillTo` normalizes its id to `null`, finds
+      // that equal to the current level and returns early. Without this branch that path cleared `state.selected`
+      // without redrawing (leaving a ring painted on a sector nothing had selected) and announced nothing at all,
+      // so the first keyboard-reachable sector read as dead. [Story 20.5 review]
+      if (id === ROOT_ID && !state.level) { announce("Already showing the whole project."); return; }
+      if (hasChildren(id)) { drillTo(id, true); return; }
       if (selectMode) {
         // A selection is a THIRD state, distinct from focus and from the drill scope: the owner's verify round
         // showed a picked leaf reading as nothing at all. Paint it, announce it, and publish it for the rail.
@@ -2133,6 +2176,11 @@
       if (id === ROOT_ID) id = null;
       if ((id || null) === state.level) return;
       state.level = id || null;
+      // Clearing the selection is part of CHANGING SCOPE, not of drilling in specifically. Doing it only on the
+      // drill-in branch of `activate` left Escape / a crumb click / a hashchange with the 4px ring still painted on
+      // a sector while the rail had already fallen back to the project card — chart and rail disagreeing about what
+      // is selected. One place, so every scope change agrees. [Story 20.5 review]
+      state.selected = null;
       redraw();
       applyState(pushHash);
       announce(state.level ? "Zoomed into " + byId[state.level].label : "Showing the whole project");
@@ -2286,7 +2334,14 @@
     }
 
     /* --- Render -------------------------------------------------------------------------------------------- */
-    function redraw() { return Plotly.react(root, [buildTrace()], layout(), CONFIG); }
+    // The shared tooltip hides on a DELEGATED `mouseout` (see the tooltip block at the top of this file), which can
+    // never fire for a node that no longer exists — and `Plotly.react` replaces every `path.surface` it draws. A
+    // pointer-driven drill therefore left the card pinned on screen describing a sector that had gone. `focusout`
+    // and `scroll` already cover the keyboard and scroll paths; this covers the mouse one. [Story 20.5 review]
+    function redraw() {
+      hideTip();
+      return Plotly.react(root, [buildTrace()], layout(), CONFIG);
+    }
 
     function applyState(pushHash) {
       renderCrumbs();
@@ -2298,12 +2353,38 @@
     // --- Mount. Reveal the host and give it its configured height first (never a literal in this file), plot,
     // and only then hide the server chart. If newPlot throws, the host is hidden again and the SVG is simply the
     // page — which is the whole reason the SVG is still there in this story.
-    root.style.height = (cfg.size || 380) + "px";
+    //
+    // The height is CAPPED to the host's own width rather than taken flat from config. `responsive: true` fits the
+    // WIDTH to the container and leaves the height exactly as set, so a flat `cfg.size` left a 375 px phone drawing
+    // a ~375 px sunburst inside a 375x560 box — ~185 px of dead canvas below it, and a treemap stretched to an
+    // aspect it was never sized for. Story 20.5's `.explorer-layout-labelled` breakpoint fixed the RAIL stacking,
+    // not the chart's own box. Never taller than configured; never taller than it is wide. [Story 20.5 review]
+    var configuredSize = cfg.size || 380;
+    function hostHeight() {
+      var w = root.clientWidth || configuredSize;
+      return Math.max(240, Math.min(configuredSize, w));
+    }
     root.style.maxWidth = "100%";
+    root.style.height = hostHeight() + "px";
     root.setAttribute("data-hierarchy-ready", "1");
     state.level = scopeFromHash();
+    // `Plotly.newPlot` returns a promise. A SYNCHRONOUS throw lands in the catch below; an ASYNCHRONOUS rejection
+    // would sail straight past it, leaving the component reporting a successful mount — and hiding the server SVG —
+    // over an empty panel. Both routes must reach the same failure exit. [Story 20.5 review]
+    function abandonMount() {
+      root.removeAttribute("data-hierarchy-ready");
+      root.style.height = "";
+      try { if (Plotly.purge) Plotly.purge(root); } catch (e2) { /* nothing plotted */ }
+      var panelEl = root.closest("[data-explorer]") || root.parentNode;
+      if (panelEl && panelEl.setAttribute) {
+        panelEl.removeAttribute("data-hierarchy-mounted");
+        panelEl.setAttribute("data-hierarchy-failed", "1");
+      }
+      restoreLegacySvg();
+    }
     try {
-      Plotly.newPlot(root, [buildTrace()], layout(), CONFIG);
+      var plotted = Plotly.newPlot(root, [buildTrace()], layout(), CONFIG);
+      if (plotted && typeof plotted.catch === "function") plotted.catch(abandonMount);
     } catch (e) {
       root.removeAttribute("data-hierarchy-ready");
       root.style.height = "";
@@ -2354,18 +2435,77 @@
     window.addEventListener("hashchange", onHistoryScope);
     window.addEventListener("popstate", onHistoryScope);
 
+    // `responsive: true` re-fits the WIDTH on resize and leaves the height exactly as set, so the cap has to be
+    // re-applied or a phone rotated to landscape keeps the portrait box. Debounced on the same 150 ms the ownership
+    // sunburst above uses. [Story 20.5 review]
+    var sizeTimer = null;
+    function onViewportResize() {
+      if (sizeTimer) clearTimeout(sizeTimer);
+      sizeTimer = setTimeout(function () {
+        if (!document.contains(root)) return;
+        var h = hostHeight() + "px";
+        if (root.style.height !== h) { root.style.height = h; try { Plotly.Plots.resize(root); } catch (e) { /* purged */ } }
+      }, 150);
+    }
+    window.addEventListener("resize", onViewportResize);
+
+    // Everything this instance attached OUTSIDE its own subtree, in one place. The purge loop calls it when the SPA
+    // detaches the host: `Plotly.purge` releases Plotly's own listener, but the probe host and these three window
+    // listeners are ours, and each closes over the whole NODES payload — so without this every content swap leaked
+    // one detached <div> and three live listeners retaining a ~190-node array. Task 4.11 names this exact failure
+    // ("leaks one per swap") and only the Plotly half of it had been done. [Story 20.5 review]
+    root.__ssHierarchyCleanup = function () {
+      window.removeEventListener("hashchange", onHistoryScope);
+      window.removeEventListener("popstate", onHistoryScope);
+      window.removeEventListener("resize", onViewportResize);
+      if (sizeTimer) clearTimeout(sizeTimer);
+      if (probeHost && probeHost.parentNode) probeHost.parentNode.removeChild(probeHost);
+    };
+    // Exposed for the same reason: the takeover hides the server SVG with an INLINE style, and no stylesheet rule
+    // can outrank that — so a caller unwinding a failed mount has to be able to undo it directly.
+    root.__ssHierarchyRestore = restoreLegacySvg;
+
     // --- The takeover. TWO parts, and the second is the one that has already bitten this epic: an SVG <a> at
     // display:none STAYS FOCUSABLE (unlike HTML), which is exactly how the Story 20.2 review's phantom tab stop
     // got in. The test suite structurally cannot see a stray tab stop, so both halves are done here and the tab
     // order is checked in a real browser.
-    var legacySvg = panel.querySelector("svg.sunburst");
-    if (legacySvg) {
-      legacySvg.style.display = "none";
-      legacySvg.setAttribute("aria-hidden", "true");
-      Array.prototype.forEach.call(legacySvg.querySelectorAll("a"), function (a) { a.setAttribute("tabindex", "-1"); });
+    //
+    // The `.sunburst-hint` goes with it. It is rendered OUTSIDE the <svg> (Charts.BuildSunburstHint, appended by
+    // Charts.Sunburst) so hiding the SVG never touched it, and left beside the Plotly chart it stated four things
+    // that are false about the chart the reader is looking at: "Click any segment to open it" (this component
+    // SELECTS a leaf and DRILLS a parent), "Epics with many stories collapse to one summary wedge" (untrue since
+    // `expandDenseEpics: true`), "Inner ring: epics (stories + follow-up peers)" (contradicts owner decision D2 —
+    // an epic's value is the sum of its DRAWN children, which is why epic-1 reads 50 and not 42), and "Orange =
+    // open; green = done" (colour-only phrasing, UX-DR17). Same phantom/misdescribing-text class Stories 10.7 and
+    // 21.1 each closed, and that the Story 20.2 review closed for the legend. [Story 20.5 review]
+    hideLegacyChart();
+
+    // The exact inverse, so a failure exit puts the server chart back the way it found it — including the tab stops
+    // and the hint. Declared (not assigned) so the async `newPlot` rejection path above can reach it.
+    function hideLegacyChart() {
+      var svgEl = panel.querySelector("svg.sunburst");
+      if (svgEl) {
+        svgEl.style.display = "none";
+        svgEl.setAttribute("aria-hidden", "true");
+        Array.prototype.forEach.call(svgEl.querySelectorAll("a"), function (a) { a.setAttribute("tabindex", "-1"); });
+      }
+      var hintEl = panel.querySelector(".sunburst-hint");
+      if (hintEl) hintEl.hidden = true;
+      var drillEl = panel.querySelector(".sb-explorer-drill");
+      if (drillEl) drillEl.hidden = true;
     }
-    var legacyDrill = panel.querySelector(".sb-explorer-drill");
-    if (legacyDrill) legacyDrill.hidden = true;
+
+    function restoreLegacySvg() {
+      var svgEl = panel.querySelector("svg.sunburst");
+      if (svgEl) {
+        svgEl.style.display = "";
+        svgEl.removeAttribute("aria-hidden");
+        Array.prototype.forEach.call(svgEl.querySelectorAll("a"), function (a) { a.removeAttribute("tabindex"); });
+      }
+      var hintEl = panel.querySelector(".sunburst-hint");
+      if (hintEl) hintEl.hidden = false;
+      panel.removeAttribute("data-explorer-ready");
+    }
     // The handshake: 20.2's own skip guard. Set LAST, and only here, so it can only ever mean "mounted".
     panel.setAttribute("data-explorer-ready", "1");
     // Ends the boot placeholder and disarms the inline script's expiry timer (which would otherwise un-hide the
@@ -2867,6 +3007,11 @@
       // Setting this attribute is what flips the rail from the JS-off "all cards" view to the single-card view —
       // it is the CSS hook, not just an init guard. [Story 20.3]
       pane.setAttribute("data-related-ready", "1");
+      // The story-tier disclosure exists for the JS-OFF reader (see RelatedWorkTemplater: 179 stacked cards
+      // otherwise). With JS on, every `[data-related-node]` card is display:none until it is the current one — but a
+      // CLOSED <details> would hide the current one too, so open it once here and let the CSS drop its summary.
+      // [Story 20.5 review]
+      Array.prototype.forEach.call(pane.querySelectorAll("details.related-work-more"), function (d) { d.open = true; });
       found = true;
     });
     // Sync a freshly-mounted rail to the scope the explorer is ALREADY in. The explorer block runs earlier in this

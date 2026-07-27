@@ -1849,7 +1849,12 @@ public static partial class Charts
     /// most-changed files rendered as proportional bars. Pure HTML/CSS + inline SVG (no JS), matching the other
     /// chart builders. When the bounded name-only git call came back empty but the rest of the pulse succeeded,
     /// the files section degrades to a graceful note rather than vanishing (partial data beats none; AD-4). The
-    /// whole-panel null case (no git at all) is the caller's `p.Git is {}` fallback. [Story 3.1 + consolidation]</summary>
+    /// whole-panel null case (no git at all) is the caller's `p.Git is {}` fallback. [Story 3.1 + consolidation]
+    /// <para><paramref name="today"/> is the run's ONE policy-resolved cutoff day (<see cref="ResolveToday"/>),
+    /// threaded in by the <see cref="SiteGenerator"/> — see the guard below. Omitting it falls back to the
+    /// machine-local day, same as <see cref="CommitHeatmap"/>, so library/test callers are unaffected; every
+    /// production call site threads the run's real value and must keep doing so, or this panel's linked day and
+    /// the heatmap it embeds can silently disagree with what was actually generated. [Story 5.5]</para></summary>
     public static string GitPulsePanel(GitPulse git, Func<string, string?>? fileHref = null, DateOnly? today = null)
     {
         // The exact last-commit clock, routed through the single PortalDates formatter (Story 10.4): 24-hour,

@@ -10,11 +10,15 @@ namespace SpecScribe;
 /// region shape the webview ships (<see cref="WebviewSurface"/>); the SPA difference is that it consolidates the
 /// WHOLE site, not the five dashboard/epics families. Rendering stays in C# (AC #1) — the client injects this
 /// string, it never re-renders or re-parses anything. [Story 6.7]</summary>
+/// <param name="MetaDescription">The page's <c>&lt;meta name="description"&gt;</c> text, for the IR's head
+/// projection (Story 22.2 AC #5). Optional: a page that carries none resolves to <see cref="Title"/> at emit,
+/// exactly as <see cref="PathUtil.RenderHeadOpen"/> already does for the static page.</param>
 public sealed record SpaPage(
     string OutputRelativePath,
     string Title,
     string ContentHtml,
-    IReadOnlyList<BreadcrumbCrumb> Breadcrumb);
+    IReadOnlyList<BreadcrumbCrumb> Breadcrumb,
+    string? MetaDescription = null);
 
 /// <summary>Everything the opt-in <c>--spa</c> delivery form needs to emit: the site title, the entry page (the
 /// dashboard, inlined into the client shell for instant first paint), the top nav graph (mirrors

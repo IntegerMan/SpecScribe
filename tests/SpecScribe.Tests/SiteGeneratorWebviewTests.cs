@@ -502,6 +502,70 @@ public class SiteGeneratorWebviewTests : IDisposable
         Assert.Contains("epics.html", keys);
     }
 
+    /// <summary>Story 22.2 AC #4, the webview half. <c>RenderWebviewSurfaces</c> built its dashboard through
+    /// <c>HtmlTemplater.BuildIndexPage</c> with named arguments starting at <c>counts:</c>, which silently skipped
+    /// the positional <c>codeItemHref</c> — and a null resolver makes <c>Charts.CodeItemLink</c> render the Git
+    /// Pulse top-changed-file labels as PLAIN TEXT instead of links (Story 23.1 measured 5 anchors lost on the SPA;
+    /// the webview omitted it identically). This pins the whole thing structurally rather than depending on the
+    /// fixture being a git repo: the webview dashboard's body must be the SAME bytes the static page wrote, so ANY
+    /// argument divergence at that call site fails here, not only this one.
+    /// <para>The one expected difference is the webview's own registered <c>data-island</c> exception — inline
+    /// <c>&lt;script type="application/json"&gt;</c> blocks it deliberately strips — so the static side is compared
+    /// with those removed. Nothing else is allowed to differ.</para></summary>
+    [Fact]
+    public void WebviewDashboardBody_IsByteIdenticalToTheStaticPage_ExceptTheStrippedDataIslands()
+    {
+        var gen = GeneratedSite();
+        var bundle = gen.RenderWebviewSurfaces();
+
+        var staticIndex = File.ReadAllText(Path.Combine(Site, "index.html"));
+        var webviewMain = MainBlock(bundle.Surfaces.Single(s => s.OutputRelativePath == "index.html").ContentHtml);
+        var staticMain = StripJsonIslands(MainBlock(staticIndex));
+
+        Assert.Equal(staticMain, webviewMain);
+        // Guard against a vacuous green: the fixture really does carry islands, so the strip above is load-bearing.
+        Assert.Contains("<script type=\"application/json\"", MainBlock(staticIndex));
+    }
+
+    private static string MainBlock(string html)
+    {
+        var start = html.IndexOf("<main id=\"main-content\"", StringComparison.Ordinal);
+        Assert.True(start >= 0, "page carries no <main id=\"main-content\"> landmark");
+        var end = html.IndexOf("</main>", start, StringComparison.Ordinal) + "</main>".Length;
+        return html[start..end];
+    }
+
+    private static string StripJsonIslands(string html) => System.Text.RegularExpressions.Regex.Replace(
+        html, "<script type=\"application/json\"[^>]*>.*?</script>\\n?", string.Empty,
+        System.Text.RegularExpressions.RegexOptions.Singleline);
+
+    /// <summary>Story 22.2 AC #5: a CAPTURED webview surface keeps the page-local context band the static page
+    /// computed for it. Before this, the capture loop re-rendered nav from <c>nav.ToNavigationView(path)</c> —
+    /// which takes no local-context argument — so an ADR page arrived in the panel carrying the generic key-views
+    /// nav instead of its own "ADRs" band (Story 23.1's enumerated difference #2).</summary>
+    [Fact]
+    public void CapturedSurface_KeepsThePagesOwnLocalContextNavBand()
+    {
+        // A second ADR guarantees the band has a NAVIGABLE (non-active) sibling — with only one ADR the band is
+        // a degenerate self-link and AppendKeyViewsBand correctly falls back to the generic chips.
+        File.WriteAllText(Path.Combine(Adrs, "0002-another-decision.md"),
+            "# ADR 0002: Another Decision\n\n**Status:** Accepted\n\nBody.\n");
+
+        var bundle = GeneratedSiteWithCapture().RenderWebviewSurfaces();
+        var adr = bundle.Surfaces.Single(s => s.OutputRelativePath == "adrs/0001-a-decision.html");
+        var navBlock = adr.ContentHtml[..adr.ContentHtml.IndexOf("</nav>", StringComparison.Ordinal)];
+
+        Assert.Contains("site-nav-local-context", navBlock);
+        Assert.Contains("aria-label=\"ADRs\"", navBlock);
+        // The sliced nav stops at the nav element: the HTML surface's inline toggle script never rides along.
+        Assert.DoesNotContain("<script", adr.ContentHtml);
+        // …and it agrees byte-for-byte with what the static page rendered, because it IS that string.
+        var staticAdr = File.ReadAllText(Path.Combine(Site, "adrs", "0001-a-decision.html"));
+        var staticNav = staticAdr[staticAdr.IndexOf("<nav class=\"site-nav\"", StringComparison.Ordinal)..];
+        staticNav = staticNav[..(staticNav.IndexOf("</nav>", StringComparison.Ordinal) + "</nav>".Length)];
+        Assert.Contains(staticNav, adr.ContentHtml);
+    }
+
     [Fact]
     public void CapturePages_IncludesCodeMapAsACapturedSurface()
     {

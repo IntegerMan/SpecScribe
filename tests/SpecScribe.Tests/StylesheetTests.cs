@@ -505,6 +505,67 @@ public class StylesheetTests
     }
 
     [Fact]
+    public void Stylesheet_KeepsTheHiddenShapeSelectorActuallyHidden()
+    {
+        // `[hidden]`'s UA rule is `[hidden] { display: none }`, and `.ss-hierarchy-controls` sets `display: flex` —
+        // a specificity TIE, which author CSS always wins. Without the explicit override the component's selector
+        // renders live for every JS-off, webview, SPA and engine-blocked reader: a "Sunburst | Treemap" tab bar that
+        // does nothing at all, which is precisely what emitting it `hidden` was supposed to prevent.
+        //
+        // This exact bug has been fixed six times in this stylesheet (`.risk-grid-item[hidden]`,
+        // `.ownership-controls[hidden]`, `.ownership-legend[hidden]`, ...), which is why it is worth a test rather
+        // than a comment. [Story 20.5 review]
+        var css = ReadStylesheet();
+        Assert.Contains(".ss-hierarchy-controls[hidden] { display: none; }", css);
+    }
+
+    [Fact]
+    public void Stylesheet_BootRulesAreNotKeyedOnTheOptInExplorerHook()
+    {
+        // The boot handshake's four rules were scoped to `[data-explorer]`, an OPT-IN attribute that reaches the
+        // panel through `HierarchyExplorer.Render(panelAttributes:)` — which defaults to "". Every rule was
+        // therefore silently inert for any call site that did not pass it, and Story 20.7 converts six more. What
+        // actually identifies a panel needing boot suppression is that it CONTAINS A HOST. [Story 20.5 review]
+        var css = ReadStylesheet();
+        Assert.Contains(":root[data-ss-hierarchy-boot] .chart-panel:has(.ss-hierarchy)", css);
+        Assert.DoesNotContain(":root[data-ss-hierarchy-boot] [data-explorer]", css);
+    }
+
+    [Fact]
+    public void Stylesheet_HasTheComponentsOwnLegend_WithHatchedNonLifecycleSwatches()
+    {
+        // AC #1: the component supplies the framing block INCLUDING the legend. It did not until the code review —
+        // the only legend on the dashboard came from inside `Charts.Sunburst`, i.e. inside the D1 fallback that
+        // Story 20.7 deletes. These rules are what keeps the dashboard's legend alive past that deletion.
+        var css = ReadStylesheet();
+        Assert.Contains(".ss-hierarchy-legend", css);
+        Assert.Contains(".ss-hierarchy-sw", css);
+        // The four non-lifecycle statuses must carry a HATCH, because that is the channel the component actually
+        // draws (Plotly's marker.line has no dash, so the SVG's stroke-dash channel is not what is on screen). A
+        // legend showing dashes beside a chart drawing hatches is the misdescribing-entry class Stories 10.7 and
+        // 21.1 each closed.
+        Assert.Contains(".ss-hierarchy-sw.sb-noplan", css);
+        Assert.Contains(".ss-hierarchy-sw.sb-followup-open", css);
+        Assert.Contains(".ss-hierarchy-sw.sb-followup-done", css);
+        Assert.Contains(".ss-hierarchy-sw.sb-unplanned", css);
+        // The no-plan CHART fill. `.sb-noplan` is `fill: transparent` in the SVG, so `fillFor()` fell back to that
+        // rule's STROKE token — `--status-pending` — and painted a no-plan sector byte-identical to a Pending one.
+        Assert.Contains(".ss-hierarchy-probe .sb-noplan", css);
+    }
+
+    [Fact]
+    public void Script_NeverDrawsTheLayoutNumberOnAChartSector()
+    {
+        // `value` is what Plotly needs to SIZE a sector; the owner's verify round called it "a confusing value ...
+        // not helpful or intuitive for the reader" and had it removed from the tooltip, the accessible name and the
+        // text twin. The treemap branch still set `textinfo: "label+value"`, which printed it on every tile — a
+        // strictly more prominent placement than the one it was removed from, and covered by no test.
+        // [Story 20.5 review]
+        var js = ReadScript();
+        Assert.DoesNotContain("\"label+value\"", js);
+    }
+
+    [Fact]
     public void Script_DisablesTheModeBar_AndShipsNoCloudUploadOrRemoteOrigin()
     {
         // plotly.js 3.7.0 changed the modebar's cloud button to UPLOAD the chart to Plotly Cloud. For a

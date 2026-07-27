@@ -39,8 +39,31 @@ public static class RelatedWorkTemplater
 
         RenderProjectCard(sb, model.Project);
 
-        foreach (var card in model.Cards)
+        // Scope cards (epics + the orphan/unplanned roots) render flat; STORY cards go behind one disclosure.
+        //
+        // Why: with JS off — or before this script runs, or when the chart engine is blocked — there is no
+        // selection, so `[data-related-ready]`'s single-card CSS never applies and EVERY card renders stacked in a
+        // ~320px column. Story 20.5 made that acute: removing the story->epic fold and expanding dense epics took
+        // the rail from ~30 cards to 179 (416,433 B, 45.7% of the dashboard), i.e. a JS-off reader met a page tens
+        // of thousands of pixels tall. Owner decision 2026-07-26: cap what the rail RENDERS VISIBLY, not how many
+        // cards exist. Every card stays in the DOM — select mode may not fetch (AC #1, `file://`-safe), so a card
+        // that is not in the document is a selection that shows nothing — and ADR 0013's availability contract is
+        // satisfied by a disclosure the reader can open. With JS on the script opens this and the CSS hides its
+        // summary, so the single-card behaviour is byte-for-byte what it was. [Story 20.5 review]
+        var scopeCards = model.Cards.Where(c => !IsStoryCard(c)).ToList();
+        var storyCards = model.Cards.Where(IsStoryCard).ToList();
+
+        foreach (var card in scopeCards)
             RenderCard(sb, card, model.WorkGraphHref);
+
+        if (storyCards.Count > 0)
+        {
+            sb.Append("<details class=\"related-work-more\">\n");
+            sb.Append($"  <summary>{storyCards.Count} {Charts.Plural(storyCards.Count, "story", "stories")}</summary>\n");
+            foreach (var card in storyCards)
+                RenderCard(sb, card, model.WorkGraphHref);
+            sb.Append("</details>\n");
+        }
 
         // The work graph's own honestly-reported draw overflow (Story 20.1 spike §1a rule 5) — surfaced, never
         // silently dropped, mirroring the per-group "+N more" pattern below. [Story 20.3]
@@ -59,6 +82,12 @@ public static class RelatedWorkTemplater
         sb.Append("</aside>\n\n");
         return sb.ToString();
     }
+
+    /// <summary>A story-tier card. Story island ids are the bare <c>{epic}.{story}</c> id (see
+    /// <c>Charts.SunburstExplorerNodes</c>); every scope id is either <c>epic-N</c> or one of the named roots, and
+    /// none of them contains a dot. Keyed on the id rather than <c>KindWord</c> so a wording change cannot silently
+    /// re-tier the rail. [Story 20.5 review]</summary>
+    private static bool IsStoryCard(RelatedCard card) => card.IslandId.Contains('.');
 
     private static void RenderProjectCard(StringBuilder sb, RelatedProjectCard card)
     {

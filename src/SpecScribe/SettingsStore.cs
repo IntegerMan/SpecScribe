@@ -66,8 +66,30 @@ public static class SettingsStore
         // Persist DatePolicy as its NAME ("Utc"), not an ordinal — a `.specscribe` is a user-editable file, and a
         // bare number would be opaque there and would silently re-map if the enum were ever reordered. The only
         // enum in SavedSettings is TodayPolicy; strings/bools are unaffected. [Story 5.5]
-        Converters = { new JsonStringEnumConverter() },
+        Converters = { new DatePolicyJsonConverter() },
     };
+
+    /// <summary>Reads <see cref="DatePolicy"/> via the same forgiving vocabulary as <c>--today-policy</c>
+    /// (<see cref="DatePolicies.TryParse"/>) rather than requiring an exact enum-member-name match, and degrades an
+    /// unrecognized/malformed token to "field not set" instead of throwing. <c>.specscribe</c> is a hand-editable
+    /// file (see <see cref="SerializerOptions"/>'s doc), and a plain <see cref="JsonStringEnumConverter"/> fails the
+    /// WHOLE document — discarding Source/Output/every other saved field too — the moment this one field holds a
+    /// value it doesn't recognize verbatim, e.g. the CLI's own accepted spelling <c>"last-commit"</c> instead of the
+    /// enum's <c>"LastCommit"</c>. One field's typo must not cost every other saved setting (NFR8). [Review][Patch]</summary>
+    private sealed class DatePolicyJsonConverter : JsonConverter<DatePolicy?>
+    {
+        public override DatePolicy? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (reader.TokenType == JsonTokenType.Null) return null;
+            return DatePolicies.TryParse(reader.GetString(), out var policy) ? policy : null;
+        }
+
+        public override void Write(Utf8JsonWriter writer, DatePolicy? value, JsonSerializerOptions options)
+        {
+            if (value is { } policy) writer.WriteStringValue(policy.ToString());
+            else writer.WriteNullValue();
+        }
+    }
 
     /// <summary>The nearest existing <c>.specscribe</c> at or above <paramref name="startDirectory"/> (defaulting to
     /// the current working directory), or null when there is none. A git-style walk-up rather than raw-cwd anchoring:

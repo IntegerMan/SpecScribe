@@ -120,7 +120,13 @@ jobs:
         # installed BMad skill packs under `.claude/` and `.agents/` (Python, and duplicated across both), and
         # `_bmad/scripts`. They dominated the findings list on day one, which is exactly what this list exists
         # to prevent. `extension/src` stays IN scope — it is genuine first-party source.
+        #
+        # continue-on-error (Story 25.1 code review, owner decision 2026-07-26): a SonarCloud outage or auth
+        # failure here must not fail this job — Story 16.2 is about to make it a required check, and AC #1 only
+        # requires this job to fail on a Build or Test failure. Build and Test below are untouched by this and
+        # still gate normally.
         if: env.SONAR_TOKEN != ''
+        continue-on-error: true
         run: |
           .\.sonar\scanner\dotnet-sonarscanner begin `
             /o:"integerman-github" `
@@ -134,8 +140,9 @@ jobs:
         #   and hand the scanner nothing to analyze.
         # --disable-build-servers: stops MSBuild node processes holding the
         #   scanner's DLLs locked, which matters most on Windows runners.
-        # No `continue-on-error` and no `if: always()` anywhere in this job — a
-        # red build or a red test must stop the run.
+        # No `continue-on-error` and no `if: always()` on Build or Test — a red
+        # build or a red test must stop the run. (The two SonarScanner steps do
+        # carry `continue-on-error`, deliberately — see the comment there.)
         run: dotnet build SpecScribe.slnx --no-incremental --disable-build-servers
 
       - name: Test
@@ -146,7 +153,10 @@ jobs:
         run: dotnet test SpecScribe.slnx --no-build --collect:"XPlat Code Coverage;Format=opencover"
 
       - name: SonarScanner end
+        # continue-on-error: see the same note on "SonarScanner begin" above — a scanner-side failure here must
+        # not fail a job that only just built and tested successfully.
         if: env.SONAR_TOKEN != ''
+        continue-on-error: true
         run: .\.sonar\scanner\dotnet-sonarscanner end /d:sonar.token="$env:SONAR_TOKEN"
 
   # -------------------------------------------------------------------------

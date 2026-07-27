@@ -354,6 +354,7 @@ public static class HierarchyExplorer
         // --- The retained server-rendered chart (owner D1). Below the host, hidden only on a successful mount.
         body.Append(fallbackHtml);
 
+        body.Append(LegendHtml(model));
         body.Append(IslandHtml(model));
         body.Append(TextTwinHtml(model));
 
@@ -362,6 +363,60 @@ public static class HierarchyExplorer
 
     private static string Checked(string shape, string value) =>
         string.Equals(shape, value, StringComparison.Ordinal) ? " checked" : string.Empty;
+
+    /// <summary>The component's OWN legend — AC#1's "one framing block (legend + analysis window + framing
+    /// sentence), so no call site hand-writes any of them."
+    ///
+    /// <para>It did not exist until the Story 20.5 code review. <see cref="Charts.Framed"/> has no legend slot, and
+    /// the only legend on the dashboard came from <see cref="Charts.SunburstLegend"/> — emitted INSIDE
+    /// <c>Charts.Sunburst</c>, i.e. inside the D1 fallback that Story 20.7 deletes. Owner decision 2026-07-26: the
+    /// component owns its legend, so 20.7's deletion cannot take the dashboard's legend with it.</para>
+    ///
+    /// <para><b>It describes the channel actually on screen.</b> The retained SVG's legend encodes fill +
+    /// <em>stroke-dash</em>; Plotly's <c>marker.line</c> has no dash, so the component signals those same four
+    /// statuses with <c>marker.pattern.shape</c> HATCHING instead. A legend showing dashes beside a chart drawing
+    /// hatches is the "phantom / misdescribing entry" class Stories 10.7 and 21.1 each closed. The swatch classes
+    /// here carry the hatch, and the note names it in prose so the channel is never colour-only (UX-DR17).</para>
+    ///
+    /// <para>Entries are the statuses the payload ACTUALLY carries — never a fixed list, so a legend row can never
+    /// point at zero sectors. The prose comes from each node's own already-resolved <see cref="HierarchyNode.StatusLabel"/>
+    /// rather than a second lookup, which is what makes chart, legend, tooltip, accessible name and text twin
+    /// incapable of disagreeing. The synthesized root is excluded: it is the whole project, not a lifecycle stage,
+    /// and it is described by the breadcrumb and the twin instead.</para></summary>
+    internal static string LegendHtml(HierarchyExplorerModel model)
+    {
+        // First label wins per status class, in canonical stage order then first-drawn order — deterministic for
+        // FR31, and identical to what the chart drew because it IS what the chart drew.
+        var seen = new Dictionary<string, string>(StringComparer.Ordinal);
+        var order = new List<string>();
+        foreach (var n in model.Nodes)
+        {
+            if (n.Id == ProjectRootId) continue;
+            if (string.IsNullOrEmpty(n.StatusClass) || string.IsNullOrEmpty(n.StatusLabel)) continue;
+            if (seen.ContainsKey(n.StatusClass)) continue;
+            seen[n.StatusClass] = n.StatusLabel;
+            order.Add(n.StatusClass);
+        }
+        if (order.Count == 0) return string.Empty;
+
+        var ordered = order
+            .OrderBy(StatusStyles.CanonicalRank)
+            .ThenBy(order.IndexOf)
+            .ToList();
+
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"ss-hierarchy-legend\">\n");
+        foreach (var status in ordered)
+        {
+            sb.Append($"  <span class=\"ss-hierarchy-legend-item\">")
+              .Append($"<span class=\"ss-hierarchy-sw sb-{PathUtil.Html(status)}\"></span>")
+              .Append($"{PathUtil.Html(seen[status])}</span>\n");
+        }
+        sb.Append("</div>\n");
+        if (ordered.Any(s => Charts.SunburstLocalStatusLabel(s) is not null))
+            sb.Append("<p class=\"ss-hierarchy-legend-note\">Hatched sectors are work outside the normal story lifecycle &mdash; follow-ups, direct changes, and stories with no task plan yet.</p>\n");
+        return sb.ToString();
+    }
 
     /// <summary>The inline JSON island — the component's ONLY data source. No fetch, so it is <c>file://</c>-safe
     /// and survives the webview's CSP and the SPA's content capture. Carries the component CONFIG alongside the

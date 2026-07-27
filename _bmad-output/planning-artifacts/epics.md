@@ -3414,6 +3414,35 @@ So that every hierarchy surface shares one implementation, one interaction gramm
      the island?" decision the spike assigned to 20.5 is DEFERRED TO STORY 20.7, which owns RenderParity and is
      where the ADR 0005 CSP amendment lands jointly with Story 23.4; WebviewRenderAdapter.cs is untouched by 20.5. -->
 
+<!-- 2026-07-25 (Story 20.5 owner verify round 3): DENSE EPICS EXPAND IN THE COMPONENT. Recorded here at the
+     2026-07-26 code review, which found this decision living ONLY in the story file — CLAUDE.md § Decision records
+     requires a structural or visible product decision to land in epics.md too. The owner drilled into Epic 20 and
+     found no component stories: Charts.StoryDensityCollapseThreshold is 8 and Epic 20 has exactly 8, so the
+     projector emitted a single "8 stories" summary wedge. That collapse is a DRAWING CONSTRAINT of the fixed 380px
+     static SVG, not a fact about the work — and the component is larger AND drills, so a drilled epic has the whole
+     sweep to itself. Collapsing there hid exactly the stories the reader drilled in to find and made them
+     unselectable, which is what select mode exists for. So Charts.SunburstExplorerNodes gains
+     `expandDenseEpics` (default FALSE, so Story 20.2's SVG-parity contract and its test are untouched); the
+     component and the rail's selectable set both pass TRUE. CONSEQUENCE, stated plainly: the component's node set
+     DELIBERATELY diverges from the SVG's while both are live, so the AC #1 anti-drift invariant is now checked as a
+     RECONCILIATION (swap the summary wedge for the stories replacing it and the two id sets agree again) rather
+     than as raw equality. Weights are unaffected — the summary wedge's weight is exactly the sum of the stories
+     that replace it, so Finding C / D2 still holds. Cost: 66 additional nodes on this project's dashboard. -->
+
+<!-- 2026-07-26 (Story 20.5 code review): TWO OWNER DECISIONS. (1) THE COMPONENT OWNS ITS LEGEND. AC #1 requires the
+     component to supply the framing block INCLUDING the legend, and it did not: Charts.Framed has no legend slot
+     and the only legend on the dashboard came from inside Charts.Sunburst — i.e. inside the D1 fallback that Story
+     20.7 DELETES, which would have taken the dashboard's legend with it. HierarchyExplorer.LegendHtml now emits one
+     from the statuses the payload actually carries, and it describes the channel actually on screen: Plotly's
+     marker.line has no dash, so the component signals the four non-lifecycle statuses with marker.pattern HATCHING
+     rather than the SVG's stroke-dash, and the legend hatches to match. (2) CAP CARDS, NOT ENTRIES.
+     RelatedWork.MaxEntriesPerGroup STAYS at 12; instead the rail's story-tier cards render behind one disclosure so
+     a JS-off reader is not met by 179 stacked cards (416,433 B, 45.7% of the dashboard). Every card stays in the
+     DOM — select mode may not fetch (AC #1, file://-safe) — so this caps VISIBLE height, not card existence, and
+     ADR 0013's availability contract is satisfied by a disclosure the reader can open. This CLOSES Story 20.5's
+     open question #3, which Story 20.3 had left as the owner's lever. -->
+
+
 ### Story 20.6: Text-Twin Audit and Golden-Fingerprint Replacement — the ADR 0013 Gate
 
 As a maintainer retiring server-rendered chart SVG,
@@ -3731,7 +3760,7 @@ Elevate the serialized JSON data-layer from an optional output adapter (Story 6.
 **Candidate stories (illustrative — finalized at kickoff, not committed here):**
 
 - **Story 22.1 — Spike: incremental recompute + IR-delta transport.** Measure changed-scope recompute correctness (incl. AD-5 topology-change invalidation) and delta latency against this repo; gates everything below.
-- **Story 22.2 — Canonical IR schema + versioning.** Serialize the AD-2 view models + chart data/component config (per ADR 0013 — *not* pre-rendered SVG) into a versioned IR; generalize the `SectionViewModelSerializationTests` round-trip into an IR golden boundary. **Known constraint:** the existing SPA path has a **byte-blind chunker** (Story 6.6 at-scale measure: `pages-root.json` reached 112.9 MB at 1,461 pages; `code-map.html` 82.5 MB) — the IR schema must chunk by **bytes**, not page count, so large repos don't ship monolithic payloads.
+- **Story 22.2 — Canonical IR schema + versioning.** Serialize the AD-2 view models + chart data/component config (per ADR 0013 — *not* pre-rendered SVG) into a versioned IR; generalize the `SectionViewModelSerializationTests` round-trip into an IR golden boundary. ~~**Known constraint:** the existing SPA path has a **byte-blind chunker** (Story 6.6 at-scale measure: `pages-root.json` reached 112.9 MB at 1,461 pages; `code-map.html` 82.5 MB) — the IR schema must chunk by **bytes**, not page count, so large repos don't ship monolithic payloads.~~ **STALE** — Story 22.1 measured `MaxChunkBytes = 2_000_000` already shipping; see the re-scope note on Story 22.2 below. Also amended by **ADR 0016** (the IR carries rendered prose HTML, not re-modelled view models).
 - **Story 22.3 — Static HTML rendered from the IR.** Prove byte/behaviour parity with today's golden output when static HTML is a projection of the IR rather than a direct render.
 - **Story 22.4 — SPA + webview as IR consumers.** Fold the Story 6.7 SPA adapter and the webview onto the canonical IR; retire duplicate data paths.
 - **Story 22.5 — Incremental event-driven regeneration engine.** Operationalize AD-5 over the IR — recompute only changed scope, emit deltas.
@@ -3768,6 +3797,14 @@ So that Epic 22's implementation stories are scoped by real numbers rather than 
 **And** its findings gate whether Stories 22.2–22.6 proceed as scoped or are re-scoped.
 
 ### Story 22.2: Canonical IR Schema + Versioning
+
+> **⚠ SCOPE RE-SCOPED — the story file's 7 ACs SUPERSEDE the 3 below** (recorded here and in `sprint-status.yaml` in the same change, per CLAUDE.md § Decision records). See [`22-2-canonical-ir-schema-and-versioning.md`](../implementation-artifacts/22-2-canonical-ir-schema-and-versioning.md). Three things moved after these ACs were written:
+>
+> 1. **AC #2's premise below is STALE — the "byte-blind chunker" was already fixed before this story started.** Story 22.1 measured the shipped code: `SpaDelivery.MaxChunkBytes = 2_000_000` ships alongside `MaxPagesPerChunk = 75`, so the 112.9 MB `pages-root.json` cannot recur. The one real gap it found was narrower: a single page above the cap still produced an over-cap chunk (**3.08 MB measured against a 2 MB guard**). 22.1's gate re-aimed the story at **page-level delta addressing** + **capping oversized pages**. *(As built: the budget now counts the exact JSON-encoded bytes rather than raw UTF-8, so a multi-page chunk can no longer overshoot; the unsplittable single-page case is **declared** in the manifest's `oversizedPages` rather than left silent.)*
+> 2. **Story 23.1 handed 22.2 a hard requirement and a live defect** — the IR must carry Markdig-rendered **prose HTML**, and the SPA/webview dashboard captures were dropping 5 anchors (3 of them `code/*.html` links) from the Git Pulse panel. Both folded in by owner direction 2026-07-23.
+> 3. **Owner decisions 2026-07-25:** promote `spa/` **in place** (no `ir/` directory, no rename — that is 22.4's call); per-page **hash + byte size only**, no delta transport; and 22.2 **proposes the ADR**.
+>
+> The ADR trigger is discharged by **[ADR 0016 — The Canonical IR Carries Rendered Prose HTML](../../docs/adrs/0016-ir-carries-rendered-prose-html.md)** (Proposed), which amends ADR 0008 §Decision 1's prose half exactly as ADR 0013 §5 already amended its chart half.
 
 As a maintainer building surfaces on top of a stable data contract,
 I want the AD-2 view models and chart data/component configuration serialized into a versioned canonical IR,

@@ -2782,9 +2782,14 @@ public sealed class SiteGenerator
             var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work, _epicsModel, _requirements);
             var followUps = BuildFollowUpGeometry(work, counts);
             var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel, retros: _retros);
+            // CodeItemHref is passed EXPLICITLY here (Story 22.2 AC #4). The named arguments below start at
+            // `counts:`, which used to silently skip the positional codeItemHref and leave it null — and a null
+            // resolver makes Charts.CodeItemLink degrade the Git Pulse top-changed-file bar labels from links to
+            // plain text, dropping 5 anchors this surface should carry. Story 23.1 measured the identical defect on
+            // the SPA capture; both are fixed together because both are the same omission.
             var dashboardPage = HtmlTemplater.BuildIndexPage(
                 docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
-                work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts, followUps: followUps, unplanned: unplanned, cadence: _cadence, workGraph: _workGraph, dateCutoff: _today);
+                work, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts: counts, followUps: followUps, unplanned: unplanned, cadence: _cadence, workGraph: _workGraph, dateCutoff: _today);
             surfaces.Add(WebviewSurfaceFor(dashboardPage));
 
             // Epics family — mirrors RenderEpicsPages' iteration exactly (same retro map, same per-epic
@@ -2903,7 +2908,7 @@ public sealed class SiteGenerator
                     if (familyPaths.Contains(normalized)) continue;
                     if (excluded.Contains(normalized)) continue;
                     if (normalized.StartsWith("commit/", StringComparison.OrdinalIgnoreCase)) continue;
-                    var navMarkup = HtmlRenderAdapter.Shared.RenderNavMarkup(nav.ToNavigationView(normalized));
+                    var navMarkup = CapturedNavMarkup(fullHtml, nav, normalized);
                     var region = SpaDelivery.ExtractContentRegion(fullHtml, navMarkup);
                     if (ReferenceEquals(region, navMarkup))
                     {
@@ -3049,9 +3054,12 @@ public sealed class SiteGenerator
         var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work, _epicsModel, _requirements);
         var followUps = BuildFollowUpGeometry(work, counts);
         var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel, retros: _retros);
+        // CodeItemHref passed explicitly — see the identical note on RenderWebviewSurfaces' dashboard call.
+        // Without it the IR's dashboard region carries 548 anchors where the static page carries 553, which is
+        // the ENTIRE 277-byte parity delta Story 23.1 measured. [Story 22.2 AC #4]
         var dashboardPage = HtmlTemplater.BuildIndexPage(
             docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
-            work, _sprint, _retros, _coverage, _timelinePath is not null, counts: counts, followUps: followUps, unplanned: unplanned, cadence: _cadence, workGraph: _workGraph, dateCutoff: _today);
+            work, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts: counts, followUps: followUps, unplanned: unplanned, cadence: _cadence, workGraph: _workGraph, dateCutoff: _today);
         AddSpaSurface(pages, familyPaths, dashboardPage);
 
         if (_epicsModel is { } model && _progress is { } progress)
@@ -3098,15 +3106,36 @@ public sealed class SiteGenerator
             {
                 var normalized = PathUtil.NormalizeSlashes(path);
                 if (familyPaths.Contains(normalized)) continue;
-                var navMarkup = HtmlRenderAdapter.Shared.RenderNavMarkup(nav.ToNavigationView(normalized));
+                var navMarkup = CapturedNavMarkup(fullHtml, nav, normalized);
                 var region = SpaDelivery.ExtractContentRegion(fullHtml, navMarkup);
                 var breadcrumb = SpaDelivery.ExtractBreadcrumb(fullHtml, normalized);
-                pages.Add(new SpaPage(normalized, SpaDelivery.ExtractTitle(fullHtml), region, breadcrumb));
+                pages.Add(new SpaPage(
+                    normalized, SpaDelivery.ExtractTitle(fullHtml), region, breadcrumb,
+                    SpaDelivery.ExtractMetaDescription(fullHtml)));
             }
         }
 
         return new SpaBundle(_options.SiteTitle, "index.html", nav.Items, pages);
     }
+
+    /// <summary>The nav markup a CAPTURED page's content region should carry: the page's OWN rendered
+    /// <c>&lt;nav class="site-nav"&gt;</c>, sliced out of the captured string, falling back to a fresh re-render
+    /// only when the page carries none.
+    /// <para>Why the slice and not the re-render (Story 22.2 AC #5): the re-render path calls
+    /// <c>nav.ToNavigationView(path)</c>, which takes no local-context argument, so every captured page lost the
+    /// page-local context band its static twin shows — an ADR page shipped the generic key-views nav instead of
+    /// its <c>aria-label="ADRs"</c> band (Story 23.1's enumerated difference #2). There is no path →
+    /// <see cref="NavLocalContext"/> resolver to re-derive it from: every producer (ADRs, commit days, commits,
+    /// insights, delivery, SDD, epics, requirements) builds one inline at render time and discards it, so
+    /// threading it here would mean ~8 call sites of plumbing for a value the captured string already holds
+    /// verbatim.</para>
+    /// <para>Both callers pass the RESULT into <see cref="SpaDelivery.ExtractContentRegion"/>, which returns that
+    /// same instance when a page carries no <c>&lt;main&gt;</c> landmark — the reference the webview loop's
+    /// <c>ReferenceEquals</c> degrade check depends on. Keep it one instance per page.</para>
+    /// [Story 22.2]</summary>
+    private static string CapturedNavMarkup(string fullPageHtml, SiteNav nav, string normalizedPath) =>
+        SpaDelivery.ExtractNavMarkup(fullPageHtml)
+        ?? HtmlRenderAdapter.Shared.RenderNavMarkup(nav.ToNavigationView(normalizedPath));
 
     /// <summary>Renders one dashboard/epics family page's SPA content region (nav + breadcrumb + body) through
     /// <see cref="JsonSpaRenderAdapter"/>, reference-linkified with the SAME skip rules the static page uses (a page
@@ -3120,7 +3149,9 @@ public sealed class SiteGenerator
             skipStoryId: skipStoryId, skipEpicNumber: skipEpicNumber);
         var path = PathUtil.NormalizeSlashes(page.OutputRelativePath);
         familyPaths.Add(path);
-        pages.Add(new SpaPage(path, page.Title, region, page.Breadcrumb.Crumbs));
+        // A family page already carries its description structurally (PageView.MetaDescription, nullable) — no
+        // extraction needed, and the IR's head projection resolves the same title fallback the static head does.
+        pages.Add(new SpaPage(path, page.Title, region, page.Breadcrumb.Crumbs, page.MetaDescription));
     }
 
     /// <summary>Writes the opt-in SPA delivery files — the client script, the manifest + content chunks, and the
@@ -3269,8 +3300,17 @@ public sealed class SiteGenerator
         }
         catch (Exception ex)
         {
-            _pendingAssetEvents.Add(new GenerationEvent(
-                GenerationOutcome.Error, ForgeOptions.HierarchyEngineScriptName, TimeSpan.Zero, ex.Message));
+            // DEDUPED BY PATH, deliberately. This list is drained only by GenerateAll, but EnsureHierarchyEngine is
+            // reached from WriteIndex — which every incremental path calls (GenerateOne, RemoveFor, RegenerateEpics,
+            // RegenerateAdrs). A persistently failing copy (locked output root, read-only disk) therefore appended
+            // one record per debounced save for the life of a watch session, and the next full generate replayed
+            // all of them onto its diagnostics page as though they had happened during that run. One record per
+            // asset says exactly as much and stays bounded. [Story 20.5 review]
+            if (!_pendingAssetEvents.Any(e => string.Equals(e.RelativePath, ForgeOptions.HierarchyEngineScriptName, StringComparison.Ordinal)))
+            {
+                _pendingAssetEvents.Add(new GenerationEvent(
+                    GenerationOutcome.Error, ForgeOptions.HierarchyEngineScriptName, TimeSpan.Zero, ex.Message));
+            }
         }
     }
 
@@ -4404,18 +4444,28 @@ public sealed class SiteGenerator
     /// <para>Surfaced by a real burst-of-saves failure: the home page grew substantially in Story 20.5 (the
     /// Hierarchy Explorer's island and text twin, and a details-rail card per selectable node), which lengthened
     /// each write enough to turn a pre-existing, rarely-hit race into an intermittent one. The size change exposed
-    /// the gap; the missing retry was always the defect. [Story 20.5 owner round]</para></summary>
+    /// the gap; the missing retry was always the defect. [Story 20.5 owner round]</para>
+    ///
+    /// <para><b>Write-to-temp then atomic <see cref="File.Move(string,string,bool)"/> — the half this was missing.</b>
+    /// Its doc claimed parity with <see cref="CopyEmbeddedAsset"/> while calling bare <c>File.WriteAllText</c>, which
+    /// TRUNCATES the target before writing: a sharing violation part-way through the final attempt therefore left a
+    /// truncated page on disk, and for <c>index.html</c> in a watch session that is the worst possible file to
+    /// corrupt. <c>CopyEmbeddedAsset</c> has written through a <c>.tmp</c> and swapped since a Story 5.3 review fix,
+    /// for exactly this reason. Now they genuinely match. [Story 20.5 review]</para></summary>
     private static void WriteTextWithRetry(string path, string content)
     {
+        var temp = path + ".tmp";
         for (var attempt = 0; ; attempt++)
         {
             try
             {
-                File.WriteAllText(path, content);
+                File.WriteAllText(temp, content);
+                File.Move(temp, path, overwrite: true);
                 return;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
+                TryDeleteTempAsset(temp);
                 if (attempt >= AssetWriteRetries) throw;
                 Thread.Sleep(AssetWriteRetryDelayMs);
             }

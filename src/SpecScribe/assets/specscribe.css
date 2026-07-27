@@ -228,8 +228,12 @@ body {
    The gate is `[data-js]`, set by an inline script that runs DURING PARSING, before the SVG below it exists — so
    the suppression lands without a flash. Nothing deferred could do that. With JS off none of this applies and the
    SVG is the page from first paint; if the mount fails or times out `data-js` comes off and the SVG returns. */
+/* KEYED ON `:has(.ss-hierarchy)`, NOT on `[data-explorer]`. `data-explorer` is an opt-in hook the dashboard call
+   site happens to pass through `panelAttributes`, which defaults to "" — so every one of these rules used to be
+   silently inert for any other call site, and Story 20.7 converts six more. The thing that actually identifies a
+   panel needing boot suppression is that it CONTAINS A HOST, which is exactly what this asks. [Story 20.5 review] */
 .ss-hierarchy-booting { display: none; }
-:root[data-ss-hierarchy-boot] [data-explorer]:has(.ss-hierarchy) .ss-hierarchy-booting {
+:root[data-ss-hierarchy-boot] .chart-panel:has(.ss-hierarchy) .ss-hierarchy-booting {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -239,13 +243,17 @@ body {
 }
 /* Only the chart is suppressed while booting — the swatch strip below it describes the Plotly chart just as well
    as the SVG, so hiding it too would make the panel flash twice instead of once. */
-:root[data-ss-hierarchy-boot] [data-explorer]:has(.ss-hierarchy) svg.sunburst { display: none; }
+:root[data-ss-hierarchy-boot] .chart-panel:has(.ss-hierarchy) svg.sunburst { display: none; }
 /* Both exits, and both must out-specify the suppression above rather than merely follow it. MOUNTED: the chart is
    up, so the placeholder goes and the SVG stays hidden (the component also hides it inline). FAILED: no engine, so
    the SVG comes straight back instead of the reader waiting out the boot timer. */
-:root[data-ss-hierarchy-boot] [data-explorer][data-hierarchy-mounted] .ss-hierarchy-booting,
-:root[data-ss-hierarchy-boot] [data-explorer][data-hierarchy-failed] .ss-hierarchy-booting { display: none; }
-:root[data-ss-hierarchy-boot] [data-explorer][data-hierarchy-failed] svg.sunburst { display: block; }
+:root[data-ss-hierarchy-boot] .chart-panel[data-hierarchy-mounted] .ss-hierarchy-booting,
+:root[data-ss-hierarchy-boot] .chart-panel[data-hierarchy-failed] .ss-hierarchy-booting { display: none; }
+:root[data-ss-hierarchy-boot] .chart-panel[data-hierarchy-failed] svg.sunburst { display: block; }
+/* The failed exit also has to beat the INLINE `display:none` the takeover sets when the mount got far enough to
+   hide the SVG before throwing. `restoreLegacySvg` clears that inline style directly, which is the real fix; this
+   stays as the belt to its braces for the decline path, where nothing inline was ever set. */
+:root[data-ss-hierarchy-boot] .chart-panel[data-hierarchy-failed] .sunburst-hint { display: block; }
 
 /* Plotly emits the hatch <path> inside every <pattern> with a `stroke` but NO `fill`, so SVG's initial black
    paints beneath every hatched sector (21 occurrences measured on the real dashboard). There is no Plotly
@@ -299,6 +307,13 @@ body {
 }
 
 .ss-hierarchy-controls { display: flex; justify-content: center; margin: 0 0 0.6rem; }
+/* `[hidden]`'s UA rule is `[hidden] { display: none }`, and the author `display: flex` above ties with it on
+   specificity — author CSS always wins that tie, so without this override the shape selector renders LIVE for every
+   JS-off, webview, SPA and engine-blocked reader: a "Sunburst | Treemap" tab bar that does nothing at all. The
+   component emits it `hidden` precisely so that cannot happen, and reveals it only on a successful mount. Same
+   override, same reason, as `.risk-grid-item[hidden]`, `.ownership-controls[hidden]` and `.ownership-legend[hidden]`
+   below. [Story 20.5 review] */
+.ss-hierarchy-controls[hidden] { display: none; }
 #dashboard-hierarchy-shape-sunburst:checked ~ .board-tabbar label[for="dashboard-hierarchy-shape-sunburst"],
 #dashboard-hierarchy-shape-treemap:checked ~ .board-tabbar label[for="dashboard-hierarchy-shape-treemap"] {
   background: var(--warm-white);
@@ -340,6 +355,84 @@ body {
 .ss-hierarchy-crumb-current { color: var(--ink); font-weight: 600; }
 .ss-hierarchy-crumb-open { font-size: 0.72rem; color: var(--rust); text-decoration: underline; }
 .ss-hierarchy-crumb-open:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
+
+/* ---- The component's OWN legend (AC #1) [Story 20.5 review] --------------------------------------------------
+   Added because the component shipped without one: `Charts.Framed` has no legend slot, and the only legend on the
+   dashboard came from inside `Charts.Sunburst` — i.e. inside the D1 fallback Story 20.7 DELETES. Owner decision
+   2026-07-26: the component owns its legend so 20.7's deletion cannot take the dashboard's legend with it.
+
+   Every swatch below references the SAME token its chart fill does — never a re-typed literal (AD-7), so a token
+   change moves chart and legend together. The four chart-local statuses carry a HATCH matching the
+   `marker.pattern.shape` the component actually draws ("/" "\" "." "x"), because Plotly's marker.line has no dash
+   and the SVG's stroke-dash channel is therefore not what is on screen. A legend showing dashes beside a chart
+   drawing hatches is the phantom/misdescribing-entry class Stories 10.7 and 21.1 each closed.
+
+   Note this legend is deliberately NOT `.sunburst-legend`: that class is wired to the Story 3.5 pure-CSS emphasis
+   rules, whose subject is `.sb-seg` inside the SVG this component hides. Reusing it would ship a legend whose
+   hover does nothing. */
+.ss-hierarchy-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem 1.1rem;
+  margin-top: 0.8rem;
+  font-size: 0.76rem;
+  color: var(--ink-faded);
+}
+.ss-hierarchy-legend-item { display: inline-flex; align-items: center; }
+.ss-hierarchy-legend-note {
+  margin: 0.35rem 0 0;
+  font-size: 0.72rem;
+  color: var(--ink-faded);
+  text-align: center;
+}
+.ss-hierarchy-sw {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 2px;
+  margin-right: 0.35rem;
+  background: var(--status-unrecognized);
+}
+.ss-hierarchy-sw.sb-pending { background: var(--status-pending); }
+.ss-hierarchy-sw.sb-drafted { background: var(--status-drafted); }
+.ss-hierarchy-sw.sb-ready { background: var(--status-ready); }
+.ss-hierarchy-sw.sb-active { background: var(--status-active); }
+.ss-hierarchy-sw.sb-review { background: var(--status-review); }
+.ss-hierarchy-sw.sb-done { background: var(--status-done); }
+.ss-hierarchy-sw.sb-unrecognized { background: var(--status-unrecognized); }
+/* The four hatched ones. Backgrounds match `fillFor()` in specscribe.js exactly — including no-plan, which the
+   component paints `--parchment-dark` (the same token the shipped SVG's `.sb-noplan:hover` uses) rather than
+   letting it fall through to its stroke token and come out byte-identical to Pending. */
+.ss-hierarchy-sw.sb-noplan {
+  background: var(--parchment-dark);
+  box-shadow: inset 0 0 0 1px var(--status-pending);
+  background-image: radial-gradient(var(--status-pending) 0.5px, transparent 0.6px);
+  background-size: 3px 3px;
+}
+.ss-hierarchy-sw.sb-followup-open {
+  background: var(--sb-followup-open, #d97706);
+  background-image: repeating-linear-gradient(
+    45deg, transparent, transparent 1px, rgba(255, 255, 255, 0.55) 1px, rgba(255, 255, 255, 0.55) 2px);
+}
+.ss-hierarchy-sw.sb-followup-done {
+  background: var(--sb-followup-done, var(--status-done));
+  background-image: repeating-linear-gradient(
+    -45deg, transparent, transparent 1px, rgba(255, 255, 255, 0.55) 1px, rgba(255, 255, 255, 0.55) 2px);
+}
+.ss-hierarchy-sw.sb-unplanned {
+  background: var(--sb-unplanned, #0e7490);
+  background-image:
+    repeating-linear-gradient(45deg, transparent, transparent 1px, rgba(255, 255, 255, 0.55) 1px, rgba(255, 255, 255, 0.55) 2px),
+    repeating-linear-gradient(-45deg, transparent, transparent 1px, rgba(255, 255, 255, 0.55) 1px, rgba(255, 255, 255, 0.55) 2px);
+}
+
+/* The chart fill for a no-plan sector. `.sb-noplan` is `fill: transparent` in the SVG (it is drawn as a dashed
+   outline there), so the component's `fillFor()` fell back to that rule's STROKE token — which is
+   `--status-pending`, making a no-plan sector byte-identical to a Pending one while the legend showed a pale
+   hatched chip. The probe element carries this class so the value still resolves through the live cascade and no
+   token is re-typed in JS. [Story 20.5 review] */
+.ss-hierarchy-probe .sb-noplan { fill: var(--parchment-dark); }
 
 /* The text twin (ADR 0013 §2). Collapsed by default is explicitly acceptable — the contract is AVAILABILITY, not
    on-screen duplication — and this story keeps the server SVG, so the twin is a second reading rather than the
@@ -429,6 +522,19 @@ body {
    relationships stay visible — that is the complete NFR8 view. Once the client takes over it shows the project
    card by default, one scope card on selection, and hides the on-card relationship <details> (the "View details"
    link carries the reader onward). `data-related-scope` is the current selection's island id. */
+/* The story-tier disclosure is a JS-OFF affordance only (RelatedWorkTemplater: without it a script-less reader
+   meets 179 stacked cards). With JS on the script opens it and this drops the summary and the wrapper's own box, so
+   the single-card view is exactly what it was before. [Story 20.5 review] */
+.related-work-more { margin: 0; }
+.related-work-more > summary {
+  cursor: pointer;
+  color: var(--ink-light);
+  font-size: 0.78rem;
+  padding: 0.35rem 0;
+}
+.related-work-more > summary:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
+[data-related-ready] .related-work-more > summary { display: none; }
+
 [data-related-ready] .related-card-full { display: none; }
 [data-related-ready] .related-card[data-related-node] { display: none; }
 [data-related-ready][data-related-scope] .related-card-project { display: none; }

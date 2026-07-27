@@ -345,6 +345,41 @@ public class SettingsStoreTests : IDisposable
         Assert.Null(loaded!.TodayPolicy);
     }
 
+    /// <summary>TodayPolicy is the first enum-typed field in a hand-editable settings file, and a genuinely
+    /// unrecognized token must not take the rest of the document down with it: it degrades that one field to "not
+    /// configured" instead of failing JsonSerializer.Deserialize for the whole object and silently discarding
+    /// Source/Output/every other saved field too. [Review][Patch — code review 2026-07-26]</summary>
+    [Fact]
+    public void TryLoad_ToleratesAnUnrecognizedTodayPolicyTokenWithoutLosingOtherFields()
+    {
+        var repo = NewDir();
+        File.WriteAllText(
+            Path.Combine(repo, SettingsStore.FileName),
+            """{ "Source": "docs", "Output": "out", "TodayPolicy": "some-future-policy" }""");
+
+        var loaded = SettingsStore.TryLoad(repo);
+
+        Assert.NotNull(loaded);
+        Assert.Equal("docs", loaded!.Source);
+        Assert.Equal("out", loaded.Output);
+        Assert.Null(loaded.TodayPolicy);
+    }
+
+    /// <summary>The CLI's own accepted spellings for `--today-policy` (case-insensitive, hyphenated) now also
+    /// round-trip through the JSON field — reusing <see cref="DatePolicies.TryParse"/> instead of a bare
+    /// enum-member-name match is strictly MORE forgiving, not just non-crashing, for the exact tokens a human is
+    /// most likely to type by hand. [Review][Patch — code review 2026-07-26]</summary>
+    [Fact]
+    public void TryLoad_AcceptsTheCliSpellingOfTodayPolicyDirectlyInTheJsonField()
+    {
+        var repo = NewDir();
+        File.WriteAllText(
+            Path.Combine(repo, SettingsStore.FileName),
+            """{ "TodayPolicy": "last-commit" }""");
+
+        Assert.Equal(DatePolicy.LastCommit, SettingsStore.TryLoad(repo)!.TodayPolicy);
+    }
+
     // ---- ADR 0014: `.specscribe` is a folder containing config.json, not a flat file ----
 
     private static string WriteFolderSettings(string dir, string json)

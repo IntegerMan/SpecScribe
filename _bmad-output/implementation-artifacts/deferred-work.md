@@ -1013,3 +1013,31 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 - source_spec: `20-3-related-work-side-pane-on-selection.md`
   summary: "epicsByNumber = epics.Epics.ToDictionary(e => e.Number)" throws on a duplicate epic number with no dedup guard. Not a regression this story introduced — the same unguarded ToDictionary(e => e.Number) pattern already exists at Charts.cs:4322 and RequirementsParser.cs:55,307, so this is a codebase-wide assumption (epics.md never produces duplicate epic numbers) this story inherited rather than created.
   evidence: Edge Case Hunter, verified during triage. [`src/SpecScribe/RelatedWorkCards.cs:61`]
+
+## Deferred from: code review of 25-1-sonarcloud-onboarding-and-ci-analysis (2026-07-26)
+
+- source_spec: `25-1-sonarcloud-onboarding-and-ci-analysis.md`
+  summary: The `actions/cache@v4` key for the SonarQube Cloud scanner (`${{ runner.os }}-sonar-scanner`) has no version component, so once a run populates the cache, `dotnet tool update dotnet-sonarscanner` never executes again and the cached scanner binary is pinned indefinitely with no built-in refresh mechanism.
+  evidence: Blind Hunter + Edge Case Hunter, verified during triage. This is the flip side of an open question the story already routes to Story 17.2 ("[scanner tool] is installed... unversioned... pinning it is a legitimate 17.2 call... flagged here rather than decided unilaterally") rather than a new defect — deferred to that story. [`.github/workflows/build-test-analyze.yml:100-113`]
+
+## Deferred from: code review of 18-1-bmad-module-landscape-and-coverage-spike (2026-07-26)
+
+- source_spec: `18-1-bmad-module-landscape-and-coverage-spike.md`
+  summary: `_bmad-output/planning-artifacts/epics.md` is absent from Story 18.1's File List even though its Dev Notes assert the 18.2 -> 18.2/18.5 scope split landed there. The split genuinely did land (Story 18.2 redefined, Story 18.5 added), and attributing the edit to the create-story 18.2 session is defensible — but CLAUDE.md requires `epics.md` and `sprint-status.yaml` to move together in the same change, and a review scoped by this story's File List would never see it.
+  evidence: Blind Hunter + Acceptance Auditor, verified during triage. Belongs to create-story 18.2's own review rather than 18.1's. [`_bmad-output/planning-artifacts/epics.md:3047-3142`]
+
+## Deferred from: code review of 23-2-component-library-and-design-token-bridge (2026-07-26)
+
+- source_spec: `23-2-component-library-and-design-token-bridge.md`
+  summary: `SiteGenerator.WriteTextWithRetry` and the `index.html` write it converted are undeclared sibling work (annotated `[Story 20.5 owner round]`, absent from 23.2's File List) and carry three defects of their own. (a) Its doc claims parity with `CopyEmbeddedAsset`, but it omits the tmp-file + atomic `File.Move` half a Story 5.3 review-fix added precisely because truncate-then-fail leaves a corrupt file on the final attempt. (b) The `IOException or UnauthorizedAccessException` catch filter makes no transient/permanent distinction, so a read-only target burns four attempts, sleeps 75ms, and still destroys the previously-good page. (c) Only one write site was converted — `WriteOutput` (`SiteGenerator.cs:3017`), which every other page including the new `design-system.html` rides, still calls bare `File.WriteAllText`, so the contention race the retry was added for is unguarded everywhere except `index.html`.
+  evidence: Blind Hunter + Edge Case Hunter + Acceptance Auditor, verified during triage. Belongs to Story 20.5's own review, not 23.2's. [`src/SpecScribe/SiteGenerator.cs:4439`, `src/SpecScribe/SiteGenerator.cs:3017`]
+
+## Deferred from: code review of 20-5-hierarchy-explorer-component (2026-07-26)
+
+- source_spec: `20-5-hierarchy-explorer-component.md`
+  summary: Story 3.5's pure-CSS legend hover-emphasis is dead on the mounted Plotly chart. The rules are `.sunburst-panel:has(.sb-<status>-item:hover) .sb-seg:not(.sb-<status>)`, and `.sb-seg` exists only inside the server SVG the component hides on takeover; Plotly draws `g.slice path.surface` and the a11y layer adds only `ss-hierarchy-sector`. Structural and already recorded in project memory as dying at Story 20.7 regardless of what 20.5 does. Separately, the comment in `DashboardViewBuilder.BuildHierarchyExplorerHtml` claims that keeping the `.sunburst-panel` class preserves the behaviour — it preserves a selector whose subject is hidden, and should say so.
+  evidence: Blind Hunter, verified during triage. Belongs to Story 20.7, which deletes the SVG and owns the replacement emphasis mechanism. [`src/SpecScribe/assets/specscribe.css:3230-3249`, `src/SpecScribe/DashboardViewBuilder.cs`]
+
+- source_spec: `20-5-hierarchy-explorer-component.md`
+  summary: Epic cards lose their stories' relationships in the engine-blocked-but-JS-on path. With Plotly blocked but `specscribe.js` running, Story 20.2's block drives the rail and its SVG NAVIGATES on a story click rather than selecting, so the story cards Story 20.5 added are unreachable — while the epic card no longer carries the folded story subjects it used to before round 2 removed the story->epic fold. Nothing is lost with JS fully off (every card renders stacked).
+  evidence: Edge Case Hunter, verified during triage. The path exists only while the 20.2 and 20.5 implementations coexist and disappears when Story 20.7 deletes 20.2's block. [`src/SpecScribe/RelatedWorkCards.cs:71-112`]

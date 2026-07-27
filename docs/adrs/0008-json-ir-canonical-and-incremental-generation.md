@@ -35,11 +35,13 @@ This move is a natural extension of existing invariants, not a break:
 
 1. **The serialized JSON data-layer is the canonical intermediate representation (IR) of a SpecScribe project.** It carries AD-2's host-neutral view models plus **pre-rendered SVG chart fragments**. The C# core is its single producer (AD-1 unchanged).
 
+   > **⚠ Both halves of this sentence are amended.** The *chart* half by [ADR 0013](0013-text-twin-is-the-no-js-contract.md) §5 (ratified 2026-07-24 — the IR carries chart **data + component configuration** and the server-rendered text twin, because Plotly cannot server-render). The *prose* half by [ADR 0016](0016-ir-carries-rendered-prose-html.md) (**Proposed** — the IR carries **Markdig-rendered prose HTML as strings**, not re-modelled view models; Story 23.1's finding that the custom Markdig renderers are a fidelity non-risk holds only under that amendment). AD-2's view models are **not** retired by either: they remain the core's internal contract, and only what the IR *transports* changes.
+
 2. **Static HTML, the SPA, and the VS Code webview are co-equal projections of the IR.** Static HTML remains the **JS-optional accessibility baseline (NFR6)** — reframed as *a projection of the IR*, **not** the sole output and **not** a mere `<noscript>` afterthought.
 
 3. **Generation targets an incremental, event-driven model.** The C# core recomputes only the changed scope (operationalizing AD-5, including AD-5's rule that *topology changes may trigger a broader refresh*) and emits **IR deltas** suitable for a future watch / client-server transport (conformant with AD-8).
 
-4. **NON-GOAL: this does not reopen the C#→TS core port.** ADR 0006 stands. Charts stay **pre-rendered SVG inside the IR**; the byte-size reduction that would require the TS chart port is explicitly out of scope. *(The presentation-layer rendering language is a separate question — see [ADR 0009](0009-frontend-framework-for-projection-layer.md).)*
+4. **NON-GOAL: this does not reopen the C#→TS core port.** ADR 0006 stands. ~~Charts stay **pre-rendered SVG inside the IR**~~ (**superseded by [ADR 0013](0013-text-twin-is-the-no-js-contract.md) §5**, restated in [ADR 0016](0016-ir-carries-rendered-prose-html.md) §Decision 3 — there is no pre-rendered chart SVG left to carry); the byte-size reduction that would require the TS chart port is explicitly out of scope. *(The presentation-layer rendering language is a separate question — see [ADR 0009](0009-frontend-framework-for-projection-layer.md).)*
 
 ### Disposition — design-now, build-later
 
@@ -65,3 +67,5 @@ This ADR **locks the direction**; it does not schedule the build. The eventual w
 - **Presentation-layer follow-on:** [ADR 0009 — Front-End Framework for the Projection Layer](0009-frontend-framework-for-projection-layer.md).
 - **Architecture:** [ARCHITECTURE-SPINE.md](../../_bmad-output/specs/spec-specscribe/ARCHITECTURE-SPINE.md) — AD-1/AD-2 (shared core; adapters translate), AD-5 (changed-scope recomputation), AD-8 (canonical interaction state, adapter transport), NFR4 (additive), NFR6 (accessibility), NFR9 (reproducible CI).
 - **Section view models the IR serializes:** Story 6.2; `DashboardView.cs` / `EpicsView.cs` + builders; `tests/SpecScribe.Tests/SectionViewModelSerializationTests.cs`.
+- **Amendments to §Decision 1:** [ADR 0013](0013-text-twin-is-the-no-js-contract.md) §5 (the chart half — data + component config, not SVG) and [ADR 0016](0016-ir-carries-rendered-prose-html.md) (the prose half — rendered HTML strings, not re-modelled view models; also versions the IR and seats it as `spa/` promoted in place). **Read §Decision 1 and §Decision 4 only together with both.**
+- **The IR as shipped:** Story 22.2; `src/SpecScribe/SpaDelivery.cs` (`schemaVersion`, per-page head projection / script-island declaration / content hash + bytes, byte-bounded chunking); `tests/SpecScribe.Tests/CanonicalIrSerializationTests.cs` (the golden round-trip boundary this ADR's §Consequences called for).

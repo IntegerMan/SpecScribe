@@ -11,8 +11,10 @@ touches: [".github/workflows/**", ".gitignore", "README.md"] # NOT src/** and NO
 
 # Story 25.1: SonarCloud Onboarding and Automated Analysis on Every Push to `main`
 
-Status: review <!-- 2026-07-26: both owner actions landed; analysis is live and green end to end.
-See Dev Agent Record -> Completion Notes section 0. One known blind spot is in Open items item 5. -->
+Status: done <!-- 2026-07-26: both owner actions landed; analysis is live and green end to end.
+See Dev Agent Record -> Completion Notes section 0. One known blind spot is in Open items item 5.
+2026-07-26: code review complete — 2 decision-needed resolved by owner, 5 patch applied, 1 deferred to 17.2,
+12 dismissed. See § Review Findings. -->
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -229,6 +231,24 @@ with that per-test justification; changing anything under `src/` is not.
         set (default: **not** set here — failing the build on the gate is 25.2's decision, not this story's), and
         where the first analysis results live.
 
+### Review Findings
+
+Scoped to this story's own commits (`611097d` through `cd7f302`), excluding sibling-story commits
+(`bcca682`, `1116e13`, `261b300`) that landed interleaved on shared `main` per CLAUDE.md's review-scoping
+convention. Blind Hunter, Edge Case Hunter, and Acceptance Auditor ran in parallel; 20 raw findings triaged
+to 2 decision-needed, 5 patch, 1 defer, 12 dismissed as noise or already-accepted trade-offs.
+
+- [x] [Review][Decision] Standing `portability-probe` (ubuntu-latest) job runs on every future push/PR indefinitely, beyond Task 6's one-time "attempt ubuntu-latest" framing. **Owner decision (2026-07-26): keep it permanent** — non-gating, cheap on a public repo (unlimited Actions minutes), ongoing portability signal for free. [.github/workflows/build-test-analyze.yml:172-204]
+- [x] [Review][Decision] `SonarScanner begin`/`end` steps have no failure isolation from Build/Test — a SonarCloud outage/auth hiccup would fail the whole required `build-test-analyze` job. **Owner decision (2026-07-26): isolate scanner failures from Build/Test** — see the applied patch below.
+- [x] [Review][Patch] Applied — documented that `portability-probe` is a deliberate permanent, non-gating CI job (owner-confirmed 2026-07-26), not the one-time Task 6 experiment it started as. [25-1-sonarcloud-onboarding-and-ci-analysis.md § Runner OS]
+- [x] [Review][Patch] Applied — added `continue-on-error: true` to both `SonarScanner begin` and `SonarScanner end`, so a SonarCloud outage or auth error cannot fail the `build-test-analyze` required check; Build and Test are untouched and still gate normally. [.github/workflows/build-test-analyze.yml:114-150]
+- [x] [Review][Patch] Applied — added the 4 missing files (`README.md`, `docs/SonarCloudSetup.md`, `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs`, `tests/SpecScribe.Tests/SiteGeneratorEpicsRemovalTests.cs`) to the File List, which had undersold this story's own scope. [25-1-sonarcloud-onboarding-and-ci-analysis.md § File List]
+- [x] [Review][Patch] Applied — Dev Notes §5's exclusion table was missing 4 entries (`_bmad/**`, `.claude/**`, `.agents/**`, `chat.json`) that §0b documents adding via commit `ab7a25a`; the table now matches the shipped `/d:sonar.exclusions` string verbatim. [25-1-sonarcloud-onboarding-and-ci-analysis.md § Dev Notes § 5]
+- [x] [Review][Patch] Applied — `IsCopiedAsset`/`IsVendoredAsset` were two independently hand-maintained allowlists (verified currently complete — 6 `CopyEmbeddedAsset` call sites in `SiteGenerator.cs` mapped 1:1 to the two lists, but nothing tied them to each other). Merged into a single `KnownStaticAssets` map so the two predicates read from one source of truth and cannot silently disagree. [tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs:1104-1142]
+- [x] [Review][Patch] Applied — `VendoredAssetToken` hashed via `File.ReadAllText(...).Replace(...)` + `Encoding.UTF8.GetBytes(...)`, a text round-trip that silently strips a BOM and replaces invalid byte sequences, undermining the token's exact-content-identity claim. Replaced with a raw-byte CRLF fold (`FoldCrLfBytes`) with no text-encoding round-trip. [tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs:1147-1172]
+- [x] [Review][Patch] Applied — added a sentence next to the frontmatter's "`GoldenContentFingerprint` MUST NOT move" line explicitly citing the AC #4 carve-out that licenses this story's own regeneration, so a future reviewer reading only that line doesn't misread it as a flat violation. [25-1-sonarcloud-onboarding-and-ci-analysis.md § What this story must NOT do]
+- [x] [Review][Defer] Sonar-scanner `actions/cache@v4` key has no version component, so `dotnet tool update dotnet-sonarscanner` never re-runs once cached — deferred, pre-existing open question. This is the same "scanner version currently unpinned" call the story already routes to Story 17.2 ("pinning it is a legitimate 17.2 call... flagged here rather than decided unilaterally"); the cache-key gap is the flip side of that same open decision, not a new defect. [.github/workflows/build-test-analyze.yml:100-113]
+
 ## Dev Notes
 
 ### Verified current state (checked 2026-07-25 at `92fa581`)
@@ -327,9 +347,21 @@ experiment, and report the divergences (AC #4) rather than quietly switching. En
 hardcodes a Windows path, tests use `Path.DirectorySeparatorChar`, and `publish-docs-live-pages.yml` already runs
 the full generation path on `ubuntu-latest` today.
 
+**⚠️ Scope decision 2026-07-26 (code review).** What shipped is a *standing* `portability-probe` job that runs
+on every future push and PR, not the one-time experiment this section describes. Flagged in review as a
+"decision needed" because it's a permanent doubling of CI compute per push beyond what this task asked for.
+**Owner decision: keep it permanent** — it is non-gating, the repo has unlimited Actions minutes as a public
+project, and the ongoing portability signal is worth the cost. No workflow change made; recorded here so a
+future reader does not mistake the standing job for scope creep against this section's original framing.
+
 ### § What this story must NOT do
 
 - **Must not move `GoldenContentFingerprint`.** Dev-time tooling only; the generated portal is untouched.
+  **⚠️ Clarified 2026-07-26 (code review):** this story's own work regenerates the constant anyway (§ 4) —
+  that is not a violation of this line. AC #4's carve-out is what licenses it: "changing a `.cs` file under
+  `tests/` is permitted only under this AC and only with that per-test justification," and § 4 documents the
+  per-change root cause for each regeneration. This line prohibits an *unjustified* regeneration to paper over
+  a real rendering change, not the portability-normalization fix AC #4 explicitly allows.
 - **Must not edit `src/SpecScribe/**`.** If a Sonar finding tempts you to fix code — that's Story 25.2's triage
   pass, and structural/security/perf items route to Stories 17.1–17.3.
 - **Must not define the quality gate.** AC #1 of Story 25.2 owns the gate conditions and what a failing gate
@@ -674,6 +706,14 @@ Excluded (all verified to exist in the tree before being listed):
 | `extension/node_modules/**`, `extension/dist/**`, `extension/bin/**` | Dependencies and build output. |
 | `SpecScribeOutput/**`, `docs/live/**`, `artifacts/**` | Generated portal output. |
 | `_bmad-output/**` | Planning/implementation artifacts — prose, not source. |
+| `_bmad/**`, `.claude/**`, `.agents/**` | Installed BMad tooling and skill packs, not authored here — `.claude` and `.agents` hold the *same* packs, which is where the spurious 12.1% duplication figure came from. |
+| `chat.json` | A 4,861-line transcript at the repo root. |
+
+**⚠️ Table corrected 2026-07-26 (code review).** This table originally listed only the first seven rows — the
+pre-widening state. The last two rows (`_bmad/**`/`.claude/**`/`.agents/**` and `chat.json`) were added by
+commit `ab7a25a` and are already live in the shipped `/d:sonar.exclusions` string (see § 0b above), but this
+table itself was never updated to match — exactly the kind of drift this story's own § 0b lesson warns about
+("an exclusion list cannot be validated by reading it"). It now matches the workflow file verbatim.
 
 **`extension/src/**` is IN scope** (the explicit Task 5 question). It is a single genuine first-party
 file, `extension/src/extension.ts` — the maintained VS Code TypeScript shim. Excluding real source to
@@ -774,9 +814,17 @@ constant again (working-tree line endings change), so it is a deliberate, review
 
 ### File List
 
+**⚠️ Corrected 2026-07-26 (code review) — this list originally omitted 4 real files that the Dev Agent Record's
+own narrative (§ 4, § 4b, § 5, Task 7) already discussed at length.** CLAUDE.md scopes reviews by a story's own
+File List, so an incomplete one is a real gap, not a formality — it now matches the diff.
+
 - `.github/workflows/build-test-analyze.yml` — **added**
 - `tests/SpecScribe.Tests/CommitDetailTemplaterTests.cs` — **modified** (one test, AC #4-justified — see § 4)
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — **modified** (golden-fingerprint portability fix, AC #4-justified — see § 4)
+- `tests/SpecScribe.Tests/SiteGeneratorEpicsRemovalTests.cs` — **modified** (flaky concurrency test fix, AC #4-justified — see § 4)
 - `.gitignore` — **modified** (added `.sonarqube/`, `.sonar/`)
+- `README.md` — **modified** (added a Continuous integration section)
+- `docs/SonarCloudSetup.md` — **added**
 - `_bmad-output/implementation-artifacts/25-1-sonarcloud-onboarding-and-ci-analysis.md` — **modified** (this record)
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` — **modified** (status transitions)
 
@@ -787,3 +835,4 @@ constant again (working-tree line endings change), so it is a deliberate, review
 | 2026-07-25 | Added `.github/workflows/build-test-analyze.yml`, the repository's first build+test workflow, with SonarScanner for .NET analysis and a non-gating ubuntu portability probe. Added `.sonarqube/` and `.sonar/` to `.gitignore`. Commit `252087f`. |
 | 2026-07-25 | Fixed a time-zone-dependent assertion in `CommitDetailTemplaterTests.RenderPage_BinaryRowShowsMarkerNotZeroChurn` — it failed on both CI runners because a whole-page `DoesNotContain("+0")` matched the footer's `UTC+00:00` offset. Scoped to the churn cells and strengthened with two positive assertions. Commit `43e9528`. AC #4-justified. |
 | 2026-07-25 | Gate green on `main` (run `30175713872`): 2390 passed / 0 failed / 0 skipped on `windows-latest`. Coverage enabled on measured evidence (+13 s / +30.6 % test-step wall-clock). Story remains **in-progress**: two owner actions block the analysis half of AC #1 — see § 0. |
+| 2026-07-26 | Code review (scoped to this story's own commits, excluding sibling stories 18.x/20.x/22.x/23.x/25.5/25.6/27 on the same shared `main`): 2 decision-needed (owner kept `portability-probe` permanent; owner chose to isolate SonarScanner failures from Build/Test), 5 patch, 1 defer, 12 dismissed. All 7 patches applied: `continue-on-error` added to both SonarScanner steps; `IsCopiedAsset`/`IsVendoredAsset` merged into one `KnownStaticAssets` map; `VendoredAssetToken` switched from a `ReadAllText` round-trip to a raw-byte CRLF fold; File List corrected (4 missing files added); Dev Notes §5 exclusion table corrected to match the shipped workflow; a reconciling note added next to the frontmatter's fingerprint-immutability line; the ubuntu job's permanence documented. See § Review Findings. |

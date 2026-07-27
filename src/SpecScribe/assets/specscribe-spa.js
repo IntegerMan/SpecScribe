@@ -19,7 +19,13 @@
   // nested) URL. On reload of a pushed nested URL the browser simply loads that static page (graceful).
   var basePrefix = location.pathname.slice(0, location.pathname.lastIndexOf("/") + 1);
 
-  var manifest = null;          // { siteTitle, entry, nav, pages: { path: { title, chunk, breadcrumb, parent, children } } }
+  // { schemaVersion, siteTitle, entry, nav, oversizedPages, pages: { path: { title, chunk, breadcrumb, parent,
+  //   children, head, scriptIslands, contentHash, bytes } } }
+  // This client reads only title + chunk. The remaining fields are the canonical IR's contract for OTHER consumers
+  // (Story 22.2 / ADR 0016) — head projection, script-island declarations, and per-page delta addressing that
+  // Stories 22.5/22.6 will diff against. Deliberately NOT consumed here: 22.2 ships addressing, not a delta
+  // channel. Additive fields never bump schemaVersion, so an older cached copy of this script still works.
+  var manifest = null;
   var chunkCache = {};          // chunkFile -> { path: regionHtml }
   var currentPath = content.getAttribute("data-path") || "index.html";
   // The build's cache-busting token (identical to specscribe.css/.js's own ?v=) — appended to every manifest/chunk

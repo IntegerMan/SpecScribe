@@ -234,6 +234,36 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
         }
     }
 
+    [SkippableFact]
+    public void GenerateAll_LastCommitPolicy_LinkedHeatmapDaySetMatchesGeneratedDayPageSet()
+    {
+        // Story 5.5 AC #2's central guarantee, exercised through the REAL production call sites (SiteGenerator's
+        // shared _today threaded into GenerateDatePagesInternal and, separately, into the git-insights heatmap via
+        // GitInsightsTemplater/Charts.CommitHeatmap) — not a synthetic double-call on the pure resolver, which is
+        // trivially true of any pure function and proves nothing about the actual wiring. Under a non-default
+        // policy, the day set the heatmap links into commits/ must be EXACTLY the day set commits/ actually
+        // contains: one shared resolved "today", never two independent clock reads. [Review][Patch — closes the
+        // AC #2 integration-test gap the code review found]
+        Skip.IfNot(GitAvailable(), "git CLI unavailable on this host — install git to exercise the LastCommit policy end-to-end (skipped, not failed)");
+        Assert.True(TryCreateGitHistory(), "git is available but the test fixture's git setup failed unexpectedly");
+
+        var options = ForgeOptions.Resolve(source: Source, output: Site, projectName: "SpecScribe", includeReadme: false,
+            deepGitAnalytics: true, datePolicy: DatePolicy.LastCommit);
+        var events = new SiteGenerator(options).GenerateAll();
+        AssertNoErrors(events);
+
+        var hub = File.ReadAllText(HubPage);
+        var linkedDays = Regex.Matches(hub, "href=\"commits/(\\d{4}-\\d{2}-\\d{2})\\.html\"")
+            .Select(m => m.Groups[1].Value)
+            .ToHashSet();
+        var generatedDays = Directory.GetFiles(CommitsDayDir, "*.html")
+            .Select(p => Path.GetFileNameWithoutExtension(p)!)
+            .ToHashSet();
+
+        Assert.NotEmpty(linkedDays);
+        Assert.Equal(generatedDays, linkedDays);
+    }
+
     /// <summary>Probes for a usable git CLI on PATH, independent of fixture setup — callers use this to decide
     /// Skip (environment gap) vs. Assert.True/fail (a real regression) on <see cref="TryCreateGitHistory"/>, so a
     /// broken `git init`/`git commit` on a host that DOES have git surfaces as a genuine test failure rather than
