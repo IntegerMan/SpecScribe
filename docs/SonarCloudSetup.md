@@ -167,21 +167,267 @@ about code this project actually authors:
 > curl -s "https://sonarcloud.io/api/measures/component_tree?component=IntegerMan_SpecScribe&metricKeys=ncloc&qualifiers=DIR&s=metric&metricSort=ncloc&asc=false&ps=25"
 > ```
 
-### Known gap: JavaScript is not currently analyzed
+### Coverage exclusions
 
-`src/SpecScribe/assets/specscribe.js` is registered by the scanner but produces **no `ncloc`** — SonarJS
-reports `Some of the project files were automatically excluded because they looked like generated code` without
-naming them. It is not the usual minified-bundle heuristic (longest line is 191 characters, and Node.js was
-available). Until this is resolved, **"no JavaScript findings" means "not analyzed", not "clean"**. TypeScript
-under `extension/src` analyzes normally.
+Separately from `sonar.exclusions` (which removes files from analysis entirely), the `begin` step carries a
+`sonar.coverage.exclusions` list that removes paths from the **coverage denominator only** — their bugs and
+code smells still report normally.
+
+**This setting has a short and instructive history. Read it before changing it.**
+
+Story 25.2 set it to the whole of `web/**`, because the only report CI uploaded was C#-only OpenCover, which
+structurally cannot reach a Nuxt/Node subtree: `web/**` contributed 918 new lines to cover, all 918
+uncovered, and alone dragged `new_coverage` to 59.4% against an 80% threshold while the C# side sat at 94.9%.
+That was a workaround for a **missing report**, and 25.2 recorded it as one.
+
+Story 23.5 then supplied the missing report — Vitest under `web/` plus
+`sonar.javascript.lcov.reportPaths` — and correctly **narrowed** the exclusion to only what genuinely cannot
+be unit-tested (`web/scripts/**` harnesses, `web/server/plugins/**` Nitro plugins, and `web/**/*.vue` until
+component tests exist). The list deliberately mirrors `web/vitest.config.ts`'s own coverage `exclude` so the
+two cannot drift.
+
+**The lesson worth keeping:** a coverage exclusion is a statement that a path *cannot* be measured, never that
+it need not be. When the report arrives, the exclusion must shrink. Do not widen it back to `web/**` — measured
+`web/` coverage is about 51% statements, which *will* show `new_coverage` red, and that is the correct signal.
+
+`extension/src/**` is **not** excluded, deliberately, even though no report reaches it either (508 lines to
+cover, 0% covered). It is shipped first-party product code and its 0% is a finding this project wants visible.
+The accepted consequence: **the next change to `extension/src` will turn the gate red on `new_coverage`, and
+that too is correct.**
+
+### Known gap: `specscribe.js` is not analyzed (JavaScript generally *is*)
+
+`src/SpecScribe/assets/specscribe.js` is registered by the scanner but produces **no `ncloc`** and zero
+issues — SonarJS reports `Some of the project files were automatically excluded because they looked like
+generated code` without naming them. It is not the usual minified-bundle heuristic (longest line is 191
+characters, and Node.js was available).
+
+**This gap is file-specific, not language-wide.** As of 2026-07-27 SonarJS analyzes `web/**` normally and
+reports real findings there (`javascript:*` and `typescript:*` rules across `web/scripts/`, `web/ir/`, and the
+`.vue` components), and TypeScript under `extension/src` has always analyzed. So:
+
+- "No findings in `web/`" would mean clean.
+- "No findings in `specscribe.js`" means **not analyzed**.
+
+Re-check the gap with:
+
+```bash
+curl -s "https://sonarcloud.io/api/measures/component?component=IntegerMan_SpecScribe%3Asrc%2FSpecScribe%2Fassets%2Fspecscribe.js&metricKeys=ncloc,lines,violations"
+```
+
+A response carrying `lines` but no `ncloc` means the file is still being skipped.
 
 `tests/SpecScribe.Tests` is classified as test code automatically by SonarScanner for .NET, via its
 `Microsoft.NET.Test.Sdk` / xunit references.
 
-### Quality gate
+---
 
-No quality gate is enforced by this workflow: `sonar.qualitygate.wait` is deliberately **not** set, so a
-failing gate does not currently fail the build. Analysis results are reported, not gated.
+## Quality gate
+
+**Decided by Story 25.2 on 2026-07-27. Earlier wording in this file said "no quality gate is enforced" — that
+was true about `sonar.qualitygate.wait` and misleading about the gate, which has been evaluating since the
+first analysis.**
+
+### Which gate
+
+SonarCloud applies its built-in **`Sonar way` (id 9)** to this project. Story 25.2 kept it rather than
+minting a project-specific gate. The reason is 1e below: a custom gate is a *server-side* object that no diff
+shows and no reviewer sees, and the org already contains a live demonstration of that failure mode — a
+second, non-default gate named **`Customized` (id 4194)** with `new_coverage ≥ 30` and
+`new_duplicated_lines_density ≤ 8`, which is **not applied to this project** and is documented nowhere.
+Anyone who finds it should assume it is inert unless `get_by_project` says otherwise.
+
+### The conditions, transcribed
+
+Gate conditions cannot live in the workflow file — they are server-side. They are transcribed here so a
+reviewer can see them without a SonarCloud login, and verified with the command below.
+
+| Condition | Operator | Threshold | Enforcing or advisory |
+|---|---|---|---|
+| `new_reliability_rating` | worse than | A | Advisory (reports; does not block) |
+| `new_security_rating` | worse than | A | Advisory |
+| `new_maintainability_rating` | worse than | A | Advisory |
+| `new_coverage` | less than | 80% | Advisory |
+| `new_duplicated_lines_density` | greater than | 3% | Advisory |
+| `new_security_hotspots_reviewed` | less than | 100% | Advisory |
+
+**Every condition is advisory today**, because `sonar.qualitygate.wait` is not set. A failing gate therefore
+blocks **nothing**: it reports on the SonarCloud dashboard and on pull requests, and CI stays green.
+
+```bash
+curl -s "https://sonarcloud.io/api/qualitygates/get_by_project?project=IntegerMan_SpecScribe&organization=integerman-github"
+```
+
+```bash
+curl -s "https://sonarcloud.io/api/qualitygates/project_status?projectKey=IntegerMan_SpecScribe"
+```
+
+### The new-code period
+
+Currently **`days: 30`** — a sliding window whose effective start is the first analysis
+(`2026-07-25T20:54:41Z`). Story 25.2 kept it, with the defect named rather than hidden:
+
+> On a repository whose first analysis is days old, a sliding 30-day window makes "new code" ≈ "all code".
+> `new_lines` went **3,198 → 22,640 in a single day** as the window swallowed whole epics. The new-code
+> conditions are currently behaving as whole-project conditions.
+
+The alternatives were rejected as costing more than they are worth *today*, not as wrong:
+
+- **`previous_version`** is the right long-term answer, but it needs `sonar.projectVersion` wired to the
+  build's informational version, and "new since the last released version" is meaningless for a project that
+  has not released. **Revisit at the first release tag (Epic 16).**
+- **A reference branch** is degenerate when the analyzed branch *is* `main`.
+
+### What would make the gate blocking
+
+`sonar.qualitygate.wait` is **not** set, deliberately. Setting it today would turn every push to `main` red on
+findings that live in `src/` and `web/` — code Epic 25 is explicitly forbidden to touch — and would break CI
+for concurrent work mid-epic.
+
+Set it once **all three** of these are true:
+
+1. `new_coverage` passes. **Not yet.** The C# side is comfortably clear at 94.9%, but Story 23.5 replaced
+   25.2's blanket `web/**` coverage exclusion with real measurement, and measured `web/` sits at roughly 51%
+   statements. The remaining gap is `.vue` component tests, named as a follow-up in Story 23.5's report.
+2. `new_reliability_rating` is A — today it is **D**, driven by two CRITICAL `javascript:S2871` bugs in
+   `web/scripts/check-links.mjs:204` and `web/scripts/ir-content-build.mjs:224`. Owned by Epic 23.
+3. `new_security_rating` is A — today it is **B**, driven by new `csharpsquid:S6444` instances. Owned by
+   Story 17.2.
+
+Until then the actionable channel is **pull-request decoration** by the SonarQube Cloud GitHub App, not a red
+CI job.
+
+---
+
+## Triaging findings
+
+This is the repeatable pass. Run it top-to-bottom; it is designed so two sessions running it a month apart
+produce comparable output. Story 25.2 performed the first baseline with it.
+
+### Step 1 — Always pass `resolved=false`
+
+`api/issues/search` **includes closed issues by default**, and the gap is large and growing: on 2026-07-27 the
+unfiltered response reported **1,598** issues against a real unresolved count of **1,420** — a 178-issue
+difference, all of it CLOSED/FIXED issues on paths the exclusion list removed from analysis. Triaging the
+default response manufactures backlog items pointing at files Sonar no longer looks at.
+
+### Step 2 — Take the shape of the set before any issue text
+
+```bash
+curl -s "https://sonarcloud.io/api/issues/search?componentKeys=IntegerMan_SpecScribe&resolved=false&ps=1&facets=rules,types,severities"
+```
+
+```bash
+curl -s "https://sonarcloud.io/api/measures/component?component=IntegerMan_SpecScribe&metricKeys=ncloc,files,coverage,duplicated_lines_density,security_rating,reliability_rating,sqale_rating,alert_status,sqale_index,new_lines"
+```
+
+### Step 3 — Triage by RULE, not by issue
+
+This is the whole method. On 2026-07-27, 1,420 issues collapsed to ~40 rules and the **top three rules were
+746 issues — 52.5% of everything**. A per-issue pass is a transcription, not a triage.
+
+For each rule above the materiality bar record: rule id, name, count, severity, whether it is a SonarSource
+rule (`csharpsquid:` / `css:` / `javascript:` / `typescript:` / `githubactions:`) or an **external Roslyn**
+import (`external_roslyn:`), and one decision — **fixed**, **scheduled to a named story**, or **accepted with
+rationale**.
+
+**The materiality bar used by the 25.2 baseline**, restated so a future pass can match or deliberately change
+it:
+
+- **Every bug gets an individual decision.** No volume excuse. There were 14.
+- **Every vulnerability rule gets a decision**, individually where the count is small.
+- **Every rule with ≥ 20 unresolved issues** gets a decision, as a rule.
+- **The INFO band is one decision.** All 771 INFO issues are `external_roslyn:` imports — .NET SDK analyzer
+  output the scanner picks up from the build, not SonarSource rules.
+
+Bugs and vulnerabilities enumerate cheaply:
+
+```bash
+curl -s "https://sonarcloud.io/api/issues/search?componentKeys=IntegerMan_SpecScribe&resolved=false&types=BUG&ps=100"
+```
+
+New-code issues — the ones actually driving the gate — need `inNewCodePeriod`:
+
+```bash
+curl -s "https://sonarcloud.io/api/issues/search?componentKeys=IntegerMan_SpecScribe&resolved=false&inNewCodePeriod=true&types=BUG,VULNERABILITY&ps=100"
+```
+
+Rule names resolve with the **required** `organization` parameter — omitting it returns an error, not a rule:
+
+```bash
+curl -s "https://sonarcloud.io/api/rules/show?organization=integerman-github&key=csharpsquid:S6444"
+```
+
+### Step 4 — Check the existing decisions before deciding anything
+
+Read **§ Rule-level decisions** below and the most recent
+`## Deferred from: …-quality-gate-and-findings-triage` group in
+[`_bmad-output/implementation-artifacts/deferred-work.md`](../_bmad-output/implementation-artifacts/deferred-work.md).
+A rule already dispositioned there is **not re-triaged** — that is the entire point of recording it.
+
+### Step 5 — Write the output where the project already reads it
+
+Findings route into `deferred-work.md`, which is **parsed by `src/SpecScribe/DeferredWorkParser.cs` and
+rendered on the portal's follow-up surface** (FR30 / Story 9.6). It is not a scratch file. The format is a
+contract:
+
+- Group heading: `## Deferred from: <label>` — the label must contain an `N-M-slug` with a letter in it for
+  provenance to link back. A bare date will not match.
+- Items are **column-0** list markers. Indented lines are continuations of the current item.
+- Match the existing `- source_spec: / summary: / evidence:` shape.
+- Resolution is `~~strikethrough~~` or a bracketed `[RESOLVED`. A bare word "RESOLVED" in prose does nothing.
+
+**Budget: ≤ 15 items for a whole baseline pass.** Add `sprint-status.yaml` `action_items:` entries only for
+things needing a *person* to act; findings scheduled into a story belong in `deferred-work.md` and must not be
+duplicated in both.
+
+**Verify by generating, not by re-reading the markdown:**
+
+```bash
+dotnet run --project src/SpecScribe -- generate --source _bmad-output --adrs docs/adrs
+```
+
+---
+
+## Rule-level decisions
+
+**This section is the single home for "Sonar reports X and this project deliberately does not follow it".**
+Story 25.2 chose it over three alternatives:
+
+| Rejected option | Why |
+|---|---|
+| Deactivate the rule in the SonarCloud **quality profile** | Server-side. Invisible in a diff, drifts silently, no reviewer ever sees it — the exact failure mode Story 25.1 rejected for exclusions, and the one the stray `Customized` gate demonstrates. |
+| A new **`.editorconfig`** | Cannot reach `csharpsquid:` / `css:` / `javascript:` rules at all — only the `external_roslyn:` band — so it could never be the *single* home and would guarantee two places to look. It also changes local and CI **build** warning behaviour for `src/` and `tests/`, which Epic 25 must not touch. Rejected, so **no ADR is required**; neither `.editorconfig` nor `Directory.Build.props` exists in this repo. |
+| Issue-level **"Won't Fix"** in the UI | Per-issue, does not scale to 156 or 326 instances, and server-side again. |
+
+**Enforcement mechanism**, for rules dispositioned *accepted — will not fix*: add
+`/d:sonar.issue.ignore.multicriteria` entries to the `begin` step in
+[`build-test-analyze.yml`](../.github/workflows/build-test-analyze.yml), in a diff, with a comment naming this
+section. For example:
+
+```text
+/d:sonar.issue.ignore.multicriteria="e1" `
+/d:sonar.issue.ignore.multicriteria.e1.ruleKey="external_roslyn:CA1861" `
+/d:sonar.issue.ignore.multicriteria.e1.resourceKey="**/*.cs" `
+```
+
+### Current decisions
+
+**As of the 2026-07-27 baseline, the enforcement mechanism is deliberately applied to zero rules.** That is a
+decision, not an omission, and the reason is worth keeping:
+
+> Every rule in the current set is either **routed to a named Epic 17 story** — where suppressing it would
+> hide scheduled work from the dashboard that is supposed to prove it done — or **INFO-band external Roslyn**,
+> whose disposition is *accepted for now, measured at Story 17.3*, and Story 17.3's AC #1 requires a
+> measurement before and after. Suppressing either band destroys the evidence the decision depends on.
+
+| Rule(s) | Count (2026-07-27) | Decision |
+|---|---|---|
+| `csharpsquid:S6444` — regex without timeout | 156 | **Scheduled → Story 17.2.** Not noise despite MINOR severity: SpecScribe parses markdown from arbitrary third-party repositories, so catastrophic backtracking is a real input-driven surface. Drives security rating **C** and keeps `new_security_rating` at **B**. Not suppressed. |
+| `csharpsquid:S4036` — OS command search in PATH | 1 | **Scheduled → Story 17.2**, with S6444. |
+| `githubactions:S8233` / `S8264` | 3 | **Fixed by Story 25.2** — permissions moved to job level in `publish-docs-live-pages.yml`. |
+| `external_roslyn:*` INFO band | 771 | **Accepted for now, not suppressed.** Revisit at Story 17.3 (the performance rules: `CA1861`, `CA1859`, `CA1822`) and as a bulk disposition for the rest. |
+| Everything else above the bar | — | Routed to Stories 17.1 / 17.3 / 17.5 — see the `25-2-quality-gate-and-findings-triage` group in `deferred-work.md`. |
 
 ## Security notes
 

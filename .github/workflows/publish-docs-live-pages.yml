@@ -12,11 +12,10 @@ on:
       - ".github/workflows/publish-docs-live-pages.yml"
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
+# Permissions are declared per JOB, not here at workflow level (Story 25.2,
+# githubactions:S8233 x2 + S8264 x1). Workflow-level grants apply to every job,
+# so the build job would otherwise carry `pages: write` and `id-token: write`
+# that only the deploy job needs.
 concurrency:
   group: pages
   cancel-in-progress: false
@@ -24,6 +23,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      # Checkout + generate + upload the artifact. No write scope of any kind.
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -69,6 +71,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     timeout-minutes: 10
+    permissions:
+      # actions/deploy-pages@v5 requires all three: `pages: write` to create the
+      # deployment, `id-token: write` for its OIDC verification of the artifact,
+      # and `contents: read`.
+      contents: read
+      pages: write
+      id-token: write
     steps:
       # GitHub's Pages backend intermittently returns "Deployment failed, try
       # again later." at the status-polling stage. The first attempt is allowed
