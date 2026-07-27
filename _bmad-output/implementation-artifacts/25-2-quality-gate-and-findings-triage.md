@@ -680,10 +680,18 @@ what 23.5 did. Three artifacts were reconciled to the new reality rather than le
 figures: `docs/SonarCloudSetup.md` § *Coverage exclusions*, the coverage entry in `deferred-work.md`, and
 precondition 1 of the `qualitygate.wait` action item.
 
+**Post-merge measurement (added after `main` reached `b86fc27`, the first analysis with the full C# + JS
+coverage path actually running): the supersession did not just preserve honesty, it fixed the condition.**
+`new_coverage` went **59.4% → 89.3%**, comfortably clearing 80%. Excluding `web/scripts/**` removed 743 of the
+918 uncovered lines and left a denominator of genuinely testable code. **Precondition 1 for
+`sonar.qualitygate.wait` is now met**, and the two that remain are both in `web/scripts/**` and both Epic 23's
+— see §7.
+
 **Two consequences that must not be lost:**
 
-- **The `87.6% → 91.4%` projection this story would have produced never happens.** `web/` is now *measured* at
-  roughly 51% statements rather than excluded, so `new_coverage` stays red — for an honest reason.
+- **The `87.6% → 91.4%` projection this story would have produced never happens**, and the real outcome is
+  better than either number implied: `web/` is *measured* rather than hidden, and the gate condition passes on
+  the strength of real tests instead of a removed denominator.
 - **`build-test-analyze.yml` is deliberately left uncommitted**, for Story 23.5 to land with its own untracked
   files (`web/.nvmrc`, `web/vitest.config.ts`, `web/test/`). Committing the workflow alone would have shipped a
   `node-version-file: web/.nvmrc` pointing at a file not in the commit — a guaranteed CI break. 25.2's
@@ -710,10 +718,20 @@ Roslyn, whose disposition depends on the very measurement suppression would dest
 
 #### 7. Handoffs (Task 8)
 
-**→ Story 25.6 (badges).** **The quality-gate badge cannot ship.** The gate is `ERROR` and will stay `ERROR`
-after this story, because two of its three failing conditions are driven by code Epic 25 is forbidden to touch.
-25.6's AC #1 requires badges green at the moment they land, so the quality-gate badge is **blocked**, not
-merely deferred. The build and coverage badges are unaffected and may ship alone.
+**→ Story 25.6 (badges).** **The quality-gate badge still cannot ship, but it is now two fixes away rather
+than three.** Re-measured on `main` at `b86fc27`: the gate is still `ERROR`, but only **two** conditions fail,
+and `new_coverage` has flipped to **passing at 89.3%**. What remains:
+
+| Condition | State | Driver | Owner |
+|---|---|---|---|
+| `new_coverage` | ✅ **89.3%** vs 80% | fixed by Story 23.5's real JS coverage | — |
+| `new_reliability_rating` | ❌ **D** | 1 CRITICAL `javascript:S2871`, `web/scripts/check-links.mjs:204` | Epic 23 |
+| `new_security_rating` | ❌ **C** | 2 MAJOR `jssecurity:S8707`/`S8705`, `web/scripts/experiment-two-ir.mjs:95` | Epic 23 |
+
+25.6's AC #1 requires badges green at the moment they land, so the quality-gate badge is **blocked** until
+Epic 23 clears three findings in two files. The build and coverage badges are unaffected and may ship alone.
+**Note the ownership shift:** the blockers are no longer Story 17.2's `csharpsquid:S6444` band — that still
+drives the *project-level* security rating, but no longer the *new-code* one.
 
 **→ Story 25.5 (local coverage report).** The two-numbers-that-disagree problem is now a *three*-number problem,
 and all three are explainable: coverlet/OpenCover reports ~89.8% (its own formula over C# assemblies); Sonar

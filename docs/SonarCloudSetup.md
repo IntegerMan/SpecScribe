@@ -284,15 +284,23 @@ The alternatives were rejected as costing more than they are worth *today*, not 
 findings that live in `src/` and `web/` — code Epic 25 is explicitly forbidden to touch — and would break CI
 for concurrent work mid-epic.
 
-Set it once **all three** of these are true:
+Set it once **all three** of these are true. **Measured on `main` at `b86fc27`, the first analysis with the
+full C# + JS coverage path wired:**
 
-1. `new_coverage` passes. **Not yet.** The C# side is comfortably clear at 94.9%, but Story 23.5 replaced
-   25.2's blanket `web/**` coverage exclusion with real measurement, and measured `web/` sits at roughly 51%
-   statements. The remaining gap is `.vue` component tests, named as a follow-up in Story 23.5's report.
-2. `new_reliability_rating` is A — today it is **D**, driven by two CRITICAL `javascript:S2871` bugs in
-   `web/scripts/check-links.mjs:204` and `web/scripts/ir-content-build.mjs:224`. Owned by Epic 23.
-3. `new_security_rating` is A — today it is **B**, driven by new `csharpsquid:S6444` instances. Owned by
-   Story 17.2.
+1. ✅ `new_coverage` — **PASSES, at 89.3% against 80%.** This condition was the whole story on 2026-07-27
+   morning (59.4%) and is now the least of the problem. Story 23.5's Vitest lcov report plus its *narrowed*
+   coverage exclusions did it: excluding `web/scripts/**` (743 of the 918 uncovered lines) and
+   `web/**/*.vue` left a denominator of genuinely testable code.
+2. ❌ `new_reliability_rating` must be A — it is **D**, from one CRITICAL `javascript:S2871` at
+   `web/scripts/check-links.mjs:204` (a `.sort()` with no compare function). **Owned by Epic 23.**
+3. ❌ `new_security_rating` must be A — it is **C**, from two MAJOR `jssecurity:S8707` / `S8705` at
+   `web/scripts/experiment-two-ir.mjs:95` (argument handling that can escape filesystem and shell sandbox
+   restrictions). **Owned by Epic 23.**
+
+> **Both remaining blockers are in `web/scripts/**`** — dev-time harness scripts, coverage-excluded but still
+> fully analyzed, which is exactly the intended arrangement. Neither is C# and neither is Story 17.2's:
+> the `csharpsquid:S6444` band no longer drives the *new-code* security rating, though it still drives the
+> project-level one.
 
 Until then the actionable channel is **pull-request decoration** by the SonarQube Cloud GitHub App, not a red
 CI job.
