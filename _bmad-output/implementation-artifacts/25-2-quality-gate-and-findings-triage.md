@@ -17,7 +17,7 @@ touches:
 
 # Story 25.2: Quality Gate and Findings Triage into the Project Backlog
 
-Status: in-progress
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -141,88 +141,88 @@ Binding clarifications:
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Re-measure the baseline before deciding anything (AC: #2)**
-  - [ ] Run the four commands in § Re-measure first and record today's numbers. **Every figure in this story is
+- [x] **Task 1 — Re-measure the baseline before deciding anything (AC: #2)**
+  - [x] Run the four commands in § Re-measure first and record today's numbers. **Every figure in this story is
         from 2026-07-26 and `main` moves fast** — a concurrent session landed 20.5/20.7/22.2/23.2 in `261b300`
         and moved ncloc 32,788 → 34,180 between 25.1's record and this one.
-  - [ ] Confirm the delta against this story's § The baseline table and note anything that moved materially.
+  - [x] Confirm the delta against this story's § The baseline table and note anything that moved materially.
         If a number here is wrong, say so in the record — do not quietly re-baseline.
-  - [ ] Confirm the `resolved=false` gap is still real (unresolved total vs. unfiltered total). If it has
+  - [x] Confirm the `resolved=false` gap is still real (unresolved total vs. unfiltered total). If it has
         closed, say so; if it has widened, that is a finding.
 
-- [ ] **Task 2 — Decide the gate (AC: #1)**
-  - [ ] Read the live gate state: `api/qualitygates/project_status` and `api/qualitygates/get_by_project`.
+- [x] **Task 2 — Decide the gate (AC: #1)**
+  - [x] Read the live gate state: `api/qualitygates/project_status` and `api/qualitygates/get_by_project`.
         Record the applied gate's name/id and every condition with its current actual value.
-  - [ ] Settle 1a–1e from AC #1's table. Each needs one paragraph: what you chose and what you rejected.
-  - [ ] For **1b** specifically: quantify the option you pick against today's numbers (new C# 348 LTC / 24
+  - [x] Settle 1a–1e from AC #1's table. Each needs one paragraph: what you chose and what you rejected.
+  - [x] For **1b** specifically: quantify the option you pick against today's numbers (new C# 348 LTC / 24
         uncovered; new `web/` 153 LTC / 153 uncovered). A `sonar.coverage.exclusions` answer goes on the
         `begin` step in the workflow — in a diff, matching 25.1's precedent — and must state plainly that
         `web/` and `extension/src` are then **unmeasured, not covered**.
-  - [ ] For **1d**: if you set `sonar.qualitygate.wait`, prove the job goes red on a failing gate the same way
+  - [x] For **1d**: if you set `sonar.qualitygate.wait`, prove the job goes red on a failing gate the same way
         25.1 proved red-on-test-failure — a real run, not an assertion. If you do not set it, say what makes
         the signal actionable without it.
-  - [ ] Update `docs/SonarCloudSetup.md` § *Quality gate* — it currently says *"No quality gate is enforced by
+  - [x] Update `docs/SonarCloudSetup.md` § *Quality gate* — it currently says *"No quality gate is enforced by
         this workflow"*, which is true about `qualitygate.wait` and **misleading about the gate**, since
         `Sonar way` is evaluating and failing today. Correct it either way.
 
-- [ ] **Task 3 — Prove PR decoration, or find out why it is absent (AC: #1)**
-  - [ ] Open a real pull request against `main` from a same-repo branch (so the token is present) and record
+- [x] **Task 3 — Prove PR decoration, or find out why it is absent (AC: #1)**
+  - [x] Open a real pull request against `main` from a same-repo branch (so the token is present) and record
         whether the SonarQube Cloud check and/or comment appears.
-  - [ ] If it does not appear: check the SonarQube Cloud GitHub App installation on `IntegerMan/SpecScribe`,
+  - [x] If it does not appear: check the SonarQube Cloud GitHub App installation on `IntegerMan/SpecScribe`,
         then the workflow `permissions:` block (`contents: read` only, today). Record what fixed it.
-  - [ ] Record the check name(s) SonarCloud contributes, so **Story 16.2** knows whether it has one required
+  - [x] Record the check name(s) SonarCloud contributes, so **Story 16.2** knows whether it has one required
         check (`build-test-analyze`) or two.
 
-- [ ] **Task 4 — Perform the baseline triage, rule-first (AC: #2, #3)**
-  - [ ] Pull the rule facet with `resolved=false` and work top-down by count. § The baseline has the current
+- [x] **Task 4 — Perform the baseline triage, rule-first (AC: #2, #3)**
+  - [x] Pull the rule facet with `resolved=false` and work top-down by count. § The baseline has the current
         ranking.
-  - [ ] For each rule reaching your materiality bar, record: rule id, name, count, severity, whether it is a
+  - [x] For each rule reaching your materiality bar, record: rule id, name, count, severity, whether it is a
         SonarSource rule (`csharpsquid:`/`css:`/`typescript:`…) or an **external Roslyn** import
         (`external_roslyn:`), and the decision — fixed / scheduled to story N / accepted with rationale.
-  - [ ] Give the **11 bugs** individual decisions. They are listed in § The baseline with file and line.
-  - [ ] Give `csharpsquid:S6444` (151 of 155 vulnerabilities) a single explicit decision. Note that it is
+  - [x] Give the **11 bugs** individual decisions. They are listed in § The baseline with file and line.
+  - [x] Give `csharpsquid:S6444` (151 of 155 vulnerabilities) a single explicit decision. Note that it is
         **MINOR** severity and drives the project's **security rating C** — those two facts pull in opposite
         directions and the record should say which won.
-  - [ ] State the disposition of the **755 external Roslyn / INFO** issues as one decision with its reasoning,
+  - [x] State the disposition of the **755 external Roslyn / INFO** issues as one decision with its reasoning,
         not 755 items.
 
-- [ ] **Task 5 — Write the triage output in the format SpecScribe itself parses (AC: #2, #3)**
-  - [ ] Follow § The output format is a parsed contract exactly. Verify by running a generation into
+- [x] **Task 5 — Write the triage output in the format SpecScribe itself parses (AC: #2, #3)**
+  - [x] Follow § The output format is a parsed contract exactly. Verify by running a generation into
         `SpecScribeOutput/` and looking at the rendered follow-up surface — **not** by re-reading the markdown.
-  - [ ] Keep to the budget in that section. If you exceed it, say why in the record.
-  - [ ] Add `sprint-status.yaml` action items only for items that need a *person* to act, following the
+  - [x] Keep to the budget in that section. If you exceed it, say why in the record.
+  - [x] Add `sprint-status.yaml` action items only for items that need a *person* to act, following the
         existing `- epic: / action: / owner: / status:` shape at `action_items:`. Findings scheduled into
         Epic 17 stories belong in `deferred-work.md`, not duplicated here (AC #3).
 
-- [ ] **Task 6 — Record the rule-level decision home (AC: #3)**
-  - [ ] Choose from § Where a rule-level decision lives and record why.
-  - [ ] If the choice is a new `.editorconfig` / `Directory.Build.props`: **propose an ADR** and do not bury
+- [x] **Task 6 — Record the rule-level decision home (AC: #3)**
+  - [x] Choose from § Where a rule-level decision lives and record why.
+  - [x] If the choice is a new `.editorconfig` / `Directory.Build.props`: **propose an ADR** and do not bury
         the decision in this story file (CLAUDE.md § Decision records). Neither file exists today — verified.
-  - [ ] Whatever the choice, add it to `docs/SonarCloudSetup.md` so the next maintainer finds it without
+  - [x] Whatever the choice, add it to `docs/SonarCloudSetup.md` so the next maintainer finds it without
         reading this story.
 
-- [ ] **Task 7 — Fix only what is in scope, and route everything else (AC: #2)**
-  - [ ] In scope to actually fix: the **3 `githubactions:*` findings on
+- [x] **Task 7 — Fix only what is in scope, and route everything else (AC: #2)**
+  - [x] In scope to actually fix: the **3 `githubactions:*` findings on
         `.github/workflows/publish-docs-live-pages.yml`** (workflow-level permissions that should be
         job-level). Note that **`build-test-analyze.yml` has zero findings** — 25.1's workflow already passes
         these rules, which is worth recording as evidence the gate is working on our own CI.
-  - [ ] **Out of scope to fix — route, do not touch:** anything under `src/`, `tests/`, `extension/src/`, or
+  - [x] **Out of scope to fix — route, do not touch:** anything under `src/`, `tests/`, `extension/src/`, or
         `web/`. Epic 25 ships no product code and `GoldenContentFingerprint` must not move. A tempting
         one-line CSS fix is still an `src/` edit.
-  - [ ] Confirm the fingerprint is unmoved and `git status` carries no concurrent session's work.
+  - [x] Confirm the fingerprint is unmoved and `git status` carries no concurrent session's work.
 
-- [ ] **Task 8 — Hand off (AC: #1, #2)**
-  - [ ] To **Story 25.6**: whether the quality-gate badge can now ship, and what it will read (green/red today).
+- [x] **Task 8 — Hand off (AC: #1, #2)**
+  - [x] To **Story 25.6**: whether the quality-gate badge can now ship, and what it will read (green/red today).
         25.6's AC #1 requires badges that render **green at the moment they land** — if the gate is red, say so
         plainly so 25.6 is not surprised.
-  - [ ] To **Story 25.5**: the coverage-number reconciliation is now explainable — Sonar reports **89.4 %**
+  - [x] To **Story 25.5**: the coverage-number reconciliation is now explainable — Sonar reports **89.4 %**
         project-wide but **91.3 % for `src/SpecScribe`**, because `extension/src` (508 lines to cover, 0 %
         covered) and `web/` sit in the same denominator. A local C#-only report will show the higher number.
         Record this so 25.5 does not rediscover it.
-  - [ ] To **Story 16.2**: the required-check list, updated for anything Task 3 discovered.
-  - [ ] To **Story 17.5**: the file-concentration ranking from § The baseline (SiteGenerator.cs 82 issues,
+  - [x] To **Story 16.2**: the required-check list, updated for anything Task 3 discovered.
+  - [x] To **Story 17.5**: the file-concentration ranking from § The baseline (SiteGenerator.cs 82 issues,
         Charts.cs 76) is independent corroboration of the large-file investigation's premise.
-  - [ ] Re-check whether the **SonarJS blind spot** is still live (`specscribe.js` at `lines=2954` with **no
+  - [x] Re-check whether the **SonarJS blind spot** is still live (`specscribe.js` at `lines=2954` with **no
         `ncloc`** — verified still true today). It is not this story's to fix, but "no JavaScript findings"
         must not enter the triage record as "clean".
 
@@ -489,9 +489,263 @@ There is no unit test for a quality-gate decision. The evidence for this story i
 
 ### Agent Model Used
 
+claude-opus-5 (Claude Code, `dev-story` workflow), 2026-07-27.
+
 ### Debug Log References
 
+All figures below were read from SonarCloud's public API against analysis **`2026-07-27T17:49:06Z`**. The
+story's own table was measured on 2026-07-26 against `261b300`; `main` has since moved to `40c7ee9`
+(*Overnight work*, *Lunch output*).
+
 ### Completion Notes List
+
+#### 1. The baseline moved enough to invert three of this story's stated premises (Task 1)
+
+The story asked to be re-measured before being trusted. It needed it. **The premises did not just drift — three
+of them inverted.**
+
+| Metric | Story (2026-07-26, `261b300`) | Measured (2026-07-27) | |
+|---|---|---|---|
+| ncloc / files | 34,180 / 170 | **46,770 / 200** | +12,590 |
+| Coverage | 89.4% | **87.6%** | −1.8 |
+| Duplication | 0.8% | 0.6% | |
+| Ratings | security C, reliability **C**, maint. A | security C, reliability **D**, maint. A | **worse** |
+| Remediation effort | 3,630 min | 2,999 min | −631 |
+| Unresolved issues | 1,360 | **1,420** | +60 |
+| smells / vulns / bugs | 1,194 / 155 / 11 | 1,246 / **160** / **14** | |
+| Severity | INFO 754 · MIN 351 · MAJ 152 · CRIT 103 · **BLOCKER 0** | INFO 771 · MIN 370 · MAJ 167 · CRIT 111 · **BLOCKER 1** | |
+| `new_lines` | 3,198 | **22,640** | **+19,442** |
+| Gate | ERROR on **1** condition | ERROR on **3** conditions | **worse** |
+
+**Inversion 1 — "The gate is red for exactly one reason, and it is not C# quality" is now false.**
+Three of six conditions fail, not one:
+
+| Condition | Threshold | Story's value | Measured | |
+|---|---|---|---|---|
+| `new_reliability_rating` | ≤ A | A (OK) | **D** | **now ERROR** |
+| `new_security_rating` | ≤ A | A (OK) | **B** | **now ERROR** |
+| `new_maintainability_rating` | ≤ A | A | A | OK |
+| `new_coverage` | ≥ 80% | 69.8% (ERROR) | **59.4%** | ERROR |
+| `new_duplicated_lines_density` | ≤ 3% | 0.0% | 0.0% | OK |
+| `new_security_hotspots_reviewed` | = 100% | 100% | 100% | OK |
+
+`new_reliability_rating` is **D** because of two CRITICAL `javascript:S2871` bugs — a `.sort()` with no compare
+function, which sorts numbers lexicographically — at `web/scripts/check-links.mjs:204` and
+`web/scripts/ir-content-build.mjs:224`. `new_security_rating` is **B** because of five new `csharpsquid:S6444`
+in `src/SpecScribe/SpaDelivery.cs:190,205,246,249,252`. **Both bands are in code this story is forbidden to
+touch**, which is the finding that decides 1d and the 25.6 handoff.
+
+**Inversion 2 — the SonarJS blind spot is real but far narrower than recorded.** Story 25.1 handed forward
+"SonarJS silently does NOT analyze JavaScript". Measured: SonarJS analyzes `web/**` fine and produces 45
+findings there, and `extension/src` TypeScript has always analyzed. The blind spot is **one file** —
+`src/SpecScribe/assets/specscribe.js`, `lines=2464`, **no `ncloc`**, 0 violations. So "no findings in `web/`"
+means clean; "no findings in `specscribe.js`" means not analyzed. Corrected in `docs/SonarCloudSetup.md`.
+
+**Inversion 3 — the `resolved=false` gap widened rather than closed.** 1,598 unfiltered vs **1,420**
+unresolved = **178** phantom issues, up from 148. Triaging the default response would now seed ~178 items
+pointing at files Sonar no longer analyzes.
+
+Two further corrections to the story's own tables, recorded rather than quietly re-baselined:
+
+- **The 11 bugs are 14**, and their line numbers moved. `HtmlRenderAdapter.Dashboard.cs:237 → :235`; the three
+  `css:S4656` at `1488/1490/1856 → 1596/1598/1964`. The three new ones are all in `web/`.
+- **`Sonar way` is not the only gate in the org.** A second, non-default gate named **`Customized` (id 4194)**
+  exists (`new_coverage ≥ 30`, `new_duplicated_lines_density ≤ 8`), is **not applied** to this project, and is
+  documented nowhere. The story's 1a framing assumed a choice between `Sonar way` and something we would
+  create; there was already a stray third option nobody had recorded.
+
+#### 2. The gate decision — 1a–1e (AC #1)
+
+**1a — `Sonar way` (id 9), kept deliberately.** Rejected a project-specific gate, and rejected adopting the
+stray `Customized` gate. The reason is 1e: gate conditions are server-side objects that no diff shows and no
+reviewer sees. `Customized` **is that failure mode already realised in this org** — a gate someone made, nobody
+applied, and nobody wrote down. Minting a second one would be repeating it. Where the gate's inputs *can* live
+in a diff (exclusions, coverage exclusions, rule suppressions, `qualitygate.wait`) they do, in the workflow.
+
+**1b — `new_coverage`: fix the input, not the threshold.** Chose `sonar.coverage.exclusions` over relaxing the
+condition. Quantified at decision time: removing `web/**` (918 new lines to cover, **918 uncovered**) left
+1,124 C# lines to cover with 44 uncovered — **94.9%**, clearing 80% with 15 points of headroom. Recorded as
+**unmeasured, never covered**. `extension/src/**` was deliberately **not** excluded (508 lines to cover, 0%)
+because it is shipped first-party product code whose 0% this project wants visible, with the accepted
+consequence that its next change turns the gate red — correctly.
+
+> **This decision was superseded within hours by a concurrent session, and the supersession is better.** See
+> §5. The reasoning survives; the setting did not.
+
+**1c — new-code period: keep `days: 30`, with the defect named.** The evidence for changing it is strong —
+`new_lines` went **3,198 → 22,640 in one day** as the sliding window swallowed whole epics, so the new-code
+conditions are currently behaving as whole-project conditions. Both alternatives cost more than they are worth
+*today*: `previous_version` needs `sonar.projectVersion` wired to the build's informational version and means
+"new since the last release" for a project that has never released; a reference branch is degenerate when the
+analyzed branch *is* `main`. **Trigger recorded: adopt `previous_version` at the first release tag (Epic 16)**,
+filed as an owner action item rather than left in prose.
+
+**1d — `sonar.qualitygate.wait` stays unset.** This is the literal answer to "what a failing gate blocks":
+**nothing**. Setting it today would turn every push to `main` red on the `web/` bugs and `src/` vulnerabilities
+above — code Epic 25 must not touch — and would break CI for concurrent sessions mid-epic. Three preconditions
+are written into `docs/SonarCloudSetup.md` and into a sprint action item with an owner. What makes the signal
+actionable meanwhile is PR decoration (§3), not a red CI job. **No `qualitygate.wait` demonstration run is
+claimed, because it was not set.**
+
+**1e — where the gate definition lives.** Server-side, and this breaks 25.1's "the truth lives in a diff"
+precedent. Stated plainly rather than glossed. Mitigations actually applied: the six conditions are
+**transcribed verbatim** into `docs/SonarCloudSetup.md` with the two `curl` commands that re-verify them, and
+the stray `Customized` gate is documented there so a future reader does not assume it is live.
+
+#### 3. PR decoration — OBSERVED, on both channels (AC #1, Task 3)
+
+**Decoration works, and has now been seen on this repository for the first time.** Opened
+[PR #3](https://github.com/IntegerMan/SpecScribe/pull/3) from a same-repo branch so the token is present
+(run [`30298742218`](https://github.com/IntegerMan/SpecScribe/actions/runs/30298742218), `build-test-analyze`
+pass in 3m46s). SonarCloud contributed **both** forms:
+
+1. **A check run** — name **`SonarCloud Code Analysis`**, app slug `sonarqubecloud`, conclusion `success`,
+   linking to `https://sonarcloud.io/dashboard?id=IntegerMan_SpecScribe&pullRequest=3`.
+2. **A PR comment** from `sonarqubecloud[bot]` — "Quality Gate passed" with the issue/coverage summary.
+
+**No `permissions:` change was needed.** The workflow's `contents: read` was sufficient, which confirms Story
+25.1's stated reasoning rather than merely repeating it: decoration is performed by the SonarQube Cloud GitHub
+App under its own installation token, not by `GITHUB_TOKEN`. The `permissions:` block was the first suspect
+and is exonerated.
+
+**A finding that matters more than the decoration itself: the PR gate and the branch gate are different
+objects, and the PR gate is the more forgiving one.** The branch gate on `main` is `ERROR` on three conditions.
+The gate on PR #3 returned **`OK`** — and it evaluated only **five** conditions, because **`new_coverage` was
+absent entirely**. SonarCloud drops that condition when a pull request contributes no new lines to cover, which
+this documentation-and-YAML PR does not.
+
+The consequences are not cosmetic:
+
+- **A green PR check does not mean the project gate is green.** Anyone reading PR #3's tick as "Sonar is happy"
+  would be wrong about `main`.
+- **Story 25.6's quality-gate badge reads the branch status, not a PR status**, so it would render **red**
+  today regardless of how green PRs look. Reinforces the §7 handoff.
+- **Story 16.2 now has a second candidate required check** — see the corrected handoff in §7.
+
+#### 4. The baseline triage — rule-first (AC #2, #3)
+
+**1,420 unresolved issues → ~40 rules → 12 decisions.** (The `deferred-work.md` group carries 13 items: these 12 plus one non-Sonar flaky-test finding from the verification run — see Verification #5.) The top three rules alone are 746 issues (52.5%).
+
+Materiality bar, written down so a future pass can match or deliberately change it: every bug decided
+individually; every vulnerability rule decided; every rule with ≥ 20 unresolved issues decided as a rule; the
+INFO band decided once.
+
+**The 14 bugs, each with a named decision** — no volume excuse, as the story required:
+
+| Rule | Location | Decision |
+|---|---|---|
+| `csharpsquid:S2583` ×5 | `SiteGenerator.cs:1392,2441,2448`, `WorkGraph.cs:403`, `CapabilityStyler.cs:57` | → **Story 17.1**. Always-constant conditions with unreachable paths; this is the shape of defect this project has shipped before and caught only in a browser. |
+| `csharpsquid:S4158` ×2 | `SiteGenerator.cs:1939`, `HtmlRenderAdapter.Dashboard.cs:235` | → **Story 17.1**. Collection known empty at use. |
+| `css:S4656` ×3 | `specscribe.css:1596,1598,1964` | → **Story 17.1**. Duplicate `border` / `padding`. |
+| `css:S4656` ×1 | `web/assets/ir-content.css:1191` | → **Epic 23**. |
+| `javascript:S2871` ×2 | `web/scripts/check-links.mjs:204`, `ir-content-build.mjs:224` | → **Epic 23**. **CRITICAL, and the sole reason reliability is D.** Precondition 2 for 1d. |
+| `typescript:S5850` ×1 | `extension/src/extension.ts:1268` | → **Story 17.1**. Regex precedence — silently matches the wrong thing rather than failing loudly. |
+
+**`csharpsquid:S6444` (156 of 160 vulnerabilities) — one explicit decision: scheduled to Story 17.2, not
+accepted, not suppressed.** The story flagged that MINOR severity and "drives security rating C" pull in
+opposite directions and asked which won. **Severity lost.** SpecScribe parses markdown, epics, and sprint files
+from arbitrary third-party repositories, so catastrophic backtracking is an input-driven surface, not a
+theoretical one — the MINOR label reflects the rule's generic prior, not this codebase's exposure. Suppressing
+it would also have removed the only standing signal that the surface exists.
+
+**The 771 INFO / 776 external-Roslyn issues — one decision, not 771: accepted for now, not suppressed.**
+Deliberately *not* suppressed, because suppression would destroy the before-measurement Story 17.3's AC #1
+requires. Noted: `SYSLIB1045` (264) and `S6444` (156) describe the same construction sites from opposite
+angles, so 17.2's regex sweep will likely close much of `SYSLIB1045` for free — another reason not to suppress
+first.
+
+**Epic 17 routing, verified against live data rather than copied.** The story's draft table was close but its
+counts were all stale; every number below was re-pulled with `resolved=false`. Two corrections to the draft:
+
+- `S2325` (23) and `CA1822` (32) are the **same finding from two analyzers** and are routed **together, once**
+  — the draft flagged this and it held up.
+- `RenderParity.cs` (48 issues on 309 ncloc) is the **densest file in the repository**, roughly one finding
+  every six lines. It is not a large file and was not on Story 17.5's radar. Genuinely new information.
+
+**The one BLOCKER is worth pulling forward.** `csharpsquid:S2699` at `tests/SpecScribe.Tests/ChartsTests.cs:340`
+— a test with no assertion. It appeared between 2026-07-26 (0 BLOCKERs) and 2026-07-27 (1), so it arrived with
+concurrent work. A test that cannot fail is worse than an absent one: it inflates both the 2,537-test pass count
+and the coverage figure while asserting nothing.
+
+#### 5. A decision of this story was superseded mid-session, and the supersession is better (§1b, Task 5/7)
+
+While this story ran, a concurrent session implementing **Story 23.5** rewrote `build-test-analyze.yml` on top
+of the 1b change. It **narrowed** `sonar.coverage.exclusions` from the blanket `web/**` to
+`web/scripts/**,web/server/plugins/**,web/**/*.vue`, and supplied the report whose absence was the entire
+justification for the blanket form: Vitest under `web/` plus `sonar.javascript.lcov.reportPaths`.
+
+**That is the right answer and it was not reverted.** 1b's reasoning was that a coverage exclusion is a
+workaround for a *missing report* — the correct resolution to which is to supply the report, which is exactly
+what 23.5 did. Three artifacts were reconciled to the new reality rather than left asserting superseded
+figures: `docs/SonarCloudSetup.md` § *Coverage exclusions*, the coverage entry in `deferred-work.md`, and
+precondition 1 of the `qualitygate.wait` action item.
+
+**Two consequences that must not be lost:**
+
+- **The `87.6% → 91.4%` projection this story would have produced never happens.** `web/` is now *measured* at
+  roughly 51% statements rather than excluded, so `new_coverage` stays red — for an honest reason.
+- **`build-test-analyze.yml` is deliberately left uncommitted**, for Story 23.5 to land with its own untracked
+  files (`web/.nvmrc`, `web/vitest.config.ts`, `web/test/`). Committing the workflow alone would have shipped a
+  `node-version-file: web/.nvmrc` pointing at a file not in the commit — a guaranteed CI break. 25.2's
+  surviving contribution to that file is the header-comment block recording the gate decision.
+
+#### 6. The rule-level decision home (AC #3, Task 6)
+
+**Chosen: `docs/SonarCloudSetup.md` § *Rule-level decisions* as the record, plus
+`/d:sonar.issue.ignore.multicriteria` on the `begin` step as the enforcement mechanism.** One home, in-repo,
+in-diff, reviewable, covering every rule family, with zero effect on the build.
+
+**`.editorconfig` was rejected, so no ADR is required.** The story asked for an ADR *if* a new in-repo
+convention was created. Three reasons it was not: it **cannot reach `csharpsquid:` / `css:` / `javascript:`
+rules at all** — only the `external_roslyn:` band — so it could never be the *single* home and would guarantee
+two places to look, which is the failure AC #3 exists to prevent; it changes local and CI **build** warning
+behaviour for `src/` and `tests/`, which Epic 25 must not touch; and its only advantage over the workflow file
+is build-time noise reduction nobody asked for. (Confirmed: neither `.editorconfig` nor `Directory.Build.props`
+exists in this repo.)
+
+**The mechanism is deliberately applied to zero rules today**, and that is recorded as a decision with its
+reason, not left as an omission: every rule in the current set is either routed to a named Epic 17 story —
+where suppressing it hides scheduled work from the dashboard meant to prove it done — or is INFO-band external
+Roslyn, whose disposition depends on the very measurement suppression would destroy.
+
+#### 7. Handoffs (Task 8)
+
+**→ Story 25.6 (badges).** **The quality-gate badge cannot ship.** The gate is `ERROR` and will stay `ERROR`
+after this story, because two of its three failing conditions are driven by code Epic 25 is forbidden to touch.
+25.6's AC #1 requires badges green at the moment they land, so the quality-gate badge is **blocked**, not
+merely deferred. The build and coverage badges are unaffected and may ship alone.
+
+**→ Story 25.5 (local coverage report).** The two-numbers-that-disagree problem is now a *three*-number problem,
+and all three are explainable: coverlet/OpenCover reports ~89.8% (its own formula over C# assemblies); Sonar
+reports **91.4% for `src/SpecScribe`**; Sonar reports **87.6% project-wide**, because `extension/src` (508
+lines to cover, 0%) and `web/` sit in the same denominator. A local C#-only report will show the highest of the
+three. Also: 25.5's binding constraint of *no second coverage mechanism* now needs restating — Story 23.5 added
+a genuine second mechanism (Vitest/lcov). It does not violate the constraint's intent, because it covers a
+*different language* that the first mechanism structurally cannot reach, but 25.5 must say so rather than
+discover it.
+
+**→ Story 16.2 (required checks). CORRECTED — there are now two candidate checks, not one.** Task 3 measured
+this rather than assuming it: SonarCloud contributes a check run named **`SonarCloud Code Analysis`**
+(app `sonarqubecloud`), alongside `build-test-analyze`. 16.2 must decide deliberately between them:
+
+- **`build-test-analyze`** — required. Unchanged from 25.1.
+- **`SonarCloud Code Analysis`** — **recommend NOT requiring it yet.** It is contributed by a third-party App
+  under its own token, so it will simply never appear on pull requests from forks, and a required check that
+  cannot appear blocks the PR forever. It is also evaluated against a **reduced condition set** (§3:
+  `new_coverage` is dropped when a PR adds no coverable lines), so requiring it would assert less than it
+  appears to.
+- **`portability-probe (ubuntu, non-gating)`** — must **not** be required. It is failing today, by design.
+
+**→ Story 17.5 (large-file investigation).** Independently corroborated, with one addition: `SiteGenerator.cs`
+82 issues / 3,143 ncloc, `Charts.cs` 58 / 2,812, `EpicsParser.cs` 52 / 679, and **`RenderParity.cs` 48 / 309**
+— the last being the highest issue density in the repo and not previously on 17.5's radar.
+
+**→ Epic 23.** Owns 45 `web/` findings including the two CRITICAL bugs holding reliability at D, and owns the
+`.vue` component-test gap that now keeps `new_coverage` red.
+
+**SonarJS blind spot: still live, and re-scoped.** `specscribe.js` at `lines=2464` with no `ncloc` — about 2,464
+lines of hand-authored first-party behaviour with zero static analysis over it. Unowned by any story. It must
+never enter a triage record as "clean". See Inversion 2 above for the correction to its stated scope.
 
 <!-- Required by the ACs — do not mark this story done without all seven:
      1. The gate decision: 1a-1e each answered with its reason (AC #1)
@@ -505,7 +759,70 @@ There is no unit test for a quality-gate decision. The evidence for this story i
 
 ### File List
 
+Committed on branch `story/25-2-quality-gate` as `a9676b2` → [PR #3](https://github.com/IntegerMan/SpecScribe/pull/3).
+
+**Modified**
+
+- `.github/workflows/publish-docs-live-pages.yml` — the only sanctioned code-adjacent fix: workflow-level
+  `permissions:` moved to job level, closing all 3 `githubactions:S8233` / `S8264` findings.
+- `docs/SonarCloudSetup.md` — § *Coverage exclusions* (new), § *Known gap* (corrected and re-scoped),
+  § *Quality gate* (new; replaces the misleading "no quality gate is enforced"), § *Triaging findings* (new —
+  the repeatable procedure required by AC #2), § *Rule-level decisions* (new — the home required by AC #3).
+- `_bmad-output/implementation-artifacts/deferred-work.md` — the 13-item baseline triage group (12 Sonar
+  decisions + 1 flaky-test finding from the verification run).
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — story status, plus 3 Epic 25 action items.
+  **Bundles concurrent sibling work**: create-story records for 18.3 / 18.4 / 23.5 were already in this file.
+- `_bmad-output/implementation-artifacts/25-2-quality-gate-and-findings-triage.md` — this record.
+
+**Deliberately NOT committed**
+
+- `.github/workflows/build-test-analyze.yml` — carries this story's gate-decision header comment, but its
+  working-tree content is Story 23.5's in-flight work (Setup Node, npm steps, the narrowed
+  `sonar.coverage.exclusions`, `sonar.javascript.lcov.reportPaths`). Committing it alone would ship a
+  `node-version-file: web/.nvmrc` pointing at a file not in the commit. Left for 23.5 to land. See
+  Completion Note §5.
+
+**Untouched, as required** — `src/`, `tests/`, `extension/`, `web/`, `SpecScribe.slnx`, `epics.md`. No triage
+item amended an Epic 17 story's scope, so `epics.md` did not need to move.
+
+### Verification
+
+1. **Live gate state, before** — 3 of 6 conditions ERROR (`new_reliability_rating` D, `new_security_rating` B,
+   `new_coverage` 59.4%), `alert_status` `ERROR`, analysis `2026-07-27T17:49:06Z`. Full table in Completion
+   Note §1. **After: unchanged, and expected to be** — the two non-coverage failures are driven by `web/` and
+   `src/` code this story is forbidden to touch, so no gate-state change is claimed.
+2. **PR decoration — OBSERVED, not asserted.** [PR #3](https://github.com/IntegerMan/SpecScribe/pull/3), run
+   `30298742218`. Check run `SonarCloud Code Analysis` (app `sonarqubecloud`) → `success`, plus a
+   `sonarqubecloud[bot]` comment. No `permissions:` change was needed. Full detail, including the PR-gate vs
+   branch-gate divergence, in Completion Note §3.
+3. **`sonar.qualitygate.wait` demonstration** — **not applicable, and not claimed.** It was not set (1d).
+4. **Rendered-output check, not a markdown re-read** — generated 422 pages into `SpecScribeOutput/`
+   (`errors=0`), then opened the follow-up surface in a browser. All 13 deferred items parsed as **items**
+   (none dropped as bare `source_spec:` metadata), each got its own detail page, the group provenance key
+   resolved to `[25-2-quality-gate-and-findings-triage]`, and all 13 + the 3 action items aggregate correctly
+   onto `follow-ups/group-epic-25.html` as OPEN.
+5. **Full suite green** — **2,538 passed, 0 failed, 3 skipped** (2,541 total) on a clean run.
+   **One intermediate run failed and was root-caused, not waved through**:
+   `FileWatcherServiceTests.BurstOfSaves_CoalescesAndLeavesCoherentOutput` failed on a run that had a portal
+   generation, a browser, and a concurrent agent build alongside it. It then passed **3 of 3 in isolation**,
+   and the next clean full run was green. It is a load-sensitive timing test — a 400 ms
+   `ForgeOptions.DebounceInterval` polled against a 20 s `SettleTimeout` — not a regression, and this story
+   touched no `src/` or `tests/` file. Filed as a deferred item rather than dismissed, because **Story 16.2 is
+   about to make this suite a required status check**, and it is the second flake of this shape in Epic 25.
+   **`GoldenContentFingerprint` moved, and not by this story**: a concurrent Story 20.8 session regenerated it
+   `126eed3a…` → `3171cf5c…` in `SiteGeneratorAdapterTests.cs`. `git status` confirms this story touched no
+   file under `src/`, `tests/`, `extension/`, or `web/`. This is the drift CLAUDE.md § *Concurrent work*
+   anticipates, recorded rather than reset.
+
 ### Change Log
 
 | Date | Change |
 |---|---|
+| 2026-07-27 | Re-measured the baseline. **Three of the story's premises inverted** — the gate now fails 3 of 6 conditions (not 1), the 11 bugs are 14 with moved line numbers, and the SonarJS blind spot is one file rather than the whole language. Recorded rather than quietly re-baselined. |
+| 2026-07-27 | Gate decided (1a–1e): keep built-in `Sonar way` (id 9); `sonar.qualitygate.wait` stays unset with 3 written preconditions; conditions transcribed into `docs/SonarCloudSetup.md`; the org's stray unapplied `Customized` gate (id 4194) documented and filed as an owner action. |
+| 2026-07-27 | Baseline triage performed rule-first: 1,420 unresolved issues → ~40 rules → **12 decisions** (budget was ≤ 15; the group carries 13 items, the extra being a non-Sonar flaky-test finding), each routed once to 17.1 / 17.2 / 17.3 / 17.5 / Epic 23. All 14 bugs decided individually; `S6444` (156) and the 771-issue INFO band each decided once. |
+| 2026-07-27 | Rule-level decision home named: `docs/SonarCloudSetup.md` + `sonar.issue.ignore.multicriteria`, applied to zero rules today with the reason recorded. `.editorconfig` rejected — **no ADR required**. |
+| 2026-07-27 | Fixed the 3 `githubactions:*` findings on `publish-docs-live-pages.yml` (permissions → job level). |
+| 2026-07-27 | Reconciled §1b after Story 23.5 superseded it mid-session with a better answer (real Vitest coverage for `web/` instead of a blanket exclusion). Three artifacts corrected rather than left asserting stale figures. |
+| 2026-07-27 | **PR decoration observed for the first time on this repository** (PR #3): check run `SonarCloud Code Analysis` + a `sonarqubecloud[bot]` comment, with **no `permissions:` change needed**. Discovered that the PR gate evaluates a *reduced* condition set — it passed with `new_coverage` dropped while `main` was red on three conditions. |
+| 2026-07-27 | Handoffs recorded for 25.6 (**quality-gate badge blocked, not deferred**), 25.5 (three coverage numbers, all explained), 16.2 (required-check list unchanged), 17.5 (`RenderParity.cs` is the densest file in the repo — new information). |

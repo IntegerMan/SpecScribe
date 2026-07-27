@@ -297,6 +297,28 @@ Set it once **all three** of these are true:
 Until then the actionable channel is **pull-request decoration** by the SonarQube Cloud GitHub App, not a red
 CI job.
 
+### Pull-request decoration
+
+**Confirmed working**, first observed on [PR #3](https://github.com/IntegerMan/SpecScribe/pull/3) on
+2026-07-27. SonarCloud contributes both:
+
+- a check run named **`SonarCloud Code Analysis`** (GitHub App slug `sonarqubecloud`), and
+- a summary comment from `sonarqubecloud[bot]`.
+
+**No `permissions:` grant is required for this.** The workflow's `contents: read` is sufficient — the App uses
+its own installation token, not `GITHUB_TOKEN`. The corollary is that decoration **cannot appear on pull
+requests from forks**, which also get no `SONAR_TOKEN` and therefore no analysis at all.
+
+> **A green PR check does not mean the project gate is green.** The two are different objects. The PR gate is
+> evaluated against the pull request's own new code, and SonarCloud **drops conditions that do not apply** —
+> on PR #3 only five of the six conditions were evaluated, because a documentation-and-YAML change contributes
+> no new lines to cover, so `new_coverage` was absent. That PR passed while `main` was red on three conditions.
+> Read the branch status for the project's real state:
+>
+> ```bash
+> curl -s "https://sonarcloud.io/api/qualitygates/project_status?projectKey=IntegerMan_SpecScribe"
+> ```
+
 ---
 
 ## Triaging findings

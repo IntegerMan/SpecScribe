@@ -421,8 +421,70 @@ development_status:
                    # Story 16.2 = `build-test-analyze`. No quality gate set (sonar.qualitygate.wait unset) - 25.2's
                    # call. ubuntu probe is non-gating with ONE failure left (PathUtil C:/ path assumption);
                    # fixing it moves the gate to ubuntu at 13s vs 47s.
-  25-2-quality-gate-and-findings-triage: in-progress # -> in-progress 2026-07-27 (dev-story).
-                   # prior: -> ready-for-dev 2026-07-26 (create-story, baseline 261b300).
+  25-2-quality-gate-and-findings-triage: review # -> review 2026-07-27 (dev-story). PR #3 (branch
+                   # story/25-2-quality-gate, commit a9676b2). prior: -> ready-for-dev 2026-07-26 (create-story,
+                   # baseline 261b300).
+                   #
+                   # THREE OF THIS STORY'S OWN PREMISES INVERTED between authoring (2026-07-26/261b300) and
+                   # implementation (2026-07-27). (1) The gate fails THREE of six conditions, not one:
+                   # new_reliability_rating D (two CRITICAL javascript:S2871 sort-without-comparator bugs in
+                   # web/scripts/check-links.mjs:204 + ir-content-build.mjs:224) and new_security_rating B (five
+                   # new csharpsquid:S6444 in SpaDelivery.cs) joined new_coverage 59.4%. BOTH new failures are in
+                   # code Epic 25 is FORBIDDEN to touch. (2) The SonarJS blind spot is ONE FILE, not the language:
+                   # web/** analyzes fine (45 findings), only src/SpecScribe/assets/specscribe.js is skipped
+                   # (lines=2464, no ncloc). 25.1's "SonarJS does not analyze JavaScript" was too broad. (3) The
+                   # resolved=false gap WIDENED 148 -> 178 (1,598 unfiltered vs 1,420 real). Also: 11 bugs are now
+                   # 14 with moved line numbers, and the org holds a STRAY UNAPPLIED gate `Customized` (id 4194)
+                   # nobody documented. Baseline: 46,770 ncloc / 200 files / 87.6% cov / 1,420 unresolved
+                   # (1,246 smells + 160 vulns + 14 bugs) / INFO 771 MIN 370 MAJ 167 CRIT 111 BLOCKER 1.
+                   #
+                   # GATE DECIDED (1a-1e): keep built-in `Sonar way` (id 9) — a custom gate is server-side and
+                   # invisible in a diff, and `Customized` is that drift already realised. Conditions TRANSCRIBED
+                   # into docs/SonarCloudSetup.md. new-code period stays `days: 30` with the defect NAMED
+                   # (new_lines 3,198 -> 22,640 in ONE DAY; the sliding window makes new-code conditions behave as
+                   # whole-project conditions) and `previous_version` filed as an owner action for the first
+                   # release tag. sonar.qualitygate.wait STAYS UNSET with 3 written preconditions — so the honest
+                   # answer to "what does a failing gate block" is NOTHING.
+                   #
+                   # PR DECORATION PROVEN (first time on this repo): PR #3 got BOTH a check run
+                   # `SonarCloud Code Analysis` (app sonarqubecloud) AND a sonarqubecloud[bot] comment, with NO
+                   # permissions: change needed — 25.1's own-installation-token reasoning confirmed, not repeated.
+                   # ⚠ THE PR GATE AND THE BRANCH GATE ARE DIFFERENT OBJECTS: PR #3 passed evaluating only FIVE
+                   # conditions (new_coverage is DROPPED when a PR adds no coverable lines) while main was red on
+                   # three. A green PR tick does NOT mean the project gate is green.
+                   #
+                   # TRIAGE: 1,420 issues -> ~40 rules -> 12 decisions (budget was 15; the deferred-work group
+                   # carries 13 items, the 13th being a NON-Sonar finding: FileWatcherServiceTests.
+                   # BurstOfSaves_CoalescesAndLeavesCoherentOutput failed once under load during the DoD run,
+                   # passed 3/3 isolated, clean full run green at 2538/0/3 - filed because 16.2 is about to make
+                   # this suite a REQUIRED check and it is the 2nd flake of this shape in Epic 25), each routed ONCE to
+                   # 17.1/17.2/17.3/17.5/Epic 23. All 14 bugs decided individually. S6444 (156 of 160 vulns)
+                   # SCHEDULED to 17.2, not accepted: severity LOST to exposure, because SpecScribe parses
+                   # markdown from arbitrary third-party repos. The 771 INFO / 776 external-Roslyn issues are ONE
+                   # decision (accepted, NOT suppressed — suppression would destroy the before-measurement 17.3's
+                   # AC #1 requires). NEW INFO for 17.5: RenderParity.cs is the DENSEST file in the repo (48
+                   # issues / 309 ncloc), and it is not a large file.
+                   #
+                   # RULE-DECISION HOME: docs/SonarCloudSetup.md § Rule-level decisions + sonar.issue.ignore.
+                   # multicriteria on the begin step, applied to ZERO rules today with the reason recorded.
+                   # .editorconfig REJECTED (cannot reach csharpsquid:/css:/javascript: rules, and changes build
+                   # warning behaviour) => NO ADR REQUIRED.
+                   #
+                   # ⚠ DECISION 1b WAS SUPERSEDED MID-SESSION BY STORY 23.5, AND THE SUPERSESSION IS BETTER: 25.2
+                   # excluded web/** from the coverage denominator as a workaround for a MISSING report; 23.5
+                   # supplied the report (Vitest + sonar.javascript.lcov.reportPaths) and narrowed the exclusion.
+                   # Three artifacts were reconciled rather than left asserting stale figures. build-test-analyze.yml
+                   # is deliberately LEFT UNCOMMITTED for 23.5 to land — committing it alone would ship a
+                   # node-version-file: web/.nvmrc pointing at a file not in the commit.
+                   #
+                   # HANDOFFS: 25.6's quality-gate badge is BLOCKED, not deferred (gate is red and stays red on
+                   # code Epic 25 cannot touch). 25.5 now has THREE coverage numbers, all explained (coverlet
+                   # ~89.8% / Sonar src/SpecScribe 91.4% / Sonar project 87.6%) AND must restate its
+                   # "no second coverage mechanism" constraint, since 23.5 added a real one for a different
+                   # language. 16.2 CORRECTED: there are now TWO candidate checks — recommend requiring
+                   # `build-test-analyze` only, NOT `SonarCloud Code Analysis` (never appears on fork PRs, and
+                   # evaluates a reduced condition set). GoldenContentFingerprint moved 126eed3a -> 3171cf5c by a
+                   # CONCURRENT Story 20.8 session, not by this story: no src/tests/extension/web file was touched.
                    # The "results are SCANNED" half — gate on new code + a repeatable triage pass routing findings
                    # into deferred-work.md / action_items using FR30 provenance. Baseline triage REQUIRED so Epic 17
                    # inherits a known state. Items matching 17.1/17.2/17.3 are TAGGED, not duplicated. Depends on 25.1.
