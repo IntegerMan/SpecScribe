@@ -4,7 +4,7 @@ baseline_commit: d1722f17a6f9fefdb50d3aab91a9b8bca805f4e7
 
 # Story 5.7: Fixed `--as-of <date>` Date-Page Cutoff Policy
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -127,61 +127,61 @@ Two further 5.5 constraints carry, both already correct in the tree — **do not
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Give the policy a shape that can carry a date** (AC: #1, #2)
-  - [ ] `DatePolicy` (enum) gains a fourth member `AsOf`. Keep `MachineLocal` as the zero value.
-  - [ ] Add `public readonly record struct DateCutoff(DatePolicy Policy, DateOnly? AsOf)` to
+- [x] **Task 1 — Give the policy a shape that can carry a date** (AC: #1, #2)
+  - [x] `DatePolicy` (enum) gains a fourth member `AsOf`. Keep `MachineLocal` as the zero value.
+  - [x] Add `public readonly record struct DateCutoff(DatePolicy Policy, DateOnly? AsOf)` to
     [DatePolicy.cs](../../src/SpecScribe/DatePolicy.cs). **`default(DateCutoff)` is `(MachineLocal, null)`** — a
     record *struct*, deliberately, so Story 5.5's "the default is the status quo by construction" guarantee
     survives the shape change verbatim. Document that in the type's XML doc.
-  - [ ] `DatePolicies.TryParse(string?, out DateCutoff)`: keep all existing canonical + forgiving spellings
+  - [x] `DatePolicies.TryParse(string?, out DateCutoff)`: keep all existing canonical + forgiving spellings
     unchanged, and add the composite form `as-of:<date>` (prefix match, case-insensitive, `_`→`-` normalized like
     the existing path). The date half parses via `DateOnly.TryParse(value, CultureInfo.InvariantCulture,
     DateTimeStyles.None, out …)` **(D3)**. A bare `as-of` with no date, or an unparseable date, returns `false`.
-  - [ ] `DatePolicies.Token(DateCutoff)` → `"as-of:2026-07-27"` for `AsOf` (ISO via `PortalDates.IsoDay`, so the
+  - [x] `DatePolicies.Token(DateCutoff)` → `"as-of:2026-07-27"` for `AsOf` (ISO via `PortalDates.IsoDay`, so the
     token matches the `commits/{date}.html` filename vocabulary), existing tokens otherwise. This is what makes
     the persisted value and the `--show-config` value round-trip through `TryParse` — a hard requirement, since
     `Token`→`TryParse` is already an asserted invariant.
-  - [ ] `DatePolicies.Label(DateCutoff)` → e.g. `"fixed date 2026-07-27"`. Still a WORD-and-digits string, never
+  - [x] `DatePolicies.Label(DateCutoff)` → e.g. `"fixed date 2026-07-27"`. Still a WORD-and-digits string, never
     a color or icon (the diagnostics `<dl>` and the interactive prompt are plain text).
-  - [ ] `RejectionMessage`: **leave `CanonicalTokens` as the three parseable tokens.** Do not add an
+  - [x] `RejectionMessage`: **leave `CanonicalTokens` as the three parseable tokens.** Do not add an
     `as-of:<date>` placeholder to that list — it is consumed as a list of things that *would have worked*, and an
     unparseable placeholder there is a trap. Instead append one sentence naming the flag:
     `"For a fixed date, use --as-of <yyyy-MM-dd>."`
-  - [ ] `Charts.ResolveToday(DateCutoff cutoff, IReadOnlyList<(DateOnly Day, int Count)>? series)`: new `AsOf` arm
+  - [x] `Charts.ResolveToday(DateCutoff cutoff, IReadOnlyList<(DateOnly Day, int Count)>? series)`: new `AsOf` arm
     returns `cutoff.AsOf`. **Degradation:** `AsOf` with a null date falls back to `MachineLocal`, mirroring
     `LastCommit`-without-history — unreachable through the validated CLI path, but this resolver is also the
     library entry point (NFR8, and the same reasoning that made `LastCommit` degrade rather than throw).
-  - [ ] Update the two in-`Charts` library-caller defaults that currently read
+  - [x] Update the two in-`Charts` library-caller defaults that currently read
     `ResolveToday(DatePolicy.MachineLocal, series: null)` ([Charts.cs:840](../../src/SpecScribe/Charts.cs),
     [Charts.cs:1377](../../src/SpecScribe/Charts.cs)) to the new type. Their **doc comments must keep** saying
     this is a deliberate degrade for library callers, not the run policy — that note exists because a future call
     site forgetting to thread `today` would silently regress to the default policy.
 
-- [ ] **Task 2 — Thread the shape through the options/settings stack** (AC: #2)
-  - [ ] `ForgeOptions`: rename `DatePolicy` → `DateCutoff`, retype to `DateCutoff`, and retype the
+- [x] **Task 2 — Thread the shape through the options/settings stack** (AC: #2)
+  - [x] `ForgeOptions`: rename `DatePolicy` → `DateCutoff`, retype to `DateCutoff`, and retype the
     `datePolicy` → `dateCutoff` parameter on `Resolve(...)` (still non-`required`, still defaulted). **Only three
     read sites**: [SiteGenerator.cs:73](../../src/SpecScribe/SiteGenerator.cs),
     [SettingsResolver.cs:153](../../src/SpecScribe/SettingsResolver.cs),
     [DiagnosticsTemplater.cs:158](../../src/SpecScribe/DiagnosticsTemplater.cs).
-  - [ ] `SiteSettings`: add `[CommandOption("--as-of <DATE>")] public string? AsOf { get; set; }` with a
+  - [x] `SiteSettings`: add `[CommandOption("--as-of <DATE>")] public string? AsOf { get; set; }` with a
     `[Description]`. Extend `ResolveDatePolicy()` (rename to `ResolveDateCutoff()`) so `AsOf` present ⇒ the fixed
     policy, with no `--today-policy` required. Keep its throw as the **defence-in-depth backstop** for
     interactive/library callers that bypass Spectre — 5.5's review explicitly confirmed that path is intentional,
     not dead code; do not delete it.
-  - [ ] `SiteSettings.Validate()` — the single gate, and it can return only **one** error, so order the checks
+  - [x] `SiteSettings.Validate()` — the single gate, and it can return only **one** error, so order the checks
     deliberately and document the order:
     1. `TodayPolicy` non-empty and unparseable → existing message (unchanged).
     2. `AsOf` non-empty and unparseable → new message naming the value and the expected `yyyy-MM-dd` shape.
     3. **(2b)** `AsOf` non-empty **and** `TodayPolicy` resolves to something other than the fixed policy →
        conflict error naming both flags. Passing `--today-policy as-of:2026-07-27 --as-of 2026-07-27` in
        agreement is **not** a conflict.
-  - [ ] `--today-policy as-of:2026-07-27` is **accepted** (it falls out of the single parse path, and the
+  - [x] `--today-policy as-of:2026-07-27` is **accepted** (it falls out of the single parse path, and the
     persisted value must round-trip through exactly that path) but stays **unadvertised**, mirroring how the
     forgiving spellings are already "accepted by `TryParse` but deliberately not advertised"
     ([DatePolicy.cs:34](../../src/SpecScribe/DatePolicy.cs)). `--as-of` is the documented surface.
-  - [ ] `SavedSettings.TodayPolicy`: retype `DatePolicy?` → `DateCutoff?`, keep it in `IsEmpty`, keep the
+  - [x] `SavedSettings.TodayPolicy`: retype `DatePolicy?` → `DateCutoff?`, keep it in `IsEmpty`, keep the
     persist-only-when-non-default rule in `Capture`/`ResolvePolicyOrNull`, keep CLI-wins in `ApplyTo`.
-  - [ ] **`DatePolicyJsonConverter` must be EXTENDED, not replaced** (AC #2's explicit requirement):
+  - [x] **`DatePolicyJsonConverter` must be EXTENDED, not replaced** (AC #2's explicit requirement):
     - `Read` keeps degrading an unrecognized token to `null` ("not configured") instead of throwing. **Do not**
       retype the field to `string?` and drop the converter: an unvalidated string would flow through `ApplyTo`
       into `ResolveDateCutoff()`'s **throw**, converting today's silent-and-safe degrade into a new hard failure
@@ -191,37 +191,37 @@ Two further 5.5 constraints carry, both already correct in the tree — **do not
       `DateCutoff { Policy = AsOf, AsOf = … }`. **Switch `Write` to `DatePolicies.Token(...)`**, making read and
       write symmetric on one vocabulary for the first time. Verify an existing `.specscribe` holding `"Utc"` /
       `"LastCommit"` still loads (both parse case-insensitively today — keep it that way).
-  - [ ] `SettingsResolver`: **no new `Fields` constant.** `Fields.TodayPolicy` (`today_policy`) is a published
+  - [x] `SettingsResolver`: **no new `Fields` constant.** `Fields.TodayPolicy` (`today_policy`) is a published
     `--show-config` CI contract and keeps carrying the composite token. `CliOverrides.TodayPolicy` must now be
     true when **either** `--today-policy` or `--as-of` was supplied — keep the existing `{ Length: > 0 }`
     predicate shape and its in-code justification comment.
 
-- [ ] **Task 3 — Interactive parity, including the date (AC: #2 / NFR7) — the highest-risk task**
-  - [ ] `ConfigurePaths`'s `SelectionPrompt<DatePolicy>` builds its choices from
+- [x] **Task 3 — Interactive parity, including the date (AC: #2 / NFR7) — the highest-risk task**
+  - [x] `ConfigurePaths`'s `SelectionPrompt<DatePolicy>` builds its choices from
     `Enum.GetValues<DatePolicy>()` ([Commands.cs:624-631](../../src/SpecScribe/Commands.cs)). Adding `AsOf`
     therefore makes the menu **offer a policy it cannot satisfy** — selecting it would produce a dateless token.
     Add a follow-up `TextPrompt<string>` for the date, gated on the fixed policy being chosen, validating with
     the **same** `TryParse`/`DateOnly.TryParse` path (`.Validate(...)` re-prompts rather than accepting garbage).
-  - [ ] Preserve the stated "re-running Configure paths never silently flips it" discipline: when the current
+  - [x] Preserve the stated "re-running Configure paths never silently flips it" discipline: when the current
     policy is already `AsOf`, pre-select it **and** seed the `TextPrompt` default with the existing date.
-  - [ ] Keep the existing yellow "saved today-policy is not recognized" warning line
+  - [x] Keep the existing yellow "saved today-policy is not recognized" warning line
     ([Commands.cs:616-622](../../src/SpecScribe/Commands.cs)) working for the new composite token.
-  - [ ] ⚠️ **This surface is unverifiable by any agent harness.** Every tool harness captures stdout, so Spectre
+  - [x] ⚠️ **This surface is unverifiable by any agent harness.** Every tool harness captures stdout, so Spectre
     reports `Interactive == false` and `AnsiConsole.Prompt` cannot be exercised — a permanent blind spot recorded
     independently by Stories 5.1, 5.2, 5.5 and confirmed at the Epic 5 retro, with the missing
     `Spectre.Console.Testing`/`CommandContext` harness logged in
     [deferred-work.md:1020](deferred-work.md). **Do not claim this task verified.** Record it under "Honest
     limits on verification" and leave it for the owner, exactly as 5.5's equivalent review finding did.
 
-- [ ] **Task 4 — Heatmap text honesty (AC: #1a / D2) — DO NOT INVENT THIS; PORT THE SIBLING**
-  - [ ] ⚠️ **The fix already exists 200 lines below, in the same file.**
+- [x] **Task 4 — Heatmap text honesty (AC: #1a / D2) — DO NOT INVENT THIS; PORT THE SIBLING**
+  - [x] ⚠️ **The fix already exists 200 lines below, in the same file.**
     `Charts.DeliveryCadenceHeatmap` ([Charts.cs:1036](../../src/SpecScribe/Charts.cs)) is the same grid and
     already does exactly what this task needs, for the same stated reason — its comment reads *"Bound EVERY
     summary derived below … so a story carrying a future-dated Change-Log date can't make the aria-label / window
     overstate what the cells actually render (the project's truthfulness invariant)"*
     ([Charts.cs:1045-1055](../../src/SpecScribe/Charts.cs)). `CommitHeatmap` is simply the **un-migrated twin**.
     Port that shape verbatim; do not design a new one.
-  - [ ] The three lines to copy, in `CommitHeatmap` after `todayValue` is resolved:
+  - [x] The three lines to copy, in `CommitHeatmap` after `todayValue` is resolved:
     1. `var visible = series.Where(s => s.Day <= todayValue).ToList();`
     2. `if (visible.Count == 0) return "<div class=\"chart-empty\">…</div>";` — **this is the crash guard.**
        `firstCommit`/`lastCommit` are `series.Min/Max(...)` ([Charts.cs:838-839](../../src/SpecScribe/Charts.cs))
@@ -232,45 +232,45 @@ Two further 5.5 constraints carry, both already correct in the tree — **do not
     3. Derive `firstCommit`, `lastCommit`, `totalCommits`, `activeDays` and `maxCount` from `visible`
        ([Charts.cs:838-839](../../src/SpecScribe/Charts.cs), [:884-886](../../src/SpecScribe/Charts.cs),
        [:867](../../src/SpecScribe/Charts.cs)).
-  - [ ] ⚠️ **Bound the visible `heatmap-headline` and the `aria-label` together.** They restate the same figures
+  - [x] ⚠️ **Bound the visible `heatmap-headline` and the `aria-label` together.** They restate the same figures
     (`heatAria` at [:886](../../src/SpecScribe/Charts.cs), the headline at
     [:908-910](../../src/SpecScribe/Charts.cs)); fixing one alone makes the text twin disagree with the visual,
     which ADR 0013 forbids.
-  - [ ] `HeatLevel` needs no change: `count <= 0` returns 0 and `maxCount <= 1` returns 1, so `maxCount == 0`
+  - [x] `HeatLevel` needs no change: `count <= 0` returns 0 and `maxCount <= 1` returns 1, so `maxCount == 0`
     cannot divide by zero. Verified — do not "fix" it.
-  - [ ] `maxCount` already filters on `s.Day <= todayValue` ([:867](../../src/SpecScribe/Charts.cs)) — folding it
+  - [x] `maxCount` already filters on `s.Day <= todayValue` ([:867](../../src/SpecScribe/Charts.cs)) — folding it
     onto `visible` is a simplification, not a behavior change. Keep its "a future commit must not inflate
     maxCount and depress every visible cell" comment.
-  - [ ] **Verify, don't assume,** that these three existing assertions still hold (they will, if and only if their
+  - [x] **Verify, don't assume,** that these three existing assertions still hold (they will, if and only if their
     fixtures carry no days after the resolved cutoff): `ChartsTests.cs:1437` (`across 2 active days, … to …`),
     `GitInsightsTemplaterTests.cs:250` (`1 commit across 1 active day`), `HtmlTemplaterTests.cs:298`.
 
-- [ ] **Task 5 — Echo the resolved date, and the diagnostics row (AC: #2, #2a)**
-  - [ ] `DiagnosticsConfig.DatePolicy` → `DateCutoff`; the config `<dl>` row
+- [x] **Task 5 — Echo the resolved date, and the diagnostics row (AC: #2, #2a)**
+  - [x] `DiagnosticsConfig.DatePolicy` → `DateCutoff`; the config `<dl>` row
     ([DiagnosticsTemplater.cs:294-296](../../src/SpecScribe/DiagnosticsTemplater.cs)) keeps the established
     `"<label> (default)"` / `"<label> (--flag <token>)"` provenance convention, naming `--as-of` for the fixed
     policy. Plain text in a `<dl>`, never color-alone.
-  - [ ] **(D3) New:** `ConsoleUi.PrintPaths` prints only Project / Sources / ADRs / Output today
+  - [x] **(D3) New:** `ConsoleUi.PrintPaths` prints only Project / Sources / ADRs / Output today
     ([ConsoleUi.cs:67-88](../../src/SpecScribe/ConsoleUi.cs)), so a pinned cutoff is currently invisible on an
     ordinary run. Add a **conditional** line — shown only when the resolved policy is the fixed date — echoing
     the ISO-canonicalized value and the flag, e.g.
     `i Date-page cutoff pinned to 2026-07-27 (--as-of)`. Match the style and placement of the existing
     conditional "ADR directory not found" line rather than adding a grid row (a permanent row would change every
     ordinary run's output for a setting almost nobody sets).
-  - [ ] Confirm `--show-config` emits `field=today_policy origin=commandline value=as-of:2026-07-27`. Note
+  - [x] Confirm `--show-config` emits `field=today_policy origin=commandline value=as-of:2026-07-27`. Note
     `EscapeForLine` needs no change — an ISO date contains no newline.
 
-- [ ] **Task 6 — Tests, and the inverted golden guard** (AC: #1, #1b, #2)
-  - [ ] `DatePolicyTests`: extend `TryParse` theories (`as-of:2026-07-27`, `AS-OF:2026-07-27`,
+- [x] **Task 6 — Tests, and the inverted golden guard** (AC: #1, #1b, #2)
+  - [x] `DatePolicyTests`: extend `TryParse` theories (`as-of:2026-07-27`, `AS-OF:2026-07-27`,
     `as_of:2026-07-27`); reject `as-of`, `as-of:`, `as-of:notadate`, `as-of:2026-13-45`. Extend
     `Token_RoundTripsThroughTryParse` with the composite token. Add `ResolveToday_AsOf_IsTheSuppliedDate` and
     `ResolveToday_AsOf_WithoutADate_FallsBackToMachineLocal`.
-  - [ ] ⚠️ **Two existing tests enumerate the enum and will need updating, not deleting:**
+  - [x] ⚠️ **Two existing tests enumerate the enum and will need updating, not deleting:**
     `Label_IsDistinctNonEmptyTextForEveryPolicy` (`DatePolicyTests.cs:169`) iterates
     `Enum.GetValues<DatePolicy>()` and must construct a `DateCutoff` per member — including a dated one for
     `AsOf` — while keeping the distinct-and-non-empty assertion. `OneResolvedToday_MakesEveryConsumerAgree`
     (`:102`) iterates an explicit three-policy array; add the fixed policy to it.
-  - [ ] AC #1's real invariant needs the **production** wiring, not the pure resolver. Follow the pattern 5.5's
+  - [x] AC #1's real invariant needs the **production** wiring, not the pure resolver. Follow the pattern 5.5's
     review installed: extend
     `SiteGeneratorCommitDetailsTests.GenerateAll_LastCommitPolicy_LinkedHeatmapDaySetMatchesGeneratedDayPageSet`
     with an `--as-of` sibling running a real `SiteGenerator` against the real git fixture, asserting the linked
@@ -278,14 +278,14 @@ Two further 5.5 constraints carry, both already correct in the tree — **do not
     as-of date before the fixture's first commit ⇒ zero `commits/*.html`, no exception, and a heatmap whose
     accessible name names no commit outside the window. A guard fix without a counter-test is how five vacuous
     tests shipped in this epic.
-  - [ ] `SettingsStoreTests`: the composite token round-trips through `.specscribe/config.json`; a legacy
+  - [x] `SettingsStoreTests`: the composite token round-trips through `.specscribe/config.json`; a legacy
     `"TodayPolicy": "Utc"` still loads; **and the red-green case AC #2 names — an unrecognized token (e.g.
     `"as-of:nope"`) must leave `Source`/`Adrs`/`Output`/`ProjectName`/`DeepGit`/`CodeUrl`/`IncludeReadme` intact.**
     Write that one as red-first: it is the defect this requirement exists for.
-  - [ ] `SettingsResolverTests`: `--as-of` provenance on `today_policy` (CLI > saved > default); `Validate()`
+  - [x] `SettingsResolverTests`: `--as-of` provenance on `today_policy` (CLI > saved > default); `Validate()`
     rejects a bad date; `Validate()` rejects the `--today-policy utc --as-of …` conflict.
-  - [ ] `DiagnosticsTemplaterTests`: the config row renders the fixed-date label + `--as-of` provenance.
-  - [ ] **Scope guard (INVERTED vs Story 5.5): `GoldenContentFingerprint` MUST NOT MOVE.** It is
+  - [x] `DiagnosticsTemplaterTests`: the config row renders the fixed-date label + `--as-of` provenance.
+  - [x] **Scope guard (INVERTED vs Story 5.5): `GoldenContentFingerprint` MUST NOT MOVE.** It is
     `2bd1c18e30c16cddb4ae62909979730161bff1f9486ec9acce0f9b4636b2beae`
     ([SiteGeneratorAdapterTests.cs:1211](../../tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs)). At the
     default policy this story renders nothing differently: the diagnostics row's default text is unchanged, the
@@ -399,6 +399,12 @@ now pins `eol=lf` and `FoldLineEndings` is deliberately kept anyway (see the unc
    `ActiveDays` / last-commit timestamp beside a correctly-suppressed link (see "Explicitly out of scope").
    Bound them in a follow-up, or accept that the pinned cutoff governs *pages and links* while the Git Pulse
    figures describe the repo as it actually is today?
+   **Live numbers, measured at close** (this repo, `--as-of 2026-07-20 --deep-git`, real "today" 2026-07-28):
+   the strip reports **376** commits in the last 30 days and **25** active days, immediately above a heatmap
+   correctly bounded to **301** commits across **17** active days. The last-commit timestamp (Jul 28) renders as
+   **plain text, not a link** — the `LinkedCommitDays` guard held, so there is no dead link, only a numeric
+   disagreement between two panels on the same page. That makes this a truthfulness question (ADR 0013's text
+   twin sits between them), not a broken-link one.
 2. **`watch` with a pinned cutoff.** `--as-of` means a long-running `specscribe watch` never advances its date
    cutoff, so commits authored during the session get no date page until the flag is dropped. Correct by design
    for a snapshot — worth a one-line note on the How-to-use page (Story 5.6), or leave it undocumented?
@@ -407,12 +413,149 @@ now pins `eol=lf` and `FoldLineEndings` is deliberately kept anyway (see the unc
 
 ### Agent Model Used
 
+claude-opus-5 (Claude Code, `bmad-dev-story`), 2026-07-28.
+
 ### Debug Log References
+
+- Full suite after implementation: **2657 passed / 0 failed / 3 skipped** (2 m 3 s).
+  One earlier full-suite run also reported `FileWatcherServiceTests.WatchedSourceFileStaysWritableAndDeletableDuringRegeneration`
+  failing; it passes in isolation (8/8) and touches nothing in this story's File List — the known
+  pre-existing concurrency flake already recorded on the 5.1 review key, not a regression from here.
+- Live CLI verification (this repo, `SpecScribeOutput/`, the default target per CLAUDE.md):
+  - `generate --as-of 2026-07-20 --deep-git` → `errors=0`; console echoed
+    `i Date-page cutoff pinned to 2026-07-20 (--as-of)`.
+  - `generate --as-of "07/20/2026" --show-config` → `field=today_policy origin=commandline value=as-of:2026-07-20`
+    — the forgiving parse canonicalized to ISO in the echo, which is the whole justification for D3's forgiveness.
+  - `generate --as-of 2000-01-01` and `--as-of 2000-01-01 --deep-git` → `errors=0`, **0** `commits/*.html`,
+    **0** `aria-label="Commit activity:`, **0** `href="commits/`, and the designed empty state
+    `No commits on or before Sat, Jan 1, 2000.` on both the dashboard and `git-insights.html`.
+  - Rejections: `--as-of lastweek`, `--today-policy utc --as-of 2026-07-20` (conflict), and
+    `--today-policy yesterday` (whose message now also names `--as-of`) all fail with the intended actionable text;
+    the agreeing pair `--today-policy as-of:2026-07-20 --as-of 2026-07-20` is accepted.
 
 ### Completion Notes List
 
+**All 6 tasks and both ACs are implemented and verified, with one honest exception recorded below (Task 3).**
+
+- **AC #1 / #1a — the explicit date is the run's single resolved `today`.** No sixth resolution point was added:
+  `SiteGenerator._today` still comes from one `RefreshToday()` call, now over `_options.DateCutoff`. Proven
+  through the REAL production wiring by a new `--as-of` sibling of the 5.5 integration test (linked heatmap day
+  set **equals** the actual `commits/*.html` file set) and its D2 counter-test (a pre-history pin ⇒ zero day
+  pages, no exception, and a heatmap naming no commit outside the window). Live confirmation above.
+- **AC #1b — the golden fingerprint did not move. ⚠️ But the story's quoted literal was already stale.**
+  The story cites `2bd1c18e30c16…`; that IS the value at this story's `baseline_commit` (d1722f17), but HEAD
+  carries `f4a7cbac5bee0fe56aa4ef9950a114a23acc8b2d59eb2e255e4b47e27873f0cd` — moved by a **sibling session's
+  committed work** between create-story and dev-story (the constant's own comment block attributes the last
+  regeneration to the Story 18.2 code review, 2026-07-27). Per the story's own "if the hash moves, do not
+  regenerate — find out why" rule I did not touch it: the current constant was left untouched and the test is
+  green, which is exactly the guarantee AC #1b asks for (this story renders nothing differently at the default
+  policy). Verified by `git show d1722f17:… | grep expected` vs `git show HEAD:…`.
+- **AC #2 / #2a / #2b — one field, one provenance entry, two ways to set it.** No new `SettingsResolver.Fields`
+  constant; `today_policy` keeps carrying the composite `as-of:{iso}` token through `--show-config`, the
+  diagnostics `<dl>`, and `.specscribe/config.json`. `Token` → `TryParse` round-trips by construction and is
+  pinned by tests. The converter was EXTENDED, not replaced, and the red-green sibling-field test is written the
+  way the requirement asks: an unrecognized `"as-of:nope"` degrades that one field to null while
+  `Source`/`Adrs`/`Output`/`ProjectName`/`DeepGit`/`CodeUrl`/`IncludeReadme` all survive intact.
+- **A guard the story did not name, found while wiring Task 2.** `SettingsStore.ApplyTo` had to learn about
+  `--as-of`: without it, a saved `"utc"` would be restored on top of an explicit `--as-of` and manufacture
+  exactly the disagreement `Validate()` rejects — turning a valid command line into an error because of a file
+  the user never mentioned. Guarded and pinned by `ApplyTo_DoesNotOverrideAnExplicitAsOfWithASavedPolicy`.
+- **A conflict case the story's rule left ambiguous, resolved toward its stated spirit.** Task 2's ordering says
+  the conflict is "`TodayPolicy` resolves to something other than the fixed policy". Read literally, that makes
+  `--today-policy as-of:2026-01-01 --as-of 2026-07-27` (same policy, DIFFERENT dates) *not* a conflict, with no
+  rule for which date wins. Both surfaces therefore compare the whole `DateCutoff`, so disagreeing dates are
+  rejected too. The story's explicit non-conflict case (identical values) is preserved and tested.
+- **Task 4 ported the sibling, it did not invent a fix.** `CommitHeatmap` now derives `byDay`, `firstCommit`,
+  `lastCommit`, `totalCommits`, `activeDays` and `maxCount` from `visible`, with `DeliveryCadenceHeatmap`'s
+  early-return empty state as the crash guard. `HeatLevel` was left alone (verified: `maxCount == 0` cannot
+  divide by zero). The three assertions the story asked me to verify rather than assume
+  (`ChartsTests.cs:1437`, `GitInsightsTemplaterTests.cs:250`, `HtmlTemplaterTests.cs:298`) all still pass
+  untouched — their fixtures carry no post-cutoff days, exactly as predicted.
+- **⚠️ One existing test DID have to change, and it is a real behavior change, not a test fix.**
+  `ChartsTests.CommitHeatmap_FutureDatedFirstCommit_KeepsValidGridWithoutOrphanCaption` fed an all-future
+  series and asserted a positive-width grid. That series now has no visible day, so it takes the new empty
+  state — which is the pre-existing future-skew overclaim D2 explicitly says this story also fixes (the old
+  render drew a zero-cell grid whose aria-label still announced "2 commits"). Split into two tests: one pinning
+  the empty state, one keeping the original mark/caption + positive-week coverage on a series that has a
+  visible day, plus a third with an explicit deterministic `today:` cutoff. A consequence worth flagging at
+  review: `if (start > end) start = end;` in `CommitHeatmap` is now **unreachable** (`firstCommit` is drawn from
+  `visible`, so it can never exceed the cutoff). It was kept because the already-migrated
+  `DeliveryCadenceHeatmap` keeps the identical line for the identical reason, and Task 4 says port that shape
+  verbatim — but "delete both, or keep both" is a legitimate review question.
+- **Honest limits on verification — Task 3 (interactive parity) is NOT verified, by design.** The
+  `ConfigurePaths` selection prompt and the new gated `TextPrompt` date follow-up are implemented (including
+  the pre-selected current policy, the seeded existing date, and the preserved yellow unrecognized-token
+  warning), but **no agent harness can exercise them**: every tool harness captures stdout, so Spectre reports
+  `Interactive == false` and `AnsiConsole.Prompt` cannot run. This is the permanent blind spot recorded
+  independently by Stories 5.1, 5.2 and 5.5 and confirmed at the Epic 5 retro; the missing
+  `Spectre.Console.Testing`/`CommandContext` harness is logged at `deferred-work.md:1020`. Left for the owner
+  to drive by hand, exactly as 5.5's equivalent finding did. Everything reachable from that path *without* a
+  TTY is covered: the token the menu writes, its round trip, and the `settings.AsOf = null` reset.
+- **Out of scope, confirmed live rather than assumed.** Under `--as-of 2026-07-20` the Git Pulse signal strip
+  still reports **376** commits in the last 30 days and **25** active days beside a heatmap correctly bounded to
+  **301** across **17** — the documented `GitMetrics`-side overclaim. Its last-commit link IS correctly
+  suppressed (Jul 28 rendered as plain text, no dead link), exactly as the story predicted. Real numbers now
+  attached to Question 1 below.
+
 ### File List
+
+**Production**
+
+- `src/SpecScribe/DatePolicy.cs` — `DatePolicy.AsOf`; new `DateCutoff` record struct; `TryParse`/`Token`/`Label`
+  retyped; new `AsOfTokenPrefix`, `TryParseAsOfDate`, `AsOfRejectionMessage`, `ConflictMessage`;
+  `RejectionMessage` now names `--as-of`.
+- `src/SpecScribe/Charts.cs` — `ResolveToday(DateCutoff, …)` + the `AsOf` arm and its degrade; `CommitHeatmap`
+  bounded to `visible` with the ported empty-state crash guard; the two library-caller defaults retyped.
+- `src/SpecScribe/ForgeOptions.cs` — `DatePolicy` property → `DateCutoff`; `datePolicy` parameter → `dateCutoff`.
+- `src/SpecScribe/SiteSettings.cs` — `--as-of <DATE>` option; ordered three-check `Validate()`;
+  `ResolveDatePolicy()` → `ResolveDateCutoff()` with the conflict backstop.
+- `src/SpecScribe/SettingsStore.cs` — `SavedSettings.TodayPolicy` retyped; `DatePolicyJsonConverter` →
+  `DateCutoffJsonConverter` (Write now emits the token); `ResolvePolicyOrNull` → `ResolveCutoffOrNull`;
+  `ApplyTo` gained the `--as-of` guard.
+- `src/SpecScribe/SettingsResolver.cs` — `CliOverrides.TodayPolicy` true for either flag; provenance reads
+  `options.DateCutoff`.
+- `src/SpecScribe/Commands.cs` — `ConfigurePaths` gained the gated date `TextPrompt`, the date-carrying label
+  converter, and the `settings.AsOf` reset.
+- `src/SpecScribe/ConsoleUi.cs` — the conditional pinned-cutoff echo line in `PrintPaths`.
+- `src/SpecScribe/DiagnosticsTemplater.cs` — `DiagnosticsConfig.DatePolicy` → `DateCutoff`; the config `<dl>`
+  row names `--as-of` for the fixed policy.
+- `src/SpecScribe/SiteGenerator.cs` — `RefreshToday()` reads `_options.DateCutoff` (+ its doc `<see cref>`).
+
+**Tests**
+
+- `tests/SpecScribe.Tests/DatePolicyTests.cs` — retyped throughout; composite-token parse/reject/round-trip,
+  invariant-culture pinning, the two `AsOf` resolver cases, the dateless-token degrade, the three message
+  helpers, and the enum-iterating `Label` test now constructing a dated cutoff.
+- `tests/SpecScribe.Tests/SettingsStoreTests.cs` — retyped; fixed-date round trip through
+  `.specscribe/config.json`, ISO canonicalization, legacy `"Utc"`/`"LastCommit"` still loading, the red-green
+  sibling-field survival test, and the `ApplyTo` `--as-of` guard.
+- `tests/SpecScribe.Tests/SettingsResolverTests.cs` — retyped; `--as-of` provenance (CLI > saved > default),
+  the `--show-config` wire line, both new `Validate()` rejections, the agreeing pair, the `ResolveDateCutoff`
+  backstop, and the unadvertised composite token on `--today-policy` alone.
+- `tests/SpecScribe.Tests/DiagnosticsTemplaterTests.cs` — helper retyped; new pinned-date row test.
+- `tests/SpecScribe.Tests/ChartsTests.cs` — the future-skew test split in two (empty state / still-valid grid)
+  plus a deterministic explicit-cutoff test bounding aria-label and headline together.
+- `tests/SpecScribe.Tests/SiteGeneratorCommitDetailsTests.cs` — retyped call; the `--as-of` production-wiring
+  sibling, the D2 counter-test, and two shared helpers.
+
+**Process artifacts**
+
+- `_bmad-output/implementation-artifacts/5-7-fixed-as-of-date-page-cutoff-policy.md` (this file)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
 
 ## Change Log
 
+- 2026-07-28 — Implemented. `--as-of <DATE>` ships end to end: a fourth `DatePolicy.AsOf` member carried on a new
+  `DateCutoff` record struct (`default` = the machine-local status quo, by construction), a composite
+  `as-of:{iso}` token that rides the existing single `today_policy` field through the CLI, `.specscribe`
+  persistence, `--show-config` and the diagnostics `<dl>`, an ordered three-check validation gate (bad policy →
+  bad date → conflict) mirrored as a `ResolveDateCutoff()` backstop, a gated interactive date prompt, an ISO
+  echo on ordinary runs, and `CommitHeatmap`'s summary text bounded to the rendered window (porting
+  `DeliveryCadenceHeatmap`'s already-shipped shape, which also fixes the pre-existing future-skew overclaim).
+  Suite 2657 passed / 0 failed / 3 skipped; golden fingerprint NOT moved. Two deviations recorded in the
+  Completion Notes: the story's quoted golden literal was already stale (a sibling session moved it after this
+  story's baseline — the CURRENT constant was left untouched and green), and one existing ChartsTests
+  future-skew test was split because the all-future case now correctly renders the designed empty state. Task 3
+  (interactive parity) is implemented but NOT verified — the permanent Spectre-TTY blind spot,
+  `deferred-work.md:1020`. Status → review.
 - 2026-07-27 — Story 5.7 seeded from the Epic 5 retrospective and contexted. Three owner decisions locked at create-story: D1 `--as-of <DATE>` implies the policy and collapses onto the single `today_policy` field as a composite `as-of:<iso>` token; D2 an out-of-range date is accepted verbatim with the heatmap's headline + `aria-label` bounded to the rendered window; D3 forgiving `DateOnly.TryParse` (invariant culture) with the resolved ISO date echoed on an ordinary run. Status → ready-for-dev.

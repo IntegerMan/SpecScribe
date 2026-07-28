@@ -29,11 +29,13 @@ public sealed class SavedSettings
     /// <see cref="SettingsStore.Capture"/>. [Story 5.2 AC #4]</summary>
     public bool? IncludeReadme { get; set; }
 
-    /// <summary>Persisted date-page "today" policy (<c>--today-policy</c>). Tri-state like <see cref="DeepGit"/>:
-    /// null means "never configured" and keeps the machine-local default, so a <c>.specscribe</c> written by an
-    /// earlier version (where the property does not exist) deserializes to null and loads unchanged. Only a
-    /// NON-default policy is ever written — see <see cref="SettingsStore.Capture"/>. [Story 5.5]</summary>
-    public DatePolicy? TodayPolicy { get; set; }
+    /// <summary>Persisted date-page "today" cutoff (<c>--today-policy</c>, or <c>--as-of</c> as the composite
+    /// <c>as-of:{iso}</c> token). Tri-state like <see cref="DeepGit"/>: null means "never configured" and keeps the
+    /// machine-local default, so a <c>.specscribe</c> written by an earlier version (where the property does not
+    /// exist) deserializes to null and loads unchanged. Only a NON-default cutoff is ever written — see
+    /// <see cref="SettingsStore.Capture"/>. Kept as ONE field carrying one composite token, deliberately: the fixed
+    /// date is part of the cutoff, not a second setting beside it. [Story 5.5, retyped in Story 5.7]</summary>
+    public DateCutoff? TodayPolicy { get; set; }
 
     /// <summary>True when nothing was configured — an all-null file is not worth writing or logging.</summary>
     [JsonIgnore]
@@ -63,30 +65,39 @@ public static class SettingsStore
     {
         WriteIndented = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        // Persist DatePolicy as its NAME ("Utc"), not an ordinal — a `.specscribe` is a user-editable file, and a
-        // bare number would be opaque there and would silently re-map if the enum were ever reordered. The only
-        // enum in SavedSettings is TodayPolicy; strings/bools are unaffected. [Story 5.5]
-        Converters = { new DatePolicyJsonConverter() },
+        // Persist the cutoff as a TOKEN ("utc", "as-of:2026-07-27"), not an ordinal — a `.specscribe` is a
+        // user-editable file, and a bare number would be opaque there and would silently re-map if the enum were
+        // ever reordered. The only non-primitive in SavedSettings is TodayPolicy; strings/bools are unaffected.
+        // [Story 5.5]
+        Converters = { new DateCutoffJsonConverter() },
     };
 
-    /// <summary>Reads <see cref="DatePolicy"/> via the same forgiving vocabulary as <c>--today-policy</c>
+    /// <summary>Reads <see cref="DateCutoff"/> via the same forgiving vocabulary as <c>--today-policy</c>
     /// (<see cref="DatePolicies.TryParse"/>) rather than requiring an exact enum-member-name match, and degrades an
     /// unrecognized/malformed token to "field not set" instead of throwing. <c>.specscribe</c> is a hand-editable
     /// file (see <see cref="SerializerOptions"/>'s doc), and a plain <see cref="JsonStringEnumConverter"/> fails the
     /// WHOLE document — discarding Source/Output/every other saved field too — the moment this one field holds a
     /// value it doesn't recognize verbatim, e.g. the CLI's own accepted spelling <c>"last-commit"</c> instead of the
-    /// enum's <c>"LastCommit"</c>. One field's typo must not cost every other saved setting (NFR8). [Review][Patch]</summary>
-    private sealed class DatePolicyJsonConverter : JsonConverter<DatePolicy?>
+    /// enum's <c>"LastCommit"</c>. One field's typo must not cost every other saved setting (NFR8). [Review][Patch]
+    /// <para>Story 5.7 EXTENDS this converter rather than retyping the field to <c>string?</c> and dropping it: an
+    /// unvalidated string would flow through <see cref="ApplyTo"/> into
+    /// <see cref="SiteSettings.ResolveDateCutoff"/>'s THROW, converting today's silent-and-safe degrade into a new
+    /// hard failure — the opposite of what the requirement asks for. <see cref="Write"/> now emits
+    /// <see cref="DatePolicies.Token"/> instead of <c>ToString()</c> (which on a record would emit
+    /// <c>DateCutoff { Policy = AsOf, … }</c>), making read and write symmetric on one vocabulary for the first
+    /// time; a pre-5.7 file holding <c>"Utc"</c>/<c>"LastCommit"</c> still loads, since
+    /// <see cref="DatePolicies.TryParse"/> accepts those spellings case-insensitively.</para></summary>
+    private sealed class DateCutoffJsonConverter : JsonConverter<DateCutoff?>
     {
-        public override DatePolicy? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        public override DateCutoff? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             if (reader.TokenType == JsonTokenType.Null) return null;
-            return DatePolicies.TryParse(reader.GetString(), out var policy) ? policy : null;
+            return DatePolicies.TryParse(reader.GetString(), out var cutoff) ? cutoff : null;
         }
 
-        public override void Write(Utf8JsonWriter writer, DatePolicy? value, JsonSerializerOptions options)
+        public override void Write(Utf8JsonWriter writer, DateCutoff? value, JsonSerializerOptions options)
         {
-            if (value is { } policy) writer.WriteStringValue(policy.ToString());
+            if (value is { } cutoff) writer.WriteStringValue(DatePolicies.Token(cutoff));
             else writer.WriteNullValue();
         }
     }
@@ -226,17 +237,28 @@ public static class SettingsStore
         // rather than writing a value that would make every save produce a non-empty file and defeat IsEmpty.
         // An explicitly persisted `MachineLocal` (hand-edited) still reads back fine — the tri-state is preserved
         // on the load side. [Story 5.5]
-        TodayPolicy = ResolvePolicyOrNull(settings),
+        TodayPolicy = ResolveCutoffOrNull(settings),
     };
 
-    /// <summary>The policy worth persisting for <paramref name="settings"/>, or null when there is nothing to save
-    /// (unset, the default, or an unparseable value). Never throws: <see cref="SiteSettings.ResolveDatePolicy"/>
+    /// <summary>The cutoff worth persisting for <paramref name="settings"/>, or null when there is nothing to save
+    /// (unset, the default, or an unparseable value). Never throws: <see cref="SiteSettings.ResolveDateCutoff"/>
     /// rejects a typo loudly at RESOLVE time, which is the right moment for it — a save path must not additionally
-    /// blow up and lose the user's other, valid choices.</summary>
-    private static DatePolicy? ResolvePolicyOrNull(SiteSettings settings)
-        => DatePolicies.TryParse(settings.TodayPolicy, out var policy) && policy != DatePolicy.MachineLocal
-            ? policy
-            : null;
+    /// blow up and lose the user's other, valid choices.
+    /// <para><c>--as-of</c> is checked FIRST and independently of <c>--today-policy</c>, matching
+    /// <see cref="SiteSettings.ResolveDateCutoff"/>'s precedence: the flag implies the policy, so a run driven only
+    /// by <c>--as-of</c> still has a cutoff worth persisting. A disagreeing pair never reaches here — it is rejected
+    /// at the validation gate. [Story 5.7]</para></summary>
+    private static DateCutoff? ResolveCutoffOrNull(SiteSettings settings)
+    {
+        if (settings.AsOf is { Length: > 0 } && DatePolicies.TryParseAsOfDate(settings.AsOf, out var pinned))
+        {
+            return new DateCutoff(DatePolicy.AsOf, pinned);
+        }
+
+        // `!= default` rather than `!= MachineLocal`: default(DateCutoff) IS (MachineLocal, null), so this keeps
+        // saying "only a non-default cutoff is worth writing" with the shape change absorbed. [Story 5.7]
+        return DatePolicies.TryParse(settings.TodayPolicy, out var cutoff) && cutoff != default ? cutoff : null;
+    }
 
     /// <summary>Writes the configured path/name choices to the <c>.specscribe</c> folder's <see cref="ConfigFileName"/>.
     /// Returns the folder path on success, or null when there was nothing worth saving or the write failed. Targets
@@ -284,12 +306,16 @@ public static class SettingsStore
         // restored; an explicit --no-readme stays on. A persisted `true` (include) needs no action — it agrees with
         // the default — but is still honored as an explicit source for provenance. [Story 5.2 AC #4]
         if (!settings.NoReadme && saved.IncludeReadme == false) settings.NoReadme = true;
-        // CLI wins: fill from the persisted policy only when no --today-policy was passed this run. Stored as the
-        // canonical token so the restored value round-trips through the same parser the command line uses — one
-        // parse path, so a saved value can never mean something the flag couldn't. [Story 5.5]
-        if (settings.TodayPolicy is not { Length: > 0 } && saved.TodayPolicy is { } savedPolicy)
+        // CLI wins: fill from the persisted cutoff only when NEITHER --today-policy NOR --as-of was passed this run.
+        // The --as-of half of that guard is load-bearing, not defensive: restoring a saved "utc" on top of an
+        // explicit --as-of would manufacture exactly the disagreement ResolveDateCutoff rejects, turning a valid
+        // command line into an error because of a file the user never mentioned. Stored as the canonical token so
+        // the restored value round-trips through the same parser the command line uses — one parse path, so a saved
+        // value can never mean something the flag couldn't. [Story 5.5, --as-of guard added in Story 5.7]
+        if (settings.TodayPolicy is not { Length: > 0 } && settings.AsOf is not { Length: > 0 }
+            && saved.TodayPolicy is { } savedCutoff)
         {
-            settings.TodayPolicy = DatePolicies.Token(savedPolicy);
+            settings.TodayPolicy = DatePolicies.Token(savedCutoff);
         }
     }
 }

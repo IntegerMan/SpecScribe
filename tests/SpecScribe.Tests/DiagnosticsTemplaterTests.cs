@@ -10,9 +10,9 @@ public class DiagnosticsTemplaterTests
     private static SiteNav Nav() =>
         SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
-    private static DiagnosticsConfig Config(bool deepGit = false, bool adrExplicit = false, DatePolicy datePolicy = DatePolicy.MachineLocal) => new()
+    private static DiagnosticsConfig Config(bool deepGit = false, bool adrExplicit = false, DateCutoff dateCutoff = default) => new()
     {
-        DatePolicy = datePolicy,
+        DateCutoff = dateCutoff,
         SiteTitle = "SpecScribe",
         RepoRoot = "C:/Dev/SpecScribe",
         SourceRootDisplay = "_bmad-output",
@@ -115,8 +115,26 @@ public class DiagnosticsTemplaterTests
     {
         // A non-default policy states the flag that produced it, mirroring "on (--deep-git)" / ADR "explicit
         // (--adrs)" provenance — so a reader can tell an override from the default at a glance. [Story 5.5]
-        var html = DiagnosticsTemplater.RenderPage(Array.Empty<DiagnosticNotice>(), Config(datePolicy: policy), Nav());
+        var html = DiagnosticsTemplater.RenderPage(
+            Array.Empty<DiagnosticNotice>(), Config(dateCutoff: new DateCutoff(policy, null)), Nav());
         Assert.Contains($"<dt>Date-page &quot;today&quot; policy</dt><dd>{expected}</dd>", html);
+    }
+
+    [Fact]
+    public void RenderPage_FixedDatePolicy_ShowsThePinnedDateAndNamesTheAsOfFlag()
+    {
+        // The pinned date is part of the effective configuration, so the row must SHOW it — and it names --as-of,
+        // the documented surface, rather than the composite --today-policy token it collapses onto internally.
+        // Plain text in a <dl>: the state is never signalled by color alone. [Story 5.7 Task 5 / AC #2]
+        var html = DiagnosticsTemplater.RenderPage(
+            Array.Empty<DiagnosticNotice>(),
+            Config(dateCutoff: new DateCutoff(DatePolicy.AsOf, new DateOnly(2026, 7, 27))),
+            Nav());
+
+        Assert.Contains(
+            "<dt>Date-page &quot;today&quot; policy</dt><dd>fixed date 2026-07-27 (--as-of 2026-07-27)</dd>",
+            html,
+            StringComparison.Ordinal);
     }
 
     [Fact]

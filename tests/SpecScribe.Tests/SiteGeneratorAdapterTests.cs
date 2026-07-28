@@ -1239,7 +1239,28 @@ public class SiteGeneratorAdapterTests : IDisposable
         // VERIFICATION: rebuilt first (the stale-build hash trap), then confirmed byte-identical across two
         // consecutive runs. Single-box only — the cross-environment caveat above still stands.
         // [Code review of Story 18.2, 2026-07-27, Patch P2; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
-        const string expected = "f4a7cbac5bee0fe56aa4ef9950a114a23acc8b2d59eb2e255e4b47e27873f0cd";
+        // ── STORY 20.7 CODE-REVIEW REGENERATION (2026-07-28) ─────────────────────────────────────────────────
+        // f4a7cbac… -> e384cbde…. One rendering-visible patch from this review reaches the fixture: the Impact
+        // Map's `HierarchyExplorer.Render` now emits a hidden `<p class="chart-empty ss-hierarchy-filter-empty">`
+        // sighted-visitor fallback for the empty-after-filter state (Task 1.3's node filter had only an aria-live
+        // announcement, no visible message) — gated on `cfg.Filterable`, so only the Impact Map page carries it.
+        // The other patches in this round (locale-invariant number formatting, a task-bulk node's accessible
+        // label wording, doc-comment corrections, a JS mount-ordering fix, dead-CSS removal) are either
+        // non-rendering or affect assets/tests this fixture does not hash.
+        //
+        // PROVENANCE (shared main) — this hash is NOT this review's work alone. `git status` at capture time
+        // showed a concurrent session mid-flight on what its new untracked story files name as Story 22.5
+        // (incremental event-driven regeneration engine) and Story 22.6 (client-server delta channel), touching
+        // `SiteGenerator.cs`, `Commands.cs`, `ConsoleUi.cs`, `ForgeOptions.cs`, `DatePolicy.cs`,
+        // `DiagnosticsTemplater.cs`, `SettingsResolver.cs`, `SettingsStore.cs`, `SiteSettings.cs` — several of
+        // which are rendering-visible in this fixture (`DiagnosticsTemplater.cs` → `diagnostics.html`, in
+        // `GoldenOutputInventory`; `DatePolicy.cs` feeds every date-cutoff-driven page). Per CLAUDE.md §
+        // Concurrent work, nothing was reset and nothing of theirs was reverted.
+        //
+        // VERIFICATION: confirmed byte-identical across two consecutive runs after a rebuild. Single-box only —
+        // the cross-environment caveat above still stands.
+        // [Code review of Story 20.7, 2026-07-28; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
+        const string expected = "e384cbde3ddaa14e7d10178bc16fc0c79456622e49e5ab89af1e3a0efcf35ecc";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

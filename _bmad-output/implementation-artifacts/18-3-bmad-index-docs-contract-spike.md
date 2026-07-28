@@ -4,7 +4,7 @@ baseline_commit: 86b35c267241c15b05c64e3aaa3e13cce58198b2
 
 # Story 18.3: BMad Index-Docs Contract Spike
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -393,6 +393,43 @@ absent — not empty, not "no description available".
   - [x] Do **not** land `src/**` / `tests/**` changes. Confirm with `git diff --stat {baseline_commit} HEAD -- src tests` and report the result honestly — 18.1's review caught a `git status` claim its own File List falsified. If the tree is dirty from a concurrent session, say whose changes and do not touch them.
   - [x] Every external claim carries its source URL/path + retrieval date + commit SHA.
 
+### Review Findings
+
+_Code review 2026-07-28 (`/bmad-code-review 18.3`). Three parallel layers: Blind Hunter (adversarial),
+Edge Case Hunter, Acceptance Auditor. Scoped to this story's own File List — the story markdown itself and
+`sprint-status.yaml`'s 18-3 entry; sibling stories' entries bundled in the same `sprint-status.yaml` file
+(18.4, 18.5, 18.6, 25.3, etc.) explicitly excluded. `git diff --stat 86b35c2 HEAD -- src tests` independently
+re-confirms zero files touched by this story (all 16 changed files belong to Story 18.2, committed
+separately) — the "no `src`/`tests` changes" claim holds on the merits. 6 findings dismissed as noise._
+
+**The spike's core conclusion survived adversarial verification.** Every spot-checked symbol
+(`ExtractAdrSummary`, `CollapseSummary`, `RegenerateAdrs`, `landingPathAlreadyWritten`, `ReservedModuleNames`,
+`PathUtil.EscapesRepoRoot`, the 5-value `AdapterDiagnosticCategory`, the ADR-index regression test, the
+12-field `Frontmatter` with no `Description`) verified exactly against the live repo. The D0 recommendation
+("no dependency on `index.md`") is independently supported by the 0/25 determinism measurement, the
+GitHub-wide null result, and the format-shape survey. The findings below are about the deliverable's
+**completeness, evidentiary calibration, and downstream coordination** — not its central conclusion.
+
+- [x] [Review][Decision] **RESOLVED (owner, 2026-07-28): annotate, keep ADR 0019 as-authored.** Proposed ADR 0019 collides with Story 22.3's own unwritten ADR 0019 claim — `docs/adrs/README.md`'s ADR 0021 entry states verbatim that "0019 is claimed-but-unwritten by BOTH Story 18.3 and Story 22.3," for two unrelated decisions. 18.3 predates this discovery (18.4, which surfaced it, ran after 18.3), so this wasn't an authoring fault. **Owner decision: leave the proposal under 0019 as historical record; a corrective numbering note added to §9** flagging the collision for whoever eventually ratifies it.
+
+- [x] [Review][Decision] **RESOLVED (owner, 2026-07-28): renamed to Story 18.7.** The follow-on story proposal in §8 squatted on an already-shipped, unrelated Story 18.6 (`epics.md`'s real "Module-Aware Artifact Coverage Families," seated after 18.3 concluded). This wasn't wrong when written, but the artifact as it stood still proposed the colliding number. **Owner decision: renumber the proposal.** §8 and §9's sequencing note now read "Story 18.7," with a dated annotation explaining the renumbering and that `18.7` was unclaimed at the time of the fix.
+
+- [x] [Review][Decision] **RESOLVED (owner, 2026-07-28): premise revised.** §9's original argument framed the fork as "human-authored vs. LLM-generated," which doesn't hold — most of SpecScribe's own inputs (including this document) are themselves LLM-generated. **Owner decision: revise before the ADR is written.** §9 now frames the fork as **provenance discipline** (accountable producer, deliberate re-run/commit, no silent regeneration) rather than authorship — `index.md` fails on producer-anonymity (§2), measured field-level instability at authorship time (§4: 0/25), and no re-sync trigger (§6e); a BMad story file fails none of these. The ADR's proposed title and decision sketch were updated to match.
+
+- [x] [Review][Patch] **§0's citation-drift note doesn't acknowledge the original citation was wrong at baseline, not just later-drifted** [§0] — the "NOT gated by 18.2" section cites `ModuleContext.cs:220,229` for the `core`-exclusion `.Where(n => …)` pattern. At `baseline_commit` (86b35c2) that pattern actually sits at lines 205 and 214, not 220/229 — inaccurate before Story 18.2 touched anything. **Applied:** a correction note added directly under the citation-drift note in §0, stating the original citation was already imprecise at baseline.
+
+- [x] [Review][Patch] **§5a's formal grammar contradicts its own prose on whether `separator` is optional** [§5a] — the BNF (`entry := WS* "-" SP+ target SP* separator SP* description? EOL`) marks only `description` as optional; `separator` has no `?`. The next bullet says "the separator **and** the description [are optional] (E8 has neither — a link-only line is a valid entry)." **Applied:** BNF changed to `(separator SP* description?)?`, grouping separator and description under one optional unit, with an inline note explaining the fix.
+
+- [x] [Review][Patch] **§3a/§3b overstate what the dangling-link evidence proves** [§3a, §3b] — the Completion Notes asserted E4's 64% dangling-link rate "**proves**" it isn't skill output and "**conclusively retires**" E2's hand-authored hypothesis. That only rules out literal hallucination, not *stale* skill output (§6e's own failure mode). **Applied:** both §3a's bullet and §10 item 3 rewritten to the accurately-scoped claim ("consistent with hand-authorship and inconsistent with fresh skill output"), each with an inline note recording the softening. AC #1's bottom line is unaffected — independently supported by E11 and §4.
+
+- [x] [Review][Patch] **`DiagnosticAnchorRoot` citation points to the wrong file** [References, §6d] — attributed to `src/SpecScribe/AdapterDiagnostic.cs`, but `enum DiagnosticAnchorRoot` is actually declared in `src/SpecScribe/DiagnosticsTemplater.cs:25`. **Applied:** correction appended to the References entry.
+
+- [x] [Review][Defer] **D2 ("docs landing page") is scored "deferred, not rejected" but left with no concrete follow-on path** [§7, §8] — deferred, pre-existing scope gap. §7 calls D2 "the only option that closes §5's gap" (generic docs listed nowhere), yet §8 gives it one sentence ("D2, sequenced after") with no story number or AC, unlike the blurb-cascade follow-on. Acceptable for a ranking spike whose job was to rank, not seed — but the owner should seat a D2 follow-on story when ready.
+
+- [x] [Review][Defer] **The §5/§6d entry grammar and failure taxonomy are not path-complete despite being framed as "closed"/"every row is complete"** [§5, §6d] — deferred, belongs to the follow-on implementation story. 13 edge cases in the parseable-contract deliverable have no mapped behavior/category/wording: case-insensitive lookup collisions between genuinely distinct same-named-differently-cased files, multiple links on one entry line, malformed/unbalanced link syntax, symlinks, backslash/drive-letter hrefs, leading-slash rooted hrefs (rejected but uncategorized, unlike every other drop case), empty href `[text]()`, URL-decode failure, an entry linking to another `index.md`, F11's tie-break comparison basis, F9/F10 evaluation order, non-ASCII whitespace in the grammar's `SP` token, soft-wrapped continuation lines, and underscore-delimited emphasis in descriptions. None of these change AC #1/#2's conclusions; they're implementation-detail gaps expected to surface once the follow-on story actually builds a parser against this contract. Recommend the follow-on story treat this list as its edge-case starting point.
+
+**Dismissed as noise (6):** AC #1's "repo-to-repo inconsistencies" answered mostly via self-generated samples rather than confirmed wild `bmad-index-docs` output — already transparently disclosed in §4's own "methodological honesty" note; E10's `bmad-document-project` provenance asserted by pattern-match rather than confirmed against that skill's own spec — reasonable inference, doesn't affect the conclusion; Task 7's verification command needing surrounding File-List prose to be meaningful — stylistic, and the File List itself is independently confirmed accurate; several evidence-ledger byte counts/hashes not independently re-verified by this review — self-disclosed reviewer-coverage limitation, not a story defect; the "7 loose files" → "6" self-correction — already caught and fixed by the story itself; an incomplete scratchpad diff file handed to one reviewer during this review — a review-tooling artifact, confirmed not to reflect any actual gap in the story's own File List.
+
 ## Dev Notes
 
 ### Spike constraints (load-bearing)
@@ -470,7 +507,7 @@ absent — not empty, not "no description available".
 - [Source: `src/SpecScribe/MarkdownConverter.cs` — `Convert`, `ExtractFirstH1`] — title resolution; the frontmatter→H1 cascade a description field would mirror.
 - [Source: `src/SpecScribe/DocModel.cs`] — the per-page model a blurb would attach to.
 - [Source: `src/SpecScribe/ListRow.cs`] — Story 10.8's shared list-row grammar; mandatory for any list-shaped recommendation.
-- [Source: `src/SpecScribe/AdapterDiagnostic.cs`] — the closed five-value category vocabulary and the source-root anchoring contract.
+- [Source: `src/SpecScribe/AdapterDiagnostic.cs`] — the closed five-value `AdapterDiagnosticCategory` vocabulary and the source-root anchoring contract. **[Review][Patch] correction, 2026-07-28:** `enum DiagnosticAnchorRoot` (`None`/`Source`/`Adr`/`Repo`) is declared in `src/SpecScribe/DiagnosticsTemplater.cs:25`, not here — `AdapterDiagnostic.cs` only references `DiagnosticAnchorRoot.Source` as a default parameter value.
 - [Source: `src/SpecScribe/DashboardViewBuilder.cs` — `KnownIndexGroups`, `IsWellKnownTopLevelFolder`] — proof the home-index doc bands were removed on purpose, plus the explicit do-not-extend warning.
 - [Source: `src/SpecScribe/SiteGenerator.cs` — `EnumerateSourceFiles`, `GenerateOneInternal`, `IsIgnored`] — only `*.md` under SourceRoot becomes a page; the `_docs` key space a parsed href must resolve into.
 - [Source: `_bmad-output/specs/spec-specscribe/ARCHITECTURE-SPINE.md` §AD-1, §AD-2, §AD-4] — shared core, host-neutral view models, and the additive/non-blocking rule for optional providers.
@@ -548,6 +585,12 @@ in between and **moved one citation this story depended on**: §"NOT gated by 18
 `.Where(n => !string.Equals(n, "core", …))`. That code no longer exists in that form. Per ADR 0015's symbol-first
 policy the current anchor is **`ModuleContext.ReservedModuleNames` / `ModuleContext.IsReservedModuleName`**
 (ADR 0015 Decision 1a). The conclusion is *unchanged and strengthened* — see §1.
+
+**[Review][Patch] correction, 2026-07-28:** the `:220,229` line numbers were also wrong at `baseline_commit`
+itself, before Story 18.2 touched anything — the `.Where(n => …)` pattern actually sat at `ModuleContext.cs:205`
+and `:214` at `86b35c2`. Not just drift from 18.2's rewrite; the original citation was imprecise. Immaterial to
+the conclusion (§1's finding stands either way), but recorded here so the drift note doesn't imply the citation
+was ever exact.
 
 ---
 
@@ -637,11 +680,16 @@ folder actually contains **4** `.md` files besides `index.md` (`setup-unity`, `s
 
 Two consequences:
 
-- **This proves E4 is not skill output.** `SKILL.md` Step 1 is *"List all files and subdirectories in the target
-  location."* A directory listing **cannot** invent entries for files that were never created. Same argument
-  retires E2 conclusively: upstream `docs/` contains `404.md`, `_STYLE_GUIDE.md`, `roadmap.mdx` and 8
-  subdirectories, and `docs/index.md` links **2** local files and lists none of the rest — it is not an index of
-  that folder in any sense.
+- **This is consistent with hand-authorship and inconsistent with fresh skill output — not literal proof E4 was
+  never skill-generated.** `SKILL.md` Step 1 is *"List all files and subdirectories in the target location,"* and
+  a directory listing cannot invent entries for files that were never created — so E4's 11 entries against 4
+  real files rules out a *fresh* run of the skill. It does not, on its own, rule out a *stale* one (the skill ran
+  once, the referenced files were later renamed or deleted — the same failure mode §6e treats as first-class for
+  `index.md` in general); neither repo's git history was checked to confirm those files never existed.
+  **[Review][Patch] softened, 2026-07-28** — was "proves E4 is not skill output." The same caveat applies to E2:
+  upstream `docs/` contains `404.md`, `_STYLE_GUIDE.md`, `roadmap.mdx` and 8 subdirectories, and `docs/index.md`
+  links **2** local files and lists none of the rest — strong evidence against a fresh skill run over that
+  folder, not a conclusive retirement of every hand-authorship-vs-stale-output possibility.
 - **The dangling-link rate is the default, not the edge case.** Any consumer must resolve by **file existence**,
   never by trusting the href. (E5/E6 are, by contrast, complete and accurate 3/3 indexes — so the failure is not
   universal, it is unpredictable, which is worse for a contract.)
@@ -689,13 +737,16 @@ Story 18.4 can consume it without inheriting a surface decision.
 ### 5a. Recognized entry line
 
 ```
-entry     := WS* "-" SP+ target SP* separator SP* description? EOL
+entry     := WS* "-" SP+ target SP* (separator SP* description?)? EOL
 target    := boldlink | plainlink
 boldlink  := "**" "[" text "]" "(" href ")" "**"
 plainlink := "[" text "]" "(" href ")"
 separator := "—" | "–" | " - "        ; em-dash, en-dash, or SPACE-hyphen-SPACE
 description := <rest of line, trimmed>
 ```
+*(**[Review][Patch] fix, 2026-07-28:** `separator` is grouped with `description` under one trailing `?` — both
+optional together, matching the very next bullet's E8 case (link-only line, no separator, no description). The
+original BNF marked only `description` optional, contradicting that bullet.)*
 
 - **Required:** the leading `-` list marker, and a markdown link whose href is present and non-empty.
 - **Optional:** the `**` bold wrapper (E8/E9 omit it); the separator **and** the description (E8 has neither —
@@ -933,7 +984,13 @@ optional surface on non-emptiness.
 
 ## 8. Follow-on scope boundary (AC #2's final clause)
 
-**Story 18.6 (proposed, not yet seated) — "Per-document descriptions from a content-derived cascade."**
+**Story 18.7 (proposed, not yet seated) — "Per-document descriptions from a content-derived cascade."**
+
+> **[Review][Patch], 2026-07-28: renumbered from "Story 18.6" to "Story 18.7".** At this story's own cited
+> HEAD (`32fd282`) no Story 18.6 existed yet; a later, unrelated story ("Module-Aware Artifact Coverage
+> Families," seated by 18.5's owner decision D4) has since shipped under that number. This proposal was never
+> wrong when written — it's renumbered here only so a reader acting on it today doesn't collide with the real
+> 18.6. `18.7` was unclaimed in `epics.md` as of the fix.
 
 **Lands:**
 - `Frontmatter.Description` (13th field) + its parse, mirroring the existing `Title` handling.
@@ -963,8 +1020,8 @@ real repo. The grammar in §5 stays surface-agnostic and is available to it, but
 18.4 also uses `ListRow` (Story 10.8) — as would D2, whose `ListRow.Render(sb, summaryHtml, badgeHtml, chipsHtml,
 primaryLinkHtml, …)` signature already carries a `summaryHtml` slot a blurb drops straight into.
 
-**Sequencing:** 18.6 (cascade + parser) → then D2 (docs landing page) as its own story. 18.4 may run in parallel
-once 18.6's `DocModel.Description` exists.
+**Sequencing:** 18.7 (cascade + parser) → then D2 (docs landing page) as its own story. 18.4 may run in parallel
+once 18.7's `DocModel.Description` exists.
 
 ---
 
@@ -973,22 +1030,42 @@ once 18.6's `DocModel.Description` exists.
 The question — *"is an external, LLM-generated, unversioned file an allowed **input** to generation?"* — is a
 genuine cross-cutting fork, and per this project's ADR-trigger discipline it is **proposed here, not buried**.
 
-**Why AD-4 does not already cover it.** AD-4 governs *optional insight providers* that "enrich but never own
-baseline success" — and every input SpecScribe reads today is either **authored by a human** (markdown docs,
-ADRs, `sprint-status.yaml`) or **derived from git** (commits, numstat). Both classes are *reproducible*: read the
-same tree twice, get the same answer. An LLM-generated artifact is a **third class** — non-reproducible at the
-field level (§4: 0/25), unversioned, carrying no producer identity (§2), and stale by construction. AD-4 tells us
-such an input must not *block* generation; it does not tell us whether such an input may *determine rendered
-content* at all, or what precedence it takes against a reproducible source. That precedence question is exactly
-what §7's cascade answers, and it is an invariant future stories will need.
+> **[Review][Decision], 2026-07-28: premise revised.** The original version of this section framed the fork as
+> "human-authored vs. LLM-generated," and code review correctly flagged that this dichotomy does not hold —
+> most of SpecScribe's own inputs, including this very document, are themselves produced by an LLM through the
+> BMad workflow, and are read back reproducibly once committed. The revision below replaces authorship with
+> **provenance discipline** as the actual fork, which is what the evidence in §2/§4/§6e supports.
 
-**Proposed ADR 0019 — "LLM-Generated Artifacts Are Enrichment-Only Inputs, Never Authoritative Ones."**
-Sketch of the decision: SpecScribe may read an LLM-generated artifact, but (a) it may never be the *sole* source
-of any rendered fact — every field it supplies must have a reproducible fallback; (b) it is always outranked by a
-human-authored source in the same document (frontmatter beats index entry); (c) every reference it makes is
-resolved against the filesystem, never trusted; (d) its absence is silent (NFR8), never signalled. Consequence:
-the §7 cascade's precedence order becomes an architectural invariant rather than one story's local choice, and
-18.4/18.6/D2 all inherit it.
+**Why AD-4 does not already cover it.** AD-4 governs *optional insight providers* that "enrich but never own
+baseline success." The naive "human-authored vs. LLM-generated" framing does not survive scrutiny — a BMad
+story file is LLM-drafted too. The real fork is **provenance discipline**, not authorship. Every input
+SpecScribe already trusts — human-edited or LLM-drafted — is a **committed document of record**: it has one
+accountable producer per artifact, it is revised deliberately (a person re-runs `create-story`/`dev-story` and
+commits the result), and re-reading it twice yields the same answer because nothing regenerates it silently in
+between. `index.md` fails all three, and the failure is measured, not assumed: §2 shows **at least three
+different BMad skills** write the same filename with no producer marker, so a reader cannot even tell which
+convention it followed; §4 measures **0/25** field-level agreement across two runs of the *same* skill over the
+*same* folder — instability at authorship time, not a hypothetical regeneration risk; and §6e shows there is no
+trigger that ever re-syncs it against the tree it describes, so it silently goes stale. An LLM-generated
+artifact that is checked in, owned, and deliberately re-run — like a BMad story file — is not this third class;
+an unowned, producer-anonymous, silently-stale byproduct is, regardless of who or what wrote it. That
+precedence question is exactly what §7's cascade answers, and it is an invariant future stories will need.
+
+**Proposed ADR 0019 — "Unowned, Producer-Anonymous Artifacts Are Enrichment-Only Inputs, Never Authoritative
+Ones."** Sketch of the decision: SpecScribe may read an artifact with no accountable producer and no
+re-sync trigger, but (a) it may never be the *sole* source of any rendered fact — every field it supplies must
+have a reproducible fallback from a committed, owned source; (b) it is always outranked by a document-of-record
+source in the same document (frontmatter beats index entry); (c) every reference it makes is resolved against
+the filesystem, never trusted; (d) its absence is silent (NFR8), never signalled. Consequence: the §7 cascade's
+precedence order becomes an architectural invariant rather than one story's local choice, and 18.4/18.7/D2 all
+inherit it.
+
+⚠️ **Numbering note (added by code review, 2026-07-28):** `docs/adrs/README.md`'s ADR 0021 entry records that
+ADR number **0019 is also claimed-but-unwritten by Story 22.3**, for an unrelated decision (reconciling ADR
+0008 vs. ADR 0009 on IR-projection architecture). That collision was discovered by Story 18.4, which ran after
+this story concluded, so it was not knowable at authorship time. Left as-authored rather than renumbered —
+whoever ratifies this proposal should resolve the collision against 22.3's draft (if one exists) before writing
+the ADR file.
 
 **Not written in this story** — the spike proposes, the owner ratifies (the Story 18.1 → ADR 0015 pattern).
 
@@ -1003,8 +1080,10 @@ Recorded so a later reader is not misled by the create-story text:
    `VSCodeIntegrationRecommendations`) plus `adrs/` and the gitignored `live/`.
 2. **§"NOT gated by 18.2" cites `ModuleContext.cs:220,229`** with a `.Where(n => … "core" …)` predicate. 18.2
    replaced it; the live anchor is `ReservedModuleNames` / `IsReservedModuleName`. Conclusion unchanged.
-3. **§3's "plausibly hand-authored"** is now **proven** hand-authored, by directory-listing contradiction (§3a) —
-   upgrade from hypothesis to fact.
+3. **§3's "plausibly hand-authored"** is strengthened by directory-listing contradiction (§3a) — the dangling-link
+   evidence rules out a *fresh* skill run over the folder, upgrading from unsupported hypothesis to
+   evidence-backed conclusion. **[Review][Patch] softened, 2026-07-28** — was "now proven hand-authored…upgrade
+   from hypothesis to fact"; the evidence rules out fresh generation, not a stale prior run (§3a).
 4. **§1's "67 lines"** — `wc -l` reports 66 (no trailing newline); the file is 67 lines of content. Immaterial.
 5. **Open Question 3 is resolved:** `sprint-status.yaml` now reads 18.2 = `review`, matching its story file. No
    drift remains.
@@ -1353,6 +1432,7 @@ session — see §11's Task 7 verification.
 | Date | Change |
 |---|---|
 | 2026-07-27 | dev-story 18.3 complete. Spike executed end to end; no production code. AC #1 and AC #2 both satisfied with a **negative-for-index.md** result: recommendation is **D0 (no dependency)** with `index.md` as optional enrichment at precedence 2 of a four-level cascade. Evidence: 8 wild samples (5 distinct shapes, **0 conforming** to `SKILL.md`), a GitHub-wide null result for the documented markers, a measured **0/25 description reproducibility** across two same-folder runs, and the new finding that **`index.md` is written by ≥3 different BMad skills** so the filename does not identify its producer. Entry grammar, path-resolution chain, and a 14-row failure taxonomy (each with category + drafted wording + anchor root) pinned surface-agnostically for 18.4 and the follow-on. **ADR 0019 proposed** (LLM-generated artifacts are enrichment-only inputs). Status → review. |
+| 2026-07-28 | code review (`/bmad-code-review 18.3`). Core conclusion (D0, the 0/25 determinism finding, all spot-checked symbols) survived adversarial verification unchanged. 3 decision-needed items resolved by owner: ADR 0019's numbering collision with Story 22.3 annotated in place (not renumbered); the follow-on's proposed "Story 18.6" renamed to **Story 18.7** (the real 18.6 shipped, unrelated, after this story concluded); §9's ADR argument reframed from "human- vs. LLM-authored" to **provenance discipline** (accountable producer, deliberate re-run/commit, no silent regeneration), since most of SpecScribe's own inputs are themselves LLM-generated. 4 patch findings applied: a baseline citation correction, the §5a grammar's separator-optionality fixed to match its own prose, §3a/§3b's "proves"/"conclusively retires" language softened to what the evidence actually supports, and a `DiagnosticAnchorRoot` citation corrected to `DiagnosticsTemplater.cs`. 2 items deferred to the follow-on story (D2's missing concrete path; 13 unmapped edge cases in the entry grammar/failure taxonomy) — see `deferred-work.md`. Status → done. |
 
 ## Open Questions for the Owner
 

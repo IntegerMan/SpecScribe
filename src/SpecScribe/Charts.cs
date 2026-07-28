@@ -829,10 +829,25 @@ public static partial class Charts
     {
         if (series.Count == 0) return "<div class=\"chart-empty\">No git history available.</div>";
 
-        var byDay = series.ToDictionary(s => s.Day, s => s.Count);
-        var firstCommit = series.Min(s => s.Day);
-        var lastCommit = series.Max(s => s.Day);
-        var todayValue = today ?? ResolveToday(DatePolicy.MachineLocal, series: null);
+        var todayValue = today ?? ResolveToday(new DateCutoff(DatePolicy.MachineLocal, null), series: null);
+
+        // Everything the summary text claims is derived from the days the grid ACTUALLY renders (<= the cutoff), not
+        // from the whole series — otherwise the aria-label and the headline name commits the cells don't show, which
+        // ADR 0013 forbids and which a past --as-of (or plain clock skew) makes routine rather than exotic. The
+        // already-migrated twin is DeliveryCadenceHeatmap; this is the same shape. [Story 5.7 D2 / AC #1a]
+        var visible = series.Where(s => s.Day <= todayValue).ToList();
+        // The crash guard, not merely an empty state: firstCommit/lastCommit below are Min/Max over this set and
+        // firstCommit also drives start/isYoungRepo, so an --as-of date before every commit would throw
+        // InvalidOperationException on a naive Min(). Answered with a designed empty state (UX-DR22) naming the
+        // cutoff, so the state explains itself rather than reading as "no git history".
+        if (visible.Count == 0)
+        {
+            return $"<div class=\"chart-empty\">No commits on or before {Html(DReadable(todayValue))}.</div>";
+        }
+
+        var byDay = visible.ToDictionary(s => s.Day, s => s.Count);
+        var firstCommit = visible.Min(s => s.Day);
+        var lastCommit = visible.Max(s => s.Day);
 
         // The grid never runs past the generation date: future-dated commits (clock/timezone skew) would
         // otherwise extend it into all-blank suppressed weeks and let the headline name a day the grid can't
@@ -859,7 +874,8 @@ public static partial class Charts
         var weeks = Math.Max(1, (int)Math.Ceiling(totalDays / 7.0));
         // Scale the heat over only the days the grid actually renders (<= today). A future-dated commit is
         // suppressed from the cells, so it must not inflate maxCount and depress every visible cell's level. [review]
-        var maxCount = series.Where(s => s.Day <= todayValue).Select(s => s.Count).DefaultIfEmpty(0).Max();
+        // (Reading `visible` rather than re-filtering `series` is a simplification, not a behavior change.)
+        var maxCount = visible.Select(s => s.Count).DefaultIfEmpty(0).Max();
 
         const int cell = 11;
         const int gap = 3;
@@ -876,8 +892,11 @@ public static partial class Charts
 
         // Whole-chart accessible name so the per-cell <title> tooltips (pointer-only) aren't the sole way to
         // read the heatmap: total commits, active days, and the date span. [Story 1.4 AC #1, UXO E6/H3]
-        var totalCommits = series.Sum(s => s.Count);
-        var activeDays = series.Count(s => s.Count > 0);
+        // Bound to `visible`, so this accessible name and the visible headline below (which restate the SAME
+        // figures) can never name a commit outside the rendered window — they must move together or the text twin
+        // disagrees with the visual (ADR 0013). [Story 5.7 AC #1a]
+        var totalCommits = visible.Sum(s => s.Count);
+        var activeDays = visible.Count(s => s.Count > 0);
         var heatAria = $"Commit activity: {totalCommits} commit{(totalCommits == 1 ? string.Empty : "s")} across {activeDays} active day{(activeDays == 1 ? string.Empty : "s")}, {DReadable(firstCommit)} to {DReadable(lastCommit)}";
 
         // The linked days, resolved up front: they decide each cell's link wrapper and the SVG role. Each
@@ -894,8 +913,9 @@ public static partial class Charts
         {
             // The "last commit" date is a date in the context of a change — link it to that day's date page so the
             // reader can click through (Story 7.3/10.4). Guarded on it being a linked day: normally it is (lastCommit
-            // has commits), but a future-skewed lastCommit is excluded from the linked set, so we fall back to plain
-            // text. Uses the same root-relative commits/ href the cells use — never a dead link.
+            // is the newest VISIBLE day and has commits), but a render without commitsByDay has no linked set at all,
+            // so we fall back to plain text. Uses the same root-relative commits/ href the cells use — never a dead
+            // link.
             var lastCommitText = DReadable(lastCommit);
             var lastCommitHtml = linkedSet.Contains(lastCommit)
                 ? $"<a class=\"date-link\" href=\"commits/{D(lastCommit)}.html\">{Html(lastCommitText)}</a>"
@@ -1369,7 +1389,7 @@ public static partial class Charts
         // The run's ONE policy-resolved cutoff (Story 5.5), threaded from the SiteGenerator — not a second
         // independent clock read. This guard and the page generator must filter on the same day or this link can
         // point at a page that was never written.
-        var todayValue = today ?? ResolveToday(DatePolicy.MachineLocal, series: null);
+        var todayValue = today ?? ResolveToday(new DateCutoff(DatePolicy.MachineLocal, null), series: null);
         var linkedDays = LinkedCommitDays(git.DailySeries, git.CommitsByDay, todayValue);
         var lastLinked = linkedDays.Contains(lastDay)
             ? $"<a class=\"date-link\" href=\"commits/{D(lastDay)}.html\">{Html(last)}</a>"
@@ -2350,7 +2370,8 @@ public static partial class Charts
     public static string DReadable(DateOnly day) => PortalDates.DayWithWeekday(day);
 
     /// <summary>Resolves the ONE <see cref="DateOnly"/> a run treats as "today" for the date-page cutoff, from the
-    /// configured <paramref name="policy"/>. Pure: the only impurity is the wall clock the policy itself asks for.
+    /// configured <paramref name="cutoff"/>. Pure: the only impurity is the wall clock the policy itself asks for
+    /// (<see cref="DatePolicy.AsOf"/> asks for none — its day is an input).
     /// <para>Deliberately co-located with <see cref="LinkedCommitDays"/>, the consumer whose guarantee this value
     /// underwrites. A run must call this ONCE and share the result — the guarantee that a linked cell always has a
     /// generated page holds only while every consumer filters on the SAME day, and independent re-resolution (a
@@ -2358,13 +2379,20 @@ public static partial class Charts
     /// <para><see cref="DatePolicy.LastCommit"/> degrades to <see cref="DatePolicy.MachineLocal"/> when
     /// <paramref name="series"/> is null or empty: with no git history (or an empty repo) there are no authored
     /// commit days to derive a cutoff from, so the honest fallback is the machine's own day rather than a crash or a
-    /// default-date sentinel (NFR8).</para></summary>
-    public static DateOnly ResolveToday(DatePolicy policy, IReadOnlyList<(DateOnly Day, int Count)>? series) => policy switch
+    /// default-date sentinel (NFR8).</para>
+    /// <para><see cref="DatePolicy.AsOf"/> without a date degrades the same way, for the same reason: the validated
+    /// CLI path cannot produce one (<c>--as-of</c> carries its date, and a dateless <c>as-of</c> token is rejected by
+    /// <see cref="DatePolicies.TryParse"/>), but this resolver is also the LIBRARY entry point, where a hand-built
+    /// <see cref="DateCutoff"/> can reach it. Degrade, do not throw. [Story 5.7]</para></summary>
+    public static DateOnly ResolveToday(DateCutoff cutoff, IReadOnlyList<(DateOnly Day, int Count)>? series) => cutoff switch
     {
-        DatePolicy.Utc => DateOnly.FromDateTime(DateTime.UtcNow),
-        DatePolicy.LastCommit when series is { Count: > 0 } => series.Max(s => s.Day),
-        // MachineLocal, and the LastCommit-without-history fallback. Written exactly as the pre-5.5 status quo
-        // expressed it so the default policy is byte-identical, not merely equivalent.
+        { Policy: DatePolicy.Utc } => DateOnly.FromDateTime(DateTime.UtcNow),
+        { Policy: DatePolicy.LastCommit } when series is { Count: > 0 } => series.Max(s => s.Day),
+        // The one policy whose answer is an INPUT: no clock is read, so the same flag on any host on any day yields
+        // the same cutoff — which is the whole point of Story 5.7.
+        { Policy: DatePolicy.AsOf, AsOf: { } day } => day,
+        // MachineLocal, plus the LastCommit-without-history and AsOf-without-a-date fallbacks. Written exactly as
+        // the pre-5.5 status quo expressed it so the default policy is byte-identical, not merely equivalent.
         _ => DateOnly.FromDateTime(DateTime.Now),
     };
 

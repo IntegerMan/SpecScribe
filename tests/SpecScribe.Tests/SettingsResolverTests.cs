@@ -221,7 +221,7 @@ public class SettingsResolverTests : IDisposable
 
         var resolved = SettingsResolver.Resolve(new SiteSettings { TodayPolicy = "utc" }, repo);
 
-        Assert.Equal(DatePolicy.Utc, resolved.Options.DatePolicy);
+        Assert.Equal(new DateCutoff(DatePolicy.Utc, null), resolved.Options.DateCutoff);
         Assert.Equal(ConfigSource.CommandLine, OriginOf(resolved, SettingsResolver.Fields.TodayPolicy));
         // Reported as the canonical token — the grep surface a CI script consumes.
         Assert.Equal("utc", resolved.For(SettingsResolver.Fields.TodayPolicy)!.EffectiveValue);
@@ -235,7 +235,7 @@ public class SettingsResolverTests : IDisposable
 
         var resolved = SettingsResolver.Resolve(new SiteSettings(), repo);
 
-        Assert.Equal(DatePolicy.Utc, resolved.Options.DatePolicy);
+        Assert.Equal(new DateCutoff(DatePolicy.Utc, null), resolved.Options.DateCutoff);
         Assert.Equal(ConfigSource.SavedSettings, OriginOf(resolved, SettingsResolver.Fields.TodayPolicy));
     }
 
@@ -246,7 +246,7 @@ public class SettingsResolverTests : IDisposable
 
         var resolved = SettingsResolver.Resolve(new SiteSettings(), repo);
 
-        Assert.Equal(DatePolicy.MachineLocal, resolved.Options.DatePolicy);
+        Assert.Equal(new DateCutoff(DatePolicy.MachineLocal, null), resolved.Options.DateCutoff);
         Assert.Equal(ConfigSource.Default, OriginOf(resolved, SettingsResolver.Fields.TodayPolicy));
         Assert.Equal("machine-local", resolved.For(SettingsResolver.Fields.TodayPolicy)!.EffectiveValue);
     }
@@ -271,10 +271,126 @@ public class SettingsResolverTests : IDisposable
     }
 
     [Fact]
-    public void ResolveDatePolicy_ThrowsOnAnUnrecognizedValue()
+    public void ResolveDateCutoff_ThrowsOnAnUnrecognizedValue()
     {
-        var ex = Assert.Throws<ArgumentException>(() => new SiteSettings { TodayPolicy = "nope" }.ResolveDatePolicy());
+        var ex = Assert.Throws<ArgumentException>(() => new SiteSettings { TodayPolicy = "nope" }.ResolveDateCutoff());
         Assert.Contains("nope", ex.Message, StringComparison.Ordinal);
+    }
+
+    // --- Story 5.7: --as-of joins the SAME single today_policy field ---
+
+    /// <summary>--as-of sets the same published <c>today_policy</c> field --today-policy does — no second Fields
+    /// constant — and reports it as a command-line override carrying the composite token a CI script could pass
+    /// straight back to --today-policy. [Story 5.7 AC #2 / D1]</summary>
+    [Fact]
+    public void Resolve_AsOfSetsTheTodayPolicyFieldAndReportsCommandLine()
+    {
+        var repo = NewRepo();
+
+        var resolved = SettingsResolver.Resolve(new SiteSettings { AsOf = "2026-07-27" }, repo);
+
+        Assert.Equal(new DateCutoff(DatePolicy.AsOf, new DateOnly(2026, 7, 27)), resolved.Options.DateCutoff);
+        Assert.Equal(ConfigSource.CommandLine, OriginOf(resolved, SettingsResolver.Fields.TodayPolicy));
+        Assert.Equal("as-of:2026-07-27", resolved.For(SettingsResolver.Fields.TodayPolicy)!.EffectiveValue);
+        // The --show-config wire shape a CI script greps. An ISO date contains no newline, so EscapeForLine has
+        // nothing to do here — the value reaches the line verbatim. [Story 5.7 Task 5]
+        Assert.Contains(
+            $"{SettingsResolver.LinePrefix} field={SettingsResolver.Fields.TodayPolicy} origin=commandline value=as-of:2026-07-27",
+            SettingsResolver.FormatConfigLines(resolved));
+    }
+
+    /// <summary>CLI > saved for the fixed date too: an explicit --as-of is not overridden by a persisted policy, and
+    /// the field is attributed to the command line rather than to the file. [Story 5.7 AC #2]</summary>
+    [Fact]
+    public void Resolve_CommandLineAsOfBeatsASavedPolicy()
+    {
+        var repo = NewRepo();
+        WriteSettings(repo, """{ "TodayPolicy": "utc" }""");
+
+        var resolved = SettingsResolver.Resolve(new SiteSettings { AsOf = "2026-07-27" }, repo);
+
+        Assert.Equal(new DateCutoff(DatePolicy.AsOf, new DateOnly(2026, 7, 27)), resolved.Options.DateCutoff);
+        Assert.Equal(ConfigSource.CommandLine, OriginOf(resolved, SettingsResolver.Fields.TodayPolicy));
+    }
+
+    /// <summary>A persisted composite token restores the whole cutoff — date included — and is attributed to the
+    /// settings file, exactly like every other saved field. [Story 5.7 AC #2]</summary>
+    [Fact]
+    public void Resolve_RestoresAndAttributesAPersistedFixedDate()
+    {
+        var repo = NewRepo();
+        WriteSettings(repo, """{ "TodayPolicy": "as-of:2026-07-27" }""");
+
+        var resolved = SettingsResolver.Resolve(new SiteSettings(), repo);
+
+        Assert.Equal(new DateCutoff(DatePolicy.AsOf, new DateOnly(2026, 7, 27)), resolved.Options.DateCutoff);
+        Assert.Equal(ConfigSource.SavedSettings, OriginOf(resolved, SettingsResolver.Fields.TodayPolicy));
+    }
+
+    /// <summary>Reject-don't-silently-accept, applied to the date half: a typo'd --as-of fails the same gate a
+    /// typo'd --today-policy does, naming the value and the expected shape. [Story 5.7 AC #2]</summary>
+    [Fact]
+    public void Validate_RejectsAnUnparseableAsOfDate()
+    {
+        var result = new SiteSettings { AsOf = "lastweek" }.Validate();
+
+        Assert.False(result.Successful);
+        Assert.Contains("lastweek", result.Message!, StringComparison.Ordinal);
+        Assert.Contains("yyyy-MM-dd", result.Message!, StringComparison.Ordinal);
+    }
+
+    /// <summary>AC #2b: the two flags disagreeing is rejected at the same gate rather than one silently winning —
+    /// the user asked for two different things and only one of them can be the run's cutoff. [Story 5.7]</summary>
+    [Theory]
+    [InlineData("utc")]
+    [InlineData("last-commit")]
+    [InlineData("as-of:2026-01-01")]
+    public void Validate_RejectsAConflictingTodayPolicyAndAsOfPair(string todayPolicy)
+    {
+        var result = new SiteSettings { TodayPolicy = todayPolicy, AsOf = "2026-07-27" }.Validate();
+
+        Assert.False(result.Successful);
+        Assert.Contains("--today-policy", result.Message!, StringComparison.Ordinal);
+        Assert.Contains("--as-of", result.Message!, StringComparison.Ordinal);
+    }
+
+    /// <summary>…but two AGREEING values are not a conflict: the composite token IS the fixed policy, so the
+    /// round-tripped form of a --as-of run has to be re-passable alongside it. [Story 5.7 Task 2]</summary>
+    [Fact]
+    public void Validate_AcceptsAnAgreeingTodayPolicyAndAsOfPair()
+    {
+        var settings = new SiteSettings { TodayPolicy = "as-of:2026-07-27", AsOf = "2026-07-27" };
+
+        Assert.True(settings.Validate().Successful);
+        Assert.Equal(new DateCutoff(DatePolicy.AsOf, new DateOnly(2026, 7, 27)), settings.ResolveDateCutoff());
+    }
+
+    /// <summary>The backstop for the surfaces Spectre never validates (the interactive menu, library callers):
+    /// ResolveDateCutoff repeats Validate's checks in the same order rather than trusting the gate ran.
+    /// [Story 5.7 Task 2]</summary>
+    [Fact]
+    public void ResolveDateCutoff_ThrowsOnABadDateAndOnAConflict()
+    {
+        var badDate = Assert.Throws<ArgumentException>(() => new SiteSettings { AsOf = "lastweek" }.ResolveDateCutoff());
+        Assert.Contains("lastweek", badDate.Message, StringComparison.Ordinal);
+
+        var conflict = Assert.Throws<ArgumentException>(
+            () => new SiteSettings { TodayPolicy = "utc", AsOf = "2026-07-27" }.ResolveDateCutoff());
+        Assert.Contains("--as-of", conflict.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>The unadvertised-but-accepted path: --today-policy carrying the composite token on its own resolves
+    /// the fixed cutoff, because the persisted value must round-trip through exactly that parse path. --as-of stays
+    /// the documented surface. [Story 5.7 Task 2]</summary>
+    [Fact]
+    public void Resolve_AcceptsTheCompositeTokenOnTodayPolicyAlone()
+    {
+        var repo = NewRepo();
+
+        var resolved = SettingsResolver.Resolve(new SiteSettings { TodayPolicy = "as-of:2026-07-27" }, repo);
+
+        Assert.Equal(new DateCutoff(DatePolicy.AsOf, new DateOnly(2026, 7, 27)), resolved.Options.DateCutoff);
+        Assert.Equal("as-of:2026-07-27", resolved.For(SettingsResolver.Fields.TodayPolicy)!.EffectiveValue);
     }
 
     // --- Resolve once (AC #2, "resolve effective settings once per run, preserving provenance") ---

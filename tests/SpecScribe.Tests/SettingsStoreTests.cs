@@ -271,7 +271,7 @@ public class SettingsStoreTests : IDisposable
     [Fact]
     public void IsEmpty_IsFalseWhenOnlyTodayPolicySet()
     {
-        Assert.False(new SavedSettings { TodayPolicy = DatePolicy.Utc }.IsEmpty);
+        Assert.False(new SavedSettings { TodayPolicy = new DateCutoff(DatePolicy.Utc, null) }.IsEmpty);
     }
 
     /// <summary>Persist-only-the-non-default: a run at the default machine-local policy has nothing worth saving, so
@@ -294,7 +294,7 @@ public class SettingsStoreTests : IDisposable
         var loaded = SettingsStore.TryLoad(repo);
 
         Assert.NotNull(loaded);
-        Assert.Equal(DatePolicy.Utc, loaded!.TodayPolicy);
+        Assert.Equal(new DateCutoff(DatePolicy.Utc, null), loaded!.TodayPolicy);
     }
 
     /// <summary>A forgiving CLI spelling is normalized to the canonical policy on save, so what round-trips through
@@ -305,7 +305,7 @@ public class SettingsStoreTests : IDisposable
         var repo = NewDir();
         SettingsStore.TrySave(new SiteSettings { TodayPolicy = "last" }, repo);
 
-        Assert.Equal(DatePolicy.LastCommit, SettingsStore.TryLoad(repo)!.TodayPolicy);
+        Assert.Equal(new DateCutoff(DatePolicy.LastCommit, null), SettingsStore.TryLoad(repo)!.TodayPolicy);
     }
 
     [Fact]
@@ -313,9 +313,9 @@ public class SettingsStoreTests : IDisposable
     {
         var settings = new SiteSettings(); // no --today-policy this run
 
-        SettingsStore.ApplyTo(new SavedSettings { TodayPolicy = DatePolicy.LastCommit }, settings);
+        SettingsStore.ApplyTo(new SavedSettings { TodayPolicy = new DateCutoff(DatePolicy.LastCommit, null) }, settings);
 
-        Assert.Equal(DatePolicy.LastCommit, settings.ResolveDatePolicy());
+        Assert.Equal(new DateCutoff(DatePolicy.LastCommit, null), settings.ResolveDateCutoff());
     }
 
     /// <summary>CLI wins: an explicit `--today-policy` is not overridden by a saved value. [Story 5.5 / AC #2]</summary>
@@ -324,9 +324,9 @@ public class SettingsStoreTests : IDisposable
     {
         var settings = new SiteSettings { TodayPolicy = "utc" };
 
-        SettingsStore.ApplyTo(new SavedSettings { TodayPolicy = DatePolicy.LastCommit }, settings);
+        SettingsStore.ApplyTo(new SavedSettings { TodayPolicy = new DateCutoff(DatePolicy.LastCommit, null) }, settings);
 
-        Assert.Equal(DatePolicy.Utc, settings.ResolveDatePolicy());
+        Assert.Equal(new DateCutoff(DatePolicy.Utc, null), settings.ResolveDateCutoff());
     }
 
     /// <summary>Backward compatibility: a `.specscribe` written before this field existed loads cleanly with the
@@ -377,7 +377,101 @@ public class SettingsStoreTests : IDisposable
             Path.Combine(repo, SettingsStore.FileName),
             """{ "TodayPolicy": "last-commit" }""");
 
-        Assert.Equal(DatePolicy.LastCommit, SettingsStore.TryLoad(repo)!.TodayPolicy);
+        Assert.Equal(new DateCutoff(DatePolicy.LastCommit, null), SettingsStore.TryLoad(repo)!.TodayPolicy);
+    }
+
+    // ---- Story 5.7: the fixed --as-of date rides the SAME single persisted field ----
+
+    /// <summary>The composite token is the whole point of D1: one field, one value, one round trip. A --as-of run
+    /// persists <c>as-of:{iso}</c> and loads back as the same cutoff — through the folder form the settings file
+    /// actually uses (ADR 0014), and through exactly the parser the command line uses. [Story 5.7 Task 6]</summary>
+    [Fact]
+    public void TrySaveThenTryLoad_RoundTripsThePinnedFixedDateThroughConfigJson()
+    {
+        var repo = NewDir();
+        var savedPath = SettingsStore.TrySave(new SiteSettings { AsOf = "2026-07-27" }, repo);
+
+        Assert.NotNull(savedPath);
+        var json = File.ReadAllText(Path.Combine(savedPath!, SettingsStore.ConfigFileName));
+        // Written as the TOKEN, not the record's ToString() — `DateCutoff { Policy = AsOf, ... }` would not parse.
+        Assert.Contains("\"as-of:2026-07-27\"", json, StringComparison.Ordinal);
+        Assert.Equal(new DateCutoff(DatePolicy.AsOf, new DateOnly(2026, 7, 27)), SettingsStore.TryLoad(repo)!.TodayPolicy);
+    }
+
+    /// <summary>A forgiving --as-of spelling is canonicalized to ISO on save, so what round-trips through the file
+    /// is exactly what the flag would parse — the same normalization the policy tokens already get. [Story 5.7]</summary>
+    [Fact]
+    public void TrySave_CanonicalizesAForgivingAsOfDateToIso()
+    {
+        var repo = NewDir();
+        SettingsStore.TrySave(new SiteSettings { AsOf = "07/27/2026" }, repo);
+
+        Assert.Equal(new DateCutoff(DatePolicy.AsOf, new DateOnly(2026, 7, 27)), SettingsStore.TryLoad(repo)!.TodayPolicy);
+    }
+
+    /// <summary>Story 5.7 switched the converter's WRITE side from the enum member name to the canonical token, so a
+    /// `.specscribe` written by ANY earlier version — holding "Utc"/"LastCommit" — must still load. Read and write
+    /// are now symmetric on one vocabulary, but the old vocabulary was never dropped. [Story 5.7 Task 2]</summary>
+    [Theory]
+    [InlineData("Utc", DatePolicy.Utc)]
+    [InlineData("LastCommit", DatePolicy.LastCommit)]
+    public void TryLoad_StillAcceptsALegacyEnumMemberNameToken(string legacy, DatePolicy expected)
+    {
+        var repo = NewDir();
+        File.WriteAllText(Path.Combine(repo, SettingsStore.FileName), $$"""{ "TodayPolicy": "{{legacy}}" }""");
+
+        Assert.Equal(new DateCutoff(expected, null), SettingsStore.TryLoad(repo)!.TodayPolicy);
+    }
+
+    /// <summary>The defect this whole converter exists to prevent, re-proved for the new argument-bearing token: a
+    /// malformed <c>as-of:</c> value degrades that ONE field to "not configured" and every sibling setting survives.
+    /// Retyping the field to <c>string?</c> and dropping the converter would pass an unvalidated token through
+    /// <see cref="SettingsStore.ApplyTo"/> into <see cref="SiteSettings.ResolveDateCutoff"/>'s throw, converting a
+    /// silent-and-safe degrade into a hard failure — which is why the converter was EXTENDED. [Story 5.7 AC #2]</summary>
+    [Fact]
+    public void TryLoad_ToleratesAnUnrecognizedAsOfTokenWithoutLosingAnySiblingSetting()
+    {
+        var repo = NewDir();
+        File.WriteAllText(
+            Path.Combine(repo, SettingsStore.FileName),
+            """
+            {
+              "Source": "docs",
+              "Adrs": "docs/adrs",
+              "Output": "out",
+              "ProjectName": "Legacy",
+              "DeepGit": true,
+              "CodeUrl": "https://example.com/repo/blob/main",
+              "IncludeReadme": false,
+              "TodayPolicy": "as-of:nope"
+            }
+            """);
+
+        var loaded = SettingsStore.TryLoad(repo);
+
+        Assert.NotNull(loaded);
+        Assert.Null(loaded!.TodayPolicy);
+        Assert.Equal("docs", loaded.Source);
+        Assert.Equal("docs/adrs", loaded.Adrs);
+        Assert.Equal("out", loaded.Output);
+        Assert.Equal("Legacy", loaded.ProjectName);
+        Assert.True(loaded.DeepGit);
+        Assert.Equal("https://example.com/repo/blob/main", loaded.CodeUrl);
+        Assert.False(loaded.IncludeReadme);
+    }
+
+    /// <summary>CLI wins, via the --as-of half of ApplyTo's guard. Without it a saved "utc" would be restored on top
+    /// of an explicit --as-of and manufacture exactly the disagreement ResolveDateCutoff rejects — turning a valid
+    /// command line into an error because of a file the user never mentioned. [Story 5.7 Task 2]</summary>
+    [Fact]
+    public void ApplyTo_DoesNotOverrideAnExplicitAsOfWithASavedPolicy()
+    {
+        var settings = new SiteSettings { AsOf = "2026-07-27" };
+
+        SettingsStore.ApplyTo(new SavedSettings { TodayPolicy = new DateCutoff(DatePolicy.Utc, null) }, settings);
+
+        Assert.Null(settings.TodayPolicy);
+        Assert.Equal(new DateCutoff(DatePolicy.AsOf, new DateOnly(2026, 7, 27)), settings.ResolveDateCutoff());
     }
 
     // ---- ADR 0014: `.specscribe` is a folder containing config.json, not a flat file ----

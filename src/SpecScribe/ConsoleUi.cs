@@ -84,6 +84,17 @@ public static class ConsoleUi
                 $"[yellow]![/] [yellow]ADR directory not found:[/] [grey]{Markup.Escape(options.AdrSourceRoot)}[/] [grey](no ADRs will be rendered)[/]");
         }
 
+        // A pinned date-page cutoff is echoed back in ISO form on an ORDINARY run, not only under --show-config:
+        // --as-of parses forgivingly (07/27/2026 is accepted), and forgiving input is only acceptable while a
+        // misparse is immediately visible rather than silently shifting which date pages exist. Conditional, and
+        // shaped like the ADR line above rather than a grid row — a permanent row would change every ordinary run's
+        // output for a setting almost nobody sets. [Story 5.7 D3 / AC #2a]
+        if (options.DateCutoff is { Policy: DatePolicy.AsOf, AsOf: { } pinned })
+        {
+            AnsiConsole.MarkupLine(
+                $"[grey]i[/] [grey]Date-page cutoff pinned to[/] [cyan]{PortalDates.IsoDay(pinned)}[/] [grey](--as-of)[/]");
+        }
+
         AnsiConsole.WriteLine();
     }
 

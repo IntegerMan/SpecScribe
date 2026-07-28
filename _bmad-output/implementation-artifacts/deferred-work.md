@@ -2,6 +2,15 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of 18-3-bmad-index-docs-contract-spike (2026-07-28)
+
+- source_spec: `18-3-bmad-index-docs-contract-spike.md`
+  summary: D2 ("docs landing page") is scored "deferred, not rejected" — the only ranked seam that closes §5's "generic docs are listed nowhere" gap — but the follow-on scope boundary gives it one sentence ("D2, sequenced after") with no story number or AC, unlike the blurb-cascade follow-on which got both.
+  evidence: Blind Hunter. Acceptable for a ranking spike whose job was to rank, not seed; the owner should seat a D2 follow-on story when ready. [§7, §8 of the story's Completion Notes]
+- source_spec: `18-3-bmad-index-docs-contract-spike.md`
+  summary: The pinned `index.md` entry grammar (§5) and path-resolution/failure taxonomy (§6d) are framed as "closed"/"every row is complete" but leave 13 edge cases unmapped to any behavior/category/wording: case-insensitive lookup collisions between genuinely distinct same-named-differently-cased files, multiple links on one entry line, malformed/unbalanced link syntax, symlinks, backslash/drive-letter hrefs, leading-slash rooted hrefs (rejected but uncategorized), empty href, URL-decode failure, an entry linking to another `index.md`, F11's tie-break comparison basis, F9/F10 evaluation order, non-ASCII whitespace in the grammar's `SP` token, soft-wrapped continuation lines, and underscore-delimited emphasis in descriptions.
+  evidence: Edge Case Hunter. None of these change AC #1/#2's conclusions — they're implementation-detail gaps expected to surface once the follow-on story actually builds a parser against this contract. Revisit when that follow-on story starts; treat this list as its edge-case starting point. [§5, §6d of the story's Completion Notes]
+
 ## Deferred from: code review of 20-6-text-twin-audit-and-fingerprint-replacement (2026-07-27)
 
 - source_spec: `20-6-text-twin-audit-and-fingerprint-replacement.md`

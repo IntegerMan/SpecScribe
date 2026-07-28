@@ -4058,6 +4058,15 @@ So that Story 6.7's SPA adapter and the webview stay consistent with static HTML
 
 ### Story 22.5: Incremental Event-Driven Regeneration Engine
 
+> **⚠ SCOPE RE-SCOPED at create-story 2026-07-28 — the story file's 8 ACs SUPERSEDE the 3 below** (recorded here and in `sprint-status.yaml` in the same change, per CLAUDE.md § Decision records). See [`22-5-incremental-event-driven-regeneration-engine.md`](../implementation-artifacts/22-5-incremental-event-driven-regeneration-engine.md). The re-scope is **mandated**, not discretionary: [Story 22.1's gate](../implementation-artifacts/22-1-spike-report.md) rules **"22.5 — RE-SCOPE (required)"**, because *"the measured facts forbid building the engine on the current narrow routes as-is."*
+>
+> 1. **This is a correctness story, not a performance story.** The latency case is already won and already shipped — 22.1 measured the narrow routes at **3×–84×** faster than a full rebuild. What it also measured is that `RegenerateEpics` **is not oracle-faithful even at no-op**: a 56-page work-graph over-count on every epic page (Epic 1: 16 items/20 links incrementally vs 13/12 from a full regen). `specscribe watch` therefore shows a different, inflated work-graph than `specscribe generate` until restart — **a live defect in the shipped tool today**, independent of the IR pivot. The gate's three required items are (a) fix `_workGraph` parity, (b) add topology-change invalidation for the cross-artifact seams no route refreshes, (c) escalate until (a)+(b) are proven against the byte-parity oracle.
+> 2. **AC #1's "and re-emitted" half is deliberately NOT in scope (owner decision D2).** Every incremental route already calls `EmitSpaSite`, which rewrites the **whole** manifest and every chunk. AC #1 is read as *recompute*, not *emit incrementally*. Selective emission belongs with the transport it serves — [Story 22.6](#story-226-spike-gated-client-server-delta-channel), which was seeded the same day, is gated on **22.2**'s per-page `contentHash` rather than on this story, and **runs first**. The two are orthogonal: 22.5 makes recompute correct; 22.6 makes transport cheap.
+> 3. **AC #2's "rebuild scope escalates as needed" is now specific (owner decision D3).** Full rebuild escalates for **topology** changes only; the narrow route is **kept** for content-only edits — including the epics/story family once parity is fixed — because a story-file save is the dominant edit class in this repo. Note that file-level topology does not escalate today: `RegenerateTopology` and `RegenerateFromDataSource` call `GenerateAll`, but an add/rename/delete of a single `.md` does not.
+> 4. **AC #3's "equivalent to a full regeneration" becomes a permanent test (owner decision D4).** 22.1's oracle-diff harness is productionized into `tests/SpecScribe.Tests/`. **No test in the suite today compares an incremental route to a full regeneration** — which is exactly why the 56-page divergence shipped and stayed shipped.
+> 5. **Sequencing (owner decision D1):** 22.5 is **gated on [Story 22.4](#story-224-spa--webview-as-ir-consumers)**, whose AC #5 / Task 3 fixes the *same* `_docs`-population ordering seam and shares one `WorkInventory` across the epics-page, SPA and webview builders. The parity gap is **re-measured after 22.4 lands** — the residue may be only the pre-nav `_workGraph` build, which 22.4 does not touch.
+> 6. ⚠️ **22.1's stranded-surface list is a lower bound.** Its correctness matrix ran with **deep-git OFF**, so per-commit pages, hotspot/coupling insights, the impact map and git-derived cadence were structurally invisible to the diff. The re-run is deep-git ON.
+
 As a maintainer running watch mode on a large or actively-changing repository,
 I want generation to recompute only the changed scope and emit IR deltas,
 So that AD-5's changed-scope principle is fully operationalized rather than partially honored.
@@ -4082,11 +4091,48 @@ So that AD-5's changed-scope principle is fully operationalized rather than part
 
 ### Story 22.6: (Spike-gated) Client-Server Delta Channel
 
+> **⚠️ The three ACs below are SUPERSEDED by the eight in
+> [Story 22.6's story file](../implementation-artifacts/22-6-client-server-delta-channel.md)** (create-story
+> 2026-07-28, baseline `811ba17`). They were written 2026-07-21, before Stories 22.1, 22.2, 23.1, 23.2, 23.3
+> and 23.5 ran. Recorded here in the same change as `sprint-status.yaml`, per CLAUDE.md § Decision records.
+>
+> 1. **AC #1's "watch server" is not what this story builds — owner decision D2 (2026-07-28).** Read
+>    literally it implies a new long-lived **network listener**, which
+>    [ADR 0008](../../docs/adrs/0008-json-ir-canonical-and-incremental-generation.md) §Consequences already
+>    defers (*"a future client/server mode adds a long-lived-process deployment shape — explicitly later; not
+>    decided here"*) and nothing since has un-deferred. What ships instead is **AD-8's own two clauses
+>    verbatim**: *extension host push* — delta frames on the **existing** `specscribe webview --serve` NDJSON
+>    stdout channel, behind a new `--serve-delta` opt-in — and *sidecar polling* — `spa/delta.json` written
+>    beside the IR in watch mode only. No port is opened, no listener is bound, no new runtime is introduced,
+>    and [ADR 0022](../../docs/adrs/0022-node-is-a-build-toolchain-and-a-generate-time-runtime.md) is
+>    untouched. **A `specscribe serve` HTTP/SSE server is explicitly out of scope** and would need its own ADR.
+>
+> 2. **The push channel already exists, and pushing the whole site is the defect this story closes.**
+>    `WebviewCommand.RunServeLoop` ([Commands.cs:142](../../src/SpecScribe/Commands.cs)) has shipped since
+>    Story 6.4's deferred item and re-serializes the **entire** payload on every debounced regen — a
+>    one-character edit re-ships the whole site, measured by the extension's own guard comment at
+>    *"~8 MB whole-site webview payload"*. The same shape holds on the SPA side: `EmitSpaSite` is called from
+>    six sites and each rewrites the manifest, every chunk, the script and the entry shell.
+>
+> 3. **AC #3's spike gate is discharged as a hard abort (owner decision D4), and it is still live.**
+>    [Story 22.1](#story-221-spike--incremental-recompute--ir-delta-transport) found transport *viable but
+>    gated on 22.2* — which has since landed the per-page `contentHash` addressing — but its 25.3 %/39.9 %
+>    figures were driven **only** through `RegenerateEpics`, whose own no-op over-count inflates them, and the
+>    byte-perfect `GenerateOne` route was **never delta-measured**. The story's Task 1 re-measures all four
+>    watch routes first; if a single-file `GenerateOne` edit's delta is not under 5 % of both the full IR and
+>    the full webview payload, the story halts, publishes the measurement, and returns to `backlog` having
+>    shipped no production code — AC #3 honored literally rather than rhetorically.
+>
+> 4. **Sequencing (owner decision D1): 22.6 runs BEFORE
+>    [Story 22.5](#story-225-incremental-event-driven-regeneration-engine).** The delta is manifest *N* vs
+>    manifest *N−1*, so no incremental engine is required underneath. 22.5 makes *recompute* cheap; 22.6 makes
+>    *transport* cheap. They are orthogonal, and 22.1's gate named **22.2**, not 22.5, as 22.6's blocker.
+
 As a maintainer wanting live-updating consumers of SpecScribe output,
 I want an optional watch server that pushes IR deltas to connected consumers,
 So that a future client/server model becomes possible without committing to it now.
 
-**Acceptance Criteria:**
+**Acceptance Criteria (superseded — see the story file):**
 
 1.
 **Given** Story 22.1's spike found IR-delta transport viable
@@ -4233,10 +4279,15 @@ So that SpecScribe has a single renderer and no drift hazard between two templat
      carve out and preserve when the HtmlRenderAdapter is retired. The ADR 0005 CSP amendment 23.4 owes is now
      SHARED with ADR 0012's webview amendment and must be landed ONCE, not twice. -->
 
-> **Scope drift recorded 2026-07-27 (create-story 23.4).** The story file's ACs **extend** the two above to
-> eight, and the story is seeded **`blocked`** — not `ready-for-dev` — because the epic's own gate above
-> (":3940–3950") is unmet: Story 23.5 is `ready-for-dev`, not done. ACs 1–2 are these; ACs 3–8 carry the four
-> owner decisions locked at elicitation plus the 23.1 spike gate's assignment of the ADR 0005 CSP amendment.
+> **Scope drift recorded 2026-07-27 (create-story 23.4); revisited 2026-07-28.** The story file's ACs
+> **extend** the two above to eight. It was seeded **`blocked`** on Story 23.5 and is now **`ready-for-dev`**:
+> the packaging gate cleared when 23.5 landed [ADR 0022](../../docs/adrs/0022-node-is-a-build-toolchain-and-a-generate-time-runtime.md).
+> ⚠️ **One gate replaced it — [Story 22.4](#story-224-spa--webview-as-ir-consumers) runs BEFORE 23.4**
+> (owner D2), so 23.4 inherits **one** region producer rather than two, and the retired
+> [Story 22.3 file](../implementation-artifacts/22-3-static-html-rendered-from-the-ir.md) is kept as the spec
+> for 23.4's region-composition task. ACs 1–2 are these; ACs 3–8 carry the four owner decisions locked at
+> elicitation plus the 23.1 spike gate's assignment of the ADR 0005 CSP amendment — which **remains 23.4's**
+> and must land once, since ADR 0022 deliberately does not touch CSP.
 > Full detail in [`23-4-…md`](../implementation-artifacts/23-4-migrate-remaining-surfaces-retire-c-sharp-html-adapter.md)
 > and on the `23-4` key in `sprint-status.yaml`. The four decisions:
 >

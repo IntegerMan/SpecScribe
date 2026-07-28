@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace SpecScribe;
 
 /// <summary>The per-surface projections onto <see cref="HierarchyExplorerModel"/> — Story 20.7 F2.
@@ -110,7 +112,7 @@ public static partial class HierarchyExplorer
             if (story.TasksTotal > 0)
             {
                 Add(new HierarchyNode(
-                    $"{story.Id}~tasks", story.Id, $"Story {story.Id}: {storyDetail}", storyDetail,
+                    $"{story.Id}~tasks", story.Id, $"Story {story.Id} tasks: {storyDetail}", storyDetail,
                     story.TasksTotal, string.Empty, storyClass, StatusLabelFor(storyClass, "story"),
                     hrefBuilder(story), "story-summary", PlanningColorClass(storyClass)));
             }
@@ -338,7 +340,7 @@ public static partial class HierarchyExplorer
                 epicId, ProjectRootId,
                 $"Epic {epic.Number}: {PathUtil.StripHtmlTags(epic.Title)}", $"Epic {epic.Number}",
                 Math.Max(1, epicChurn),
-                $"{files.Count} {Charts.Plural(files.Count, "file", "files")} · {epicChurn:N0} lines changed",
+                $"{files.Count} {Charts.Plural(files.Count, "file", "files")} · {epicChurn.ToString("N0", CultureInfo.InvariantCulture)} lines changed",
                 "unrecognized", $"Epic {epic.Number}", $"{prefix}epics/epic-{epic.Number}.html", "epic",
                 ImpactStructuralColorClass));
 
@@ -355,7 +357,7 @@ public static partial class HierarchyExplorer
                     // A file that is genuinely attributed but shows zero churn (a pure rename) still gets a
                     // visible tile rather than a zero-width one it is impossible to click or read.
                     Math.Max(1, file.Churn),
-                    $"{file.Churn:N0} {Charts.Plural(file.Churn, "line", "lines")} changed across {file.Commits:N0} {Charts.Plural(file.Commits, "commit", "commits")}",
+                    $"{file.Churn.ToString("N0", CultureInfo.InvariantCulture)} {Charts.Plural(file.Churn, "line", "lines")} changed across {file.Commits.ToString("N0", CultureInfo.InvariantCulture)} {Charts.Plural(file.Commits, "commit", "commits")}",
                     "unrecognized", "Touched file",
                     file.CodePageHref is { Length: > 0 } href ? prefix + href : null, "file",
                     $"impact-tm-tile impact-level-{ImpactLevel(file.Commits, maxCommits)}"));

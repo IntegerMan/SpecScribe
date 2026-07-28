@@ -1017,7 +1017,7 @@
           hierarchyMounts.push(root);
         } else {
           // Declined rather than threw (no engine, no island) — same outcome for the reader, so release the
-          // placeholder immediately and let the server SVG be the page.
+          // placeholder immediately and let the already-rendered text twin be the page.
           //
           // `|| root.parentNode` matters: `data-explorer` is an OPT-IN hook the dashboard call site happens to pass
           // via `panelAttributes`, which defaults to "". A Story 20.7 call site that omits it got `closest(...)` ===
@@ -2006,9 +2006,8 @@
       if (pushHash) syncHistory();
     }
 
-    // --- Mount. Reveal the host and give it its configured height first (never a literal in this file), plot,
-    // and only then hide the server chart. If newPlot throws, the host is hidden again and the SVG is simply the
-    // page — which is the whole reason the SVG is still there in this story.
+    // --- Mount. Reveal the host and give it its configured height first (never a literal in this file), then plot.
+    // If newPlot throws, the host is hidden again and the text twin is simply the page.
     //
     // The height is CAPPED to the host's own width rather than taken flat from config. `responsive: true` fits the
     // WIDTH to the container and leaves the height exactly as set, so a flat `cfg.size` left a 375 px phone drawing
@@ -2021,8 +2020,11 @@
       return Math.max(240, Math.min(configuredSize, w));
     }
     root.style.maxWidth = "100%";
-    root.style.height = hostHeight() + "px";
+    // `data-hierarchy-ready` MUST be set before `hostHeight()` reads `clientWidth` — `.ss-hierarchy` is
+    // `display:none` until that attribute exists, so a read taken beforehand always sees 0 and the width cap
+    // silently no-ops on first paint (only a later `resize` event would apply it). [Story 20.7 review]
     root.setAttribute("data-hierarchy-ready", "1");
+    root.style.height = hostHeight() + "px";
     state.level = scopeFromHash();
     // Resolve the DEFAULT dimension before the first plot, so the chart is never drawn once in the payload's
     // structural colours and then re-coloured a frame later.
@@ -2034,8 +2036,8 @@
       resolveDimension();
     }
     // `Plotly.newPlot` returns a promise. A SYNCHRONOUS throw lands in the catch below; an ASYNCHRONOUS rejection
-    // would sail straight past it, leaving the component reporting a successful mount — and hiding the server SVG —
-    // over an empty panel. Both routes must reach the same failure exit. [Story 20.5 review]
+    // would sail straight past it, leaving the component reporting a successful mount over an empty panel with the
+    // text twin already collapsed. Both routes must reach the same failure exit. [Story 20.5 review]
     function abandonMount() {
       root.removeAttribute("data-hierarchy-ready");
       root.style.height = "";
@@ -2182,6 +2184,8 @@
       // the entire contract, and nothing here knows what those ids mean.
       if (cfg.filterable) {
         var filterBoxes = Array.prototype.slice.call(controls.querySelectorAll("[data-hierarchy-filter]"));
+        // Scoped to this panel, not the document — a page can carry more than one filterable instance.
+        var filterEmptyMsg = panel.querySelector(".ss-hierarchy-filter-empty");
         if (filterBoxes.length) {
           var applyFilter = function () {
             var next = Object.create(null), kept = 0;
@@ -2192,6 +2196,9 @@
             if (state.level && filterState && !next[state.level]) { state.level = null; }
             redraw();
             applyState(true);
+            // A sighted visitor who filters out everything needs a visible reason, not only the aria-live
+            // announcement below — the aria-live text is easy to miss without a screen reader running.
+            if (filterEmptyMsg) filterEmptyMsg.hidden = kept !== 0;
             announce(kept === filterBoxes.length
               ? "Showing all " + filterBoxes.length
               : "Showing " + kept + " of " + filterBoxes.length);

@@ -90,7 +90,7 @@ public class ChartsTests
     }
 
     [Fact]
-    public void Sunburst_SegmentLinksCarryAriaLabelsAndKeepTitles()
+    public void Sunburst_SegmentLinksCarryDescriptiveLabels()
     {
         var story = Story("1.1", "Do the thing", "in progress", done: 2, total: 5);
         var model = new EpicsModel
@@ -102,13 +102,11 @@ public class ChartsTests
 
         var svg = Glance(model);
 
-        // Epic + story segment <a>s carry a descriptive aria-label (keyboard/SR name)...
+        // Epic + story nodes carry a descriptive label (keyboard/SR name), reachable via the payload/twin — there
+        // is no SVG <title> tooltip any more (Story 20.7 retired the last hand-rolled SVG renderer; Plotly's own
+        // hover reads the payload, not a static attribute this test can assert against).
         Assert.Contains("Epic 1: First Epic", svg);
         // Story now includes task count in the aria-label (no separate task ring).
-        Assert.Contains("Story 1.1: Do the thing", svg);
-        // No task ring arcs — removed per spec-sunburst-remaining-work-hierarchy.
-        // ...and the pointer-only  tooltips are still present (both paths retained).
-        Assert.Contains("Epic 1: First Epic", svg);
         Assert.Contains("Story 1.1: Do the thing", svg);
         // Legend text keeps status shape+label, not colour alone (UX-DR17). The wording is the payload's own
         // prose status, so it can never disagree with the sector, the tooltip, the accessible name or the twin —
@@ -1282,8 +1280,11 @@ public class ChartsTests
 
     private static string ExtractFollowUpAriaLabels(string svg)
     {
+        // There is no SVG aria-label attribute to scan any more (Story 20.7 retired the last hand-rolled SVG
+        // renderer) — the payload island is where each node's label actually lives now, as a JSON `"label":"..."`
+        // pair.
         var labels = new List<string>();
-        var needle = "";
+        var needle = "\"label\":\"";
         for (var i = 0; (i = svg.IndexOf(needle, i, StringComparison.Ordinal)) >= 0;)
         {
             i += needle.Length;
@@ -1396,6 +1397,7 @@ public class ChartsTests
         var donutHtml = html.Substring(html.IndexOf("epic-mosaic-donut", StringComparison.Ordinal));
         donutHtml = donutHtml[..donutHtml.IndexOf("epic-mosaic-label", StringComparison.Ordinal)];
         Assert.Contains("aria-hidden=\"true\"", donutHtml);
+        Assert.DoesNotContain("role=\"img\"", donutHtml);
         Assert.DoesNotContain("tabindex=\"0\"", donutHtml);
         Assert.DoesNotContain($"aria-label=\"{sentence}\"", html);
         Assert.Contains($"class=\"epic-mosaic-delivery\">{sentence}</span>", html);
@@ -1412,6 +1414,7 @@ public class ChartsTests
             ("Pending", 2, "pending"),
         }, ariaLabel: "Epic status: 3 drafted, 2 pending");
 
+        Assert.Contains("role=\"img\"", svg);
         Assert.Contains("aria-label=\"Epic status: 3 drafted, 2 pending\"", svg);
     }
 
@@ -1421,6 +1424,7 @@ public class ChartsTests
         var svg = Charts.Donut(new (string, int, string)[] { ("Detailed", 1, "ready") });
 
         Assert.Contains("aria-hidden=\"true\"", svg);
+        Assert.DoesNotContain("role=\"img\"", svg);
     }
 
     [Fact]
@@ -1433,6 +1437,7 @@ public class ChartsTests
         var svg = Charts.CommitHeatmap(series);
 
         // A link-free render keeps role="img": one named graphic, children hidden from AT.
+        Assert.Contains("role=\"img\"", svg);
         // Visible/AT dates read in the human format; the range uses "to", not an en-dash.
         Assert.Contains($"across 2 active days, {Charts.DReadable(d1)} to {Charts.DReadable(d2)}", svg);
         Assert.Contains($"<title>{Charts.DReadable(d1)}: 3 commits</title>", svg);
@@ -1459,6 +1464,7 @@ public class ChartsTests
 
         // With day-page links present, the SVG is role="group" so AT can reach them.
         Assert.Contains("role=\"group\"", svg);
+        Assert.DoesNotContain("role=\"img\"", svg);
         // Active-day cells link to their generated per-day page; href stays ISO, the name is readable.
         Assert.Contains($"<a href=\"commits/2026-01-05.html\" aria-label=\"{Charts.DReadable(d1)}: 2 commits — view details\">", svg);
         Assert.Contains($"<a href=\"commits/2026-01-07.html\" aria-label=\"{Charts.DReadable(d2)}: 1 commit — view details\">", svg);
@@ -1547,6 +1553,7 @@ public class ChartsTests
 
         // The center reads as progress (a fraction), not a bare total that looks like a score. [Story 1.5 E3]
         Assert.Contains("donut-center-fraction", svg);
+        Assert.Contains(">4/14</text>", svg);
     }
 
     [Fact]
@@ -1558,6 +1565,7 @@ public class ChartsTests
             ("Pending", 10, "pending"),
         });
 
+        Assert.Contains(">14</text>", svg);
         Assert.DoesNotContain("donut-center-fraction", svg);
     }
 
@@ -1794,12 +1802,24 @@ public class ChartsTests
         }));
 
         // Whole-chart accessible name summarizing every stage and cumulative count.
+        Assert.Contains("role=\"img\"", svg);
         Assert.Contains("aria-label=\"Story pipeline: 37 stories drafted, 26 reached ready for dev, " +
                         "18 reached development, 16 reached review, 12 done\"", svg);
         // Every stage carries its visible count + text label (never color-only).
+        Assert.Contains(">37</text>", svg);
+        Assert.Contains(">Drafted</text>", svg);
+        Assert.Contains(">26</text>", svg);
+        Assert.Contains(">Ready for dev</text>", svg);
+        Assert.Contains(">18</text>", svg);
+        Assert.Contains(">In development</text>", svg);
+        Assert.Contains(">16</text>", svg);
+        Assert.Contains(">In review</text>", svg);
+        Assert.Contains(">12</text>", svg);
+        Assert.Contains(">Done</text>", svg);
         // Per-band tooltips spell out the reached-at-least reading; the %-of-stories sub gives conversion.
         Assert.Contains("<title>26 of 37 stories have reached Ready for dev</title>", svg);
         Assert.Contains("<title>12 of 37 stories are done</title>", svg);
+        Assert.Contains(">70% of stories</text>", svg);
         // Bands ride the 1:1 status-token classes, joined by sideways-funnel connectors.
         Assert.Contains("funnel-band funnel-drafted", svg);
         Assert.Contains("funnel-band funnel-ready", svg);
@@ -1836,6 +1856,14 @@ public class ChartsTests
         // data), and no height goes NaN/negative. [AC #2]
         var svg = Charts.RefinementFunnel(Pipeline(3, new Dictionary<string, int> { ["drafted"] = 3 }));
 
+        Assert.Contains(">3</text>", svg);
+        Assert.Contains(">Drafted</text>", svg);
+        Assert.Contains(">0</text>", svg);
+        Assert.Contains(">Ready for dev</text>", svg);
+        Assert.Contains(">In development</text>", svg);
+        Assert.Contains(">In review</text>", svg);
+        Assert.Contains(">Done</text>", svg);
+        Assert.Contains(">0% of stories</text>", svg);
         // All four later stages are zero → four dashed placeholder bands; drafted keeps the full height.
         Assert.Equal(4, CountOf(svg, "funnel-zero"));
         Assert.Contains("height=\"136\"", svg);
@@ -2038,6 +2066,10 @@ public class ChartsTests
         var svg = Charts.RiskQuadrant(RiskFiles());
 
         Assert.Contains("class=\"risk-tick-label\"", svg);
+        Assert.Contains(">100</text>", svg);    // min lines (X)
+        Assert.Contains(">5,000</text>", svg);  // max lines (X)
+        Assert.Contains(">1</text>", svg);      // min changes (Y)
+        Assert.Contains(">50</text>", svg);     // max changes (Y)
 
         // The median cutoff lines get their own real-unit label, distinct class from the plain min/max ticks.
         Assert.Contains("class=\"risk-median-tick-label\"", svg);
@@ -2392,6 +2424,7 @@ public class ChartsTests
         var (reqs, epics) = FlowFixture();
         var svg = Charts.RequirementFlow(reqs, epics);
 
+        Assert.Contains("role=\"img\"", svg);
         Assert.Contains("aria-label=\"", svg);
         // The aria summary names the FULL requirement total (FR + NFR = 5), not just the functional ones.
         Assert.Contains("5 requirements", svg);
@@ -2424,6 +2457,8 @@ public class ChartsTests
         // and the shared-count note appears on the node tooltip. [multi-epic split]
         var (reqs, epics) = FlowFixture();
         var svg = Charts.RequirementFlow(reqs, epics);
+        Assert.Contains(">Epic 1</text>", svg);
+        Assert.Contains(">Epic 2</text>", svg);
         Assert.Contains("shared with other epics", svg);
     }
 
@@ -2495,6 +2530,7 @@ public class ChartsTests
 
         var svg = Charts.RequirementFlow(reqs, epics);
         Assert.DoesNotContain("NaN", svg);
+        Assert.Contains("role=\"img\"", svg);
     }
 
     [Fact]
@@ -2695,6 +2731,8 @@ public class ChartsTests
 
         // Exactly two hub nodes (one per distinct epic), even though three stories cite the file.
         Assert.Equal(2, CountOccurrences(svg, "<g class=\"ref-epic-hub\""));
+        Assert.Contains(">Epic 1</text>", svg);
+        Assert.Contains(">Epic 2</text>", svg);
         // All three story nodes still render as ordinary gold artifact nodes (shape/colour unchanged).
         Assert.Equal(3, CountOccurrences(svg, "class=\"ref-dot\""));
         // Hub->story spokes exist (nesting), distinct from the file->hub spokes.
@@ -2715,6 +2753,7 @@ public class ChartsTests
 
         // One hub (for the story) — the ADR never gets a hub or a hub-spoke, it keeps a direct file->node spoke.
         Assert.Equal(1, CountOccurrences(svg, "<g class=\"ref-epic-hub\""));
+        Assert.Contains(">ADR 0005</text>", svg);
         Assert.Equal(2, CountOccurrences(svg, "class=\"ref-dot\""));
     }
 
@@ -3586,14 +3625,36 @@ public class ChartsTests
     }
 
     [Fact]
-    public void CommitHeatmap_FutureDatedFirstCommit_KeepsValidGridWithoutOrphanCaption()
+    public void CommitHeatmap_EveryCommitAfterTheCutoff_RendersTheDesignedEmptyStateInsteadOfAnOverclaimingGrid()
     {
-        // Clock/timezone skew can put the series Min day well after today. The young-repo lead-in
-        // (firstCommit − 7d) would then start after end and invert the window — clamp must keep a
-        // positive week count, and the first-commit caption must not appear without its SVG mark.
+        // Clock/timezone skew can put the series Min day well after today — and since Story 5.7 an --as-of date
+        // before every commit reaches the same state deliberately. There is then nothing to draw, and the pre-5.7
+        // whole-series summary would still have named the commits no cell renders. The honest answer is the
+        // designed empty state (UX-DR22) naming the cutoff, not a zero-cell grid with an overclaiming
+        // aria-label/headline. [Story 5.7 D2 / AC #1a; supersedes the old "clamp the inverted window" expectation,
+        // which is now unreachable because the window is derived from the VISIBLE days.]
         var today = DateOnly.FromDateTime(DateTime.Now);
-        var firstCommit = today.AddDays(21);
-        var series = new (DateOnly Day, int Count)[] { (firstCommit, 2) };
+        var series = new (DateOnly Day, int Count)[] { (today.AddDays(21), 2) };
+
+        var svg = Charts.CommitHeatmap(series);
+
+        Assert.Contains("chart-empty", svg, StringComparison.Ordinal);
+        Assert.Contains("No commits on or before", svg, StringComparison.Ordinal);
+        Assert.DoesNotContain("<svg", svg, StringComparison.Ordinal);
+        // The whole point: no summary figure survives that the grid cannot show.
+        Assert.DoesNotContain("2 commit", svg, StringComparison.Ordinal);
+        Assert.DoesNotContain("heatmap-headline", svg, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CommitHeatmap_FutureDatedCommitBesideAVisibleOne_KeepsValidGridAndCountsOnlyTheVisibleDays()
+    {
+        // The surviving half of the future-skew guard: with at least one day on or before the cutoff the grid still
+        // renders with a positive week count and the first-commit caption never appears without its SVG mark — and
+        // the accessible name and the visible headline BOTH count only the visible day, so the text twin and the
+        // cells agree (ADR 0013). [Story 5.7 AC #1a]
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var series = new (DateOnly Day, int Count)[] { (today.AddDays(-3), 1), (today.AddDays(21), 2) };
 
         var svg = Charts.CommitHeatmap(series);
 
@@ -3602,11 +3663,43 @@ public class ChartsTests
         var width = int.Parse(viewBox.Groups[1].Value);
         Assert.True(width > 26, $"expected a positive-width SVG grid, got width {width}");
         var weeks = (width - 26) / 14;
-        Assert.True(weeks >= 1, $"expected at least one week after clamp, got {weeks}");
+        Assert.True(weeks >= 1, $"expected at least one week, got {weeks}");
 
         var hasMark = svg.Contains("heatmap-first-commit-mark", StringComparison.Ordinal);
         var hasCaption = svg.Contains("class=\"heatmap-first-commit\"", StringComparison.Ordinal);
         Assert.Equal(hasMark, hasCaption);
+
+        // 1 visible commit on 1 visible day — never the 3-commit whole-series total.
+        Assert.Contains("aria-label=\"Commit activity: 1 commit across 1 active day,", svg, StringComparison.Ordinal);
+        Assert.Contains("<strong>1</strong> commit &middot; <strong>1</strong> active day", svg, StringComparison.Ordinal);
+        Assert.DoesNotContain("3 commit", svg, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CommitHeatmap_ExplicitPastCutoff_BoundsBothTheAriaLabelAndTheHeadlineToTheRenderedWindow()
+    {
+        // The production shape of the --as-of path: the run's ONE resolved cutoff arrives via `today:` and is fully
+        // deterministic (no machine clock involved). Both text surfaces restate the same figures, so BOTH must stop
+        // at the cutoff — fixing one alone leaves the twin disagreeing with the visual, which ADR 0013 forbids.
+        // [Story 5.7 AC #1a]
+        var series = new (DateOnly Day, int Count)[]
+        {
+            (new DateOnly(2026, 1, 5), 2),
+            (new DateOnly(2026, 1, 9), 1),
+            (new DateOnly(2026, 3, 1), 40),
+        };
+
+        var svg = Charts.CommitHeatmap(series, today: new DateOnly(2026, 1, 31));
+
+        Assert.Contains(
+            "aria-label=\"Commit activity: 3 commits across 2 active days, Mon, Jan 5, 2026 to Fri, Jan 9, 2026\"",
+            svg,
+            StringComparison.Ordinal);
+        Assert.Contains("<strong>3</strong> commits &middot; <strong>2</strong> active days", svg, StringComparison.Ordinal);
+        // The out-of-window day must appear in neither text surface, nor as a linked "last commit" date.
+        Assert.DoesNotContain("2026-03-01", svg, StringComparison.Ordinal);
+        Assert.DoesNotContain("Mar 1, 2026", svg, StringComparison.Ordinal);
+        Assert.DoesNotContain("43 commit", svg, StringComparison.Ordinal);
     }
 
     [Fact]

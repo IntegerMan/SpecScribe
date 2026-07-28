@@ -56,7 +56,7 @@ public sealed class SiteGenerator
     private ProgressModel? _progress;
 
     /// <summary>The ONE calendar day this pass treats as "today" for the date-page cutoff, resolved from
-    /// <see cref="ForgeOptions.DatePolicy"/> by <see cref="Charts.ResolveToday"/> and shared by every consumer: the
+    /// <see cref="ForgeOptions.DateCutoff"/> by <see cref="Charts.ResolveToday"/> and shared by every consumer: the
     /// linked-day set (<see cref="Charts.LinkedCommitDays"/>), the generated <c>commits/{date}.html</c> set, the
     /// artifact-by-day future-skew guard, the heatmap grid extent, and every guarded date link.
     /// <para>A field rather than five independent resolutions BY DESIGN. <see cref="Charts.LinkedCommitDays"/>'s
@@ -70,7 +70,7 @@ public sealed class SiteGenerator
     /// <summary>Re-resolves <see cref="_today"/> from the current policy and git series. Called exactly where
     /// <see cref="_progress"/> is (re)assigned — that is the moment git metrics become known, and it is BEFORE any
     /// consumer runs on every path. Within a single pass the value never moves.</summary>
-    private void RefreshToday() => _today = Charts.ResolveToday(_options.DatePolicy, _progress?.Git?.DailySeries);
+    private void RefreshToday() => _today = Charts.ResolveToday(_options.DateCutoff, _progress?.Git?.DailySeries);
 
     private RequirementsModel? _requirements;
     private List<AdrEntry> _adrs = new();

@@ -541,9 +541,12 @@ public class StylesheetTests
     [Fact]
     public void Stylesheet_HasTheComponentsOwnLegend_WithHatchedNonLifecycleSwatches()
     {
-        // AC #1: the component supplies the framing block INCLUDING the legend. It did not until the code review —
-        // the only legend on the dashboard came from inside `Charts.Sunburst`, i.e. inside the D1 fallback that
-        // Story 20.7 deletes. These rules are what keeps the dashboard's legend alive past that deletion.
+        // AC #1: the component supplies the framing block INCLUDING a legend. Story 20.7's own planning surfaces
+        // (dashboard, epics index, epic/story detail) render their legend through `Charts.SunburstLegend`'s
+        // `.sunburst-legend`/`.sb-legend-item` markup instead — deliberately, so the pre-existing pure-CSS
+        // drilled-legend filter (`Stylesheet_HasDrilledLegendScopeRules`) keeps matching. These `.ss-hierarchy-*`
+        // rules are this family's SECOND consumer (Story 20.9's Code Map / Git Insights ownership legends, which
+        // carry colorize dimensions the `--status-*` vocabulary can't express) — not the dashboard.
         var css = ReadStylesheet();
         Assert.Contains(".ss-hierarchy-legend", css);
         Assert.Contains(".ss-hierarchy-sw", css);

@@ -4,13 +4,19 @@ baseline_commit: 32fd282
 
 # Story 23.4: Migrate Remaining Surfaces + Retire the C# HtmlRenderAdapter for Content
 
-Status: blocked
+Status: ready-for-dev
 
-<!-- BLOCKED ON STORY 23.5 (packaging reconciliation, `ready-for-dev`). Owner decision D1, 2026-07-27.
-     epics.md:3940/:3942–3950 — "23.4 retires the C# renderer irreversibly and must not start before that is
-     settled." Do NOT flip this to `ready-for-dev` because the story file looks complete. The gate is 23.5's
-     verdict, and specifically its answer to Q2 (what the standalone binary does when Node is absent), because
-     AC #6 here deletes the fallback that question is currently answered by. -->
+<!-- UNBLOCKED 2026-07-27 (Story 23.5 dev-story). The packaging gate this story was seeded `blocked` on is
+     SETTLED by ADR 0022 (Proposed): Node is a build/CI-time toolchain AND a generate-time runtime; the shipped
+     artefact is a project-independent 3.78 MB prebuilt `.output/` proven to render a DIFFERENT project's IR;
+     the standalone binary takes a DOCUMENTED NODE PREREQUISITE (owner decision) rather than degrading to the
+     C# renderer. That is the answer this story needed — see `23-5-packaging-strategy-report.md`.
+     ⚠️ ONE GATE REMAINS AND IT IS NEW: Story 22.4 (`ready-for-dev`) runs BEFORE this story by owner decision
+     (2026-07-27, epics.md § Story 22.4 D2). See Task 0. -->
+
+<!-- Status history: seeded `blocked` 2026-07-27 (owner decision D1) → `ready-for-dev` same day once 23.5
+     landed. Revisited 2026-07-28: the file was still saying `blocked` while `sprint-status.yaml` said
+     `ready-for-dev` — reconciled here, and the stale premises below were re-measured rather than assumed. -->
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -91,12 +97,15 @@ retirement condition._
    **content survival**, because the half-applied fix is catastrophically worse than none (148 SVGs → **0**,
    23-1-spike-report.md:195–216).
 
-7. **Given** owner decision **D4** — *Story 22.3 is retired; 23.4 is the answer*
+7. **Given** owner decision **D4** — *Story 22.3 is retired; 23.4 is the answer* — ✅ **already discharged**:
+   22.3's retirement and 22.4's restatement were both recorded in `epics.md` **and** `sprint-status.yaml` at
+   create-story, and Story 22.4's own owner decision D2 (*22.4 runs before 23.4*) closes the restatement
+   question from the other side
    **When** this story lands
-   **Then** `epics.md` **and** `sprint-status.yaml` record 22.3's retirement **in the same change**
-   (CLAUDE.md — a structural change recorded in only one artifact is a drift bug), naming 23.4 as its
-   replacement, and 22.4's "SPA + webview as IR consumers" scope is restated against AC #3's surviving region
-   path so the two stories do not contradict each other.
+   **Then** what remains is **this story's own** structural bookkeeping in both artifacts in the same change:
+   its AC drift (ACs 3–8 extend the epic's two), the fate of the `ir-content.css` layer and ADR 0018, and the
+   fate of `GoldenContentFingerprint` — plus a statement of what, if anything, is left of Epic 22's
+   `22-5`/`22-6` premises once the C# writer is gone.
 
 8. **Given** the story's own surface inventory must be complete before "all remaining surfaces" can mean
    anything
@@ -111,19 +120,35 @@ retirement condition._
 
 ## Tasks / Subtasks
 
-> **Do not start.** This story is `blocked` on Story 23.5 (owner decision D1). Task 0 is the gate.
+> **Packaging gate: CLEARED.** One gate remains — **Story 22.4 runs first.** Task 0 records both.
 
-- [ ] **Task 0 — Confirm the gate is open** (AC: #3, #6)
-  - [ ] 23.5 is `done`/`review` with its packaging strategy **recorded**, and its **Q2** answered: what the
-        standalone self-contained binary does when Node is absent. This story deletes the C# HTML writer,
-        which is the only current answer to that question — if Q2 resolved to "degrade to the C# renderer",
-        **stop and escalate**; that answer and this story are mutually exclusive.
-  - [ ] Re-read `23-5-…md`'s Dev Agent Record for what its **two-IR experiment** (its AC #4) actually found.
-        If one prebuilt `.output/` could **not** render two different projects' IRs, the delivery model for a
-        Nuxt-rendered site is unsettled and AC #3 must not proceed.
-  - [ ] Re-read this file's Dev Notes end-to-end. Every `web/` and `src/` fact here was measured at
-        `32fd282` + uncommitted work and **will have moved** — 23.5 alone changes `nuxt.config.ts`,
-        `package.json` and possibly the Nuxt major (Nuxt 3 EOL **2026-07-31**).
+- [ ] **Task 0 — Confirm the gate is open, and read what 23.5 and 22.4 hand you** (AC: #3, #6)
+  - [x] ✅ **Packaging is settled (2026-07-27, ADR 0022 Proposed).** Node is a build/CI-time toolchain **and**
+        a generate-time runtime; the shipped artefact is a **project-independent 3.78 MB prebuilt `.output/`**,
+        proven against a second project's IR (**1056/1056** this repo, **32/33** CORA) at **~4 ms/route**; the
+        standalone binary takes a **documented Node prerequisite** — it detects Node at startup and fails with
+        an actionable error, it does **not** bundle a runtime and does **not** degrade to the C# renderer.
+        The 23.1 gate's "client-rendered SPA *or* Node at run time" binary was **false**: build needs native
+        `.node` bindings, the shipped artefact contains **zero**. Read
+        [`23-5-packaging-strategy-report.md`](23-5-packaging-strategy-report.md) before starting.
+  - [ ] ⚠️ **Story 22.4 (`ready-for-dev`) runs BEFORE this story** — owner decision D2, 2026-07-27
+        (epics.md § Story 22.4). It collapses `BuildSpaBundle` and `RenderWebviewSurfaces` into **one region
+        seam** (the slicers **survive**; 22.4 retires the *duplicate*, not the *slice*), so **23.4 inherits one
+        region producer instead of two** and the circularity below is answered in advance. Confirm 22.4 is at
+        least `review` before starting Task 2 — starting first means doing the unification twice.
+  - [ ] 22.4 also lands two things Task 2 would otherwise inherit as defects: the **46-delta** convergence
+        (root-caused to `RenderEpicsPages` building follow-up geometry from `ResolveFollowUpWork(files)` while
+        `_docs` is still empty) and the **two region shapes** — a one-marker fix in
+        `HtmlRenderAdapter.RenderWayfinding`, which then **deletes** `web/ir/adapter.ts`'s `wayfindingRepaired`
+        + `stillUnbalanced` throw. Re-check both are done rather than assuming.
+  - [ ] **Read the retired Story 22.3 file — it is a 50 KB spec for Task 2, deliberately kept.**
+        [`22-3-static-html-rendered-from-the-ir.md`](22-3-static-html-rendered-from-the-ir.md) characterizes
+        exactly the region path this story stands up: the **25-templater migration inventory**, the
+        **`NavLocalContext` blocker**, **eight traps** (each resolved at its own create-story so they are not
+        re-derived under time pressure), the ADR constraint table and a **ranked test-gate map**. It is
+        retired as a *story*, not as *analysis*.
+  - [ ] Re-read this file's Dev Notes end-to-end and re-measure. Facts already known to have moved since
+        seeding are flagged inline with **↻**.
 
 - [ ] **Task 1 — Build the true surface inventory** (AC: #1, #8)
   - [ ] `dotnet run --project src/SpecScribe -- generate --spa --deep-git` into `SpecScribeOutput/` (the
@@ -153,19 +178,35 @@ retirement condition._
         when a harness or a prerender hangs.
 
 - [ ] **Task 2 — Stand up the C# region-composition path BEFORE removing anything** (AC: #3)
+  - [ ] ↻ **Work from the retired [Story 22.3 file](22-3-static-html-rendered-from-the-ir.md), not from
+        scratch.** It is the spec for this task and it is already elicited: the 25-templater inventory with
+        the six axes on which they actually differ (`extraHead` used **exactly once**; **12 distinct `<main>`
+        class values**; 6 templaters render a pager and the rest call `RenderBreadcrumb`, which is
+        byte-identical to `RenderWayfinding` with a null pager; exactly one inline body `<script>`; exactly
+        one piece of content after `</main>`; four sites deliberately **not** reference-linkified), plus its
+        batching advice — **migrate in reverse order of volume**, singletons first, `CodeFileTemplater`
+        (~hundreds of pages) last.
+  - [ ] ⚠️ **Do its Task 1 first: there is no `path → NavLocalContext` resolver, and this blocks everything
+        else.** `SpaDelivery.ExtractNavMarkup` slices the page-local nav band out of the rendered page because
+        every producer builds a `NavLocalContext` inline at render time and **discards it**. The moment the
+        region comes from `RenderNavMarkup(page.Nav)` instead of a slice, `nav.ToNavigationView(path)` takes no
+        local-context argument and **every migrated page silently loses its band** — regressing the 23.1
+        difference #2 that Story 22.2 just fixed. Two tests fail immediately and byte-for-byte:
+        `SiteGeneratorSpaTests.cs:387` and `SiteGeneratorWebviewTests.cs:547`. ~8 call sites of plumbing is
+        the real cost of this story's correctness; pay it up front, not 20 templaters in.
   - [ ] Add a region-render seam that composes `navMarkup + wayfinding + <main …>…</main>` **directly from
         `PageView`** — the same concatenation `Render` does at
         [HtmlRenderAdapter.cs:31–51](src/SpecScribe/HtmlRenderAdapter.cs:31) minus `RenderHeadOpen`,
-        `RenderFooter`, the script tags and `</body></html>`. `WebviewRenderAdapter.RenderContent` is already
-        almost exactly this shape — **read it and reuse it**; do not write a third region composer.
+        `RenderFooter`, the script tags and `</body></html>`. ↻ After Story 22.4 there is **one** region
+        builder to extend, not two — read it and reuse it; do not write a third region composer.
   - [ ] Prove the new path emits **byte-identical regions** to today's `ExtractContentRegion` slice for all
         1,046+ pages before deleting the slice. This is a strictly mechanical equality check and it is the
         only thing standing between you and a silently-degraded IR.
-  - [ ] ⚠️ The captured path and the family path are **not** equivalent today and 23.3 was bitten by exactly
-        this: `ExtractContentRegion` slices from **inside** the `page-wayfinding` wrapper for the 853 captured
-        pages but the 187 family pages carry the whole band (23-3-…md Debug Log #6). Whatever you build must
-        emit **one** shape, and `web/ir/adapter.ts`'s two-shape split logic should then **shrink**, not grow.
-        If it grows, the region path is not actually unified.
+  - [ ] ↻ The two-region-shape hazard that bit 23.3 (Debug Log #6) is **Story 22.4's to fix** — a one-marker
+        change in `HtmlRenderAdapter.RenderWayfinding`, which emits the `page-wayfinding` wrapper only when a
+        pager renders while `ExtractContentRegion` slices from the *inner* breadcrumb. Confirm it landed:
+        `web/ir/adapter.ts`'s `wayfindingRepaired` + `stillUnbalanced` throw should be **gone**. If they are
+        still there, 22.4 did not finish and Task 2 will re-inherit the trap.
   - [ ] Only then: delete `HtmlRenderAdapter.Render`'s page composition and the `WriteOutput` HTML writes.
         Keep `RenderNavMarkup`, `RenderBreadcrumb`, `RenderWayfinding`, `RenderDashboardBody`,
         `RenderEpicsBody` — they feed the region.
@@ -234,9 +275,12 @@ retirement condition._
         **lower bound**, and the webview is not a Nuxt consumer in this story anyway (AC #3).
   - [ ] Author **one** ADR 0005 amendment covering both owed changes (ADR 0012 §Decision 5 + this story's).
         House form: Status/Context/Decision/Consequences/Ratified-decisions. Leave it **Proposed** —
-        ratification is the owner's. Update `docs/adrs/README.md` in the same change. Confirm the next free
-        number by listing `docs/adrs/` (0018 is the highest at seeding; **0017 and 0018 are both Proposed** —
-        expect contention on `README.md`).
+        ratification is the owner's. Update `docs/adrs/README.md` in the same change. ↻ **The next
+        uncontested number is 0023**: 0017/0018/0020/0021/0022 all exist, **0019 is claimed-but-unwritten by
+        Story 18.3**, and several are still `Proposed`. Re-list `docs/adrs/` before claiming a number and
+        expect contention on `README.md`.
+  - [ ] ↻ **ADR 0022 is a DIFFERENT ADR and deliberately does not touch CSP.** Do not fold the CSP amendment
+        into it or treat it as having discharged this obligation — 23.5 was explicit about the separation.
   - [ ] If a policy-string change **is** required: land both knobs in one edit and add a regression test
         asserting **content survives** (SVG/element count), not merely that the page loads. The half-applied
         fix blanked the page.
@@ -253,6 +297,14 @@ retirement condition._
         **every output file**. With no `.html` output it is either retired or re-aimed at the IR. Decide,
         state it in the test's own comment block (that comment is a running log of every deliberate
         regeneration — continue it), and confirm across **two repeated runs**.
+  - [ ] ↻ **Do not cite a hash from memory — it moved four times in two days.** The constant is at
+        `SiteGeneratorAdapterTests.cs:1242` and the log above it records the chain
+        `126eed3a… → 3171cf5c… → 06788c0f… → 2bd1c18e… → f4a7cbac…` across Stories 20.6/20.7/20.8, a code
+        review and 18.5. Read the current value; do not reuse one quoted in a sibling story.
+  - [ ] ↻ **The golden fixture generates WITHOUT `--spa`**, so an IR-region change alone cannot move the
+        fingerprint. That cuts both ways: it means Task 2's region work is *not* covered by this gate, so the
+        byte-equality proof in Task 2 is the only thing checking it — and it means a hash that moves during
+        Task 2 is telling you the page render changed, which it must not until Task 2 is finished.
   - [ ] `GoldenOutputInventory` pins the output **file set**. It will change wholesale. Same treatment.
   - [ ] Expect **one rotating file-write-contention flake per full run** (23.3 recorded six in one run, all
         green in isolation). Report it honestly rather than as a clean pass.
@@ -365,6 +417,29 @@ policy-string change is required," that is a **stronger** ADR, not a missing one
 land, because ADR 0005's "the body carries no scripts of its own" clause is contradicted by the vendored
 Plotly bundle regardless of Nuxt.
 
+### ↻ What moved between seeding and 2026-07-28 — re-measured, not assumed
+
+| was seeded as | is now |
+| --- | --- |
+| 23.5 `ready-for-dev`, the blocking gate | **`review`.** ADR 0022 settles packaging; the standalone binary takes a **documented Node prerequisite** (it detects Node and fails with an actionable error — it does not degrade to the C# renderer). **Q1 and Q2 in this file are answered.** |
+| Nuxt 3, EOL 2026-07-31, undecided | ↻ **Nuxt `^4.5.1`**, and `engines.node` is now pinned (`^22.19.0 \|\| ^24.11.0 \|\| >=26.0.0`). 23.5 absorbed the major. The "Nuxt 3 EOL" trap is **closed**. |
+| "zero tests under `web/`" | ↻ **False now.** `web/test/` + `vitest.config.ts` + `coverage/` exist (`harness-lib`, `ir-content-lib`, `region-split`, `relative-prefix`, `tokens-lib`). New `web/` code is under a coverage gate — write tests with it, do not discover this at the Sonar gate. |
+| no packaging script | ↻ `npm run build:package` (`scripts/build-package.mjs`) exists. |
+| 22.4 `backlog` | ↻ **`ready-for-dev`, and it runs BEFORE this story** (owner D2). It unifies the two region builders, fixes the 46-delta and the two-region-shape trap. |
+| 22.3 `backlog`, a competing story | ↻ **`retired`** — and its 50 KB file is **kept as the spec for Task 2**. |
+| ADR 0018 highest; 0017/0018 Proposed | ↻ **0020/0021/0022 also exist; 0019 is claimed-unwritten by 18.3; next uncontested is 0023.** |
+| Epic 20: 20.6 `review`, 20.7–20.9 `ready-for-dev` | ↻ **20.6 `done`; 20.7/20.8/20.9 all `review`.** The explorer rollout is essentially complete, so `specscribe.js`/`.css` are steadier than at seeding — but three stories in `review` still move under you. |
+
+**↻ Two things this story now inherits from 23.5, both named by 23.5 rather than patched by it:**
+
+1. **`web/components/surfaces/DashboardSurface.vue` hard-throws on any project whose dashboard carries no
+   Hierarchy Explorer.** That is a genuine **project-independence defect** — it is the one thing that broke
+   in the two-IR experiment (CORA rendered 32/33). 23.5 attributed it to Story 23.3 and left it open. **This
+   story touches that surface in Task 3**, so it is cheapest to fix here; if you do, say so, because 23.5's
+   open-items table still points at 23.3.
+2. **The ADR 0005 CSP amendment is still this story's, and ADR 0022 deliberately does not touch CSP.** It
+   must land **once** (ADR 0012 §Decision 5). See below — it is probably documentation-only.
+
 ### The fingerprint flips meaning (AC #5)
 
 Story 23.3's AC #8 made a **stationary** `GoldenContentFingerprint` the assertion — a moved hash meant the
@@ -433,17 +508,20 @@ repeated runs and name whose uncommitted work it sat on.
    enhancement). `epics.md`'s own NFR6 is a different requirement. The collision is recorded and
    **unresolved** (epics.md:123–134). Cite it as "the PRD's NFR-5, cited as NFR6 throughout Epic 23 per the
    recorded collision."
-9. **Nuxt 3 EOL is 2026-07-31.** 23.5 owns that decision (its Task 1 / Q1). Inherit its answer; do not make a
-   second one here.
+9. ~~**Nuxt 3 EOL is 2026-07-31.**~~ ↻ **CLOSED** — 23.5 upgraded to Nuxt `^4.5.1` and pinned `engines.node`.
+   Do not re-open it; do verify the version you are building against matches `package.json`.
 
 ### Concurrency — this is a live tree (CLAUDE.md § Concurrent work on shared main)
 
-At seeding (`32fd282` + working tree): `src/SpecScribe/Charts.cs` and `HierarchyExplorer.cs` modified,
-`sprint-status.yaml` and `18-3-…md` modified. **Epic 20 is mid-flight around exactly the assets this story
-touches** — 20.6 `review`, **20.7 / 20.8 / 20.9 `ready-for-dev`**; 20.7 deletes the three legacy arc renderers
-and 20.9 finishes the rollout. Epic 18 is in flight in `src/`. So `specscribe.js`, `specscribe.css` and
-`HierarchyExplorer.cs` **will move under you** — which is why the runtime assets are **copied through a gated
-script**, and why you re-run the copy before verifying.
+↻ **Re-checked 2026-07-28 at `811ba17`.** The tree is quieter than at seeding (only `sprint-status.yaml`
+modified), but four sibling stories sit in `review` and can still be patched under you: **20.7 / 20.8 / 20.9**
+(the explorer rollout — `specscribe.js`, `specscribe.css`, `HierarchyExplorer.cs`) and **22.2 / 23.2 / 23.3 /
+23.5 / 25.2**. Commit `c1a6ee5` ("Land concurrent story work: 18.4, 18.5, 20.8, 23.5, 25.3 + ADRs 0021/0022")
+is the shape to expect: **one commit carrying five stories** — so scope any review by this story's File List
+and declared symbols, never a commit range.
+
+Runtime assets are still **copied through a gated script** rather than forked, for exactly this reason;
+re-run `npm run sync:assets` before verifying.
 
 - **Verify after every edit.** Grep for the symbol you just added before relying on it. A `Charts.cs` edit has
   silently vanished this way. ⚠️ A zero-grep can also be a **transient mid-write read** — confirm with
@@ -488,9 +566,18 @@ script**, and why you re-run the copy before verifying.
 - [Story 23.3 — baseline surfaces](23-3-migrate-baseline-surfaces-dashboard-epics.md) — **the pattern this
   story extends.** Its Debug Log's six defects (especially #6, the double-wrapped band no harness saw), the
   parity/link/a11y numbers that are this story's bar, and the named head-projection gaps handed to Epic 22.
-- [Story 23.5 — packaging](23-5-packaging-reconciliation-node-build-step.md) — **the gate.** Its two-IR
-  experiment (AC #4), the build-time↔runtime adjudication (AC #5), and Q2 (the standalone binary without
-  Node), which this story's AC #3 depends on.
+- [Story 23.5 — packaging](23-5-packaging-reconciliation-node-build-step.md) and its
+  [**packaging strategy report**](23-5-packaging-strategy-report.md) — ↻ **the gate, now cleared.** The
+  two-IR result (1056/1056 + 32/33 at ~4 ms/route), the channel table, the documented Node prerequisite for
+  the standalone binary, the closed door on embedding a JS engine, and the **open-items table** whose row 1
+  this story inherits. [**ADR 0022**](../../docs/adrs/0022-node-is-a-build-toolchain-and-a-generate-time-runtime.md)
+  is its decision record — and it deliberately does **not** touch CSP.
+- ↻ [**Story 22.3 (RETIRED, kept as reference)**](22-3-static-html-rendered-from-the-ir.md) — **the spec for
+  Task 2.** The `NavLocalContext` blocker, the 25-templater migration inventory and its six axes of
+  variation, eight pre-resolved traps, the ADR constraint table, and the ranked test-gate map.
+- ↻ [Story 22.4 — SPA + webview as IR consumers](22-4-spa-and-webview-as-ir-consumers.md) — **runs before
+  this story.** One region seam, the 46-delta convergence, and the one-marker `RenderWayfinding` fix that
+  deletes `web/ir/adapter.ts`'s `wayfindingRepaired` + `stillUnbalanced` throw.
 - [Story 23.2](23-2-component-library-and-design-token-bridge.md) — the primitives, the token bridge and its
   both-directions drift proof, the payload measurement (and its fragile harness).
 - [Story 23.1 spike report](23-1-spike-report.md) — Axis 3 (the CSP matrix, :173–228), findings 5/8/9, and the
@@ -525,23 +612,27 @@ script**, and why you re-run the copy before verifying.
 
 ### Questions for the owner
 
-Saved from analysis. None blocks the story being written; each changes what "done" looks like.
+Saved from analysis. ↻ Two of the four were answered by Story 23.5 and Story 22.4 between seeding and
+2026-07-28.
 
-- **Q1 — What does `specscribe generate` do on a machine without Node, after this story?** 23.5's Q2 in the
-  form this story cares about. Today the C# writer is the answer; AC #3 deletes it. If 23.5 answers "degrade
-  to the C# renderer," that answer and this story cannot both hold — and that is a sequencing decision with a
-  shelf life, not a technical one.
-- **Q2 — Does the webview eventually consume the Nuxt output, or stay on the C# region path forever?** AC #3
-  keeps it on the region path and Story 22.4 nominally owns the move. If it never moves, the "one renderer"
-  claim is true for the *site* and not for the *product* — worth saying out loud in the ADR rather than
-  leaving implied.
-- **Q3 — Is a prose-styling stylesheet authored in `web/` acceptable as the D3 end state?** Dev Notes → **The
-  D2/D3 tension** argues yes, on provenance grounds. If you want the harder line (nothing injected at all,
-  prose decomposed into components), that requires structured per-family data in the IR and this story grows
-  by an Epic 22 dependency.
-- **Q4 — Story 22.4's scope after 22.3 retires.** 22.4 says "retire the duplicate, non-IR data paths for SPA
-  and webview." AC #3 deliberately keeps one region composer feeding all three. Restating 22.4 is in Task 8;
-  confirm the restatement is what you want rather than a quiet reinterpretation.
+- ~~**Q1 — What does `specscribe generate` do on a machine without Node?**~~ ✅ **ANSWERED (ADR 0022, owner
+  decision 2026-07-27):** it requires Node as a **documented prerequisite** — detect at startup, fail with an
+  actionable error naming the supported range. It does not bundle a runtime and does not degrade to the C#
+  renderer. Cost stated plainly by 23.5: **a user without Node cannot generate at all** once this story
+  lands. Node detection itself is **Story 16.3's** open item, not this story's.
+- ~~**Q4 — Story 22.4's scope after 22.3 retires.**~~ ✅ **ANSWERED:** 22.4 runs **before** 23.4 and retires
+  the *duplicate builder*, not the *slice*. Recorded in `epics.md` § Story 22.4 and on its sprint-status key.
+- **Q2 — Does the webview eventually consume the Nuxt output, or stay on the C# region path forever?** Still
+  open, and now sharper: after 22.4 there is exactly **one** region producer, and AC #3 keeps the webview on
+  it. If it never moves to Nuxt, the "one renderer" claim is true for the *site* and not for the *product* —
+  worth saying out loud in the ADR 0005 amendment rather than leaving implied.
+- **Q3 — Is a prose-styling stylesheet authored in `web/` acceptable as the D3 end state?** Still open. Dev
+  Notes → **The D2/D3 tension** argues yes, on provenance grounds. The harder line (nothing injected at all,
+  prose decomposed into components) requires structured per-family data in the IR and grows this story by an
+  Epic 22 dependency.
+- **Q5 — new.** `DashboardSurface.vue`'s hard-throw is a **project-independence** defect 23.5 attributed to
+  Story 23.3 and left open (its open-items table, row 1). This story touches that surface anyway. Fix it here
+  and re-home the open item, or leave it for a 23.3 patch round?
 
 ## Dev Agent Record
 
@@ -557,4 +648,5 @@ Saved from analysis. None blocks the story being written; each changes what "don
 
 | Date | Change |
 | --- | --- |
+| 2026-07-28 | **Revisited and re-measured at `811ba17`; status reconciled `blocked` → `ready-for-dev`** (the file said `blocked` while `sprint-status.yaml` had said `ready-for-dev` since 23.5 landed — a one-artifact drift, now closed). **The packaging gate is CLEARED**: ADR 0022 makes Node a build/CI-time toolchain *and* a generate-time runtime, the shipped artefact is a project-independent 3.78 MB prebuilt `.output/` proven against a second project's IR (1056/1056 + 32/33 at ~4 ms/route), and the standalone binary takes a **documented Node prerequisite** rather than degrading to the C# renderer — so **Q1 and Q2 are answered**. **One new gate replaces it: Story 22.4 runs BEFORE this story** (owner D2), unifying the two region builders, converging the 46-delta and fixing the two-region-shape trap — so Task 2 inherits one region producer, not two. **Story 22.3's retired 50 KB file is now Task 2's spec** (the `NavLocalContext` blocker — there is no `path → NavLocalContext` resolver and ~8 call sites of plumbing is the real cost of correctness — the 25-templater inventory, eight pre-resolved traps, the ranked test-gate map). Stale premises corrected: **Nuxt 3 → `^4.5.1`** with `engines.node` pinned (the EOL trap is closed), **`web/` now has a vitest suite and a coverage gate** (the "zero tests" fact is false), the **next uncontested ADR number is 0023** (0019 claimed-unwritten by 18.3; 0020–0022 exist), and the golden fingerprint has moved four times in two days to `f4a7cbac…` at `SiteGeneratorAdapterTests.cs:1242` — read it, never quote it. Two items inherited from 23.5 and named rather than patched by it: **`DashboardSurface.vue` hard-throws on any project with no Hierarchy Explorer** (the one thing that broke in the two-IR run) and **the ADR 0005 CSP amendment is still this story's** — ADR 0022 deliberately does not touch CSP. |
 | 2026-07-27 | Story 23.4 created (baseline `32fd282`), seeded **`blocked`** on Story 23.5. Four owner decisions locked: (D1) seed now but blocked; (D2) "retire the `HtmlRenderAdapter`" means C# stops **writing** `.html` while keeping a **region-composition** path that feeds the IR and the webview/SPA; (D3) **full componentization** of the remaining 857 pages with `ir-content.css` retired to empty per ADR 0018; (D4) **Story 22.3 is retired** and 23.4 is the answer to "who renders static HTML from the IR." ACs 3–8 extend the epic's two. Three structural findings drove the shape: the IR for 82 % of the site is **produced by the code this story retires** (`ExtractContentRegion` slices the C# renderer's own full-page output), so the region path must be stood up and proven byte-equal **before** any deletion; D2 and D3 are in apparent tension and are reconciled on **provenance** (after C# stops writing pages, `specscribe.css` serves only the webview/SPA, so `web/` owning authored styles completes rather than reverses 23.2's decision); and the owed **ADR 0005 CSP amendment is probably now documentation-only**, because 23.3's `noScripts: true` removed the hydration that 23.1's `'strict-dynamic'` finding was about. `GoldenContentFingerprint` **inverts** here — 23.3 asserted it stationary; this story must move or retire it, by design. |

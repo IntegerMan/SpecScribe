@@ -248,21 +248,81 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
         Assert.True(TryCreateGitHistory(), "git is available but the test fixture's git setup failed unexpectedly");
 
         var options = ForgeOptions.Resolve(source: Source, output: Site, projectName: "SpecScribe", includeReadme: false,
-            deepGitAnalytics: true, datePolicy: DatePolicy.LastCommit);
+            deepGitAnalytics: true, dateCutoff: new DateCutoff(DatePolicy.LastCommit, null));
         var events = new SiteGenerator(options).GenerateAll();
         AssertNoErrors(events);
 
         var hub = File.ReadAllText(HubPage);
-        var linkedDays = Regex.Matches(hub, "href=\"commits/(\\d{4}-\\d{2}-\\d{2})\\.html\"")
-            .Select(m => m.Groups[1].Value)
-            .ToHashSet();
-        var generatedDays = Directory.GetFiles(CommitsDayDir, "*.html")
-            .Select(p => Path.GetFileNameWithoutExtension(p)!)
-            .ToHashSet();
+        var linkedDays = LinkedDaysOn(hub);
+        var generatedDays = GeneratedDayPages();
 
         Assert.NotEmpty(linkedDays);
         Assert.Equal(generatedDays, linkedDays);
     }
+
+    [SkippableFact]
+    public void GenerateAll_AsOfPolicy_LinkedHeatmapDaySetMatchesGeneratedDayPageSet()
+    {
+        // Story 5.7 AC #1's central guarantee, exercised through the same REAL production wiring as the LastCommit
+        // sibling above rather than through the pure resolver: the fixed date must become the run's ONE resolved
+        // today for every consumer, so the day set the heatmap links into commits/ is EXACTLY the day set commits/
+        // actually contains. The fixture's commits are authored now, so pinning to the machine's own day includes
+        // them — this is the "the pin agrees with reality" half; the counter-test below is the other half.
+        Skip.IfNot(GitAvailable(), "git CLI unavailable on this host — install git to exercise the --as-of policy end-to-end (skipped, not failed)");
+        Assert.True(TryCreateGitHistory(), "git is available but the test fixture's git setup failed unexpectedly");
+
+        var options = ForgeOptions.Resolve(source: Source, output: Site, projectName: "SpecScribe", includeReadme: false,
+            deepGitAnalytics: true, dateCutoff: new DateCutoff(DatePolicy.AsOf, DateOnly.FromDateTime(DateTime.Now)));
+        var events = new SiteGenerator(options).GenerateAll();
+        AssertNoErrors(events);
+
+        var linkedDays = LinkedDaysOn(File.ReadAllText(HubPage));
+        var generatedDays = GeneratedDayPages();
+
+        Assert.NotEmpty(linkedDays);
+        Assert.Equal(generatedDays, linkedDays);
+    }
+
+    [SkippableFact]
+    public void GenerateAll_AsOfBeforeTheFirstCommit_EmitsNoDayPagesAndClaimsNoCommitsInTheHeatmapText()
+    {
+        // Story 5.7 D2 / AC #1a — the counter-test for the guard above. An out-of-range pin is the CORRECT answer
+        // for a historical snapshot, so it is accepted verbatim: no crash (the naive series.Min() on an empty
+        // filtered set would throw InvalidOperationException), no rejection, no warning. And the heatmap's text
+        // twin must describe only the rendered window: with nothing rendered it must not name the fixture's real
+        // commits, which the pre-5.7 whole-series aria-label and headline both would have.
+        Skip.IfNot(GitAvailable(), "git CLI unavailable on this host — install git to exercise the --as-of policy end-to-end (skipped, not failed)");
+        Assert.True(TryCreateGitHistory(), "git is available but the test fixture's git setup failed unexpectedly");
+
+        var options = ForgeOptions.Resolve(source: Source, output: Site, projectName: "SpecScribe", includeReadme: false,
+            deepGitAnalytics: true, dateCutoff: new DateCutoff(DatePolicy.AsOf, new DateOnly(2000, 1, 1)));
+        var events = new SiteGenerator(options).GenerateAll();
+        AssertNoErrors(events);
+
+        Assert.Empty(GeneratedDayPages());
+
+        var hub = File.ReadAllText(HubPage);
+        Assert.Empty(LinkedDaysOn(hub));
+        // The designed empty state (UX-DR22), naming the cutoff so the state explains itself.
+        Assert.Contains("No commits on or before", hub, StringComparison.Ordinal);
+        // The accessible name and the visible headline restate the same figures, so BOTH must be gone — one of them
+        // surviving is exactly the text-twin disagreement ADR 0013 forbids.
+        Assert.DoesNotContain("aria-label=\"Commit activity:", hub, StringComparison.Ordinal);
+        Assert.DoesNotContain("heatmap-headline", hub, StringComparison.Ordinal);
+    }
+
+    /// <summary>The <c>commits/{date}.html</c> days a rendered page links to — the heatmap's linked-cell set.</summary>
+    private static HashSet<string> LinkedDaysOn(string html) =>
+        Regex.Matches(html, "href=\"commits/(\\d{4}-\\d{2}-\\d{2})\\.html\"")
+            .Select(m => m.Groups[1].Value)
+            .ToHashSet();
+
+    /// <summary>The <c>commits/{date}.html</c> pages actually written. Tolerates the directory being absent, which
+    /// is itself a legitimate outcome under a cutoff that precedes every commit.</summary>
+    private HashSet<string> GeneratedDayPages() =>
+        Directory.Exists(CommitsDayDir)
+            ? Directory.GetFiles(CommitsDayDir, "*.html").Select(p => Path.GetFileNameWithoutExtension(p)!).ToHashSet()
+            : new HashSet<string>();
 
     /// <summary>Probes for a usable git CLI on PATH, independent of fixture setup — callers use this to decide
     /// Skip (environment gap) vs. Assert.True/fail (a real regression) on <see cref="TryCreateGitHistory"/>, so a

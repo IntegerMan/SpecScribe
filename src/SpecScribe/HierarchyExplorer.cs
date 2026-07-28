@@ -577,6 +577,12 @@ public static partial class HierarchyExplorer
         // --- Breadcrumb (drill scope) + the polite live region the a11y layer announces through.
         body.Append("<div class=\"ss-hierarchy-drill\" hidden><ol class=\"ss-hierarchy-breadcrumb\" aria-label=\"Zoom scope\"></ol></div>\n");
 
+        // A sighted, non-screen-reader visitor who filters out every root subtree needs a visible reason the chart
+        // went blank, not only the aria-live announcement — the pre-conversion Impact Map showed exactly this kind
+        // of message. Hidden by default; the client toggles it alongside the live-region announcement.
+        if (cfg.Filterable)
+            body.Append("<p class=\"chart-empty ss-hierarchy-filter-empty\" hidden>Nothing selected — choose at least one to see the chart.</p>\n");
+
         // --- The boot placeholder — the anti-flash half of the JS handshake.
         //
         // Without it a scripted visitor sees the server SVG paint, then a differently-organized Plotly chart
@@ -937,21 +943,24 @@ public static partial class HierarchyExplorer
     public const string HostMarker = "data-hierarchy";
 
     /// <summary>Set on the PANEL by the client the moment a mount succeeds. It ends the boot placeholder and
-    /// disarms the inline script's expiry timer, so the two never fight over whether to show the server SVG.</summary>
+    /// disarms the inline script's expiry timer, so the two never fight over whether to keep showing it.</summary>
     public const string MountedMarker = "data-hierarchy-mounted";
 
-    /// <summary>Set on the panel by the client when a mount DECLINES or throws, so the server SVG comes straight
-    /// back instead of the reader watching a placeholder until <see cref="BootTimeoutMs"/> expires.</summary>
+    /// <summary>Set on the panel by the client when a mount DECLINES or throws, so the boot placeholder clears
+    /// straight away instead of the reader watching it until <see cref="BootTimeoutMs"/> expires. There is no
+    /// server-rendered chart to fall back to any more (Story 20.7 retired the last hand-rolled SVG renderer) — the
+    /// reader is left with the already-rendered text twin, which <c>Render</c> always emits regardless of mount
+    /// outcome.</summary>
     public const string FailedMarker = "data-hierarchy-failed";
 
-    /// <summary>How long the boot placeholder may stand before it gives up and hands the page back to the server
-    /// SVG. Long enough for a large bundle to parse and plot on a slow machine, short enough that a blocked script
-    /// is not mistaken for a slow one.</summary>
+    /// <summary>How long the boot placeholder may stand before it gives up and reveals the text twin underneath.
+    /// Long enough for a large bundle to parse and plot on a slow machine, short enough that a blocked script is
+    /// not mistaken for a slow one.</summary>
     public const int BootTimeoutMs = 5000;
 
     /// <summary>The anti-flash handshake, injected by <see cref="HtmlRenderAdapter"/> BEFORE the page body so it
-    /// runs while the body is still being parsed — the only moment at which the server SVG can be suppressed
-    /// without the reader seeing it paint first. <c>specscribe.js</c> is <c>defer</c>, so it cannot do this.
+    /// runs while the body is still being parsed — the only moment at which the boot placeholder can be shown
+    /// without the reader seeing a layout jump first. <c>specscribe.js</c> is <c>defer</c>, so it cannot do this.
     ///
     /// <para>It lives on the CHROME seam rather than inside the component's markup for a hard reason: the webview
     /// and SPA surfaces consume <see cref="PageView.BodyHtml"/> directly and must carry <b>no</b> script
@@ -960,8 +969,8 @@ public static partial class HierarchyExplorer
     ///
     /// <para>The expiry is what keeps owner decision D1 honest. If the bundle is blocked or missing,
     /// <c>specscribe.js</c> may never mount anything — and a hide-first with no timeout would leave a permanent
-    /// "Initializing…" over a chart that exists and works. So the marker is removed from any panel that has neither
-    /// mounted nor reported failure, and the server SVG is simply the page.</para></summary>
+    /// "Initializing…" placeholder with nothing behind it. So the marker is removed from any panel that has
+    /// neither mounted nor reported failure, and the text twin is simply the page.</para></summary>
     public static readonly string BootScript =
         "<script>(function(){var r=document.documentElement;r.setAttribute('data-ss-hierarchy-boot','1');"
         + $"setTimeout(function(){{r.removeAttribute('data-ss-hierarchy-boot');}},{BootTimeoutMs});}})();</script>\n";

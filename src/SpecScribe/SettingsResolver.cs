@@ -47,10 +47,13 @@ public sealed record CliOverrides(bool Source, bool Adrs, bool Output, bool Proj
         DeepGit: settings.DeepGit,
         CodeUrl: settings.CodeUrl is not null,
         // TodayPolicy is deliberately still `{ Length: > 0 }`, not `is not null`: SiteSettings.Validate() and
-        // ResolveDatePolicy() both already treat an empty string identically to "not passed" (falls back to
+        // ResolveDateCutoff() both already treat an empty string identically to "not passed" (falls back to
         // MachineLocal) — unlike the path/name fields above, there is no ApplyTo `??=` divergence to reconcile
         // here, so aligning with THAT existing behavior is correct, not a bug. [Story 5.5]
-        TodayPolicy: settings.TodayPolicy is { Length: > 0 });
+        // EITHER flag counts: --as-of and --today-policy set the SAME single today_policy field (--as-of just
+        // supplies the composite as-of:{iso} token for it), so a run driven only by --as-of must still attribute
+        // that field to the command line. One field, one provenance entry, two ways to set it. [Story 5.7]
+        TodayPolicy: settings.TodayPolicy is { Length: > 0 } || settings.AsOf is { Length: > 0 });
 }
 
 /// <summary>The outcome of loading <c>.specscribe</c> for a run: what was found, where, and — captured before the
@@ -149,8 +152,9 @@ public static class SettingsResolver
             // exactly like an auto-discovered path does.
             Entry(Fields.CodeUrl, "--code-url", options.CodeSourceBaseUrl ?? string.Empty, cli.CodeUrl, saved?.CodeUrl is not null),
             // Reported as the canonical token (not the display label) — this is the machine surface a CI script
-            // greps, and the token is exactly what could be passed back to --today-policy. [Story 5.5]
-            Entry(Fields.TodayPolicy, "--today-policy", DatePolicies.Token(options.DatePolicy), cli.TodayPolicy, saved?.TodayPolicy is not null),
+            // greps, and the token is exactly what could be passed back to --today-policy, including the composite
+            // `as-of:{iso}` form a --as-of run resolves to. [Story 5.5, Story 5.7]
+            Entry(Fields.TodayPolicy, "--today-policy", DatePolicies.Token(options.DateCutoff), cli.TodayPolicy, saved?.TodayPolicy is not null),
         };
     }
 

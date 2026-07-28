@@ -620,16 +620,47 @@ public sealed class InteractiveCommand : Command<SiteSettings>
             // this prompt exists to give — say so, the same way the settings-save failure below does. [Review][Patch]
             AnsiConsole.MarkupLine($"[yellow]![/] [yellow]Saved today-policy '{Markup.Escape(unrecognized)}' is not recognized[/] [grey](defaulting to machine-local below)[/]");
         }
-        var currentPolicy = todayPolicyParsed ? parsed : DatePolicy.MachineLocal;
-        var policyChoices = new[] { currentPolicy }
-            .Concat(Enum.GetValues<DatePolicy>().Where(p => p != currentPolicy))
+        var currentCutoff = todayPolicyParsed ? parsed : default;
+        var policyChoices = new[] { currentCutoff.Policy }
+            .Concat(Enum.GetValues<DatePolicy>().Where(p => p != currentCutoff.Policy))
             .ToArray();
         var chosenPolicy = AnsiConsole.Prompt(
             new SelectionPrompt<DatePolicy>()
                 .Title("Which calendar day counts as \"today\" for date pages?")
-                .UseConverter(p => $"{DatePolicies.Label(p)}{(p == DatePolicy.MachineLocal ? " (default)" : string.Empty)}")
+                // The already-pinned date rides along on the current choice's label, so the menu shows what
+                // re-selecting it would keep rather than a bare "fixed date". [Story 5.7]
+                .UseConverter(p => $"{DatePolicies.Label(new DateCutoff(p, p == currentCutoff.Policy ? currentCutoff.AsOf : null))}" +
+                                   $"{(p == DatePolicy.MachineLocal ? " (default)" : string.Empty)}")
                 .AddChoices(policyChoices));
-        settings.TodayPolicy = DatePolicies.Token(chosenPolicy);
+
+        // The fixed policy is the one menu entry that is NOT self-sufficient: selecting it without asking for the
+        // date would produce a dateless token that silently degrades back to machine-local. Ask, and validate with
+        // the SAME parser --as-of uses, so the prompt re-asks on garbage instead of accepting it. [Story 5.7 Task 3]
+        if (chosenPolicy == DatePolicy.AsOf)
+        {
+            var datePrompt = new TextPrompt<string>("Pin the date-page cutoff to which date? (yyyy-MM-dd):")
+                .Validate(v => DatePolicies.TryParseAsOfDate(v, out _)
+                    ? ValidationResult.Success()
+                    : ValidationResult.Error("[red]Enter a calendar date such as 2026-07-27[/]"));
+            // Same "re-running Configure paths never silently flips it" discipline as the choices above: an
+            // already-pinned date is offered back as the default, so Enter keeps it.
+            if (currentCutoff is { Policy: DatePolicy.AsOf, AsOf: { } pinned })
+            {
+                datePrompt = datePrompt.DefaultValue(PortalDates.IsoDay(pinned));
+            }
+
+            DatePolicies.TryParseAsOfDate(AnsiConsole.Prompt(datePrompt), out var chosenDate);
+            settings.TodayPolicy = DatePolicies.Token(new DateCutoff(DatePolicy.AsOf, chosenDate));
+        }
+        else
+        {
+            settings.TodayPolicy = DatePolicies.Token(new DateCutoff(chosenPolicy, null));
+        }
+
+        // The menu writes the whole cutoff onto the single TodayPolicy field (as the composite token when pinned),
+        // so a --as-of passed at launch must not survive as a second, now-stale source that ResolveDateCutoff would
+        // read as a conflict with what was just chosen here.
+        settings.AsOf = null;
 
         // Persist the choices so they're restored on the next run.
         if (SettingsStore.TrySave(settings) is not { } savedPath)

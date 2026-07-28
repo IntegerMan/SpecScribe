@@ -48,12 +48,13 @@ public sealed class ForgeOptions
     /// <see cref="ForgeOptions"/> construction defaults to no external link. [Story 7.7, was 7.1]</summary>
     public string? CodeSourceBaseUrl { get; init; }
 
-    /// <summary>How this run decides which calendar day is "today" for the date-page cutoff (<c>--today-policy</c>).
-    /// Governs which <c>commits/{date}.html</c> pages are generated and which date links are drawn — NEVER how a
-    /// timestamp is displayed (commit times stay in their authored offset, Story 10.4). Not <c>required</c>, and
-    /// <see cref="DatePolicy.MachineLocal"/> is the zero value, so every existing <see cref="ForgeOptions"/>
-    /// construction defaults to the Story 10.4 status quo. [Story 5.5]</summary>
-    public DatePolicy DatePolicy { get; init; }
+    /// <summary>How this run decides which calendar day is "today" for the date-page cutoff (<c>--today-policy</c>,
+    /// or <c>--as-of &lt;DATE&gt;</c> for a fixed day). Governs which <c>commits/{date}.html</c> pages are generated
+    /// and which date links are drawn — NEVER how a timestamp is displayed (commit times stay in their authored
+    /// offset, Story 10.4). Not <c>required</c>, and <c>default(DateCutoff)</c> is
+    /// <c>(<see cref="DatePolicy.MachineLocal"/>, null)</c>, so every existing <see cref="ForgeOptions"/>
+    /// construction defaults to the Story 10.4 status quo. [Story 5.5, retyped in Story 5.7]</summary>
+    public DateCutoff DateCutoff { get; init; }
 
     public const string StylesheetName = "specscribe.css";
 
@@ -134,7 +135,7 @@ public sealed class ForgeOptions
         string? codeSourceBaseUrl = null,
         bool autoDetectCodeUrl = false,
         bool requireSource = true,
-        DatePolicy datePolicy = DatePolicy.MachineLocal)
+        DateCutoff dateCutoff = default)
     {
         string repoRoot;
         string sourceRoot;
@@ -194,7 +195,7 @@ public sealed class ForgeOptions
             CodeSourceBaseUrl = TryValidateCodeUrl(codeSourceBaseUrl, out var validatedCodeUrl)
                 ? validatedCodeUrl
                 : autoDetectCodeUrl ? CodeSourceUrlResolver.TryDetect(repoRoot) : null,
-            DatePolicy = datePolicy,
+            DateCutoff = dateCutoff,
         };
     }
 
