@@ -257,8 +257,14 @@ public sealed class ModuleContext
     /// <para>The disk half resolves the directory by case-insensitive ENUMERATION rather than by constructing
     /// <c>{bmadRoot}/{code}/module-help.csv</c>: path construction is case-sensitive on Linux, so
     /// <c>_bmad/BMM/</c> used to report <c>IsMethodPresent == false</c> while <see cref="Detect"/>'s own scan
-    /// still found it — two answers to the same question on the same repo. [ADR 0015 Decision 1b]</para></summary>
-    private static bool IsModulePresent(string repoRoot, string moduleName)
+    /// still found it — two answers to the same question on the same repo. [ADR 0015 Decision 1b]</para>
+    /// <para>PUBLIC since Story 18.5: module-artifact coverage must gate on the module being INSTALLED rather
+    /// than on filenames alone (a repo with a coincidental <c>test-review.md</c> and no <c>_bmad/tea/</c> must
+    /// produce nothing), and open-world identity means there is no <see cref="BmadModule"/> case to add an
+    /// <c>Is…Present</c> wrapper for. Callers pass the module CODE — the same <c>_bmad/{code}/</c> directory name
+    /// <see cref="Code"/> carries. Kept as the ONE presence check rather than a second one written beside it.
+    /// [Story 18.5 Task 4; ADR 0015 Decisions 1, 1b, 2]</para></summary>
+    public static bool IsModulePresent(string repoRoot, string moduleName)
     {
         try
         {
@@ -272,6 +278,29 @@ public sealed class ModuleContext
             return FindModuleCsv(bmadRoot, moduleName) is not null;
         }
         catch { return false; }
+    }
+
+    /// <summary>The context for ONE NAMED module, or null when that module is not installed or its catalog will
+    /// not parse. This is NOT detection: <see cref="Detect"/> ranks every installed candidate and returns the
+    /// single PRIMARY module, and calling it twice is the bug Story 18.2 closed. This answers a different
+    /// question — "what does module <paramref name="code"/> itself declare?" — which a surface covering a
+    /// SECONDARY module's artifacts has to ask.
+    /// <para>Story 18.5's motivating case: in a BMM+TEA repo the primary module is BMad Method, so naming the
+    /// Test Artifacts surface from the primary catalog's <see cref="CommandCatalog.ModuleLabel"/> would label
+    /// Test Architect's own artifacts "BMad Method" — a silent misattribution of exactly the kind ADR 0015 exists
+    /// to prevent. It also keeps AC #2's command vocabulary honest: a TEA command must come from TEA's own parsed
+    /// CSV through <see cref="CommandCatalog.Command"/>, never a literal.</para> [Story 18.5; ADR 0015 Decision 1]</summary>
+    public static ModuleContext? ForCode(string repoRoot, string code)
+    {
+        try
+        {
+            var bmadRoot = Path.Combine(repoRoot, "_bmad");
+            if (!Directory.Exists(bmadRoot)) return null;
+            if (IsReservedModuleName(code)) return null;
+
+            return FindModuleCsv(bmadRoot, code) is { } csv ? BuildContext(csv) : null;
+        }
+        catch { return null; }
     }
 
     /// <summary>The <c>module-help.csv</c> of the install directory whose name matches <paramref name="code"/>

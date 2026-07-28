@@ -33,6 +33,13 @@ public static class DashboardViewBuilder
         // _bmad-output = SourceRoot), and Story 18.4 gives it a first-class rendered surface. The warning's
         // rationale simply does not cover this case. [Story 18.4]
         ("Ideas", IdeaDiscovery.WorkspaceRootDirName),
+        // Module test artifacts. Same categorical argument as `forge` directly above, and for the same reason: it
+        // IS a SourceRoot top, written there by an installed BMad module (Test Architect's `module.yaml` declares
+        // `test_artifacts` default "{output_folder}/test-artifacts", and {output_folder} resolves to
+        // _bmad-output = SourceRoot), and Story 18.5 gives it a first-class rendered surface. Without this entry
+        // `SiteGenerator.UnrecognizedTopLevelFolders` emits "unrecognized top-level folder" for a directory this
+        // story now models — a regression signal, not cosmetic. [Story 18.5]
+        ("Test Artifacts", TestArtifactDerivation.ArtifactsDirName),
     };
 
     /// <summary>Whether a top-level <see cref="ForgeOptions.SourceRoot"/> folder is one of the well-known groups —
@@ -60,7 +67,8 @@ public static class DashboardViewBuilder
         FollowUpGeometry? followUps = null,
         UnplannedWorkGeometry? unplanned = null,
         DeliveryCadenceData? cadence = null,
-        WorkGraphModel? workGraph = null)
+        WorkGraphModel? workGraph = null,
+        TestArtifactsModel? testArtifacts = null)
     {
         // Production always passes the shared SiteGenerator ledger. Null → build an equivalent ephemeral
         // ledger from the same inputs so tests/stubs that omit counts keep correct Defined/Tracked numbers.
@@ -114,6 +122,12 @@ public static class DashboardViewBuilder
             // what a JS-off (or failed-mount) visitor reads. [Story 20.5; Story 20.7]
             HierarchyExplorerHtml = BuildHierarchyExplorerHtml(
                 epicsModel, geometry, unplannedGeometry, nav.SiteTitle),
+            // Story 18.5's Module Coverage panel. `testArtifacts` is the generator's ALREADY-DISCOVERED model
+            // handed in verbatim — never re-discovered here, and ModuleContext.Detect is never called again
+            // (Story 18.2 made detection once-per-run on purpose). Empty model ⇒ empty fragment ⇒ no panel.
+            ModuleCoverageHtml = testArtifacts is { IsEmpty: false } moduleCoverage
+                ? TestArtifactsTemplater.RenderModuleCoveragePanelBody(moduleCoverage)
+                : string.Empty,
         };
     }
 
@@ -152,7 +166,8 @@ public static class DashboardViewBuilder
             // `SunburstCompanionList` tile grid ("Remaining Work by Epic") and the Story 20.3 rail — so a third
             // visible listing would be on-screen duplication. The twin still discharges ADR 0013 §2's completeness
             // contract, which neither of those two can: the tile grid is epic-level only and deliberately omits
-            // done epics with no open follow-ups (`Charts.cs:668`), and the rail is a selection detail pane.
+            // done epics with no open follow-ups (`Charts.SunburstCompanionList`), and the rail is a selection
+            // detail pane.
             // Audited 2026-07-26 (20-6-text-twin-audit.md, surface 1): the twin's node set matches the payload
             // 212/212 and is a strict superset of the 138 real nodes the SVG draws.
             TwinDisplay: HierarchyTwinDisplay.ScreenReaderOnly);

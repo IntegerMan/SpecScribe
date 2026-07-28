@@ -4,7 +4,7 @@ baseline_commit: 86b35c267241c15b05c64e3aaa3e13cce58198b2
 
 # Story 20.6: Text-Twin Audit and Golden-Fingerprint Replacement — the ADR 0013 Gate
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -157,6 +157,28 @@ so that ADR 0013's no-JS contract is proven rather than assumed, and chart regre
 ### Review Findings
 
 *(populated by code-review at epic end — Epic 20's review runs once every story is complete and the owner is satisfied)*
+
+**Scope:** reviewed only this story's own File List, diffed `baseline_commit` (`86b35c2`) → the landing commit (`32fd282`,
+"Overnight work", which bundles 18.1/18.2/18.3/20.6/23.3/23.5). All sibling-story files in that commit were excluded.
+Three layers ran (Blind Hunter, Edge Case Hunter, Acceptance Auditor). Acceptance Auditor found **no AC violations**
+— AC#1 and AC#2 are met by the diff and are internally consistent with the durable audit record and ADR 0013/0012.
+
+- [x] [Review][Patch] `.ss-hierarchy-twin.sr-only:focus-within` uses an undefined CSS custom property (`--surface`), so the revealed panel always renders a plain white box instead of a themed panel [src/SpecScribe/assets/specscribe.css:446] — fixed: swapped to `--warm-white` (the token every other `.chart-panel` background already uses); verified live, revealed panel computes to `rgb(250, 247, 242)`
+- [x] [Review][Patch] Sr-only twin's `<h3>{Title} — full text listing</h3>` duplicates the same-level `<h3>{Title}</h3>` `Charts.Framed` already emits for the panel — two same-level headings for one landmark [src/SpecScribe/HierarchyExplorer.cs:611, src/SpecScribe/Charts.cs:170] — fixed: demoted the twin's heading to `<h4>`; verified live, the panel now nests one `<h3>` + one `<h4>`
+- [x] [Review][Patch] `TwinDisplay`'s XML doc claims "the same discipline that keeps Size out of the JS", but unlike `Size`, `TwinDisplay` never reaches `IslandHtml`'s emitted client config at all — the analogy is inaccurate [src/SpecScribe/HierarchyExplorer.cs:94] — fixed: reworded to state `TwinDisplay` is server-only and never serialized to the client
+- [x] [Review][Patch] New comment cites `Charts.cs:668` by line number, which this project's own convention flags as fragile (memory: cite-adrs-by-symbol-not-line-number) [src/SpecScribe/DashboardViewBuilder.cs:169] — fixed: cited by symbol (`Charts.SunburstCompanionList`) instead
+- [x] [Review][Patch] Test comment "The real shape a converted surface ships" hardcodes `<details>`, but the dashboard (the surface it's modeled on) now ships `<section sr-only>` post-diff — comment is stale, assertions remain valid [tests/SpecScribe.Tests/SunburstExplorerTests.cs:208] — fixed: reworded to note the fixture is a generic stand-in, not either surface's exact wrapper
+- [x] [Review][Patch] `srOnly` is derived via a direct `==` comparison rather than an exhaustive switch; an out-of-range `HierarchyTwinDisplay` value would silently take the `Details` branch [src/SpecScribe/HierarchyExplorer.cs:602] — fixed: switch expression with a `default` arm throwing `ArgumentOutOfRangeException`
+- [x] [Review][Defer] No automated test guards that `git-insights.html` keeps its SVG until a twin exists — only a doc comment states the constraint today; enforcement is Story 20.7's gate-read of the audit record [src/SpecScribe/GitInsightsTemplater.cs] — deferred, out of this story's declared scope (Task 2.4 was doc-only)
+
+**Patches applied (2026-07-27):** all 6 fixed as noted above. Targeted suite re-run green (73/73: `HierarchyExplorerTests`,
+`SunburstExplorerTests`, `SiteGeneratorSpaTests`, `GoldenContentFingerprint`). The h3→h4 and CSS-token changes moved
+the golden fingerprint; regenerated `3171cf5c…` (Story 20.8's value) → `06788c0fa85928924226617c767a808c85ae5a55fd9a8d9b3fb1757769a95e61`,
+confirmed stable across two repeated runs, stacked provenance comment added at `SiteGeneratorAdapterTests.cs`. One
+transient build break from a concurrent session's in-flight work (`TestArtifactDiscovery.cs`/`SiteGenerator.cs`) was
+encountered between runs and resolved on its own without any action taken on those files, per CLAUDE.md § Concurrent work.
+
+**Dismissed as noise or already addressed (8):** `EpicsViewBuilder.cs` not given the D4 `ScreenReaderOnly` treatment (confirmed via `git blame` to postdate this diff — it's Story 20.7's own conversion); the sr-only reveal CSS reflow "not verified live" (Completion Notes already record live verification: 212 links, 0 untabbable, 1×1→669×5680 on focus); new tests validating the component "in isolation" (the golden-fingerprint test covers the real production wiring end-to-end; unit-level isolation is appropriate for the rest); the fingerprint stability claim being unverifiable in the diff (Completion Notes record the confirmation); the removed "not yet load-bearing" framing sentence (superseded by the new, more detailed rationale); the 40+ line regeneration comment's length (matches this codebase's established house style for prior golden-fingerprint changes); Task 3.1's illustrative `<div>` vs. the shipped `<section>` (a deliberate, disclosed improvement); the sr-only twin still requiring 212 tab-stops before reveal (already flagged in the story's own Completion Notes as an owner-verify-round item).
 
 ---
 
@@ -453,6 +475,28 @@ chart, and no `Charts.cs` symbol was modified.
 
 ## Change Log
 
+- 2026-07-27 — **code review: 6 patches applied, status → done.** 3-layer review (Blind Hunter, Edge Case Hunter,
+  Acceptance Auditor) scoped to this story's own File List, diffed `baseline_commit` (`86b35c2`) → the landing
+  commit (`32fd282`, "Overnight work" — bundles sibling stories 18.1/18.2/18.3/23.3/23.5, all excluded). Acceptance
+  Auditor found **no AC violations** — both ACs are met and internally consistent with the durable audit record and
+  ADR 0013/0012. 6 patches applied: an undefined CSS custom property (`--surface`) that always fell back to a stark
+  white reveal panel (now `--warm-white`, matching every other `.chart-panel`); the sr-only twin's own `<h3>`
+  duplicating the chart panel's existing same-level `<h3>` (demoted to `<h4>`); a misleading doc-comment analogy
+  claiming `TwinDisplay` reaches the client like `Size` does (it doesn't — reworded); a fragile line-number citation
+  (`Charts.cs:668` → cited by symbol); a stale test comment describing `<details>` as "the real shape a converted
+  surface ships" post-diff (the dashboard now ships `<section sr-only>` — reworded); and a non-exhaustive `==`
+  branch on `HierarchyTwinDisplay` (now an exhaustive switch with a throwing default arm). 1 finding deferred to
+  Story 20.7 (no automated tripwire test guarding that `git-insights.html` keeps its SVG); 8 dismissed as noise or
+  already addressed elsewhere (including one, `EpicsViewBuilder.cs` not getting the D4 treatment, confirmed via
+  `git blame` to be Story 20.7's own later work, not this diff's). The `<h3>`→`<h4>` and CSS-token fixes moved the
+  golden fingerprint (it had already moved twice more since this story's own dev-story pass, through Stories 20.7
+  and 20.8's landed regenerations to `3171cf5c…`); regenerated to
+  `06788c0fa85928924226617c767a808c85ae5a55fd9a8d9b3fb1757769a95e61`, confirmed stable across two repeated runs, with
+  a stacked provenance comment. Targeted suite re-run green (73/73). Verified live in the browser: the sr-only
+  reveal now computes to the themed `rgb(250, 247, 242)` background (not white), and the chart panel nests exactly
+  one `<h3>` + one `<h4>`. One transient build break from a concurrent session's in-flight, unrelated work
+  (`TestArtifactDiscovery.cs`/`SiteGenerator.cs`) was encountered between the two stability-confirmation runs and
+  resolved on its own without touching those files, per CLAUDE.md § Concurrent work.
 - 2026-07-26 — **dev-story: implemented, status → review.** All seven surfaces audited live with JavaScript
   disabled (CSP `script-src 'none'`, with the boot-marker/`window.Plotly` probes proving execution was blocked);
   durable record written to `20-6-text-twin-audit.md`. **Four surfaces cleared for 20.7 (dashboard, story detail,

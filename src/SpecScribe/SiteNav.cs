@@ -94,6 +94,20 @@ public sealed class SiteNav
     /// <c>ideas/index.html</c> means nothing to collide with.</para> [Story 18.4]</summary>
     public const string IdeasOutputPath = "ideas.html";
 
+    /// <summary>The module test-artifacts page — every discovered Test Architect artifact with the coverage tier
+    /// SpecScribe assigns it, the quality-gate verdict, and the coverage figures. Written only when a
+    /// <see cref="TestArtifactsModel"/> is non-empty; the nav entry and quick link gate on the SAME signal
+    /// (surfaced by the caller, since the artifacts are found by a module-presence-gated directory walk that also
+    /// reads two JSON files the <c>*.md</c> source list cannot reveal) so the link can never dangle.
+    /// <para>Rides the DELIVERY nav group rather than Insights: its content is a quality gate on delivery plus a
+    /// requirement-axis coverage join, which puts it beside Traceability and Cadence. Insights is where
+    /// git/source-derived analysis lives, and none of this is derived from either.</para>
+    /// <para>Deliberately a TOP-LEVEL <c>test-artifacts.html</c> (the same rationale as
+    /// <see cref="IdeasOutputPath"/>): a <c>test-artifacts/index.html</c> would collide with the landing slot
+    /// <c>SiteGenerator.RegenerateAdrs</c> guards with <c>landingPathAlreadyWritten</c>, and <c>test-artifacts/</c>
+    /// is a REAL source directory whose documents already render there.</para> [Story 18.5]</summary>
+    public const string TestArtifactsOutputPath = "test-artifacts.html";
+
     /// <summary>The generation diagnostics (run-log) page: the run's non-fatal notices (unsupported/malformed/
     /// skipped artifacts + render-time errors) plus the effective configuration and detection results. Written on
     /// EVERY full run (the zero-notice case renders an all-clear state), so — unlike the git pages — its link can
@@ -165,6 +179,12 @@ public sealed class SiteNav
 
     public bool HasIdeas => Items.Any(i => i.Label == "Ideas");
 
+    public bool HasTestArtifacts => Items.Any(i => i.Label == TestArtifactsLabel);
+
+    /// <summary>The one home for the Test Artifacts nav/quick-link label, so the entry and the
+    /// <see cref="HasTestArtifacts"/> predicate can never disagree about the string. [Story 18.5]</summary>
+    internal const string TestArtifactsLabel = "Test Artifacts";
+
     /// <summary>Assembles the journey-organized top nav (Home · Delivery · Insights · Follow-ups · Project).
     /// Every child is added only when its availability signal is true; an empty group is omitted; a group with
     /// exactly one available child collapses to a flat top-level link. [Story 10.1]</summary>
@@ -191,6 +211,7 @@ public sealed class SiteNav
         bool hasDeferredWork = false,
         bool hasWorkGraph = false,
         bool hasIdeas = false,
+        bool hasTestArtifacts = false,
         string? deferredWorkOutputPath = null,
         List<AdapterDiagnostic>? diagnostics = null)
     {
@@ -295,6 +316,16 @@ public sealed class SiteNav
         {
             delivery.Add(("Impact Map", ImpactMapOutputPath));
             quickLinks.Add(("Impact Map", ImpactMapOutputPath, "See which code areas each epic's work touched.", "Delivery"));
+        }
+
+        // Module test artifacts (Story 18.5) — gated on the caller's data signal (a non-empty
+        // TestArtifactsModel), NOT on hasEpics: a TEA-only repo has quality evidence and no epics.md at all, and
+        // must still get the page. A BMM-only repo sees nothing here — no entry, no quick link, no page (NFR8).
+        if (hasTestArtifacts)
+        {
+            delivery.Add((TestArtifactsLabel, TestArtifactsOutputPath));
+            quickLinks.Add((TestArtifactsLabel, TestArtifactsOutputPath,
+                "Review the quality gate and test coverage reported by an installed methodology module.", "Delivery"));
         }
 
         // The sprint tracking file (sprint-status.yaml) is its own first-class delivery view, gated on the

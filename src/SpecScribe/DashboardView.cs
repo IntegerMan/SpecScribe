@@ -149,4 +149,17 @@ public sealed record DashboardView
     /// review had to patch exactly that). It also keeps HTML/webview/SPA parity-identical by construction.</para>
     /// [Story 20.5]</summary>
     public string HierarchyExplorerHtml { get; init; } = string.Empty;
+
+    /// <summary>Pre-rendered Story 18.5 <em>Module Coverage</em> panel body
+    /// (<see cref="TestArtifactsTemplater.RenderModuleCoveragePanelBody"/>) — the module label, its quality-gate
+    /// verdict, the per-tier artifact counts and a link through to <c>test-artifacts.html</c>. Empty when no
+    /// methodology-module artifacts were discovered, which OMITS the panel entirely: a BMM-only repo sees no
+    /// panel, no notice and no empty state (NFR8 — absent, never misleadingly empty).
+    /// <para>Built in <see cref="DashboardViewBuilder"/> rather than in the adapter for the same AD-2 reason as
+    /// every sibling fragment above (Story 6.2's guardrail: the adapter maps DATA to bytes and branches on
+    /// nothing), which also keeps HTML/webview/SPA parity-identical by construction.</para>
+    /// <para>Deliberately module-AGNOSTIC in shape — a label, a verdict word and a tier-count map, none of which
+    /// name Test Architect — so a second covered module drops in by producing the same model. No second module is
+    /// implemented in this story.</para> [Story 18.5 D1]</summary>
+    public string ModuleCoverageHtml { get; init; } = string.Empty;
 }

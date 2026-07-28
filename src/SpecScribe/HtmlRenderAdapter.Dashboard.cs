@@ -163,6 +163,24 @@ public sealed partial class HtmlRenderAdapter
             sb.Append("</div>\n\n");
         }
 
+        // Module Coverage — Requirements. Sits directly after Planning Artifacts because it answers the same
+        // question ("what evidence does this project carry?") for artifacts an installed methodology module owns
+        // rather than ones SpecScribe's own family set models. Data-only: the fragment is built by
+        // DashboardViewBuilder, so there is no branching here beyond present/absent (Story 6.2). [Story 18.5 D1]
+        if (view.ModuleCoverageHtml.Length > 0)
+        {
+            // Work modes: Overview as well as Requirements and Review. Its sibling Planning Artifacts panel is
+            // Requirements-only, but owner decision D1 makes this panel "the at-a-glance signal" — a quality-gate
+            // verdict that only appears once you switch modes is not at a glance. Verified in a live browser:
+            // without wm-show-overview the panel computed to `display: none` on the default dashboard.
+            sb.Append("<div class=\"chart-panel module-coverage-panel wm-panel wm-show-overview wm-show-requirements wm-show-review\">\n");
+            sb.Append("<div class=\"chart-panel-header-row\"><h3>Module Coverage</h3>");
+            sb.Append($"<a class=\"view-epic-link\" href=\"{SiteNav.TestArtifactsOutputPath}\">View all test artifacts &rarr;</a>");
+            sb.Append("</div>\n");
+            sb.Append(view.ModuleCoverageHtml);
+            sb.Append("</div>\n\n");
+        }
+
         AppendRequirementsPanel(sb, view.Requirements, view.Epics, view.Counts);
         AppendTraceabilityPanel(sb, view.TraceabilityStripHtml);
 

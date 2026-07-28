@@ -65,7 +65,7 @@ A maintainer can run default CLI generation or watch in representative supported
 
 ## Open Questions
 
-- How should coverage tiers (rendered, summarized, unsupported) be communicated so users understand interpretation boundaries?
+- ~~How should coverage tiers (rendered, summarized, unsupported) be communicated so users understand interpretation boundaries?~~ **ANSWERED 2026-07-27 by Story 18.5** (see the PRD's §9 entry for the full answer): the three tiers are a real closed type assigned per discovered artifact, and the boundary is stated in WORDS on the surface — a tier badge carrying its word on every row, a legend giving each tier's promise in a sentence, and per-tier counts on the dashboard panel. Tiers describe interpretation depth, not discovery.
 - Which additional agent-file families should be promoted to plugin candidates after core plus orchestration coverage stabilizes?
 - Should deeper git analysis be configured by CLI flag, settings profile, or both?
 - What popularity threshold (for frameworks/modules) determines "decent degree of popularity" for first-class adapter support?

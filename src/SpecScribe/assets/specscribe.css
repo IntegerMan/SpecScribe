@@ -443,7 +443,7 @@ body {
   white-space: normal;
   border: 1px solid var(--teal);
   border-radius: 4px;
-  background: var(--surface, #fff);
+  background: var(--warm-white);
 }
 .ss-hierarchy-twin-title { margin: 0 0 0.35rem; font-size: 0.8rem; color: var(--ink-light); }
 
@@ -7094,6 +7094,10 @@ body:has(.followup-group-wrap) .doc-header {
 .list-row-accent-done { --list-row-accent: var(--status-done); }
 .list-row-accent-pending { --list-row-accent: var(--status-pending); }
 .list-row-accent-deferred { --list-row-accent: var(--status-deferred); }
+/* Completes the modifier set against the same six-token source. Added by Story 18.5, whose coverage-tier accents
+   need the `ready` tone; a caller emitting .list-row-accent-ready previously fell through to the neutral default,
+   which reads as "no accent asked for" rather than as the stage it asked for. No new token. */
+.list-row-accent-ready { --list-row-accent: var(--status-ready); }
 .followup-row.resolved,
 .list-row.resolved {
   border-left-color: var(--status-done);
@@ -7467,3 +7471,168 @@ a.deferred-item-resolving:hover { color: var(--rust); }
   text-underline-offset: 2px;
   color: var(--ink-light);
 }
+
+/* ============== MODULE TEST ARTIFACTS (Story 18.5) ==============
+   Two surfaces: the test-artifacts.html list page and the dashboard's Module Coverage panel. Both are pure
+   server-rendered markup — no chart, no JS — so ADR 0013's text-twin gate is never entered. Every tier and every
+   gate verdict carries its WORD in the badge; the rules below only tint an already-labelled element, and every
+   colour is an existing --status-* token (no new family, per the single stage->colour source). */
+.ta-intro,
+.ta-note {
+  max-width: 66ch;
+  color: var(--ink-light);
+}
+
+.ta-intro { margin-bottom: 2rem; }
+
+.ta-section { margin: 0 0 2.5rem; }
+
+.ta-section > h2 {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.4rem;
+  margin-bottom: 0.9rem;
+}
+
+.ta-gate-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin-bottom: 0.6rem;
+}
+
+.ta-gate-meaning { color: var(--ink-light); }
+
+.ta-gate-rationale {
+  max-width: 66ch;
+  border-left: 3px solid var(--border);
+  padding-left: 0.9rem;
+  color: var(--ink);
+}
+
+.ta-gate-criteria {
+  list-style: none;
+  padding: 0;
+  margin: 0.8rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.4rem;
+}
+
+.ta-gate-criteria li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+}
+
+.ta-criterion-label { color: var(--ink-light); font-size: 0.85rem; }
+
+.ta-gate-risk { color: var(--ink-light); }
+
+/* Tables scroll inside their own box rather than widening the page (the shared wide-content rule). */
+.ta-table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1rem 0 1.6rem;
+  font-size: 0.9rem;
+}
+
+.ta-table caption {
+  text-align: left;
+  color: var(--ink-light);
+  font-size: 0.82rem;
+  padding-bottom: 0.4rem;
+}
+
+.ta-table th,
+.ta-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 0.45rem 0.7rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.ta-table thead th {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-faded);
+}
+
+/* The honest-absence statement when the coverage oracle admits no requirement join. Deliberately prose in a
+   bordered block, not an error state: nothing failed, the two matrices simply describe different things. */
+.ta-join-absent {
+  max-width: 70ch;
+  border-left: 3px solid var(--status-deferred);
+  padding-left: 0.9rem;
+  color: var(--ink);
+}
+
+.ta-attribution { font-size: 0.88rem; }
+
+.ta-tier-legend {
+  margin: 0;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.55rem 1rem;
+  align-items: baseline;
+}
+
+.ta-tier-legend dt { margin: 0; }
+
+.ta-tier-legend dd {
+  margin: 0;
+  max-width: 70ch;
+  color: var(--ink-light);
+}
+
+@media (max-width: 640px) {
+  .ta-tier-legend { grid-template-columns: 1fr; gap: 0.2rem 0; }
+  .ta-tier-legend dd { margin-bottom: 0.7rem; }
+}
+
+/* ---- Dashboard Module Coverage panel ---- */
+.module-coverage-lead,
+.module-coverage-rationale {
+  max-width: 62ch;
+  color: var(--ink-light);
+  margin: 0 0 0.7rem;
+}
+
+.module-coverage-gate {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-bottom: 0.7rem;
+}
+
+.module-coverage-gate-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-faded);
+}
+
+.module-coverage-tiers {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.module-coverage-count {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.module-coverage-tier-note { color: var(--ink-faded); font-size: 0.85rem; }
+
+.module-coverage-link { margin: 0; }
+
+/* Story 18.5's tables reuse the shared `.table-scroll` wrapper rather than defining a second one. Caught in the
+   live-browser pass at 375 px: the page reached 422 px (374 px of table min-content + main's 48 px padding)
+   while every sibling standalone page stayed at 375. A first attempt with a bare `overflow-x: auto` wrapper did
+   NOT fix it — `contain: inline-size` is the load-bearing half, and `.table-scroll` already had it. */

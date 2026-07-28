@@ -205,7 +205,10 @@ public class SunburstExplorerTests
                 ParentTarget = breadcrumb.ParentTarget,
                 ChildTargets = Array.Empty<string>(),
             },
-            // The real shape a converted surface ships: the component's island, and its text twin.
+            // A converted surface's shape: the component's island, and its text twin. Uses the `<details>`
+            // presentation as its stand-in (post-Story 20.6 the dashboard itself ships `<section sr-only>` instead
+            // — see HierarchyExplorer.TwinDisplay — but this fixture is testing the webview-stripping contract
+            // generically, not pinning either surface's exact wrapper).
             BodyHtml = "<main id=\"main-content\"><div class=\"chart-panel sunburst-panel\" data-explorer>"
                 + "<div class=\"ss-hierarchy\" id=\"dashboard-hierarchy\" data-hierarchy></div>\n"
                 + "<script type=\"application/json\" class=\"ss-hierarchy-data\" id=\"dashboard-hierarchy-data\">{\"nodes\":[]}</script>\n"

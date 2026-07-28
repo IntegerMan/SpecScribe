@@ -216,6 +216,18 @@
       "port": 8111
     },
     {
+      "name": "review-20-6-patches",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8113",
+        "--directory",
+        "C:/Users/MattE/AppData/Local/Temp/claude/C--Dev-SpecScribe/9252fe4c-8485-44a7-bd29-bbf652a55ac8/scratchpad/review-site"
+      ],
+      "port": 8113
+    },
+    {
       "name": "ideas-18-4-jsoff",
       "runtimeExecutable": "python",
       "runtimeArgs": [
@@ -224,6 +236,30 @@
         "C:/Users/MattE/AppData/Local/Temp/claude/C--Dev-SpecScribe/5ad0c685-cee8-4926-9e2e-33e1842641ed/scratchpad/forge-repo/SpecScribeOutput"
       ],
       "port": 8112
+    },
+    {
+      "name": "tea-coverage-18-5",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8109",
+        "--directory",
+        "C:/Users/MattE/AppData/Local/Temp/claude/C--Dev-SpecScribe/3ae69b7f-75d8-40f1-bf78-b9800cd66014/scratchpad/tea-site"
+      ],
+      "port": 8109
+    },
+    {
+      "name": "bmm-control-18-5",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8110",
+        "--directory",
+        "SpecScribeOutput"
+      ],
+      "port": 8110
     }
   ]
 }

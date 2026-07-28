@@ -4,7 +4,7 @@ baseline_commit: 40c7ee96f197a7907dbf8c8fe80c8e5c8fb575a3
 
 # Story 18.5: Priority BMad Module Baseline Coverage
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -282,127 +282,133 @@ Anchor root: TEA artifacts live under **SourceRoot**, so `DiagnosticAnchorRoot.S
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Re-pin the TEA contract against upstream before writing any parser (AC: #1)**
-  - [ ] Re-fetch `src/module.yaml`, `src/module-help.csv`, and the `workflow.yaml` of `bmad-testarch-trace`,
+- [x] **Task 1 — Re-pin the TEA contract against upstream before writing any parser (AC: #1)**
+  - [x] Re-fetch `src/module.yaml`, `src/module-help.csv`, and the `workflow.yaml` of `bmad-testarch-trace`,
         `-nfr`, `-test-review`, `-test-design`, `-atdd` from
         `bmad-code-org/bmad-method-test-architecture-enterprise`. Record the **commit SHA per file** in the test
         fixture provenance block, following `ModuleContextTests.cs`'s existing header convention (ADR 0015
         Decision 7). 18.2's pinned SHA for that repo was `4a7522664ad4bf1c5338a1819144de458eaebecd`.
-  - [ ] Fetch `src/workflows/testarch/bmad-testarch-trace/steps-c/step-05-gate-decision.md` and
+  - [x] Fetch `src/workflows/testarch/bmad-testarch-trace/steps-c/step-05-gate-decision.md` and
         `trace-template.md` and confirm the two JSON schemas and the matrix grammar above are still current.
-  - [ ] Correct this story's table in place if upstream has moved, and say so in Completion Notes.
+  - [x] Correct this story's table in place if upstream has moved, and say so in Completion Notes.
         **Do not implement against a stale table.**
 
-- [ ] **Task 2 — Build the fixture repository the ACs require (AC: #1 — both clauses, incl. "BMM support fully intact")**
-  - [ ] There is no repo anywhere that has actually run TEA — 18.1 searched and found none, and this repo has
+- [x] **Task 2 — Build the fixture repository the ACs require (AC: #1 — both clauses, incl. "BMM support fully intact")**
+  - [x] There is no repo anywhere that has actually run TEA — 18.1 searched and found none, and this repo has
         no `_bmad/tea/`. The "representative repository" is a **fixture you construct**, exactly as 18.2 did.
-  - [ ] Build **two** fixtures: **(a) BMM + TEA** — the realistic case, and the one the join design targets —
+  - [x] Build **two** fixtures: **(a) BMM + TEA** — the realistic case, and the one the join design targets —
         and **(b) TEA-only**, the honest-degradation case. Each carries a real `_bmad/tea/module-help.csv`
         (all 10 rows, verbatim upstream) plus a `_bmad-output/test-artifacts/` tree with the pinned filenames.
-  - [ ] Author fixture artifact *contents* from `trace-template.md`'s real grammar and the real JSON schemas —
+  - [x] Author fixture artifact *contents* from `trace-template.md`'s real grammar and the real JSON schemas —
         not from imagination. Include at least one `inventory_basis: acceptance_criteria` case (joinable) and
         one `user_journeys` / `synthetic: true` case (must NOT join).
-  - [ ] Add a **BMM-only** control fixture asserting byte-identical output to today — this is AC #1's "BMM
+  - [x] Add a **BMM-only** control fixture asserting byte-identical output to today — this is AC #1's "BMM
         support fully intact" clause and the cheapest regression net you will get.
 
-- [ ] **Task 3 — Coverage-tier vocabulary as a real type (AC: #1, #2)**
-  - [ ] Introduce the tier vocabulary once — `rendered` / `summarized` / `unsupported` — as a typed enum plus a
+- [x] **Task 3 — Coverage-tier vocabulary as a real type (AC: #1, #2)**
+  - [x] Introduce the tier vocabulary once — `rendered` / `summarized` / `unsupported` — as a typed enum plus a
         label/description pair, following `StatusStyles`' one-classifier discipline. It is currently nowhere in
         `src/`.
-  - [ ] Assign a tier per discovered artifact: `rendered` = a full page exists for it; `summarized` = its
+  - [x] Assign a tier per discovered artifact: `rendered` = a full page exists for it; `summarized` = its
         headline (gate verdict, coverage %, NFR category table) is extracted onto a surface but the file is not
         fully modeled; `unsupported` = discovered and named, nothing interpreted.
-  - [ ] Every tier must be **derivable and testable without disk access** (pure derivation half).
+  - [x] Every tier must be **derivable and testable without disk access** (pure derivation half).
 
-- [ ] **Task 4 — `TestArtifactDiscovery` + `TestArtifactsModel` (AC: #1, #2)**
-  - [ ] IO half walks SourceRoot for the pinned filename set; pure half applies every classification rule.
+- [x] **Task 4 — `TestArtifactDiscovery` + `TestArtifactsModel` (AC: #1, #2)**
+  - [x] IO half walks SourceRoot for the pinned filename set; pure half applies every classification rule.
         Mirror `IdeaDiscovery`/`IdeaDerivation`'s split and its never-throws contract.
-  - [ ] Gate discovery on the **module being present**, not on filenames alone: a repo with a coincidental
+  - [x] Gate discovery on the **module being present**, not on filenames alone: a repo with a coincidental
         `test-review.md` and no `_bmad/tea/` must produce nothing. Use 18.2's presence machinery
         (`ModuleContext`'s installed-module set / `IsModulePresent`) — do not write a new presence check.
-  - [ ] Populate `ArtifactBundle.ConsumedSourceRelatives` for every markdown artifact the Test Artifacts page
+  - [x] Populate `ArtifactBundle.ConsumedSourceRelatives` for every markdown artifact the Test Artifacts page
         now owns, so the generic-pages pass does not double-render it. **Verify against the real generated
         site**, not just the model — this is where 18.4's `forge/` work and this story most plausibly collide.
-  - [ ] Register `test-artifacts` as a `DashboardViewBuilder` folder-group key so
+        **DISCHARGED DIFFERENTLY — read Completion Note §3.** `ConsumedSourceRelatives` is deliberately NOT
+        populated. This page is an INDEX: it links the page the generic `*.md` pass already writes rather
+        than re-rendering the document, so nothing is rendered twice and consuming the paths would delete
+        the very page each `Rendered` row links to. The subtask's requirement (no double-render) is met and
+        pinned by `GenerateAll_EachMarkdownArtifactIsRenderedExactlyOnce`, asserted against the real
+        generated site as instructed.
+  - [x] Register `test-artifacts` as a `DashboardViewBuilder` folder-group key so
         `UnrecognizedTopLevelFolders` stops flagging it. Assert the notice's absence in a test.
 
-- [ ] **Task 5 — JSON ingest for the two TEA JSON files (AC: #1) [ADR-gated — see Task 7]**
-  - [ ] Read `gate-decision.json` and `e2e-trace-summary.json` **by exact filename under the discovered
+- [x] **Task 5 — JSON ingest for the two TEA JSON files (AC: #1) [ADR-gated — see Task 7]**
+  - [x] Read `gate-decision.json` and `e2e-trace-summary.json` **by exact filename under the discovered
         `test-artifacts` root only** — do not widen the global `*.md` glob to `*.json`, and do not walk the
         whole tree for JSON. Scope is the narrowest thing that satisfies D3.
-  - [ ] Gate on `schema_version` major; unknown → `Skipped` diagnostic, no parse attempt. Malformed → `Malformed`.
+  - [x] Gate on `schema_version` major; unknown → `Skipped` diagnostic, no parse attempt. Malformed → `Malformed`.
         Neither ever aborts the run.
-  - [ ] `System.Text.Json` only — no new package dependency (the project has none for this and ADR 0010 records
+  - [x] `System.Text.Json` only — no new package dependency (the project has none for this and ADR 0010 records
         a zero-dependency posture for tooling).
-  - [ ] Surface `gate_status` + `rationale` + `critical_open` on the Module Coverage panel; surface the fuller
+  - [x] Surface `gate_status` + `rationale` + `critical_open` on the Module Coverage panel; surface the fuller
         `e2e-trace-summary.json` coverage/priority/level breakdowns on the Test Artifacts page.
-  - [ ] `target.id`/`target.label` are nullable — render the gate without them; never key anything on them.
+  - [x] `target.id`/`target.label` are nullable — render the gate without them; never key anything on them.
 
-- [ ] **Task 6 — The two surfaces (AC: #1, #2) [D1]**
-  - [ ] **`test-artifacts.html`** — top-level output path (`SiteNav.TestArtifactsOutputPath`), ListRow grammar
+- [x] **Task 6 — The two surfaces (AC: #1, #2) [D1]**
+  - [x] **`test-artifacts.html`** — top-level output path (`SiteNav.TestArtifactsOutputPath`), ListRow grammar
         per Story 10.8 (`ListRow.Render` / `.Chip` / `.PrimaryLink` / `.EmptyState`), one row per discovered
         artifact: title, tier badge (word, not colour), producing skill, link through to its page.
         Nav entry **and** page omitted entirely when the model is empty — match `IdeasOutputPath`'s gating and
         `SiteNav`'s existing optional-surface conventions.
-  - [ ] **Module Coverage panel on the dashboard** — built in `DashboardViewBuilder` into a new `DashboardView`
+  - [x] **Module Coverage panel on the dashboard** — built in `DashboardViewBuilder` into a new `DashboardView`
         property, rendered by `HtmlRenderAdapter.RenderDashboardBody`. Data-only in the view; **no branching in
         the adapter** (the Story 6.2 discipline the file's own doc comment states). Shows the module label, the
         gate badge, the tier counts, and a link to `test-artifacts.html`. Absent for a BMM-only repo.
-  - [ ] Make the panel's shape module-agnostic (keyed on module code + a coverage model), so 18.6 and a future
+  - [x] Make the panel's shape module-agnostic (keyed on module code + a coverage model), so 18.6 and a future
         second module reuse it. **Do not implement a second module.**
-  - [ ] Reuse existing tokens only — no new `--status-*` token (the six are the single stage→colour source,
+  - [x] Reuse existing tokens only — no new `--status-*` token (the six are the single stage→colour source,
         [[specscribe-status-token-system]]). A gate verdict maps onto existing status tokens **plus** its word.
 
-- [ ] **Task 7 — Propose the ADR for non-markdown source ingestion (AC: #1) [D3]**
-  - [ ] `SiteGenerator`'s `*.md`-only source scan is a cross-cutting contract; reading JSON sources changes it.
+- [x] **Task 7 — Propose the ADR for non-markdown source ingestion (AC: #1) [D3]**
+  - [x] `SiteGenerator`'s `*.md`-only source scan is a cross-cutting contract; reading JSON sources changes it.
         CLAUDE.md requires an ADR proposed without being asked for exactly this.
-  - [ ] **Number it `0020`.** `0019` is claimed-but-unwritten by Story 18.3
+  - [x] **Number it `0020`.** `0019` is claimed-but-unwritten by Story 18.3
         (`18-3-…-spike.md:985`, *"LLM-Generated Artifacts Are Enrichment-Only Inputs"*) and is not yet in
         `docs/adrs/`. Verify before writing; if 18.3's ADR has landed as 0019, take the next free number.
-  - [ ] Scope it narrowly: *when* SpecScribe may read a non-markdown source (module-declared, exact-filename,
+  - [x] Scope it narrowly: *when* SpecScribe may read a non-markdown source (module-declared, exact-filename,
         schema-versioned, inside SourceRoot), what it must do on version drift, and the explicit non-goal that
         this is **not** a general "ingest any JSON" seam. State its relationship to 18.3's proposed ADR 0019
         rather than contradicting it.
-  - [ ] Add its `docs/adrs/README.md` index entry in the same change. ⚠️ Story 18.1's review found an earlier
+  - [x] Add its `docs/adrs/README.md` index entry in the same change. ⚠️ Story 18.1's review found an earlier
         edit **blanked ADR 0014's entry** — re-read the whole file after editing and confirm every prior entry
         still has its parenthetical.
-  - [ ] Cite by **symbol/quote anchor, not line number** ([[cite-adrs-by-symbol-not-line-number]] — ADR 0015's
+  - [x] Cite by **symbol/quote anchor, not line number** ([[cite-adrs-by-symbol-not-line-number]] — ADR 0015's
         refs drifted within one day).
 
-- [ ] **Task 8 — Close the PRD/SPEC open question; carry the two open owner items (AC: #1) [D4]**
-  - [ ] Record the coverage-tier answer back into the two open-question lines
+- [x] **Task 8 — Close the PRD/SPEC open question; carry the two open owner items (AC: #1) [D4]**
+  - [x] Record the coverage-tier answer back into the two open-question lines
         (`prds/prd-SpecScribe-2026-07-05/prd.md:250`, `specs/spec-specscribe/SPEC.md:118`) — located by quote,
         not line number.
-  - [ ] **Story 18.6 is already seated** — create-story landed *Story 18.6: Module-Aware Artifact Coverage
+  - [x] **Story 18.6 is already seated** — create-story landed *Story 18.6: Module-Aware Artifact Coverage
         Families* in `epics.md` (after Story 18.5, with its provenance comment) **and** the
         `18-6-module-aware-artifact-coverage-families: backlog` key in `sprint-status.yaml`, in the same change.
         Nothing to create; just do not absorb its scope, and confirm both artifacts still carry it before you
         finish (the tree is shared).
-  - [ ] **Owner proposal already open, do not lose it:** Story 18.2 Completion Note §8 asks to retire
+  - [x] **Owner proposal already open, do not lose it:** Story 18.2 Completion Note §8 asks to retire
         `epics.md`'s stale *"strongly GDS-oriented … requires generalization"* clause (`:173`), which
         **Story 18.1's AC #2 also cites** (`epics.md:3045`). Both sites must move together. Surface it; the
         deletion is the owner's call, not this story's.
 
-- [ ] **Task 9 — Tests (AC: #1, #2)**
-  - [ ] Red-green: write the failing assertions first, as 18.2 did (13 tests before the fix).
-  - [ ] Pure-derivation unit tests for tier assignment, gate parsing, schema-version gating, and the
+- [x] **Task 9 — Tests (AC: #1, #2)**
+  - [x] Red-green: write the failing assertions first, as 18.2 did (13 tests before the fix).
+  - [x] Pure-derivation unit tests for tier assignment, gate parsing, schema-version gating, and the
         join-admissibility rule (including the negative cases: synthetic oracle, non-`acceptance_criteria`
         basis, unresolvable id).
-  - [ ] Generation-level tests over both fixtures: page present/absent, nav entry present/absent, panel
+  - [x] Generation-level tests over both fixtures: page present/absent, nav entry present/absent, panel
         present/absent, `ConsumedSourceRelatives` suppression, no `UnrecognizedTopLevelFolders` notice.
-  - [ ] **BMM-only control**: assert output unchanged. Golden byte-parity gate stays green — or, if it moves,
+  - [x] **BMM-only control**: assert output unchanged. Golden byte-parity gate stays green — or, if it moves,
         prove the move is yours before re-baselining ([[golden-diff-normalization-gotchas]]; 18.2's worktree
         byte-compare technique is the reliable method, and `git status` under-reported a concurrent mid-write
         for several minutes during that story).
 
-- [ ] **Task 10 — Live-browser verification (CLAUDE.md § Verification)**
-  - [ ] The suite structurally cannot see CSS containment leaks, sub-pixel collapse, or DOM corruption. Verify
+- [x] **Task 10 — Live-browser verification (CLAUDE.md § Verification)**
+  - [x] The suite structurally cannot see CSS containment leaks, sub-pixel collapse, or DOM corruption. Verify
         in a real browser: the Test Artifacts page (rows render, tier badges carry words, links resolve, empty
         state never renders alongside rows), the dashboard panel (no layout collapse, no horizontal body
         scroll), and the **BMM-only** portal (panel and nav entry genuinely absent, glossary/legend/`<abbr>`
         intact).
-  - [ ] Generate to `SpecScribeOutput/` or an explicit scratch dir. **Never `--output docs/live`.**
-  - [ ] Add a `.claude/launch.json` entry following that file's existing convention if a preview slot is needed
+  - [x] Generate to `SpecScribeOutput/` or an explicit scratch dir. **Never `--output docs/live`.**
+  - [x] Add a `.claude/launch.json` entry following that file's existing convention if a preview slot is needed
         (18.2 used `tea-identity-18-2`, port 8108).
 
 ## Dev Notes
@@ -498,14 +504,258 @@ Anchor root: TEA artifacts live under **SourceRoot**, so `DiagnosticAnchorRoot.S
 
 ### Agent Model Used
 
+Claude Opus 5 (`claude-opus-5`), via the `bmad-dev-story` workflow. Story baseline `40c7ee9`; HEAD at start `6017c2c`
+(Story 18.4 landed in between, so its `IdeaDiscovery` precedent was COMMITTED rather than in-flight — the merge
+friction the story warned about on `SiteNav.cs` / `SiteGenerator.cs` / `DashboardViewBuilder.cs` did not
+materialize). A DIFFERENT concurrent session was live throughout, on the Story 20.6 code-review patch round; see
+Completion Note §9.
+
 ### Debug Log References
+
+- Upstream re-pin (Task 1): GitHub REST `commits?path=…` per file + `raw.githubusercontent.com` fetches against
+  `bmad-code-org/bmad-method-test-architecture-enterprise@main`, 2026-07-27. Per-file SHAs are recorded in
+  `TestArtifactDerivationTests.cs`'s provenance header, not here, so they travel with the fixtures.
+- Live-browser verification (Task 10): `tea-coverage-18-5` (port 8109) over a constructed BMM+TEA fixture site, and
+  `bmm-control-18-5` (port 8110) over this repo's own real portal regenerated to `SpecScribeOutput/`. Both slots
+  added to `.claude/launch.json`.
+- Golden fingerprint: rebuilt first, then measured across two consecutive runs (`2bd1c18e…` both times) with
+  `git diff --stat src/` identical before and after. Full suite then run three consecutive times, green each time.
 
 ### Completion Notes List
 
+**1. Task 1 re-pinned the contract and found four corrections — all recorded, none of them "upstream moved".**
+Every filename in the story's pinned table is CONFIRMED verbatim against each skill's own `workflow.yaml`
+(`default_output_file` / `outputs[].path`), so the story's central correction of Story 18.1 stands. The four new
+findings change parser shape rather than filenames:
+
+  - **`traceability-matrix.md`'s Detailed Mapping is NOT a table.** The story described it as a five-column
+    `Oracle Item | Mapped Test(s) | Coverage Status | Test Level | Priority` table. `trace-template.md` is an
+    **h4 heading per criterion** — `#### {CRITERION_ID}: {DESCRIPTION} ({PRIORITY})` — followed by
+    `- **Coverage:** {STATUS}` and `- **Tests:**` bullets. A table parser would have found nothing. The
+    implemented reader parses the real grammar.
+  - **`inventory_basis` has a FOURTH value the story's table omits.** `bmad-testarch-trace/workflow.yaml`'s
+    `coverage_basis` enum is `auto | acceptance_criteria | synthetic_requirements | openapi_endpoints |
+    user_journeys`. `synthetic_requirements` is non-joinable (upstream's own `syntheticOracle` test includes it)
+    and is now covered by a test.
+  - **`gate_status` is OPTIONAL on `e2e-trace-summary.json`.** Upstream appends `gate_status` and `gate_criteria`
+    only inside `if (gateEligible)`, so an inventory-only or waived run writes the file without them. A reader
+    that required them would report every such run as malformed. `gate-decision.json` is likewise written only
+    when gate-eligible — so a repo can have a trace summary and no gate file at all.
+  - **⚠️ `trace/workflow.yaml`'s own inline schema comment is STALE and contradicts the emitter.** It documents
+    `schema_version: 1` with `generated_at` / `coverage_statistics` / `gap_analysis`; `step-05-gate-decision.md`,
+    which actually writes the file, emits `schema_version: '0.1.0'` with `snapshot_at` / `coverage` /
+    `risk_summary`. **The step file is the authority.** A parser built from the workflow.yaml comment — the
+    obvious place to look — would find nothing. This is the same doc-vs-reality trap that produced 18.1's wrong
+    filenames, one level deeper.
+
+  The story's prose table was left unedited (only the permitted story sections were modified); these corrections
+  live here and in the code's own doc comments.
+
+**2. The coverage-tier vocabulary is a real type, and it closes the PRD/SPEC open question.** `CoverageTier`
+(`Rendered` / `Summarized` / `Unsupported`) + `CoverageTiers` as the single classifier — no surface spells a tier
+itself, the same one-classifier discipline `StatusStyles` holds. The tiers describe **interpretation depth**, not
+discovery: everything in the model was found by definition. Communicated three ways at once — a badge carrying the
+WORD on every row, a "How far interpretation goes" legend stating each tier's promise in a sentence, and per-tier
+counts on the dashboard panel. Both open-question lines (`prd.md` §9, `SPEC.md` §Open Questions) are struck through
+with the answer recorded inline, located by quote rather than line number.
+
+**3. `ConsumedSourceRelatives` is deliberately NOT populated — the one place this story departs from a subtask as
+literally written.** Task 4 asked for it so the generic-pages pass would not double-render. But TEA's markdown
+already renders today (that is the story's own headline finding), and this page is an **index**: it LINKS the page
+the generic pass writes rather than re-rendering the document. Consuming those paths would delete the very page
+each `Rendered` row links to, turning every such row into a dangling link and making the tier label false. The
+subtask's actual requirement — nothing rendered twice — is met and pinned by
+`GenerateAll_EachMarkdownArtifactIsRenderedExactlyOnce`, which asserts against the **real generated site** exactly
+as the subtask instructs (one `nfr-assessment.html` on disk, at the path the list page links). The Story 18.4
+shape the instruction was modelled on needed consumption because an idea's detail page re-renders its workspace
+markdown; this surface does not. Flagged prominently because the box is checked and the mechanism differs.
+
+**4. Two real defects were caught by the tests before they could ship.**
+
+  - **The dashboard panel named the WRONG module.** Discovery originally took the run's already-detected
+    `ModuleContext` for its label. In the realistic BMM+TEA repo the PRIMARY module is BMad Method, so Test
+    Architect's own artifacts were labelled "BMad Method" — a silent misattribution of precisely the class ADR
+    0015 exists to prevent. Fixed by adding `ModuleContext.ForCode(repoRoot, code)`, which answers "what does
+    module *X* itself declare?" — a different question from `Detect`'s "which module is primary?", and explicitly
+    **not** a second detection call (Story 18.2 made detection once-per-run on purpose).
+  - **The join table rendered empty in a TEA-only repo.** Basis/confidence/synthetic all passed, so the join was
+    judged admissible, resolved zero rows (no `epics.md` ⇒ no requirement or story ids exist), and drew an empty
+    "Module test coverage by requirement" table — which reads as *"covered by nothing"*, a claim rather than an
+    absence. The two no-join outcomes are now distinct and both state their reason in words.
+
+**5. The join degrades honestly, and the design rule was not crossed.** Admissibility is judged from the oracle
+signals BEFORE any criterion id is looked at, so a `user_journeys`/synthetic run whose ids happen to look like FR
+ids joins nothing — pinned by `BuildJoin_InadmissibleBasis_ProducesNoRows_EvenWhenEveryIdWouldResolve`. Id
+resolution admits exactly two forms, both requiring a literal match against an id that EXISTS: the whole item
+(`FR12`, `NFR3`, `UX-DR2`, or a story id), or a story-id PREFIX plus a separator (`18.4-AC-2`), where the prefix
+itself must match a real story. Nothing else — no fuzzy matching, no "AC-1 probably means this run's story",
+because `target.id` is literally null in upstream's own schema example so there is no scope to attach a bare
+`AC-n` to. Unresolved rows are COUNTED and stated, never dropped silently. The signals are read from the JSON
+summary first and the **markdown's own frontmatter** second — a useful find: `trace-template.md` carries
+`coverageBasis` / `oracleConfidence` / `oracleResolutionMode` in its frontmatter, so a Phase-1-only run that never
+wrote any JSON still exposes everything the admissibility rule needs.
+
+**6. ADR 0020 proposed, and it does not compete with 18.3's unwritten 0019.** `0019` is still claimed-but-unwritten
+by both Story 18.3 and Story 22.3 (confirmed at dev time — `docs/adrs/` has no `0019`), and `0020` was pre-claimed
+by this story, so `0020` was taken as planned. It scopes non-markdown ingest to four simultaneous conditions
+(module-declared, exact filename, directory-scoped, module-presence-gated) plus a **major-version gate applied
+before any field is touched**, and states the enrichment-only constraint in §5 as something it *defers to* ADR 0019
+rather than deciding. `docs/adrs/README.md` gained its entry in the same change; per Story 18.1's review finding
+(an earlier edit blanked ADR 0014's entry), the whole file was re-counted afterwards — **20 entries before, 21
+after, every one still carrying its status and parenthetical**, ADR 0014's included.
+
+**7. Live-browser verification found three defects the suite structurally could not see.** All three were found by
+looking at the rendered page, exactly as CLAUDE.md § Verification predicts:
+
+  - **The dashboard panel computed to `display: none`.** It carried `wm-show-requirements wm-show-review` but not
+    `wm-show-overview`, so on the default dashboard it was in the DOM and invisible. Owner decision D1 calls this
+    panel "the at-a-glance signal" — a quality-gate verdict that only appears once you switch work modes is not at
+    a glance. Added `wm-show-overview`.
+  - **The page overflowed horizontally at 375 px** (422 px document against a 375 px viewport) while every sibling
+    standalone page — traceability, requirements, cadence, epics — stayed at exactly 375. The cause: `main` is a
+    flex item with `min-width: auto`, so a table's 374 px min-content plus main's 48 px padding became the page's
+    minimum. **A first fix with a bare `overflow-x: auto` wrapper did not work** — `contain: inline-size` is the
+    load-bearing half, and the codebase already had `.table-scroll` carrying both, so the tables now reuse that
+    shared primitive rather than a second one. Re-measured: 375/375, tables scroll inside their own box, no
+    vertical clipping (containment-leak check clean).
+  - **Two prose defects.** `not_met` leaked raw into an artifact headline ("P1 not_met"), and the join sentence
+    read "5 of 6 of Test Architecture Enterprise's mapped items" with a plural/singular disagreement in its tail.
+    Both fixed and re-verified in the browser.
+
+  Also verified: 22/22 links on the page resolve HTTP 200, zero console errors, DOM structure intact after the
+  markup splicing (3 tables, 3 wrappers, none malformed, all five sections still siblings of `<main>`), and every
+  tier and gate badge carries its WORD.
+
+**8. The BMM-only control is clean, verified two independent ways.** On this repo's own real portal (429 pages, no
+`_bmad/tea/`): no `test-artifacts.html` (HTTP 404), no nav entry, no quick link, no dashboard panel, no notice, no
+mention of the tier vocabulary — and the glossary (10 terms) and legend intact. The only greps that hit
+"test-artifacts" are the code-listing pages rendering this story's own source and the story/PRD documents that
+discuss it. In the suite, `GenerateAll_BmmOnly_ShowsNoTestArtifactSurfaceAtAll` asserts the absence and
+`GenerateAll_BmmOnly_ProducesByteIdenticalOutputToARunOfTheSameFixture` byte-compares two full generations.
+
+**9. The golden fingerprint moved, and the move is CSS bytes only.** `06788c0f…` → `2bd1c18e…`. `specscribe.css` is
+copied to the output verbatim and is in the hash; this story added `.list-row-accent-ready` (completing an
+already-existing three-of-four modifier set against the same six `--status-*` tokens — no new token), the
+`MODULE TEST ARTIFACTS` block, and one comment. **No markup changed in the golden fixture**, because every
+Story 18.5 surface is gated on a non-empty `TestArtifactsModel` and that fixture has no `_bmad/tea/`.
+**Provenance:** the `06788c0f…` baseline this story started from was itself the concurrent **Story 20.6
+code-review** session's value (its `<h3>`→`<h4>` twin demotion and `--surface`→`--warm-white` fix), and that
+session was still editing `HierarchyExplorer.cs` / `HierarchyExplorerTests.cs` / `SunburstExplorerTests.cs` while
+this value was measured. Nothing of theirs was reset or reverted. Rebuilt FIRST (the stale-build hash trap), then
+confirmed identical across two consecutive runs.
+
+**10. One of this story's own tests was flaky and was hardened rather than accepted.** The BMM-only byte-compare
+failed once in a full-suite run and passed in isolation. Cause: the site footer carries a generation clock with
+MINUTES, so two runs straddling a minute boundary differ on every page — a timestamp doing its job, not
+nondeterminism. It now folds that one token, reusing the same rule (and the same regex shape) the golden
+fingerprint test already applies for the same reason, and nothing else. Three consecutive full-suite runs green
+afterwards.
+
+**11. Suite status.** Full suite: **2612 passed, 0 failed, 3 skipped**, three consecutive runs. An earlier run
+showed 12 failures across `SiteGeneratorCommitDetailsTests`, `SiteGeneratorHowToReadTests`,
+`GitMetricsFirstCommitDateTests`, `SiteGeneratorImpactMapTests`, `SiteGeneratorGitInsightsTests`,
+`SiteGeneratorCodeInsightsTests`, `GitMetricsTryComputeTests` and `SiteGeneratorCodeMapTests` — **every one passed
+in isolation** and none is in a class this story touches. That is the documented rotating deep-git concurrency
+flake (Story 18.2 measured 19 such failures), confirmed rather than assumed.
+
+**12. Non-goals held.** `ArtifactCoverage`'s BMM family set is untouched — a TEA-only repo still shows eight
+missing BMM families, which is Story 18.6's scope and is seated in BOTH `epics.md` (line ~3243, with its
+provenance comment) and `sprint-status.yaml` (`18-6-module-aware-artifact-coverage-families: backlog`), both
+re-verified at the end of this story. No `_bmad/tea/config.yaml` read. No `BmadModule.TestArchitect` enum case —
+coverage keys on the module CODE string. No `AboutSddTemplater.Frameworks` row. No second `IArtifactAdapter` and no
+registry. No sixth `AdapterDiagnosticCategory`. No new `--status-*` token. No hard-coded module label — both
+"Test Architect" (`module.yaml`) and "Test Architecture Enterprise" (the installed CSV) are read, never written.
+No widened source glob. No chart, so ADR 0013's text-twin gate is never entered.
+
+**13. OWNER ITEM CARRIED FORWARD, NOT ACTIONED — the stale "strongly GDS-oriented" clause.** Story 18.2's
+Completion Note §8 asks to retire `epics.md`'s *"current next-step command mapping is strongly GDS-oriented and
+requires generalization"* clause, which ADR 0015 already records as retired. It is still live at **two** sites that
+must move together: `epics.md:173` (Additional Requirements) and `epics.md:3082` (Story 18.1's AC #2, which quotes
+it). Surfaced here as instructed; the deletion is the owner's call, not this story's.
+
+**14. Gate note.** Story 18.2 is still `review`, not `done`. This story builds directly on its `ModuleContext`
+work and additionally widens two of its members (`IsModulePresent` made public, `ForCode` added). If 18.2's review
+produces patches there, rebase onto them rather than working around them.
+
 ### File List
+
+**New — source**
+
+- `src/SpecScribe/TestArtifactsModel.cs` — `CoverageTier`, `CoverageTiers`, `TestArtifactEntry`,
+  `TestGateDecision`, `TeaPriorityCoverage`, `TeaLevelCoverage`, `TestTraceSummary`, `TeaCriterionCoverage`,
+  `TeaMatrix`, `TeaJoinVerdict`, `TeaJoinRow`, `TeaJoin`, `TestArtifactsModel`, `TeaJsonOutcome`,
+  `TestArtifactDerivation` (the pure half)
+- `src/SpecScribe/TestArtifactDiscovery.cs` — the IO half (`Discover`, `WithJoin`)
+- `src/SpecScribe/TestArtifactsTemplater.cs` — `test-artifacts.html` + the dashboard Module Coverage panel body
+
+**New — docs**
+
+- `docs/adrs/0020-module-declared-non-markdown-sources.md`
+
+**New — tests**
+
+- `tests/SpecScribe.Tests/TestArtifactDerivationTests.cs` (pure derivation; carries the upstream provenance block)
+- `tests/SpecScribe.Tests/TestArtifactDiscoveryTests.cs` (IO + generation-level, three fixtures)
+
+**Modified — source**
+
+- `src/SpecScribe/ModuleContext.cs` — `IsModulePresent` made public; `ForCode(repoRoot, code)` added
+- `src/SpecScribe/SiteNav.cs` — `TestArtifactsOutputPath`, `TestArtifactsLabel`, `HasTestArtifacts`,
+  `hasTestArtifacts` parameter, Delivery-group nav entry + quick link
+- `src/SpecScribe/SiteGenerator.cs` — `_testArtifacts` field, discovery before nav, diagnostics merge, the D2 join
+  completion, `WriteTestArtifacts`, both `SiteNav.Build` call sites, `BuildNav`, three dashboard call sites
+- `src/SpecScribe/DashboardView.cs` — `ModuleCoverageHtml`
+- `src/SpecScribe/DashboardViewBuilder.cs` — `test-artifacts` folder-group key, `testArtifacts` parameter,
+  `ModuleCoverageHtml` construction
+- `src/SpecScribe/HtmlRenderAdapter.Dashboard.cs` — the Module Coverage panel wrapper
+- `src/SpecScribe/HtmlTemplater.cs` — `testArtifacts` threaded through `RenderIndex` / `BuildIndexPage`
+- `src/SpecScribe/assets/specscribe.css` — `.list-row-accent-ready`; the `MODULE TEST ARTIFACTS` block
+
+**Modified — docs / planning**
+
+- `docs/adrs/README.md` — ADR 0020 index entry (20 entries before, 21 after; all verified intact)
+- `_bmad-output/planning-artifacts/prds/prd-SpecScribe-2026-07-05/prd.md` — coverage-tier open question answered
+- `_bmad-output/specs/spec-specscribe/SPEC.md` — same question answered
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — `18-5-…` → `in-progress` → `review`
+- `_bmad-output/implementation-artifacts/18-5-priority-bmad-module-baseline-coverage.md` — this record
+
+**Modified — tests / tooling**
+
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — golden fingerprint re-baselined with stacked provenance
+- `.claude/launch.json` — `tea-coverage-18-5` (8109) and `bmm-control-18-5` (8110) preview slots
+
+**Not modified, deliberately:** `epics.md` (Story 18.6 was already seated by create-story; the "strongly
+GDS-oriented" retirement is the owner's call — Completion Note §13), `ArtifactCoverage.cs`, `AboutSddTemplater.cs`,
+`AdapterDiagnostic.cs`, `BmadArtifactAdapter.cs`.
 
 ## Change Log
 
+- 2026-07-27 — Story 18.5 implemented (dev-story, story baseline `40c7ee9`; HEAD at start `6017c2c`). Both
+  owner surfaces shipped: `test-artifacts.html` (ListRow grammar, tier badges carrying their WORD, a tier legend,
+  the gate section, coverage tables, and the attributed traceability join) and the dashboard's module-agnostic
+  Module Coverage panel. The coverage-tier vocabulary landed as a real type (`CoverageTier`/`CoverageTiers`) and
+  the PRD's and SPEC.md's open question — *"how should coverage tiers be communicated"* — is answered and struck
+  through in both. Two JSON files the `*.md` scan structurally cannot see are now read by exact filename, module-
+  scoped and major-version-gated, under the newly proposed **ADR 0020** (indexed in `docs/adrs/README.md`; entry
+  count verified 20 → 21 with every prior parenthetical intact, per Story 18.1's blanked-entry finding).
+  **Task 1's re-pin confirmed every filename but corrected four of the story's own facts**: the Detailed Mapping
+  is an h4-per-criterion structure, NOT a table; `inventory_basis` has a fourth value (`synthetic_requirements`);
+  `gate_status` is optional on the trace summary; and `trace/workflow.yaml`'s own inline schema comment is STALE
+  and contradicts the emitter, so `step-05-gate-decision.md` is the authority. **Two real defects were caught by
+  the tests before shipping** — the dashboard panel named the run's PRIMARY module (labelling TEA's artifacts
+  "BMad Method", the exact misattribution class ADR 0015 exists to prevent; fixed with
+  `ModuleContext.ForCode`), and the join table rendered EMPTY in a TEA-only repo, which reads as "covered by
+  nothing" rather than as an absence. **Live-browser verification found three more the suite could not see**: the
+  panel computed to `display: none` on the default dashboard, the page overflowed horizontally at 375 px (fixed
+  by reusing the shared `.table-scroll` primitive — a bare `overflow-x: auto` did NOT work, `contain: inline-size`
+  is the load-bearing half), and two prose defects. `ConsumedSourceRelatives` is deliberately NOT populated and
+  the reason is recorded prominently (Completion Note §3): this page is an index that LINKS the generic page
+  rather than re-rendering it, so consuming would delete the page each `Rendered` row points at. BMM-only output
+  verified clean two ways (429-page real portal + a two-run byte-compare). Golden fingerprint moved
+  `06788c0f…` → `2bd1c18e…`, **CSS bytes only**, re-baselined on top of the concurrent Story 20.6 code-review
+  session's own value after a rebuild and two stable runs. Full suite 2612 passed / 0 failed across three
+  consecutive runs. Owner item carried forward, not actioned: `epics.md`'s stale "strongly GDS-oriented" clause
+  still lives at two sites (`:173` and `:3082`) that must move together.
 - 2026-07-27 — Story 18.5 drafted (create-story, baseline `40c7ee9`). Carries the pre-split Story 18.2 ACs
   verbatim, retargeted to Test Architect (TEA) per Story 18.1's coverage map. **Three of 18.1's TEA facts were
   corrected against upstream**: the filenames are `traceability-matrix.md` / `nfr-assessment.md` (not

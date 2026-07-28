@@ -1159,7 +1159,56 @@ public class SiteGeneratorAdapterTests : IDisposable
         // VERIFICATION: rebuilt, then confirmed byte-identical across two consecutive full runs, with
         // `git diff --stat src/` identical before and after both. Single-box only.
         // [Story 20.8 Task 6.8; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
-        const string expected = "3171cf5c7b389640606ccdd4fa763cdf0af38237d7d7a1ddd3077bc0a415e8c4";
+        // ── STORY 20.6 CODE-REVIEW REGENERATION (2026-07-27) ─────────────────────────────────────────────────
+        // 3171cf5c… -> 06788c0f…. Two deliberate patches applied by this code review, both landing inside the
+        // dashboard's sr-only Hierarchy Explorer twin (Story 20.6's own D4 feature):
+        //   1. `.ss-hierarchy-twin.sr-only:focus-within`'s `background` referenced the undefined custom property
+        //      `--surface` (always fell back to its literal `#fff`); changed to `--warm-white`, the token every
+        //      other `.chart-panel` background already uses. specscribe.css is copied to the output verbatim, so
+        //      this line's bytes are in the hash.
+        //   2. The sr-only twin's own heading was a second same-level `<h3>` sitting beside the chart panel's
+        //      existing `<h3>{Title}</h3>` (`Charts.Framed`) — two same-level, near-identical headings for one
+        //      panel. Demoted to `<h4>`, since the twin nests INSIDE the panel Framed already headed.
+        //
+        // WHAT DID NOT CHANGE: the twin's node listing (`<ul class="ss-hierarchy-twin-list">`) — only its wrapper's
+        // color and heading level. No chart SVG was retired; no other surface's markup changed.
+        //
+        // PROVENANCE (shared main) — this hash is not this review's work alone; it sits on top of everything
+        // Stories 20.7/20.8 already baked into `3171cf5c…` above, per their own stacked comments.
+        //
+        // VERIFICATION: confirmed stable across two repeated full runs before locking in. Single-box only.
+        // [Code review of Story 20.6, 2026-07-27; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
+        // ── STORY 18.5 REGENERATION (2026-07-27) ─────────────────────────────────────────────────────────────
+        // 06788c0f… -> 2bd1c18e…. The move is **entirely `specscribe.css`**, which the generator copies to the
+        // output verbatim and is therefore in this hash. Story 18.5 added three things to it:
+        //   1. `.list-row-accent-ready`, completing the `.list-row-accent-*` modifier set (the other three
+        //      already existed) against the same six `--status-*` tokens — no new token.
+        //   2. A `MODULE TEST ARTIFACTS` block for `test-artifacts.html` and the dashboard's Module Coverage
+        //      panel (`.ta-*`, `.module-coverage-*`).
+        //   3. A comment recording that those tables reuse the shared `.table-scroll` wrapper rather than a
+        //      second one, after a live-browser pass at 375 px measured the page at 422 px without it.
+        //
+        // WHAT DID NOT CHANGE, and why this fixture's markup is byte-identical: every Story 18.5 surface is
+        // gated on a non-empty `TestArtifactsModel`, which requires an installed `_bmad/tea/` module. The golden
+        // fixture has none, so there is no page, no nav entry, no quick link and no dashboard panel — `SiteNav`'s
+        // new `hasTestArtifacts` parameter is false and emits nothing, and `DashboardView.ModuleCoverageHtml` is
+        // "". That absence is itself asserted independently by
+        // `TestArtifactDiscoveryTests.GenerateAll_BmmOnly_ShowsNoTestArtifactSurfaceAtAll` and by a two-run
+        // byte-compare of the whole BMM-only site, so this hash move is CSS bytes only, not a markup regression.
+        //
+        // PROVENANCE (shared main) — this hash is NOT this story's work alone. `git status` at capture time showed
+        // a concurrent session mid-flight on the **Story 20.6 code-review patch round**, whose rendering-visible
+        // work was ALREADY baked into the `06788c0f…` baseline this story started from (the sr-only twin's
+        // `<h3>` → `<h4>` demotion in `HierarchyExplorer.cs` and the `--surface` → `--warm-white` fix), and which
+        // was still editing `HierarchyExplorer.cs` / `HierarchyExplorerTests.cs` / `SunburstExplorerTests.cs`
+        // while this value was measured. Per CLAUDE.md § Concurrent work, nothing was reset and nothing of theirs
+        // was reverted.
+        //
+        // VERIFICATION: rebuilt FIRST (the stale-build hash trap in golden-diff-normalization-gotchas), then
+        // confirmed byte-identical across two consecutive runs, with `git diff --stat src/` identical before and
+        // after both. Single-box only — the cross-environment caveat above still stands.
+        // [Story 18.5 Task 9; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
+        const string expected = "2bd1c18e30c16cddb4ae62909979730161bff1f9486ec9acce0f9b4636b2beae";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

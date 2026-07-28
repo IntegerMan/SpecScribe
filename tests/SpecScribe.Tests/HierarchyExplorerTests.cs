@@ -796,7 +796,7 @@ public class HierarchyExplorerTests
         Assert.StartsWith("<section class=\"ss-hierarchy-twin sr-only\" id=\"test-hierarchy-twin\"", twin);
         // A landmark with an accessible NAME — how a screen-reader user finds the listing without tabbing to it.
         Assert.Contains("aria-labelledby=\"test-hierarchy-twin-title\"", twin);
-        Assert.Contains("id=\"test-hierarchy-twin-title\">Project at a Glance — full text listing</h3>", twin);
+        Assert.Contains("id=\"test-hierarchy-twin-title\">Project at a Glance — full text listing</h4>", twin);
         Assert.DoesNotContain("<details", twin);
 
         // `sr-only` is the clip-rect technique, NOT display:none — the links must stay real anchors so they remain

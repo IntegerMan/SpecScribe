@@ -1032,6 +1032,43 @@ So that demos and onboarding cover both reading the portal and producing it — 
 **Then** it names the same effective settings surface users see on Diagnostics (Story 4.8)
 **And** copy stays framework-agnostic in shared chrome (NFR8).
 
+### Story 5.7: Fixed `--as-of <date>` Date-Page Cutoff Policy
+
+<!-- Seeded 2026-07-27 at the Epic 5 retrospective (owner decision on Story 5.5's Open Question #3).
+     Story 5.5 delivered the three policies its AC #2 required *at least* — machine-local (default),
+     utc, last-commit — and flagged a fixed explicit date as out of scope. The owner elected to add it.
+     Story 5.5's Open Questions #1 and #2 were confirmed AS IMPLEMENTED at the same retrospective:
+     the `--today-policy` name and its `machine-local`/`utc`/`last-commit` tokens stand, and
+     `LastCommit` remains `series.Max(day)` (latest authored commit day) for symmetry with
+     `LinkedCommitDays`. This story must therefore EXTEND that vocabulary, not re-open it. -->
+
+As a maintainer producing a portal for a review, a demo, or a historical snapshot,
+I want to pin the date-page "today" cutoff to an explicit calendar date,
+So that a regenerated portal reproduces the same date-page set regardless of when or where it is generated.
+
+**Acceptance Criteria:**
+
+1.
+**Given** I supply an explicit date to the date-page today policy
+**When** generation runs
+**Then** that date is used as the single resolved `today` by every one of Story 5.5's five cutoff
+consumers (`LinkedCommitDays`, date-page generation, artifact-skew, the heatmap grid, and the Git
+Pulse guard) with no second resolution anywhere
+**And** git commit times still render in each commit's authored offset (Story 10.4 honesty, unchanged)
+**And** the dashboard's artifact-staleness `today` stays a separate value from the date cutoff, per
+Story 5.5's `dateCutoff` separation.
+
+2.
+**Given** the explicit-date policy is set via CLI or persisted in `.specscribe/config.json`
+**When** generation runs
+**Then** it participates in the existing three-way provenance (`CommandLine` > `SavedSettings` >
+`Default`) and appears on `--show-config` and the Diagnostics config log (Story 4.8) like every other
+field, with interactive/CLI parity (NFR7 / Story 5.2)
+**And** an unparseable or absent date is rejected at the same `SiteSettings.Validate()` gate the other
+policy tokens use, with the same forgiving-vocabulary persistence treatment `DatePolicyJsonConverter`
+already applies — a bad token must never fail whole-document deserialization and discard sibling
+settings (the defect Story 5.5's code review fixed).
+
 ## Epic 6: VS Code Read-Only Companion Surface
 
 Expose the same shared projection in a read-only VS Code webview for in-editor visibility without introducing authoring side effects, and grow the extension's native host-integration surface (discoverability, commands, tree view/status bar, editor bridges, reactivity) so it feels native — all read-only and rendered from core-emitted data.
@@ -3975,6 +4012,11 @@ So that NFR6's accessibility baseline is preserved while unifying all surfaces o
 > 2. **The two-region-shapes defect.** The IR carries two region shapes: 187 re-rendered family pages carry the page-wayfinding wrapper, while ~853 captured pages slice from *inside* it (`SpaDelivery.ExtractContentRegion` starts at the breadcrumb) and are unbalanced by one element. 23.3's adapter detects both and throws on a band it cannot balance — that workaround is what 22.4 should be able to delete.
 >
 > **AC #3 below must also be restated.** Per the Story 22.3 retirement note, **[Story 23.4](#story-234-migrate-remaining-surfaces--retire-the-c-htmlrenderadapter-for-content) AC #3 deliberately keeps one C# region-composition path** (nav + wayfinding + `<main>`) feeding the IR and the webview/SPA. AC #3's *"the duplicate, non-IR data paths… are retired"* must therefore be scoped **against that surviving path**, not read as contradicting it. The retired [Story 22.3 file](../implementation-artifacts/22-3-static-html-rendered-from-the-ir.md) is kept as a reference and characterizes exactly that path — the 25-templater inventory, the `NavLocalContext` blocker (there is **no** `path → NavLocalContext` resolver; any path that stops slicing must thread it), eight traps, the ADR constraint table, and the ranked test-gate map.
+>
+> **⚠ SCOPE RE-SCOPED at create-story 2026-07-27 — the story file's 9 ACs SUPERSEDE the 3 below.** See [`22-4-spa-and-webview-as-ir-consumers.md`](../implementation-artifacts/22-4-spa-and-webview-as-ir-consumers.md); Task 10 there records the drift in both artifacts. Two things moved:
+>
+> 1. **AC #1 is already satisfied and near-vacuous.** `spa/manifest.json` + `spa/pages-*.json` **are** the IR — ADR 0008 seated that file set and Story 22.2 promoted it **in place** (no `ir/` directory, no rename). The SPA client already consumes the IR; there is nothing to migrate. The real duplication is that `BuildSpaBundle` and `RenderWebviewSurfaces` are two ~200-line builders sharing an identical prelude, an identical epics-family iteration and an identical captured-region loop.
+> 2. **Owner decisions 2026-07-27:** **D1** — one region seam plus both inherited defects; the slicers **survive** (they remain the IR's producer for ~853 pages until Story 23.4 replaces them), so this story retires the *duplicate*, not the *slice*. **D2** — **22.4 runs BEFORE 23.4**, so 23.4 inherits one region producer to preserve and its *"delete the page render first and the IR goes dark for 82 % of the site"* circularity is answered in advance; 23.4's AC #7 restatement obligation is discharged by that ordering. **D3** — the **static** page moves to converge the 46-delta, honouring Story 23.3's measurement that the IR is the more complete render.
 
 As a maintainer of the SPA and VS Code webview surfaces,
 I want both surfaces to consume the canonical IR instead of their own duplicate data paths,

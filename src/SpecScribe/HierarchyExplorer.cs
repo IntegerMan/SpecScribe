@@ -92,8 +92,10 @@ public enum HierarchyTwinDisplay
 /// <param name="Labels">Whether to draw in-sector labels (owner decision D3, "Labelled explorer").</param>
 /// <param name="Meta">The Story 10.2 framing block — title + analysis window + framing sentence.</param>
 /// <param name="TwinDisplay">How the text twin presents (owner D3/D4). Config-driven, never a call-site literal
-/// and never a second twin builder — the same discipline that keeps <paramref name="Size"/> out of the JS.
-/// Trailing and defaulted so every existing call site keeps compiling and keeps the D3 default.</param>
+/// and never a second twin builder. Unlike <paramref name="Size"/>, it is server-only: it never reaches
+/// <see cref="IslandHtml"/>'s emitted client configuration, because the client has no reason to know how the twin
+/// it never renders is presented. Trailing and defaulted so every existing call site keeps compiling and keeps the
+/// D3 default.</param>
 /// <param name="Filterable">Whether this instance honours root-subtree filter controls (Story 20.7 Task 1.3).
 /// When set, the client watches for <c>[data-hierarchy-filter]</c> checkboxes inside the panel — each carrying the
 /// id of a ROOT CHILD as its value — projects the payload to the checked roots plus their descendants, re-runs the
@@ -599,16 +601,23 @@ public static partial class HierarchyExplorer
 
         var id = PathUtil.Html(model.Config.DomId);
         var heading = $"{PathUtil.Html(model.Config.Meta.Title)} — full text listing";
-        var srOnly = model.Config.TwinDisplay == HierarchyTwinDisplay.ScreenReaderOnly;
+        var srOnly = model.Config.TwinDisplay switch
+        {
+            HierarchyTwinDisplay.Details => false,
+            HierarchyTwinDisplay.ScreenReaderOnly => true,
+            _ => throw new ArgumentOutOfRangeException(nameof(model), model.Config.TwinDisplay, "Unrecognized HierarchyTwinDisplay value."),
+        };
 
         var sb = new StringBuilder();
         if (srOnly)
         {
             // A <section> with aria-labelledby rather than a bare <div>: a landmark with an accessible name is how
             // a screen-reader user FINDS this listing without tabbing to it, which matters more here than in the
-            // <details> mode where a visible summary already advertises it.
+            // <details> mode where a visible summary already advertises it. <h4>, not <h3>: this section nests
+            // INSIDE the chart panel Charts.Framed already headed with its own <h3>{Title}</h3>, so a heading-level
+            // reader would otherwise hit two same-level, near-identical headings for one panel.
             sb.Append($"<section class=\"ss-hierarchy-twin sr-only\" id=\"{id}-twin\" aria-labelledby=\"{id}-twin-title\">\n");
-            sb.Append($"<h3 class=\"ss-hierarchy-twin-title\" id=\"{id}-twin-title\">{heading}</h3>\n");
+            sb.Append($"<h4 class=\"ss-hierarchy-twin-title\" id=\"{id}-twin-title\">{heading}</h4>\n");
             AppendTwinLevel(sb, roots, childrenOf, new HashSet<string>(StringComparer.Ordinal), 1);
             sb.Append("</section>\n");
         }

@@ -86,6 +86,15 @@ public sealed class SiteGenerator
     // freshness enrichment (see that method for why). Watch-mode BuildNav reuses the last full run's model, like
     // _workGraph/_progress: forge activity is invisible to the watcher by design (see IsDataSource).
     private IdeasModel _ideas = IdeasModel.Empty;
+
+    // Methodology-module test artifacts (Story 18.5), discovered once BEFORE nav.Build so the Delivery "Test
+    // Artifacts" entry, the test-artifacts.html write and the dashboard's Module Coverage panel all share one gate
+    // (a non-empty model) — the link never dangles. Discovery is gated on the module being INSTALLED
+    // (ModuleContext.IsModulePresent on the code string "tea"), never on filenames, and it reads two JSON files the
+    // *.md source list cannot reveal (ADR 0020). Watch-mode BuildNav reuses the last full run's model like
+    // _workGraph/_ideas/_progress.
+    private TestArtifactsModel _testArtifacts = TestArtifactsModel.Empty;
+
     private List<CommitDayEntry> _commitDays = new();
 
     // Story 7.5: full %H commit hash -> per-commit detail page output-relative path (commit/{shortHash}.html).
@@ -244,6 +253,15 @@ public sealed class SiteGenerator
             var ideaDiagnostics = new List<AdapterDiagnostic>();
             _ideas = IdeaDiscovery.Discover(_options.SourceRoot, ideaDiagnostics);
             var hasIdeas = !_ideas.IsEmpty;
+            // Discover methodology-module test artifacts now (Story 18.5) — BEFORE nav — for the same
+            // one-gate reason. ModuleContext.Detect is deliberately NOT called again (Story 18.2 made detection
+            // once-per-run, and re-detecting silently reintroduces the undiagnosed-detection bug); discovery
+            // instead reads the covered module's OWN catalog by code via ModuleContext.ForCode, because in a
+            // BMM+TEA repo `_module` is BMad Method and naming TEA's artifacts from it would misattribute them.
+            var testArtifactDiagnostics = new List<AdapterDiagnostic>();
+            _testArtifacts = TestArtifactDiscovery.Discover(
+                _options.RepoRoot, _options.SourceRoot, testArtifactDiagnostics);
+            var hasTestArtifacts = !_testArtifacts.IsEmpty;
             var nav = SiteNav.Build(
                 sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), ReadmeAvailable, SprintAvailable,
                 hasCodeMap: _codeFiles.Count > 0,
@@ -253,6 +271,7 @@ public sealed class SiteGenerator
                 hasDeferredWork: hasDeferredWork,
                 hasWorkGraph: hasWorkGraph,
                 hasIdeas: hasIdeas,
+                hasTestArtifacts: hasTestArtifacts,
                 deferredWorkOutputPath: deferredWorkPath,
                 diagnostics: navDiagnostics);
             _nav = nav;
@@ -271,7 +290,7 @@ public sealed class SiteGenerator
                         hasSprint: SprintAvailable, hasCodeMap: _codeFiles.Count > 0,
                         hasGitInsights: hasGitInsights, hasDeepAnalytics: hasDeepAnalytics,
                         hasActionItems: hasActionItems, hasDeferredWork: hasDeferredWork,
-                        hasWorkGraph: hasWorkGraph, hasIdeas: hasIdeas,
+                        hasWorkGraph: hasWorkGraph, hasIdeas: hasIdeas, hasTestArtifacts: hasTestArtifacts,
                         deferredWorkOutputPath: deferredWorkPath, diagnostics: navDiagnostics);
                     _nav = nav;
                 }
@@ -333,6 +352,18 @@ public sealed class SiteGenerator
             // self-contained carry gate or the size cap) ride the same channel. Every one anchors to
             // DiagnosticAnchorRoot.Source — every forge path is under the source root. [Story 18.4]
             events.AddRange(MapDiagnostics(ideaDiagnostics));
+
+            // Module test-artifact discovery notices (an unreadable or unknown-schema TEA JSON, a matrix that
+            // doesn't follow the documented structure, artifact families SpecScribe doesn't model, or a module
+            // installed with its output directory outside the scanned tree) ride the same channel. Every one
+            // anchors to DiagnosticAnchorRoot.Source — every test-artifacts path is under the source root, so
+            // Story 18.2's DiagnosticAnchorRoot.Repo is deliberately NOT reused here. [Story 18.5]
+            events.AddRange(MapDiagnostics(testArtifactDiagnostics));
+
+            // The D2 join can only be completed now: it needs BOTH the requirements model and the epics model,
+            // and this is the first point at which both are cached. Inadmissible bases and unresolvable ids are
+            // judged inside the derivation, never here. [Story 18.5 D2]
+            _testArtifacts = TestArtifactDiscovery.WithJoin(_testArtifacts, _requirements, _epicsModel);
 
             // Unrecognized top-level source folders render coherently (each gets its own home-index band, see
             // HtmlTemplater.RenderIndex) AND are reported as categorized non-fatal structure notices on the
@@ -484,6 +515,7 @@ public sealed class SiteGenerator
             // phase, because AC #2's forward links can only be resolved once _docs knows which targets actually got
             // a page (a target with no page is dropped, never emitted as a dead link).
             events.AddRange(WriteIdeas(nav));
+            events.AddRange(WriteTestArtifacts(nav));
             // Delivery cadence (Story 21.2) — built ONCE here (after ProgressCalculator filled LastUpdatedDate),
             // then shared by WriteCadence and the dashboard strip (WriteIndex reads _cadence). The bounded
             // per-done-story first-touch git lookups happen exactly once, in this build.
@@ -2839,7 +2871,7 @@ public sealed class SiteGenerator
             // the SPA capture; both are fixed together because both are the same omission.
             var dashboardPage = HtmlTemplater.BuildIndexPage(
                 docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
-                work, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts: counts, followUps: followUps, unplanned: unplanned, cadence: _cadence, workGraph: _workGraph, dateCutoff: _today);
+                work, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts: counts, followUps: followUps, unplanned: unplanned, cadence: _cadence, workGraph: _workGraph, dateCutoff: _today, testArtifacts: _testArtifacts);
             surfaces.Add(WebviewSurfaceFor(dashboardPage));
 
             // Epics family — mirrors RenderEpicsPages' iteration exactly (same retro map, same per-epic
@@ -3116,7 +3148,7 @@ public sealed class SiteGenerator
         // the ENTIRE 277-byte parity delta Story 23.1 measured. [Story 22.2 AC #4]
         var dashboardPage = HtmlTemplater.BuildIndexPage(
             docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
-            work, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts: counts, followUps: followUps, unplanned: unplanned, cadence: _cadence, workGraph: _workGraph, dateCutoff: _today);
+            work, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts: counts, followUps: followUps, unplanned: unplanned, cadence: _cadence, workGraph: _workGraph, dateCutoff: _today, testArtifacts: _testArtifacts);
         AddSpaSurface(pages, familyPaths, dashboardPage);
 
         if (_epicsModel is { } model && _progress is { } progress)
@@ -3312,7 +3344,7 @@ public sealed class SiteGenerator
         var unplanned = UnplannedWorkGeometry.From(inventory, followUps, _epicsModel, retros: _retros);
         // `_workGraph` is handed in verbatim — the SAME instance WriteWorkGraph renders — so the Story 20.3
         // related-work pane is a pure read over the already-computed model, never a second projection. [Story 20.3]
-        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, inventory, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts, followUps, unplanned, cadence: _cadence, workGraph: _workGraph, dateCutoff: _today);
+        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, inventory, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts, followUps, unplanned, cadence: _cadence, workGraph: _workGraph, dateCutoff: _today, testArtifacts: _testArtifacts);
         WriteTextWithRetry(indexPath, ApplyReferenceLinks(html, "index.html"));
         EnsureHierarchyEngine(html);
     }
@@ -3748,6 +3780,39 @@ public sealed class SiteGenerator
             {
                 events.Add(new GenerationEvent(GenerationOutcome.Error, idea.DetailOutputPath, detailSw.Elapsed, ex.Message));
             }
+        }
+
+        return events;
+    }
+
+    /// <summary>Writes <c>test-artifacts.html</c> when a methodology module contributed any artifact. Gated on the
+    /// SAME non-empty <see cref="_testArtifacts"/> model the nav entry and the dashboard panel gate on, so no
+    /// module artifacts ⇒ no page, no nav entry, no quick link, no panel (NFR8 — absent, not an empty page). A
+    /// BMM-only repo never reaches the write.
+    ///
+    /// <para><b>No markdown is consumed here, deliberately.</b> Every markdown artifact keeps the page the generic
+    /// <c>*.md</c> pass writes for it, and this page LINKS that page rather than re-rendering it — which is what
+    /// makes the <see cref="CoverageTier.Rendered"/> label true. Adding these paths to
+    /// <c>ArtifactBundle.ConsumedSourceRelatives</c> (the shape Story 18.4 needed, because an idea's detail page
+    /// re-renders its workspace markdown) would suppress exactly the page each row links to and turn every
+    /// <c>Rendered</c> row into a dangling link. The hazard that instruction guards against — one artifact rendered
+    /// twice — is discharged by not rendering it twice, and pinned by a test.</para> [Story 18.5]</summary>
+    private IReadOnlyList<GenerationEvent> WriteTestArtifacts(SiteNav nav)
+    {
+        var events = new List<GenerationEvent>();
+        if (_testArtifacts.IsEmpty) return events;
+
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            WriteOutput(SiteNav.TestArtifactsOutputPath,
+                ApplyReferenceLinks(
+                    TestArtifactsTemplater.RenderListPage(_testArtifacts, nav), SiteNav.TestArtifactsOutputPath));
+            events.Add(new GenerationEvent(GenerationOutcome.Generated, SiteNav.TestArtifactsOutputPath, sw.Elapsed));
+        }
+        catch (Exception ex)
+        {
+            events.Add(new GenerationEvent(GenerationOutcome.Error, SiteNav.TestArtifactsOutputPath, sw.Elapsed, ex.Message));
         }
 
         return events;
@@ -4878,6 +4943,11 @@ public sealed class SiteGenerator
             // ignored and a `forge-report.html` is not `.md`, so neither reaches the dispatch — see IsDataSource,
             // the seam a follow-on would extend). [Story 18.4]
             hasIdeas: !_ideas.IsEmpty,
+            // Same reuse-the-last-full-run rule again: a module's test artifacts are re-discovered only on a full
+            // rebuild. The two TEA JSON files are not `.md` and so never reach the watch dispatch (IsDataSource),
+            // and the module-presence gate reads `_bmad/` which is outside the watched source tree entirely.
+            // [Story 18.5]
+            hasTestArtifacts: !_testArtifacts.IsEmpty,
             deferredWorkOutputPath: deferredWorkPath,
             diagnostics: diagnostics);
     }

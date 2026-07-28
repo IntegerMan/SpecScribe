@@ -2,6 +2,12 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of 20-6-text-twin-audit-and-fingerprint-replacement (2026-07-27)
+
+- source_spec: `20-6-text-twin-audit-and-fingerprint-replacement.md`
+  summary: No automated test guards that `git-insights.html` keeps its server-rendered SVG until a real text twin exists — the constraint that Story 20.7 "must not retire it until a twin exists" is stated only in a doc comment, not enforced by any assertion.
+  evidence: Blind Hunter. Real gap, but out of this story's declared scope — Task 2.4 was explicitly doc-only (no rendering change), and the enforcement mechanism this story establishes is Story 20.7 reading the durable audit record as its permission slip, not a test tripwire. Revisit if/when Story 20.7 starts converting surfaces — a test asserting the SVG/`role="img"` chart survives on `git-insights.html` would catch a premature retirement. [`src/SpecScribe/GitInsightsTemplater.cs`]
+
 ## Deferred from: code review of 5-6-how-to-use-specscribe-cli-guidance (2026-07-27)
 
 - source_spec: `5-6-how-to-use-specscribe-cli-guidance.md`
