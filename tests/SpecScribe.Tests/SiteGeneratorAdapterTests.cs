@@ -1208,7 +1208,38 @@ public class SiteGeneratorAdapterTests : IDisposable
         // confirmed byte-identical across two consecutive runs, with `git diff --stat src/` identical before and
         // after both. Single-box only — the cross-environment caveat above still stands.
         // [Story 18.5 Task 9; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
-        const string expected = "2bd1c18e30c16cddb4ae62909979730161bff1f9486ec9acce0f9b4636b2beae";
+        // ── STORY 18.2 CODE-REVIEW REGENERATION (2026-07-27) ─────────────────────────────────────────────────
+        // 2bd1c18e… -> f4a7cbac…. The move is ONE review patch — P2, the how-to-read honesty gate — and it is
+        // markup, not CSS. `how-to-read.html` is in GoldenOutputInventory, so its bytes are in this hash.
+        //
+        // WHAT CHANGED AND WHY. Story 18.2's unmodeled-module acknowledgement always renders for an unmodeled
+        // module, and it was being counted as evidence that module content exists — so the page's subtitle and
+        // intro promised "the reading order and glossary below" and "what the recurring terms mean" on a page
+        // whose glossary section says SpecScribe publishes no glossary. Story 5.6's rule. The fix splits that
+        // one boolean into two independent signals (`hasModuleContent`, `hasGlossaryTerms`), because a repo
+        // routinely HAS a reading order while having no glossary.
+        //
+        // WHY THIS FIXTURE MOVED AT ALL, given it has no `_bmad/`: precisely because it has none. `_module` is
+        // `ModuleContext.None`, whose glossary is empty, so this fixture takes the NEW middle branch — subtitle
+        // "Start with the reading order below" (was "…reading order and glossary below") and an intro without
+        // the "what the recurring terms mean" clause. The no-module path was making the same false promise the
+        // unmodeled path was, and the patch corrects both. That is a deliberate content improvement, not drift.
+        // None of the other twelve patches can reach this fixture: they all live in `ModuleContext`, which
+        // returns `None` on the first `Directory.Exists` check when there is no `_bmad/`, emitting nothing.
+        //
+        // CAUSALITY PROVEN, NOT ASSUMED (golden-diff-normalization-gotchas). A `git worktree` at HEAD `d1722f1`
+        // — which carries none of this review's edits — ran the golden test GREEN on the existing `2bd1c18e…`
+        // constant. So the move is from the working tree, and the only working-tree changes besides this
+        // review's are a concurrent session's comment-only edit to THIS file's `FoldLineEndings` doc, a new
+        // `.gitattributes`, and `web/scripts/ir-content-build.mjs` — none of which can reach generated HTML.
+        //
+        // PROVENANCE (shared main): `git status` at capture time showed that concurrent session's three files
+        // above still uncommitted. Per CLAUDE.md § Concurrent work nothing was reset and nothing reverted.
+        //
+        // VERIFICATION: rebuilt first (the stale-build hash trap), then confirmed byte-identical across two
+        // consecutive runs. Single-box only — the cross-environment caveat above still stands.
+        // [Code review of Story 18.2, 2026-07-27, Patch P2; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
+        const string expected = "f4a7cbac5bee0fe56aa4ef9950a114a23acc8b2d59eb2e255e4b47e27873f0cd";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
@@ -1290,9 +1321,11 @@ public class SiteGeneratorAdapterTests : IDisposable
     private static bool IsCopiedAsset(string relativePath) =>
         KnownStaticAssets.TryGetValue(relativePath, out var vendored) && !vendored;
 
-    /// <summary>The one normalization a verbatim-copied asset still needs: this repo has no <c>.gitattributes</c>,
-    /// so a checked-out text asset is CRLF wherever <c>core.autocrlf=true</c> and LF everywhere else (including
-    /// every CI runner). Content, not checkout, is what the fingerprint pins.</summary>
+    /// <summary>The one normalization a verbatim-copied asset still needs. The repo now pins <c>eol=lf</c> in
+    /// <c>.gitattributes</c>, so a fresh checkout is LF on every platform — but this fold is deliberately KEPT:
+    /// a working tree predating that file (or written by a tool that ignores it) still carries CRLF, and
+    /// content, not checkout, is what the fingerprint pins. Removing it would make the golden hash depend on
+    /// how the tree happened to be checked out.</summary>
     private static string FoldLineEndings(string content) => content.Replace("\r\n", "\n");
 
     private static bool IsVendoredAsset(string relativePath) =>

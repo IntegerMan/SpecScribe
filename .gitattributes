@@ -1,0 +1,40 @@
+# Line endings are settled HERE rather than by each contributor's core.autocrlf.
+#
+# The INDEX was never the problem: 1188 of 1190 tracked files were already LF (the two
+# exceptions were auto-detected binaries). The split was created at CHECKOUT — Git for
+# Windows defaults to core.autocrlf=true, so the same commit materialized as CRLF on a
+# Windows working tree and LF on Linux.
+#
+# That split broke CI run 30320616634. A C# raw string literal keeps its SOURCE FILE's
+# line endings, so the "\n"-anchored string surgery in TestArtifactDerivationTests
+# silently matched nothing on the Windows runner while passing on the Ubuntu portability
+# probe. The test was made line-ending agnostic, but the underlying platform discrepancy
+# is what this file removes.
+#
+# `eol=lf` is the operative part, NOT a bare `text=auto`. A bare `text=auto` normalizes
+# the INDEX — which was already clean — and leaves the Windows/Linux WORKING-TREE split
+# exactly where it was, so it would not have prevented the failure above. `eol=lf` pins
+# the working tree to LF on every platform, making checkouts byte-identical everywhere.
+#
+# `text=auto` is still present so Git keeps running its binary detection: genuinely
+# binary content is never line-ending converted. This repo has no .bat/.cmd files, which
+# are the usual reason to carve out a CRLF exception.
+* text=auto eol=lf
+
+# Patches encode their own payload's line endings; rewriting them would corrupt the diff
+# they carry. Frozen verbatim, which is also how Git already treated this one.
+*.patch -text
+
+# Defensive binary guards. Nothing matching these is tracked today, but an image or font
+# added later must never be line-ending converted on the strength of a bad text sniff.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.zip binary
+*.vsix binary

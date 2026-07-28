@@ -292,6 +292,17 @@ body {
    override, same reason, as `.risk-grid-item[hidden]`, `.ownership-controls[hidden]` and `.ownership-legend[hidden]`
    below. [Story 20.5 review] */
 .ss-hierarchy-controls[hidden] { display: none; }
+
+/* The legend bar a dimension-bearing surface routes its own legend blocks through (Story 20.9 Task 1.6). Hidden
+   until a successful mount for the same reason the control bar is: a legend describes a CHART, and on these two
+   surfaces the chart only exists once the component draws it — with JS off the text twin carries the information
+   and a colour key for a picture nobody can see is chrome for nothing.
+   No `display` of its own, so `[hidden]`'s UA rule wins unopposed and the specificity trap above cannot recur
+   here; the blocks INSIDE it are the ones that carry `display: flex`, and each of those already ships its own
+   `[hidden]` override. */
+.ss-hierarchy-legends { margin: 0.4rem 0 0; }
+.ss-hierarchy-legends > * + * { margin-top: 0.25rem; }
+
 #dashboard-hierarchy-shape-sunburst:checked ~ .board-tabbar label[for="dashboard-hierarchy-shape-sunburst"],
 #dashboard-hierarchy-shape-treemap:checked ~ .board-tabbar label[for="dashboard-hierarchy-shape-treemap"] {
   background: var(--warm-white);
@@ -4262,14 +4273,13 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
    precomputed panels via pure CSS (round 2). [Story 7.6] */
 .codemap-panel .chart-lead { margin-top: 0; }
 
-/* The SVG scales to the panel width; on a very narrow screen the viewport scrolls internally (a last resort per
-   the overflow discipline) rather than forcing a horizontal PAGE scroll. */
-.codemap-viewport { overflow-x: auto; margin-top: 0.6rem; }
-.codemap { display: block; width: 100%; min-width: 320px; height: auto; }
-
-/* File cells: the sequential ramp fill (levels), a hairline boundary, and the shared focus ring. Levels reuse the
-   SAME values as the commit heatmap so the two sequential ramps can never desync. level-none = a file with no git
-   record (neutral, clearly "no data" — never the sole signal; the tooltip + text table carry the truth). */
+/* File-cell COLOUR. Story 20.9 retired the SVG these rules were written for, and KEPT them, because they are now
+   the component's colour SOURCE: `tokenFor` puts a node's class list on a throwaway probe and reads fill and
+   stroke back out of this cascade, so a token change still moves the chart and no colour value is ever typed into
+   the JS (AD-7). What went with the SVG is everything that was about drawing it — the viewport, the hover and
+   focus strokes, the `<a>` wrapper rules — none of which a Plotly sector has.
+   Levels reuse the SAME values as the commit heatmap so the two sequential ramps can never desync.
+   level-none = a file with no git record (neutral, clearly "no data" — never the sole signal). */
 .codemap-cell { stroke: var(--parchment); stroke-width: 0.5; transition: stroke 0.12s ease; }
 .codemap-cell.level-0 { fill: var(--parchment-dark); fill-opacity: 0.35; }
 .codemap-cell.level-1 { fill: #ecd18f; }
@@ -4292,22 +4302,6 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .codemap-cell.type-config { fill: var(--moss); }
 .codemap-cell.type-other-lang { fill: var(--violet); }
 .codemap-cell.type-other { fill: var(--parchment-dark); fill-opacity: 0.55; stroke-dasharray: 2 1; }
-.codemap-cell:hover { stroke: var(--rust); stroke-width: 1.5; }
-/* SVG focus: default outlines render unreliably around SVG rects, so express focus on the rect itself (teal, the
-   shared ring) — never outline:none without a visible replacement. Matches the heatmap/sunburst convention.
-   Linked cells put focus on the wrapping <a> (Tile pattern); :focus-within paints the same ring on the child rect. */
-.codemap-cell:focus-visible,
-.codemap a:focus-visible .codemap-cell { outline: none; stroke: var(--teal); stroke-width: 2; }
-.codemap a { cursor: pointer; }
-.codemap a:focus-visible { outline: none; }
-
-/* Directory boundaries: neutral guide-rule tone, transparent fill so the child cells read through — no text label
-   at any depth (identity lives in the tooltip card + text table). When the script makes a directory an activatable
-   zoom target it gains the same hover/focus affordance as a cell. */
-.codemap-dir { fill: none; stroke: var(--ink-light); stroke-width: 1; stroke-opacity: 0.5; }
-.codemap-dir[role="button"] { cursor: pointer; }
-.codemap-dir[role="button"]:hover { stroke: var(--rust); stroke-opacity: 1; }
-.codemap-dir:focus-visible { outline: none; stroke: var(--teal); stroke-width: 2; stroke-opacity: 1; }
 
 /* Colorize control (revealed by script; hidden in the no-JS page so no inert control ships). A <select> dropdown
    (round 2) rather than a radio group — six dimensions read better as one compact control than a six-item list. */
@@ -4350,8 +4344,6 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 #cm-exclude-spec:checked ~ #cm-exclude-tests:checked ~ .codemap-view[data-view="no-spec-no-tests"] {
   display: block;
 }
-.codemap-view-note { color: var(--ink-light); font-size: 0.8rem; margin: 0.5rem 0 0; }
-
 /* Legend — always visible (it explains the baked-in default colors). Same ramp tokens as the cells + heatmap. */
 .codemap-legend {
   display: flex;
@@ -4383,23 +4375,6 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .codemap-legend-swatch.type-config { background: var(--moss); }
 .codemap-legend-swatch.type-other-lang { background: var(--violet); }
 .codemap-legend-swatch.type-other { background: var(--parchment-dark); opacity: 0.55; }
-
-/* Drill breadcrumb (revealed by script). Reuses the button/crumb vocabulary; separators via ::before. */
-.codemap-drill { margin: 0.5rem 0 0.2rem; }
-.codemap-breadcrumb { list-style: none; display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; margin: 0; padding: 0; font-size: 0.8rem; }
-.codemap-breadcrumb li { display: flex; align-items: center; }
-.codemap-breadcrumb li + li::before { content: "\203A"; color: var(--ink-faded); margin-right: 0.25rem; }
-.codemap-crumb {
-  background: none;
-  border: 0;
-  color: var(--rust);
-  cursor: pointer;
-  padding: 0.1rem 0.2rem;
-  font: inherit;
-  border-radius: 3px;
-}
-.codemap-crumb:hover { text-decoration: underline; }
-.codemap-crumb[aria-current="true"] { color: var(--ink); cursor: default; text-decoration: none; }
 
 .codemap-notice { color: var(--ink-light); font-size: 0.85rem; margin: 0.6rem 0; }
 /* Story 7.9: demoted from the full-replacement notice pre-7.9 to a smaller supplementary line — the colorize
@@ -4435,28 +4410,12 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .codemap-table-pager-prev:disabled, .codemap-table-pager-next:disabled { color: var(--ink-faded); cursor: default; opacity: 0.5; }
 .codemap-table-pager-status { color: var(--ink-light); }
 
-/* ============ CODE MAP SHAPE TOGGLE + SUNBURST (code-map.html, Story 7.12 review) ============ */
-/* "View as: Treemap | Sunburst" — a panel-scoped clone of the sprint board's .board-tabs pure-CSS radio toggle.
-   Each of the four filter-combination panels renders its own copy with variant-suffixed ids, so :has() is
-   scoped to THIS .codemap-panel instance and a shared .cs-sunburst-radio marker class (rather than a per-variant
-   id list) picks the toggle state regardless of which variant it belongs to. Both shapes are colorized by the
-   SAME dropdown below the toggle (the "what to view" x "how to view it" pairing, owner feedback). */
-.codemap-panel .codemap-shape-tabs { display: flex; justify-content: center; margin-bottom: 0.6rem; }
-.codemap-shape-sunburst { display: none; }
-.codemap-panel:has(.cs-sunburst-radio:checked) .codemap-shape-treemap { display: none; }
-.codemap-panel:has(.cs-sunburst-radio:checked) .codemap-shape-sunburst { display: block; }
-
-/* The sunburst: a recursive angular partition (NOT the fixed 3-ring epic/story .sunburst) — the "how to view it"
-   sibling of the treemap. File wedges reuse the exact SAME .codemap-cell classes/fills the treemap's rects use
-   (level-0..4 ramp or type-* categorical), so the shared colorize-dropdown/JS recolor applies identically to
-   both shapes with no second color system. Directory wedges use their own neutral, non-zoomable class
-   (.codemap-dir-sunburst — distinct from .codemap-dir so the treemap's directory-zoom enhancement can never
-   mistake a wedge for a zoomable rect) with a faint parchment FILL (not none): a hollow annular sector reads as
-   a visual "hole" in a polar layout in a way an unfilled treemap rect (packed edge-to-edge against colored
-   siblings) never does, especially across this project's own deep, skinny directory tree. */
-.codemap-sunburst-wrap { display: flex; flex-direction: column; align-items: center; }
-.codemap-sunburst { display: block; width: 100%; max-width: 420px; height: auto; }
-.codemap-sunburst a:focus-visible .codemap-cell { outline: none; stroke: var(--teal); stroke-width: 2; }
+/* Directory nodes. Story 20.9 retired both Code Map SVGs — the treemap, its "View as" pure-CSS shape toggle and
+   the recursive angular partition that was its sibling — because the component draws both shapes from one
+   payload behind one selector. This rule survives them as a COLOUR SOURCE: a directory node paints from it
+   through the same probe every other family goes through. The `-sunburst` variant is the one kept rather than
+   `.codemap-dir`'s `fill: none`, because a Plotly sector is a filled shape, not a boundary rect drawn over its
+   children. */
 .codemap-dir-sunburst { fill: var(--parchment-dark); fill-opacity: 0.18; stroke: var(--ink-light); stroke-width: 1; stroke-opacity: 0.5; }
 
 /* ============ REFACTOR-TARGET RISK QUADRANT (risk-quadrant.html, Story 7.10) ============ */
@@ -6359,49 +6318,18 @@ body:has(main.req-detail) .doc-header {
 .ownership-controls select:focus-visible,
 .ownership-controls input:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
 
-/* Sunburst/Treemap view toggle (owner feedback): a panel-scoped clone of the sprint board's .board-tabs pure-CSS
-   radio toggle — mirrors Story 7.12's Code Freshness toggle exactly. Both views render from the SAME data, so
-   :has() just swaps which one is visible; the live JS mode switcher recolors both together (queries
-   .ownership-wedge and .ownership-cell as one set) so switching the toggle never shows a stale color mode. */
-.ownership-panel .board-tabs { display: flex; justify-content: center; margin-bottom: 0.6rem; }
-.ownership-view-treemap { display: none; }
-.ownership-panel:has(.ownership-treemap-radio:checked) .ownership-view-sunburst { display: none; }
-.ownership-panel:has(.ownership-treemap-radio:checked) .ownership-view-treemap { display: block; }
-/* The active tab's own pressed look (owner feedback: it wasn't clear which view was current) — the SAME
-   background/box-shadow the sprint board's/requirements panel's own .board-tabbar toggles already use. */
-#ownership-view-sunburst:checked ~ .board-tabbar label[for="ownership-view-sunburst"],
-#ownership-view-treemap:checked ~ .board-tabbar label[for="ownership-view-treemap"] {
-  background: var(--warm-white);
-  color: var(--ink);
-  box-shadow: 0 1px 3px var(--shadow);
-}
-#ownership-view-sunburst:focus-visible ~ .board-tabbar label[for="ownership-view-sunburst"],
-#ownership-view-treemap:focus-visible ~ .board-tabbar label[for="ownership-view-treemap"] { outline: 2px solid var(--teal); outline-offset: 2px; }
-
-.ownership-sunburst-wrap,
-.ownership-treemap-wrap { display: flex; flex-direction: column; align-items: center; }
-.ownership-sunburst { display: block; width: 100%; max-width: 420px; height: auto; }
-.ownership-treemap { display: block; width: 100%; max-width: 640px; height: auto; }
-.ownership-wedge,
-.ownership-cell { stroke: var(--parchment); stroke-width: 0.5; transition: stroke 0.12s ease; }
-.ownership-wedge.level-1,
-.ownership-cell.level-1 { fill: #ecd18f; }
-.ownership-wedge.level-2,
-.ownership-cell.level-2 { fill: #dfb455; }
-.ownership-wedge.level-3,
-.ownership-cell.level-3 { fill: var(--gold-light); }
-.ownership-wedge.level-4,
-.ownership-cell.level-4 { fill: var(--gold); }
-.ownership-wedge.level-none,
-.ownership-cell.level-none { fill: var(--parchment-dark); fill-opacity: 0.55; }
-.ownership-wedge:hover, .ownership-cell:hover,
-.ownership-wedge:focus-visible, .ownership-cell:focus-visible { outline: none; stroke: var(--rust); stroke-width: 1.5; }
-.ownership-sunburst a:focus-visible .ownership-wedge,
-.ownership-treemap a:focus-visible .ownership-cell { outline: none; stroke: var(--teal); stroke-width: 2; }
+/* Story 20.9 retired the Sunburst/Treemap pure-CSS view toggle and both server-rendered SVGs: the component
+   draws both shapes from ONE payload behind ONE selector, so there is no second view to swap to and no
+   `.ownership-cell` class family at all any more. What follows survives them as the COLOUR SOURCE the
+   component's probe resolves each node's class list against — a token change still moves the chart, and no
+   colour value is ever typed into the JS (AD-7). */
+.ownership-wedge { stroke: var(--parchment); stroke-width: 0.5; transition: stroke 0.12s ease; }
+.ownership-wedge.level-1 { fill: #ecd18f; }
+.ownership-wedge.level-2 { fill: #dfb455; }
+.ownership-wedge.level-3 { fill: var(--gold-light); }
+.ownership-wedge.level-4 { fill: var(--gold); }
+.ownership-wedge.level-none { fill: var(--parchment-dark); fill-opacity: 0.55; }
 .ownership-wedge-dir { fill: var(--parchment-dark); fill-opacity: 0.18; stroke: var(--ink-light); stroke-width: 1; stroke-opacity: 0.5; }
-/* Treemap directory rects sit edge-to-edge against colored siblings (unlike the sunburst's hollow-reading
-   annular gaps), so — matching .codemap-dir — they stay unfilled, not washed. */
-.ownership-cell-dir { fill: none; stroke: var(--ink-light); stroke-width: 1; stroke-opacity: 0.4; }
 
 /* Discrete top-author palette (JS-only mode): the SAME 7-hue categorical palette Story 7.9's file-type legend
    already established (owner feedback: author colors must draw from the one discrete color scheme this codebase
@@ -6409,14 +6337,14 @@ body:has(main.req-detail) .doc-header {
    markup/config/other-lang). Charts.OwnershipTopAuthorPaletteSize bounds the roster to exactly these 7 slots.
    "Other" (below the bounded top-N roster) reads honestly muted + dashed, matching the file-type legend's own
    overflow-bucket treatment (also identical). */
-.ownership-wedge.owner-author-0, .ownership-cell.owner-author-0 { fill: var(--teal-deep); }
-.ownership-wedge.owner-author-1, .ownership-cell.owner-author-1 { fill: var(--moss-light); }
-.ownership-wedge.owner-author-2, .ownership-cell.owner-author-2 { fill: var(--teal); }
-.ownership-wedge.owner-author-3, .ownership-cell.owner-author-3 { fill: var(--rust); }
-.ownership-wedge.owner-author-4, .ownership-cell.owner-author-4 { fill: var(--rust-light); }
-.ownership-wedge.owner-author-5, .ownership-cell.owner-author-5 { fill: var(--moss); }
-.ownership-wedge.owner-author-6, .ownership-cell.owner-author-6 { fill: var(--violet); }
-.ownership-wedge.owner-author-other, .ownership-cell.owner-author-other { fill: var(--parchment-dark); fill-opacity: 0.55; stroke-dasharray: 2 1; }
+.ownership-wedge.owner-author-0 { fill: var(--teal-deep); }
+.ownership-wedge.owner-author-1 { fill: var(--moss-light); }
+.ownership-wedge.owner-author-2 { fill: var(--teal); }
+.ownership-wedge.owner-author-3 { fill: var(--rust); }
+.ownership-wedge.owner-author-4 { fill: var(--rust-light); }
+.ownership-wedge.owner-author-5 { fill: var(--moss); }
+.ownership-wedge.owner-author-6 { fill: var(--violet); }
+.ownership-wedge.owner-author-other { fill: var(--parchment-dark); fill-opacity: 0.55; stroke-dasharray: 2 1; }
 
 /* Individual-author spotlight (JS-only mode, owner feedback): NOT a binary touched/not-touched flag — files the
    chosen contributor touched reuse the SAME level-1..4 fill ramp share-% mode uses (Charts.OwnershipSpotlightLegend),
@@ -6424,13 +6352,13 @@ body:has(main.req-detail) .doc-header {
    stroke so the highlighted set still reads clearly beyond hue alone (color is never the sole signal). Files
    they never touched stay the distinct muted owner-spotlight-off state — not a recency value, so it can't sit
    on the ramp. */
-.ownership-wedge.spotlight-touched, .ownership-cell.spotlight-touched { stroke: var(--ink); stroke-width: 1.2; }
-.ownership-wedge.owner-spotlight-off, .ownership-cell.owner-spotlight-off { fill: var(--parchment-dark); fill-opacity: 0.35; }
+.ownership-wedge.spotlight-touched { stroke: var(--ink); stroke-width: 1.2; }
+.ownership-wedge.owner-spotlight-off { fill: var(--parchment-dark); fill-opacity: 0.35; }
 
 /* Staleness mode (JS-only): a binary cutoff at the reader's chosen threshold, dashed stroke on the stale side
    so the flag is never color-only. */
-.ownership-wedge.owner-fresh, .ownership-cell.owner-fresh { fill: var(--moss-light); }
-.ownership-wedge.owner-stale, .ownership-cell.owner-stale { fill: var(--rust); stroke-dasharray: 2 1; }
+.ownership-wedge.owner-fresh { fill: var(--moss-light); }
+.ownership-wedge.owner-stale { fill: var(--rust); stroke-dasharray: 2 1; }
 
 /* ONE shared legend area below the toggle (not duplicated per view — colors mean the same thing in both charts).
    Four mode-specific blocks; the live JS mode switcher shows exactly one at a time (owner feedback: the visible

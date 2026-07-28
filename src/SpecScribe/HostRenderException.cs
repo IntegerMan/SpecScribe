@@ -66,7 +66,15 @@ public static class HostRenderExceptions
             + "visualization, never the information or the navigation. It is a SEQUENCING choice rather than a "
             + "technical limit: the Story 20.4 spike proved Plotly renders under the byte-verbatim shipped policy, "
             + "and the ADR 0005 CSP amendment that would let it load here lands ONCE, with Story 23.4 (ADR 0012 §5) "
-            + "— deliberately not twice. Owner decision D3, Story 20.7."),
+            + "— deliberately not twice. Owner decision D3, Story 20.7. "
+            + "EXTENDED BY STORY 20.9 to the two colorize-driven surfaces it converted, and one of them needs its "
+            + "own sentence: on git-insights.html the fallback is exactly as described above, the component's own "
+            + "text twin. On code-map.html the component emits NO twin (HierarchyTwinDisplay.External) because the "
+            + "surface already ships a richer one — its per-variant file table, which Story 20.6 D1 audited and "
+            + "kept, carrying every file's path, line count, type and six git metrics as real table cells with "
+            + "every path linked. So the picture is absent on both, the INFORMATION is present on both, and the "
+            + "thing carrying it differs by surface. Saying \"the Hierarchy Explorer's text twin\" alone would "
+            + "have been wrong for the Code Map."),
         new HostRenderException("spa", "mermaid",
             "The SPA swaps content regions via innerHTML, where an injected Mermaid init script never executes and "
             + "is not re-run across swaps, so the epics roadmap's <pre class=\"mermaid\"> degrades to readable "

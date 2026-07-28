@@ -15,20 +15,25 @@ namespace SpecScribe;
 /// The superseded wording claimed the default-mode chart "renders and works with JS off" and treated that as the
 /// surface's whole no-JS story. Under ADR 0013 the contract is a server-rendered <b>text twin</b>: JS-off may lose
 /// the visualization, but it must never lose the <b>information</b> or the <b>navigation</b>.
-/// <b>This page does not satisfy that contract today.</b> Story 20.6's audit measured it live with JavaScript
-/// disabled: the ownership charts carry 1,115 file nodes and 224 directory nodes, only 6 of those files are linked
-/// anywhere outside an <c>&lt;svg&gt;</c>, the page contains zero tables or lists enumerating them (Story 7.11
-/// deleted both prior ownership tables), the treemap emits no per-node <c>&lt;title&gt;</c> at all, and both charts
-/// are <c>role="img"</c> — which prunes their in-chart links from the accessibility tree. A non-visual or JS-off
-/// visitor receives two summary sentences and a colour legend.
-/// <b>Consequence: this surface KEEPS its server-rendered SVG.</b> Story 20.7 must not retire it until a twin
-/// exists. The per-surface verdict and the enumerated missing facts are in
-/// <c>_bmad-output/implementation-artifacts/20-6-text-twin-audit.md</c> (surface 6).</para>
-/// <para>JS adds the live mode selector (top contributors / individual-author spotlight / staleness threshold) —
-/// see <c>specscribe.js</c>'s <c>initOwnershipSunburst</c>. Author information stays descriptive attribution in
-/// every mode, never a cross-repo ranked scoreboard (FR-10). Outgoing file links are guarded on target existence
-/// via the <c>fileHref</c> resolver (Stories 7.1/7.4 seam): no resolver or no target → plain escaped text, never a
-/// dead link. [Story 3.8; Story 7.11 rewrite; Story 20.6 contract correction]</para></summary>
+/// <para>Story 20.6's audit (surface 6, in <c>20-6-text-twin-audit.md</c>) recorded this page as the one surface
+/// with <b>no twin at all</b>: 1,115 file nodes and 224 directory nodes, only 6 of those files linked anywhere
+/// outside an <c>&lt;svg&gt;</c>, zero tables or lists enumerating them (Story 7.11 deleted both prior ownership
+/// tables), no per-node <c>&lt;title&gt;</c> on the treemap, and both charts <c>role="img"</c> — which prunes
+/// their in-chart links from the accessibility tree.</para>
+/// <b>Story 20.9 satisfies the contract and only then retired the SVG</b>, in that order, because AC#3 states it:
+/// the ownership chart now renders through the ONE Hierarchy Explorer component, whose server-rendered
+/// <see cref="HierarchyExplorer.TextTwinHtml"/> enumerates EVERY node the chart draws — nested by directory, each
+/// file carrying its dominant author, share %, contributor count and last-active date as prose, and every file a
+/// real resolving link. It ships as a collapsed <c>&lt;details&gt;</c> (Story 20.6 D3's default), which needs no
+/// script to open. A per-directory rollup would have been shorter and more readable and was rejected: it would not
+/// enumerate every node, failing ADR 0013 §2's completeness predicate.</para>
+/// <para>JS adds the live dimension selector (dominant-author share / top contributors / individual-author
+/// spotlight / staleness threshold) through the component's dimension contract. Author information stays
+/// descriptive attribution in every mode, never a cross-repo ranked scoreboard (FR-10, ADR 0010 §4 — unaffected by
+/// rendering technology): the top-contributor roster is a bounded colour palette and the spotlight picker is the
+/// alphabetical union of every file's own contributors. Outgoing file links are guarded on target existence via
+/// the <c>fileHref</c> resolver (Stories 7.1/7.4 seam): no resolver or no target → a plain, focusable node, never a
+/// dead link. [Story 3.8; Story 7.11 rewrite; Story 20.6 contract correction; Story 20.9 conversion]</para></summary>
 public static class GitInsightsTemplater
 {
     public static string RenderPage(
@@ -74,29 +79,44 @@ public static class GitInsightsTemplater
 
         sb.Append("</main>\n\n");
         sb.Append(PathUtil.RenderFooter());
+        // The vendored plotly.js hierarchy engine — same seam and same terms as the Impact Map and the Code Map:
+        // this page builds its own document, so the AssetManifest flag never reaches it. Conditional on a host
+        // actually being present, so the solo-maintainer reframe and the no-file-data empty state both ship no
+        // engine they cannot use. [Story 20.9 Task 5]
+        if (HierarchyExplorer.ContainsHost(sb.ToString()))
+        {
+            sb.Append($"<script src=\"{prefix}{ForgeOptions.HierarchyEngineScriptName}\"></script>\n");
+        }
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
     }
 
-    /// <summary>Code ownership &amp; bus-factor (Story 7.11 rewrite — replaces the earlier files-and-contributors
-    /// master-detail table AND the earlier plain ranked ownership table; see this file's Change Log): a
-    /// whole-tree, interactive sunburst/treemap TOGGLE (owner feedback — mirrors Story 7.12's own Sunburst/
-    /// Treemap pure-CSS radio toggle) over EVERY source file (not a top-N subset — <paramref name="codeMap"/>
-    /// comes from the same uncapped <see cref="CodeMap.Build"/> walk the Code Map and Risk Quadrant pages use),
-    /// pre-colored server-side by dominant-author commit share % (ADR 0010 §2's "pre-rendered default mode" — a
-    /// reading ADR 0013 §4 supersedes: a rendered chart is no longer accepted AS the no-JS contract, see this
-    /// class's summary and Story 20.6's audit) with a
-    /// client-side mode selector for top contributors / an individual-author spotlight / a configurable staleness
-    /// threshold that recolors WHICHEVER view is toggled visible (<c>specscribe.js</c>'s
-    /// <c>initOwnershipSunburst</c> queries both <c>.ownership-wedge</c> and <c>.ownership-cell</c>). Every file
-    /// wedge/cell carries a rich hover card (<see cref="Charts.CodeOwnershipSunburst"/>'s <c>data-tip-html</c>,
-    /// owner feedback) in place of a plain tooltip. ONE shared legend area follows the toggle with all four
-    /// mode-specific blocks — the live switcher shows exactly one at a time so the legend can never disagree with
-    /// what's actually colored (owner feedback: colors and legend must always match up, including a "fresh"
-    /// swatch for staleness mode, which was previously missing). No separate accessible text-equivalent table
-    /// ships here (owner feedback: removed entirely — the two chart forms plus their rich per-file tooltips are
-    /// the surface now). In a solo-maintainer repo (<c>insights.ContributorCount == 1</c>) every mode would
-    /// trivially read "one person, everywhere", so the section reframes honestly instead (AC #4, NFR8).</summary>
+    /// <summary>Code ownership &amp; bus-factor: ONE Hierarchy Explorer instance over EVERY source file (not a
+    /// top-N subset — <paramref name="codeMap"/> comes from the same uncapped <see cref="CodeMap.Build"/> walk the
+    /// Code Map and Risk Quadrant pages use), drawing both shapes from one
+    /// <see cref="HierarchyExplorer.ProjectOwnership"/> payload behind the component's standard selector.
+    ///
+    /// <para><b>Story 20.9 replaced two server-rendered SVGs and a pure-CSS view toggle with that one instance</b>
+    /// (Story 7.11's <c>CodeOwnershipSunburst</c> + <c>CodeOwnershipTreemap</c>, and 20.6's finding that this page
+    /// had no text twin at all). The four live modes — dominant-author share, top contributors, an
+    /// individual-author spotlight, and a configurable staleness threshold — are now DECLARED as dimensions
+    /// (<see cref="HierarchyExplorer.OwnershipDimensions"/>) and resolved by the shared component, rather than
+    /// implemented as four bespoke recolour functions that each knew this page's vocabulary. Two of them cannot be
+    /// precomputed at all (owner decision D1): the spotlight takes an arbitrary contributor and staleness a free
+    /// 1–60 month threshold, which is exactly why the payload carries each file's RAW generation-time values.</para>
+    ///
+    /// <para>Every file node carries the rich <c>.codemap-card</c> hover card
+    /// (<see cref="Charts.BuildOwnershipCard"/>) the shipped wedges did — Story 20.5 made <c>.ss-tooltip</c> +
+    /// <c>data-tip-html</c> the one tooltip system site-wide precisely so swapping the drawing engine never swaps
+    /// the tooltip's look. ONE shared legend area carries all four mode-specific blocks, routed through the
+    /// component's framing block; it shows exactly one at a time so the visible legend can never disagree with
+    /// what is coloured (owner feedback), and it is hidden until a successful mount because a colour key for a
+    /// chart that never renders is chrome for nothing.</para>
+    ///
+    /// <para>In a solo-maintainer repo every mode would trivially read "one person, everywhere", so the section
+    /// reframes honestly instead of flagging every file as a bus-factor risk (AC #4, NFR8). That gate reads the
+    /// <paramref name="codeMap"/>'s OWN contributor population rather than <c>insights.ContributorCount</c>, which
+    /// counts authors across all commits repo-wide — the two can legitimately diverge.</para></summary>
     private static void AppendOwnershipSection(
         StringBuilder sb,
         GitInsightsData insights,
@@ -142,67 +162,107 @@ public static class GitInsightsTemplater
             return;
         }
 
-        sb.Append("  <div class=\"chart-panel ownership-panel\">\n");
+        // Mode selector + contextual controls. They ride INSIDE the component's own hidden control bar, so they
+        // inherit its reveal-on-successful-mount handshake rather than carrying a second one — a no-JS visitor
+        // never sees an inert control either way. `data-hierarchy-dimension` publishes which dimension is active;
+        // the two `data-hierarchy-arg` inputs are the runtime arguments for the two dimensions owner decision D1
+        // says cannot be precomputed. The contributor list is populated by the component from the ALPHABETICAL
+        // UNION of every node's own roster — never a top-N ranking (FR-10).
+        var controls = new StringBuilder();
+        controls.Append("    <div class=\"ownership-controls\">\n");
+        controls.Append("      <label class=\"ownership-controls-label\">Color by\n");
+        controls.Append("        <select class=\"ownership-mode-select\" data-hierarchy-dimension aria-label=\"Color the ownership chart by\">\n");
+        controls.Append("          <option value=\"share\" selected>Dominant-author share</option>\n");
+        controls.Append("          <option value=\"top\">Top contributors</option>\n");
+        controls.Append("          <option value=\"spotlight\">One contributor's work</option>\n");
+        controls.Append("          <option value=\"staleness\">Staleness (no current contributor)</option>\n");
+        controls.Append("        </select>\n      </label>\n");
+        controls.Append($"      <label class=\"ownership-author-wrap\" data-hierarchy-arg-wrap=\"{HierarchyDimensionArg.Roster}\" hidden>Contributor\n");
+        controls.Append($"        <select class=\"ownership-author-select\" data-hierarchy-arg=\"{HierarchyDimensionArg.Roster}\" aria-label=\"Spotlight a contributor\"></select>\n");
+        controls.Append("      </label>\n");
+        controls.Append($"      <label class=\"ownership-threshold-wrap\" data-hierarchy-arg-wrap=\"{HierarchyDimensionArg.Threshold}\" hidden>Stale after (months)\n");
+        controls.Append($"        <input type=\"number\" class=\"ownership-threshold-input\" data-hierarchy-arg=\"{HierarchyDimensionArg.Threshold}\" min=\"1\" max=\"60\" value=\"6\">\n");
+        controls.Append("      </label>\n");
+        controls.Append("    </div>\n");
 
-        // Mode selector + contextual controls: hidden in the server HTML so no-JS never ships an inert control
-        // (mirrors the Code Map colorize dropdown's own reveal-on-enhance pattern), populated/wired by
-        // specscribe.js's initOwnershipSunburst (ADR 0010, Story 7.11 Task 4).
-        sb.Append("    <div class=\"ownership-controls\" hidden>\n");
-        sb.Append("      <label class=\"ownership-controls-label\">Color by\n");
-        sb.Append("        <select class=\"ownership-mode-select\" aria-label=\"Color the ownership sunburst by\">\n");
-        sb.Append("          <option value=\"share\" selected>Dominant-author share</option>\n");
-        sb.Append("          <option value=\"top\">Top contributors</option>\n");
-        sb.Append("          <option value=\"spotlight\">One contributor's work</option>\n");
-        sb.Append("          <option value=\"staleness\">Staleness (no current contributor)</option>\n");
-        sb.Append("        </select>\n      </label>\n");
-        sb.Append("      <label class=\"ownership-author-wrap\" hidden>Contributor\n");
-        sb.Append("        <select class=\"ownership-author-select\" aria-label=\"Spotlight a contributor\"></select>\n");
-        sb.Append("      </label>\n");
-        sb.Append("      <label class=\"ownership-threshold-wrap\" hidden>Stale after (months)\n");
-        sb.Append("        <input type=\"number\" class=\"ownership-threshold-input\" min=\"1\" max=\"60\" value=\"6\">\n");
-        sb.Append("      </label>\n");
-        sb.Append("    </div>\n");
+        // ONE shared legend area, four mode-specific blocks — ROUTED through the component's framing block rather
+        // than rewritten (Story 20.9 Task 1.6). The component shows exactly the one the active dimension owns, so
+        // the visible legend can never disagree with what is coloured. The bar is hidden until a successful mount:
+        // with JS off this page now has no chart at all, and a legend for a chart nobody can see is chrome for
+        // nothing — the twin below is what carries the information.
+        var legend = new StringBuilder();
+        legend.Append("    <div class=\"ss-hierarchy-legends\" hidden>\n");
+        legend.Append(Charts.OwnershipLegend(files, " data-hierarchy-legend=\"share\""));
+        legend.Append(Charts.OwnershipTopAuthorsLegend(topAuthors, " data-hierarchy-legend=\"top\""));
+        legend.Append(Charts.OwnershipSpotlightLegend(" data-hierarchy-legend=\"spotlight\""));
+        legend.Append(Charts.OwnershipStalenessLegend(" data-hierarchy-legend=\"staleness\""));
+        legend.Append("    </div>\n");
 
-        // Sunburst/Treemap view toggle: a pure-CSS radio pair mirroring the sprint board's .board-tabs component
-        // and Story 7.12's own Code Freshness toggle exactly — both views render from the SAME codeMap/topAuthors
-        // so either is instantly available with no re-fetch, and the live mode switcher recolors both together.
-        // The active tab carries a visible pressed state (owner feedback: it wasn't clear which view was current).
-        sb.Append("    <div class=\"board-tabs\">\n");
-        sb.Append("      <input type=\"radio\" id=\"ownership-view-sunburst\" name=\"ownership-view\" class=\"board-tab-radio\" checked>\n");
-        sb.Append("      <input type=\"radio\" id=\"ownership-view-treemap\" name=\"ownership-view\" class=\"board-tab-radio ownership-treemap-radio\">\n");
-        sb.Append("      <div class=\"board-tabbar\">\n");
-        sb.Append("        <label for=\"ownership-view-sunburst\" class=\"board-tab\">Sunburst</label>\n");
-        sb.Append("        <label for=\"ownership-view-treemap\" class=\"board-tab\">Treemap</label>\n");
-        sb.Append("      </div>\n");
-        sb.Append("    </div>\n");
-
-        // Detail cap (same MaxDetailedCodeMapFiles discipline the Code Map treemap already applies, [Review][Patch]
-        // 2026-07-22): computed once here from the SAME file list both views render from (already fetched above
-        // for the solo-repo gate), so the sunburst and the treemap can never disagree on which files get the rich
-        // hover card past the cap.
+        // Detail cap (the same MaxDetailedCodeMapFiles discipline the Code Map applies, [Review][Patch]
+        // 2026-07-22): computed once here from the SAME file list the chart renders from, so a large repo cannot
+        // reintroduce the per-node HTML bloat that cap exists to prevent.
         var detailedFiles = Charts.SelectDetailedCodeMapFiles(files, codeMap.FileCount);
 
-        sb.Append("    <div class=\"ownership-view ownership-view-sunburst\">\n");
-        sb.Append("      <div class=\"ownership-sunburst-wrap\">\n");
-        sb.Append("        ").Append(Charts.CodeOwnershipSunburst(codeMap.Roots, topAuthors, fileHref: fileHref, detailedFiles: detailedFiles));
-        sb.Append("      </div>\n");
-        sb.Append("    </div>\n");
-        sb.Append("    <div class=\"ownership-view ownership-view-treemap\">\n");
-        sb.Append("      <div class=\"ownership-treemap-wrap\">\n");
-        sb.Append("        ").Append(Charts.CodeOwnershipTreemap(codeMap.Layout(), topAuthors, fileHref: fileHref, detailedFiles: detailedFiles));
-        sb.Append("      </div>\n");
-        sb.Append("    </div>\n");
+        // The panel-wide constants (Task 1.2). `asof` is the tree's most-recent commit day — the staleness and
+        // spotlight rules' fixed "now", generation-time computed, NEVER wall-clock (FR31).
+        var constants = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [HierarchyExplorer.ConstantTopAuthors] = Charts.BuildTopAuthorsJson(topAuthors),
+        };
+        if (MostRecentCommitDay(files) is { } asOf)
+        {
+            constants[HierarchyExplorer.ConstantAsOf] = asOf.DayNumber.ToString(CultureInfo.InvariantCulture);
+        }
 
-        // ONE shared legend area (not duplicated per view — the colors mean the same thing in both charts):
-        // four mode-specific blocks, the live switcher shows exactly one so the visible legend can never
-        // disagree with what's actually colored (owner feedback).
-        sb.Append(Charts.OwnershipLegend(files));
-        sb.Append(Charts.OwnershipTopAuthorsLegend(topAuthors));
-        sb.Append(Charts.OwnershipSpotlightLegend());
-        sb.Append(Charts.OwnershipStalenessLegend());
+        var config = new HierarchyExplorerConfig(
+            DomId: "ownership-explorer",
+            // Story 20.7 D2: selector ordering is fixed site-wide, the DEFAULT shape stays per-instance. This
+            // surface's shipped default was the sunburst.
+            Shape: "sunburst",
+            Mode: HierarchyMode.Navigate,
+            HashKey: "own",
+            Size: OwnershipExplorerSize,
+            Labels: true,
+            Meta: new Charts.ChartMeta(
+                "Ownership by file",
+                Window: $"{codeMap.FileCount:N0} {Charts.Plural(codeMap.FileCount, "file", "files")} · {codeMapContributorCount:N0} {Charts.Plural(codeMapContributorCount, "contributor", "contributors")}"),
+            // Owner decision D3: the component's own generic nested twin. NOT a per-directory rollup — that would
+            // be shorter and more readable but would not enumerate every node the chart draws, failing ADR 0013
+            // §2's completeness predicate, which is the entire reason this twin exists. And NOT a restored ranked
+            // table: Story 7.11 deleted both prior ownership tables on owner feedback, and this does not
+            // re-litigate that.
+            TwinDisplay: HierarchyTwinDisplay.Details,
+            Dimensions: HierarchyExplorer.OwnershipDimensions(),
+            Constants: constants);
 
-        sb.Append("  </div>\n");
+        var model = HierarchyExplorer.ProjectOwnership(
+            codeMap.Roots, topAuthors, config, fileHref, detailedFiles);
+
+        sb.Append(HierarchyExplorer.Render(
+            model, "chart-panel ownership-panel", " data-explorer", controls.ToString(), legend.ToString()));
+
         sb.Append("</section>\n\n");
+    }
+
+    /// <summary>The explorer's configured size — applied by the component as a HEIGHT capped to its own width.
+    /// The retired SVG's 480 was a genuine square for a chart that neither labelled nor drilled; raised modestly
+    /// because in-sector labels need room, and verified live rather than ported on faith (Story 20.9 F5,
+    /// Open Question #3).</summary>
+    private const int OwnershipExplorerSize = 560;
+
+    /// <summary>The whole-tree "as of" day: the most recent commit date across every file in the map. This is the
+    /// staleness and spotlight rules' fixed "now", exactly as the retired SVG root's <c>data-asof</c> was — a
+    /// generation-time value, never wall-clock, so a regenerated portal colours a file the same way tomorrow as it
+    /// did today (FR31).</summary>
+    private static DateOnly? MostRecentCommitDay(IReadOnlyList<CodeMapNode> files)
+    {
+        DateOnly? most = null;
+        foreach (var f in files)
+        {
+            if (f.Metrics?.LastDate is not { } d) continue;
+            if (most is null || d > most) most = d;
+        }
+        return most;
     }
 
     /// <summary>Activity over time — the existing accessible commit heatmap, reused rather than a parallel

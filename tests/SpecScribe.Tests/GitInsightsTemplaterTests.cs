@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using SpecScribe;
 
 namespace SpecScribe.Tests;
@@ -9,6 +10,26 @@ namespace SpecScribe.Tests;
 /// reframe, and friendly empty states.</summary>
 public class GitInsightsTemplaterTests
 {
+    /// <summary>The rendered island's JSON body — Story 20.9 moved every per-file fact this page asserts out of
+    /// 1,420 elements' `data-*` attributes and into one payload, so the assertions moved with them.</summary>
+    private static string Island(string html)
+    {
+        var m = Regex.Match(html, "<script type=\"application/json\" class=\"ss-hierarchy-data\"[^>]*>(?<j>.*?)</script>", RegexOptions.Singleline);
+        Assert.True(m.Success, "expected a Hierarchy Explorer island on this page");
+        return m.Groups["j"].Value;
+    }
+
+    /// <summary>Every charted file's own `path` metric, read back through a real JSON parse - so a test that
+    /// claims the payload round-trips is actually parsing it rather than pattern-matching the text.</summary>
+    private static List<string?> IslandPaths(string html)
+    {
+        using var doc = System.Text.Json.JsonDocument.Parse(Island(html));
+        return doc.RootElement.GetProperty("nodes").EnumerateArray()
+            .Where(n => n.TryGetProperty("metrics", out _))
+            .Select(n => n.GetProperty("metrics").GetProperty("path").GetString())
+            .ToList();
+    }
+
     private static SiteNav Nav() =>
         SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
@@ -118,12 +139,17 @@ public class GitInsightsTemplaterTests
     }
 
     [Fact]
-    public void RenderPage_RendersTheWholeTreeSunburstAndItsRealValueLegend()
+    public void RenderPage_RendersTheWholeTreeExplorerAndItsRealValueLegend()
     {
+        // Story 20.9: the hand-rolled SVG is gone; the chart is the ONE Hierarchy Explorer over a
+        // ProjectOwnership payload. The FACT this test has always asserted — the whole tree is charted, and its
+        // legend prints real share ranges rather than a "Less ... More" placeholder — is unchanged and just moved.
         var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
 
-        Assert.Contains("<svg class=\"ownership-sunburst\"", html);
-        Assert.Contains("ownership-wedge", html);
+        Assert.Contains(HierarchyExplorer.HostMarker, html);
+        Assert.Contains("ss-hierarchy-data", html);
+        Assert.DoesNotContain("<svg class=\"ownership-sunburst\"", html);
+        Assert.DoesNotContain("<svg class=\"ownership-treemap\"", html);
         // Real-value legend (Story 10.2) — never the literal "Less … More" placeholder.
         Assert.Contains("ownership-legend", html);
         Assert.Contains("76–100%", html);
@@ -132,38 +158,106 @@ public class GitInsightsTemplaterTests
     }
 
     [Fact]
-    public void RenderPage_OwnershipHasASunburstTreemapToggleNotAThirdStackedView()
+    public void RenderPage_OwnershipIsOneInstanceWithTheStandardSelector_NotTwoStackedCharts()
     {
-        // Owner feedback: sunburst OR treemap via a toggle (mirroring Story 7.12's own Code Freshness toggle) —
-        // not the sunburst with a permanently-visible text tree stacked below it.
+        // Owner feedback (Story 7.11): sunburst OR treemap behind a toggle, never both stacked. Story 20.9 keeps
+        // the affordance and deletes the mechanism: TWO server-rendered SVGs behind a pure-CSS `display:none`
+        // pair become ONE instance whose selector re-types the trace in place. That collapse is the real shape of
+        // the conversion, so it is asserted rather than merely described.
         var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
 
-        Assert.Contains("<div class=\"board-tabs\">", html);
-        Assert.Contains("id=\"ownership-view-sunburst\"", html);
-        Assert.Contains("id=\"ownership-view-treemap\"", html);
-        Assert.Contains("<label for=\"ownership-view-sunburst\" class=\"board-tab\">Sunburst</label>", html);
-        Assert.Contains("<label for=\"ownership-view-treemap\" class=\"board-tab\">Treemap</label>", html);
-        Assert.Contains("<div class=\"ownership-view ownership-view-sunburst\">", html);
-        Assert.Contains("<div class=\"ownership-view ownership-view-treemap\">", html);
-        Assert.Contains("<svg class=\"ownership-treemap\"", html);
-        Assert.Contains("ownership-cell", html);
+        Assert.Single(Regex.Matches(html, Regex.Escape(HierarchyExplorer.HostMarker + "></div>")));
+        Assert.Single(Regex.Matches(html, "ss-hierarchy-data"));
+
+        // The component's own selector, ordered Sunburst-then-Treemap site-wide (Story 20.7 D2), with THIS
+        // surface's shipped default shape preserved.
+        Assert.Contains("class=\"board-tab-radio ss-hierarchy-shape\" value=\"sunburst\" checked", html);
+        Assert.Contains("class=\"board-tab-radio ss-hierarchy-shape\" value=\"treemap\"", html);
+
+        // The retired pure-CSS view toggle and its two hidden view wrappers are gone by name.
+        Assert.DoesNotContain("ownership-view-sunburst", html);
+        Assert.DoesNotContain("ownership-view-treemap", html);
+        Assert.DoesNotContain("ownership-cell", html);
     }
 
     [Fact]
-    public void RenderPage_SunburstEmbedsGenerationTimeDataForTheLiveModeSwitcher()
+    public void RenderPage_EmbedsTheSameGenerationTimeDataTheRetiredSvgCarried()
     {
+        // ADR 0010 3 / ADR 0012 7: every mode's data is computed ONCE at generation time and embedded — nothing
+        // re-derives from live git state or wall-clock `now`. The values are identical to the `data-*` the retired
+        // SVG wrote (they were LIFTED, not re-derived); only their carrier changed, from attributes on 1,420
+        // elements to one JSON island. Same numbers, same units, so no dimension can silently re-bucket.
+        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
+        var island = Island(html);
+
+        Assert.Contains("\"share\":\"78\"", island);   // Charts.cs: Alice 7/9 -> 78%
+        Assert.Contains("\"share\":\"100\"", island);  // HtmlTemplater.cs: Bob 4/4 -> 100%
+        Assert.Contains("\"dominant\":\"Alice\"", island);
+        Assert.Contains("\"dominant\":\"Bob\"", island);
+        Assert.Contains("\"contributors\":\"2\"", island);
+        Assert.Contains("\"owner\":", island);
+
+        // Panel-wide, so they live on the config rather than being repeated on every node.
+        Assert.Contains("\"" + HierarchyExplorer.ConstantTopAuthors + "\":", island);
+        Assert.Contains("\"" + HierarchyExplorer.ConstantAsOf + "\":", island);
+    }
+
+    [Fact]
+    public void RenderPage_DeclaresTheFourOwnershipDimensions_WithTheShippedRulesIntact()
+    {
+        // AC#1: a surface may offer several dimensions and switching one re-colours in place. The rules ported
+        // here are the ones whose arithmetic must NOT drift — share's fixed 25/50/75 cut points and the
+        // spotlight's 30/90/180-day recency boundaries were both deliberate "meaningful on their own scale, never
+        // a moving target" decisions, and re-deriving either would recolour every repo's chart.
+        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
+        var island = Island(html);
+
+        foreach (var key in new[] { "share", "top", "spotlight", "staleness" })
+        {
+            Assert.Contains("\"key\":\"" + key + "\"", island);
+        }
+
+        Assert.Contains("\"cutoffs\":[25,50,75]", island);
+        Assert.Contains("\"cutoffs\":[30,90,180]", island);
+
+        // The two dimensions owner decision D1 says cannot be precomputed declare the runtime control they take.
+        Assert.Contains("\"arg\":\"" + HierarchyDimensionArg.Roster + "\"", island);
+        Assert.Contains("\"arg\":\"" + HierarchyDimensionArg.Threshold + "\"", island);
+
+        // The honest wording is DATA, ported verbatim — the softened spotlight-absence phrasing especially, which
+        // must never harden back into the stronger and sometimes-false "has not worked on this file".
+        Assert.Contains("most-active tracked contributors", island);
+        Assert.Contains("(date unknown)", island);
+        Assert.DoesNotContain("has not worked on this file", island);
+    }
+
+    [Fact]
+    public void RenderPage_BuildsTheTextTwinThisSurfaceHasNeverHad()
+    {
+        // AC#3 and the reason it exists: Story 20.6's audit recorded this page as the one surface with NO twin at
+        // all, because Story 7.11 deleted both prior ownership tables on owner feedback. Owner decision D3 gives
+        // it the component's generic nested twin — every node the chart draws, nested by directory, each file
+        // carrying its ownership facts as PROSE and a real resolving link.
+        //
+        // The completeness predicate is a SET match, not a count (Story 20.6 Task 1.3b): every file the payload
+        // charts has to appear in the twin, not merely the same NUMBER of things.
         var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
 
-        // ADR 0010 Task 4: every mode's data is embedded once at generation time — share/dominant/contributors/
-        // last/owner per wedge, plus the bounded top-author roster and the whole-tree "as of" day on the SVG root.
-        Assert.Contains("data-share=\"78\"", html); // Charts.cs: Alice 7/9 -> 78%
-        Assert.Contains("data-share=\"100\"", html); // HtmlTemplater.cs: Bob 4/4 -> 100%
-        Assert.Contains("data-dominant=\"Alice\"", html);
-        Assert.Contains("data-dominant=\"Bob\"", html);
-        Assert.Contains("data-contributors=\"2\"", html);
-        Assert.Contains("data-owner=", html);
-        Assert.Contains("data-top-authors=", html);
-        Assert.Contains("data-asof=", html);
+        Assert.Contains("<details class=\"ss-hierarchy-twin\"", html);
+        var twin = html[html.IndexOf("<details class=\"ss-hierarchy-twin\"", StringComparison.Ordinal)..];
+
+        var charted = Regex.Matches(Island(html), "\"kind\":\"file\"").Count;
+        Assert.True(charted > 0, "fixture must chart at least one file");
+
+        foreach (Match m in Regex.Matches(Island(html), "\"path\":\"(?<p>[^\"]+)\""))
+        {
+            Assert.Contains(m.Groups["p"].Value, twin, StringComparison.Ordinal);
+        }
+
+        // Prose, not colour: the dominant author, the share %, the contributor count.
+        Assert.Contains("Alice", twin, StringComparison.Ordinal);
+        Assert.Contains("78% share", twin, StringComparison.Ordinal);
+        Assert.Contains("contributor", twin, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -171,11 +265,18 @@ public class GitInsightsTemplaterTests
     {
         var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
 
-        // NFR-5/ADR 0010: no inert control ships in the no-JS page — specscribe.js reveals it.
-        Assert.Contains("<div class=\"ownership-controls\" hidden>", html);
+        // NFR-5 / ADR 0013: no inert control ships in the no-JS page. Story 20.9 moved these INSIDE the
+        // component's own hidden control bar rather than giving them a second reveal of their own, so the
+        // guarantee now comes from one place for every surface. Two nested `hidden` layers would have left the
+        // select invisible after a successful mount, so the inner one is deliberately gone.
+        Assert.Contains("<div class=\"ss-hierarchy-controls\" hidden>", html);
         Assert.Contains("ownership-mode-select", html);
-        Assert.Contains("<label class=\"ownership-author-wrap\" hidden>", html);
-        Assert.Contains("<label class=\"ownership-threshold-wrap\" hidden>", html);
+        Assert.Contains("data-hierarchy-dimension", html);
+        Assert.Contains("data-hierarchy-arg-wrap=\"" + HierarchyDimensionArg.Roster + "\" hidden>", html);
+        Assert.Contains("data-hierarchy-arg-wrap=\"" + HierarchyDimensionArg.Threshold + "\" hidden>", html);
+
+        // The legend bar too: a colour key for a chart that never renders is chrome for nothing.
+        Assert.Contains("<div class=\"ss-hierarchy-legends\" hidden>", html);
     }
 
     [Fact]
@@ -197,12 +298,15 @@ public class GitInsightsTemplaterTests
         // card BuildTreemapCard/RiskQuadrant already established, not a bare native <title>.
         var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
 
-        Assert.Contains("js-tip", html);
-        Assert.Contains("data-tip-html=", html);
-        Assert.Contains("codemap-card", html);
-        Assert.Contains("Dominant author", html);
-        Assert.Contains("Alice (78%)", html);
-        Assert.Contains("By commits", html);
+        // Story 20.9: the card survives the engine swap verbatim — Story 20.5 made `.ss-tooltip` +
+        // `data-tip-html` the ONE tooltip system site-wide precisely so swapping the renderer never swaps the
+        // tooltip's look. It now rides in the payload as a JSON string instead of a doubly-escaped attribute.
+        var island = Island(html);
+        Assert.Contains("\"tip\":", island);
+        Assert.Contains("codemap-card", island);
+        Assert.Contains("Dominant author", island);
+        Assert.Contains("Alice (78%)", island);
+        Assert.Contains("By commits", island);
     }
 
     [Fact]
@@ -213,10 +317,13 @@ public class GitInsightsTemplaterTests
         // Only the share-% block is visible without JS; the rest ship hidden (their mode selector is too).
         var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
 
-        Assert.Contains("class=\"ownership-legend ownership-legend-share\">", html);
-        Assert.Contains("class=\"ownership-legend ownership-legend-top\" hidden>", html);
-        Assert.Contains("class=\"ownership-legend ownership-legend-spotlight\" hidden>", html);
-        Assert.Contains("class=\"ownership-legend ownership-legend-staleness\" hidden>", html);
+        // Story 20.9 ROUTES these four through the component's framing block rather than rewriting them, and
+        // adds the marker that pairs each with the dimension that owns it — so "exactly one visible" became a
+        // property of the shared component rather than a per-surface loop.
+        Assert.Contains("class=\"ownership-legend ownership-legend-share\" data-hierarchy-legend=\"share\">", html);
+        Assert.Contains("class=\"ownership-legend ownership-legend-top\" hidden data-hierarchy-legend=\"top\">", html);
+        Assert.Contains("class=\"ownership-legend ownership-legend-spotlight\" hidden data-hierarchy-legend=\"spotlight\">", html);
+        Assert.Contains("class=\"ownership-legend ownership-legend-staleness\" hidden data-hierarchy-legend=\"staleness\">", html);
         // The staleness legend's own "fresh" swatch — previously missing from every legend (owner feedback).
         Assert.Contains("ownership-legend-swatch owner-fresh", html);
         Assert.Contains("Touched within the threshold", html);
@@ -277,10 +384,57 @@ public class GitInsightsTemplaterTests
 
         var html = GitInsightsTemplater.RenderPage(insights, null, Nav(), codeMap, Array.Empty<string>());
 
-        Assert.Contains("src/&lt;weird&gt; &amp; &quot;odd&quot;.cs", html);
-        Assert.Contains("&lt;b&gt;Eve&lt;/b&gt; &amp; Co", html);
-        Assert.DoesNotContain("<weird>", html);
-        Assert.DoesNotContain("<b>Eve</b>", html);
+        // The VISIBLE half - the text twin and every other rendered string - is HTML-escaped exactly as before.
+        var visible = html.Replace(Island(html), string.Empty, StringComparison.Ordinal);
+        Assert.Contains("src/&lt;weird&gt; &amp; &quot;odd&quot;.cs", visible);
+        Assert.Contains("&lt;b&gt;Eve&lt;/b&gt; &amp; Co", visible);
+        Assert.DoesNotContain("<weird>", visible);
+        Assert.DoesNotContain("<b>Eve</b>", visible);
+
+        // The ISLAND half is a different contract, and Story 20.9 changed it deliberately, so it is asserted
+        // rather than assumed. The payload is JSON inside `<script type="application/json">`, i.e. RAW TEXT: a
+        // bare `<` is not markup there, and escaping every one to a six-byte unicode sequence cost 2.8 MB on
+        // code-map.html for no safety at all. What DOES matter is that the payload can never end or re-frame its
+        // own element, so the two sequences that can - `</` and `<!` - are neutralized, and nothing else is.
+        var island = Island(html);
+        Assert.DoesNotContain("</", island, StringComparison.Ordinal);
+        Assert.DoesNotContain("<!", island, StringComparison.Ordinal);
+
+        // And it still round-trips: a consumer gets the ORIGINAL characters back, so neutralizing is not lossy.
+        Assert.Contains("src/<weird> & \"odd\".cs", IslandPaths(html));
+    }
+
+    [Fact]
+    public void RenderPage_APathThatLooksLikeAClosingScriptTag_CannotBreakOutOfTheIsland()
+    {
+        // The hostile case for the encoder change above, given its own test because "it happens not to occur in
+        // this fixture" is not the same as "it cannot occur". A repo may legally contain a path with `</script`
+        // in it, and if it did, the island would end early and the remainder of the payload would land in the
+        // document as live markup.
+        var evil = "src/</script><img src=x onerror=alert(1)>/<!--x.cs";
+        var codeMap = CodeMap.Build(
+            new (string, long)[] { (evil, 10) },
+            new Dictionary<string, CodeFileMetrics>
+            {
+                [evil] = new CodeFileMetrics(1, 10, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 1),
+                    Contributors: new[]
+                    {
+                        new FileContributor("A", 1, new DateOnly(2026, 7, 1)),
+                        new FileContributor("B", 1, new DateOnly(2026, 6, 1)),
+                    }, TotalContributors: 2),
+            });
+        var insights = new GitInsightsData(
+            Files: Array.Empty<FileChangeStat>(), Activity: Array.Empty<(DateOnly, int)>(),
+            CommitCount: 1, ContributorCount: 2, TotalFilesTouched: 1);
+
+        var html = GitInsightsTemplater.RenderPage(insights, null, Nav(), codeMap, Array.Empty<string>());
+        var island = Island(html);
+
+        // Neither sequence survives anywhere in the payload, so the element cannot be closed or re-framed...
+        Assert.DoesNotContain("</", island, StringComparison.Ordinal);
+        Assert.DoesNotContain("<!", island, StringComparison.Ordinal);
+        // ...and the value is still recoverable in full, character for character.
+        Assert.Contains(evil, IslandPaths(html));
     }
 
     [Fact]
@@ -329,7 +483,7 @@ public class GitInsightsTemplaterTests
         Assert.Contains("Single-maintainer project", html);
         Assert.Contains("gi-solo-repo-note", html);
         // No sunburst/mode-selector in the solo case — that would flag every wedge at-risk, noise not signal.
-        Assert.DoesNotContain("ownership-sunburst", html);
+        Assert.DoesNotContain(HierarchyExplorer.HostMarker, html);
         Assert.DoesNotContain("ownership-controls", html);
     }
 
@@ -347,7 +501,7 @@ public class GitInsightsTemplaterTests
 
         Assert.Contains("No file change data available.", html);
         Assert.Contains("No activity data available.", html);
-        Assert.DoesNotContain("ownership-sunburst", html);
+        Assert.DoesNotContain(HierarchyExplorer.HostMarker, html);
         Assert.DoesNotContain("<tbody>", html);
     }
 }

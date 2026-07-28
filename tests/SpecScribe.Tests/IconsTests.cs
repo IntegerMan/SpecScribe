@@ -95,6 +95,7 @@ public class IconsTests
         // ArtifactCoverage ConceptIconKeys (families always listed, present or not).
         var coverage = ArtifactCoverage.Build(
             Array.Empty<string>(),
+            BmadModule.BmadMethod,
             new Dictionary<string, DateOnly>(),
             new Dictionary<string, DateOnly>(),
             DateOnly.FromDateTime(DateTime.UtcNow));

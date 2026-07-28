@@ -50,6 +50,23 @@ public enum HierarchyMode
 /// <para><see cref="StatusClass"/> stays and keeps its three jobs: the text twin, the accessible name, and the
 /// <c>data-tok-*</c> publication the pure-CSS drilled legend consumes. It is the node's IDENTITY; this is only
 /// how it paints. [Story 20.7 F3(a)]</param>
+/// <param name="Metrics">The node's RAW, GENERATION-TIME metric bag — owner decision D1 of Story 20.9. String-
+/// valued so a day-number, a count, a category key and a contributor JSON array all travel one way, and so the
+/// island carries exactly the values the retired SVG carried as <c>data-*</c> (they are LIFTED from
+/// <c>Charts</c>'s own <c>data-*</c> builders, never re-derived).
+/// <para><b>Why raw values and not a precomputed class per dimension.</b> Two of the eleven colorize dimensions
+/// cannot be precomputed as a finite class set at all: staleness takes a free 1–60 month threshold from a
+/// <c>&lt;input type="number"&gt;</c>, and the spotlight takes an arbitrary contributor from an unbounded roster.
+/// A class-per-dimension payload would have to drop or freeze both. This does NOT move logic client-side — the
+/// bucketing already ran there and mirrored <see cref="Charts"/>'s rule by hand; the dimension contract only
+/// NAMES what was already there and makes it generic.</para>
+/// <para><b>Determinism is unaffected</b> (ADR 0012 §7 / ADR 0010 §3): every value here is computed once at
+/// generation time and embedded. Nothing re-derives from live git state or wall-clock <c>now</c>. [Story 20.9]</para></param>
+/// <param name="TipHtml">The surface's OWN rich hover card, already built by <see cref="Charts"/> — used verbatim
+/// in place of the component's generic card. Story 20.5 made <c>.ss-tooltip</c> + <c>data-tip-html</c> +
+/// <c>hoverinfo:"none"</c> the one tooltip system site-wide, so swapping the drawing engine must not swap the
+/// tooltip's look: <c>code-map.html</c>'s and <c>git-insights.html</c>'s cards carry per-file metrics the generic
+/// card has no field for. Null on every surface that has no card of its own. [Story 20.9 F8]</param>
 public sealed record HierarchyNode(
     string Id,
     string? ParentId,
@@ -61,7 +78,128 @@ public sealed record HierarchyNode(
     string StatusLabel,
     string? Href,
     string Kind,
-    string ColorClass = "");
+    string ColorClass = "",
+    IReadOnlyDictionary<string, string>? Metrics = null,
+    string? TipHtml = null);
+
+/// <summary>The KINDS of colorize rule a dimension may declare — Story 20.9 owner decision D1's "declarative
+/// per-dimension rule". Each names how a node's raw <see cref="HierarchyNode.Metrics"/> value becomes a CLASS
+/// LIST the component resolves through the shipped cascade (AD-7 — never a re-typed token value).
+///
+/// <para>Deliberately a small closed vocabulary rather than free-form: the eleven live dimensions across the two
+/// converted surfaces need exactly these seven, and a kind nobody declares is a kind nobody has to keep
+/// honest.</para></summary>
+public static class HierarchyDimensionKind
+{
+    /// <summary>Scale the metric against the visible set's MAX, from zero, onto <c>Charts.Bucket</c>'s 0–4 ramp.
+    /// Counts and averages (change frequency, churn, co-change, average change size).</summary>
+    public const string Ramp = "ramp";
+
+    /// <summary>Scale the metric against the visible set's own <c>[min,max]</c> WINDOW. Absolute day-numbers are
+    /// huge and nearly equal, so a from-zero ramp would paint every file the same level.</summary>
+    public const string RampWindow = "ramp-window";
+
+    /// <summary>The metric IS the class suffix — a bounded categorical vocabulary (file type). No scan, no
+    /// bucketing; the accessible name reads the companion label metric.</summary>
+    public const string Categorical = "categorical";
+
+    /// <summary>FIXED real-unit cut points rather than a data-relative split, so a level means the same thing on
+    /// every repo's chart (<c>Charts.OwnershipShareLevel</c>'s reasoning, preserved).</summary>
+    public const string Cutoff = "cutoff";
+
+    /// <summary>Match the metric against a panel-wide ROSTER constant; the matched index is the class suffix, and
+    /// anything past the bounded roster falls to the shared overflow class.</summary>
+    public const string Roster = "roster";
+
+    /// <summary>Relative to a contributor the reader picks at runtime from the full alphabetical roster — one of
+    /// the two dimensions that cannot be precomputed.</summary>
+    public const string Spotlight = "spotlight";
+
+    /// <summary>Relative to a free numeric threshold the reader types at runtime — the other one.</summary>
+    public const string Threshold = "threshold";
+}
+
+/// <summary>The runtime ARGUMENTS a dimension may take from a control the reader operates — the two inputs that
+/// make owner decision D1's "cannot be precomputed" claim concrete. Named constants because the same strings have
+/// to appear on the emitted markers (<c>data-hierarchy-arg</c>) and in the dimension declarations, and a typo
+/// between the two would leave a control wired to nothing.</summary>
+public static class HierarchyDimensionArg
+{
+    /// <summary>A name picked from the FULL contributor roster — the alphabetical union of every node's own
+    /// bounded list, which the component builds and populates. Never a top-N ranking (FR-10).</summary>
+    public const string Roster = "roster";
+
+    /// <summary>A free number the reader types (the 1–60 month staleness threshold).</summary>
+    public const string Threshold = "threshold";
+}
+
+/// <summary>One colorize dimension a surface offers through the shared component (Story 20.9 AC#1). A surface may
+/// declare several; switching between them re-colors IN PLACE — no geometry is re-derived, nothing is re-counted
+/// against <see cref="ProjectCounts"/>, and no fetch is issued.
+///
+/// <para><b>The non-colour channel is part of the contract, not an afterthought.</b> A dimension whose fill
+/// changes and whose accessible name does not is a UX-DR17 failure that ships green, so <paramref name="Text"/>
+/// is required alongside the class rule and the component recomposes every node's accessible name on every
+/// switch. <paramref name="LegendKey"/> is the other half: exactly one legend block is visible per active
+/// dimension, so the legend can never disagree with what is coloured.</para>
+///
+/// <para><b>No surface name appears here or in the client rule that reads it</b> (Task 1.8). The vocabulary —
+/// "dominant-author share", "file type" — lives in the SURFACE's own declaration, which is why the phrasing
+/// templates are data rather than a <c>switch</c> in the shared component.</para></summary>
+/// <param name="Key">The value the surface's own dimension control carries. Stable; it is also the id suffix
+/// nothing else may collide with.</param>
+/// <param name="Label">The dimension's prose name, substituted into <paramref name="Text"/> as <c>{label}</c>
+/// ("change frequency", "file type").</param>
+/// <param name="Kind">One of <see cref="HierarchyDimensionKind"/>.</param>
+/// <param name="Metric">The <see cref="HierarchyNode.Metrics"/> key this dimension reads.</param>
+/// <param name="Text">The accessible-name phrasings, keyed by OUTCOME — <c>value</c>/<c>none</c> for the scaled
+/// and categorical kinds, plus <c>hit</c>/<c>unknown</c>/<c>off</c> for a spotlight and <c>fresh</c>/<c>stale</c>
+/// for a threshold. Placeholders: <c>{label}</c>, <c>{value}</c>, <c>{level}</c>, <c>{name}</c>, <c>{days}</c>,
+/// <c>{months}</c>, <c>{monthsAgo}</c>. Ported VERBATIM from the shipped renderers, whose wording is careful in
+/// ways worth keeping: the bucket LEVEL is the honest equivalent of what the colour encodes rather than the raw
+/// day-number the colour does not literally represent; a spotlight absence says "not among this file's
+/// most-active tracked contributors" rather than the stronger and sometimes-false "has not worked on this file";
+/// an unknown last-touch date is an explicit "(date unknown)" rather than a coercion into the oldest
+/// bucket.</param>
+/// <param name="ClassPrefix">Prefix for the resolved state class (<c>level-</c>, <c>type-</c>,
+/// <c>owner-author-</c>).</param>
+/// <param name="NoneClass">The class for a node whose metric is absent — an honest "no data" state, never a
+/// silent coercion onto the ramp.</param>
+/// <param name="LegendKey">Which legend block this dimension owns, matched against the surface's own
+/// <c>data-hierarchy-legend</c> markers. Several dimensions may share one block.</param>
+/// <param name="Divisor">A second metric key this one is divided by (average change size is churn ÷ changes).
+/// A zero or absent divisor yields the "no data" state, exactly as the shipped rule's <c>!ch</c> guard did.</param>
+/// <param name="LabelMetric">The metric carrying the human label for a categorical value, so the accessible name
+/// reads "C#" rather than "csharp".</param>
+/// <param name="Cutoffs">Fixed ascending cut points for <see cref="HierarchyDimensionKind.Cutoff"/> and for a
+/// spotlight's recency ramp.</param>
+/// <param name="ExtraClass">A second class token layered on top of the resolved one — the spotlight's own
+/// <c>spotlight-touched</c> stroke, which is a SECOND channel on the same node.</param>
+/// <param name="OffClass">The class for a node the dimension's runtime argument does not apply to at all — a file
+/// the spotlighted contributor is not among the tracked contributors of. Distinct from
+/// <paramref name="NoneClass"/> on purpose: "not tracked here" and "tracked, date unknown" are different facts
+/// and the shipped renderer already told them apart.</param>
+/// <param name="Arg">Which runtime control feeds this dimension: <c>roster</c> (a contributor picker the
+/// component populates from the union of every node's own roster, alphabetical — never a top-N ranking, FR-10)
+/// or <c>threshold</c> (a number input). Empty for the nine dimensions that need neither.</param>
+/// <param name="RosterConstant">The panel-wide constant holding the bounded roster a
+/// <see cref="HierarchyDimensionKind.Roster"/> dimension matches against.</param>
+public sealed record HierarchyDimension(
+    string Key,
+    string Label,
+    string Kind,
+    string Metric,
+    IReadOnlyDictionary<string, string> Text,
+    string ClassPrefix = "level-",
+    string NoneClass = "level-none",
+    string LegendKey = "",
+    string Divisor = "",
+    string LabelMetric = "",
+    IReadOnlyList<int>? Cutoffs = null,
+    string ExtraClass = "",
+    string OffClass = "",
+    string Arg = "",
+    string RosterConstant = "");
 
 /// <summary>How the text twin PRESENTS. It never changes what the twin contains — ADR 0013 §2's completeness
 /// contract is identical in both modes — only whether a sighted reader sees a disclosure control for it.
@@ -77,6 +215,20 @@ public enum HierarchyTwinDisplay
     /// where a second visible listing would be on-screen duplication. The twin still discharges the completeness
     /// contract; the tile grid keeps its product value as a navigation aid.</summary>
     ScreenReaderOnly,
+
+    /// <summary>The component emits NO twin, because this surface already ships one of its own that is RICHER
+    /// than the generic nested listing and was audited complete before any SVG was retired.
+    ///
+    /// <para>The Code Map is the only case (Story 20.6 D1): its per-variant file table carries every file's
+    /// path, line count, type and six git metrics as real table cells, which the generic twin has no field for.
+    /// Emitting both would ship two complete listings of the same 2,970 files on one page — on-screen
+    /// duplication AND a byte cost, for strictly less information.</para>
+    ///
+    /// <para><b>This is not an escape hatch from ADR 0013 §2.</b> The completeness contract still has to be
+    /// discharged; it is discharged BY THE SURFACE, and the surface's twin has to be verified live with
+    /// JavaScript off before the SVG goes — which is exactly what AC#2 requires and Task 7.4 exercises. A
+    /// surface reaching for this without such a listing is simply a surface with no twin. [Story 20.9 D1]</para></summary>
+    External,
 }
 
 /// <summary>The component's own configuration, embedded in the island beside the nodes. ADR 0013 §5: the IR
@@ -102,6 +254,14 @@ public enum HierarchyTwinDisplay
 /// parent roll-up client-side, and re-plots. It is config-gated and generic on purpose: the Impact Map's epic
 /// multi-select is the first consumer and Story 20.9's is the second, and an Impact-Map-shaped branch inside the
 /// shared component is precisely the drift ADR 0012 exists to end.</param>
+/// <param name="Dimensions">The colorize dimensions this instance offers (Story 20.9 AC#1). Empty on the six
+/// surfaces whose colour is a single lifecycle token — they paint from each node's own
+/// <see cref="HierarchyNode.ColorClass"/> and never switch. When non-empty, the FIRST entry is the default and
+/// the surface's own dimension control must offer exactly these keys.</param>
+/// <param name="Constants">Panel-wide values a dimension rule needs that are NOT per-node — the bounded top-author
+/// roster and the tree's most-recent commit day. Kept off the nodes deliberately: repeating a roster on 1,420
+/// nodes is 1,420 copies of one fact. <c>asof</c> is the tree's most recent commit day, <b>never</b> wall-clock
+/// <c>now</c> (FR31). [Story 20.9 Task 1.2]</param>
 public sealed record HierarchyExplorerConfig(
     string DomId,
     string Shape,
@@ -111,7 +271,9 @@ public sealed record HierarchyExplorerConfig(
     bool Labels,
     Charts.ChartMeta Meta,
     HierarchyTwinDisplay TwinDisplay = HierarchyTwinDisplay.Details,
-    bool Filterable = false);
+    bool Filterable = false,
+    IReadOnlyList<HierarchyDimension>? Dimensions = null,
+    IReadOnlyDictionary<string, string>? Constants = null);
 
 /// <summary>The whole payload: component configuration + the node hierarchy. One datasource, both shapes — the
 /// selector re-types the trace, it never re-derives geometry, re-counts against <see cref="ProjectCounts"/>, or
@@ -515,11 +677,52 @@ public static partial class HierarchyExplorer
     /// <para><see cref="JsonSerializer"/>'s default encoder escapes <c>&lt; &gt; &amp;</c>, so the payload is safe
     /// to embed directly inside a <c>&lt;script&gt;</c> (the same reasoning
     /// <see cref="Charts.SunburstExplorerIsland"/> relies on).</para></summary>
+    /// <summary>Null-skipping options used ONLY for a dimension-bearing payload. A per-node <c>metrics</c>/
+    /// <c>tip</c> pair that is null on most surfaces would add <c>"metrics":null,"tip":null</c> to every node —
+    /// and on <c>code-map.html</c>'s 2,970 nodes that is tens of kilobytes of nothing, on the one page whose byte
+    /// accounting this story exists to settle (AC#4).
+    ///
+    /// <para><b>Why it is gated rather than applied everywhere.</b> Turning null-skipping on globally would also
+    /// drop <c>"parentId":null</c> and <c>"href":null</c> from the six already-shipped surfaces, moving the golden
+    /// fingerprint for a reason that has nothing to do with this story. Gating it on "does this instance declare
+    /// dimensions" keeps every existing island byte-identical. The client reads a missing key and an explicit
+    /// null the same way, so the two shapes are interchangeable to it.</para></summary>
+    private static readonly JsonSerializerOptions CompactIslandJson = new()
+    {
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+        // The default encoder escapes every `<`, `>` and `&` to a six-byte `\uXXXX`. That is a sound blanket rule
+        // for a payload that might be embedded anywhere — and it is a 5× blow-up on THESE payloads specifically,
+        // because their biggest field by far is HTML: 2,970 hover cards of `<div>…<dt>…</dd>` markup. Measured
+        // before this line existed: 2.82 MB of `code-map.html`'s 4.53 MB island was that escaping. On the one page
+        // whose byte accounting this story exists to settle (AC#4), that is not a detail.
+        //
+        // What replaces it is narrower and explicit rather than blanket — see EscapeForScriptElement.
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
+
+    /// <summary>Makes a relaxed-encoded JSON payload safe to embed verbatim in a
+    /// <c>&lt;script type="application/json"&gt;</c> element. There are exactly two sequences that can end or
+    /// re-frame that element's raw-text content, and both are neutralized here:
+    /// <list type="bullet">
+    /// <item><c>&lt;/</c> — the only way to close the element. Rewritten to <c>&lt;\/</c>, which is a valid JSON
+    /// string escape for <c>/</c>, so <c>JSON.parse</c> hands the consumer back the original characters. Costs one
+    /// byte instead of the default encoder's five.</item>
+    /// <item><c>&lt;!</c> — the opening of <c>&lt;!--</c>, which switches the HTML tokenizer into script-data-escaped
+    /// state and changes how a later <c>&lt;/script&gt;</c> is read. Rare enough that the full <c><</c> costs
+    /// nothing measurable, so it takes the belt-and-braces form.</item>
+    /// </list>
+    /// Applied ONLY to the dimension-bearing payload, alongside the relaxed encoder it exists to compensate for;
+    /// every other island keeps the default encoding and is byte-identical.</summary>
+    internal static string EscapeForScriptElement(string json) =>
+        json.Replace("</", "<\\/", StringComparison.Ordinal)
+            .Replace("<!", "\\u003C!", StringComparison.Ordinal);
+
     public static string IslandHtml(HierarchyExplorerModel model)
     {
         if (model.Nodes.Count == 0) return string.Empty;
 
         var cfg = model.Config;
+        var dimensions = cfg.Dimensions is { Count: > 0 } dims ? dims : null;
         var payload = new
         {
             config = new
@@ -558,9 +761,70 @@ public static partial class HierarchyExplorer
                 kind = n.Kind,
             }),
         };
-        var json = JsonSerializer.Serialize(payload);
+
+        // Two payload SHAPES, one contract. A dimension-bearing instance needs a per-node metric bag, its own
+        // hover card, the dimension declarations and the panel-wide constants; the six surfaces without
+        // dimensions must keep emitting exactly the bytes they emit today, or the golden fingerprint moves for
+        // no reason of this story's. [Story 20.9 Task 1.1/1.2/1.3]
+        var json = dimensions is null
+            ? JsonSerializer.Serialize(payload)
+            : EscapeForScriptElement(JsonSerializer.Serialize(new
+            {
+                config = new
+                {
+                    domId = cfg.DomId,
+                    title = cfg.Meta.Title,
+                    shape = cfg.Shape,
+                    mode = cfg.Mode == HierarchyMode.Select ? "select" : "navigate",
+                    hashKey = cfg.HashKey,
+                    size = cfg.Size,
+                    labels = cfg.Labels,
+                    branchvalues = BranchValues,
+                    filterable = cfg.Filterable,
+                    constants = cfg.Constants,
+                    dimensions = dimensions.Select(d => new
+                    {
+                        key = d.Key,
+                        label = d.Label,
+                        kind = d.Kind,
+                        metric = d.Metric,
+                        text = d.Text,
+                        classPrefix = d.ClassPrefix,
+                        noneClass = d.NoneClass,
+                        legendKey = NullIfEmpty(d.LegendKey),
+                        divisor = NullIfEmpty(d.Divisor),
+                        labelMetric = NullIfEmpty(d.LabelMetric),
+                        cutoffs = d.Cutoffs,
+                        extraClass = NullIfEmpty(d.ExtraClass),
+                        offClass = NullIfEmpty(d.OffClass),
+                        arg = NullIfEmpty(d.Arg),
+                        rosterConstant = NullIfEmpty(d.RosterConstant),
+                    }),
+                },
+                nodes = model.Nodes.Select(n => new
+                {
+                    id = n.Id,
+                    parentId = n.ParentId,
+                    label = n.Label,
+                    shortLabel = NullIfEmpty(n.ShortLabel),
+                    value = n.Value,
+                    detail = NullIfEmpty(n.Detail),
+                    statusClass = NullIfEmpty(n.StatusClass),
+                    statusLabel = NullIfEmpty(n.StatusLabel),
+                    colorClass = NullIfEmpty(n.ColorClass),
+                    href = n.Href,
+                    kind = n.Kind,
+                    metrics = n.Metrics,
+                    tip = n.TipHtml,
+                }),
+            }, CompactIslandJson));
         return $"<script type=\"application/json\" class=\"ss-hierarchy-data\" id=\"{PathUtil.Html(model.Config.DomId)}-data\">{json}</script>\n";
     }
+
+    /// <summary>Lets <see cref="CompactIslandJson"/>'s null-skipping reach an EMPTY string too. A record's
+    /// convention here is <c>""</c> for "not set" rather than null, and on a 2,970-node payload the difference
+    /// between <c>"detail":""</c> and no key at all is real bytes.</summary>
+    private static string? NullIfEmpty(string? value) => string.IsNullOrEmpty(value) ? null : value;
 
     /// <summary>The text twin — mandatory, and under ADR 0013 §2 it is <b>the</b> no-JS contract rather than a
     /// courtesy: server-rendered, COMPLETE (every node's label, prose status and value), NAVIGABLE (every node's
@@ -598,6 +862,10 @@ public static partial class HierarchyExplorer
             if (!childrenOf.TryGetValue(n.ParentId, out var list)) childrenOf[n.ParentId] = list = new List<HierarchyNode>();
             list.Add(n);
         }
+
+        // The surface supplies its own, richer listing (Story 20.6 D1). Emitting the generic one as well would
+        // ship two complete listings of the same file set on one page.
+        if (model.Config.TwinDisplay == HierarchyTwinDisplay.External) return string.Empty;
 
         var id = PathUtil.Html(model.Config.DomId);
         var heading = $"{PathUtil.Html(model.Config.Meta.Title)} — full text listing";

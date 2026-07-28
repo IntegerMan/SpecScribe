@@ -74,6 +74,18 @@ public class SiteGeneratorCodeMapTests : IDisposable
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
     }
 
+    /// <summary>The unfiltered panel's island JSON. Story 20.9 moved every per-file fact these tests assert out
+    /// of two SVGs' markup and into one payload per panel.</summary>
+    private static string FullIsland(string html)
+    {
+        var m = Regex.Match(
+            html,
+            "<script type=\"application/json\" class=\"ss-hierarchy-data\" id=\"codemap-full-data\">(?<j>.*?)</script>",
+            RegexOptions.Singleline);
+        Assert.True(m.Success, "expected an island for the unfiltered Code Map panel");
+        return m.Groups["j"].Value;
+    }
+
     [Fact]
     public void GenerateAll_WithSourceCode_ProducesCodeMapPageWithTreemapNavAndQuickLink()
     {
@@ -87,11 +99,20 @@ public class SiteGeneratorCodeMapTests : IDisposable
         Assert.Contains("class=\"site-nav\"", html);
         Assert.Contains("class=\"breadcrumb\"", html);
 
-        // The server-rendered SVG treemap + the no-JS text-equivalent table listing the walked source file.
-        Assert.Contains("class=\"codemap\"", html);
-        Assert.Contains("codemap-cell", html);
+        // Story 20.9: the server-rendered SVG treemap is gone and the chart is the ONE Hierarchy Explorer over a
+        // ProjectCodeMap payload. What a JS-off visitor gets is the per-variant text-equivalent table, which
+        // Story 20.6 D1 audited and KEPT as this surface's twin because it is richer than the generic listing.
+        Assert.Contains(HierarchyExplorer.HostMarker, html);
+        Assert.Contains("ss-hierarchy-data", html);
+        Assert.DoesNotContain("class=\"codemap\"", html);
         Assert.Contains("codemap-table", html);
         Assert.Contains("src/Sample/Widget.cs", html);
+        // The vendored engine is referenced from THIS page. It has to be: this page builds its own document, so
+        // the AssetManifest flag never reaches it - the exact miss that left four of Story 20.7's surfaces
+        // rendering a correct payload and mounting nothing.
+        Assert.Contains(ForgeOptions.HierarchyEngineScriptName + "\"></script>", html);
+        Assert.True(File.Exists(Path.Combine(Site, ForgeOptions.HierarchyEngineScriptName)),
+            "the hierarchy engine must be on disk for a source-only repo, not only when a dashboard chart copied it");
         // Non-git temp repo → no deep-git metrics → sized-by-LOC with the graceful-degradation notice.
         Assert.Contains("codemap-notice", html);
         // Round 2: the two pure-CSS exclude-filter checkboxes and their four precomputed panels are always present.
@@ -181,9 +202,13 @@ public class SiteGeneratorCodeMapTests : IDisposable
         var html = File.ReadAllText(CodeMapPage);
         Assert.Contains("value=\"filetype\" selected", html);
         Assert.Contains("codemap-legend-discrete", html);
-        Assert.Contains("class=\"codemap-legend codemap-legend-discrete\">", html); // visible (not hidden)
-        Assert.DoesNotContain("codemap-cell level-none", html); // no flat-neutral fallback in this state anymore
-        Assert.Contains("codemap-cell type-", html);
+        Assert.Contains("data-hierarchy-legend=\"" + HierarchyExplorer.CodeMapDiscreteLegend + "\">", html); // visible
+        // File type is the ONLY dimension declared - there is nothing for the six git-derived ramps to quantize,
+        // which is the same rule the dropdown has always followed, now stated once in the contract.
+        var island = FullIsland(html);
+        Assert.Contains("\"key\":\"filetype\"", island);
+        Assert.DoesNotContain("\"key\":\"changes\"", island);
+        Assert.Contains("\"filetype\":\"csharp\"", island);
         Assert.Contains(">Type</th>", html); // always-present text-table column
         Assert.Contains(">C#</td>", html);   // src/Sample/Widget.cs classifies as C#
 
@@ -236,8 +261,18 @@ public class SiteGeneratorCodeMapTests : IDisposable
         var html = File.ReadAllText(CodeMapPage);
         Assert.Contains("value=\"changes\" selected", html);   // unchanged sequential default (AC #3)
         Assert.Contains("value=\"filetype\">File type</option>", html); // 7th option, not selected
-        Assert.Contains("class=\"codemap-legend codemap-legend-ramp\">", html); // ramp legend visible by default
-        Assert.Contains("class=\"codemap-legend codemap-legend-discrete\" hidden>", html); // discrete legend pre-rendered, hidden
+        Assert.Contains("data-hierarchy-legend=\"" + HierarchyExplorer.CodeMapRampLegend + "\">", html);
+        Assert.Contains("data-hierarchy-legend=\"" + HierarchyExplorer.CodeMapDiscreteLegend + "\" hidden>", html);
+
+        // Story 20.9: the dropdown's seven options are now backed by seven DECLARED dimensions, in the same
+        // order, with change frequency first - so the control and the contract cannot drift apart.
+        var island = FullIsland(html);
+        foreach (var key in new[] { "changes", "last", "created", "avgchange", "churn", "cochange", "filetype" })
+        {
+            Assert.Contains("\"key\":\"" + key + "\"", island);
+        }
+        Assert.True(island.IndexOf("\"key\":\"changes\"", StringComparison.Ordinal) < island.IndexOf("\"key\":\"filetype\"", StringComparison.Ordinal),
+            "change frequency is the default and must be declared first");
         Assert.Contains(">Type</th>", html); // Type column always present regardless of hasMetrics
     }
 
@@ -320,8 +355,12 @@ public class SiteGeneratorCodeMapTests : IDisposable
         GenerateSite();
 
         var html = File.ReadAllText(CodeMapPage);
-        Assert.Contains("class=\"codemap-sunburst\"", html);
-        Assert.Contains("codemap-cell type-", html);
+        // One payload now serves BOTH shapes, so parity between them is structural rather than something two
+        // renderers have to agree on: there is only one set of nodes and one dimension rule.
+        Assert.Contains(HierarchyExplorer.HostMarker, html);
+        Assert.DoesNotContain("class=\"codemap-sunburst\"", html);
+        Assert.Contains("\"colorClass\":\"codemap-cell\"", FullIsland(html));
+        Assert.Contains("\"filetype\":\"csharp\"", FullIsland(html));
         AssertNoBrokenLocalLinks(CodeMapPage);
     }
 
@@ -335,8 +374,14 @@ public class SiteGeneratorCodeMapTests : IDisposable
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
         var html = File.ReadAllText(CodeMapPage);
-        Assert.Contains("class=\"codemap-sunburst\"", html);
-        Assert.Matches(new Regex("codemap-cell level-[1-4]"), html); // real git history → a colored (not level-none) wedge
+        // Real git history means the ramp has something to quantize. The LEVEL is resolved client-side per
+        // dimension now (that is what makes a free staleness threshold and an arbitrary contributor possible at
+        // all), so what the server can honestly assert is that the raw metric the ramp reads actually arrived -
+        // and that the node still routes to its own code page through the guarded Story 7.1 resolver.
+        var island = FullIsland(html);
+        Assert.Contains(HierarchyExplorer.HostMarker, html);
+        Assert.Matches(new Regex("\"changes\":\"[1-9][0-9]*\""), island);
+        Assert.Matches(new Regex("\"href\":\"code/[^\"]+\\.html\""), island);
         AssertNoBrokenLocalLinks(CodeMapPage);
     }
 

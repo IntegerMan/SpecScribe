@@ -205,6 +205,70 @@ public class DiagnosticsTemplaterTests
     }
 
     [Fact]
+    public void FromRun_UnmodeledModule_ShowsItsRealLabel_NotNotDetected()
+    {
+        // This row is the ENTIRE justification for ADR 0015 Decision 2a — that `Unmodeled` had to be a new
+        // enum case rather than a reuse of `Unknown`. `ModuleDisplay` is the only live consumer of `Unknown`,
+        // and it is the one surface already correct for a TEA repo (it prints the parsed label); routing
+        // unmodeled modules through `Unknown` would have flipped it to "Unknown (not detected)", trading one
+        // correct surface for another. Nothing pinned it, so the decision's load-bearing premise rested on a
+        // single live inspection recorded in a Completion Note. [Review][Patch P7]
+        var options = new ForgeOptions
+        {
+            RepoRoot = Path.Combine(Path.GetTempPath(), "diagcfg-repo"),
+            SourceRoot = Path.Combine(Path.GetTempPath(), "diagcfg-repo", "_bmad-output"),
+            AdrSourceRoot = Path.Combine(Path.GetTempPath(), "diagcfg-repo", "docs", "adrs"),
+            AdrSourceExplicit = false,
+            OutputRoot = Path.Combine(Path.GetTempPath(), "diagcfg-repo", "SpecScribeOutput"),
+            SiteTitle = "SpecScribe",
+            IncludeReadme = true,
+            DeepGitAnalytics = false,
+        };
+        var unmodeled = new ModuleContext
+        {
+            Module = BmadModule.Unmodeled,
+            Code = "tea",
+            Commands = new CommandCatalog("Test Architecture Enterprise", new Dictionary<string, string>()),
+            Docs = Array.Empty<ModuleDoc>(),
+            Glossary = Array.Empty<GlossaryTerm>(),
+        };
+
+        var config = DiagnosticsConfig.FromRun(options, unmodeled);
+
+        Assert.Equal("Test Architecture Enterprise", config.ModuleDisplay);
+    }
+
+    [Fact]
+    public void FromRun_ModuleWithNoLabel_FallsBackToNotDetected_RatherThanABlank()
+    {
+        // Decision 2b's other half: an EMPTY label means "no label", never a name. A context that parsed but
+        // declared no label must not render an empty Detected-framework cell. [Review][Patch P1 + P7]
+        var options = new ForgeOptions
+        {
+            RepoRoot = Path.Combine(Path.GetTempPath(), "diagcfg-repo"),
+            SourceRoot = Path.Combine(Path.GetTempPath(), "diagcfg-repo", "_bmad-output"),
+            AdrSourceRoot = Path.Combine(Path.GetTempPath(), "diagcfg-repo", "docs", "adrs"),
+            AdrSourceExplicit = false,
+            OutputRoot = Path.Combine(Path.GetTempPath(), "diagcfg-repo", "SpecScribeOutput"),
+            SiteTitle = "SpecScribe",
+            IncludeReadme = true,
+            DeepGitAnalytics = false,
+        };
+        var unlabelled = new ModuleContext
+        {
+            Module = BmadModule.Unmodeled,
+            Code = "acme",
+            Commands = new CommandCatalog(string.Empty, new Dictionary<string, string>()),
+            Docs = Array.Empty<ModuleDoc>(),
+            Glossary = Array.Empty<GlossaryTerm>(),
+        };
+
+        var config = DiagnosticsConfig.FromRun(options, unlabelled);
+
+        Assert.Equal("Unknown (not detected)", config.ModuleDisplay);
+    }
+
+    [Fact]
     public void FromRun_OutputOutsideRepo_FallsBackToAbsolutePath()
     {
         var repo = Path.Combine(Path.GetTempPath(), "diagcfg-repo");

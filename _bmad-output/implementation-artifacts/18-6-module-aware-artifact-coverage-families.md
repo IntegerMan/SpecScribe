@@ -4,7 +4,7 @@ baseline_commit: 6017c2cd2d4e3928c4713ac369ac401fd9f1dbb7
 
 # Story 18.6: Module-Aware Artifact Coverage Families
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -196,82 +196,83 @@ run's `events` list).
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Confirm the baseline before changing anything (AC: #1, #2)**
-  - [ ] Re-read `src/SpecScribe/ArtifactCoverage.cs`, `SiteGenerator.BuildArtifactCoverage` /
+- [x] **Task 1 — Confirm the baseline before changing anything (AC: #1, #2)**
+  - [x] Re-read `src/SpecScribe/ArtifactCoverage.cs`, `SiteGenerator.BuildArtifactCoverage` /
         `ResolveFamilyHref` / `RefreshCoverage`, `Charts.CoverageMeter` / `ArtifactCoveragePanel` /
         `FamilyAccentClass`, and the `coverage-panel` block in `HtmlRenderAdapter.Dashboard.cs`. The tree is
         shared and Story 18.5 may be in flight in the same files.
-  - [ ] Re-verify the Core-skill finding against this repo's install: `_bmad/core/module-help.csv` contains
+  - [x] Re-verify the Core-skill finding against this repo's install: `_bmad/core/module-help.csv` contains
         `bmad-spec`, `_bmad/bmm/module-help.csv` does not. If upstream has moved, correct this story in place
         and say so — the reachability argument is the story's premise.
-  - [ ] Confirm `ModuleContext.None.Module == BmadModule.Unknown` and that `_module` is assigned
+  - [x] Confirm `ModuleContext.None.Module == BmadModule.Unknown` and that `_module` is assigned
         (`_module = bundle.Module`) **before** `_coverage = BuildArtifactCoverage(sourceRelatives)` runs in
         `GenerateAll`. Both are true at baseline `6017c2c`; prove it, do not assume it.
 
-- [ ] **Task 2 — Red first: fixtures + failing assertions (AC: #1, #2)**
-  - [ ] Add a generation-level fixture with `_bmad/cis/module-help.csv` (real upstream bytes, provenance block
+- [x] **Task 2 — Red first: fixtures + failing assertions (AC: #1, #2)**
+  - [x] Add a generation-level fixture with `_bmad/cis/module-help.csv` (real upstream bytes, provenance block
         with the commit SHA, per `ModuleContextTests.cs`'s convention and ADR 0015 Decision 7) **plus** a
         `_bmad-output/specs/spec-x/SPEC.md` — the exact reachable case from the premise above. Assert it renders
         the panel **today** (proving the defect) and omits it after the fix.
-  - [ ] Add a **BMM control** fixture (`_bmad/bmm/module-help.csv` + the eight families' files) asserting the
+  - [x] Add a **BMM control** fixture (`_bmad/bmm/module-help.csv` + the eight families' files) asserting the
         panel and all eight cards are unchanged.
-  - [ ] Add a **GDS control** asserting the eight BMM families still render for `gds` (AC #2's explicit lock).
-  - [ ] Add a **no-`_bmad/`** assertion (D1) — the existing `SiteGeneratorCoverageTests` fixture already is
+  - [x] Add a **GDS control** asserting the eight BMM families still render for `gds` (AC #2's explicit lock).
+  - [x] Add a **no-`_bmad/`** assertion (D1) — the existing `SiteGeneratorCoverageTests` fixture already is
         this case; add one explicit test that names D1 so the behavior is protected by intent, not by accident.
 
-- [ ] **Task 3 — Cut the seam in `ArtifactCoverage` (AC: #1)**
-  - [ ] Add private `SpecsFor(BmadModule)` with the polarity and comment specified above; keep `FamilySpec`
+- [x] **Task 3 — Cut the seam in `ArtifactCoverage` (AC: #1)**
+  - [x] Add private `SpecsFor(BmadModule)` with the polarity and comment specified above; keep `FamilySpec`
         private.
-  - [ ] Thread a **required** `BmadModule` parameter through `Build` and `AllCandidatePaths`; replace the
+  - [x] Thread a **required** `BmadModule` parameter through `Build` and `AllCandidatePaths`; replace the
         `CreateStepKeys` static dictionary with `CreateStepKeysFor(BmadModule)`.
-  - [ ] Update the class/`Specs` doc comments: the seam the comment promised is now cut, and the comment should
+  - [x] Update the class/`Specs` doc comments: the seam the comment promised is now cut, and the comment should
         say what governs the set (module identity) and what the `Unknown` arm means (D1).
-  - [ ] Mechanically update every call site — `SiteGenerator.BuildArtifactCoverage` (both `Build` calls and the
+  - [x] Mechanically update every call site — `SiteGenerator.BuildArtifactCoverage` (both `Build` calls and the
         `AllCandidatePaths` call) and the ~28 test call sites across `ArtifactCoverageTests`,
-        `HtmlTemplaterTests`, `IconsTests`, `ChartsTests`.
+        `HtmlTemplaterTests`, `IconsTests`, `ChartsTests`. **`ChartsTests` needed no change** — it builds an
+        `ArtifactCoverage` object initializer directly and never calls `Build`. 28 call sites in the other three.
 
-- [ ] **Task 4 — Wire module identity into the coverage build (AC: #1)**
-  - [ ] `BuildArtifactCoverage` passes `_module.Module`. Both the full-generate call
+- [x] **Task 4 — Wire module identity into the coverage build (AC: #1)**
+  - [x] `BuildArtifactCoverage` passes `_module.Module`. Both the full-generate call
         (`GenerateAll`) and the watch `RefreshCoverage()` path go through it, so both become module-aware with
         one change — confirm the watch path in a test, since `_module` persists across incrementals.
-  - [ ] Do **not** call `ModuleContext.Detect` again. 18.2 made detection once-per-run on purpose; read
+  - [x] Do **not** call `ModuleContext.Detect` again. 18.2 made detection once-per-run on purpose; read
         `_module`.
 
-- [ ] **Task 5 — The D3 diagnostic (AC: #1)**
-  - [ ] Implement per the D3 spec above: `Informational`, `RepoRelativeCsv` + `DiagnosticAnchorRoot.Repo`,
+- [x] **Task 5 — The D3 diagnostic (AC: #1)**
+  - [x] Implement per the D3 spec above: `Informational`, `RepoRelativeCsv` + `DiagnosticAnchorRoot.Repo`,
         widened to `internal`, emitted once per generate run from the events path, never from
         `BuildArtifactCoverage`.
-  - [ ] Test both cardinality (one row, not N) and that a watch rebuild does not accumulate rows.
-  - [ ] Test that a BMM / GDS / no-`_bmad` repo emits **zero** such diagnostics.
+  - [x] Test both cardinality (one row, not N) and that a watch rebuild does not accumulate rows.
+  - [x] Test that a BMM / GDS / no-`_bmad` repo emits **zero** such diagnostics.
 
-- [ ] **Task 6 — Regression + golden gate (AC: #2)**
-  - [ ] Run the full suite. **Known suite property, do not misread it:** a rotating subset of the deep-git test
+- [x] **Task 6 — Regression + golden gate (AC: #2)**
+  - [x] Run the full suite. **Known suite property, do not misread it:** a rotating subset of the deep-git test
         family (`SiteGeneratorTimelineTests`, `SiteGeneratorGitInsightsTests`, `GitMetricsFirstCommitDateTests`,
         …) fails under concurrent load and passes in isolation — Story 18.2 measured 19 such failures, all
         outside its own classes. Confirm any failure is in a class **this** story touches before calling the
         suite red.
-  - [ ] `GenerateAll_GoldenContentFingerprint_IsStableAfterNormalizingVolatileTokens`
+  - [x] `GenerateAll_GoldenContentFingerprint_IsStableAfterNormalizingVolatileTokens`
         [`SiteGeneratorAdapterTests`] **must not move.** This repo's primary is BMM, so output is byte-identical
         by construction — a moved fingerprint means the change leaked into the modeled path. If it moves,
         confirm the move is yours before re-baselining ([[golden-diff-normalization-gotchas]]) and confirm the
-        new hash is stable across two repeated runs.
+        new hash is stable across two repeated runs. **It did not move — no re-baseline needed.**
 
-- [ ] **Task 7 — Live-browser verification (CLAUDE.md § Verification)**
-  - [ ] Generate this repo (BMM) to `SpecScribeOutput/` and confirm the Planning Artifacts panel renders
+- [x] **Task 7 — Live-browser verification (CLAUDE.md § Verification)**
+  - [x] Generate this repo (BMM) to `SpecScribeOutput/` and confirm the Planning Artifacts panel renders
         identically — eight cards, meter, chips, tooltips, create commands, no layout shift.
-  - [ ] Generate the unmodeled fixture and confirm in a real browser that the panel is **absent** — not empty,
+  - [x] Generate the unmodeled fixture and confirm in a real browser that the panel is **absent** — not empty,
         not zero-height, not a collapsed `.chart-panel` leaving a gap or an orphaned grid row in the dashboard
         layout. The suite structurally cannot see sub-pixel collapse; this is why the check exists.
-  - [ ] Confirm the diagnostics page shows the one `Informational` row with its word-bearing badge (status is
+  - [x] Confirm the diagnostics page shows the one `Informational` row with its word-bearing badge (status is
         never signalled by colour alone).
-  - [ ] Never `--output docs/live`. Add a `.claude/launch.json` entry following that file's convention if a
+  - [x] Never `--output docs/live`. Add a `.claude/launch.json` entry following that file's convention if a
         preview slot is needed.
 
-- [ ] **Task 8 — Record the decisions (AC: #1, #2)**
-  - [ ] ADR 0015 Decision 5a is **implemented, not amended** — D2 takes it literally. **Do not author a new
+- [x] **Task 8 — Record the decisions (AC: #1, #2)**
+  - [x] ADR 0015 Decision 5a is **implemented, not amended** — D2 takes it literally. **Do not author a new
         ADR.** If implementation forces a deviation from 5a, stop and propose an ADR amendment rather than
-        shipping a divergence (CLAUDE.md § Decision records).
-  - [ ] Record in Completion Notes: the Core-skill reachability proof, the GDS-family-set observation as a
+        shipping a divergence (CLAUDE.md § Decision records). **No deviation arose; no ADR authored.**
+  - [x] Record in Completion Notes: the Core-skill reachability proof, the GDS-family-set observation as a
         candidate follow-up, and the `RegenerateEpics` re-emission choice from Task 5.
 
 ## Dev Notes
@@ -415,14 +416,183 @@ do not conflate them in code, comments or tests.
 
 ### Agent Model Used
 
+claude-opus-5 (Claude Code, dev-story workflow)
+
 ### Debug Log References
+
+- **RED, proving the premise.** With the fix not yet written, the CIS fixture failed exactly as the story
+  predicted: `Assert.DoesNotContain() Failure: Sub-string found ↓ (pos 12086) String: ···" class="chart-panel
+  coverage-panel wm-pan"···`. Four of the six new generation tests failed; the BMM and GDS controls passed
+  untouched, confirming the defect is confined to the unmodeled path.
+- **Full suite, first run after the change:** 2625 passed / 0 failed / 3 skipped in 1m47s. None of the
+  documented rotating deep-git flakes fired.
+- **Golden gate:** `GenerateAll_GoldenContentFingerprint_IsStableAfterNormalizingVolatileTokens` passed in the
+  full run and again in isolation. Not re-baselined.
+- **A LATER run in the shared tree showed 23 failures — none of them this story's, and the bisect proving it
+  is recorded below.** Between the two runs a concurrent session's in-flight edits landed in `Charts.cs`,
+  `CodeMapTemplater.cs`, `HierarchyExplorer.cs`, `HierarchyExplorer.Projectors.cs` and `assets/specscribe.js`,
+  leaving `src/` **not compiling** at one point: `Charts.cs(2758): error CS0103: The name 'CompactMetricsTail'
+  does not exist in the current context` (plus `FreshnessRecursionGuard`, `BuildOwnershipDataAttrs`). A grep
+  moments later found `CompactMetricsTail` defined at `Charts.cs:2452` — the file changed between two reads,
+  the exact transient mid-write hazard CLAUDE.md § shared `main` describes. The 23 failures were confined to
+  `CodeMapTemplaterTests`, `SiteGeneratorCodeMapTests`, `GitInsightsTemplaterTests`, `SiteGeneratorWebviewTests`
+  (code-map capture), `SiteGeneratorSpaTests` (hierarchy bundle) and the golden fingerprint — i.e. exactly the
+  surfaces those five files own, and **no class this story touches**.
+- **Bisect, following the Story 18.4 precedent, without touching the shared tree.** Built an isolated copy from
+  `git archive HEAD` (pristine, working-copy changes excluded) and overwrote **only this story's eight files**
+  from the working tree, at
+  `<scratchpad>/bisect-18-6`. Full suite there: **2625 passed / 0 failed / 3 skipped**, twice consecutively
+  (50s, 54s) — golden fingerprint green in both. That is the honest state of this story's work. The shared
+  tree's 23 failures are the concurrent session's to resolve; nothing of theirs was reset, reverted or stashed.
+- **Live sites generated:** this repo → `SpecScribeOutput/` (432 pages, errors=0); the CIS fixture →
+  `<scratchpad>/cis-repo/SpecScribeOutput` (14 pages, errors=0); a partial-BMM fixture →
+  `<scratchpad>/bmm-partial/SpecScribeOutput` (13 pages, errors=0) to exercise the Missing-chip and
+  create-command affordances the full BMM portal cannot show (it is 8/8 present).
 
 ### Completion Notes List
 
+**1. The Core-skill reachability proof holds at HEAD, and was re-verified against this repo's install.**
+`_bmad/core/module-help.csv:12` carries `Core,bmad-spec,Spec,SP,…` and `_bmad/bmm/module-help.csv` carries no
+`bmad-spec` row at all. Core ships with every module install, so a cis/tea/bmb repo that ran `/bmad-spec` owns a
+genuine `specs/*/SPEC.md`. The RED run demonstrated the consequence directly rather than by argument: the CIS
+fixture rendered `class="chart-panel coverage-panel …"` — 1 present + 7 missing BMad Method families — on a
+project with no PRD, no epics, no stories and no FR/NFR catalog. Upstream had not moved; the story's premise
+needed no correction.
+
+**2. The GDS family-set observation — recorded as a follow-up candidate, deliberately NOT actioned.** Game Dev
+Studio produces `gdd.md`, `narrative-design.md` and `game-architecture.md` (`ModuleContext.GameDevStudioDocs`),
+not a PRD or a product brief, so today's panel is arguably wrong for GDS in the same *kind* of way it was wrong
+for CIS — it asserts a vocabulary that module does not use. AC #2 forbids changing modeled-module behavior here,
+and doing so would move the golden fingerprint. The deliberate lock is now pinned by two tests
+(`Build_GameDevStudio_KeepsTheBmadMethodFamilySet`, `GenerateAll_GameDevStudioPrimary_KeepsTheEightBmadMethodFamilyPanel`)
+whose comments say *why*, so a later reader cannot "fix" it by accident. **A GDS-specific family set is a real
+candidate for a future story.** Note it is a smaller defect than the CIS one: GDS is `IsModeled`, so it keeps
+its docs and glossary correctly — only the artifact-family vocabulary is BMM's.
+
+**3. `RegenerateEpics` re-emission — chosen NOT to re-emit, and why.** `AppendCountDivergenceNotice` is
+re-emitted from `RegenerateEpics` because the count ledger genuinely *changes* on a watch rebuild, so the
+previously-emitted row can go stale. The detected module cannot change: Story 18.2 made detection once-per-run
+and `_module` is immutable for the life of the `SiteGenerator`. A re-emission could therefore only ever
+duplicate a row that is already correct — which is what ADR 0015 Decision 2d's at-most-one-per-run rule exists
+to prevent. Pinned by `RegenerateEpics_AfterUnmodeledPrimary_DoesNotReEmitThePanelOmissionDiagnostic` and
+`GenerateOne_AfterUnmodeledPrimary_DoesNotAccumulatePanelOmissionDiagnostics`.
+
+**4. Live-browser findings — the omission is geometrically clean, which the suite could not have told us.**
+On the CIS portal at 1280×900 the panel is absent from the DOM entirely (0 `.coverage-panel`, 0
+`.coverage-grid`, 0 `.coverage-meter`, and the string "Planning Artifacts" appears nowhere in `innerText`). The
+`.dashboard` section measures **104px, exactly equal to the sum of its visible children, with a 0px trailing
+gap** — no collapsed `.chart-panel`, no zero-height residue, no orphaned row. It is also structurally
+impossible for one to appear here: `.dashboard` computes to `display: block`, not `grid`. No horizontal
+overflow (`scrollWidth` 1280 = `innerWidth` 1280). The two zero-height panels that *do* exist (Story Pipeline,
+Git Pulse) are `display: none` from the pre-existing work-mode CSS and are unrelated to this story.
+
+**5. BMM is untouched, verified three ways.** (a) The golden fingerprint did not move. (b) The full BMM portal
+renders all eight cards in a 2-column grid (497px + 497px, 11.2px gap), heights 109–131px, every card carrying
+its `js-tip` tooltip and a resolved href, meter reading `8/8 100%` with
+`aria-label="Planning artifact coverage: 8 of 8 present"`, no horizontal overflow. (c) The partial-BMM fixture
+confirms the affordances the full portal cannot show: seven `Missing` chips carrying the **word** (never colour
+alone), create commands correctly resolved from the module's own catalog (`/bmad-prd`, `/bmad-product-brief`,
+`/bmad-architecture`, `/bmad-ux`, `/bmad-create-story`), and Spec Kernel correctly showing **no** command —
+BMad Method exposes no `spec` step, so that card degrades to guidance text exactly as before.
+
+**6. The D3 diagnostic renders as specified.** The CIS portal's `diagnostics.html` carries exactly one matching
+row: badge `Informational` (class `status-badge diag-info`, the word present in the text), subject
+`_bmad/cis/module-help.csv`, message *"Primary BMad module 'cis' (Creative Intelligence Suite) has no modeled
+planning-artifact family set, so the dashboard's Planning Artifacts panel is omitted."* Story 18.2's separate
+docs/glossary notice appears alongside it and the two read as distinct facts, not duplicates — which was the
+point of giving this one its own wording rather than extending `ReportUnmodeledPrimary`.
+
+**7. Two small corrections to the story's own expectations, neither changing its shape.**
+(a) `ChartsTests` needed no edit — it constructs `new ArtifactCoverage { Families = [...] }` directly and never
+calls `Build`, so the "~28 call sites across `ArtifactCoverageTests`, `HtmlTemplaterTests`, `IconsTests`,
+`ChartsTests`" is really 28 across the first three. (b) The module-aware generation tests went into a **new**
+`SiteGeneratorModuleCoverageTests` class rather than into `SiteGeneratorCoverageTests`, because that fixture's
+constructor writes `planning-artifacts/epics.md` for all five of its tests — a CIS-only repo would not have one,
+and the reachability case needs the core-produced `SPEC.md` to be the *only* matching artifact. This also keeps
+the "add no `_bmad/` fixtures here" trap structurally impossible to trip: the two concerns now live in two
+files. `SiteGeneratorCoverageTests` gained exactly one test, which asserts `_bmad/` does **not** exist and then
+names D1.
+
+**8. No new production file, no second gate, no ADR.** `src/` gained no file. The panel omission rides entirely
+on the existing `IsEmpty` → `view.Coverage is { IsEmpty: false }` guard; nothing was added to
+`DashboardViewBuilder` or `HtmlRenderAdapter.Dashboard.cs`, and both were left byte-unchanged. `Charts.FamilyAccentClass`
+and `SiteGenerator.ResolveFamilyHref` were confirmed (not assumed) to need no change: with an empty family set
+neither loop body executes, so no label reaches either `label switch`, and both carry `_ =>` fallbacks anyway.
+ADR 0015 Decision 5a was implemented literally with no deviation, so no ADR was authored or amended.
+
+**9. ⚠️ Concurrent-session state at hand-off — the shared tree does NOT currently build, and that is not this
+story (CLAUDE.md § shared `main`).** Another session is actively mid-write on
+`src/SpecScribe/HierarchyExplorer.cs`, `HierarchyExplorer.Projectors.cs`, `Charts.cs`, `CodeMapTemplater.cs`
+and `assets/specscribe.js` (Story 20.9-shaped sunburst/hierarchy work), and has separately added
+`.gitattributes`, a Story 5.7 file, an unrelated `SiteGeneratorAdapterTests.cs` comment change (about
+`.gitattributes` / `FoldLineEndings`), and edits to `epics.md` / `sprint-status.yaml`. **None of that is this
+story's work and none of it is in its File List.** At the moment of the final regression run their `Charts.cs`
+did not compile, which is why the shared-tree suite showed 23 failures; the isolated bisect above proves this
+story's own work is 2625/0 twice over. **A reviewer should re-run the suite once the concurrent session
+settles** — this story's verdict rests on the bisect, not on the shared tree's current red. Every symbol this
+story added was grep-verified on disk and confirmed present in `git diff HEAD` after the fact.
+
 ### File List
+
+- `src/SpecScribe/ArtifactCoverage.cs` — `Specs` → `BmadMethodSpecs`; new private `SpecsFor(BmadModule)`;
+  required `BmadModule` parameter on `Build` and `AllCandidatePaths`; `CreateStepKeys` (static dictionary) →
+  `CreateStepKeysFor(BmadModule)` over new `BmadMethodStepKeys` / `EmptyStepKeys`; class, `IsEmpty` and family-set
+  doc comments rewritten to state what governs the set and why the `_ =>` polarity is inverted.
+- `src/SpecScribe/SiteGenerator.cs` — `BuildArtifactCoverage` reads `_module.Module` and threads it through both
+  `Build` calls, the `AllCandidatePaths` call and `CreateStepKeysFor`; new
+  `AppendUnmodeledCoverageNotice(List<GenerationEvent>, ModuleContext)`, invoked once from `GenerateAll` beside
+  `AppendCountDivergenceNotice`.
+- `src/SpecScribe/ModuleContext.cs` — `RepoRelativeCsv` widened `private` → `internal` (visibility only), with
+  the reason recorded in its doc comment.
+- `tests/SpecScribe.Tests/SiteGeneratorModuleCoverageTests.cs` — **NEW.** Six generation-level tests: the CIS
+  reachability case, D3 cardinality/anchor/wording, BMM and GDS controls, and the two watch-path
+  non-accumulation cases. Carries upstream-pinned BMM / GDS / CIS `module-help.csv` fixtures per
+  `ModuleContextTests`' provenance convention.
+- `tests/SpecScribe.Tests/ArtifactCoverageTests.cs` — 25 `Build`/`AllCandidatePaths` call sites updated to name
+  the module explicitly via a new `Bmm` alias; `CreateStepKeys` → `CreateStepKeysFor(Bmm)`; six new pure tests
+  covering `Unmodeled` (empty set, and the core-`SPEC.md` case), `Unknown` (D1), `GameDevStudio` (AC #2),
+  `AllCandidatePaths` agreement, and `CreateStepKeysFor`.
+- `tests/SpecScribe.Tests/SiteGeneratorCoverageTests.cs` — one new test,
+  `GenerateAll_NoBmadInstallAtAll_KeepsThePlanningArtifactsPanel`, asserting `_bmad/` is absent and naming D1.
+  The five existing tests are **unmodified** and still run at `BmadModule.Unknown`.
+- `tests/SpecScribe.Tests/HtmlTemplaterTests.cs` — 2 `Build` call sites updated.
+- `tests/SpecScribe.Tests/IconsTests.cs` — 1 `Build` call site updated.
+- `.claude/launch.json` — three preview slots for Task 7: `bmm-control-18-6` (8114), `bmm-partial-18-6` (8116),
+  `unmodeled-18-6` (8115).
 
 ## Change Log
 
+- 2026-07-27 — Story 18.6 implemented (dev-story; story baseline `6017c2c`, HEAD at start `d1722f1`). ADR 0015
+  **Decision 5a is closed** — the last un-closed surface from the 18.1 spike's Finding 3b table. The canonical
+  artifact-family set is now resolved from the detected `BmadModule` via a private `ArtifactCoverage.SpecsFor`,
+  and `Build` / `AllCandidatePaths` / `CreateStepKeysFor` all take the module as a **required** parameter with
+  no default. **The premise was proved rather than assumed**: with the fix unwritten, the CIS + core-`SPEC.md`
+  fixture rendered `class="chart-panel coverage-panel …"` — 1 present + 7 missing BMad Method families on a
+  project that produces none of them — and the BMM/GDS controls passed untouched in the same run. All three
+  owner decisions shipped literally: **D1** an undetected repo (`BmadModule.Unknown`) keeps the eight families,
+  so `SiteGeneratorCoverageTests`' five no-`_bmad/` tests pass **unmodified** and D1 is now additionally pinned
+  by an explicit test that names it; **D2** an `Unmodeled` primary declares an empty set and the whole panel
+  omits through the `IsEmpty` gate that already existed — **no second gate was added** in `DashboardViewBuilder`
+  or `HtmlRenderAdapter.Dashboard.cs`, both of which are byte-unchanged; **D3** the omission is silent on the
+  page but recorded as exactly one `Informational` diagnostic anchored at `DiagnosticAnchorRoot.Repo` via the
+  now-`internal` `ModuleContext.RepoRelativeCsv`. **`RegenerateEpics` deliberately does NOT re-emit** the
+  notice (unlike the count-divergence one): the count ledger changes on a watch rebuild, the detected module
+  cannot, so a re-emission could only duplicate a still-correct row. **The golden fingerprint did not move** and
+  was not re-baselined; full suite **2625 passed / 0 failed / 3 skipped** on the first run with none of the
+  documented deep-git flakes firing, and **2625 / 0 twice more in an isolated `git archive HEAD` + this story's
+  eight files copy** after a concurrent session left the shared tree's `Charts.cs` non-compiling (bisect
+  recorded in the Debug Log; nothing of theirs was reset or reverted). Live-browser verification confirmed what the suite structurally cannot
+  see: on the unmodeled portal the `.dashboard` section measures **104px, exactly its visible children's height,
+  with a 0px trailing gap** — no collapsed panel, no orphaned row, no horizontal overflow — while the BMM portal
+  keeps all eight cards, its `8/8 100%` meter, tooltips, `Missing` chips carrying the word, and create commands
+  resolved from the module's own catalog. **No new ADR** — 5a was implemented, not amended, and no deviation
+  arose. Two of the story's own expectations were corrected in flight, neither changing its shape: `ChartsTests`
+  needed **no** edit (it builds `ArtifactCoverage` by object initializer and never calls `Build`), and the
+  module-aware generation tests went into a **new** `SiteGeneratorModuleCoverageTests` class because
+  `SiteGeneratorCoverageTests`' constructor writes `epics.md` for every test, which a CIS-only repo would not
+  have. **Recorded as a candidate follow-up, not actioned**: AC #2 locks Game Dev Studio to the BMad Method
+  family set even though GDS produces `gdd.md` / `narrative-design.md` / `game-architecture.md` — a smaller
+  instance of the same NFR8 defect, now pinned by two tests whose comments say the lock is deliberate.
 - 2026-07-27 — Story 18.6 drafted (create-story, baseline `6017c2c`). Implements ADR 0015 Decision 5a, seated by
   Story 18.5's owner decision D4. **Proved the defect reachable**, which the ADR asserted but did not
   demonstrate: `IsEmpty` already omits an all-missing panel, so the "TEA-only repo shows eight missing families"

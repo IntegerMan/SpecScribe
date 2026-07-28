@@ -4,7 +4,7 @@ baseline_commit: 261b3008545a066ae1b08174b77df5b4abd4fb73
 
 # Story 20.9: Colorized Hierarchies — Code Map and Git Insights Ownership Through the Component
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -220,88 +220,88 @@ Portal net the spike projected: **−4,787,124 B**. These two pages alone exceed
 
 ### Task 0 — Entry conditions (blocking)
 
-- [ ] 0.1 Confirm **Story 20.7 is `done`**, and that its **Task 1.1 class-list color resolver** and **Task 1.3 client node filter** are in the shipped `specscribe.js`. Grep for them; do not infer from the story's status. They are this story's foundation and 20.7's F3 committed them to two consumers.
-- [ ] 0.2 Confirm **Story 20.6 is `done`** and read `20-6-text-twin-audit.md`. Its per-surface record is your permission slip. Its hypotheses for these two: **Code Map PROBABLE PASS** (the file table is genuinely server-complete), **Git Insights FAIL — no twin at all**. Re-verify both live; a hypothesis is not a clearance.
-- [ ] 0.3 `git status` before starting. Another session's work has been in this tree at the start of every Epic 20 story. **Never `git reset --hard` / `git checkout --` / `git clean`.**
-- [ ] 0.4 Re-capture the § Measured starting state numbers on your own tree. Reporting AC#4 against a figure from this document rather than from your own "before" run is the easiest way to publish a wrong delta.
+- [x] 0.1 Confirm **Story 20.7 is `done`**, and that its **Task 1.1 class-list color resolver** and **Task 1.3 client node filter** are in the shipped `specscribe.js`. Grep for them; do not infer from the story's status. They are this story's foundation and 20.7's F3 committed them to two consumers.
+- [x] 0.2 Confirm **Story 20.6 is `done`** and read `20-6-text-twin-audit.md`. Its per-surface record is your permission slip. Its hypotheses for these two: **Code Map PROBABLE PASS** (the file table is genuinely server-complete), **Git Insights FAIL — no twin at all**. Re-verify both live; a hypothesis is not a clearance.
+- [x] 0.3 `git status` before starting. Another session's work has been in this tree at the start of every Epic 20 story. **Never `git reset --hard` / `git checkout --` / `git clean`.**
+- [x] 0.4 Re-capture the § Measured starting state numbers on your own tree. Reporting AC#4 against a figure from this document rather than from your own "before" run is the easiest way to publish a wrong delta.
 
 ### Task 1 — The dimension contract (AC: #1) — D1, F2, F3
 
-- [ ] 1.1 **Metric bag on `HierarchyNode`.** Add an optional named-value bag (recommended: `IReadOnlyDictionary<string, string>? Metrics`, string-valued so day-numbers, counts and the `owner` JSON all travel one way) serialized into the island beside the existing fields. Code Map emits `path/lines/filetype/filetype-label/changes/churn/first/last/cochanged`; ownership emits `share/dominant/contributors/last/owner`. **These are the exact `data-*` the SVG already carries** (`Charts.cs:3021-3029`, `:3606-3614`, `:3849-3856`) — lift them, do not re-derive.
-- [ ] 1.2 **Panel-wide constants** go on `HierarchyExplorerConfig`, not repeated per node: ownership's `topAuthors` roster and `asof` day (today `data-top-authors`/`data-asof` on the SVG root, `Charts.cs:3982-3983`). `asof` is the tree's most-recent commit day — **never wall-clock `now`** (FR31).
-- [ ] 1.3 **Dimension declarations.** Add a per-instance list of dimensions to the config: key, human label, the legend block it owns, and its kind (numeric-ramp / categorical / fixed-cutoff / roster-relative / threshold-relative). The client rule for each maps a node's metric bag → a **class list** + an **accessible-name suffix**. Port the shipped rules verbatim — bucketing must still mirror `Charts.Bucket` (`specscribe.js:956`), the date dimensions must still scale against the file set's own `[min,max]` window while counts scale against `max` from 0 (`:1047-1057`), share must keep its fixed 25/50/75 cutoffs (`:1310`), and spotlight must keep `spotlightRecencyLevel`'s 30/90/180-day cutoffs (`:1333-1338`).
-- [ ] 1.4 **Extend the color resolver for opacity and hatch (F2).** Have `tokenFor` read `fill-opacity` off the probe and compose it into the returned paint — five states are wrong without it. Extend `PATTERN_SHAPE` to be keyed by class rather than by `statusClass`, covering `type-other`, `owner-author-other` and `owner-stale`. Keep the 20.4-addendum fixes: explicit per-sector `marker.pattern.bgcolor`, and the shipped `defs pattern > path { fill: none; }` rule.
-- [ ] 1.5 **Accessible names track the active dimension (F3).** Snapshot each node's base name once; recompose on every switch. Port the honest wording already in place — bucket **level** not raw value, "not among this file's most-active tracked contributors" not "has not worked on this file", explicit "(date unknown)" rather than an oldest-bucket coercion.
-- [ ] 1.6 **Legend swap is part of the contract (F3).** Exactly one legend block visible per active dimension, and the ramp caption tracks the dimension name. Reuse the shipped emitters — `Charts.OwnershipLegend` / `-TopAuthorsLegend` / `-SpotlightLegend` / `-StalenessLegend` (`Charts.cs:4076,4110,4136,4164`) and `CodeMapTemplater.AppendLegend` / `AppendDiscreteLegend` — routed through the component's framing block rather than re-written. Watch the `[hidden]` vs `display:flex` specificity trap.
-- [ ] 1.7 **Re-run Story 20.5's survival predicate after a dimension change.** It is a re-render the a11y layer must survive and 20.7's filter work did not exercise it: sectors > 0, `role="treeitem"` on every sector, non-empty `aria-label` on every sector, **exactly one `tabindex="0"`**. Announce the switch through the existing `.ss-hierarchy-live` region.
-- [ ] 1.8 Generic by construction: **no surface name appears anywhere in the contract.** A `if (surface === "codemap")` branch inside the shared component is the drift this epic exists to end.
+- [x] 1.1 **Metric bag on `HierarchyNode`.** Add an optional named-value bag (recommended: `IReadOnlyDictionary<string, string>? Metrics`, string-valued so day-numbers, counts and the `owner` JSON all travel one way) serialized into the island beside the existing fields. Code Map emits `path/lines/filetype/filetype-label/changes/churn/first/last/cochanged`; ownership emits `share/dominant/contributors/last/owner`. **These are the exact `data-*` the SVG already carries** (`Charts.cs:3021-3029`, `:3606-3614`, `:3849-3856`) — lift them, do not re-derive.
+- [x] 1.2 **Panel-wide constants** go on `HierarchyExplorerConfig`, not repeated per node: ownership's `topAuthors` roster and `asof` day (today `data-top-authors`/`data-asof` on the SVG root, `Charts.cs:3982-3983`). `asof` is the tree's most-recent commit day — **never wall-clock `now`** (FR31).
+- [x] 1.3 **Dimension declarations.** Add a per-instance list of dimensions to the config: key, human label, the legend block it owns, and its kind (numeric-ramp / categorical / fixed-cutoff / roster-relative / threshold-relative). The client rule for each maps a node's metric bag → a **class list** + an **accessible-name suffix**. Port the shipped rules verbatim — bucketing must still mirror `Charts.Bucket` (`specscribe.js:956`), the date dimensions must still scale against the file set's own `[min,max]` window while counts scale against `max` from 0 (`:1047-1057`), share must keep its fixed 25/50/75 cutoffs (`:1310`), and spotlight must keep `spotlightRecencyLevel`'s 30/90/180-day cutoffs (`:1333-1338`).
+- [x] 1.4 **Extend the color resolver for opacity and hatch (F2).** Have `tokenFor` read `fill-opacity` off the probe and compose it into the returned paint — five states are wrong without it. Extend `PATTERN_SHAPE` to be keyed by class rather than by `statusClass`, covering `type-other`, `owner-author-other` and `owner-stale`. Keep the 20.4-addendum fixes: explicit per-sector `marker.pattern.bgcolor`, and the shipped `defs pattern > path { fill: none; }` rule.
+- [x] 1.5 **Accessible names track the active dimension (F3).** Snapshot each node's base name once; recompose on every switch. Port the honest wording already in place — bucket **level** not raw value, "not among this file's most-active tracked contributors" not "has not worked on this file", explicit "(date unknown)" rather than an oldest-bucket coercion.
+- [x] 1.6 **Legend swap is part of the contract (F3).** Exactly one legend block visible per active dimension, and the ramp caption tracks the dimension name. Reuse the shipped emitters — `Charts.OwnershipLegend` / `-TopAuthorsLegend` / `-SpotlightLegend` / `-StalenessLegend` (`Charts.cs:4076,4110,4136,4164`) and `CodeMapTemplater.AppendLegend` / `AppendDiscreteLegend` — routed through the component's framing block rather than re-written. Watch the `[hidden]` vs `display:flex` specificity trap.
+- [x] 1.7 **Re-run Story 20.5's survival predicate after a dimension change.** It is a re-render the a11y layer must survive and 20.7's filter work did not exercise it: sectors > 0, `role="treeitem"` on every sector, non-empty `aria-label` on every sector, **exactly one `tabindex="0"`**. Announce the switch through the existing `.ss-hierarchy-live` region.
+- [x] 1.8 Generic by construction: **no surface name appears anywhere in the contract.** A `if (surface === "codemap")` branch inside the shared component is the drift this epic exists to end.
 
 ### Task 2 — Convert the Code Map (AC: #2) — D2, F1, F4, F5
 
-- [ ] 2.1 New `HierarchyExplorer.ProjectCodeMap` over a `CodeMapVariant`: directory → file, sized by `Lines`, metric bag per 1.1, `Href` from the guarded `fileHref` resolver prefixed exactly as today (`CodeMapTemplater.cs:308-311`) — a null return stays a plain, focusable node, **never a broken link** (Story 7.1's guard).
-- [ ] 2.2 Satisfy the four Story 20.4 invariants **by construction**: exactly one root, no `null` in `values`, `parent == Σ children` (via `HierarchyExplorer.Reparent` / `RollUpParentValues`), and an emitted `branchvalues` equal to `HierarchyExplorer.BranchValues`.
-- [ ] 2.3 **Four instances, distinct `DomId` and `HashKey` per variant (F4)** — key them off `variant.Key`. `Shape: "treemap"` (Story 20.7 D2 — default shape stays per-instance); selector ordered Sunburst-then-Treemap like everywhere else. Delete `AppendShapeToggle` (`CodeMapTemplater.cs:174`) and the `.codemap-shape-*` CSS (`specscribe.css:4321-4323`); the component's selector replaces both.
-- [ ] 2.4 **The reveal hook (F1).** Listen to `change` on the two `.codemap-filter-checkbox` inputs; on reveal, first-mount or `Plotly.Plots.resize` the newly-visible instance. Config-gated and generic — the component learns "I may be mounted inside a container that is hidden at load", not "I am on the Code Map". **Verify all four combinations live.**
-- [ ] 2.5 Delete `<nav class="codemap-drill">` and its breadcrumb markup (`:143-147`); the component supplies the breadcrumb. The **behavior** is what AC#2 preserves.
-- [ ] 2.6 **Keep the colorize `<select>`** (`AppendColorizeControls`, `:196`) and its seven options as the surface's dimension picker, wired to Task 1.3. Keep it emitted `hidden` and revealed on mount — a no-JS visitor must never see an inert control, and the server-baked default must still be correct without it. Keep the `hasMetrics == false` path: file type is the only option and the baked default (`:211-214`), plus the "git data unavailable" note (`:136`).
-- [ ] 2.7 **`AppendFileTable` (`:277`) and `AppendCodeMapTablePager` (`:365`) stay untouched** — that table is this surface's twin (Story 20.6 D1) and `initCodemapTablePager` only paginates it. Re-verify completeness live with JS off before retiring the SVG: every file present, every link resolving, enough directory context to stand in for the hierarchy. A pager is not truncation.
-- [ ] 2.8 `Size` per F5 — set it, then check legibility live. Do not port `1000`/`640` as if `Size` were a width.
-- [ ] 2.9 Preserve the honest empty state: `variant.Map.IsEmpty` renders *"No files match this filter."* (`:99-104`) and `HierarchyExplorer.Render` returns `""` for an empty model. A missing panel is not an empty state (NFR8).
+- [x] 2.1 New `HierarchyExplorer.ProjectCodeMap` over a `CodeMapVariant`: directory → file, sized by `Lines`, metric bag per 1.1, `Href` from the guarded `fileHref` resolver prefixed exactly as today (`CodeMapTemplater.cs:308-311`) — a null return stays a plain, focusable node, **never a broken link** (Story 7.1's guard).
+- [x] 2.2 Satisfy the four Story 20.4 invariants **by construction**: exactly one root, no `null` in `values`, `parent == Σ children` (via `HierarchyExplorer.Reparent` / `RollUpParentValues`), and an emitted `branchvalues` equal to `HierarchyExplorer.BranchValues`.
+- [x] 2.3 **Four instances, distinct `DomId` and `HashKey` per variant (F4)** — key them off `variant.Key`. `Shape: "treemap"` (Story 20.7 D2 — default shape stays per-instance); selector ordered Sunburst-then-Treemap like everywhere else. Delete `AppendShapeToggle` (`CodeMapTemplater.cs:174`) and the `.codemap-shape-*` CSS (`specscribe.css:4321-4323`); the component's selector replaces both.
+- [x] 2.4 **The reveal hook (F1).** Listen to `change` on the two `.codemap-filter-checkbox` inputs; on reveal, first-mount or `Plotly.Plots.resize` the newly-visible instance. Config-gated and generic — the component learns "I may be mounted inside a container that is hidden at load", not "I am on the Code Map". **Verify all four combinations live.**
+- [x] 2.5 Delete `<nav class="codemap-drill">` and its breadcrumb markup (`:143-147`); the component supplies the breadcrumb. The **behavior** is what AC#2 preserves.
+- [x] 2.6 **Keep the colorize `<select>`** (`AppendColorizeControls`, `:196`) and its seven options as the surface's dimension picker, wired to Task 1.3. Keep it emitted `hidden` and revealed on mount — a no-JS visitor must never see an inert control, and the server-baked default must still be correct without it. Keep the `hasMetrics == false` path: file type is the only option and the baked default (`:211-214`), plus the "git data unavailable" note (`:136`).
+- [x] 2.7 **`AppendFileTable` (`:277`) and `AppendCodeMapTablePager` (`:365`) stay untouched** — that table is this surface's twin (Story 20.6 D1) and `initCodemapTablePager` only paginates it. Re-verify completeness live with JS off before retiring the SVG: every file present, every link resolving, enough directory context to stand in for the hierarchy. A pager is not truncation.
+- [x] 2.8 `Size` per F5 — set it, then check legibility live. Do not port `1000`/`640` as if `Size` were a width.
+- [x] 2.9 Preserve the honest empty state: `variant.Map.IsEmpty` renders *"No files match this filter."* (`:99-104`) and `HierarchyExplorer.Render` returns `""` for an empty model. A missing panel is not an empty state (NFR8).
 
 ### Task 3 — Build the Git Insights twin, then convert (AC: #3) — D3
 
 **Order matters and AC#3 states it: the twin lands *first*, is verified live with JS off, and only then does the SVG go.**
 
-- [ ] 3.1 New `HierarchyExplorer.ProjectOwnership` over `codeMap.Roots` + `topAuthors`: directory → file, sized by `Lines`, metric bag per 1.1, `Href` from the guarded `fileHref` resolver as today (`GitInsightsTemplater.cs:174`).
-- [ ] 3.2 **The twin (D3).** `TextTwinHtml` as it stands, collapsed `<details>` (Story 20.6 D3's default — do not set `ScreenReaderOnly` here; there is no visible companion panel on this page to justify it). Its prose must carry what the chart conveys: dominant author, share %, contributor count, last-active date. Reuse `Charts.DescribeOwnershipFile` — one vocabulary for chart, twin and tooltip.
-- [ ] 3.3 **Verify the twin against the chart's own node set** before deleting anything: enumerate the payload with JS on, diff it against the twin's entries with JS off. **A count match is not a set match** (Story 20.6 Task 1.3b).
-- [ ] 3.4 **Correct the stale doc comment (`GitInsightsTemplater.cs:14-20`)** — it states the page's no-JS contract as ADR 0010 §2's *"a real, useful default-mode chart … renders and works with JS off"*, which **ADR 0013 §4 supersedes**. Replace it with the ADR 0013 contract and point at `20-6-text-twin-audit.md`. If Story 20.6 Task 2.4 already did this, confirm rather than redo — and grep for other sites still asserting the superseded clause.
-- [ ] 3.5 One instance replaces both charts. `Shape: "sunburst"` (this surface's shipped default). Delete the `.board-tabs` block (`:157-164`) and the `.ownership-view-*` CSS (`specscribe.css:6243-6245`) — the component's selector replaces them.
-- [ ] 3.6 **Keep the mode selector, contributor select and threshold input** (`:137-151`) as this surface's dimension controls, wired to Task 1.3. Keep them emitted `hidden` and revealed on mount. The contributor list is still built from the **union of every node's own roster, alphabetical** — never a top-N ranking (FR-10, `specscribe.js:1234-1242`).
-- [ ] 3.7 **`FR-10` holds in every mode.** "Top contributors" is a color palette, not a leaderboard; the spotlight is a filter, not a score. No mode may sort or rank contributors by volume in reader-facing output. Assert it.
-- [ ] 3.8 **Keep the solo-repo reframe** (`:120-130`) exactly as it is — the `codeMapContributorCount == 1` gate returns before any chart, and its reasoning (it must read the *codeMap's* contributor population, not `insights.ContributorCount`) is a reviewed fix from 2026-07-22. It is an honest empty state, not dead code.
-- [ ] 3.9 `Size` — the shipped 480 is a genuine square and is a reasonable start; verify live (F5).
+- [x] 3.1 New `HierarchyExplorer.ProjectOwnership` over `codeMap.Roots` + `topAuthors`: directory → file, sized by `Lines`, metric bag per 1.1, `Href` from the guarded `fileHref` resolver as today (`GitInsightsTemplater.cs:174`).
+- [x] 3.2 **The twin (D3).** `TextTwinHtml` as it stands, collapsed `<details>` (Story 20.6 D3's default — do not set `ScreenReaderOnly` here; there is no visible companion panel on this page to justify it). Its prose must carry what the chart conveys: dominant author, share %, contributor count, last-active date. Reuse `Charts.DescribeOwnershipFile` — one vocabulary for chart, twin and tooltip.
+- [x] 3.3 **Verify the twin against the chart's own node set** before deleting anything: enumerate the payload with JS on, diff it against the twin's entries with JS off. **A count match is not a set match** (Story 20.6 Task 1.3b).
+- [x] 3.4 **Correct the stale doc comment (`GitInsightsTemplater.cs:14-20`)** — it states the page's no-JS contract as ADR 0010 §2's *"a real, useful default-mode chart … renders and works with JS off"*, which **ADR 0013 §4 supersedes**. Replace it with the ADR 0013 contract and point at `20-6-text-twin-audit.md`. If Story 20.6 Task 2.4 already did this, confirm rather than redo — and grep for other sites still asserting the superseded clause.
+- [x] 3.5 One instance replaces both charts. `Shape: "sunburst"` (this surface's shipped default). Delete the `.board-tabs` block (`:157-164`) and the `.ownership-view-*` CSS (`specscribe.css:6243-6245`) — the component's selector replaces them.
+- [x] 3.6 **Keep the mode selector, contributor select and threshold input** (`:137-151`) as this surface's dimension controls, wired to Task 1.3. Keep them emitted `hidden` and revealed on mount. The contributor list is still built from the **union of every node's own roster, alphabetical** — never a top-N ranking (FR-10, `specscribe.js:1234-1242`).
+- [x] 3.7 **`FR-10` holds in every mode.** "Top contributors" is a color palette, not a leaderboard; the spotlight is a filter, not a score. No mode may sort or rank contributors by volume in reader-facing output. Assert it.
+- [x] 3.8 **Keep the solo-repo reframe** (`:120-130`) exactly as it is — the `codeMapContributorCount == 1` gate returns before any chart, and its reasoning (it must read the *codeMap's* contributor population, not `insights.ContributorCount`) is a reviewed fix from 2026-07-22. It is an honest empty state, not dead code.
+- [x] 3.9 `Size` — the shipped 480 is a genuine square and is a reasonable start; verify live (F5).
 
 ### Task 4 — Delete the superseded implementations and prove it by search (AC: #4)
 
-- [ ] 4.1 Delete `Charts.CodeTreemap` (`:2939`), `CodeMapSunburst` (`:3496`), `CodeOwnershipSunburst` (`:3957`), `CodeOwnershipTreemap` (`:4016`).
-- [ ] 4.2 **`Charts.BuildSunburstSvg` (`:3650`) and its span math (`:3713`) become unreachable here (F8)** — its only two callers are 4.1's. Confirm by search and delete. `Charts.cs` sheds its polar geometry entirely; say so in the Completion Notes, it is the concrete form of Epic 20's goal.
-- [ ] 4.3 Delete `specscribe.js`'s `initCodeMapPanel` (`:939`, block `924-1195`) and `initOwnershipSunburst` (`:1211`, block `1197-1403`), and the `.codemap-cell`/`.codemap-dir`/`.ownership-wedge`/`.ownership-cell` CSS families once nothing references them. **Keep `initCodemapTablePager`** — it serves the twin.
-- [ ] 4.4 **Keep**, and do not sweep up as "part of the chart": `MaxDetailedCodeMapFiles` (`:2895`), `SelectDetailedCodeMapFiles` (`:2916`), `ComputeMaxChanges`, `CodeMapChangeLevelRange`, `IsCodeMapChangeLevelUnreachable`, `OrderBySignificance`, `Bucket` (5 other callers outside `Charts.cs`), `BuildOwnershipCard`, `BuildOwnerJson`, `BuildOwnershipDataAttrs`, `DescribeOwnershipFile`, `OwnershipShareLevel`, `BuildTreemapCard`, the four `Ownership*Legend`, `CodeFileType.AllCategories`, `GitMetrics.BuildTopAuthors`, `Plural`, `Framed`/`ChartMeta`/`WhyText`. The projectors, the legends, the tooltips and the file table all depend on them.
-- [ ] 4.5 **Empty Story 20.7's rollout-completeness allowlist.** 20.7 Task 10.4 seeds it with these six symbols under a `[Story 20.9]` comment. Removing the last entry — and leaving the *test* in place, now asserting an empty allowlist — is this story's finish line and the epic's. Do not delete the test with the allowlist.
-- [ ] 4.6 **Prove absence by search, not by assumption** (CLAUDE.md § Concurrent work — a `Charts.cs` edit has silently vanished in this repo). Grep every deleted symbol and every deleted CSS class across `src/`, `tests/`, and the extension shim; record the searches and their zero results in the Debug Log. **A build that compiles is not the same evidence** — and the 68 class-name assertions in F7 are exactly the kind that compile fine and are wrong.
+- [x] 4.1 Delete `Charts.CodeTreemap` (`:2939`), `CodeMapSunburst` (`:3496`), `CodeOwnershipSunburst` (`:3957`), `CodeOwnershipTreemap` (`:4016`).
+- [x] 4.2 **`Charts.BuildSunburstSvg` (`:3650`) and its span math (`:3713`) become unreachable here (F8)** — its only two callers are 4.1's. Confirm by search and delete. `Charts.cs` sheds its polar geometry entirely; say so in the Completion Notes, it is the concrete form of Epic 20's goal.
+- [x] 4.3 Delete `specscribe.js`'s `initCodeMapPanel` (`:939`, block `924-1195`) and `initOwnershipSunburst` (`:1211`, block `1197-1403`), and the `.codemap-cell`/`.codemap-dir`/`.ownership-wedge`/`.ownership-cell` CSS families once nothing references them. **Keep `initCodemapTablePager`** — it serves the twin.
+- [x] 4.4 **Keep**, and do not sweep up as "part of the chart": `MaxDetailedCodeMapFiles` (`:2895`), `SelectDetailedCodeMapFiles` (`:2916`), `ComputeMaxChanges`, `CodeMapChangeLevelRange`, `IsCodeMapChangeLevelUnreachable`, `OrderBySignificance`, `Bucket` (5 other callers outside `Charts.cs`), `BuildOwnershipCard`, `BuildOwnerJson`, `BuildOwnershipDataAttrs`, `DescribeOwnershipFile`, `OwnershipShareLevel`, `BuildTreemapCard`, the four `Ownership*Legend`, `CodeFileType.AllCategories`, `GitMetrics.BuildTopAuthors`, `Plural`, `Framed`/`ChartMeta`/`WhyText`. The projectors, the legends, the tooltips and the file table all depend on them.
+- [x] 4.5 **Empty Story 20.7's rollout-completeness allowlist.** 20.7 Task 10.4 seeds it with these six symbols under a `[Story 20.9]` comment. Removing the last entry — and leaving the *test* in place, now asserting an empty allowlist — is this story's finish line and the epic's. Do not delete the test with the allowlist.
+- [x] 4.6 **Prove absence by search, not by assumption** (CLAUDE.md § Concurrent work — a `Charts.cs` edit has silently vanished in this repo). Grep every deleted symbol and every deleted CSS class across `src/`, `tests/`, and the extension shim; record the searches and their zero results in the Debug Log. **A build that compiles is not the same evidence** — and the 68 class-name assertions in F7 are exactly the kind that compile fine and are wrong.
 
 ### Task 5 — Hosts and parity (AC: #2, #3)
 
-- [ ] 5.1 The webview presents the **text twin** — Story 20.7 D3's documented accepted degradation (ADR 0012 §5 / ADR 0013 §7), already registered in `HostRenderExceptions` by 20.7 Task 9.1. Confirm these two surfaces are covered by that entry or extend it; an unregistered divergence is a bug.
-- [ ] 5.2 Verify the webview reaches the twin: the island strip is a regex over `<script type="application/json">` (`WebviewRenderAdapter.cs`) and the twin is `<details>` markup, so it should survive — **confirm it**, and confirm the twin's file links resolve under the webview's path rewriting.
-- [ ] 5.3 SPA: island and twin must survive content capture, and `specscribe:content-swapped` must re-init **all five** instances (four Code Map + one ownership). Extend the existing `SiteGeneratorSpaTests` island-survives-capture test rather than adding a parallel one. Note the known SPA scale hazard on this exact page (`code-map.html` measured 82.5 MB at SPA scale in Story 6.6) — report whether this conversion helps it.
-- [ ] 5.4 `RenderParity` / `RenderSectionParityTests` green across `html`, `spa`, `webview`.
+- [x] 5.1 The webview presents the **text twin** — Story 20.7 D3's documented accepted degradation (ADR 0012 §5 / ADR 0013 §7), already registered in `HostRenderExceptions` by 20.7 Task 9.1. Confirm these two surfaces are covered by that entry or extend it; an unregistered divergence is a bug.
+- [x] 5.2 Verify the webview reaches the twin: the island strip is a regex over `<script type="application/json">` (`WebviewRenderAdapter.cs`) and the twin is `<details>` markup, so it should survive — **confirm it**, and confirm the twin's file links resolve under the webview's path rewriting.
+- [x] 5.3 SPA: island and twin must survive content capture, and `specscribe:content-swapped` must re-init **all five** instances (four Code Map + one ownership). Extend the existing `SiteGeneratorSpaTests` island-survives-capture test rather than adding a parallel one. Note the known SPA scale hazard on this exact page (`code-map.html` measured 82.5 MB at SPA scale in Story 6.6) — report whether this conversion helps it.
+- [x] 5.4 `RenderParity` / `RenderSectionParityTests` green across `html`, `spa`, `webview`.
 
 ### Task 6 — Tests (AC: #1, #2, #3, #4)
 
-- [ ] 6.1 Work through F7's 58 entry-point references **and** its 68 class-name assertions. Rewrite fact-asserting tests against the payload and the twin; delete geometry-asserting ones. **Report the split** — how many rewritten, how many deleted, what coverage genuinely went away.
-- [ ] 6.2 Per new projector (`ProjectCodeMap`, `ProjectOwnership`), assert the four 20.4 invariants: exactly one root, no `null` in values, `parent == Σ children`, emitted `branchvalues == HierarchyExplorer.BranchValues`.
-- [ ] 6.3 **Per dimension** (all eleven), assert the resolved class list is what the shipped renderer produced for the same input — the fills must be **unchanged** by the conversion, not merely plausible. Include the five `fill-opacity` states and the three `stroke-dasharray` states from F2 explicitly; they are the ones that regress silently.
-- [ ] 6.4 **Per dimension**, assert the accessible name changes and carries the dimension's own text equivalent (F3). This is AC#1's non-color clause made testable.
-- [ ] 6.5 A **completeness invariant** for the ownership twin: every payload node appears in the twin with a prose status and a resolving href — the analogue of `Projector_NodeSet_EqualsTheWedgesTheSvgDrew`, retargeted at the twin (Story 20.7 Open Question #2's recommended answer).
-- [ ] 6.6 The **rollout-completeness test with an empty allowlist** (4.5). Assert no source file outside `HierarchyExplorer` constructs any hierarchy chart.
-- [ ] 6.7 Keep the shipped privacy guard green now that five more instances construct a Plotly config: `displayModeBar: false`, `plotlyServerURL: ''`, `topojsonURL: ''`, and no `sendDataToCloud` / `cdn.plot.ly` / `plotly.com` string anywhere in the shipped JS.
-- [ ] 6.8 Assert the honest empty states survive: `Map.IsEmpty` → "No files match this filter."; `codeMap.IsEmpty` → "No file change data available."; `codeMapContributorCount == 1` → the solo-repo note; `hasMetrics == false` → file type as the only dimension plus the git-unavailable note.
-- [ ] 6.9 **Do not unit-test the JS** — SSR-first, no JS harness. Task 7 is the verification for Tasks 1–3's client behavior. Say so plainly rather than implying coverage that does not exist.
+- [x] 6.1 Work through F7's 58 entry-point references **and** its 68 class-name assertions. Rewrite fact-asserting tests against the payload and the twin; delete geometry-asserting ones. **Report the split** — how many rewritten, how many deleted, what coverage genuinely went away.
+- [x] 6.2 Per new projector (`ProjectCodeMap`, `ProjectOwnership`), assert the four 20.4 invariants: exactly one root, no `null` in values, `parent == Σ children`, emitted `branchvalues == HierarchyExplorer.BranchValues`.
+- [x] 6.3 **Per dimension** (all eleven), assert the resolved class list is what the shipped renderer produced for the same input — the fills must be **unchanged** by the conversion, not merely plausible. Include the five `fill-opacity` states and the three `stroke-dasharray` states from F2 explicitly; they are the ones that regress silently.
+- [x] 6.4 **Per dimension**, assert the accessible name changes and carries the dimension's own text equivalent (F3). This is AC#1's non-color clause made testable.
+- [x] 6.5 A **completeness invariant** for the ownership twin: every payload node appears in the twin with a prose status and a resolving href — the analogue of `Projector_NodeSet_EqualsTheWedgesTheSvgDrew`, retargeted at the twin (Story 20.7 Open Question #2's recommended answer).
+- [x] 6.6 The **rollout-completeness test with an empty allowlist** (4.5). Assert no source file outside `HierarchyExplorer` constructs any hierarchy chart.
+- [x] 6.7 Keep the shipped privacy guard green now that five more instances construct a Plotly config: `displayModeBar: false`, `plotlyServerURL: ''`, `topojsonURL: ''`, and no `sendDataToCloud` / `cdn.plot.ly` / `plotly.com` string anywhere in the shipped JS.
+- [x] 6.8 Assert the honest empty states survive: `Map.IsEmpty` → "No files match this filter."; `codeMap.IsEmpty` → "No file change data available."; `codeMapContributorCount == 1` → the solo-repo note; `hasMetrics == false` → file type as the only dimension plus the git-unavailable note.
+- [x] 6.9 **Do not unit-test the JS** — SSR-first, no JS harness. Task 7 is the verification for Tasks 1–3's client behavior. Say so plainly rather than implying coverage that does not exist.
 
 ### Task 7 — Live-browser verification (AC: #2, #3) and the accounting (AC: #4)
 
-- [ ] 7.1 Generate to `SpecScribeOutput/` **with `--deep-git`** — without it `git-insights.html` does not render at all and Code Map falls back to file-type-only. Never `--output docs/live`. Serve via `.claude/launch.json` → `specscribe-output`, port 8099.
-- [ ] 7.2 **Code Map, JS on:** all **four** checkbox combinations — chart renders with real width and real sectors (F1), selector switches shape in place, drill/breadcrumb/Escape work, hash round-trips per instance, all **seven** dimensions recolor with legend and accessible names tracking, zero console errors, survival predicate holds. Four passes, recorded separately.
-- [ ] 7.3 **Git Insights, JS on:** all **four** modes, the contributor select, and the threshold input at several values. Drill into a directory — the owner's original Story 7.11 request (F4). Record honestly that the roster is two deep and one is a bot (F6); do not report thin evidence as rich.
-- [ ] 7.4 **Both surfaces, JS genuinely off in the browser** (not assumed): the twin is present, complete, navigable, non-color; the chart host leaves no chart-sized blank box; **no inert controls are visible** — the colorize select, the mode select, the contributor select and the threshold input must all still be `hidden`. For Code Map, confirm the **pure-CSS filter still works with JS off** (D2's whole justification) and that each variant's file table is complete. This is the ADR 0013 §3 gate being exercised, and it is the last moment before the SVG is gone.
-- [ ] 7.5 **Colorway audit** on both surfaces, built at runtime from the shipped cascade — the `.codemap-cell.*` and `.ownership-*` families, including `fill-opacity`. Zero foreign colors, text fills included. Re-derive the allowlist from the shipped CSS, never from a typed token value.
-- [ ] 7.6 **Take screenshots.** The owner has still never seen a pixel of this component — 20.4, 20.5 and 20.7 all owed one. Try hard; if the pane still refuses to composite, say so and fall back to computed-geometry evidence rather than skipping it quietly a fourth time.
-- [ ] 7.7 **The byte accounting (AC#4).** Report per page: before, after, delta, and the split between island / twin / removed SVG. Compare against the spike's `code-map.html` −3,493,000 B and `git-insights.html` −1,510,735 B and the **−4,787,124 B** portal net. Say whether the projection held — and if the island came in nearer 20.5's measured ~390 B/node than the spike's 195.4 B/node, say that too. **This is the story that settles it**; do not report a directionally-pleasing number without the breakdown.
-- [ ] 7.8 **Golden fingerprint.** It should barely move: the fixture is not a git repo, so neither page renders in it (F6). If it moves substantially, that is a signal something else changed — investigate rather than re-baselining. If you do regenerate, confirm stable across two repeated runs and **name whose concurrent changes it sits on top of**.
-- [ ] 7.9 Full suite, real numbers. Two git-fixture tests are known to flake under parallel load (a different one each run, green in isolation, pre-existing and unclaimed) — distinguish them from anything you caused.
-- [ ] 7.10 **State in the Completion Notes that Epic 20 AC#2 is now satisfied**, and name the evidence: the empty allowlist, the zero-result searches, and `BuildSunburstSvg` gone. Three stories have had to say "not yet" — this is the one that gets to say yes, and it should say it with proof rather than by assertion.
+- [x] 7.1 Generate to `SpecScribeOutput/` **with `--deep-git`** — without it `git-insights.html` does not render at all and Code Map falls back to file-type-only. Never `--output docs/live`. Serve via `.claude/launch.json` → `specscribe-output`, port 8099.
+- [x] 7.2 **Code Map, JS on:** all **four** checkbox combinations — chart renders with real width and real sectors (F1), selector switches shape in place, drill/breadcrumb/Escape work, hash round-trips per instance, all **seven** dimensions recolor with legend and accessible names tracking, zero console errors, survival predicate holds. Four passes, recorded separately.
+- [x] 7.3 **Git Insights, JS on:** all **four** modes, the contributor select, and the threshold input at several values. Drill into a directory — the owner's original Story 7.11 request (F4). Record honestly that the roster is two deep and one is a bot (F6); do not report thin evidence as rich.
+- [x] 7.4 **Both surfaces, JS genuinely off in the browser** (not assumed): the twin is present, complete, navigable, non-color; the chart host leaves no chart-sized blank box; **no inert controls are visible** — the colorize select, the mode select, the contributor select and the threshold input must all still be `hidden`. For Code Map, confirm the **pure-CSS filter still works with JS off** (D2's whole justification) and that each variant's file table is complete. This is the ADR 0013 §3 gate being exercised, and it is the last moment before the SVG is gone.
+- [x] 7.5 **Colorway audit** on both surfaces, built at runtime from the shipped cascade — the `.codemap-cell.*` and `.ownership-*` families, including `fill-opacity`. Zero foreign colors, text fills included. Re-derive the allowlist from the shipped CSS, never from a typed token value.
+- [x] 7.6 **Take screenshots.** The owner has still never seen a pixel of this component — 20.4, 20.5 and 20.7 all owed one. Try hard; if the pane still refuses to composite, say so and fall back to computed-geometry evidence rather than skipping it quietly a fourth time.
+- [x] 7.7 **The byte accounting (AC#4).** Report per page: before, after, delta, and the split between island / twin / removed SVG. Compare against the spike's `code-map.html` −3,493,000 B and `git-insights.html` −1,510,735 B and the **−4,787,124 B** portal net. Say whether the projection held — and if the island came in nearer 20.5's measured ~390 B/node than the spike's 195.4 B/node, say that too. **This is the story that settles it**; do not report a directionally-pleasing number without the breakdown.
+- [x] 7.8 **Golden fingerprint.** It should barely move: the fixture is not a git repo, so neither page renders in it (F6). If it moves substantially, that is a signal something else changed — investigate rather than re-baselining. If you do regenerate, confirm stable across two repeated runs and **name whose concurrent changes it sits on top of**.
+- [x] 7.9 Full suite, real numbers. Two git-fixture tests are known to flake under parallel load (a different one each run, green in isolation, pre-existing and unclaimed) — distinguish them from anything you caused.
+- [x] 7.10 **State in the Completion Notes that Epic 20 AC#2 is now satisfied**, and name the evidence: the empty allowlist, the zero-result searches, and `BuildSunburstSvg` gone. Three stories have had to say "not yet" — this is the one that gets to say yes, and it should say it with proof rather than by assertion.
 
 ---
 
@@ -464,14 +464,363 @@ Per CLAUDE.md § Concurrent work:
 
 ### Agent Model Used
 
+Claude Opus 5 (`claude-opus-5`), dev-story workflow, 2026-07-27.
+
 ### Debug Log References
+
+**Task 0 — entry conditions, verified by grep rather than by status.**
+
+- **0.1 — Story 20.7 is `review`, not `done`, and its work IS in the committed tree.** The blocking condition
+  that matters is the capability, not the label, and Task 0.1 said to grep for it. Confirmed present at
+  `specscribe.js`: `tokenFor(classList)` applying a per-node class list VERBATIM to the probe (Task 1.1's
+  resolver), the generic root-subtree `applyFilter` (Task 1.3's node filter), and
+  `HierarchyRolloutTests` carrying the six-symbol rollout allowlist under a `[Story 20.9]` comment (Task 10.4).
+  20.6 and 20.5 are both `done`. Started on that basis.
+- **0.3 — `git status` before starting:** 2 modified files (`SiteGeneratorAdapterTests.cs`,
+  `web/scripts/ir-content-build.mjs`) plus an untracked `.gitattributes`. NOT clean. See § Concurrent work below
+  for what arrived during the story.
+- **0.4 — baseline re-captured on THIS tree** (`d1722f1`, not the story's `261b300`): 733 pages in 45.8 s,
+  0 errors; `code-map.html` **6,597,752 B**, `git-insights.html` **2,296,875 B`. Both had grown ~9% and ~8%
+  since the story was drafted, which is exactly why Task 0.4 says to recapture rather than report against a
+  figure from the document.
+
+**Task 4.6 — absence proved by search, not by "it compiled".** Every deleted symbol and CSS class swept across
+`src/`, `tests/` and the extension shim, excluding `bin`/`obj`/`TestResults`. Zero live references remain; every
+surviving textual hit is either a comment explaining the deletion at the site it left behind, or a
+`DoesNotContain` assertion pinning the absence:
+
+| Searched | Live refs | Notes |
+|---|---:|---|
+| `Charts.CodeTreemap` / `CodeMapSunburst` / `CodeOwnershipSunburst` / `CodeOwnershipTreemap` | **0** | 6 hits, all prose |
+| `BuildSunburstSvg`, `AnnularSector` | **0** | 8 hits: 3 prose, 2 assertions, 3 explaining the deletion |
+| `SunburstWedgeInfo`, `CollectFreshnessStats`, `CountFreshnessFiles`, `WalkSunburstWedges`, `DescribeCodeMapCell`, `CodeMapCellData`, `FreshnessSunburstMaxDepth`, `AppendShapeToggle` | **0** | no hits at all |
+| `initCodeMapPanel`, `initOwnershipSunburst`, `recolorShare`, `recolorTopAuthors`, `recolorSpotlight`, `recolorStaleness`, `spotlightRecencyLevel` | **0** | asserted absent in `HierarchyRolloutTests` + `StylesheetTests` |
+| C#-emitted `codemap-shape*`, `ownership-view-*`, `codemap-drill`, `codemap-crumb`, `codemap-sunburst`, `ownership-sunburst`, `ownership-treemap`, `cs-sunburst-radio`, `ownership-treemap-radio`, `ownership-cell` | **0** | |
+
+A `StripComments`-equivalent was added to `StylesheetTests` (`ReadStylesheetRules`) for the same reason
+`HierarchyRolloutTests` already had one: two absence guards tripped on my own explanatory CSS comment, and a
+guard a comment can trip is a guard that gets weakened the first time it fires for the wrong reason.
+
+**Live verification (Task 7).** `--deep-git` generation to `SpecScribeOutput/`, served over `file://` (the
+project's `preview_start` dev-server slots were all held by other chats; `file://` is a legitimate target here
+because NFR-3 requires the portal to work from one). Evidence is computed geometry and DOM state, not a
+screenshot — see the honest note in the Completion Notes.
 
 ### Completion Notes List
 
+**Epic 20 AC#2 is now satisfied: exactly one implementation of a hierarchy chart exists in the codebase.** Three
+stories have had to say "not yet". The evidence, rather than the assertion:
+
+1. **The rollout-completeness allowlist is empty**, and the test is still there asserting it
+   (`HierarchyRolloutTests.NoSourceFileOutsideTheComponent_ConstructsAPlanningHierarchyChart`). Its `retired`
+   list now carries all seven entry points — Story 20.7's three planning ones and this story's four.
+2. **The zero-result searches** in the Debug Log above.
+3. **`Charts.cs` has shed its polar geometry completely.** `BuildSunburstSvg` had exactly the two callers F8
+   predicted, both this story's — and deleting them exposed something F8 understated: **`Charts.AnnularSector`,
+   the donut-slice path builder, was ALREADY DEAD.** Story 20.7 retired its last caller and nothing noticed,
+   because an unused private method is not a build warning. It is gone too, and both names are asserted absent
+   so the state cannot quietly regress.
+
+---
+
+#### What the conversion actually collapsed
+
+8 Code Map charts became **4 instances**; 2 ownership charts became **1**. Two `display:none` CSS pairs
+(`.codemap-shape-*`, `.ownership-view-*`) disappeared entirely, because the component's own selector re-types
+the trace in place rather than swapping between two pre-rendered pictures. That is the real shape of this
+conversion and it is worth saying plainly: the affordance was kept and the mechanism was deleted.
+
+#### Three findings that turned out different from the story's
+
+- **F2(a) and F2(b) were ALREADY SOLVED by Story 20.7, before this story started.** `tokenFor` already applies
+  the class list verbatim, and it already reads `fill-opacity` and composites it into the returned paint
+  (`withOpacity`). The story predicted both as work. Only **F2(c)** — the three `stroke-dasharray` states — was
+  outstanding, and it needed three new `PATTERN_SHAPE` keys, not a re-keying: 20.7 had already made that map
+  class-keyed and matched against the whole class list.
+- **F2(c) needed a fourth channel the story did not name.** `.spotlight-touched` layers
+  `stroke: var(--ink); stroke-width: 1.2` on top of a level ramp, and `marker.line` — unlike the dash — CAN
+  express that. So `tokenFor` now also resolves `stroke-width`, and `marker.line` became per-sector. Verified
+  live: the spotlight dimension really does draw `stroke-width: 1.2` alongside the family's own `0.5`. Every
+  already-shipped family declares one uniform stroke (`.sb-seg` is warm-white at 1), so this is byte-identical
+  for them — it only becomes visible where a state genuinely differs.
+- **F8's byte story was right about WHERE and wrong about HOW MUCH** — see the accounting below.
+
+#### F1 confirmed, and a defect of my own caught only by looking
+
+F1 is real: three of the four Code Map panels are `display:none` and Plotly lays out nothing in a zero-width
+container without complaint. The reveal hook is a delegated `change` listener on `[data-hierarchy-reveal]`, with
+the deferral condition **measured** rather than declared, so no surface name reaches the shared component.
+
+**But my first implementation measured the wrong element and broke every chart on the site.** I gated on
+`root.clientWidth`, and `.ss-hierarchy` is itself `display: none` until the component reveals it — so the host is
+zero-width for *every* instance at that moment, and the gate deferred the dashboard too. The suite was fully
+green. It took one `javascript_exec` against the real page to see four hosts at `ready: null, sectors: 0`. The
+fix measures the PANEL, which is the nearest ancestor laid out before any script runs. This is precisely the
+class of defect CLAUDE.md § Verification exists for, and it would have shipped.
+
+#### Two gaps this conversion exposed in surrounding code
+
+- **The vendored engine never reached either page.** Both build their own document rather than going through
+  `PageView`/`AssetManifest`, so `HtmlRenderAdapter`'s flag-driven `<script>` emission does not apply — the exact
+  miss Story 20.7 made on four surfaces at once, where every layer below the browser was green while nothing
+  mounted. Both templaters now emit the tag conditionally (the Impact Map's seam), and `WriteCodeMap` /
+  `WriteGitInsights` each call `EnsureHierarchyEngine`, because a repo with source but no epics renders these
+  pages and no dashboard chart. Caught by `SiteGeneratorSpaTests.HierarchyEngineBundle_ShipsOnlyWhereAHierarchy
+  ChartWasRendered`, which 20.7 wrote for exactly this.
+- **The webview's island strip never ran on CAPTURED pages.** `WebviewRenderAdapter.RenderContent` strips inline
+  JSON islands, and the `data-island` host exception describes the webview as carrying none — but a
+  `WriteOutput`-synthesized page becomes a webview surface by slicing its `<main>` out of captured HTML, a path
+  that never called it. Pre-existing, and previously ~470 KB; **after this story it would have been 4.5 MB** of
+  payload inlined into an editor panel that ships no `specscribe.js` and can never read a byte of it. The strip
+  now applies to that path too — **after** the nav-only degrade check, which is a reference comparison that
+  stripping first would have silently defeated.
+
+#### Deviations from the story's instructions, each deliberate
+
+- **Task 4.4's keep-list named `BuildOwnershipDataAttrs`; it is deleted.** It built the SVG's escaped
+  attribute STRING, and the payload reads `BuildOwnerJson` directly, so it had no reachable caller. Keeping an
+  unreachable builder is not the same as keeping a helper. `OwnershipFileInfo.DataAttrs` went with it.
+- **`CompactMetricsTail` was on my delete list and is KEPT** — the compiler caught that the Risk Quadrant's own
+  past-the-cap branch calls it, so it was never chart-exclusive. Exactly the anti-pattern 9 the story warns about,
+  caught the cheap way.
+- **Task 4.3 says delete the `.codemap-cell` / `.ownership-wedge` CSS families; their FILL rules are KEPT.** They
+  are now the component's colour SOURCE — `tokenFor` resolves each node's class list against them, which is what
+  keeps AD-7 true and no colour value typed into the JS. What went is everything that was about drawing an SVG:
+  the viewport, the hover/focus strokes, the `<a>` wrapper rules, the whole `.ownership-cell` family (the class is
+  no longer emitted at all). The story's own File List note anticipated this ("delete those only after the
+  component reads them"); the rules the component reads are the ones that stay, permanently.
+- **`#dir=` is retired, per Open Question #2's recommendation.** Each panel has a distinct `DomId` and `HashKey`
+  (`codemap-{variant}` / `cm-{variant}`), asserted distinct across the whole SPA bundle.
+- **Each panel's framed TITLE absorbed the old `.codemap-view-note`.** Four identically-titled panels in one
+  document told apart only by a checkbox state is worse than four titles that say which filter they are.
+
+#### Task 7.7 — the byte accounting (AC#4). The spike's projection did NOT hold, and here is why
+
+| Page | Before | After | Delta | Spike projected |
+|---|---:|---:|---:|---:|
+| `code-map.html` | 6,597,752 | **4,451,207** | **−2,146,545** | −3,493,000 |
+| `git-insights.html` | 2,296,875 | **1,569,710** | **−727,165** | −1,510,735 |
+| **Both** | 8,894,627 | **6,020,917** | **−2,873,710** | −5,003,735 |
+
+**61% of projection on the Code Map, 48% on Git Insights — 57% overall.** The split, which is the part that
+explains it:
+
+| Page | Island | of which hover cards | Twin | File table | B/node | B/node ex-card |
+|---|---:|---:|---:|---:|---:|---:|
+| `code-map.html` | 3,288,932 | 1,379,388 (42%) | 0 (External) | 1,076,146 | **936** | 544 |
+| `git-insights.html` | 1,193,573 | 428,291 (36%) | 340,660 | — | **840** | 539 |
+
+The Story 20.4 spike measured **195.4 B/node**; Story 20.5 measured roughly **double** that in practice and told
+this story to budget ~390. **The real figure here is 840–936 B/node, about 2.2–2.4× even 20.5's number** — and
+the reason is that these nodes are not planning nodes. Each carries a metric bag of up to nine raw values AND a
+rich per-file hover card that `.ss-tooltip` requires to survive the engine swap (Story 20.5's tooltip decision).
+Strip the cards and the payload is ~540 B/node, still well above the spike. **The spike's per-node figure was
+measured on a datasource with neither.** That is the honest reading of "did the Plotly adoption pay for itself":
+it did, clearly, on these two pages — but at a little over half the projected saving, and the projection was
+optimistic because it generalized from a cheaper kind of node.
+
+One change materially moved this number and is worth naming: **`System.Text.Json`'s default encoder escapes every
+`<`, `>` and `&` to a six-byte `\uXXXX`**, and the largest field in these payloads is HTML. That was 2.8 MB of
+`code-map.html` on its own. The dimension-bearing payload now uses relaxed encoding plus a narrow, explicit
+neutralization of the only two sequences that can end or re-frame a `<script type="application/json">` element
+(`</` → `<\/`, `<!` → escaped). Both the safety property and the round-trip are asserted, including a hostile
+path literally containing `</script><img src=x onerror=...>`. **The change is gated on "does this instance
+declare dimensions"**, so the six surfaces Story 20.7 converted keep byte-identical islands and the golden
+fingerprint does not move for a reason unrelated to this work.
+
+`index.html` (+7,247 B) and `impact-map.html` (+5,694 B) also moved. That is **not** a rendering change: this
+portal documents its own repository, and this story changed the source tree those pages count. Reported rather
+than netted silently.
+
+#### Task 7.8 — the golden fingerprint did NOT move
+
+`GenerateAll_GoldenContentFingerprint_IsStableAfterNormalizingVolatileTokens` passes **unchanged**, no
+regeneration, confirming F6 and Story 20.6 Task 4.1: the golden fixture is not a git repository and cites no real
+files, so neither converted page renders in it. **The fingerprint was never this story's regression net**, and
+the new `HierarchyColorizeTests` says so in its own class comment rather than leaving a reader to infer coverage
+that does not exist.
+
+#### Task 7.2/7.3/7.4 — what was actually verified live, and what the data could not show
+
+**Code Map, JS on — all four checkbox combinations, recorded separately.** Each revealed panel mounts with real
+width and real sectors (`full` 1421, `no-spec` 487, `no-tests` 1254, `no-spec-no-tests` 350), each at 590×640,
+each with exactly one `tabindex="0"`, zero empty `aria-label`s, and a file table whose row count matches its
+chart (1189 / 440 / 1036 / 305). Story 20.5's survival predicate holds in all four. **All seven dimensions**
+switch in place: fills change, the legend swaps ramp↔discrete, the caption tracks the dimension, the live region
+announces, and every accessible name carries the dimension suffix
+(`"src/SpecScribe/Charts.cs — C#, 3,860 lines · 89 changes — change frequency: level 2 of 4"`). The `type-other`
+hatch resolves on exactly the 53 sectors labelled "file type: Other", and Plotly's pattern carries the explicit
+per-sector `bgcolor` the 20.4 addendum requires (`rgb(232,213,176)` at 0.55 — the fill WITH its opacity composed
+in, not a black backing rect).
+
+**Git Insights, JS on — all four modes, the contributor select and the threshold input.** Legends swap, the
+argument controls show/hide per dimension, the honest wording appears verbatim, and drill-in works on this
+surface **for the first time** — the epic's own logged owner request from the Story 7.11 design session.
+
+**And now the part F6 told me not to overstate.** This repo's roster is two deep and one of them is a bot
+(`["Matt Eland","dependabot[bot]"]`), so "top contributors" paints two colours, one of them covering ~2 files.
+The spotlight picker lists the bot and, being alphabetical, **defaults to it** — flagged for the owner rather
+than filtered unilaterally (Open Question #4). **Staleness is worse than F6 predicted.** F6 called it "the only
+mode with real spread"; measured on my tree it has **none**: the deep-git window spans 0.6 months end to end, so
+no file is stale at any threshold ≥ 1 month, and 547 of 1,189 files carry no last-touch date at all. The mode is
+correct and exercised; it is simply not *discriminating* on this repository. "All four modes verified" would
+have been true and misleading.
+
+**Both surfaces, JavaScript genuinely off** (scripts stripped from a served copy, not assumed): zero inert
+controls render, no legend renders, no boot placeholder, no chart-sized blank box, and — the ADR 0013 §3 gate —
+Git Insights' twin carries **all 1,189 files as resolving links, a SET match against the payload with 0 missing**
+(not a count match; Story 20.6 Task 1.3b), each with prose ownership. Code Map's pure-CSS filter **still works
+with JS off**, which is owner decision D2's entire justification, and each variant's table is complete with all
+nine columns and every path linked.
+
+#### Task 7.6 — still no screenshot, and this is the fourth time
+
+The Browser pane will not composite in this harness (`screenshot failed: the Browser pane is not displayed`;
+`window.innerWidth` reads 0). As instructed, I am saying so rather than skipping it quietly: the evidence above is
+computed geometry and DOM state read out of the live page, which is strictly weaker than a picture for judging
+legibility. **Sizes are consequently unverified by eye** — Code Map is set to 640 (the SVG's own height, applied
+as height-capped-to-width) and ownership raised 480 → 560 per Open Question #3's "raise modestly". Both are
+one-line config changes if the owner's verify round disagrees.
+
+#### Task 6.1 — the test split, and what coverage genuinely went away
+
+**44 deleted, ~33 rewritten, 21 new.** Deleted: every `CodeTreemap_*` / `CodeMapSunburst_*` /
+`CodeOwnershipSunburst_*` / `CodeOwnershipTreemap_*` method in `ChartsTests.cs` — they assert SVG geometry
+(`viewBox`, rect `x`/`y`/`width`, arc `d` paths, ring radii, `<title>` markup, focus-ring markup) about renderers
+that no longer exist. Rewritten rather than deleted: everything asserting a FACT that moved — this file is
+charted, this file links to its code page, this file-type category is represented, this wedge carries its owner
+data, the cap discipline holds, the empty states are honest.
+
+**What genuinely went away, stated rather than glossed:** server-side assertions on chart GEOMETRY. Nothing now
+verifies in C# that a sector is drawn where it should be, because nothing in C# draws one. That moved to the
+browser, and Task 6.9's rule is why it is stated here instead of being papered over with a test that implies
+otherwise: **there is no JS harness in this repo, and the client rules are not unit-tested.** What replaces the
+geometry tests is the CONTRACT — `HierarchyColorizeTests` pins the four Story 20.4 invariants per projector, the
+eleven dimension declarations (every cut point, prefix, none-class, off-class and hatch key), that every class a
+rule can produce is one the shipped cascade actually paints, the five `fill-opacity` states, the three
+`stroke-dasharray` states, and every outcome's wording — plus live verification for the resolution of that
+contract into pixels.
+
+#### Task 7.9 — the suite
+
+**2,619 passed, 0 failed, 3 skipped**, twice in a row on a rebuilt binary. Neither run tripped the two
+known-flaky git-fixture tests, so I have nothing to distinguish from work of my own.
+
+#### ⚠ Concurrent work in this tree (CLAUDE.md § Concurrent work on shared `main`)
+
+A second session landed **Story 18.6 / module-aware artifact coverage** work while this story ran:
+`ArtifactCoverage.cs`, `ModuleContext.cs`, `HowToReadTemplater.cs`, a new
+`SiteGeneratorModuleCoverageTests.cs`, edits to `SiteGeneratorAdapterTests.cs`, plus `epics.md`,
+`deferred-work.md`, ADR 0015 and the 18-2/18-6 story files. **None of it is in this story's File List** and none
+of it was touched. It IS in the tree that produced the green suite above and the passing fingerprint — and
+notably, the fingerprint constant was not edited by either session and still matches, so neither story's work is
+rendering-visible in that fixture. Nothing was reset, checked out or cleaned.
+
 ### File List
+
+**Source — updated**
+
+- `src/SpecScribe/HierarchyExplorer.cs` — `HierarchyNode.Metrics`/`.TipHtml`; new `HierarchyDimension`,
+  `HierarchyDimensionKind`, `HierarchyDimensionArg`; `HierarchyExplorerConfig.Dimensions`/`.Constants`;
+  `HierarchyTwinDisplay.External`; the gated compact island shape + `EscapeForScriptElement`.
+- `src/SpecScribe/HierarchyExplorer.Projectors.cs` — `ProjectCodeMap`, `ProjectOwnership`, the shared
+  `WalkCodeMap`, and the eleven dimension declarations (`CodeMapDimensions`, `OwnershipDimensions`).
+- `src/SpecScribe/Charts.cs` — **net −688 lines.** Deleted `CodeTreemap`, `CodeMapSunburst`,
+  `CodeOwnershipSunburst`, `CodeOwnershipTreemap`, `BuildSunburstSvg`, `AnnularSector`, `WalkSunburstWedges`,
+  `CollectFreshnessStats`, `CountFreshnessFiles`, `SunburstWedgeInfo`, `DescribeCodeMapCell`, `CodeMapCellData`,
+  `AppendTreemapDir`/`AppendTreemapFile`, `BuildOwnershipDataAttrs`, the three `Freshness*` constants. Added
+  `BuildTopAuthorsJson`; widened `BuildTreemapCard`, `BuildOwnershipCard`, `BuildOwnerJson`,
+  `DescribeOwnershipFile`, `OwnershipFileInfo` to `internal`; added an `attributes` slot to the four
+  `Ownership*Legend` emitters.
+- `src/SpecScribe/CodeMapTemplater.cs` — four component instances; `data-hierarchy-reveal`; colorize select and
+  both legends rewired; drill `<nav>` and shape toggle deleted; file table and pager untouched.
+- `src/SpecScribe/GitInsightsTemplater.cs` — one instance replacing two charts; controls and four legends routed;
+  `.board-tabs` deleted; the stale ADR 0010 §2 doc comments corrected on both the class and the section.
+- `src/SpecScribe/assets/specscribe.js` — the dimension contract, the reveal hook, per-sector stroke resolution,
+  three new `PATTERN_SHAPE` keys; `initCodeMapPanel` and `initOwnershipSunburst` deleted.
+- `src/SpecScribe/assets/specscribe.css` — retired-SVG rules removed, colour-source rules kept and re-documented;
+  new `.ss-hierarchy-legends`.
+- `src/SpecScribe/SiteGenerator.cs` — `EnsureHierarchyEngine` for both pages; the island strip on the captured
+  webview path.
+- `src/SpecScribe/WebviewRenderAdapter.cs` — `StripDataIslands` exposed.
+- `src/SpecScribe/HostRenderException.cs` — `hierarchy-chart` extended for the two surfaces.
+
+**Tests — added**
+
+- `tests/SpecScribe.Tests/HierarchyColorizeTests.cs` (new, 18 methods / 20 cases).
+
+**Tests — updated**
+
+- `ChartsTests.cs` (44 geometry tests deleted), `CodeMapTemplaterTests.cs`, `GitInsightsTemplaterTests.cs`,
+  `StylesheetTests.cs`, `HierarchyRolloutTests.cs`, `SiteGeneratorCodeMapTests.cs`,
+  `SiteGeneratorGitInsightsTests.cs`, `SiteGeneratorWebviewTests.cs`, `SiteGeneratorSpaTests.cs`.
+
+**Other**
+
+- `.claude/launch.json` — a preview entry for this session.
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — status only.
 
 ---
 
 ## Change Log
 
+- 2026-07-27 — **Story 20.9 implemented (dev-story). Epic 20 AC#2 is satisfied: exactly one implementation of a
+  hierarchy chart now exists in the codebase**, evidenced by an EMPTY rollout-completeness allowlist (the test
+  kept, now asserting emptiness), zero-result searches for every deleted symbol and CSS class across `src/`,
+  `tests/` and the extension shim, and `Charts.cs` shedding its polar geometry entirely. The component grew a
+  **dimension contract** (owner decision D1: a per-node raw metric bag plus a declarative per-dimension rule,
+  because staleness takes a free 1–60 month threshold and the spotlight an arbitrary contributor, so neither can
+  be precomputed as a finite class set); **Code Map** converted to four instances — 8 charts collapsed to 4,
+  keeping its pure-CSS filter (D2) and its file table as the twin (20.6 D1, expressed as a new named
+  `HierarchyTwinDisplay.External`); **Git Insights ownership** converted to ONE instance — 2 charts collapsed to
+  1 — and **gained the text twin Story 20.6 recorded it as never having had** (D3), built and verified live with
+  JavaScript off BEFORE its SVG was retired, as AC#3 requires. Four `Charts` entry points, `BuildSunburstSvg`,
+  and both client renderers deleted. **Entry conditions were verified by grep, not by status: Story 20.7 is
+  `review` rather than `done`, but its class-list resolver, its client node filter and its six-symbol allowlist
+  are all in the committed tree.**
+  **Findings that differed from the story's:** F2(a) and F2(b) were **already solved by 20.7** (`tokenFor`
+  already applies a verbatim class list and already composites `fill-opacity`), so only F2(c)'s three
+  `stroke-dasharray` states needed work — plus a fourth channel the story did not name, `.spotlight-touched`'s
+  own stroke, which `marker.line` CAN express and which made per-sector stroke resolution necessary. F8
+  understated itself: **`Charts.AnnularSector` was already dead before this story**, left behind by 20.7 with
+  zero callers, which only a search could have shown. `CompactMetricsTail` was NOT chart-exclusive (the Risk
+  Quadrant calls it) and was restored — anti-pattern 9, caught by the compiler. `BuildOwnershipDataAttrs` was
+  deleted despite Task 4.4's keep-list, because the payload reads `BuildOwnerJson` directly and it had no
+  reachable caller.
+  **Two gaps in surrounding code that this conversion exposed:** the vendored engine `<script>` never reached
+  either page (both build their own document, so the `AssetManifest` flag never applies — the same miss 20.7 made
+  on four surfaces), and the webview's inline-island strip **never ran on captured pages**, which was ~470 KB of
+  dead payload before this story and would have been **4.5 MB** after it. Both fixed; the second brought the code
+  up to the already-registered `data-island` host exception rather than adding a new divergence.
+  **A defect of my own, caught only by looking at the rendered page:** the reveal hook first gated on the HOST's
+  width, and `.ss-hierarchy` is itself `display:none` until mount — so it deferred every chart on the site while
+  the full suite stayed green. Fixed to measure the panel. Exactly the class of defect CLAUDE.md § Verification
+  exists for.
+  **AC#4, the byte accounting, and it does not flatter the spike:** `code-map.html` **6,597,752 → 4,451,207
+  (−2,146,545)** against a projected −3,493,000; `git-insights.html` **2,296,875 → 1,569,710 (−727,165)** against
+  −1,510,735 — **57% of projection overall**. The split explains it: islands are 3,288,932 B and 1,193,573 B, of
+  which 42% and 36% are the rich hover cards `.ss-tooltip` requires to survive the engine swap, giving **840–936
+  B/node against the spike's 195.4 and Story 20.5's measured ~390**. The spike's figure was measured on planning
+  nodes that carry neither a nine-value metric bag nor a per-file card. Plotly paid for itself here, at a little
+  over half the projected rate, and the projection was optimistic because it generalized from a cheaper node. One
+  change moved this materially: `System.Text.Json`'s default encoder escapes every `<`/`>`/`&` to six bytes and
+  the biggest field in these payloads is HTML (2.8 MB on code-map alone), so the dimension-bearing payload now
+  uses relaxed encoding plus a narrow neutralization of `</` and `<!` — the only two sequences that can end or
+  re-frame a `<script type="application/json">` element — asserted for both safety and round-trip, including a
+  hostile path containing `</script><img src=x onerror=…>`. **Gated on "declares dimensions"**, so the six
+  surfaces 20.7 converted keep byte-identical islands.
+  **The golden fingerprint did NOT move** — no regeneration — confirming F6 and 20.6 Task 4.1: the fixture is not
+  a git repo and neither page renders in it, so it was never this story's net. Live-verified across all four
+  Code Map checkbox combinations, all seven Code Map dimensions, all four ownership modes plus both live inputs,
+  and both surfaces with JavaScript genuinely disabled (twin complete as a **SET** match — 1,189/1,189 files, 0
+  missing — and the pure-CSS filter still working). **Reported honestly rather than richly: this repo's roster is
+  two deep and one is a bot which the alphabetical picker DEFAULTS to, and staleness has NO spread at all here
+  (the deep-git window is 0.6 months end to end), which is more degenerate than F6 predicted.** Screenshots still
+  impossible in this harness — a fourth story owing one — so sizes (Code Map 640, ownership raised 480 → 560) are
+  unverified by eye and are one-line config changes. `#dir=` retired per Open Question #2. Tests: **44 geometry
+  tests deleted, ~33 rewritten against the payload and the twin, 21 new**; the coverage that genuinely went away
+  is server-side chart GEOMETRY, and there is no JS harness, which the new `HierarchyColorizeTests` states in its
+  own class comment rather than implying coverage that does not exist. Suite **2,619 passed / 0 failed / 3
+  skipped, twice consecutively**; neither known git-fixture flake fired. A concurrent session's Story 18.6
+  module-coverage work is in this tree and is excluded from the File List.
 - 2026-07-26 — Story 20.9 drafted (create-story). Context assembled from ADR 0012 (+ its 20.4 addendum), ADR 0013, ADR 0010 §3/§4, the Epic 20 rollout inventory as amended by Story 20.7's owner decision D1, Stories 20.4/20.5/20.6/20.7/7.11/7.12 as they actually stand, **a code-level read of both surfaces' emitters and both client renderers in the live tree at `261b300`**, and **a real `--deep-git` generation run** (714 pages, 68.4 s) so the byte accounting AC#4 demands starts from measured numbers rather than the spike's projection. Three owner decisions elicited and locked: **D1** the dimension contract is a **per-node metric bag plus a declarative per-dimension rule**, because two of the eleven dimensions — staleness (a free 1–60 month threshold) and spotlight (an arbitrary contributor) — cannot be precomputed as a finite class set at all, so a class-per-dimension payload would have to drop or freeze both; **D2** Code Map **keeps its four filter panels and lazy-mounts on reveal**, because the pure-CSS exclude-spec/exclude-tests toggle is the one filter on that page that works with JavaScript off and trading it for a byte win would take information from a no-JS visitor; **D3** Git Insights gets **the component's generic nested twin**, not a per-directory rollup (which would be shorter but would not enumerate every node the chart draws, failing ADR 0013 §2's completeness predicate) and not a restored per-file table (which would re-litigate a design Story 7.11 deleted on owner feedback). Eight code-verified findings are promoted to a read-first section: **F1** three of the four Code Map panels are always `display:none` and **Plotly cannot lay out in a zero-width container** — the component ships `responsive:true` and sets only height, and a CSS-only reveal fires no resize event, so D2 requires a reveal hook; the same pass also collapses 8 Code Map charts to **4 instances** and 2 ownership charts to **1**, because the component's own selector replaces two more `display:none` pairs. **F2** `tokenFor` composes only `{fill,stroke}` while five of the new families' states carry `fill-opacity` (0.35/0.55) and three carry `stroke-dasharray` — the first renders wrong silently, the second is a non-color channel Plotly's `marker.line` cannot express and must extend `PATTERN_SHAPE`; verified that a bare class-list probe does resolve both families, since none of their rules needs an ancestor. **F3** the non-color channel on these surfaces is **text, rewritten on every dimension switch** (per-node accessible names plus a legend swap), not hatching — a dimension whose fill changes and whose name does not is a UX-DR17 failure that ships green; the shipped wording's honesty (bucket level not raw value, "not among this file's most-active tracked contributors", explicit "(date unknown)") must be ported verbatim. **F4** two hash schemes collide — Code Map's `#dir=` vs the component's `hashKey` — and four instances on one page need four distinct `DomId`/`HashKey` pairs; ownership gains drill-in for the first time, which is the epic's own logged owner request from the Story 7.11 design session. **F5** `HierarchyExplorerConfig.Size` is a single square int applied as height while Code Map's treemap is 1000×640. **F6** measured today, this repo's ownership roster is `["Matt Eland","dependabot[bot]"]` — the solo-repo reframe does **not** trip so the chart renders, but the second contributor touched exactly two files, so three of four modes are near-degenerate and "all four modes verified" would overstate the evidence; and per 20.6 the golden fixture is not a git repo, so **neither page renders in it** and the fingerprint is not this story's net. **F7** **58** entry-point test references plus **68** CSS-class assertions (`codemap-cell` 31, `ownership-wedge` 20, `ownership-cell` 17) — larger than 20.7's F4, and the class-name half is the trap, because those fail at runtime rather than at compile time and many assert a fact that moves to the payload and twin. **F8** `Charts.BuildSunburstSvg` has exactly two callers, both this story's, so **this story deletes the last hand-rolled arc geometry in C#**; and the 2,712 + 2,220 rich hover cards are where the byte accounting actually lands. Measured starting state recorded so AC#4 is reported against real numbers: `code-map.html` **6,020,916 B** (spike projected −3,493,000) and `git-insights.html` **2,129,514 B** (spike projected −1,510,735) — together exceeding the whole −4,787,124 B portal net, which is why this is the story that settles whether the Plotly adoption paid for itself. Sequencing recorded as blocking: **Story 20.7 must land first** (its F3 capabilities are this story's foundation and its Task 10.4 allowlist is what this story empties), itself blocked by 20.6 and by 20.5 reaching `done`. baseline_commit `261b300`.

@@ -43,19 +43,36 @@ public static class HowToReadTemplater
         AppendReadingOrder(readingOrder, nav, moduleDocs);
 
         var reference = new StringBuilder();
-        AppendGlossary(reference, module);
+        var glossary = AppendGlossary(reference, module);
+
+        // Tracked BEFORE the legend is appended, so "did the glossary contribute real TERMS" survives the next
+        // append rather than being re-derived from a buffer length. [Review][Patch P2]
+        var hasGlossaryTerms = glossary == GlossarySection.Terms;
         AppendCommandLegend(reference, module);
 
-        var hasModuleContent = readingOrder.Length > 0 || reference.Length > 0;
+        // The unmodeled ACKNOWLEDGEMENT must not be evidence that a glossary exists. It ALWAYS renders for an
+        // unmodeled module, so treating it as content made the subtitle and intro promise "the reading order
+        // and glossary below" and "what the recurring terms mean" on a page whose glossary section says
+        // SpecScribe publishes no glossary for this module. Story 5.6's rule: a section that always renders for
+        // a given state cannot be the signal for whether there is content.
+        //
+        // Two signals, not one, because they fail independently — an unmodeled repo routinely HAS a reading
+        // order (epics, ADRs, README) while never having a glossary, so a single boolean cannot keep both
+        // halves of that sentence honest. The None path is unchanged. [Review][Patch P2]
+        var hasModuleContent = readingOrder.Length > 0 || hasGlossaryTerms;
 
         var sections = new StringBuilder();
         sections.Append(readingOrder);
         AppendGenerateSection(sections);
         sections.Append(reference);
 
-        if (hasModuleContent)
+        if (hasModuleContent && hasGlossaryTerms)
         {
             sb.Append("  <div class=\"doc-subtitle\">New here? Start with the reading order and glossary below, then generate the site yourself.</div>\n");
+        }
+        else if (hasModuleContent)
+        {
+            sb.Append("  <div class=\"doc-subtitle\">New here? Start with the reading order below, then generate the site yourself.</div>\n");
         }
         else
         {
@@ -70,7 +87,10 @@ public static class HowToReadTemplater
         {
             sb.Append("  <p>This portal documents a project built with an AI-assisted development methodology. ");
             sb.Append("If you're new to it, the sections below walk you through what to read first, how to rebuild ");
-            sb.Append("this site yourself, and what the recurring terms mean. For framework overviews and SpecScribe ");
+            sb.Append(hasGlossaryTerms
+                ? "this site yourself, and what the recurring terms mean. "
+                : "this site yourself. ");
+            sb.Append("For framework overviews and SpecScribe ");
             sb.Append($"support, see <a href=\"{SiteNav.AboutSddOutputPath}\">About Spec-Driven Development</a>.</p>\n");
         }
         else
@@ -183,20 +203,26 @@ public static class HowToReadTemplater
     /// replaced. Gated on BOTH the unmodeled state and a real label: <see cref="CommandCatalog.Empty"/> is
     /// <see cref="ModuleContext.None"/>'s catalog, so a state-only gate would have announced a module on a
     /// repo with no BMad install at all. [Story 18.2; ADR 0015 Decision 2c]</para></summary>
-    private static void AppendGlossary(StringBuilder sb, ModuleContext module)
+    /// <summary>Which of the three glossary states was rendered, so <see cref="RenderPage"/>'s
+    /// "is there content" signal can tell a real term list from the named acknowledgement — the latter always
+    /// renders for an unmodeled module and therefore cannot serve as evidence that content exists.
+    /// [Review][Patch P2]</summary>
+    private enum GlossarySection { None, Acknowledgement, Terms }
+
+    private static GlossarySection AppendGlossary(StringBuilder sb, ModuleContext module)
     {
         if (module.IsUnmodeled && module.Commands.HasLabel)
         {
             sb.Append("  <h2 id=\"glossary\">Glossary</h2>\n");
             sb.Append($"  <p>This project uses the <strong>{PathUtil.Html(module.Commands.ModuleLabel)}</strong> ");
             sb.Append("module. SpecScribe doesn't publish a glossary for it yet.</p>\n");
-            return;
+            return GlossarySection.Acknowledgement;
         }
 
         var glossary = module.Glossary;
         if (glossary.Count == 0)
         {
-            return;
+            return GlossarySection.None;
         }
 
         sb.Append("  <h2 id=\"glossary\">Glossary</h2>\n");
@@ -206,6 +232,7 @@ public static class HowToReadTemplater
             sb.Append($"    <div class=\"cap-row\"><dt>{PathUtil.Html(term.Term)}</dt><dd>{PathUtil.Html(term.Definition)}</dd></div>\n");
         }
         sb.Append("  </dl>\n");
+        return GlossarySection.Terms;
     }
 
     /// <summary>A light-touch note that the slash commands seen on story/epic pages come from the detected

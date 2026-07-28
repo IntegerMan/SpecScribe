@@ -388,4 +388,376 @@ public static partial class HierarchyExplorer
         var slash = path.LastIndexOf('/');
         return slash >= 0 && slash + 1 < path.Length ? path[(slash + 1)..] : path;
     }
+
+    // -----------------------------------------------------------------------------------------------------------
+    // Code Map and Git Insights ownership — the two COLORIZE-DRIVEN surfaces [Story 20.9]
+    //
+    // These two are the ones Story 20.7's owner decision D1 split out, and the reason is worth stating where the
+    // code is: their colour is not a property of a node at all. It is a property of the node CROSSED WITH a
+    // dimension the reader is choosing right now — seven of them on one page, four modes plus two live inputs on
+    // the other. So the projections below carry each node's RAW metric bag (owner decision D1) and the config
+    // carries the per-dimension rules; the component resolves a class list per node per dimension through the
+    // shipped cascade and never learns which surface it is drawing.
+    // -----------------------------------------------------------------------------------------------------------
+
+    /// <summary>The structural class every DIRECTORY node paints with on both converted surfaces. Directories are
+    /// real drawn sectors here (the SVG drew them as boundary rects), and they do NOT participate in any
+    /// dimension — a directory has no change frequency and no dominant author, and the shipped SVG never
+    /// recoloured one either.
+    ///
+    /// <para>The <c>-sunburst</c> variant is chosen deliberately over <c>.codemap-dir</c>: the treemap's rule is
+    /// <c>fill: none</c>, which was right for a boundary rect drawn OVER its children and is wrong for a Plotly
+    /// sector, which is a filled shape. One instance now draws both shapes, so the class with a real fill is the
+    /// one that can serve both. Its ownership counterpart <c>.ownership-wedge-dir</c> already has the identical
+    /// declaration.</para></summary>
+    private const string CodeMapDirColorClass = "codemap-dir-sunburst";
+
+    private const string OwnershipDirColorClass = "ownership-wedge-dir";
+
+    /// <summary>The Code Map's leaf colour FAMILY. The dimension rule appends the state token
+    /// (<c>level-3</c>, <c>type-csharp</c>); this is the half that says which stylesheet family resolves it.</summary>
+    private const string CodeMapLeafColorClass = "codemap-cell";
+
+    private const string OwnershipLeafColorClass = "ownership-wedge";
+
+    /// <summary>Panel-wide constant keys (Task 1.2) — named once so the emitter and the dimension declarations
+    /// cannot drift on a string.</summary>
+    public const string ConstantTopAuthors = "topAuthors";
+
+    /// <summary>The tree's most-recent commit day, as a day-number. The staleness and spotlight rules measure
+    /// against THIS, never wall-clock <c>now</c> (FR31) — a regenerated portal must colour a file the same way
+    /// tomorrow as it did today.</summary>
+    public const string ConstantAsOf = "asof";
+
+    /// <summary>Projects one precomputed Code Map filter variant onto the component: directory → file, sized by
+    /// lines of code, with each file's seven colorize dimensions carried as raw generation-time values.
+    ///
+    /// <para><b>The metric bag is LIFTED, not re-derived.</b> Its keys are exactly the <c>data-*</c> the retired
+    /// <c>Charts.CodeTreemap</c> wrote on every rect — <c>path</c>, <c>lines</c>, <c>filetype</c>,
+    /// <c>filetype-label</c>, <c>changes</c>, <c>churn</c>, <c>first</c>, <c>last</c>, <c>cochanged</c> — in the
+    /// same units (day-NUMBERS for the two dates, the same <c>0.###</c> format for co-change). A dimension whose
+    /// input changed units would recolour the chart silently, so they did not.</para>
+    ///
+    /// <para><b>The link guard is Story 7.1's, unchanged.</b> A <paramref name="fileHref"/> returning null leaves
+    /// a plain, focusable node — never a broken link — and a non-null return is prefixed exactly as the file
+    /// table prefixes it, so the chart and the table cannot route one file two ways.</para>
+    ///
+    /// <para>Returns an empty model for an empty variant, so the call site renders its own honest "No files match
+    /// this filter." rather than an empty chart frame (NFR8).</para></summary>
+    public static HierarchyExplorerModel ProjectCodeMap(
+        CodeMapVariant variant,
+        HierarchyExplorerConfig config,
+        Func<string, string?>? fileHref = null,
+        string prefix = "")
+    {
+        if (variant.Map.IsEmpty) return new HierarchyExplorerModel(config, Array.Empty<HierarchyNode>());
+
+        // The detail cap is the SAME one the file table applies, from the same file list — so a file with a table
+        // row has a hover card and vice versa, and a large repo cannot reintroduce the per-node HTML bloat
+        // `MaxDetailedCodeMapFiles` exists to prevent (Task 4.4 keeps that discipline alive).
+        var files = variant.Map.Files();
+        var detailed = Charts.SelectDetailedCodeMapFiles(files, variant.Map.FileCount);
+
+        var nodes = new List<HierarchyNode>
+        {
+            new(ProjectRootId, null, "All files", "All files", 0,
+                $"{variant.Map.FileCount:N0} {Charts.Plural(variant.Map.FileCount, "file", "files")}",
+                string.Empty, "All files", null, ProjectRootKind, CodeMapDirColorClass),
+        };
+        var seen = new HashSet<string>(StringComparer.Ordinal) { ProjectRootId };
+
+        WalkCodeMap(variant.Map.Roots, ProjectRootId, node =>
+        {
+            if (!seen.Add(node.Id)) return;
+            nodes.Add(node);
+        }, (node, parentId) => CodeMapDirNode(node, parentId), (node, parentId) =>
+            CodeMapFileNode(node, parentId, fileHref, prefix, detailed));
+
+        if (nodes.Count == 1) return new HierarchyExplorerModel(config, Array.Empty<HierarchyNode>());
+        return new HierarchyExplorerModel(config, RollUp(nodes));
+    }
+
+    private static HierarchyNode CodeMapDirNode(CodeMapNode node, string parentId) =>
+        new(node.RepoRelativePath, parentId, node.RepoRelativePath, node.Label, 0,
+            string.Empty, string.Empty, "Directory", null, "directory", CodeMapDirColorClass);
+
+    private static HierarchyNode CodeMapFileNode(
+        CodeMapNode node, string parentId, Func<string, string?>? fileHref, string prefix, HashSet<string>? detailed)
+    {
+        var category = node.Category ?? CodeFileType.Other;
+        var metrics = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["path"] = node.RepoRelativePath,
+            ["lines"] = Inv(node.Lines),
+            ["filetype"] = category.Key,
+            ["filetype-label"] = category.Label,
+        };
+        if (node.Metrics is { } m)
+        {
+            metrics["changes"] = Inv(m.Changes);
+            metrics["churn"] = Inv(m.TotalChurn);
+            if (m.FirstDate is { } fd) metrics["first"] = Inv(fd.DayNumber);
+            if (m.LastDate is { } ld) metrics["last"] = Inv(ld.DayNumber);
+            // The SAME "0.###" the SVG's data-cochanged used — a different rounding here would re-bucket files.
+            if (m.AvgCoChanged is { } co) metrics["cochanged"] = co.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        var href = fileHref?.Invoke(node.RepoRelativePath);
+        var lineWord = Charts.Plural((int)Math.Min(node.Lines, int.MaxValue), "line", "lines");
+        var detail = node.Metrics is { } dm
+            ? $"{node.Lines:N0} {lineWord} · {dm.Changes:N0} {Charts.Plural(dm.Changes, "change", "changes")}"
+            : $"{node.Lines:N0} {lineWord}";
+
+        return new HierarchyNode(
+            node.RepoRelativePath, parentId, node.RepoRelativePath, node.Label,
+            // A zero-line file still gets a visible, clickable sector rather than a zero-width one nobody can
+            // reach — the same floor the Impact Map's pure-rename tiles take.
+            (int)Math.Max(1, Math.Min(node.Lines, int.MaxValue)),
+            detail, string.Empty, category.Label,
+            href is { Length: > 0 } target ? prefix + target : null,
+            "file", CodeMapLeafColorClass, metrics,
+            detailed is null || detailed.Contains(node.RepoRelativePath) ? Charts.BuildTreemapCard(node) : null);
+    }
+
+    /// <summary>Projects the whole-tree code-ownership hierarchy: directory → file, sized by lines of code, each
+    /// file carrying the four modes' raw inputs. Replaces <c>Charts.CodeOwnershipSunburst</c> AND
+    /// <c>Charts.CodeOwnershipTreemap</c> — ONE instance where there were two charts, because the component's own
+    /// selector re-types the trace in place.
+    ///
+    /// <para><b>Every file's prose lands in the payload, because this surface's twin is the component's.</b>
+    /// Story 7.11 deleted both prior ownership tables on owner feedback, which is why Story 20.6's audit recorded
+    /// this page as having no text twin AT ALL. <see cref="HierarchyNode.StatusLabel"/> and
+    /// <see cref="HierarchyNode.Detail"/> therefore carry the dominant author, share %, contributor count and
+    /// last-active date as words — the twin, the accessible name and the tooltip all read them, so there is one
+    /// vocabulary rather than three.</para>
+    ///
+    /// <para><b>FR-10 / ADR 0010 §4 hold in every mode, and rendering technology does not change that.</b> The
+    /// top-contributor roster is a bounded COLOUR PALETTE, not a leaderboard; the spotlight picker is built by the
+    /// component from the alphabetical union of every node's own roster, never a top-N ranking. Nothing here
+    /// sorts a contributor by volume into reader-facing output.</para></summary>
+    public static HierarchyExplorerModel ProjectOwnership(
+        IReadOnlyList<CodeMapNode> roots,
+        IReadOnlyList<string> topAuthors,
+        HierarchyExplorerConfig config,
+        Func<string, string?>? fileHref = null,
+        HashSet<string>? detailedFiles = null)
+    {
+        var nodes = new List<HierarchyNode>
+        {
+            new(ProjectRootId, null, "All files", "All files", 0, string.Empty,
+                string.Empty, "Whole tree", null, ProjectRootKind, OwnershipDirColorClass),
+        };
+        var seen = new HashSet<string>(StringComparer.Ordinal) { ProjectRootId };
+
+        WalkCodeMap(roots, ProjectRootId, node =>
+        {
+            if (!seen.Add(node.Id)) return;
+            nodes.Add(node);
+        },
+        (node, parentId) => new HierarchyNode(
+            node.RepoRelativePath, parentId, node.RepoRelativePath, node.Label, 0,
+            string.Empty, string.Empty, "Directory", null, "directory", OwnershipDirColorClass),
+        (node, parentId) => OwnershipFileNode(node, parentId, fileHref, detailedFiles));
+
+        if (nodes.Count == 1) return new HierarchyExplorerModel(config, Array.Empty<HierarchyNode>());
+        return new HierarchyExplorerModel(config, RollUp(nodes));
+    }
+
+    private static HierarchyNode OwnershipFileNode(
+        CodeMapNode node, string parentId, Func<string, string?>? fileHref, HashSet<string>? detailedFiles)
+    {
+        var info = Charts.DescribeOwnershipFile(node, fileHref);
+        var contributors = node.Metrics?.Contributors ?? Array.Empty<FileContributor>();
+
+        // The SAME values BuildOwnershipDataAttrs wrote as data-share / data-dominant / data-contributors /
+        // data-last / data-owner, in the same units. `owner` stays the compact [name, commits, lastDay] triple
+        // array the spotlight rule and the roster union both read.
+        var metrics = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["path"] = node.RepoRelativePath,
+            ["lines"] = Inv(node.Lines),
+        };
+        if (contributors.Count > 0 && info.SharePct is { } share)
+        {
+            metrics["share"] = Inv(share);
+            metrics["dominant"] = info.DominantName ?? string.Empty;
+            metrics["contributors"] = Inv(info.TotalContributors);
+            if (info.LastDate is { } d) metrics["last"] = Inv(d.DayNumber);
+            metrics["owner"] = Charts.BuildOwnerJson(contributors);
+        }
+
+        // The twin's prose (owner decision D3): what the chart conveys, in words. A file with no contributor
+        // record says so honestly rather than reading as an unowned file.
+        var statusLabel = contributors.Count == 0
+            ? "No git history"
+            : $"{info.DominantName} · {info.SharePct}% share";
+        var detail = contributors.Count == 0
+            ? $"{node.Lines:N0} {Charts.Plural((int)Math.Min(node.Lines, int.MaxValue), "line", "lines")}"
+            : $"{info.TotalContributors} {Charts.Plural(info.TotalContributors, "contributor", "contributors")}"
+              + (info.LastDate is { } ld ? $" · last active {PortalDates.Day(ld)}" : string.Empty);
+
+        return new HierarchyNode(
+            node.RepoRelativePath, parentId, node.RepoRelativePath, node.Label,
+            (int)Math.Max(1, Math.Min(node.Lines, int.MaxValue)),
+            detail, string.Empty, statusLabel, info.Href, "file", OwnershipLeafColorClass, metrics,
+            detailedFiles is null || detailedFiles.Contains(node.RepoRelativePath)
+                ? Charts.BuildOwnershipCard(node, info)
+                : null);
+    }
+
+    /// <summary>The ONE depth-first walk both converted surfaces project through — directories before their
+    /// contents, so the emitted order is parent-before-child at every level, which the roll-up, the client filter
+    /// and the twin all rely on. A second walk here would be exactly the drift ADR 0012 exists to end.
+    ///
+    /// <para>A directory with no files anywhere beneath it is emitted anyway: the roll-up will give it value 0,
+    /// which Plotly draws as nothing, and dropping it would need a second tree pass to know. An empty directory
+    /// cannot occur in a <see cref="CodeMap"/> today (the builder prunes them), so this is a guard rather than a
+    /// case.</para></summary>
+    private static void WalkCodeMap(
+        IReadOnlyList<CodeMapNode> level,
+        string parentId,
+        Action<HierarchyNode> emit,
+        Func<CodeMapNode, string, HierarchyNode> dir,
+        Func<CodeMapNode, string, HierarchyNode> file)
+    {
+        foreach (var node in level)
+        {
+            if (node.IsDirectory)
+            {
+                emit(dir(node, parentId));
+                WalkCodeMap(node.Children, node.RepoRelativePath, emit, dir, file);
+            }
+            else
+            {
+                emit(file(node, parentId));
+            }
+        }
+    }
+
+    private static string Inv(long value) => value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    private static string Inv(int value) => value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    // -----------------------------------------------------------------------------------------------------------
+    // The eleven dimension declarations [Story 20.9 Task 1.3]
+    //
+    // These live BESIDE their projectors and not inside the component, because the vocabulary is the surface's:
+    // "dominant-author share" and "file type" are facts about these two pages, and a `switch (surface)` inside the
+    // shared component is the drift this epic exists to end (Task 1.8). Every rule below is a VERBATIM port of the
+    // one `initCodeMapPanel` / `initOwnershipSunburst` shipped — the fills must be UNCHANGED by the conversion,
+    // not merely plausible, so the bucketing, the cut points and the wording all had to travel exactly.
+    // -----------------------------------------------------------------------------------------------------------
+
+    /// <summary>Which legend block the Code Map's numeric dimensions share. Six of the seven are ramps over the
+    /// same 0–4 scale, so they share one ramp legend whose caption tracks the active dimension; "File type" owns
+    /// the discrete one.</summary>
+    public const string CodeMapRampLegend = "ramp";
+
+    public const string CodeMapDiscreteLegend = "discrete";
+
+    /// <summary>The Code Map's seven colorize dimensions, in the shipped dropdown's own order — change frequency
+    /// first, because it is the default the SVG baked. When <paramref name="hasMetrics"/> is false, file type is
+    /// the ONLY dimension (there is nothing for the six git-derived ramps to quantize), matching the shipped
+    /// dropdown exactly. [Story 7.9 / 7.12 preserved]</summary>
+    public static IReadOnlyList<HierarchyDimension> CodeMapDimensions(bool hasMetrics)
+    {
+        var fileType = new HierarchyDimension(
+            "filetype", "file type", HierarchyDimensionKind.Categorical, "filetype",
+            new Dictionary<string, string>(StringComparer.Ordinal) { ["value"] = "{label}: {value}" },
+            ClassPrefix: "type-", NoneClass: "level-none",
+            LegendKey: CodeMapDiscreteLegend, LabelMetric: "filetype-label");
+
+        if (!hasMetrics) return new[] { fileType };
+
+        return new[]
+        {
+            Ramp("changes", "change frequency", "changes"),
+            // Absolute day-numbers are ~739,000 and differ by hundreds, so a from-zero ramp would put every file
+            // in the top bucket. The date dimensions scale against the file set's own [min,max] window instead —
+            // the shipped rule's `isDate` branch, preserved.
+            RampWindow("last", "recency of last change", "last"),
+            RampWindow("created", "recency of first change", "first"),
+            // Churn ÷ changes, with the shipped `!ch` guard: a file with zero changes has no average, and saying
+            // "no data" is honest where dividing by zero is not.
+            Ramp("avgchange", "average change size", "churn", divisor: "changes"),
+            Ramp("churn", "churn", "churn"),
+            Ramp("cochange", "files changed together", "cochanged"),
+            fileType,
+        };
+    }
+
+    private static HierarchyDimension Ramp(string key, string label, string metric, string divisor = "") =>
+        new(key, label, HierarchyDimensionKind.Ramp, metric, RampText, LegendKey: CodeMapRampLegend, Divisor: divisor);
+
+    private static HierarchyDimension RampWindow(string key, string label, string metric) =>
+        new(key, label, HierarchyDimensionKind.RampWindow, metric, RampText, LegendKey: CodeMapRampLegend);
+
+    /// <summary>The ramp dimensions' accessible-name phrasing, shared by all six because the shipped renderer
+    /// phrased all six identically. <c>{level}</c> renders as "lowest" / "level N of 4" / "highest" — the BUCKET,
+    /// which is exactly what the colour encodes, and never the raw value the colour does not literally
+    /// represent.</summary>
+    private static readonly IReadOnlyDictionary<string, string> RampText =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["value"] = "{label}: {level}",
+            ["none"] = "no data for {label}",
+        };
+
+    /// <summary>Git Insights ownership's four live modes, in the shipped selector's own order. Share is the
+    /// default (it was the server-baked one).</summary>
+    public static IReadOnlyList<HierarchyDimension> OwnershipDimensions() => new[]
+    {
+        // Fixed cut points, not a data-relative quartile split: a share percentage is meaningful on its own
+        // scale, so "76–100%" means the same thing on every repo's chart (Charts.OwnershipShareLevel's reasoning).
+        new HierarchyDimension(
+            "share", "dominant-author share", HierarchyDimensionKind.Cutoff, "share",
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["value"] = "{value}% dominant-author share",
+                ["none"] = "no git history",
+            },
+            LegendKey: "share", Cutoffs: new[] { 25, 50, 75 }),
+
+        // A bounded COLOUR PALETTE, not a leaderboard (FR-10). Anything past the roster falls to the shared
+        // overflow class, exactly as a file type past the classified set does.
+        new HierarchyDimension(
+            "top", "dominant contributor", HierarchyDimensionKind.Roster, "dominant",
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["value"] = "dominant contributor: {name}",
+                ["none"] = "no git history",
+            },
+            ClassPrefix: "owner-author-", LegendKey: "top", RosterConstant: ConstantTopAuthors),
+
+        // One of the two dimensions owner decision D1 says cannot be precomputed: the contributor is chosen at
+        // runtime from an unbounded roster. Cutoffs are the shipped fixed day-boundaries, and they run the other
+        // way from `share`'s — MORE recent is a HIGHER level.
+        new HierarchyDimension(
+            "spotlight", "contributor spotlight", HierarchyDimensionKind.Spotlight, "owner",
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["hit"] = "{name} worked on this file ({days} ago)",
+                // Touched, but their own last-touch date was not embedded — an honest "unknown", never coerced
+                // into a recency bucket the data does not support. [Review 2026-07-22, preserved]
+                ["unknown"] = "{name} worked on this file (date unknown)",
+                // NEVER the stronger, and sometimes false, "has not worked on this file": a file with more
+                // contributors than the per-file cap can have a real contributor who simply ranks below it here.
+                ["off"] = "{name} is not among this file's most-active tracked contributors",
+                ["none"] = "no git history",
+            },
+            LegendKey: "spotlight", Cutoffs: new[] { 30, 90, 180 },
+            ExtraClass: "spotlight-touched", OffClass: "owner-spotlight-off",
+            Arg: HierarchyDimensionArg.Roster),
+
+        // The other one: a free 1–60 month threshold typed into a number input. Measures the FILE's own
+        // last-touch date, not anything contributor-specific — `last` carries no author.
+        new HierarchyDimension(
+            "staleness", "staleness", HierarchyDimensionKind.Threshold, "last",
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["stale"] = "not touched in {monthsAgo}+ months",
+                ["fresh"] = "touched within the last {months} months",
+                ["none"] = "no git history",
+            },
+            ClassPrefix: "owner-", LegendKey: "staleness", Arg: HierarchyDimensionArg.Threshold),
+    };
 }

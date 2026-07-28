@@ -3,16 +3,25 @@ using System.Text;
 
 namespace SpecScribe;
 
-/// <summary>Renders the standalone <c>code-map.html</c> page — the source-code treemap surface (Story 7.6, FR14).
+/// <summary>Renders the standalone <c>code-map.html</c> page — the source-code map surface (Story 7.6, FR14).
 /// Reuses the same page shell every <c>Write*</c> page uses (<see cref="PathUtil.RenderHeadOpen"/> + nav +
-/// breadcrumb + <c>&lt;main id="main-content"&gt;</c> + footer); the treemap SVG itself comes from the pure, server-
-/// computed <see cref="Charts.CodeTreemap"/>. The page is fully correct with JavaScript OFF: each of the four
-/// precomputed <see cref="CodeMapVariant"/> panels ships a server-rendered treemap sized-by-LOC with the default
-/// colorize dimension baked in, a legend, the "git data unavailable" notice when applicable, and a complete
-/// text-equivalent table — and the two "exclude spec-driven development directories" / "exclude tests" checkboxes
-/// that pick which panel shows are PURE CSS (no script needed at all — round 2). Only the colorize dropdown and
-/// directory zoom remain a scoped JS enhancement per panel: emitted <c>hidden</c>/inert and revealed by that script,
-/// so a no-JS visitor never sees a dead control. Replaced the retired Story 3.4 structure-tree page. [Story 7.6]</summary>
+/// breadcrumb + <c>&lt;main id="main-content"&gt;</c> + footer). Each of the four precomputed
+/// <see cref="CodeMapVariant"/> panels renders through the ONE Hierarchy Explorer component
+/// (<see cref="HierarchyExplorer.ProjectCodeMap"/>), which draws both shapes from one payload behind one selector.
+/// <para><b>No-JS contract — ADR 0013, which supersedes the "a correct server-rendered chart IS the no-JS story"
+/// reading this comment used to state.</b> Story 20.9 retired the server-rendered treemap and sunburst SVGs, so
+/// JS-off loses the VISUALIZATION. It loses neither the information nor the navigation: each panel's complete
+/// per-file table (<see cref="AppendFileTable"/>) ships as ordinary server-rendered markup with every file's path,
+/// line count, type and six git metrics as text and every path linked, and Story 20.6 D1 audited that table as
+/// this surface's text twin BECAUSE it is richer than the component's generic nested listing. The component is
+/// therefore configured <see cref="HierarchyTwinDisplay.External"/> — one complete listing per panel, not two.</para>
+/// <para>The two "exclude spec-driven development directories" / "exclude tests" checkboxes that pick which panel
+/// shows stay PURE CSS and keep working with JavaScript off (owner decision D2 of Story 20.9) — they are the one
+/// filter on this page that does. They additionally carry <c>data-hierarchy-reveal</c>, because three of the four
+/// panels are <c>display:none</c> at load and Plotly cannot lay out in a zero-width container (F1). Every control
+/// that DOES need script — the shape selector, the colorize picker — rides inside the component's hidden control
+/// bar, so a no-JS visitor never sees a dead control. Replaced the retired Story 3.4 structure-tree page.
+/// [Story 7.6; Story 20.9 conversion]</para></summary>
 public static class CodeMapTemplater
 {
     /// <summary>Renders the whole page from all four precomputed filter combinations (<see cref="CodeMap.BuildVariants"/>).
@@ -52,7 +61,7 @@ public static class CodeMapTemplater
         // same nesting level as their targets), so nothing here can be a common ancestor of both.
         sb.Append("<h3>Source Code Map</h3>\n");
         sb.Append("<p class=\"chart-lead\">Every file, sized by its lines of code and nested inside its directory. ");
-        sb.Append("Use \"View as\" to switch between a Treemap and a Sunburst, and \"Colorize by\" to switch what the color encodes — a git-derived change signal when available, or file type. Select a directory to zoom in (Treemap only). Filter what's shown with the checkboxes below.</p>\n\n");
+        sb.Append("Use \"Sunburst / Treemap\" to switch shape, and \"Colorize by\" to switch what the color encodes — a git-derived change signal when available, or file type. Select a directory to zoom in. Filter what's shown with the checkboxes below; the full text listing under each map works with JavaScript off.</p>\n\n");
 
         // Pure CSS: no JavaScript is needed for filtering to work (round 2).
         AppendFilterCheckbox(sb, "cm-exclude-spec", "Exclude spec-driven development directories");
@@ -65,15 +74,42 @@ public static class CodeMapTemplater
 
         sb.Append("</main>\n\n");
         sb.Append(PathUtil.RenderFooter());
+        // The vendored plotly.js hierarchy engine. This page builds its own document rather than going through
+        // PageView/AssetManifest, so the flag-driven emission in HtmlRenderAdapter never reaches it — the engine is
+        // appended here on the same terms the Impact Map uses: AFTER the body, a local file reference, never a CDN
+        // (NFR-3). Conditional on a host actually being present, so an empty repo ships no 1.2 MB bundle it cannot
+        // use. This is the exact miss Story 20.7 made on four surfaces at once — every layer below the browser was
+        // green while nothing mounted — which is why `SiteGeneratorSpaTests` asserts the "no fewer" half.
+        if (HierarchyExplorer.ContainsHost(sb.ToString()))
+        {
+            sb.Append($"<script src=\"{prefix}{ForgeOptions.HierarchyEngineScriptName}\"></script>\n");
+        }
         sb.Append("</body>\n</html>\n");
         return sb.ToString();
     }
 
+    /// <summary>The pure-CSS panel toggle — the ONE filter on this page that works with JavaScript off, and owner
+    /// decision D2 of Story 20.9 keeps it that way deliberately: trading it for a byte win would take information
+    /// away from a no-JS visitor to make a chart cheaper.
+    ///
+    /// <para><c>data-hierarchy-reveal</c> is the only thing this story adds. Exactly one <c>.codemap-view</c> panel
+    /// is visible at a time and the other three are <c>display:none</c>, i.e. ZERO-WIDTH — and Plotly cannot lay
+    /// out in a zero-width container while <c>responsive: true</c>'s resize listener never fires on a CSS-only
+    /// reveal. The marker tells the component "a mount may become possible when this changes"; it does not tell it
+    /// anything about this page. These are real <c>&lt;input&gt;</c> elements — the toggle is pure CSS for
+    /// STYLING, but the elements still fire <c>change</c>. [Story 20.9 F1]</para></summary>
     private static void AppendFilterCheckbox(StringBuilder sb, string id, string label)
     {
-        sb.Append($"  <input type=\"checkbox\" id=\"{id}\" class=\"codemap-filter-checkbox\">");
+        sb.Append($"  <input type=\"checkbox\" id=\"{id}\" class=\"codemap-filter-checkbox\" data-hierarchy-reveal>");
         sb.Append($"<label for=\"{id}\" class=\"codemap-filter-label\">{PathUtil.Html(label)}</label>\n");
     }
+
+    /// <summary>The Code Map explorer's configured size, applied by the component as a HEIGHT capped to its own
+    /// width (never a width — <c>HierarchyExplorerConfig.Size</c> is one int and the container supplies the
+    /// width). The retired SVG's 1000×640 was a fixed viewBox for a chart that neither labelled nor drilled;
+    /// only the 640 carries over, and only because it is the height. Verified live rather than ported on faith
+    /// (Story 20.9 F5).</summary>
+    private const int CodeMapExplorerSize = 640;
 
     /// <summary>Renders one precomputed filter combination as a self-contained panel: a "View as" shape toggle
     /// (Treemap/Sunburst) crossed with a shared "Colorize by" dimension dropdown, the drill breadcrumb (Treemap
@@ -105,85 +141,71 @@ public static class CodeMapTemplater
 
         var files = variant.Map.Files();
         var hasMetrics = files.Any(f => f.Metrics is not null);
-
-        sb.Append("  <section class=\"chart-panel codemap-panel\">\n");
-
-        if (variant.ExcludesSpecDev || variant.ExcludesTests)
-        {
-            var excluded = variant.ExcludesSpecDev && variant.ExcludesTests
-                ? "spec-driven development directories and tests excluded"
-                : variant.ExcludesSpecDev
-                    ? "spec-driven development directories excluded"
-                    : "tests excluded";
-            sb.Append($"    <p class=\"codemap-view-note\">{Charts.Plural(variant.Map.FileCount, "file", "files")} shown — {excluded}.</p>\n");
-        }
-
-        // "How to view it" — a pure-CSS radio pair swapping between the Treemap and Sunburst shapes, both driven
-        // by the SAME colorize dimension below. [Story 7.12 review]
-        AppendShapeToggle(sb, variant.Key);
-
-        // File type is the one colorize dimension that needs no git data, so the dropdown + a legend always
-        // render once the variant has files — the "git data unavailable" state is no longer a fully-inert
-        // controls block, just a smaller supplementary note below a WORKING (file-type) colorize dimension.
-        // [Story 7.9 owner-directed design decision]
         var maxChanges = Charts.ComputeMaxChanges(variant.Map.Roots);
 
-        AppendColorizeControls(sb, hasMetrics);
-        AppendLegend(sb, hasMetrics, maxChanges);
-        AppendDiscreteLegend(sb, files, hasMetrics);
+        // "What to view" — the colorize dimension picker, kept exactly as Story 7.12's owner-directed merge left
+        // it and now wired to the component's dimension contract instead of a per-panel recolour loop. It rides
+        // inside the component's own hidden control bar, so it inherits the reveal handshake rather than
+        // re-inventing one, and the "how to view it" axis is the component's shape selector.
+        var controls = new StringBuilder();
+        AppendColorizeControls(controls, hasMetrics);
+
+        var legend = new StringBuilder();
         if (!hasMetrics)
         {
-            sb.Append("    <p class=\"codemap-notice codemap-notice-secondary\" role=\"note\">Git change data is unavailable (run with <code>--deep-git</code> in a git repository to colorize by the six git-derived dimensions). The map is colorized by file type instead.</p>\n");
+            // OUTSIDE the legend bar deliberately: this is a fact about the DATA, not chrome for a chart, so it
+            // stands whether or not the chart ever mounts.
+            legend.Append("    <p class=\"codemap-notice codemap-notice-secondary\" role=\"note\">Git change data is unavailable (run with <code>--deep-git</code> in a git repository to colorize by the six git-derived dimensions). The map is colorized by file type instead.</p>\n");
         }
+        // Both legend shapes ship pre-rendered; the component shows exactly the one the active dimension owns, so
+        // the visible legend can never disagree with what is coloured. The bar itself is hidden until a successful
+        // mount — a legend for a chart that never renders is chrome for nothing.
+        legend.Append("    <div class=\"ss-hierarchy-legends\" hidden>\n");
+        AppendLegend(legend, hasMetrics, maxChanges);
+        AppendDiscreteLegend(legend, files, hasMetrics);
+        legend.Append("    </div>\n");
 
-        sb.Append("    <div class=\"codemap-shape codemap-shape-treemap\">\n");
-        // The drill breadcrumb is JS-driven (zoom requires script) and Treemap-only (a polar sunburst has no
-        // rectangular viewBox to zoom into); emit it hidden so a no-JS visitor never sees an inert control. The
-        // enhancement script reveals it on init, scoped to this panel.
-        sb.Append("      <nav class=\"codemap-drill\" aria-label=\"Treemap zoom\" hidden>\n");
-        sb.Append("        <ol class=\"codemap-breadcrumb\">\n");
-        sb.Append("          <li><button type=\"button\" class=\"codemap-crumb\" data-path=\"\" aria-current=\"true\">All files</button></li>\n");
-        sb.Append("        </ol>\n");
-        sb.Append("      </nav>\n");
-        sb.Append("      <div class=\"codemap-viewport\">\n");
-        // totalFileCount passed explicitly (variant.Map.FileCount, the SAME source AppendFileTable's `files` come
-        // from) so the treemap's detail cap and the table's row cap agree on whether the cap trips even on the
-        // rare repo deep enough that Layout() omits a file nested past its own recursion cap. [Review][Patch]
-        sb.Append(Charts.CodeTreemap(variant.Layout, CodeMap.DefaultWidth, CodeMap.DefaultHeight, hasMetrics, fileHref, prefix, variant.Map.FileCount));
-        sb.Append("      </div>\n");
-        sb.Append("    </div>\n");
+        // Four instances, four DomIds, four HashKeys — keyed off the variant so their deep links cannot collide
+        // (Story 20.9 F4). `#dir=` is deliberately NOT preserved: it was never a documented stable scheme and
+        // contorting `hashKey` to keep it would fork the deep-link vocabulary across surfaces.
+        var config = new HierarchyExplorerConfig(
+            DomId: $"codemap-{variant.Key}",
+            // Story 20.7 D2: selector ordering is fixed site-wide, the DEFAULT shape stays per-instance. This
+            // surface's shipped default was the treemap.
+            Shape: "treemap",
+            Mode: HierarchyMode.Navigate,
+            HashKey: $"cm-{variant.Key}",
+            Size: CodeMapExplorerSize,
+            Labels: true,
+            Meta: new Charts.ChartMeta(
+                VariantTitle(variant),
+                Window: $"{variant.Map.FileCount:N0} {Charts.Plural(variant.Map.FileCount, "file", "files")} · {variant.Map.TotalLines:N0} {Charts.Plural((int)Math.Min(variant.Map.TotalLines, int.MaxValue), "line", "lines")}"),
+            // Story 20.6 D1: the per-variant file table below IS this surface's twin, and it is richer than the
+            // generic nested listing — it carries every file's six git metrics as real table cells.
+            TwinDisplay: HierarchyTwinDisplay.External,
+            Dimensions: HierarchyExplorer.CodeMapDimensions(hasMetrics));
 
-        sb.Append("    <div class=\"codemap-shape codemap-shape-sunburst\">\n");
-        sb.Append("      <div class=\"codemap-sunburst-wrap\">\n");
-        sb.Append(Charts.CodeMapSunburst(variant.Map.Roots, hasMetrics, fileHref: fileHref));
-        sb.Append("      </div>\n");
-        sb.Append("    </div>\n");
-
-        sb.Append("  </section>\n\n");
+        var model = HierarchyExplorer.ProjectCodeMap(variant, config, fileHref, prefix);
+        sb.Append(HierarchyExplorer.Render(
+            model, "chart-panel codemap-panel", " data-explorer", controls.ToString(), legend.ToString()));
 
         AppendFileTable(sb, files, hasMetrics, fileHref, prefix);
 
         sb.Append("</div>\n\n");
     }
 
-    /// <summary>The "View as: Treemap | Sunburst" pure-CSS toggle (a panel-scoped clone of the sprint board's
-    /// <c>.board-tabs</c> radio toggle) — the "how to view it" axis, orthogonal to the "what to view" colorize
-    /// dropdown below it (both apply to whichever shape is showing). Radio ids/names are suffixed with
-    /// <paramref name="variantKey"/> since all four filter-combination panels' markup coexists in the DOM.
-    /// [Story 7.12 review]</summary>
-    private static void AppendShapeToggle(StringBuilder sb, string variantKey)
-    {
-        var treemapId = $"cs-treemap-{variantKey}";
-        var sunburstId = $"cs-sunburst-{variantKey}";
-        sb.Append("    <div class=\"board-tabs codemap-shape-tabs\">\n");
-        sb.Append($"      <input type=\"radio\" id=\"{treemapId}\" name=\"cs-shape-{variantKey}\" class=\"board-tab-radio\" checked>\n");
-        sb.Append($"      <input type=\"radio\" id=\"{sunburstId}\" name=\"cs-shape-{variantKey}\" class=\"board-tab-radio cs-sunburst-radio\">\n");
-        sb.Append("      <div class=\"board-tabbar\">\n");
-        sb.Append($"        <label for=\"{treemapId}\" class=\"board-tab\">Treemap</label>\n");
-        sb.Append($"        <label for=\"{sunburstId}\" class=\"board-tab\">Sunburst</label>\n");
-        sb.Append("      </div>\n");
-        sb.Append("    </div>\n");
-    }
+    /// <summary>Each panel's own framed title. The page heading above the checkboxes describes the surface; a
+    /// panel's title has to say WHICH filter combination it is, or four identically-titled panels sit in one
+    /// document with nothing but a checkbox state telling them apart. This absorbs the old
+    /// <c>.codemap-view-note</c> — same fact, in the frame's own slot rather than a bespoke paragraph.</summary>
+    private static string VariantTitle(CodeMapVariant variant) =>
+        (variant.ExcludesSpecDev, variant.ExcludesTests) switch
+        {
+            (true, true) => "Source Code Map — excluding spec-driven development directories and tests",
+            (true, false) => "Source Code Map — excluding spec-driven development directories",
+            (false, true) => "Source Code Map — excluding tests",
+            _ => "Source Code Map — every file",
+        };
 
     /// <summary>The dimension-switch control — a dropdown, keyboard-operable, present whenever the variant has
     /// files (Story 7.9 loosened this from "only when git metrics exist" — file type needs no git data). Emitted
@@ -195,9 +217,11 @@ public static class CodeMapTemplater
     /// dropdown than a many-item radio list. [Subtask 5.2; Story 7.9]</summary>
     private static void AppendColorizeControls(StringBuilder sb, bool hasMetrics)
     {
-        sb.Append("    <div class=\"codemap-controls\" hidden>\n");
+        // No `hidden` here any more: this rides INSIDE the component's own hidden control bar, which is revealed
+        // by the same successful mount. Two nested `hidden` layers would leave the select invisible after mount.
+        sb.Append("    <div class=\"codemap-controls\">\n");
         sb.Append("      <label class=\"codemap-controls-label\">Colorize by\n");
-        sb.Append("        <select class=\"codemap-dim-select\" aria-label=\"Colorize the treemap and sunburst by\">\n");
+        sb.Append("        <select class=\"codemap-dim-select\" data-hierarchy-dimension aria-label=\"Colorize the treemap and sunburst by\">\n");
         if (hasMetrics)
         {
             AppendOption(sb, "changes", "Change frequency", true);
@@ -232,8 +256,13 @@ public static class CodeMapTemplater
     /// Story 7.9; Review 2026-07-22]</summary>
     private static void AppendLegend(StringBuilder sb, bool hasMetrics, double maxChanges)
     {
-        sb.Append("    <div class=\"codemap-legend codemap-legend-ramp\"").Append(hasMetrics ? "" : " hidden").Append(">");
-        sb.Append("<span class=\"codemap-legend-dim\">Colorized by change frequency</span> ");
+        // `data-hierarchy-legend` names which dimensions own this block (the six numeric ramps share it); the
+        // caption is a TEMPLATE the component substitutes the active dimension's own label into, so the words
+        // stay this surface's and the component never learns them. Initial `hidden` is only the pre-mount state —
+        // the component sets it explicitly for every block on the first dimension apply.
+        sb.Append("    <div class=\"codemap-legend codemap-legend-ramp\" data-hierarchy-legend=\"")
+          .Append(HierarchyExplorer.CodeMapRampLegend).Append('"').Append(hasMetrics ? "" : " hidden").Append(">");
+        sb.Append("<span class=\"codemap-legend-dim\" data-hierarchy-legend-caption=\"Colorized by {label}\">Colorized by change frequency</span> ");
         for (var l = 0; l <= 4; l++)
         {
             if (l > 0 && Charts.IsCodeMapChangeLevelUnreachable(l, maxChanges)) continue;
@@ -255,8 +284,9 @@ public static class CodeMapTemplater
     {
         var present = CodeFileType.AllCategories.Where(cat => files.Any(f => f.Category == cat)).ToList();
 
-        sb.Append("    <div class=\"codemap-legend codemap-legend-discrete\"").Append(hasMetrics ? " hidden" : "").Append(">");
-        sb.Append("<span class=\"codemap-legend-dim\">Colorized by file type</span> ");
+        sb.Append("    <div class=\"codemap-legend codemap-legend-discrete\" data-hierarchy-legend=\"")
+          .Append(HierarchyExplorer.CodeMapDiscreteLegend).Append('"').Append(hasMetrics ? " hidden" : "").Append(">");
+        sb.Append("<span class=\"codemap-legend-dim\" data-hierarchy-legend-caption=\"Colorized by {label}\">Colorized by file type</span> ");
         foreach (var cat in present)
         {
             sb.Append($"<span class=\"codemap-legend-swatch type-{cat.Key}\"></span>");

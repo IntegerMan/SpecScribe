@@ -250,6 +250,42 @@
       "port": 8109
     },
     {
+      "name": "bmm-control-18-6",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8114",
+        "--directory",
+        "SpecScribeOutput"
+      ],
+      "port": 8114
+    },
+    {
+      "name": "bmm-partial-18-6",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8116",
+        "--directory",
+        "C:/Users/MattE/AppData/Local/Temp/claude/C--Dev-SpecScribe/1fe51693-4f31-4fe3-b650-6917000ec864/scratchpad/bmm-partial/SpecScribeOutput"
+      ],
+      "port": 8116
+    },
+    {
+      "name": "unmodeled-18-6",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8115",
+        "--directory",
+        "C:/Users/MattE/AppData/Local/Temp/claude/C--Dev-SpecScribe/1fe51693-4f31-4fe3-b650-6917000ec864/scratchpad/cis-repo/SpecScribeOutput"
+      ],
+      "port": 8115
+    },
+    {
       "name": "bmm-control-18-5",
       "runtimeExecutable": "python",
       "runtimeArgs": [
@@ -260,6 +296,18 @@
         "SpecScribeOutput"
       ],
       "port": 8110
+    },
+    {
+      "name": "codemap-20-9",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8114",
+        "--directory",
+        "SpecScribeOutput"
+      ],
+      "port": 8114
     }
   ]
 }

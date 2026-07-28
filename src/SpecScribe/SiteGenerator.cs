@@ -481,6 +481,9 @@ public sealed class SiteGenerator
             // Cached so every WriteIndex call shares one instance. Never-throw: any failure degrades to Empty,
             // the panel omits, and generation still succeeds (AD-4 / NFR2). [Story 3.3 Task 2; review: reordered]
             _coverage = BuildArtifactCoverage(sourceRelatives);
+            // The panel omission above is silent on the page by design, so record WHY here — once per generate
+            // run, on the events path, next to the other run-level notice. [Story 18.6 owner decision D3]
+            AppendUnmodeledCoverageNotice(events, _module);
 
             // Built once and shared with WriteSprint / WriteActionItems / WriteIndex. Lifted above WriteSprint
             // so the sprint page can consume the shared ledger without moving the sprint write later in the
@@ -2588,6 +2591,11 @@ public sealed class SiteGenerator
             var topAuthors = GitMetrics.BuildTopAuthors(_progress.DeepGit.Commits, capN: Charts.OwnershipTopAuthorPaletteSize);
             var html = GitInsightsTemplater.RenderPage(insights, _progress.Git, nav, codeMap, topAuthors, fileHref: CodeItemHref, today: _today);
             WriteOutput(SiteNav.GitInsightsOutputPath, ApplyReferenceLinks(html, SiteNav.GitInsightsOutputPath));
+            // Story 20.9: this page now hosts a Hierarchy Explorer, so it needs the vendored engine on disk in its
+            // own right. It cannot rely on the dashboard having copied it first — a repo with git history but no
+            // epics renders this page and no dashboard chart. Idempotent, and it reads the FINISHED html rather
+            // than a belief about it.
+            EnsureHierarchyEngine(html);
             events.Add(new GenerationEvent(GenerationOutcome.Generated, SiteNav.GitInsightsOutputPath, sw.Elapsed));
         }
         catch (Exception ex)
@@ -2999,6 +3007,15 @@ public sealed class SiteGenerator
                         // a browser tab is escapable; a status panel claiming "links work" is not).
                         continue;
                     }
+                    // Same rule the PageView path applies in WebviewRenderAdapter.RenderContent, which this path
+                    // never ran: this surface ships no specscribe.js, so an inline JSON island is dead weight it
+                    // can never read — and after Story 20.9 that is 4.5 MB of it on code-map.html alone. The
+                    // `data-island` host exception already described the webview as carrying none.
+                    //
+                    // AFTER the degrade check, deliberately: that check is a REFERENCE comparison against the
+                    // nav markup, and stripping first would hand it a fresh string every time, so a genuinely
+                    // landmark-less page would stop being detected and would ship as a blank surface.
+                    region = WebviewRenderAdapter.StripDataIslands(region);
                     sourceByOutput.TryGetValue(normalized, out var capturedSource);
                     surfaces.Add(new WebviewSurface(
                         normalized,
@@ -3459,6 +3476,39 @@ public sealed class SiteGenerator
         }));
     }
 
+    /// <summary>Appends the Story 18.6 <see cref="AdapterDiagnosticCategory.Informational"/> notice recording that
+    /// the dashboard's Planning Artifacts panel was omitted because the detected primary module declares no
+    /// modeled artifact-family set. Owner decision D3: the omission is SILENT on the page (no markup, no
+    /// acknowledgement line, no new <c>DashboardView</c> field — the dashboard is already dense) but must not be
+    /// invisible, so the diagnostics page explains it rather than the panel vanishing without trace.
+    /// <para>Deliberately a SEPARATE notice from <see cref="ModuleContext"/>'s <c>ReportUnmodeledPrimary</c>,
+    /// which covers the docs/glossary omission: the subject is a different surface, and <c>ModuleContext</c>
+    /// should not learn what a dashboard panel is.</para>
+    /// <para><b>Emitted from the GenerateAll events path only — never from <see cref="BuildArtifactCoverage"/>.</b>
+    /// <see cref="RefreshCoverage"/> calls that on EVERY watch incremental (<c>GenerateOne</c> / <c>RemoveFor</c> /
+    /// <c>RegenerateEpics</c> / <c>RegenerateAdrs</c>), so emitting there would accumulate a diagnostics row per
+    /// keystroke — the exact failure ADR 0015 Decision 2d's at-most-one-per-run rule forbids. Unlike
+    /// <see cref="AppendCountDivergenceNotice"/>, this one is NOT re-emitted from <c>RegenerateEpics</c>: the
+    /// count ledger genuinely changes on a watch rebuild, whereas the detected module is fixed for the life of
+    /// the run (detect-once-per-run, Story 18.2), so a re-emission could only duplicate a still-correct row.</para>
+    /// [Story 18.6; ADR 0015 Decisions 2d + 5a]</summary>
+    private static void AppendUnmodeledCoverageNotice(List<GenerationEvent> events, ModuleContext module)
+    {
+        if (!module.IsUnmodeled) return;
+
+        var code = module.Code ?? string.Empty;
+        events.AddRange(MapDiagnostics(new[]
+        {
+            new AdapterDiagnostic(
+                AdapterDiagnosticCategory.Informational,
+                // Reuses ModuleContext's centralized repo-relative path rather than re-literalizing it.
+                ModuleContext.RepoRelativeCsv(code),
+                $"Primary BMad module '{code}' ({module.Commands.ModuleLabel}) has no modeled "
+                + "planning-artifact family set, so the dashboard's Planning Artifacts panel is omitted.",
+                DiagnosticAnchorRoot.Repo),
+        }));
+    }
+
     /// <summary>One <see cref="AdapterDiagnosticCategory.Informational"/> notice per top-level SourceRoot folder
     /// outside the well-known set — the "unrecognized structure degrades, visibly" half of the grouping contract.
     /// Derived from SourceRoot relatives only. When <see cref="ForgeOptions.AdrSourceRoot"/> is outside SourceRoot
@@ -3618,6 +3668,10 @@ public sealed class SiteGenerator
 
         var html = CodeMapTemplater.RenderPage(variants, nav, fileHref: CodeItemHref);
         WriteOutput(SiteNav.CodeMapOutputPath, ApplyReferenceLinks(html, SiteNav.CodeMapOutputPath));
+        // Story 20.9: four Hierarchy Explorer instances live on this page, so the engine has to be on disk even in
+        // a source-only repo with no epics and therefore no dashboard chart. See EnsureHierarchyEngine — the flag
+        // is an optimization and the disk is the truth.
+        EnsureHierarchyEngine(html);
         return full.Map;
     }
 
@@ -4974,13 +5028,18 @@ public sealed class SiteGenerator
             // First pass with empty maps discovers which canonical families are present and their matched
             // source paths, so we stat ONLY those files (not every markdown doc). All family-matching logic
             // stays in ArtifactCoverage — the single coverage seam Epic 4 generalizes.
-            var discovered = ArtifactCoverage.Build(sourceRelatives, EmptyDates, EmptyDates, today);
+            // The DETECTED module decides the canonical family set (Story 18.6 / ADR 0015 Decision 5a). Read
+            // from the cached _module — never a second ModuleContext.Detect, which Story 18.2 made
+            // once-per-run on purpose. _module is assigned from the adapter bundle well before this runs, and
+            // persists across watch incrementals, so RefreshCoverage()'s rebuilds stay module-aware too.
+            var module = _module.Module;
+            var discovered = ArtifactCoverage.Build(sourceRelatives, module, EmptyDates, EmptyDates, today);
 
             // Stat every candidate matching ANY family (not just each family's provisional first match) so an
             // OR-predicate family (UX: DESIGN.md or EXPERIENCE.md) has both mtimes available when Build picks
             // the freshest one as canonical below. [Story 3.3 review]
             var mtimes = new Dictionary<string, DateOnly>(StringComparer.OrdinalIgnoreCase);
-            foreach (var rel in ArtifactCoverage.AllCandidatePaths(sourceRelatives))
+            foreach (var rel in ArtifactCoverage.AllCandidatePaths(sourceRelatives, module))
             {
                 try
                 {
@@ -4996,7 +5055,7 @@ public sealed class SiteGenerator
 
             var memlogByFamily = BuildMemlogMap(discovered);
 
-            var coverage = ArtifactCoverage.Build(sourceRelatives, mtimes, memlogByFamily, today);
+            var coverage = ArtifactCoverage.Build(sourceRelatives, module, mtimes, memlogByFamily, today);
 
             // Enrich each family with presentation data the pure Build can't know: the page a PRESENT family
             // links to, and the create command a MISSING family surfaces for the detected module. Resolved
@@ -5005,7 +5064,7 @@ public sealed class SiteGenerator
                 .Select(f => f with
                 {
                     Href = f.Present ? ResolveFamilyHref(f) : null,
-                    CreateCommand = !f.Present && ArtifactCoverage.CreateStepKeys.TryGetValue(f.Label, out var step)
+                    CreateCommand = !f.Present && ArtifactCoverage.CreateStepKeysFor(module).TryGetValue(f.Label, out var step)
                         ? _module.Commands.Command(step)
                         : null,
                 })

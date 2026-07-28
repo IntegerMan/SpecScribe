@@ -78,9 +78,27 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
         // under this adapter's path rewriting like any other. The absent chart PICTURE is its own registered
         // exception (`hierarchy-chart`), the ADR 0012 §5 / ADR 0013 §7 fallback owner decision D3 accepted.
         // [Story 20.2; rationale corrected + registered by the 20.2 review; amended Story 20.7]
-        sb.Append(JsonDataIsland.Replace(page.BodyHtml, string.Empty));
+        sb.Append(StripDataIslands(page.BodyHtml));
         return sb.ToString();
     }
+
+    /// <summary>The island strip, exposed so the CAPTURED-page path can apply the same rule this one does.
+    ///
+    /// <para><b>It was missing there, and Story 20.9 made that expensive rather than merely untidy.</b> A page
+    /// written through <c>WriteOutput</c> (<c>code-map.html</c>, <c>git-insights.html</c>) becomes a webview
+    /// surface by slicing its <c>&lt;main&gt;</c> out of the captured HTML — a path that never ran
+    /// <see cref="RenderContent"/> and therefore never stripped anything. The island sits inside
+    /// <c>&lt;main&gt;</c>, so it rode along. That was ~470 KB of unreadable payload before this story and
+    /// <b>4.5 MB</b> after it, inlined into a document the editor holds in memory, on a surface that ships no
+    /// <c>specscribe.js</c> and so can never read a byte of it.</para>
+    ///
+    /// <para>The <c>data-island</c> entry in <see cref="HostRenderExceptions"/> already described this surface as
+    /// carrying no islands, so this is the code being brought up to the registered contract rather than a new
+    /// divergence. What carries the information here is unchanged: the text twin (or, on the Code Map, its
+    /// per-variant file table), which is <c>&lt;details&gt;</c>/<c>&lt;table&gt;</c> markup no part of the regex
+    /// matches. <b>The SPA deliberately does NOT call this</b> — it is a real browser that keeps
+    /// <c>specscribe.js</c>, so its islands are live data, not dead weight. [Story 20.9 Task 5.2]</para></summary>
+    public static string StripDataIslands(string html) => JsonDataIsland.Replace(html, string.Empty);
 
     /// <summary>Matches an inline <c>&lt;script type="application/json"&gt;…&lt;/script&gt;</c> data island (with its
     /// trailing newline) so the webview region ships none — inert data the CSP would block anyway. [Story 20.2]</summary>

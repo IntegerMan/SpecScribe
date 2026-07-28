@@ -97,9 +97,10 @@ public class SiteGeneratorGitInsightsTests : IDisposable
         var hub = File.ReadAllText(HubPage);
         Assert.Contains(">Code Ownership &amp; Bus-Factor</h2>", hub); // Story 7.11: renders whenever the hub does — no separate gate
         Assert.Contains(">Activity Over Time</h2>", hub);
-        Assert.Contains("tracked.txt", hub);           // a known committed file appears in the ownership tree/sunburst
-        Assert.Contains("ownership-sunburst", hub);     // the whole-tree sunburst renders
-        Assert.Contains("Insight Tester", hub);         // the committing author appears as a file contributor (data-owner/tree)
+        Assert.Contains("tracked.txt", hub);           // a known committed file appears in the chart AND its twin
+        Assert.Contains(HierarchyExplorer.HostMarker, hub);   // the whole-tree explorer renders (Story 20.9)
+        Assert.Contains("<details class=\"ss-hierarchy-twin\"", hub); // ...and the twin AC#3 required it to gain
+        Assert.Contains("Insight Tester", hub);         // the committing author appears as a file contributor
 
         var index = File.ReadAllText(IndexPage);
         Assert.Contains("href=\"git-insights.html\"", index);

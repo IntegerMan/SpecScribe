@@ -229,31 +229,37 @@ public class HierarchyRolloutTests
         // one shared charting engine as a CONVENTION and it did not hold — three concurrent sessions produced
         // three arc renderers. A convention is easy to defeat; an assertion is not.
         //
-        // The ALLOWLIST is the point of the test, not an exemption from it. Story 20.9 converts Code Map and Git
-        // Insights ownership and DELETES these four entry points, at which moment this list shrinks to empty and
-        // Epic 20 AC#2's "exactly one implementation of a hierarchy chart" is finally true. It is satisfied at
-        // 20.9, NOT here. A future story that widens this list instead of shrinking it is doing the wrong thing.
-        var story209Survivors = new[]
-        {
-            "CodeTreemap",           // [Story 20.9]
-            "CodeMapSunburst",       // [Story 20.9]
-            "CodeOwnershipSunburst", // [Story 20.9]
-            "CodeOwnershipTreemap",  // [Story 20.9]
-        };
+        // The ALLOWLIST is the point of the test, not an exemption from it, and Story 20.9 EMPTIED IT. Story 20.7
+        // seeded it with the four entry points Code Map and Git Insights ownership still needed; converting those
+        // two surfaces deleted all four, and an empty allowlist is now the assertion rather than a placeholder.
+        //
+        // This is the moment Epic 20 AC#2 — "exactly one implementation of a hierarchy chart exists in the
+        // codebase" — stops being aspirational. Three stories in a row had to say "not yet". A future story that
+        // WIDENS this list instead of leaving it empty is doing the wrong thing; the component is the route.
+        var allowlist = Array.Empty<string>();
 
-        var retired = new[] { "Sunburst", "EpicSunburst", "TaskSunburst" };
+        var retired = new[]
+        {
+            // Story 20.7's three planning entry points…
+            "Sunburst", "EpicSunburst", "TaskSunburst",
+            // …and Story 20.9's four colorize-driven ones.
+            "CodeTreemap", "CodeMapSunburst", "CodeOwnershipSunburst", "CodeOwnershipTreemap",
+        };
         var chartsSource = StripComments(File.ReadAllText(SourcePath("Charts.cs")));
 
+        Assert.Empty(allowlist);
         foreach (var name in retired)
         {
             Assert.DoesNotMatch(
                 new Regex($@"public static string {name}\s*\("),
                 chartsSource);
         }
-        foreach (var name in story209Survivors)
-        {
-            Assert.Matches(new Regex($@"public static string {name}\s*\("), chartsSource);
-        }
+
+        // The last hand-rolled ARC GEOMETRY in C# went with them, and that is the concrete form of "exactly one
+        // implementation": `BuildSunburstSvg` had exactly two callers, both Story 20.9's, so Charts.cs now sheds
+        // its polar geometry completely. Asserted rather than left to a reader to confirm by eye. [Story 20.9 F8]
+        Assert.DoesNotContain("BuildSunburstSvg", chartsSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("AnnularSector", chartsSource, StringComparison.Ordinal);
 
         // And no source file CALLS a retired entry point by any route. Comments are stripped first: the deletions
         // are explained in prose at the sites they left behind, and a guard that a comment can trip is a guard
@@ -279,14 +285,20 @@ public class HierarchyRolloutTests
         Assert.DoesNotContain("var STATUS_CLASS", js);
         Assert.Contains("colorClass", js);
 
-        // The three retired client renderers, gone by name.
-        foreach (var fn in new[] { "function initSunburstExplorer", "function renderSunburst", "function arcPath", "function initImpactMap" })
+        // Every retired client renderer, gone by name — Story 20.7's three, plus Story 20.9's two.
+        foreach (var fn in new[]
+                 {
+                     "function initSunburstExplorer", "function renderSunburst", "function arcPath",
+                     "function initImpactMap", "function initCodeMapPanel", "function initOwnershipSunburst",
+                 })
+        {
             Assert.DoesNotContain(fn, js);
+        }
 
-        // Story 20.9's two are explicitly still standing — a sweep that took them would be out of scope, and this
-        // says so rather than leaving it to a reader's memory.
-        Assert.Contains("function initCodeMapPanel", js);
-        Assert.Contains("function initOwnershipSunburst", js);
+        // KEPT, and deliberately: it paginates the Code Map's per-variant file table, which Story 20.6 D1 audited
+        // and kept as that surface's text twin. Sweeping it up with the renderers would have removed a control
+        // over the one listing a JS-off visitor reads.
+        Assert.Contains("function initCodemapTablePager", js);
     }
 
     [Fact]

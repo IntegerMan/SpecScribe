@@ -11,6 +11,12 @@ public class ArtifactCoverageTests
     private static readonly IReadOnlyDictionary<string, DateOnly> NoMemlog = new Dictionary<string, DateOnly>();
     private static readonly DateOnly Today = new(2026, 7, 8);
 
+    /// <summary>Story 18.6 made the canonical family set module-aware, and the new parameter is REQUIRED — no
+    /// default — so "silently inherits BMad Method" can never be re-introduced by omission. Every case below
+    /// exercises BMad Method's own eight-family set, so each names it explicitly through this alias rather than
+    /// hiding it behind a helper. The module-varying rules have their own tests at the bottom of this class.</summary>
+    private const BmadModule Bmm = BmadModule.BmadMethod;
+
     private static ArtifactFamily Family(ArtifactCoverage cov, string label) =>
         cov.Families.Single(f => f.Label == label);
 
@@ -29,7 +35,7 @@ public class ArtifactCoverageTests
     [Fact]
     public void Build_AllCanonicalFamiliesPresent()
     {
-        var cov = ArtifactCoverage.Build(AllFamilyPaths(), NoDates, NoMemlog, Today);
+        var cov = ArtifactCoverage.Build(AllFamilyPaths(), Bmm, NoDates, NoMemlog, Today);
 
         Assert.False(cov.IsEmpty);
         Assert.Equal(0, cov.MissingCount);
@@ -43,7 +49,7 @@ public class ArtifactCoverageTests
     {
         // Only PRD + Epics supplied — everything else must read as missing.
         var paths = new[] { "planning-artifacts/prds/prd-x/prd.md", "planning-artifacts/epics.md" };
-        var cov = ArtifactCoverage.Build(paths, NoDates, NoMemlog, Today);
+        var cov = ArtifactCoverage.Build(paths, Bmm, NoDates, NoMemlog, Today);
 
         Assert.False(cov.IsEmpty);
         Assert.Equal(2, cov.PresentCount);
@@ -58,7 +64,7 @@ public class ArtifactCoverageTests
     {
         // A repo with only unknown/custom files → panel is omitted (IsEmpty), never throws.
         var cov = ArtifactCoverage.Build(
-            new[] { "notes/random.md", "README.md", "docs/some-guide.md" }, NoDates, NoMemlog, Today);
+            new[] { "notes/random.md", "README.md", "docs/some-guide.md" }, Bmm, NoDates, NoMemlog, Today);
 
         Assert.True(cov.IsEmpty);
         Assert.Equal(0, cov.PresentCount);
@@ -74,11 +80,11 @@ public class ArtifactCoverageTests
             "implementation-artifacts/deferred-work.md",
             "implementation-artifacts/spec-quick-fix.md",
         };
-        Assert.False(Family(ArtifactCoverage.Build(notStories, NoDates, NoMemlog, Today), "Stories").Present);
+        Assert.False(Family(ArtifactCoverage.Build(notStories, Bmm, NoDates, NoMemlog, Today), "Stories").Present);
 
         // One <n>-<n>-*.md file flips Stories to present.
         var withStory = notStories.Append("implementation-artifacts/1-2-user-auth.md").ToArray();
-        Assert.True(Family(ArtifactCoverage.Build(withStory, NoDates, NoMemlog, Today), "Stories").Present);
+        Assert.True(Family(ArtifactCoverage.Build(withStory, Bmm, NoDates, NoMemlog, Today), "Stories").Present);
     }
 
     [Fact]
@@ -87,7 +93,7 @@ public class ArtifactCoverageTests
         // A malformed "1-2-.md" (empty title after the epic-story prefix) must not count as a story artifact.
         // [Story 3.3 review]
         var malformed = new[] { "implementation-artifacts/1-2-.md" };
-        Assert.False(Family(ArtifactCoverage.Build(malformed, NoDates, NoMemlog, Today), "Stories").Present);
+        Assert.False(Family(ArtifactCoverage.Build(malformed, Bmm, NoDates, NoMemlog, Today), "Stories").Present);
     }
 
     [Fact]
@@ -96,11 +102,11 @@ public class ArtifactCoverageTests
         // Location tolerance (Story 4.2 Task 4): the folder may sit deeper in the tree — coverage must agree
         // with the adapter's story discovery, which classifies by ancestor segment, not fixed parent.
         var nested = new[] { "tracking/implementation-artifacts/1-2-user-auth.md" };
-        Assert.True(Family(ArtifactCoverage.Build(nested, NoDates, NoMemlog, Today), "Stories").Present);
+        Assert.True(Family(ArtifactCoverage.Build(nested, Bmm, NoDates, NoMemlog, Today), "Stories").Present);
 
         // But a like-named file with no implementation-artifacts/ ancestor still isn't a story.
         var elsewhere = new[] { "tracking/other/1-2-user-auth.md" };
-        Assert.False(Family(ArtifactCoverage.Build(elsewhere, NoDates, NoMemlog, Today), "Stories").Present);
+        Assert.False(Family(ArtifactCoverage.Build(elsewhere, Bmm, NoDates, NoMemlog, Today), "Stories").Present);
     }
 
     [Theory]
@@ -108,7 +114,7 @@ public class ArtifactCoverageTests
     [InlineData("planning-artifacts/ux-designs/ux-x/EXPERIENCE.md")]
     public void Build_UxFamilyPresentWhenEitherDesignOrExperienceExists(string uxPath)
     {
-        var cov = ArtifactCoverage.Build(new[] { uxPath }, NoDates, NoMemlog, Today);
+        var cov = ArtifactCoverage.Build(new[] { uxPath }, Bmm, NoDates, NoMemlog, Today);
         Assert.True(Family(cov, "UX").Present);
     }
 
@@ -126,7 +132,7 @@ public class ArtifactCoverageTests
             [experience] = new DateOnly(2026, 7, 1),
         };
 
-        var cov = ArtifactCoverage.Build(new[] { design, experience }, dates, NoMemlog, Today);
+        var cov = ArtifactCoverage.Build(new[] { design, experience }, Bmm, dates, NoMemlog, Today);
 
         var ux = Family(cov, "UX");
         Assert.Equal(experience, ux.SourcePath);
@@ -142,8 +148,8 @@ public class ArtifactCoverageTests
         var pathA = "planning-artifacts/prds/prd-a/prd.md";
         var pathB = "planning-artifacts/prds/prd-b/prd.md";
 
-        var forward = ArtifactCoverage.Build(new[] { pathA, pathB }, NoDates, NoMemlog, Today);
-        var reversed = ArtifactCoverage.Build(new[] { pathB, pathA }, NoDates, NoMemlog, Today);
+        var forward = ArtifactCoverage.Build(new[] { pathA, pathB }, Bmm, NoDates, NoMemlog, Today);
+        var reversed = ArtifactCoverage.Build(new[] { pathB, pathA }, Bmm, NoDates, NoMemlog, Today);
 
         Assert.Equal(Family(forward, "PRD").SourcePath, Family(reversed, "PRD").SourcePath);
     }
@@ -155,7 +161,7 @@ public class ArtifactCoverageTests
         var experience = "planning-artifacts/ux-designs/ux-x/EXPERIENCE.md";
         var unrelated = "custom/notes.md";
 
-        var candidates = ArtifactCoverage.AllCandidatePaths(new[] { design, experience, unrelated });
+        var candidates = ArtifactCoverage.AllCandidatePaths(new[] { design, experience, unrelated }, Bmm);
 
         Assert.Contains(design, candidates);
         Assert.Contains(experience, candidates);
@@ -168,7 +174,7 @@ public class ArtifactCoverageTests
         // AC #2: unknown or custom files do not cause generation failure — they simply aren't matched.
         var cov = ArtifactCoverage.Build(
             new[] { "planning-artifacts/prds/prd-x/prd.md", "custom/weird-thing.md", "prd.md.bak" },
-            NoDates, NoMemlog, Today);
+            Bmm, NoDates, NoMemlog, Today);
 
         Assert.True(Family(cov, "PRD").Present);
         Assert.Equal(1, cov.PresentCount);
@@ -181,12 +187,12 @@ public class ArtifactCoverageTests
         DateOnly Modified(int daysAgo) => Today.AddDays(-daysAgo);
 
         // Exactly StalenessThresholdDays old → NOT stale; one day older → stale.
-        var atThreshold = ArtifactCoverage.Build(new[] { path },
+        var atThreshold = ArtifactCoverage.Build(new[] { path }, Bmm,
             new Dictionary<string, DateOnly> { [path] = Modified(ArtifactCoverage.StalenessThresholdDays) }, NoMemlog, Today);
         Assert.False(Family(atThreshold, "PRD").IsStale(Today));
         Assert.Equal(0, atThreshold.StaleCount(Today));
 
-        var pastThreshold = ArtifactCoverage.Build(new[] { path },
+        var pastThreshold = ArtifactCoverage.Build(new[] { path }, Bmm,
             new Dictionary<string, DateOnly> { [path] = Modified(ArtifactCoverage.StalenessThresholdDays + 1) }, NoMemlog, Today);
         Assert.True(Family(pastThreshold, "PRD").IsStale(Today));
         Assert.Equal(1, pastThreshold.StaleCount(Today));
@@ -196,7 +202,7 @@ public class ArtifactCoverageTests
     public void IsStale_MissingOrUnknownDateIsNeverStale()
     {
         // Missing family: never stale. Present-but-no-mtime family: unknown ≠ old, so never stale.
-        var cov = ArtifactCoverage.Build(new[] { "planning-artifacts/prds/prd-x/prd.md" }, NoDates, NoMemlog, Today);
+        var cov = ArtifactCoverage.Build(new[] { "planning-artifacts/prds/prd-x/prd.md" }, Bmm, NoDates, NoMemlog, Today);
         Assert.False(Family(cov, "PRD").IsStale(Today));   // present, LastModified null
         Assert.False(Family(cov, "Epics").IsStale(Today)); // missing entirely
         Assert.Equal(0, cov.StaleCount(Today));
@@ -206,7 +212,7 @@ public class ArtifactCoverageTests
     public void Build_ClampsFutureDatedMtimeToGenerationDate()
     {
         var path = "planning-artifacts/prds/prd-x/prd.md";
-        var cov = ArtifactCoverage.Build(new[] { path },
+        var cov = ArtifactCoverage.Build(new[] { path }, Bmm,
             new Dictionary<string, DateOnly> { [path] = Today.AddDays(5) }, NoMemlog, Today);
 
         // Future skew is clamped to today — never reads as "edited in the future", never stale.
@@ -219,7 +225,7 @@ public class ArtifactCoverageTests
     {
         // Description is static canonical data set by the pure Build; Href/CreateCommand are generator-resolved
         // (page routing + detected module) so Build must leave them null — it stays purely source-derived.
-        var cov = ArtifactCoverage.Build(AllFamilyPaths(), NoDates, NoMemlog, Today);
+        var cov = ArtifactCoverage.Build(AllFamilyPaths(), Bmm, NoDates, NoMemlog, Today);
 
         Assert.All(cov.Families, f => Assert.False(string.IsNullOrWhiteSpace(f.Description)));
         Assert.All(cov.Families, f => Assert.Null(f.Href));
@@ -232,10 +238,10 @@ public class ArtifactCoverageTests
         // The step-key map is the single source the generator uses to resolve a missing family's create
         // command; every family here should map to a workflow step (Spec Kernel intentionally has one too,
         // even if a given module may not expose it — resolution degrades at Command() time, not here).
-        var cov = ArtifactCoverage.Build(AllFamilyPaths(), NoDates, NoMemlog, Today);
+        var cov = ArtifactCoverage.Build(AllFamilyPaths(), Bmm, NoDates, NoMemlog, Today);
         foreach (var f in cov.Families)
         {
-            Assert.True(ArtifactCoverage.CreateStepKeys.ContainsKey(f.Label), $"no step key for {f.Label}");
+            Assert.True(ArtifactCoverage.CreateStepKeysFor(Bmm).ContainsKey(f.Label), $"no step key for {f.Label}");
         }
     }
 
@@ -244,7 +250,7 @@ public class ArtifactCoverageTests
     {
         var path = "planning-artifacts/prds/prd-x/prd.md";
         var memlogDate = new DateOnly(2026, 7, 1);
-        var cov = ArtifactCoverage.Build(new[] { path }, NoDates,
+        var cov = ArtifactCoverage.Build(new[] { path }, Bmm, NoDates,
             new Dictionary<string, DateOnly> { ["PRD"] = memlogDate }, Today);
 
         Assert.Equal(memlogDate, Family(cov, "PRD").MemlogUpdated);
@@ -261,8 +267,8 @@ public class ArtifactCoverageTests
             ["planning-artifacts/prds/prd-x/prd.md"] = new DateOnly(2026, 6, 15),
         };
 
-        var withoutMemlog = ArtifactCoverage.Build(paths, mtimes, NoMemlog, Today);
-        var withMemlog = ArtifactCoverage.Build(paths, mtimes,
+        var withoutMemlog = ArtifactCoverage.Build(paths, Bmm, mtimes, NoMemlog, Today);
+        var withMemlog = ArtifactCoverage.Build(paths, Bmm, mtimes,
             new Dictionary<string, DateOnly> { ["PRD"] = new DateOnly(2026, 7, 2) }, Today);
 
         foreach (var baseline in withoutMemlog.Families)
@@ -275,6 +281,89 @@ public class ArtifactCoverageTests
         // The only difference is the additive memlog date on PRD.
         Assert.Null(Family(withoutMemlog, "PRD").MemlogUpdated);
         Assert.Equal(new DateOnly(2026, 7, 2), Family(withMemlog, "PRD").MemlogUpdated);
+    }
+
+    // ---- Story 18.6: the canonical family set is resolved from the detected module -------------------
+    // ADR 0015 Decision 5a. Every rule here is assertable with no disk access — the pure half stays pure.
+
+    [Fact]
+    public void Build_UnmodeledModule_DeclaresNoFamiliesAtAll()
+    {
+        // D2 taken literally: a detected-but-unmodeled primary declares an EMPTY family set, so the whole
+        // panel omits via the IsEmpty gate that already exists — not "the same eight with the missing ones
+        // hidden". Note the input: EVERY BMad Method family file is on disk and NONE is reported, because the
+        // question is what this METHODOLOGY claims to produce, not what files happen to be present.
+        var cov = ArtifactCoverage.Build(AllFamilyPaths(), BmadModule.Unmodeled, NoDates, NoMemlog, Today);
+
+        Assert.Empty(cov.Families);
+        Assert.True(cov.IsEmpty);
+        Assert.Equal(0, cov.PresentCount);
+        Assert.Equal(0, cov.MissingCount);
+        Assert.Equal(0, cov.StaleCount(Today));
+    }
+
+    [Fact]
+    public void Build_UnmodeledModuleWithOnlyACoreProducedSpec_StillDeclaresNothing()
+    {
+        // The exact reachable defect: `bmad-spec` is a CORE skill shipped with every module install, so an
+        // unmodeled repo can own a real specs/*/SPEC.md. Before Story 18.6 that made Spec Kernel Present,
+        // IsEmpty false, and the panel rendered 1 present + 7 missing BMad Method families.
+        var cov = ArtifactCoverage.Build(
+            new[] { "specs/spec-x/SPEC.md" }, BmadModule.Unmodeled, NoDates, NoMemlog, Today);
+
+        Assert.Empty(cov.Families);
+        Assert.True(cov.IsEmpty);
+    }
+
+    [Fact]
+    public void Build_UnknownModule_KeepsTheBmadMethodFamilySet()
+    {
+        // Owner decision D1 — and the polarity trap. BmadModule.Unknown means "no _bmad/ install, or nothing
+        // parsed": the repo asserts NO methodology, and the panel's present/missing data is still
+        // source-derived truth, so it keeps the families. This is the OPPOSITE of ModuleContext.DocsFor /
+        // GlossaryFor, whose `_ =>` arms return empty. Aligning them would silently delete the panel from
+        // every repository that has no BMad install.
+        var cov = ArtifactCoverage.Build(AllFamilyPaths(), BmadModule.Unknown, NoDates, NoMemlog, Today);
+
+        Assert.Equal(8, cov.Families.Count);
+        Assert.False(cov.IsEmpty);
+        Assert.Equal(0, cov.MissingCount);
+    }
+
+    [Fact]
+    public void Build_GameDevStudio_KeepsTheBmadMethodFamilySet()
+    {
+        // AC #2 locks GDS to the BMad Method set even though GDS actually produces gdd.md /
+        // narrative-design.md / game-architecture.md. Modeling a GDS-specific set is a real candidate
+        // follow-up; doing it in this story would change modeled-module behavior, which AC #2 forbids.
+        var cov = ArtifactCoverage.Build(AllFamilyPaths(), BmadModule.GameDevStudio, NoDates, NoMemlog, Today);
+
+        Assert.Equal(8, cov.Families.Count);
+        Assert.Equal(
+            ArtifactCoverage.Build(AllFamilyPaths(), Bmm, NoDates, NoMemlog, Today).Families.Select(f => f.Label),
+            cov.Families.Select(f => f.Label));
+    }
+
+    [Fact]
+    public void AllCandidatePaths_UnmodeledModule_StatsNothing()
+    {
+        // AllCandidatePaths drives which files the generator stats for mtimes. It must agree with Build about
+        // the family set, or an unmodeled repo would pay for IO whose result nothing can ever read.
+        Assert.Empty(ArtifactCoverage.AllCandidatePaths(AllFamilyPaths(), BmadModule.Unmodeled));
+        Assert.NotEmpty(ArtifactCoverage.AllCandidatePaths(AllFamilyPaths(), BmadModule.Unknown));
+    }
+
+    [Fact]
+    public void CreateStepKeysFor_UnmodeledModule_OffersNoCreateCommands()
+    {
+        // No declared families means nothing to create — the map must not fall back to BMad Method's steps.
+        Assert.Empty(ArtifactCoverage.CreateStepKeysFor(BmadModule.Unmodeled));
+
+        // ...while every modeled-or-undetected module keeps the full set (D1 / AC #2).
+        foreach (var module in new[] { BmadModule.Unknown, BmadModule.BmadMethod, BmadModule.GameDevStudio })
+        {
+            Assert.Equal(8, ArtifactCoverage.CreateStepKeysFor(module).Count);
+        }
     }
 }
 

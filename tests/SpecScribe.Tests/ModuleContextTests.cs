@@ -54,12 +54,24 @@ public class ModuleContextTests : IDisposable
         File.WriteAllText(Path.Combine(moduleDir, "module-help.csv"), csv);
     }
 
+    // VERBATIM upstream content, like every other fixture in this file. It was the last synthetic one, which
+    // left AC #3's "verified against REAL module-help.csv content rather than synthetic fixtures" half-met:
+    // Task 6 re-pinned GDS/TEA/CIS/BMB but not BMad Method — the one module whose behaviour AC #3 most needs
+    // held still. Rows chosen to preserve every property the old synthetic fixture exercised, now with real
+    // bytes: the two `bmad-create-story` rows are genuinely how upstream ships it, so `first row wins for a
+    // given step` (create beating validate) is now pinned against reality rather than an invention, and
+    // `bmad-prd`'s real description supplies the quoted-field-with-embedded-commas case.
+    //   BMad Method  bmad-code-org/BMAD-METHOD  src/bmm-skills/module-help.csv
+    //                fetched 2026-07-27, pinned at bb45db4aa4496c69239f9c0629c290fd1b072fc9
+    // [Review][Patch P4; ADR 0015 Decision 7]
     private const string BmmCsv = """
         module,skill,display-name,menu-code,description,action,args,phase,preceded-by,followed-by,required,output-location,outputs
-        BMad Method,_meta,,,,,,,,,false,url,
-        BMad Method,bmad-create-story,Create Story,CS,"Prepare the next story, with commas, quoted",create,,4-implementation,,,true,implementation_artifacts,story
-        BMad Method,bmad-dev-story,Dev Story,DS,Execute the story,,,4-implementation,,,true,,
-        BMad Method,bmad-code-review,Code Review,CR,Review the changes,,,4-implementation,,,false,,
+        BMad Method,_meta,,,,,,,,,false,https://docs.bmad-method.org/llms.txt,
+        BMad Method,bmad-prd,Create Edit and Review PRD,PRD,"Facilitated PRD workflow — create a new PRD via coached discovery, update an existing one against a change signal, or validate a finished PRD against a checklist with an HTML findings report.",,,2-planning,bmad-product-brief,,true,planning_artifacts,prd
+        BMad Method,bmad-create-story,Create Story,CS,Story cycle start: Prepare first found story in the sprint plan that is next or a specific epic/story designation.,create,,4-implementation,bmad-sprint-planning,bmad-create-story:validate,true,implementation_artifacts,story
+        BMad Method,bmad-create-story,Validate Story,VS,Validates story readiness and completeness before development work begins.,validate,,4-implementation,bmad-create-story:create,bmad-dev-story,false,implementation_artifacts,story validation report
+        BMad Method,bmad-dev-story,Dev Story,DS,Story cycle: Execute story implementation tasks and tests then CR then back to DS if fixes needed.,,,4-implementation,bmad-create-story:validate,,true,,
+        BMad Method,bmad-code-review,Code Review,CR,Story cycle: If issues back to DS if approved then next CS or ER if epic complete.,,,4-implementation,bmad-dev-story,,false,,
         """;
 
     // ---- Upstream-pinned module fixtures [Story 18.2 Task 6; ADR 0015 Decision 7] --------------------
@@ -72,6 +84,12 @@ public class ModuleContextTests : IDisposable
     //   Test Architect   bmad-method-test-architecture-enterprise 4a7522664ad4bf1c5338a1819144de458eaebecd
     //   Creative Intel.  bmad-module-creative-intelligence-suite  0a3413af3a4dc3ef9c06da79c671958b59b3b46c
     //   BMad Builder     bmad-builder (skills/module-help.csv)    a4a8483defb54ca3f42c76b6e80eed05279ed3a2
+    //   BMad Method      BMAD-METHOD (src/bmm-skills/module-help.csv)
+    //                    bb45db4aa4496c69239f9c0629c290fd1b072fc9  — added 2026-07-27 by code review [Patch P4].
+    //                    BMM was the ONE module Task 6 left synthetic, and it is the module AC #3 most needs
+    //                    held still. Note the real path is `src/bmm-skills/`, not the `src/` the ADR's
+    //                    evidence table implies. Its constant sits with the tests below, not in this block,
+    //                    because several fixtures are derived from it by string replacement.
     //
     // Rows are subset, never edited: the module label, the skill ids and the `_meta` row's docs-URL
     // output-location are exactly what ships. This matters — synthetic `gds-*` rows are precisely why the
@@ -301,8 +319,14 @@ public class ModuleContextTests : IDisposable
     public void Detect_KnownModules_CarryTheirCode()
     {
         WriteModule("bmm", BmmCsv, "core", "bmm");
-        Assert.Equal("bmm", ModuleContext.Detect(_repo, Array.Empty<string>()).Code);
-        Assert.False(ModuleContext.Detect(_repo, Array.Empty<string>()).IsUnmodeled);
+
+        var ctx = ModuleContext.Detect(_repo, Array.Empty<string>());
+
+        Assert.Equal("bmm", ctx.Code);
+        // The former second assertion here — a SECOND Detect call asserting !IsUnmodeled — was implied by
+        // Code == "bmm" and added no coverage. Replaced with the label, which is independent state and is what
+        // the Decision-1c cross-check now reads. [Review][Patch P7]
+        Assert.Equal("BMad Method", ctx.Commands.ModuleLabel);
     }
 
     [Fact]
@@ -394,6 +418,141 @@ public class ModuleContextTests : IDisposable
 
         Assert.Equal(BmadModule.BmadMethod, ctx.Module);
         Assert.Contains(ctx.Glossary, g => g.Term == "FR");
+        // Code is stored lower-invariant so comparison is case-insensitive everywhere. Pinned because the
+        // lower-casing was previously unasserted, and a diagnostic PATH built from it named a file that does
+        // not exist on a case-sensitive filesystem — see the anchor test below. [Review][Patch P6]
+        Assert.Equal("bmm", ctx.Code);
+    }
+
+    [Fact]
+    public void Detect_DiagnosticAnchor_UsesTheRealDirectoryCasing_NotTheLowercasedCode()
+    {
+        // RepoRelativeCsv used to be built from the lower-invariant code, so a repo whose install directory is
+        // `_bmad/TEA/` produced the anchor `_bmad/tea/module-help.csv` — a path that resolves to nothing on
+        // Linux/macOS, which is the same wrong-root failure DiagnosticAnchorRoot.Repo was added to prevent.
+        // [Review][Patch P6]
+        WriteModule("TEA", TeaCsv, "core", "TEA");
+
+        var diagnostics = new List<AdapterDiagnostic>();
+        var ctx = ModuleContext.Detect(_repo, Array.Empty<string>(), diagnostics);
+
+        Assert.True(ctx.IsUnmodeled);
+        var notice = Assert.Single(diagnostics, d => d.Category == AdapterDiagnosticCategory.Informational);
+        Assert.Equal("_bmad/TEA/module-help.csv", notice.RelativePath);
+        Assert.Equal(DiagnosticAnchorRoot.Repo, notice.Anchor);
+    }
+
+    // ---- Review patches P1 / P9 / P10: the label is evidence, not an identity oracle -------------------
+
+    [Fact]
+    public void BuildContext_CsvWithNoModuleColumn_YieldsNoLabel_NotTheLiteralBMad()
+    {
+        // The label used to default to the literal "BMad" at the parse site, so a catalog with no `module`
+        // header column (only `skill` is required to parse) made CommandCatalog.HasLabel true for every
+        // context — rendering "This project uses the BMad module", the exact false claim ADR 0015 Decision 2b
+        // exists to prevent, and leaving all three HasLabel guards unreachable. [Review][Patch P1]
+        const string noModuleColumn = """
+            skill,display-name,menu-code,description
+            acme-create-story,Create Story,CS,Prepare the next story
+            acme-dev-story,Dev Story,DS,Execute the story
+            """;
+        WriteModule("acme", noModuleColumn, "core", "acme");
+
+        var ctx = ModuleContext.Detect(_repo, Array.Empty<string>());
+
+        Assert.True(ctx.IsUnmodeled);
+        Assert.Equal(string.Empty, ctx.Commands.ModuleLabel);
+        Assert.False(ctx.Commands.HasLabel);
+        // The catalog itself still parses — an absent label costs the module its NAME, not its commands.
+        Assert.Equal("/acme-create-story", ctx.Commands.Command("create-story"));
+    }
+
+    [Fact]
+    public void BuildContext_ModeledCodeWithNoLabelAtAll_IsNotDemoted()
+    {
+        // An ABSENT label is not evidence of squatting. Demoting on it would strip a genuine BMM install of
+        // its docs, glossary and commands because of a missing CSV column. [Review][Patch P1 + P9]
+        const string bmmNoLabel = """
+            skill,display-name,menu-code,description
+            bmad-create-story,Create Story,CS,Prepare the next story
+            """;
+        WriteModule("bmm", bmmNoLabel, "core", "bmm");
+
+        var diagnostics = new List<AdapterDiagnostic>();
+        var ctx = ModuleContext.Detect(_repo, Array.Empty<string>(), diagnostics);
+
+        Assert.Equal(BmadModule.BmadMethod, ctx.Module);
+        Assert.Contains(ctx.Glossary, g => g.Term == "FR");
+        Assert.DoesNotContain(diagnostics, d => d.Category == AdapterDiagnosticCategory.Unsupported);
+    }
+
+    [Theory]
+    [InlineData("BMad Method")]           // exact — the shipped case
+    [InlineData("BMad Method v6")]        // a plausible upstream version suffix
+    [InlineData("BMad  Method")]          // interior whitespace drift
+    [InlineData("BMM: BMad Method")]      // the "BMGD: …" branding shape BMad's own module.yaml files use
+    public void BuildContext_ModeledCodeWithADriftedLabel_IsNotDemoted(string label)
+    {
+        // Exact matching made the shipped happy path depend on a third-party display string, and ADR 0015
+        // itself documents that BMad's labels drift. A cosmetic upstream rename must not strip a real install
+        // of its docs, glossary, site-wide abbreviation expansion and command legend. [Review][Patch P9]
+        WriteModule("bmm", BmmCsv.Replace("BMad Method", label), "core", "bmm");
+
+        var diagnostics = new List<AdapterDiagnostic>();
+        var ctx = ModuleContext.Detect(_repo, Array.Empty<string>(), diagnostics);
+
+        Assert.Equal(BmadModule.BmadMethod, ctx.Module);
+        Assert.Contains(ctx.Glossary, g => g.Term == "FR");
+        Assert.DoesNotContain(diagnostics, d => d.Category == AdapterDiagnosticCategory.Unsupported);
+    }
+
+    [Fact]
+    public void Detect_SquatterAtAModeledCode_NeverDemotesAGenuineModeledModuleBelowIt()
+    {
+        // AC #2's first clause. Ranking is computed from CODES before any label is parsed, so a minted module
+        // squatting `_bmad/gds/` outranks a genuine `_bmad/bmm/` the moment the source tree carries a game
+        // hint. Detect used to break on the first non-null BuildContext — and a demoted context is non-null —
+        // so the squatter took the primary slot and BMM, a MODELED module, was demoted below an auxiliary one:
+        // Defect B's exact symptom through a different door. [Review][Patch P10]
+        const string squatter = """
+            module,skill,display-name,menu-code,description,action,args,phase,preceded-by,followed-by,required,output-location,outputs
+            Totally Not GDS,_meta,,,,,,,,,false,url,
+            Totally Not GDS,gds-something,Something,SO,Do a thing,,,,,,false,output_folder,
+            """;
+        WriteManifest("core", "gds", "bmm");
+        WriteModuleDir("gds", squatter);
+        WriteModuleDir("bmm", BmmCsv);
+
+        var diagnostics = new List<AdapterDiagnostic>();
+        // The game hint ranks gds ABOVE bmm — this is the ordering that used to lose BMM.
+        var ctx = ModuleContext.Detect(_repo, new[] { "gdds/gdd.md" }, diagnostics);
+
+        Assert.Equal(BmadModule.BmadMethod, ctx.Module);
+        Assert.Equal("bmm", ctx.Code);
+        Assert.Equal("/bmad-create-story", ctx.Commands.Command("create-story"));
+        Assert.Contains(ctx.Glossary, g => g.Term == "FR");
+        Assert.Contains(ctx.Docs, d => d.FileName == "prd.md");
+        // The squatter is still reported — skipped, not silently ignored.
+        Assert.Single(diagnostics, d => d.Category == AdapterDiagnosticCategory.Unsupported);
+    }
+
+    [Fact]
+    public void Detect_SquatterIsTheOnlyInstall_StillYieldsItsContext_NotNone()
+    {
+        // The demoted candidate is a LAST-RESORT fallback: skipping it entirely would leave a repo whose only
+        // install is a squatter with no context at all, losing its real label and parsed catalog. [Patch P10]
+        const string squatter = """
+            module,skill,display-name,menu-code,description,action,args,phase,preceded-by,followed-by,required,output-location,outputs
+            Totally Not GDS,_meta,,,,,,,,,false,url,
+            Totally Not GDS,gds-something,Something,SO,Do a thing,,,,,,false,output_folder,
+            """;
+        WriteModule("gds", squatter, "core", "gds");
+
+        var ctx = ModuleContext.Detect(_repo, Array.Empty<string>());
+
+        Assert.Equal(BmadModule.Unmodeled, ctx.Module);
+        Assert.Equal("Totally Not GDS", ctx.Commands.ModuleLabel);
+        Assert.Empty(ctx.Glossary);
     }
 
     // ---- Story 18.2 / ADR 0015: the open-world guards ------------------------------------------------
@@ -460,9 +619,61 @@ public class ModuleContextTests : IDisposable
         // BMM still wins the primary slot (rank, not discovery order)...
         Assert.Equal(BmadModule.BmadMethod, ctx.Module);
         // ...but TEA is now visible, and is reported rather than invisible.
-        var skipped = Assert.Single(diagnostics, d => d.Category == AdapterDiagnosticCategory.Skipped);
-        Assert.Contains("tea", skipped.Message);
-        Assert.Equal(DiagnosticAnchorRoot.Repo, skipped.Anchor);
+        //
+        // Informational, NOT Skipped: this notice fires at ONE non-primary module, i.e. the ordinary healthy
+        // BMM+TEA install, and Skipped renders at Warning severity — a correctly configured repo must not show
+        // a warning. The threshold stays at one because the explanation is what a BMM+TEA user needs.
+        // [Review][Patch P13; owner call D5]
+        var secondary = Assert.Single(
+            diagnostics, d => d.Category == AdapterDiagnosticCategory.Informational);
+        Assert.Contains("tea", secondary.Message);
+        Assert.Equal(DiagnosticAnchorRoot.Repo, secondary.Anchor);
+        Assert.DoesNotContain(diagnostics, d => d.Category == AdapterDiagnosticCategory.Skipped);
+        // A MODELED primary does publish planning docs and a glossary, so the provenance clause says so.
+        Assert.Contains("planning docs, glossary and workflow commands come from 'bmm'", secondary.Message);
+    }
+
+    [Fact]
+    public void Detect_UnparseableHigherRanked_IsNotAlsoReportedAsMerelyNotPrimary()
+    {
+        // The `others` set used to be "every index except the winner", which swept in the higher-ranked
+        // candidates that had just FAILED TO PARSE. So an unreadable bmm beside a valid tea produced two
+        // notices about bmm: one saying its catalog could not be parsed, and one saying it merely lost a
+        // ranking. The second was false, and it told the reader the ranking worked as designed.
+        // [Review][Patch P3]
+        WriteManifest("core", "bmm", "tea");
+        WriteModuleDir("bmm", "not,a,valid\ncatalog");
+        WriteModuleDir("tea", TeaCsv);
+
+        var diagnostics = new List<AdapterDiagnostic>();
+        var ctx = ModuleContext.Detect(_repo, Array.Empty<string>(), diagnostics);
+
+        Assert.Equal("tea", ctx.Code);
+        var malformed = Assert.Single(diagnostics, d => d.Category == AdapterDiagnosticCategory.Malformed);
+        Assert.Contains("bmm", malformed.Message);
+        // The whole point: no second notice re-describing bmm as a ranking loser.
+        Assert.DoesNotContain(
+            diagnostics,
+            d => d.Category == AdapterDiagnosticCategory.Informational && d.Message.Contains("are not the primary"));
+    }
+
+    [Fact]
+    public void Detect_UnmodeledPrimary_DoesNotClaimItPublishesDocsOrGlossary()
+    {
+        // Two unmodeled modules: the secondary notice and the unmodeled notice render on the same diagnostics
+        // page, so the first must not assert that "planning docs, glossary and workflow commands come from"
+        // a module the second says publishes neither. [Review][Patch P3]
+        WriteManifest("core", "tea", "cis");
+        WriteModuleDir("tea", TeaCsv);
+        WriteModuleDir("cis", CisCsv);
+
+        var diagnostics = new List<AdapterDiagnostic>();
+        var ctx = ModuleContext.Detect(_repo, Array.Empty<string>(), diagnostics);
+
+        Assert.True(ctx.IsUnmodeled);
+        var secondary = Assert.Single(diagnostics, d => d.Message.Contains("are not the primary"));
+        Assert.DoesNotContain("planning docs, glossary", secondary.Message);
+        Assert.Contains("publishes no planning docs or glossary", secondary.Message);
     }
 
     [Fact]

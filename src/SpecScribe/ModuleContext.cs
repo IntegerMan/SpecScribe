@@ -335,6 +335,11 @@ public sealed class ModuleContext
     public static ModuleContext Detect(
         string repoRoot, IReadOnlyList<string> sourceRelativePaths, List<AdapterDiagnostic>? diagnostics = null)
     {
+        // Notices are buffered here and flushed to the caller ONLY once detection succeeds. Detection used to
+        // append straight into the caller's list, so the catch-all below could return None — rendering
+        // "Detected framework: Unknown (not detected)" — while that same list already carried notices naming a
+        // real module code and label: a diagnostics page that contradicted itself. [Review][Patch P5]
+        var pending = new List<AdapterDiagnostic>();
         try
         {
             var bmadRoot = Path.Combine(repoRoot, "_bmad");
@@ -352,37 +357,90 @@ public sealed class ModuleContext
             // Descend the rank. A candidate that won't parse is REPORTED and skipped, and the rank of the
             // remaining candidates is untouched — so a lower-ranked module never inherits the primary slot
             // merely because a higher-ranked one was unreadable. [ADR 0015 Decision 4d]
+            //
+            // A candidate DEMOTED by the Decision-1c label cross-check is skipped the same way, and for the
+            // same reason: ranking is computed from codes BEFORE any label is parsed, so a BMB-minted module
+            // squatting `_bmad/gds/` outranks a genuine `_bmad/bmm/` whenever the source tree carries a game
+            // hint. Accepting the squatter as primary would demote a MODELED module below an auxiliary one —
+            // Defect B's exact symptom through a different door, and a violation of AC #2's first clause. The
+            // demoted context is kept as a LAST-RESORT fallback so a repo whose only install is a squatter
+            // still gets a context (its real label and catalog) rather than None.
+            // [Review][Patch P10; ADR 0015 Decisions 4d + 1c, as amended]
             ModuleContext? primary = null;
             var chosenIndex = -1;
+            ModuleContext? demoted = null;
+            var demotedIndex = -1;
             for (var i = 0; i < ranked.Count; i++)
             {
-                var context = BuildContext(ranked[i], diagnostics);
-                if (context is not null)
+                CandidateContext? candidate;
+                try
                 {
-                    primary = context;
-                    chosenIndex = i;
-                    break;
+                    candidate = BuildCandidate(ranked[i], pending);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // A CSV deleted or exclusively locked between FindModuleCsv's File.Exists and the read —
+                    // a live watch-session race. Without this the throw escaped to the catch-all and discarded
+                    // every lower-ranked, perfectly parseable module, so Decision 4d's guarantee held only for
+                    // BuildContext returning null, never for it throwing. [Review][Patch P5]
+                    candidate = null;
                 }
 
-                diagnostics?.Add(new AdapterDiagnostic(
-                    AdapterDiagnosticCategory.Malformed, RepoRelativeCsv(CodeOf(ranked[i])),
-                    $"module help catalog could not be parsed; '{CodeOf(ranked[i])}' is skipped as a module candidate",
-                    DiagnosticAnchorRoot.Repo));
+                if (candidate is null)
+                {
+                    pending.Add(new AdapterDiagnostic(
+                        AdapterDiagnosticCategory.Malformed, RepoRelativeCsv(DirNameOf(ranked[i])),
+                        $"module help catalog could not be parsed; '{CodeOf(ranked[i])}' is skipped as a module candidate",
+                        DiagnosticAnchorRoot.Repo));
+                    continue;
+                }
+
+                if (candidate.Value.Demoted)
+                {
+                    // The Unsupported notice naming both labels was already emitted by BuildCandidate.
+                    if (demoted is null)
+                    {
+                        demoted = candidate.Value.Context;
+                        demotedIndex = i;
+                    }
+
+                    continue;
+                }
+
+                primary = candidate.Value.Context;
+                chosenIndex = i;
+                break;
             }
 
             if (primary is null)
             {
-                return None;
+                if (demoted is null)
+                {
+                    return None;
+                }
+
+                primary = demoted;
+                chosenIndex = demotedIndex;
             }
 
-            ReportSecondaryModules(ranked, chosenIndex, primary, diagnostics);
-            ReportUnmodeledPrimary(primary, diagnostics);
+            ReportSecondaryModules(ranked, chosenIndex, primary, pending);
+            ReportUnmodeledPrimary(primary, ranked[chosenIndex], pending);
+            diagnostics?.AddRange(pending);
             return primary;
         }
         catch (Exception)
         {
             // Detection is best-effort: any failure (IO, permissions, malformed data) degrades to None
-            // rather than aborting the whole site build.
+            // rather than aborting the whole site build. It is REPORTED rather than silent, though — an
+            // operator whose `_bmad/` is unreadable used to get a portal indistinguishable from one with no
+            // BMad install at all, and nothing to act on. Unsupported (not Malformed) keeps this new emission
+            // path off the Error mapping: nothing about the site is wrong, one input could not be read.
+            // [Review][Patch P5]
+            diagnostics?.Add(new AdapterDiagnostic(
+                AdapterDiagnosticCategory.Unsupported, "_bmad/",
+                "the installed BMad module set could not be read, so no methodology module was detected; "
+                + "module docs, glossary and command suggestions are omitted",
+                DiagnosticAnchorRoot.Repo));
             return None;
         }
     }
@@ -391,8 +449,16 @@ public sealed class ModuleContext
     /// that carry a <c>module-help.csv</c>, minus reserved names, deduped by code.
     /// <para>The disk scan used to fire only when the manifest yielded ZERO candidates, so a manifest listing
     /// <c>bmm</c> beside an installed <c>_bmad/tea/</c> never saw TEA — while <see cref="IsModulePresent"/>'s OR
-    /// semantics reported TEA present. Those two must not disagree, so the disk scan stops being a fallback.
-    /// [ADR 0015 Decision 1d]</para></summary>
+    /// semantics reported TEA present. The disk scan therefore stops being a fallback.
+    /// [ADR 0015 Decision 1d]</para>
+    /// <para><b>This closes ONE direction, not both.</b> The candidate set is
+    /// <c>(manifest ∪ disk) ∩ has-csv</c> while <see cref="IsModulePresent"/> is <c>manifest OR disk-csv</c>,
+    /// so a manifest entry whose <c>module-help.csv</c> is not on disk still reports present while
+    /// contributing no candidate — see <c>IsMethodPresent_TrueWhenManifestListsBmmWithoutCsv</c>, which pins
+    /// exactly that. Decision 1d's "those two must not disagree" is therefore an overstatement of what the
+    /// union achieved; the residual divergence is recorded as a known state rather than fixed here, because
+    /// <see cref="IsModulePresent"/>'s presence contract is depended on by Story 18.5's artifact gating.
+    /// [Review][Patch P11]</para></summary>
     private static List<string> DiscoverCandidates(string bmadRoot)
     {
         var byCode = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -403,39 +469,67 @@ public sealed class ModuleContext
             if (FindModuleCsv(bmadRoot, name) is { } csv) byCode[name] = csv;
         }
 
-        foreach (var name in ReadInstalledModules(bmadRoot)) Consider(name);
+        // The manifest read is guarded the way SafeEnumerateDirectories already is. It used to be enumerated
+        // eagerly and unwrapped, so a `_bmad/_config/manifest.yaml` that was exclusively locked, permission-
+        // denied, or mid-write — i.e. during a BMad install — threw straight past the whole union to Detect's
+        // catch-all, yielding None even with `_bmad/bmm/module-help.csv` sitting on disk. The disk half is the
+        // more reliable signal of the two; losing it to a manifest problem is the wrong failure.
+        // [Review][Patch P5]
+        foreach (var name in SafeReadInstalledModules(bmadRoot)) Consider(name);
         foreach (var dir in SafeEnumerateDirectories(bmadRoot)) Consider(Path.GetFileName(dir));
 
         return byCode.Values.ToList();
     }
 
-    /// <summary>One <see cref="AdapterDiagnosticCategory.Skipped"/> notice recording the installed modules that
-    /// did NOT become the primary — so a multi-module repo can see why its second module's docs and commands
-    /// are absent instead of guessing. [ADR 0015 Decision 4e]</summary>
+    /// <summary>One <see cref="AdapterDiagnosticCategory.Informational"/> notice recording the installed modules
+    /// that did NOT become the primary — so a multi-module repo can see why its second module's docs and
+    /// commands are absent instead of guessing. [ADR 0015 Decision 4e, as amended]
+    /// <para>Only candidates ranked BELOW the winner are listed. The set used to be "every index except the
+    /// winner", which swept in the higher-ranked candidates that had just failed to parse — so an unparseable
+    /// <c>bmm</c> beside a valid <c>tea</c> produced a <c>Malformed</c> notice saying bmm is unreadable AND
+    /// this one saying bmm merely lost a ranking. The second was false and told the reader the ranking worked
+    /// as designed. A candidate demoted by the label cross-check is excluded for the same reason: its
+    /// <c>Unsupported</c> notice already explains, more specifically, why it is not the primary.
+    /// [Review][Patch P3]</para>
+    /// <para><see cref="AdapterDiagnosticCategory.Informational"/> rather than
+    /// <see cref="AdapterDiagnosticCategory.Skipped"/>: this fires at ONE non-primary module, which is the
+    /// ordinary healthy BMM+TEA install, and <c>Skipped</c> renders at Warning severity — a clean repo must not
+    /// show a warning for being correctly configured. The threshold stays at one because that explanation is
+    /// exactly what a BMM+TEA user needs. [Review][Patch P13; owner call D5, 2026-07-27]</para></summary>
     private static void ReportSecondaryModules(
         List<string> ranked, int chosenIndex, ModuleContext primary, List<AdapterDiagnostic>? diagnostics)
     {
-        if (diagnostics is null || ranked.Count < 2) return;
+        if (diagnostics is null) return;
 
-        var others = ranked.Where((_, i) => i != chosenIndex).Select(CodeOf).ToList();
+        var others = ranked.Where((_, i) => i > chosenIndex).Select(CodeOf).ToList();
         if (others.Count == 0) return;
 
+        // The clause is conditional because an UNMODELED primary publishes no planning docs and no glossary —
+        // asserting they "come from" it would contradict ReportUnmodeledPrimary's notice emitted moments later
+        // on the same page. [Review][Patch P3]
+        var provenance = primary.IsModeled
+            ? $"planning docs, glossary and workflow commands come from '{primary.Code}'."
+            : $"workflow commands come from '{primary.Code}', which publishes no planning docs or glossary.";
+
         diagnostics.Add(new AdapterDiagnostic(
-            AdapterDiagnosticCategory.Skipped, RepoRelativeCsv(primary.Code ?? string.Empty),
+            AdapterDiagnosticCategory.Informational, RepoRelativeCsv(DirNameOf(ranked[chosenIndex])),
             $"{others.Count} other installed BMad module(s) ({string.Join(", ", others)}) are not the primary; "
-            + $"planning docs, glossary and workflow commands come from '{primary.Code}'.",
+            + provenance,
             DiagnosticAnchorRoot.Repo));
     }
 
     /// <summary>The one <see cref="AdapterDiagnosticCategory.Informational"/> "FYI, nothing to do" notice for a
     /// detected-but-unmodeled primary — the reported half of NFR8's honest absence, replacing what used to be a
-    /// silent misattribution to BMad Method. [ADR 0015 Decision 2d]</summary>
-    private static void ReportUnmodeledPrimary(ModuleContext primary, List<AdapterDiagnostic>? diagnostics)
+    /// silent misattribution to BMad Method. Anchored on the winning candidate's REAL directory name rather
+    /// than its lower-invariant code, so the path names a file that exists on a case-sensitive filesystem.
+    /// [ADR 0015 Decision 2d; Review][Patch P6]</summary>
+    private static void ReportUnmodeledPrimary(
+        ModuleContext primary, string csvPath, List<AdapterDiagnostic>? diagnostics)
     {
         if (diagnostics is null || !primary.IsUnmodeled) return;
 
         diagnostics.Add(new AdapterDiagnostic(
-            AdapterDiagnosticCategory.Informational, RepoRelativeCsv(primary.Code ?? string.Empty),
+            AdapterDiagnosticCategory.Informational, RepoRelativeCsv(DirNameOf(csvPath)),
             $"Detected BMad module '{primary.Code}' ({primary.Commands.ModuleLabel}); SpecScribe has no "
             + "module-specific docs or glossary for it, so those sections are omitted.",
             DiagnosticAnchorRoot.Repo));
@@ -443,8 +537,17 @@ public sealed class ModuleContext
 
     /// <summary>A module diagnostic's subject, anchored at the REPO root (not the source root every other
     /// adapter diagnostic uses) — <c>_bmad/</c> is a sibling of the source tree, so a source-anchored path
-    /// would resolve to a file that does not exist. [ADR 0015 Decision 2d, anchor root]</summary>
-    private static string RepoRelativeCsv(string code) => $"_bmad/{code}/{ModuleHelpFileName}";
+    /// would resolve to a file that does not exist. <c>internal</c> rather than private so a module diagnostic
+    /// raised OUTSIDE this class (Story 18.6's Planning Artifacts panel-omission notice, emitted from
+    /// <c>SiteGenerator</c>) reuses the one place this path shape is written down, instead of re-literalizing
+    /// <c>_bmad/{code}/module-help.csv</c> as a second source of truth. [ADR 0015 Decision 2d, anchor root]</summary>
+    internal static string RepoRelativeCsv(string code) => $"_bmad/{code}/{ModuleHelpFileName}";
+
+    private static IReadOnlyList<string> SafeReadInstalledModules(string bmadRoot)
+    {
+        try { return ReadInstalledModules(bmadRoot); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return Array.Empty<string>(); }
+    }
 
     private static IReadOnlyList<string> ReadInstalledModules(string bmadRoot)
     {
@@ -504,13 +607,34 @@ public sealed class ModuleContext
     /// — <c>module.yaml</c> (which carries a clean <c>code:</c>) is an installer-source file and is never
     /// installed, and <c>_bmad/{code}/config.yaml</c> carries no module identity at all.
     /// [Story 18.2; ADR 0015 Decisions 1, 1b]</summary>
-    private static string CodeOf(string csvPath) =>
-        (Path.GetFileName(Path.GetDirectoryName(csvPath) ?? string.Empty)).ToLowerInvariant();
+    private static string CodeOf(string csvPath) => DirNameOf(csvPath).ToLowerInvariant();
+
+    /// <summary>The install directory's name in its REAL on-disk casing — what a path must be built from.
+    /// <see cref="CodeOf"/> lower-invariants for comparison, and building
+    /// <see cref="RepoRelativeCsv"/> from that produced <c>_bmad/bmm/module-help.csv</c> for a repo whose
+    /// directory is <c>_bmad/BMM/</c>: a file that does not exist on a case-sensitive filesystem, so the
+    /// webview Problems entry (file-anchored via <see cref="DiagnosticAnchorRoot.Repo"/>) resolved to nothing.
+    /// That is the same wrong-root failure the Repo anchor was introduced to prevent, reached through casing
+    /// instead of rooting. Compare with <see cref="CodeOf"/>; construct paths with this. [Review][Patch P6]</summary>
+    private static string DirNameOf(string csvPath) =>
+        Path.GetFileName(Path.GetDirectoryName(csvPath) ?? string.Empty);
 
     private static bool IsFile(string path, string fileName) =>
         string.Equals(Path.GetFileName(path), fileName, StringComparison.OrdinalIgnoreCase);
 
-    private static ModuleContext? BuildContext(string csvPath, List<AdapterDiagnostic>? diagnostics = null)
+    /// <summary>A parsed candidate plus whether the Decision-1c label cross-check demoted it. The two are
+    /// separated because <see cref="Detect"/> must not treat a demotion as "found the primary" — see the
+    /// descend-the-rank loop. [Review][Patch P10]</summary>
+    private readonly record struct CandidateContext(ModuleContext Context, bool Demoted);
+
+    /// <summary>The context for one candidate CSV, or null when it will not parse. Wraps
+    /// <see cref="BuildCandidate"/> for the callers that do not care whether the label cross-check fired
+    /// (<see cref="ForCode"/>, which answers "what does this named module declare?" rather than ranking
+    /// anything).</summary>
+    private static ModuleContext? BuildContext(string csvPath, List<AdapterDiagnostic>? diagnostics = null) =>
+        BuildCandidate(csvPath, diagnostics)?.Context;
+
+    private static CandidateContext? BuildCandidate(string csvPath, List<AdapterDiagnostic>? diagnostics = null)
     {
         var rows = ParseCsv(csvPath);
         if (rows.Count < 2)
@@ -526,7 +650,15 @@ public sealed class ModuleContext
             return null;
         }
 
-        var moduleLabel = "BMad";
+        // EMPTY, never a placeholder. This used to start at the literal "BMad", and only `CommandCatalog.Empty`
+        // was emptied for Decision 2b — so the fabrication simply moved here. A CSV with no `module` header
+        // column (only `skill` is required to parse) or with every module cell blank kept the literal, which
+        // made CommandCatalog.HasLabel true for EVERY context this method returns: the three HasLabel guards
+        // added for Decision 2b were unreachable, how-to-read announced "This project uses the BMad module" —
+        // verbatim the false claim 2b exists to prevent — and a genuine `_bmad/bmm/` in that shape failed the
+        // label cross-check below and lost its docs, glossary and commands. Decision 2b's rule is "every label
+        // consumer must treat an empty label as 'no label'"; that starts at the parse site. [Review][Patch P1]
+        var moduleLabel = string.Empty;
         string? prefix = null;
         var byStep = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -578,28 +710,55 @@ public sealed class ModuleContext
         // A minted module installed at a modeled code (say _bmad/gds/) would otherwise inherit that module's
         // docs and glossary wholesale. The label is already parsed, so the guard costs one comparison: a
         // modeled code that declares the wrong label is demoted to Unmodeled and reported. [Decision 1c]
+        var demoted = false;
         if (module is not BmadModule.Unmodeled
             && ModeledModuleLabels.TryGetValue(code, out var expectedLabel)
-            && !string.Equals(moduleLabel, expectedLabel, StringComparison.OrdinalIgnoreCase))
+            && moduleLabel.Length > 0
+            && !LabelMatchesModeled(moduleLabel, expectedLabel))
         {
             diagnostics?.Add(new AdapterDiagnostic(
-                AdapterDiagnosticCategory.Unsupported, RepoRelativeCsv(code),
+                AdapterDiagnosticCategory.Unsupported, RepoRelativeCsv(DirNameOf(csvPath)),
                 $"module '{code}' declares the label '{moduleLabel}', but SpecScribe models '{code}' as "
                 + $"'{expectedLabel}'; treating it as an unmodeled module so it never inherits "
                 + $"{expectedLabel}'s planning docs or glossary",
                 DiagnosticAnchorRoot.Repo));
             module = BmadModule.Unmodeled;
+            demoted = true;
         }
 
-        return new ModuleContext
-        {
-            Module = module,
-            Code = code,
-            Commands = new CommandCatalog(moduleLabel, byStep),
-            Docs = DocsFor(module),
-            Glossary = GlossaryFor(module),
-        };
+        return new CandidateContext(
+            new ModuleContext
+            {
+                Module = module,
+                Code = code,
+                Commands = new CommandCatalog(moduleLabel, byStep),
+                Docs = DocsFor(module),
+                Glossary = GlossaryFor(module),
+            },
+            demoted);
     }
+
+    /// <summary>Whether a CSV's declared label is close enough to a modeled module's expected label to be the
+    /// same module. Deliberately TOLERANT, not exact.
+    /// <para>Exact matching made the shipped happy path depend on a third-party display string. ADR 0015 itself
+    /// documents that BMad's own labels drift — GDS's <c>module.yaml</c> says "BMGD: BMad Game Dev Studio"
+    /// while its CSV says "Game Dev Studio", and TEA's say "Test Architect" vs "Test Architecture Enterprise".
+    /// A cosmetic upstream rename such as <c>BMad Method v6</c> would therefore have stripped every real BMM
+    /// install of its planning docs, its whole glossary, site-wide abbreviation expansion and its command
+    /// legend, signalled only by one warning row. Interior whitespace is normalized and a prefix or containment
+    /// match passes, so drift survives; <c>Totally Not GDS</c> still fails, which is the squatter case Decision
+    /// 1c exists for. An ABSENT label is not evidence of squatting and never demotes — see the caller's
+    /// <c>moduleLabel.Length > 0</c> guard. [Review][Patch P9; owner call D1, 2026-07-27]</para></summary>
+    private static bool LabelMatchesModeled(string declared, string expected)
+    {
+        var d = CollapseWhitespace(declared);
+        var e = CollapseWhitespace(expected);
+        return d.Contains(e, StringComparison.OrdinalIgnoreCase)
+            || e.Contains(d, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string CollapseWhitespace(string value) =>
+        string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
     /// <summary>The modeled module a code maps to, or <see cref="BmadModule.Unmodeled"/> for anything else —
     /// which keeps its real label and parsed command catalog but publishes no docs and no glossary (the

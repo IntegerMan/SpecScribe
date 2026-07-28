@@ -1042,6 +1042,23 @@ So that demos and onboarding cover both reading the portal and producing it — 
      `LastCommit` remains `series.Max(day)` (latest authored commit day) for symmetry with
      `LinkedCommitDays`. This story must therefore EXTEND that vocabulary, not re-open it. -->
 
+<!-- 2026-07-27 (create-story, baseline d1722f17): three owner decisions locked, recorded here and on the
+     `5-7-…` key in sprint-status.yaml. (D1) `--as-of <DATE>` is its own option and IMPLIES the fixed policy —
+     the user does not also pass `--today-policy` — but it collapses onto the EXISTING single configured field:
+     provenance, `.specscribe` persistence and the diagnostics row all carry one composite token
+     `as-of:2026-07-27` on `today_policy`, so no new `SettingsResolver.Fields` constant and no second
+     `SavedSettings` field are introduced. (D2) an `--as-of` date BEFORE the repo's first commit is ACCEPTED
+     verbatim — an empty commit-date-page set is the correct answer for a historical snapshot — with no
+     rejection and no warning. (D3) the date parses with forgiving `DateOnly.TryParse` pinned to
+     `CultureInfo.InvariantCulture`, and the resolved ISO date is echoed on an ordinary run, not only under
+     `--show-config`.
+     AC DRIFT (recorded per the standing rule): D2 adds one requirement AC #1 does not name — `CommitHeatmap`'s
+     accessible name and visible headline currently count the WHOLE series while the cells already stop at the
+     cutoff, so a past `--as-of` would have them naming commits the grid does not show. Bounding both to the
+     rendered window lands as AC #1a in the story file. It also fixes the pre-existing future-skew case, and it
+     is a PORT of the pattern `Charts.DeliveryCadenceHeatmap` already ships, not a new design. The Git Pulse
+     signal strip's equivalent overclaim is explicitly OUT of scope and raised as an owner question. -->
+
 As a maintainer producing a portal for a review, a demo, or a historical snapshot,
 I want to pin the date-page "today" cutoff to an explicit calendar date,
 So that a regenerated portal reproduces the same date-page set regardless of when or where it is generated.

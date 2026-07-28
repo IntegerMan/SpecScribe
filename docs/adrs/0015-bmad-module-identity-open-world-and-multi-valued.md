@@ -1,7 +1,9 @@
 # ADR 0015: BMad Module Identity Is Open-World and Multi-Valued
 
-**Status:** **Accepted** — ratified 2026-07-26. All three open questions closed; see [Ratification](#ratification).
-**Date:** 2026-07-25 (drafted) · 2026-07-26 (ratified)
+**Status:** **Accepted** — ratified 2026-07-26; **amended 2026-07-27** (Amendment 1, from the Story 18.2 code
+review: Decisions **1c**, **4d** and **4e** are modified — read them together with
+[Amendment 1](#amendment-1--2026-07-27-from-the-story-182-code-review)).
+**Date:** 2026-07-25 (drafted) · 2026-07-26 (ratified) · 2026-07-27 (amended)
 **Deciders:** Matthew-Hope Eland
 **Relates to:** [ADR 0001](0001-spec-driven-development-framework.md) (BMAD is the framework SpecScribe is built on and renders); [ADR 0002](0002-shared-rendering-core-and-host-neutral-view-models.md) (module identity is part of the host-neutral projection this ADR keeps honest); Epic 18 (Stories 18.1, 18.2, 18.5); Epics 11–15 (**deliberately not** reopened — see Non-goals); **NFR8** (honest absence); FR36, FR-19
 
@@ -157,6 +159,11 @@ its CSV `module` label is cross-checked against that module's expected label; a 
 `Unmodeled` (Decision 2) and emits an `Unsupported` diagnostic naming both labels. The label is already parsed;
 this costs one comparison.
 
+> **AMENDED 2026-07-27 — see [A1.1](#amendment-1--2026-07-27-from-the-story-182-code-review).** The match is
+> now **tolerant** (whitespace-normalized, prefix/containment), not exact, and an **absent** label never
+> demotes. Exact matching made a real install's survival depend on an upstream display string that §7 of this
+> very document shows to drift.
+
 **1d. The installed set is the union of manifest and disk.** Today the disk scan fires **only** when the
 manifest yields zero candidates, so a manifest listing `bmm` alongside an installed `_bmad/tea/` never sees TEA
 — while `IsModulePresent` (OR semantics) reports TEA present. Those two must not disagree. The set is the
@@ -282,8 +289,19 @@ existing. A candidate that fails to parse emits `Malformed` and is skipped; the 
 candidates is unchanged, so a lower-ranked module never inherits the primary slot merely because a higher-ranked
 one was unreadable.
 
+> **AMENDED 2026-07-27 — see [A1.2](#amendment-1--2026-07-27-from-the-story-182-code-review).** This guarantee
+> now covers a **1c demotion** as well as a parse failure. As written it covered only the latter, and the
+> demotion path did the opposite: a squatter at a modeled code took the primary slot over a genuine modeled
+> module ranked below it. See also [A1.4](#amendment-1--2026-07-27-from-the-story-182-code-review) on the
+> accepted `Malformed` → `errors=N` consequence of the category this decision mandates.
+
 **4e. Multiple installed modules, one chosen.** When >1 non-primary module is installed, one `Skipped`
 diagnostic records the others (see §7 of Story 18.1 for the drafted wording).
+
+> **AMENDED 2026-07-27 — see [A1.3](#amendment-1--2026-07-27-from-the-story-182-code-review).** Both the
+> threshold and the category changed: the notice fires at **≥1** non-primary module and is emitted as
+> **`Informational`**. ">1" would have silenced the ordinary BMM+TEA install — Story 18.5's own primary
+> scenario — and `Skipped` renders at Warning severity, so a correctly configured repo showed a warning.
 
 ### 5. Adding a module's docs/glossary — and its coverage vocabulary — stays an explicit, per-module act
 
@@ -385,6 +403,70 @@ Ratified **2026-07-26** by Matthew-Hope Eland. All three open questions are clos
    `ModuleContext`. A `Modules` collection on the bundle is a wider blast radius for the same outcome.
 3. **`Unknown` naming — resolved: rename.** A new `Unmodeled` case is introduced and `Unknown` is retained for
    genuine detection failure. This is **forced** by shipped code rather than chosen on taste — see 2a.
+
+## Amendment 1 — 2026-07-27, from the Story 18.2 code review
+
+**Status: Accepted.** Decided by Matthew-Hope Eland during the code review of Story
+`18-2-bmad-module-identity-foundation`, the story that first implemented Decisions 1, 2 and 4. Three ratified
+sub-decisions are amended and one previously-unrecorded tension is accepted. The implementation and this
+document were changed **together**, so no window exists in which the code and the ratified text disagree.
+
+**A1.1 — Decision 1c's label cross-check becomes TOLERANT, not exact.** As ratified, 1c demoted a modeled code
+to `Unmodeled` whenever its CSV `module` label was not an exact match for the expected one. The review found
+this made the shipped happy path depend on a third-party display string — and **this ADR's own §7 evidence table
+documents that BMad's labels drift**: GDS's `module.yaml` says *"BMGD: BMad Game Dev Studio"* where its CSV says
+*"Game Dev Studio"*, and TEA's say *"Test Architect"* vs *"Test Architecture Enterprise"*. A cosmetic upstream
+rename such as `BMad Method v6` would therefore have stripped every real BMM install of its planning docs, its
+whole glossary, site-wide abbreviation expansion and its command legend — signalled only by one warning row.
+Amended: interior whitespace is normalized and a **prefix or containment** match passes; a genuine squatter such
+as *"Totally Not GDS"* still demotes, which is the case 1c exists for. **An absent label never demotes** — an
+empty `module` column is no evidence of squatting, and demoting on it would cost a genuine install everything
+because of a missing CSV column. Symbols: `ModuleContext.LabelMatchesModeled`, `ModuleContext.BuildCandidate`.
+
+**A1.2 — Decision 4d's guarantee extends from a parse failure to a 1c demotion.** As ratified, 4d said only that
+a candidate which *fails to parse* is skipped without reordering the rest. The review found the demotion path
+did the opposite: ranking is computed from **codes, before any label is parsed**, and `Detect` accepted the
+first non-null `BuildContext` — and a demoted context is non-null. So a minted module squatting `_bmad/gds/`
+beside a genuine `_bmad/bmm/`, in a repo with any game-shaped source path, took the primary slot as `Unmodeled`
+and demoted **BMM, a modeled module, below an auxiliary one** — Defect B's exact symptom through a different
+door, and a violation of Story 18.2's AC #2. Amended: a demotion is skipped exactly like a parse failure, with
+its `Unsupported` notice still emitted, and the demoted context is retained only as a **last-resort fallback**
+so a repo whose sole install is a squatter still gets its real label and catalog rather than `None`. Symbols:
+`ModuleContext.Detect`'s descend-the-rank loop, `ModuleContext.CandidateContext`.
+
+**A1.3 — Decision 4e fires at ≥1 non-primary module and emits `Informational`, not `Skipped`.** As ratified, 4e
+read *"When **>1** non-primary module is installed, one `Skipped` diagnostic records the others."* Two problems.
+The threshold as written would have silenced the notice for the ordinary BMM+TEA install — which is Story 18.5's
+own primary scenario, and precisely the reader who needs to know why TEA's docs and commands are absent. And
+`Skipped` renders at **Warning** severity (`DiagnosticsTemplater.FromEvents` maps only `Informational` to
+`DiagnosticSeverity.Info`), so a correctly configured repo showed a warning for being correctly configured.
+Amended: the notice fires when **one or more** non-primary modules are installed, and its category is
+`Informational`. Two further corrections landed with it — the reported set is now candidates ranked **below**
+the winner only (it previously swept in higher-ranked candidates that had just failed to parse, contradicting
+their own `Malformed` notice), and its provenance clause no longer claims planning docs and a glossary "come
+from" a primary that is itself `Unmodeled`. Symbol: `ModuleContext.ReportSecondaryModules`.
+
+**A1.4 — Accepted tension: Decision 4d's `Malformed` category vs the Error mapping.** Recorded, not changed. 4d
+mandates `Malformed` for an unparseable candidate, and `SiteGenerator.MapDiagnostics` maps `Malformed` to
+`GenerationOutcome.Error`. A **non-primary** candidate's broken catalog therefore produces `errors=1` on
+`GenerationSummary`'s machine summary line — the record CI greps — and makes every watch rebuild report as
+failed, on a run whose site generated completely correctly. The owner accepted this: a broken module catalog is
+worth failing the run's status line. Documented here so a future reader does not "fix" it as a bug.
+
+**A1.5 — Decision 1d's "those two must not disagree" is an overstatement.** Recorded, not changed. The union
+closes one direction only: the candidate set is `(manifest ∪ disk) ∩ has-csv` while `IsModulePresent` is
+`manifest OR disk-csv`, so a manifest entry whose `module-help.csv` is absent still reports present while
+contributing no candidate. Consequently **AC #2's "About-SDD Detected and the selected primary never contradict
+each other" is only partially satisfied** — a 1c-demoted squatter and a partial install both still report
+"Detected". The presence checks stay independent because Story 18.5's artifact gating depends on that contract;
+`ModuleContext.DiscoverCandidates`' doc-comment was narrowed to match.
+
+**A1.6 — Decision 7's evidence table: BMad Method's path is `src/bmm-skills/module-help.csv`.** The table above
+says `src/module-help.csv` for `bmad-code-org/BMAD-METHOD`; that path does not exist. BMM's catalog was fetched
+2026-07-27 from `src/bmm-skills/module-help.csv` and pinned at `bb45db4aa4496c69239f9c0629c290fd1b072fc9`. This
+mattered in practice: BMM was the one module Story 18.2 left on a synthetic fixture, leaving its AC #3 —
+"verified against **real** module `module-help.csv` content" — half met for the module the AC most needs held
+still.
 
 ## References
 

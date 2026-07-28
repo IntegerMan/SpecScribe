@@ -152,4 +152,26 @@ public class SiteGeneratorCoverageTests : IDisposable
         // Stories' card is present now — it no longer shows a Missing chip next to that family name.
         Assert.DoesNotContain("Stories</span><span class=\"coverage-chip missing\">", html);
     }
+
+    [Fact]
+    public void GenerateAll_NoBmadInstallAtAll_KeepsThePlanningArtifactsPanel()
+    {
+        // Story 18.6 owner decision D1, protected by INTENT rather than by accident. This fixture creates no
+        // `_bmad/` directory, so every test in this class runs at BmadModule.Unknown — and Unknown must KEEP
+        // the family set, because an undetected repo asserts no methodology and the panel's present/missing
+        // data is still source-derived truth. The five tests above depend on this silently; this one says so.
+        //
+        // If a future change makes this fail, the fix is NOT to add a `_bmad/bmm/module-help.csv` fixture here
+        // — that would be implementing the opposite of D1 and would delete the panel from every repository
+        // that does not install BMad.
+        Assert.False(Directory.Exists(Path.Combine(_root, "_bmad")));
+
+        var gen = new SiteGenerator(Options());
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+
+        var html = File.ReadAllText(IndexPage);
+        Assert.Contains("coverage-panel", html);
+        Assert.Contains("Planning Artifacts", html);
+        Assert.Contains(">Epics<", html);
+    }
 }

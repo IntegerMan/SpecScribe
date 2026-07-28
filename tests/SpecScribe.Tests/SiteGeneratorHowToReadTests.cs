@@ -45,10 +45,14 @@ public class SiteGeneratorHowToReadTests : IDisposable
         As a maintainer, I want the foundation.
         """;
 
+    // Verbatim upstream rows, pinned exactly as in ModuleContextTests — see the provenance block there for
+    // repositories and commit SHAs. This fixture was the last synthetic one; AC #3 requires BMad Method's
+    // surfaces to be verified against REAL catalog content, not invented rows. [Review][Patch P4]
     private const string BmmCsv = """
         module,skill,display-name,menu-code,description,action,args,phase,preceded-by,followed-by,required,output-location,outputs
-        BMad Method,_meta,,,,,,,,,false,url,
-        BMad Method,bmad-create-story,Create Story,CS,Prepare the next story,create,,4-implementation,,,true,implementation_artifacts,story
+        BMad Method,_meta,,,,,,,,,false,https://docs.bmad-method.org/llms.txt,
+        BMad Method,bmad-create-story,Create Story,CS,Story cycle start: Prepare first found story in the sprint plan that is next or a specific epic/story designation.,create,,4-implementation,bmad-sprint-planning,bmad-create-story:validate,true,implementation_artifacts,story
+        BMad Method,bmad-dev-story,Dev Story,DS,Story cycle: Execute story implementation tasks and tests then CR then back to DS if fixes needed.,,,4-implementation,bmad-create-story:validate,,true,,
         """;
 
     // Verbatim upstream rows, pinned exactly as in ModuleContextTests — see the provenance block there for
@@ -598,6 +602,43 @@ public class SiteGeneratorHowToReadTests : IDisposable
         Assert.DoesNotContain("href=\"prd.html\"", order);
         Assert.DoesNotContain("href=\"ARCHITECTURE-SPINE.html\"", order);
         Assert.Contains("href=\"epics.html\"", order);
+    }
+
+    [Fact]
+    public void HowToRead_UnmodeledModule_DoesNotPromiseAGlossaryTheAcknowledgementDenies()
+    {
+        // The acknowledgement ALWAYS renders for an unmodeled module, so counting it as "module content" made
+        // the page's own subtitle and intro promise "the reading order and glossary below" and "what the
+        // recurring terms mean" — on a page whose glossary section says SpecScribe publishes no glossary for
+        // this module. That is Story 5.6's rule: a section that always renders for a given state cannot be the
+        // signal for "is there content". Only the header copy changes; the acknowledgement itself stays.
+        // [Review][Patch P2]
+        InstallOnly("tea", TeaCsv);
+
+        new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
+        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+
+        // The acknowledgement still renders, anchor and all — this patch must not have silenced it.
+        Assert.Contains("<h2 id=\"glossary\">Glossary</h2>", html);
+        Assert.Contains("SpecScribe doesn't publish a glossary for it yet.", html);
+
+        // ...but nothing on the page promises a glossary that does not exist.
+        Assert.DoesNotContain("Start with the reading order and glossary below", html);
+        Assert.DoesNotContain("what the recurring terms mean", html);
+        Assert.Contains("Orientation for a first visit", html);
+    }
+
+    [Fact]
+    public void HowToRead_ModeledModule_StillPromisesItsReadingOrderAndGlossary()
+    {
+        // The other side of Patch P2: a real glossary is real content, so the modeled path's header copy is
+        // unchanged. AC #3 — BMad Method's surfaces must not move. [Review][Patch P2]
+        new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
+        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+
+        Assert.Contains("Start with the reading order and glossary below", html);
+        Assert.Contains("what the recurring terms mean", html);
+        Assert.Contains("<dl class=\"howtoread-glossary\">", html);
     }
 
     [Fact]

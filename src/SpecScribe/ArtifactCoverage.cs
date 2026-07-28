@@ -37,7 +37,11 @@ public sealed record ArtifactFamily(
 /// the memlog <c>updated:</c> date is consumed only as optional secondary enrichment, so a repo with no
 /// memlogs produces an identical primary coverage picture (PRD FR-11: source-derived insights stay primary).
 /// Never throws — the generator degrades any failure to <see cref="Empty"/> so the panel omits and generation
-/// still succeeds (AD-4 / NFR2). [Story 3.3]</summary>
+/// still succeeds (AD-4 / NFR2).
+/// <para>WHICH families are canonical is governed by the detected BMad module (<see cref="SpecsFor"/>), not by
+/// a single hardcoded list: a module SpecScribe models no family set for declares none, so the panel omits
+/// rather than reporting eight artifacts that methodology never produces. Presence/freshness within a declared
+/// set remain 100% source-derived. [Story 3.3; Story 18.6 / ADR 0015 Decision 5a]</para></summary>
 public sealed class ArtifactCoverage
 {
     /// <summary>Days after a present family's last edit before it is flagged stale. A sensible default; the
@@ -48,7 +52,10 @@ public sealed class ArtifactCoverage
     public required IReadOnlyList<ArtifactFamily> Families { get; init; }
 
     /// <summary>True when no canonical family was discovered, so the caller omits the whole panel (Story 1.1
-    /// graceful omission) rather than render an all-missing board on a repo whose family set we don't recognize.</summary>
+    /// graceful omission) rather than render an all-missing board on a repo whose family set we don't recognize.
+    /// <para>Also the ONLY omission gate for Story 18.6's unmodeled-module case: an empty declared family set
+    /// makes this trivially true, so the existing <c>Coverage is { IsEmpty: false }</c> guard in the render
+    /// adapter already does the work. Do not add a second gate — one omission rule, in one place.</para></summary>
     public bool IsEmpty => !Families.Any(f => f.Present);
 
     /// <summary>Number of canonical families discovered in the source tree — the "N" in the panel headline.</summary>
@@ -76,13 +83,15 @@ public sealed class ArtifactCoverage
     private const string RequirementsFile = "requirements.md";
     private const string RequirementsCatalogFile = "requirements-catalog.md";
 
-    /// <summary>The V1 "Core + Orchestration" canonical family set (PRD FR-11). THIS list is the coverage seam
-    /// Epic 4 generalizes — a future framework adapter swaps this family set, not the panel or the builder.
-    /// Filenames key off <see cref="ModuleContext.WellKnownDocs"/> where those constants exist (single source
-    /// of truth) and each family is matched by filename ANYWHERE in the source tree, because folder layout
-    /// varies (same rationale as ModuleContext's well-known-doc matching). Glyph keys reuse the exact
-    /// <see cref="Icons.ForConcept"/> vocabulary so the panel adds no new icon strings.</summary>
-    private static readonly IReadOnlyList<FamilySpec> Specs = new[]
+    /// <summary>The V1 "Core + Orchestration" canonical family set (PRD FR-11) — <b>BMad Method's</b> families,
+    /// not every module's. Which modules receive this set is decided by <see cref="SpecsFor"/>; the seam the
+    /// old doc comment promised ("a future framework adapter swaps this family set, not the panel or the
+    /// builder") is cut there. Filenames key off <see cref="ModuleContext.WellKnownDocs"/> where those
+    /// constants exist (single source of truth) and each family is matched by filename ANYWHERE in the source
+    /// tree, because folder layout varies (same rationale as ModuleContext's well-known-doc matching). Glyph
+    /// keys reuse the exact <see cref="Icons.ForConcept"/> vocabulary so the panel adds no new icon strings.
+    /// [Story 3.3; family set made module-aware by Story 18.6]</summary>
+    private static readonly IReadOnlyList<FamilySpec> BmadMethodSpecs = new[]
     {
         new FamilySpec("PRD", "PRD", "What you're building and why — the product requirements.", "prd",
             NameIs(ModuleContext.WellKnownDocs.Prd)),
@@ -107,13 +116,45 @@ public sealed class ArtifactCoverage
             p => NameMatches(p, RequirementsFile) || NameMatches(p, RequirementsCatalogFile)),
     };
 
+    /// <summary>The canonical family set a detected module declares — the one place module identity governs
+    /// what the Planning Artifacts panel asserts about a project (ADR 0015 Decision 5a). A module with no
+    /// modeled family set declares NOTHING, which leaves <see cref="Families"/> empty, <see cref="IsEmpty"/>
+    /// true, and therefore omits the whole panel through the gate that already exists — absent, not
+    /// misleadingly empty (NFR8). No second gate is added anywhere downstream.
+    /// <para><b>The <c>_ =&gt;</c> arm is deliberately the OPPOSITE polarity from
+    /// <see cref="ModuleContext.DocsFor"/> and <see cref="ModuleContext.GlossaryFor"/>, whose defaults return
+    /// empty. Do not "align" them.</b> Those two publish module-SPECIFIC vocabulary, which an undetected repo
+    /// must never be given. This publishes SOURCE-DERIVED truth about files that are actually on disk, and a
+    /// repo with no <c>_bmad/</c> install (<see cref="BmadModule.Unknown"/>) asserts no methodology at all —
+    /// so it keeps the panel. Only a module that was genuinely DETECTED and is not modeled loses it. Flipping
+    /// this arm to empty would silently delete the panel from every non-BMad repository.
+    /// [Story 18.6 owner decision D1]</para>
+    /// <para><see cref="BmadModule.GameDevStudio"/> keeps the BMad Method set on purpose (AC #2). GDS really
+    /// produces <c>gdd.md</c> / <c>narrative-design.md</c> / <c>game-architecture.md</c> (see
+    /// <c>ModuleContext.GameDevStudioDocs</c>), so a GDS-specific family set is a real candidate — but modeling
+    /// one here would change modeled-module behavior, which AC #2 forbids. Recorded as a follow-up, not
+    /// done.</para></summary>
+    private static IReadOnlyList<FamilySpec> SpecsFor(BmadModule module) => module switch
+    {
+        BmadModule.Unmodeled => Array.Empty<FamilySpec>(),
+        _ => BmadMethodSpecs, // Unknown (D1), BmadMethod, GameDevStudio (AC #2)
+    };
+
     /// <summary>Maps a family <see cref="ArtifactFamily.Label"/> to the workflow step key that creates it —
     /// the single source the generator feeds to <see cref="CommandCatalog.Command"/> to resolve a missing
     /// family's create command against the detected module. A label absent here (or a step the module doesn't
-    /// expose) yields no command, so the missing card degrades to guidance text. [Story 3.3 actionable panel]</summary>
-    public static readonly IReadOnlyDictionary<string, string> CreateStepKeys =
-        Specs.Where(s => s.StepKey is not null)
+    /// expose) yields no command, so the missing card degrades to guidance text. Keyed on the module for the
+    /// same reason <see cref="Build"/> is: a module with no modeled family set has no families to create, so
+    /// the map is empty rather than offering BMad Method's commands. [Story 3.3 actionable panel; Story 18.6]</summary>
+    public static IReadOnlyDictionary<string, string> CreateStepKeysFor(BmadModule module) =>
+        module is BmadModule.Unmodeled ? EmptyStepKeys : BmadMethodStepKeys;
+
+    private static readonly IReadOnlyDictionary<string, string> BmadMethodStepKeys =
+        BmadMethodSpecs.Where(s => s.StepKey is not null)
             .ToDictionary(s => s.Label, s => s.StepKey!, StringComparer.Ordinal);
+
+    private static readonly IReadOnlyDictionary<string, string> EmptyStepKeys =
+        new Dictionary<string, string>(StringComparer.Ordinal);
 
     /// <summary>Builds the coverage view over already-resolved inputs — NO disk access here, so every
     /// coverage/freshness/staleness rule is unit-testable without a repo (the same IO-in-the-caller split as
@@ -122,19 +163,25 @@ public sealed class ArtifactCoverage
     /// <paramref name="memlogUpdatedByFamilyLabel"/> is keyed by family <see cref="ArtifactFamily.Label"/> and
     /// is strictly additive — an empty map leaves every primary Present/LastModified value unchanged (AC #2).</summary>
     /// <param name="sourceRelativePaths">Every source-relative markdown path discovered in the tree.</param>
+    /// <param name="module">The DETECTED primary BMad module, which decides the canonical family set via
+    /// <see cref="SpecsFor"/>. <b>Required on purpose — there is no default.</b> A
+    /// <c>= BmadModule.BmadMethod</c> default is exactly the "silently inherits BMad Method" shape Epic 18
+    /// exists to kill, and would let a future caller re-introduce the defect by omission. [Story 18.6]</param>
     /// <param name="lastModifiedByPath">Source-file last-write dates, keyed by normalized-slash source path.</param>
     /// <param name="memlogUpdatedByFamilyLabel">Optional secondary memlog <c>updated:</c> dates, keyed by family label.</param>
     /// <param name="today">The generation date; a future-dated mtime (clock/timezone skew) is clamped to it.</param>
     public static ArtifactCoverage Build(
         IReadOnlyList<string> sourceRelativePaths,
+        BmadModule module,
         IReadOnlyDictionary<string, DateOnly> lastModifiedByPath,
         IReadOnlyDictionary<string, DateOnly> memlogUpdatedByFamilyLabel,
         DateOnly today)
     {
         var normalized = sourceRelativePaths.Select(PathUtil.NormalizeSlashes).ToList();
+        var specs = SpecsFor(module);
 
-        var families = new List<ArtifactFamily>(Specs.Count);
-        foreach (var spec in Specs)
+        var families = new List<ArtifactFamily>(specs.Count);
+        foreach (var spec in specs)
         {
             var match = SelectCanonicalMatch(normalized, spec, lastModifiedByPath);
 
@@ -159,11 +206,14 @@ public sealed class ArtifactCoverage
     /// <see cref="SiteGenerator.BuildArtifactCoverage"/> stats in its second (mtime) gather pass. Broader than
     /// just the winning match per family, so a family with two candidates (e.g. both DESIGN.md and
     /// EXPERIENCE.md present for UX) has both mtimes available when <see cref="Build"/> picks the canonical
-    /// one. [Story 3.3 review]</summary>
-    public static IReadOnlyList<string> AllCandidatePaths(IReadOnlyList<string> sourceRelativePaths)
+    /// one. Takes the same required <paramref name="module"/> as <see cref="Build"/> so the two can never
+    /// disagree about which family set is in play — a module with no modeled set stats nothing.
+    /// [Story 3.3 review; Story 18.6]</summary>
+    public static IReadOnlyList<string> AllCandidatePaths(IReadOnlyList<string> sourceRelativePaths, BmadModule module)
     {
+        var specs = SpecsFor(module);
         var normalized = sourceRelativePaths.Select(PathUtil.NormalizeSlashes);
-        return normalized.Where(p => Specs.Any(s => s.Matches(p))).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        return normalized.Where(p => specs.Any(s => s.Matches(p))).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     /// <summary>Picks the single canonical match for a family among every path satisfying its predicate: the

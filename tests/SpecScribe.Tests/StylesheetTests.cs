@@ -18,6 +18,13 @@ public class StylesheetTests
         return reader.ReadToEnd();
     }
 
+    /// <summary>The stylesheet with its comments removed. An absence guard must read RULES, not prose: the
+    /// deletions Story 20.9 made are explained in comments at the sites they left behind, and a guard a comment
+    /// can trip is a guard that gets weakened the first time it fires for the wrong reason. Same discipline
+    /// `HierarchyRolloutTests.StripComments` already applies to C# source.</summary>
+    private static string ReadStylesheetRules() =>
+        Regex.Replace(ReadStylesheet(), @"/\*.*?\*/", string.Empty, RegexOptions.Singleline);
+
     [Fact]
     public void Stylesheet_HasReducedMotionBlock()
         => Assert.Contains("@media (prefers-reduced-motion: reduce)", ReadStylesheet());
@@ -626,29 +633,32 @@ public class StylesheetTests
     {
         var css = ReadStylesheet();
         Assert.Contains(".gi-solo-repo-note", css);
-        Assert.Contains(".ownership-sunburst", css);
-        Assert.Contains(".ownership-wedge.level-4,", css);
+        // The wedge ramp and the directory fill survive the SVG's retirement as the component's colour source.
+        Assert.Contains(".ownership-wedge.level-4 {", css);
         Assert.Contains(".ownership-wedge-dir", css);
         Assert.Contains(".ownership-legend", css);
-        Assert.Contains(".ownership-tree", css);
         Assert.Contains(".ownership-controls", css);
+        // The retired SVG's own geometry classes are gone.
+        Assert.DoesNotContain(".ownership-sunburst", ReadStylesheetRules());
     }
 
     [Fact]
-    public void Stylesheet_HasOwnershipTreemapToggleStyles()
+    public void Stylesheet_HasNoSecondShapeToggle_TheComponentSelectorReplacedIt()
     {
-        // Owner feedback: sunburst/treemap TOGGLE (mirroring Story 7.12's Code Freshness toggle), not a chart
-        // plus a permanently-visible second view. The pure-CSS :has() toggle, its active-tab pressed state, and
-        // the treemap's own SVG/cell/dir classes must all resolve.
-        var css = ReadStylesheet();
-        Assert.Contains(".ownership-panel .board-tabs", css);
-        Assert.Contains(".ownership-panel:has(.ownership-treemap-radio:checked) .ownership-view-sunburst", css);
-        Assert.Contains(".ownership-panel:has(.ownership-treemap-radio:checked) .ownership-view-treemap", css);
-        Assert.Contains("#ownership-view-sunburst:checked ~ .board-tabbar label[for=\"ownership-view-sunburst\"]", css);
-        Assert.Contains(".ownership-treemap-wrap", css);
-        Assert.Contains(".ownership-treemap {", css);
-        Assert.Contains(".ownership-cell.level-4", css);
-        Assert.Contains(".ownership-cell-dir", css);
+        // Owner feedback (Story 7.11) asked for sunburst OR treemap behind a toggle, never both stacked. Story
+        // 20.9 keeps the affordance and deletes the MECHANISM: one instance re-types its trace in place, so the
+        // pure-CSS `:has()` pair, both `display:none` view wrappers and the treemap's own SVG classes all go.
+        // Their absence is what proves "exactly one implementation" on this surface, so it is asserted.
+        var css = ReadStylesheetRules();
+        Assert.DoesNotContain(".ownership-treemap-radio", css);
+        Assert.DoesNotContain(".ownership-view-sunburst", css);
+        Assert.DoesNotContain(".ownership-view-treemap", css);
+        Assert.DoesNotContain(".ownership-treemap-wrap", css);
+        Assert.DoesNotContain(".ownership-cell", css);
+
+        // The component's own selector and its legend bar are what stand in their place.
+        Assert.Contains(".ss-hierarchy-controls", css);
+        Assert.Contains(".ss-hierarchy-legends", css);
     }
 
     [Fact]
@@ -669,9 +679,14 @@ public class StylesheetTests
         // the file), not a binary touched/not-touched flag — it reuses the SAME level-1..4 fill ramp share-%
         // mode uses (Charts.OwnershipSpotlightLegend), layered with its own .spotlight-touched stroke marker.
         var css = ReadStylesheet();
-        Assert.Contains(".ownership-wedge.spotlight-touched, .ownership-cell.spotlight-touched", css);
+        Assert.Contains(".ownership-wedge.spotlight-touched", css);
         Assert.Contains(".ownership-legend-swatch.owner-spotlight-off", css);
         Assert.DoesNotContain("owner-spotlight-on", css);
+
+        // The ramp really is REUSED rather than re-declared: the spotlight dimension paints through the same
+        // `level-` prefix share does, and its own 30/90/180-day cut points are the only thing that differs.
+        var js = ReadScript();
+        Assert.Contains("d.classPrefix + level + extra", js);
     }
 
     [Fact]
@@ -698,14 +713,19 @@ public class StylesheetTests
         // resolve for BOTH the sunburst wedge and treemap cell class families (the live mode switcher recolors
         // whichever view is toggled visible), plus the honestly-muted "other" overflow bucket, and the SAME
         // swatch colors must also resolve in the legend.
+        // Story 20.9 retired the treemap SVG, so the `.ownership-cell` half of every pair went with it - but the
+        // `.ownership-wedge` half is now MORE load-bearing, not less: it is the colour SOURCE the component's
+        // probe resolves each node's class list against, so a token change still moves the chart and no colour
+        // value is ever typed into the JS (AD-7).
         var css = ReadStylesheet();
         for (var i = 0; i < Charts.OwnershipTopAuthorPaletteSize; i++)
         {
-            Assert.Contains($".ownership-wedge.owner-author-{i}, .ownership-cell.owner-author-{i} {{", css);
+            Assert.Contains($".ownership-wedge.owner-author-{i} {{", css);
             Assert.Contains($".ownership-legend-swatch.owner-author-{i} {{", css);
         }
-        Assert.Contains(".ownership-wedge.owner-author-other, .ownership-cell.owner-author-other", css);
-        Assert.DoesNotContain(".ownership-wedge.owner-author-7,", css);
+        Assert.Contains(".ownership-wedge.owner-author-other", css);
+        Assert.DoesNotContain(".ownership-wedge.owner-author-7", css);
+        Assert.DoesNotContain(".ownership-cell", ReadStylesheetRules());
     }
 
     [Fact]
@@ -715,9 +735,19 @@ public class StylesheetTests
         // modes must each carry a stroke/dash change alongside their fill, not a hue swap alone, for both the
         // sunburst wedge and treemap cell class families. Spotlight's recency ramp gets its stroke via the
         // separate .spotlight-touched marker class (layered on top of the reused level-1..4 fill classes).
+        // Both channels survive the engine swap, by two different routes, and BOTH are asserted because each
+        // regresses silently: `.spotlight-touched`'s stroke is resolved per sector and applied through
+        // `marker.line` (which Plotly does have), while `owner-stale`'s dash is a channel `marker.line` CANNOT
+        // express and is carried by `marker.pattern` HATCHING instead - the same answer Story 20.5 reached.
         var css = ReadStylesheet();
-        Assert.Matches(new Regex(@"\.ownership-wedge\.spotlight-touched,\s*\.ownership-cell\.spotlight-touched\s*\{[^}]*stroke:"), css);
-        Assert.Matches(new Regex(@"\.ownership-wedge\.owner-stale,\s*\.ownership-cell\.owner-stale\s*\{[^}]*stroke-dasharray:"), css);
+        Assert.Matches(new Regex(@"\.ownership-wedge\.spotlight-touched\s*\{[^}]*stroke:"), css);
+        Assert.Matches(new Regex(@"\.ownership-wedge\.owner-stale\s*\{[^}]*stroke-dasharray:"), css);
+
+        var js = ReadScript();
+        foreach (var hatched in new[] { "owner-stale", "owner-author-other", "type-other" })
+        {
+            Assert.Matches(new Regex("\"" + hatched + "\": \"[^\"]+\""), js);
+        }
     }
 
     [Fact]
@@ -732,21 +762,36 @@ public class StylesheetTests
     }
 
     [Fact]
-    public void Script_HasOwnershipSunburstModeSwitcher()
+    public void Script_HasTheGenericDimensionContract_NotFourHardCodedOwnershipModes()
     {
-        // ADR 0010 Task 4/4.3: ONE shared charting-JS engine lives in the existing sanctioned specscribe.js
-        // (no second opt-in-only asset) and reads only generation-time-embedded data — never fetches live git
-        // state or reads wall-clock time to decide staleness.
+        // ADR 0010 Task 4/4.3 still holds: ONE shared charting engine in the sanctioned specscribe.js, reading
+        // ONLY generation-time-embedded data - never live git state, never wall-clock time to decide staleness.
+        //
+        // What changed is where the four modes live. Story 20.9 replaced `recolorShare`/`recolorTopAuthors`/
+        // `recolorSpotlight`/`recolorStaleness` - four functions that each knew one page's vocabulary - with the
+        // generic dimension contract: the emitter DECLARES a rule and this file resolves it. So the fact worth
+        // pinning is the absence of the per-surface functions and the presence of the seven generic kinds.
         var js = ReadScript();
-        Assert.Contains("initOwnershipSunburst", js);
-        Assert.Contains(".ownership-panel", js);
-        Assert.Contains("data-top-authors", js);
-        Assert.Contains("data-asof", js);
-        Assert.Contains("recolorShare", js);
-        Assert.Contains("recolorTopAuthors", js);
-        Assert.Contains("recolorSpotlight", js);
-        Assert.Contains("recolorStaleness", js);
-        Assert.Contains("spotlightRecencyLevel", js);
+
+        foreach (var gone in new[] { "recolorShare", "recolorTopAuthors", "recolorSpotlight", "recolorStaleness", "spotlightRecencyLevel" })
+        {
+            Assert.DoesNotContain(gone, js);
+        }
+
+        Assert.Contains("function classifyNode", js);
+        Assert.Contains("function resolveDimension", js);
+        foreach (var kind in new[] { "ramp", "ramp-window", "categorical", "cutoff", "roster", "spotlight", "threshold" })
+        {
+            Assert.Contains("d.kind === \"" + kind + "\"", js);
+        }
+
+        // Generic by construction (Task 1.8): no surface name appears in the shared component at all.
+        Assert.DoesNotContain(".ownership-panel", js);
+        Assert.DoesNotContain(".codemap-view", js);
+        Assert.DoesNotContain("data-top-authors", js);
+
+        // The one reserved constant the contract does name, and the rule that keeps it deterministic (FR31).
+        Assert.Contains("CONSTANTS.asof", js);
         Assert.DoesNotContain("Date.now()", js);
     }
 

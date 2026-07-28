@@ -512,6 +512,7 @@ public class HtmlTemplaterTests
         var modified = new DateOnly(2026, 6, 20);
         var coverage = ArtifactCoverage.Build(
             new[] { prdPath, "planning-artifacts/epics.md" },
+            BmadModule.BmadMethod,
             new Dictionary<string, DateOnly> { [prdPath] = modified },
             new Dictionary<string, DateOnly>(),
             new DateOnly(2026, 7, 8));
@@ -607,8 +608,9 @@ public class HtmlTemplaterTests
         // means a family added to Specs without a matching entry in `expectedAccent` below fails this test's
         // own count assertion — a family added to one list without the other can't silently miscolor. [Story
         // 3.3 review]
-        var labels = ArtifactCoverage.Build(Array.Empty<string>(), new Dictionary<string, DateOnly>(),
-            new Dictionary<string, DateOnly>(), new DateOnly(2026, 7, 8)).Families.Select(f => f.Label).ToList();
+        var labels = ArtifactCoverage.Build(Array.Empty<string>(), BmadModule.BmadMethod,
+            new Dictionary<string, DateOnly>(), new Dictionary<string, DateOnly>(), new DateOnly(2026, 7, 8))
+            .Families.Select(f => f.Label).ToList();
         var expectedAccent = new Dictionary<string, string>
         {
             ["PRD"] = "family-planning",

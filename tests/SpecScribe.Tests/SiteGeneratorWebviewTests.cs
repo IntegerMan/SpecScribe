@@ -580,10 +580,21 @@ public class SiteGeneratorWebviewTests : IDisposable
         var codeMap = bundle.Surfaces.SingleOrDefault(s => s.OutputRelativePath == "code-map.html");
 
         Assert.NotNull(codeMap);
-        Assert.Contains("codemap-cell type-csharp", codeMap!.ContentHtml);
-        Assert.Contains("codemap-legend-discrete", codeMap.ContentHtml);
+        Assert.Contains("codemap-legend-discrete", codeMap!.ContentHtml);
         Assert.Contains("<nav class=\"site-nav\"", codeMap.ContentHtml); // carries the shared chrome like every surface
-        Assert.DoesNotContain("<script", codeMap.ContentHtml);          // captured regions never carry the scoped enhancement
+
+        // Story 20.9 / 20.7 D3: the webview presents the TEXT TWIN, a documented accepted degradation registered
+        // in HostRenderExceptions. On this surface the twin is the per-variant file table (Story 20.6 D1), and
+        // it has to survive the capture intact, because it is the whole of what a webview reader gets.
+        Assert.Contains("codemap-table", codeMap.ContentHtml);
+        Assert.Contains("src/Lib/Widget.cs", codeMap.ContentHtml);
+
+        // And the island does NOT: this surface ships no specscribe.js, so a JSON payload here is dead weight it
+        // can never read - 4.5 MB of it on this page after Story 20.9. The `data-island` host exception already
+        // described the webview as carrying none; the CAPTURED-page path simply never applied the strip the
+        // PageView path did, which nobody noticed while the payload was small. Confirmed, not assumed.
+        Assert.DoesNotContain("ss-hierarchy-data", codeMap.ContentHtml);
+        Assert.DoesNotContain("<script", codeMap.ContentHtml);
     }
 
     [Fact]

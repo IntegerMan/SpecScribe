@@ -921,486 +921,23 @@
     try { initCodemapTablePager(table); } catch (err) { /* degrade silently — the full server-ordered table stands */ }
   });
 
-  // ---- Source-code treemap: dimension switch + directory zoom [Story 7.6, round 2] ---------
-  // Progressive enhancement ONLY. The server ships up to four self-contained ".codemap-view" panels (one per
-  // exclude-spec-dev / exclude-tests filter combination — Story 7.6 round 2), each with a correct, sized-by-LOC
-  // treemap, the default (change-frequency) colorize baked in, a legend, and a full text-equivalent table; with JS
-  // off this block never runs and all of that stands. The panel TOGGLE itself (the two checkboxes) is pure CSS and
-  // needs no JS at all. This block only wires, PER PANEL, (1) reveals the hidden colorize dropdown + drill
-  // breadcrumb, (2) re-fills the rects when the dimension changes (reading the same data-* the server wrote,
-  // re-bucketing with the SAME thresholds Charts.Bucket uses so the default matches byte-for-byte), and (3) zooms
-  // the SVG viewBox into a directory — deep-linkable via the URL hash — respecting reduced motion (the reduce
-  // branch snaps instead of tweening). Nothing here uses a global id (four panels share one shape), so every
-  // lookup is scoped with querySelector against the panel it belongs to.
-  Array.prototype.forEach.call(document.querySelectorAll(".codemap-view"), function (panel) {
-    initCodeMapPanel(panel);
-  });
-
-  function initCodeMapPanel(panel) {
-    var svg = panel.querySelector(".codemap");
-    if (!svg) return;
-
-    // Story 7.12 review: the panel now hosts TWO shapes (Treemap + Sunburst) behind a "View as" toggle, both
-    // colorized by the SAME dimension dropdown — so the cell query spans the whole panel, not just the treemap's
-    // own <svg>, and a dimension switch recolors whichever shape is showing (and the other, off-screen one, so
-    // neither can drift stale). Directory-zoom below stays scoped to `svg` (.codemap-dir only exists there — the
-    // sunburst's directory wedges carry the unrelated, non-zoomable .codemap-dir-sunburst class).
-    var cells = Array.prototype.slice.call(panel.querySelectorAll(".codemap-cell"));
-    var baseViewBox = svg.getAttribute("viewBox");
-    var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    // Mirror Charts.Bucket exactly (<=0.25/0.5/0.75) so the client re-fill agrees with the server-baked default.
-    // A degenerate single-point range (min === max, i.e. exactly one cell carries data for this dimension) always
-    // reads as the top bucket rather than falling through the max<=0 guard to "no activity" — the one file that
-    // DOES have data must not render identically to files with none.
-    function bucket(value, max) {
-      if (max <= 0) return value > 0 ? 4 : 0;
-      if (value <= 0) return 0;
-      var r = value / max;
-      return r <= 0.25 ? 1 : r <= 0.5 ? 2 : r <= 0.75 ? 3 : 4;
-    }
-
-    function num(cell, name) { var v = cell.getAttribute(name); return v === null ? null : parseFloat(v); }
-
-    function metricFor(cell, dim) {
-      if (dim === "changes") return num(cell, "data-changes");
-      if (dim === "last") return num(cell, "data-last");
-      if (dim === "created") return num(cell, "data-first");
-      if (dim === "avgchange") {
-        var churn = num(cell, "data-churn"), ch = num(cell, "data-changes");
-        return (churn === null || !ch) ? null : churn / ch;
-      }
-      if (dim === "cochange") return num(cell, "data-cochanged");
-      if (dim === "churn") return num(cell, "data-churn");
-      return null;
-    }
-
-    // Human-readable name for each dimension — used to keep the aria-label/tooltip/legend text equivalents in
-    // sync with whatever the color currently encodes (AC #4: color is never the sole signal).
-    var DIM_LABELS = {
-      changes: "change frequency",
-      last: "recency of last change",
-      created: "recency of first change",
-      avgchange: "average change size",
-      cochange: "files changed together",
-      churn: "churn",
-      filetype: "file type"
-    };
-
-    // Capture each cell's server-baked base label/tooltip once, before any recolor, so repeated dimension
-    // switches append to the ORIGINAL text rather than stacking onto a previously-appended suffix.
-    // The tooltip is a static, server-built HTML card (data-tip-html) listing every metric, so it already satisfies
-    // "color is never the sole signal" for any active dimension — no per-dimension tooltip rewrite is needed. Only
-    // the aria-label (and the legend) track the active dimension, so we snapshot just the base label.
-    // Linked cells put aria-label on the wrapping <a> (Tile pattern); unlinked cells keep it on the rect.
-    function labelHost(c) {
-      var a = c.closest && c.closest("a");
-      return a || c;
-    }
-    cells.forEach(function (c) {
-      if (!c.hasAttribute("data-base-label")) {
-        c.setAttribute("data-base-label", labelHost(c).getAttribute("aria-label") || "");
-      }
-    });
-
-    // Scoped to the ramp legend specifically — the discrete (file-type) legend's caption is static (there is only
-    // ever one categorical dimension, so its text never needs rewriting on a dimension switch).
-    var legendDim = panel.querySelector(".codemap-legend-ramp .codemap-legend-dim");
-    var legendRamp = panel.querySelector(".codemap-legend-ramp");
-    var legendDiscrete = panel.querySelector(".codemap-legend-discrete");
-
-    // Both legend shapes are pre-rendered server-side (one hidden, matching whichever dimension is baked as the
-    // default); a dimension switch only toggles which one is visible, never rewrites either one's content.
-    function swapLegend(showDiscrete) {
-      if (legendRamp) legendRamp.hidden = showDiscrete;
-      if (legendDiscrete) legendDiscrete.hidden = !showDiscrete;
-    }
-
-    // Strips BOTH class families before applying the new one — a cell last colorized by file type must not carry
-    // a stale type-* class after switching to a numeric dimension, and vice versa (the two are mutually exclusive
-    // fill vocabularies, never combined).
-    function clearFillClasses(c) {
-      for (var l = 0; l <= 4; l++) c.classList.remove("level-" + l);
-      c.classList.remove("level-none");
-      Array.prototype.slice.call(c.classList).forEach(function (cls) {
-        if (cls.indexOf("type-") === 0) c.classList.remove(cls);
-      });
-    }
-
-    function recolor(dim) {
-      var dimLabel = DIM_LABELS[dim] || dim;
-
-      if (dim === "filetype") {
-        // Categorical, not scaled — no bucket()/min-max scan (that machinery is for the numeric dimensions only).
-        cells.forEach(function (c) {
-          clearFillClasses(c);
-          var key = c.getAttribute("data-filetype");
-          var label = c.getAttribute("data-filetype-label") || key || "";
-          if (key) c.classList.add("type-" + key);
-          var baseLabel = c.getAttribute("data-base-label") || "";
-          labelHost(c).setAttribute("aria-label", baseLabel + " — " + dimLabel + ": " + label);
-        });
-        swapLegend(true);
-        return;
-      }
-
-      // Dates are huge absolute day numbers, so they must be scaled against the file set's own [min,max]
-      // window; counts/averages scale against max (min 0), matching the server's default (change-frequency) fill.
-      var isDate = dim === "last" || dim === "created";
-      var min = Infinity, max = 0;
-      cells.forEach(function (c) {
-        var v = metricFor(c, dim);
-        if (v === null) return;
-        if (v > max) max = v;
-        if (v < min) min = v;
-      });
-      var range = isDate ? (max - min) : max;
-      cells.forEach(function (c) {
-        clearFillClasses(c);
-        var v = metricFor(c, dim);
-        var baseLabel = c.getAttribute("data-base-label") || "";
-        var host = labelHost(c);
-        if (v === null) {
-          c.classList.add("level-none");
-          host.setAttribute("aria-label", baseLabel + " — no data for " + dimLabel);
-          return;
-        }
-        var lvl = bucket(isDate ? (v - min) : v, range);
-        c.classList.add("level-" + lvl);
-        // The bucket level (0-4) IS exactly what the color encodes, so it's the honest text equivalent —
-        // never a raw day-number or other value the color itself doesn't literally represent.
-        var levelText = lvl === 0 ? "lowest" : lvl === 4 ? "highest" : "level " + lvl + " of 4";
-        host.setAttribute("aria-label", baseLabel + " — " + dimLabel + ": " + levelText);
-      });
-      if (legendDim) legendDim.textContent = "Colorized by " + dimLabel;
-      swapLegend(false);
-    }
-
-    // Reveal the colorize dropdown (hidden in the server HTML so no inert control ships in the no-JS page).
-    var controls = panel.querySelector(".codemap-controls");
-    var select = panel.querySelector(".codemap-dim-select");
-    if (controls && select) {
-      controls.hidden = false;
-      select.addEventListener("change", function () { recolor(select.value); });
-    }
-
-    var drill = panel.querySelector(".codemap-drill");
-    var crumbs = panel.querySelector(".codemap-breadcrumb");
-    var dirs = Array.prototype.slice.call(svg.querySelectorAll(".codemap-dir"));
-
-    function cssEscape(s) {
-      return (window.CSS && CSS.escape) ? CSS.escape(s) : s.replace(/["\\]/g, "\\$&");
-    }
-
-    function viewBoxFor(path) {
-      if (!path) return baseViewBox;
-      var rect = svg.querySelector('.codemap-dir[data-path="' + cssEscape(path) + '"]');
-      if (!rect) return baseViewBox;
-      return rect.getAttribute("x") + " " + rect.getAttribute("y") + " " +
-        rect.getAttribute("width") + " " + rect.getAttribute("height");
-    }
-
-    function labelFor(path) {
-      if (!path) return "All files";
-      var i = path.lastIndexOf("/");
-      return i >= 0 ? path.slice(i + 1) : path;
-    }
-
-    // Zoom-tween duration is read from the shared --motion-* token system (Story 3.5), not a bare hardcoded
-    // number, so the treemap's motion feel stays in sync with every other animated surface. --motion-fast is the
-    // closest semantic fit (a direct-manipulation UI transition, not a one-time chart-entrance reveal); a
-    // 240ms fallback covers browsers/tests where the token can't be read (e.g. no document.documentElement).
-    function motionFastMs() {
-      try {
-        var raw = getComputedStyle(document.documentElement).getPropertyValue("--motion-fast").trim();
-        var ms = raw.endsWith("ms") ? parseFloat(raw) : parseFloat(raw) * 1000;
-        return ms > 0 ? ms : 240;
-      } catch (e) {
-        return 240;
-      }
-    }
-
-    // Tween the viewBox with requestAnimationFrame when motion is allowed; snap instantly under reduced motion.
-    function setViewBox(target, animate) {
-      if (!animate || !window.requestAnimationFrame) { svg.setAttribute("viewBox", target); return; }
-      var from = svg.getAttribute("viewBox").split(/\s+/).map(Number);
-      var to = target.split(/\s+/).map(Number);
-      if (from.length !== 4 || to.length !== 4) { svg.setAttribute("viewBox", target); return; }
-      var start = null, dur = motionFastMs();
-      function step(ts) {
-        if (start === null) start = ts;
-        var t = Math.min(1, (ts - start) / dur);
-        var e = t * (2 - t); // easeOutQuad
-        svg.setAttribute("viewBox", from.map(function (v, i) { return v + (to[i] - v) * e; }).join(" "));
-        if (t < 1) window.requestAnimationFrame(step);
-      }
-      window.requestAnimationFrame(step);
-    }
-
-    function renderCrumbs(path) {
-      if (!crumbs) return;
-      crumbs.innerHTML = "";
-      var trail = [{ p: "", l: "All files" }];
-      if (path) {
-        var acc = "";
-        path.split("/").forEach(function (s) { acc = acc ? acc + "/" + s : s; trail.push({ p: acc, l: s }); });
-      }
-      trail.forEach(function (t, idx) {
-        var li = document.createElement("li");
-        var btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "codemap-crumb";
-        btn.textContent = t.l;
-        btn.setAttribute("data-path", t.p);
-        if (idx === trail.length - 1) btn.setAttribute("aria-current", "true");
-        btn.addEventListener("click", function () { zoomTo(t.p, true); });
-        li.appendChild(btn);
-        crumbs.appendChild(li);
-      });
-    }
-
-    function zoomTo(path, pushHash) {
-      setViewBox(viewBoxFor(path), !reduceMotion);
-      renderCrumbs(path);
-      if (pushHash && window.history && history.pushState) {
-        if (path) history.pushState({ dir: path }, "", "#dir=" + encodeURIComponent(path));
-        else history.pushState({ dir: "" }, "", location.pathname + location.search);
-      }
-    }
-
-    if (drill) drill.hidden = false;
-
-    // A directory rect becomes an activatable zoom target (click + keyboard). Made focusable/labelled at runtime
-    // so the no-JS page never ships inert tab stops; aria-hidden is dropped since it's now interactive.
-    dirs.forEach(function (rect) {
-      var path = rect.getAttribute("data-path");
-      rect.removeAttribute("aria-hidden");
-      rect.setAttribute("tabindex", "0");
-      rect.setAttribute("role", "button");
-      rect.setAttribute("aria-label", "Zoom into " + labelFor(path));
-      rect.addEventListener("click", function () { zoomTo(path, true); });
-      rect.addEventListener("keydown", function (e) {
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); zoomTo(path, true); }
-      });
-    });
-
-    function applyHash() {
-      var m = /#dir=([^&]+)/.exec(location.hash);
-      var path = m ? decodeURIComponent(m[1]) : "";
-      svg.setAttribute("viewBox", viewBoxFor(path)); // snap on load/back-forward (no entrance animation)
-      renderCrumbs(path);
-    }
-    window.addEventListener("popstate", applyHash);
-    applyHash();
-  }
-
-  // ---- Code ownership sunburst: live mode selector [Story 7.11, ADR 0010] ------------------
-  // Progressive enhancement ONLY (NFR-5, reinterpreted by ADR 0010 for this opt-in surface): the server ships
-  // a complete, correct sunburst pre-colored in the default share-% mode plus its full text-equivalent tree; with
-  // JS off this block never runs and both stand on their own. Every wedge carries its generation-time-embedded
-  // per-file data (data-share/data-dominant/data-contributors/data-last/data-owner) and the SVG root carries the
-  // bounded top-author roster (data-top-authors) and the whole-tree "as of" day (data-asof) — nothing here ever
-  // fetches live data or reads wall-clock time, so a mode switch is a pure re-read of already-embedded values
-  // (FR31). The individual-author picker is built from the UNION of every wedge's own data-owner list (the full
-  // roster present in the data), not just the bounded top-author palette — an alphabetical list, never a "top
-  // contributors" ranking (FR-10).
-  Array.prototype.forEach.call(document.querySelectorAll(".ownership-panel"), function (panel) {
-    try { initOwnershipSunburst(panel); } catch (err) { /* degrade — the server-rendered share-% mode stands */ }
-  });
-
-  function initOwnershipSunburst(panel) {
-    // data-top-authors/data-asof are panel-wide (both views share one dataset), so they're only ever read off
-    // the sunburst SVG root — but wedges/cells are gathered across BOTH views (sunburst .ownership-wedge paths
-    // AND treemap .ownership-cell rects) so a mode switch recolors whichever view the reader has toggled to,
-    // and the other, currently-hidden one never goes stale for when they toggle back.
-    var svg = panel.querySelector(".ownership-sunburst");
-    var controls = panel.querySelector(".ownership-controls");
-    if (!svg || !controls) return;
-
-    var wedges = Array.prototype.slice.call(panel.querySelectorAll(".ownership-wedge, .ownership-cell"));
-    if (wedges.length === 0) return;
-
-    var topAuthors = [];
-    try { topAuthors = JSON.parse(svg.getAttribute("data-top-authors") || "[]"); } catch (err) { topAuthors = []; }
-    var asofRaw = svg.getAttribute("data-asof");
-    var asof = asofRaw === null ? NaN : parseInt(asofRaw, 10);
-
-    function ownerData(w) {
-      var raw = w.getAttribute("data-owner");
-      if (!raw) return [];
-      try { var parsed = JSON.parse(raw); return Array.isArray(parsed) ? parsed : []; } catch (err) { return []; }
-    }
-
-    // Full contributor roster (alphabetical, union of every wedge's own bounded list) — the spotlight picker's
-    // source. Never capped to the top-author palette (AC #2c: any contributor, not just a bounded top-N).
-    var rosterSet = {};
-    wedges.forEach(function (w) {
-      ownerData(w).forEach(function (entry) {
-        if (entry && typeof entry[0] === "string") rosterSet[entry[0]] = true;
-      });
-    });
-    var roster = Object.keys(rosterSet).sort(function (a, b) { return a.localeCompare(b); });
-    if (roster.length === 0) return; // no embedded contributor data at all — nothing to switch modes over
-
-    var modeSelect = controls.querySelector(".ownership-mode-select");
-    var authorSelect = controls.querySelector(".ownership-author-select");
-    var authorWrap = controls.querySelector(".ownership-author-wrap");
-    var thresholdInput = controls.querySelector(".ownership-threshold-input");
-    var thresholdWrap = controls.querySelector(".ownership-threshold-wrap");
-    if (!modeSelect || !authorSelect || !authorWrap || !thresholdInput || !thresholdWrap) return;
-
-    roster.forEach(function (name) {
-      var opt = document.createElement("option");
-      opt.value = name;
-      opt.textContent = name;
-      authorSelect.appendChild(opt);
-    });
-
-    var FILL_CLASSES = ["level-0", "level-1", "level-2", "level-3", "level-4", "level-none",
-      "owner-author-other", "spotlight-touched", "owner-spotlight-off", "owner-fresh", "owner-stale"];
-    topAuthors.forEach(function (name, i) { FILL_CLASSES.push("owner-author-" + i); });
-
-    function clearFillClasses(w) {
-      FILL_CLASSES.forEach(function (cls) { w.classList.remove(cls); });
-    }
-
-    // Four mode-specific legend blocks (Charts.OwnershipLegend/-TopAuthorsLegend/-SpotlightLegend/
-    // -StalenessLegend) — show exactly the one matching the active mode so the visible legend can never disagree
-    // with what's actually colored (owner feedback: colors and legend must always match up).
-    var legendShare = Array.prototype.slice.call(panel.querySelectorAll(".ownership-legend-share"));
-    var legendTop = Array.prototype.slice.call(panel.querySelectorAll(".ownership-legend-top"));
-    var legendSpotlight = Array.prototype.slice.call(panel.querySelectorAll(".ownership-legend-spotlight"));
-    var legendStaleness = Array.prototype.slice.call(panel.querySelectorAll(".ownership-legend-staleness"));
-
-    function swapLegend(mode) {
-      function setHidden(list, hidden) { list.forEach(function (el) { el.hidden = hidden; }); }
-      setHidden(legendShare, mode !== "share");
-      setHidden(legendTop, mode !== "top");
-      setHidden(legendSpotlight, mode !== "spotlight");
-      setHidden(legendStaleness, mode !== "staleness");
-    }
-
-    function labelHost(w) {
-      var a = w.closest && w.closest("a");
-      return a || w;
-    }
-
-    // Snapshot each wedge's server-baked base label ONCE, before any recolor, so repeated mode switches append
-    // to the ORIGINAL text rather than stacking suffixes (mirrors the Code Map dimension switch's own pattern).
-    wedges.forEach(function (w) {
-      if (!w.hasAttribute("data-base-label")) {
-        w.setAttribute("data-base-label", labelHost(w).getAttribute("aria-label") || "");
-      }
-    });
-
-    function setLabel(w, suffix) {
-      var base = w.getAttribute("data-base-label") || "";
-      var text = base + " — " + suffix;
-      labelHost(w).setAttribute("aria-label", text);
-      var title = w.querySelector("title");
-      if (title) title.textContent = text;
-    }
-
-    function recolorShare() {
-      wedges.forEach(function (w) {
-        clearFillClasses(w);
-        var raw = w.getAttribute("data-share");
-        if (raw === null) { w.classList.add("level-none"); setLabel(w, "no git history"); return; }
-        var pct = parseInt(raw, 10);
-        var level = pct <= 25 ? 1 : pct <= 50 ? 2 : pct <= 75 ? 3 : 4;
-        w.classList.add("level-" + level);
-        setLabel(w, pct + "% dominant-author share");
-      });
-    }
-
-    function recolorTopAuthors() {
-      wedges.forEach(function (w) {
-        clearFillClasses(w);
-        var dominant = w.getAttribute("data-dominant");
-        if (!dominant) { w.classList.add("level-none"); setLabel(w, "no git history"); return; }
-        var idx = topAuthors.indexOf(dominant);
-        if (idx >= 0) { w.classList.add("owner-author-" + idx); } else { w.classList.add("owner-author-other"); }
-        setLabel(w, "dominant contributor: " + dominant);
-      });
-    }
-
-    // Fixed real-unit day cutoffs (owner feedback: not a binary touched/not-touched flag — a recency spectrum,
-    // "days since THIS contributor last touched the file"). Mirrors OwnershipShareLevel's fixed-cutoff
-    // reasoning (meaningful on its own scale, never a moving target) rather than a per-render quartile split.
-    // Only called with a real, known day-count — an unknown last-touch date is a distinct "unknown" state
-    // handled by the caller, never silently coerced into the oldest bucket (that would fabricate a "long ago"
-    // claim the embedded data never actually supports). [Review 2026-07-22]
-    function spotlightRecencyLevel(daysAgo) {
-      if (daysAgo <= 30) return 4;
-      if (daysAgo <= 90) return 3;
-      if (daysAgo <= 180) return 2;
-      return 1;
-    }
-
-    function recolorSpotlight(name) {
-      wedges.forEach(function (w) {
-        clearFillClasses(w);
-        var entry = ownerData(w).filter(function (e) { return e[0] === name; })[0];
-        // Absence here means "not among this file's own embedded (capped) contributor list," not proven "never
-        // touched this file" — a file with more contributors than the per-file cap could have a real, spotlighted
-        // contributor who simply ranks below it for THIS file. Wording says "not among the tracked contributors,"
-        // never the stronger (and sometimes false) "has not worked on this file." [Review 2026-07-22]
-        if (!entry) { w.classList.add("owner-spotlight-off"); setLabel(w, name + " is not among this file's most-active tracked contributors"); return; }
-        var lastDay = entry[2];
-        var daysAgo = (lastDay === null || lastDay === undefined || isNaN(asof)) ? null : (asof - lastDay);
-        if (daysAgo === null) {
-          // Touched, but their own last-touch date wasn't embedded — an honest "unknown," never coerced into a
-          // recency bucket the data doesn't actually support. [Review 2026-07-22]
-          w.classList.add("level-none", "spotlight-touched");
-          setLabel(w, name + " worked on this file (date unknown)");
-          return;
-        }
-        var level = spotlightRecencyLevel(daysAgo);
-        w.classList.add("level-" + level, "spotlight-touched");
-        setLabel(w, name + " worked on this file (" + daysAgo + (daysAgo === 1 ? " day" : " days") + " ago)");
-      });
-    }
-
-    function recolorStaleness(months) {
-      wedges.forEach(function (w) {
-        clearFillClasses(w);
-        var raw = w.getAttribute("data-last");
-        if (raw === null || isNaN(asof)) { w.classList.add("level-none"); setLabel(w, "no git history"); return; }
-        var monthsAgo = (asof - parseInt(raw, 10)) / 30;
-        var stale = monthsAgo >= months;
-        w.classList.add(stale ? "owner-stale" : "owner-fresh");
-        // Measures the FILE's own last-touch date, not anything contributor-specific — the label said "no
-        // current contributor" before, which claimed more than the data (data-last has no author attached).
-        // [Review 2026-07-22]
-        setLabel(w, stale
-          ? "not touched in " + Math.round(monthsAgo) + "+ months"
-          : "touched within the last " + months + " months");
-      });
-    }
-
-    function applyMode() {
-      var mode = modeSelect.value;
-      authorWrap.hidden = mode !== "spotlight";
-      thresholdWrap.hidden = mode !== "staleness";
-      swapLegend(mode);
-      if (mode === "top") recolorTopAuthors();
-      else if (mode === "spotlight") recolorSpotlight(authorSelect.value || roster[0]);
-      else if (mode === "staleness") {
-        var months = parseInt(thresholdInput.value, 10);
-        recolorStaleness(isNaN(months) || months < 1 ? 6 : months);
-      }
-      else recolorShare();
-    }
-
-    controls.hidden = false;
-    modeSelect.addEventListener("change", applyMode);
-    authorSelect.addEventListener("change", applyMode);
-    thresholdInput.addEventListener("input", applyMode);
-    // Sync once at init: relying on the server-baked default (share mode) matching modeSelect's own default
-    // option is fragile — a bfcache/back-navigation restore of a non-default select value would otherwise leave
-    // the chart showing stale colors until the next manual interaction. [Review 2026-07-22]
-    applyMode();
-  }
+  // ---- Source-code treemap + code-ownership sunburst -> RETIRED by Story 20.9 --------------
+  // `initCodeMapPanel` (Story 7.6/7.12) and `initOwnershipSunburst` (Story 7.11, ADR 0010) were deleted here,
+  // together with the four `Charts` entry points and all remaining hand-rolled arc geometry they enhanced. Both
+  // surfaces now render through the Hierarchy Explorer component below — `ProjectCodeMap` and `ProjectOwnership`
+  // payloads, with their eleven colorize dimensions expressed through the component's generic DIMENSION CONTRACT
+  // rather than two bespoke recolour loops that each knew their own page.
+  //
+  // What moved rather than disappeared, because it was the careful part: the `Charts.Bucket` mirror and its
+  // deliberate degenerate-range rule; the [min,max] window scaling that keeps absolute day-numbers from
+  // collapsing to one level; share's fixed 25/50/75 cut points and the spotlight's 30/90/180-day ones; and the
+  // per-node accessible-name wording, whose honesty was hard-won — the bucket LEVEL rather than a raw value the
+  // colour does not represent, "not among this file's most-active tracked contributors" rather than the stronger
+  // and sometimes-false "has not worked on this file", and an explicit "(date unknown)" rather than a coercion
+  // into the oldest bucket. All of it now lives in the dimension declarations the emitter writes.
+  //
+  // `initCodemapTablePager` above is KEPT: it paginates the Code Map's per-variant file table, which Story 20.6
+  // D1 audited and kept as that surface's text twin. A pager is presentation, not truncation. [Story 20.9 Task 4.3]
 
   // ---- Planning <-> Code Impact Map ---------------------------------------------------------
   // Story 21.3's hand-rolled squarified treemap and arc renderer (`initImpactMap` / `renderTreemap` /
@@ -1458,6 +995,22 @@
     }
     Array.prototype.forEach.call(host.querySelectorAll("[data-hierarchy]"), function (root) {
       if (root.getAttribute("data-hierarchy-ready")) return;
+      // --- The reveal hook. Plotly CANNOT lay out in a zero-width container, and it does not complain: it draws a
+      // chart with no sectors that looks fine until someone reveals the panel. The component ships
+      // `responsive: true` and sets only the HEIGHT — width comes from the container — and `responsive`'s
+      // window-resize listener does NOT fire on a CSS-only reveal, so an eager mount inside a `display:none`
+      // ancestor is permanently broken.
+      //
+      // Generic by construction: the condition is MEASURED, never declared, so no instance has to know it might be
+      // hidden and no surface name reaches this file. Deferring the first mount is also the cheaper default — a
+      // chart never drawn is work never done. [Story 20.9 F1]
+      //
+      // Measured on the PANEL, not on the host. The host's own `.ss-hierarchy` rule is `display: none` until this
+      // block reveals it, so `root.clientWidth` is zero for EVERY instance at this point — testing it deferred the
+      // dashboard along with the three hidden Code Map panels, i.e. every chart on the site. The panel is the
+      // nearest ancestor that is laid out before any script runs, so its width is the honest answer to "is this
+      // subtree rendered at all". Caught live rather than by the suite, which is what F1 said to expect.
+      if (!hierarchyPanelOf(root).clientWidth) { deferHierarchyMount(root); return; }
       try {
         if (initHierarchyExplorer(root)) {
           root.setAttribute("data-hierarchy-ready", "1");
@@ -1495,7 +1048,60 @@
         }
       }
     });
+    flushHierarchyReveals();
   }
+
+  /* --- Deferred mounts: hosts that were zero-width when we first reached them [Story 20.9 F1] ---------------
+     Two things happen on a reveal, and only one of them is a mount: a host that has never been plotted gets its
+     FIRST mount, and a host that was plotted while visible and has since been resized gets `Plotly.Plots.resize`,
+     which is the documented way to re-lay-out a plot whose container changed size without a window event.
+
+     The trigger is a single delegated `change` listener on `[data-hierarchy-reveal]` controls, registered once.
+     Deliberately not one listener per pending host: the SPA replaces the content region wholesale, and a
+     per-host listener would retain a detached node on every swap. */
+  var hierarchyPending = [];
+  // The nearest laid-out ancestor. `|| root.parentNode` matters: `data-explorer` is an opt-in hook a call site may
+  // omit, and the mount path resolves its panel with exactly this fallback.
+  function hierarchyPanelOf(root) {
+    return (root.closest && root.closest("[data-explorer]")) || root.parentNode || root;
+  }
+  function deferHierarchyMount(root) {
+    if (hierarchyPending.indexOf(root) === -1) hierarchyPending.push(root);
+  }
+  function flushHierarchyReveals() {
+    var still = [];
+    for (var i = 0; i < hierarchyPending.length; i++) {
+      var root = hierarchyPending[i];
+      // Dropped by an SPA swap — forget it rather than retaining a detached host forever.
+      if (!document.contains(root)) continue;
+      if (root.getAttribute("data-hierarchy-ready")) continue;
+      if (!hierarchyPanelOf(root).clientWidth) { still.push(root); continue; }
+      try {
+        if (initHierarchyExplorer(root)) {
+          root.setAttribute("data-hierarchy-ready", "1");
+          hierarchyMounts.push(root);
+        }
+      } catch (err) { /* one bad instance must not down the others; the text twin stands */ }
+    }
+    hierarchyPending = still;
+
+    // Already mounted, newly re-sized. `responsive: true` fits the width on a WINDOW resize only, so a CSS-only
+    // reveal leaves the plot at whatever width it had when it was drawn.
+    for (var j = 0; j < hierarchyMounts.length; j++) {
+      var m = hierarchyMounts[j];
+      if (!document.contains(m) || !m.clientWidth) continue;
+      try { if (window.Plotly && Plotly.Plots) Plotly.Plots.resize(m); } catch (e) { /* purged */ }
+    }
+  }
+  document.addEventListener("change", function (e) {
+    var t = e && e.target;
+    if (t && t.getAttribute && t.getAttribute("data-hierarchy-reveal") !== null) flushHierarchyReveals();
+  });
+
+  // The two runtime-argument kinds a dimension may take (HierarchyDimensionArg). Named once so the marker
+  // attribute and the emitted declaration cannot drift on a typo.
+  var HIERARCHY_ARG_ROSTER = "roster";
+  var HIERARCHY_ARG_THRESHOLD = "threshold";
 
   function initHierarchyExplorer(root) {
     // No engine, no takeover. Checked first so a blocked or absent bundle costs nothing and changes nothing.
@@ -1548,8 +1154,14 @@
     // Plotly's marker.line has no `dash`, so per-sector hatching replaces that channel — a stronger one, and the
     // reason no state here is signalled by colour alone. Keyed by CLASS TOKEN and matched against the node's whole
     // class list, so a second family can bring its own non-colour channel without this becoming a status map again.
+    // Story 20.9 adds the three states whose non-colour channel in the shipped CSS is `stroke-dasharray: 2 1` —
+    // `.codemap-cell.type-other`, `.ownership-wedge.owner-author-other` and `.ownership-wedge.owner-stale`. A dash
+    // is exactly what `marker.line` cannot express, which is the limit Story 20.5 already hit; hatching is the
+    // channel that survives the engine swap. Keyed by class token, so a dimension declares its non-colour channel
+    // the same way it declares its fill.
     var PATTERN_SHAPE = {
-      "sb-followup-open": "/", "sb-followup-done": "\\", "sb-noplan": ".", "sb-unplanned": "x"
+      "sb-followup-open": "/", "sb-followup-done": "\\", "sb-noplan": ".", "sb-unplanned": "x",
+      "type-other": ".", "owner-author-other": ".", "owner-stale": "x"
     };
 
     var probeHost = document.createElement("div");
@@ -1575,8 +1187,16 @@
       var cs = getComputedStyle(path);
       // fill-opacity is read and COMPOSITED into the colour rather than dropped. Several structural classes carry
       // it (`.impact-arc-dir` is fill-opacity 0.7), and a resolver that returned only `fill` would paint them at
-      // full strength with no test able to see the difference — the family renders, just wrong.
-      tokenCache[cls] = { fill: withOpacity(cs.fill, cs.fillOpacity), stroke: cs.stroke };
+      // full strength with no test able to see the difference — the family renders, just wrong. Story 20.9 depends
+      // on this for five more states (`.codemap-cell.level-0` 0.35, `.level-none`/`.type-other` 0.55,
+      // `.owner-author-other` 0.55, `.owner-spotlight-off` 0.35).
+      //
+      // `stroke-width` joins them for the same reason. It is a real, SECOND channel on at least one state —
+      // `.spotlight-touched` layers `stroke: var(--ink); stroke-width: 1.2` on top of a level ramp — and a
+      // resolver that returned one global edge colour could not express it. Every already-shipped family declares
+      // one uniform stroke (`.sb-seg` is warm-white at 1), so resolving per sector reproduces exactly what those
+      // charts already draw.
+      tokenCache[cls] = { fill: withOpacity(cs.fill, cs.fillOpacity), stroke: cs.stroke, width: parseFloat(cs.strokeWidth) };
       return tokenCache[cls];
     }
     // rgb(a) + a separate fill-opacity -> one rgba Plotly can use. Anything unparseable is passed through
@@ -1592,8 +1212,203 @@
       if (!isFinite(existing)) existing = 1;
       return "rgba(" + parts[0].trim() + "," + parts[1].trim() + "," + parts[2].trim() + "," + (existing * a) + ")";
     }
+    /* --- The dimension contract (config-gated) [Story 20.9 AC#1] ---------------------------------------------
+       A surface may offer several colorize dimensions, and switching one re-colours IN PLACE: no geometry is
+       re-derived, nothing is re-counted, no fetch is issued. Every rule below reads only values the emitter
+       embedded at generation time (ADR 0012 §7 / ADR 0010 §3) — including `asof`, which is the tree's most-recent
+       commit day and never wall-clock `now` (FR31).
+
+       Nothing here names a surface or a colour. A dimension DECLARES which metric it reads, which class prefix it
+       paints with and how its accessible name reads; this resolves that declaration and hands the class list to
+       the same probe every other family goes through (AD-7). The two dimensions that cannot be precomputed —
+       a spotlight on an arbitrary contributor, a free 1–60 month staleness threshold — are exactly why the payload
+       carries raw values rather than a frozen class per node (owner decision D1). */
+    var DIMS = (cfg.dimensions && cfg.dimensions.length) ? cfg.dimensions : null;
+    var CONSTANTS = cfg.constants || {};
+    // Reserved constant: the payload's reference day. Part of the contract rather than a surface's private key,
+    // because "how long ago" is only answerable against a fixed, embedded day.
+    var AS_OF = CONSTANTS.asof === undefined ? NaN : parseFloat(CONSTANTS.asof);
+    var dimState = { key: DIMS ? DIMS[0].key : null, roster: null, threshold: null };
+    var dimClassOf = Object.create(null);
+    var dimTextOf = Object.create(null);
+
+    function metricOf(n, key) {
+      var m = n && n.metrics;
+      if (!m || !key) return null;
+      var v = m[key];
+      return (v === undefined || v === null || v === "") ? null : v;
+    }
+    function numOf(n, key) {
+      var raw = metricOf(n, key);
+      if (raw === null) return null;
+      var v = parseFloat(raw);
+      return isNaN(v) ? null : v;
+    }
+    // Mirrors Charts.Bucket's <=0.25/0.5/0.75 cut points exactly, INCLUDING its one deliberate difference: a
+    // degenerate single-point range (max <= 0 but a positive value) reads as the TOP bucket rather than falling
+    // through to "no activity", because the one file that does have data must not render identically to files
+    // with none. Carried over verbatim from the renderer this replaces.
+    function bucket(value, max) {
+      if (max <= 0) return value > 0 ? 4 : 0;
+      if (value <= 0) return 0;
+      var r = value / max;
+      return r <= 0.25 ? 1 : r <= 0.5 ? 2 : r <= 0.75 ? 3 : 4;
+    }
+    // The bucket LEVEL is exactly what the colour encodes, so it is the honest text equivalent — never the raw
+    // day-number or count the colour does not literally represent.
+    function levelWord(l) { return l === 0 ? "lowest" : l === 4 ? "highest" : "level " + l + " of 4"; }
+    function tmpl(text, vars) {
+      return String(text == null ? "" : text).replace(/\{(\w+)\}/g, function (whole, k) {
+        return vars[k] === undefined || vars[k] === null ? whole : String(vars[k]);
+      });
+    }
+    var constantCache = Object.create(null);
+    function constantList(name) {
+      if (!name) return [];
+      if (constantCache[name]) return constantCache[name];
+      var out = [];
+      try { var p = JSON.parse(CONSTANTS[name] || "[]"); if (Array.isArray(p)) out = p; } catch (e) { out = []; }
+      constantCache[name] = out;
+      return out;
+    }
+    function tupleList(n, key) {
+      var raw = metricOf(n, key);
+      if (!raw) return [];
+      try { var p = JSON.parse(raw); return Array.isArray(p) ? p : []; } catch (e) { return []; }
+    }
+    function dimValue(n, d) {
+      var v = numOf(n, d.metric);
+      if (v === null) return null;
+      // The shipped `!ch` guard: a file with zero changes has no average, and "no data" is honest where dividing
+      // by zero is not.
+      if (d.divisor) { var by = numOf(n, d.divisor); if (!by) return null; v = v / by; }
+      return v;
+    }
+    function activeDim() {
+      if (!DIMS) return null;
+      for (var i = 0; i < DIMS.length; i++) { if (DIMS[i].key === dimState.key) return DIMS[i]; }
+      return DIMS[0];
+    }
+    /// The alphabetical UNION of every node's own bounded contributor list — never the panel-wide top-N palette,
+    /// and never sorted by volume. FR-10 / ADR 0010 §4: attribution, never a ranking.
+    function dimRoster(d) {
+      var seenNames = Object.create(null), out = [];
+      NODES.forEach(function (n) {
+        tupleList(n, d.metric).forEach(function (entry) {
+          if (entry && typeof entry[0] === "string" && !seenNames[entry[0]]) { seenNames[entry[0]] = true; out.push(entry[0]); }
+        });
+      });
+      return out.sort(function (a, b) { return a.localeCompare(b); });
+    }
+
+    function classifyNode(n, d, scale) {
+      var T = d.text || {};
+      var vars = { label: d.label };
+      var extra = d.extraClass ? " " + d.extraClass : "";
+
+      if (d.kind === "categorical") {
+        var key = metricOf(n, d.metric);
+        vars.value = metricOf(n, d.labelMetric) || key || "";
+        return { cls: key ? d.classPrefix + key : d.noneClass, text: tmpl(T.value, vars) };
+      }
+      if (d.kind === "ramp" || d.kind === "ramp-window") {
+        var v = dimValue(n, d);
+        if (v === null) return { cls: d.noneClass, text: tmpl(T.none, vars) };
+        var lvl = scale.window ? bucket(v - scale.min, scale.max - scale.min) : bucket(v, scale.max);
+        vars.level = levelWord(lvl);
+        return { cls: d.classPrefix + lvl, text: tmpl(T.value, vars) };
+      }
+      if (d.kind === "cutoff") {
+        var raw = numOf(n, d.metric);
+        if (raw === null) return { cls: d.noneClass, text: tmpl(T.none, vars) };
+        var cuts = d.cutoffs || [];
+        var band = cuts.length + 1;
+        for (var i = 0; i < cuts.length; i++) { if (raw <= cuts[i]) { band = i + 1; break; } }
+        vars.value = metricOf(n, d.metric);
+        return { cls: d.classPrefix + band, text: tmpl(T.value, vars) };
+      }
+      if (d.kind === "roster") {
+        var name = metricOf(n, d.metric);
+        if (name === null) return { cls: d.noneClass, text: tmpl(T.none, vars) };
+        var idx = constantList(d.rosterConstant).indexOf(name);
+        vars.name = name;
+        return { cls: idx >= 0 ? d.classPrefix + idx : d.classPrefix + "other", text: tmpl(T.value, vars) };
+      }
+      if (d.kind === "spotlight") {
+        var who = dimState.roster;
+        vars.name = who;
+        var entry = null, list = tupleList(n, d.metric);
+        for (var j = 0; j < list.length; j++) { if (list[j] && list[j][0] === who) { entry = list[j]; break; } }
+        // Absence means "not among this file's own embedded (capped) contributor list", NOT a proven "never
+        // touched" — a file with more contributors than the per-file cap can have a real, spotlighted contributor
+        // who simply ranks below it here. The declared wording says so. [Review 2026-07-22, preserved]
+        if (!entry) return { cls: d.offClass || d.noneClass, text: tmpl(T.off, vars) };
+        var lastDay = entry[2];
+        var daysAgo = (lastDay === null || lastDay === undefined || isNaN(AS_OF)) ? null : (AS_OF - lastDay);
+        // Touched, but their own last-touch date was not embedded — an honest "unknown", never coerced into the
+        // oldest bucket, which would fabricate a "long ago" claim the data does not support.
+        if (daysAgo === null) return { cls: d.noneClass + extra, text: tmpl(T.unknown, vars) };
+        // MORE recent is a HIGHER level, so this ramp runs the opposite way from `cutoff`'s.
+        var rcuts = d.cutoffs || [];
+        var level = 1;
+        for (var k = 0; k < rcuts.length; k++) { if (daysAgo <= rcuts[k]) { level = rcuts.length + 1 - k; break; } }
+        vars.days = daysAgo + (daysAgo === 1 ? " day" : " days");
+        return { cls: d.classPrefix + level + extra, text: tmpl(T.hit, vars) };
+      }
+      if (d.kind === "threshold") {
+        var last = numOf(n, d.metric);
+        if (last === null || isNaN(AS_OF)) return { cls: d.noneClass, text: tmpl(T.none, vars) };
+        var months = dimState.threshold;
+        var monthsAgo = (AS_OF - last) / 30;
+        var stale = monthsAgo >= months;
+        vars.months = months;
+        vars.monthsAgo = Math.round(monthsAgo);
+        return { cls: d.classPrefix + (stale ? "stale" : "fresh"), text: tmpl(stale ? T.stale : T.fresh, vars) };
+      }
+      return null;
+    }
+
+    function resolveDimension() {
+      dimClassOf = Object.create(null);
+      dimTextOf = Object.create(null);
+      var d = activeDim();
+      if (!d) return;
+
+      // The scan spans the WHOLE payload, not the drilled or filtered view — the renderer this replaces scanned
+      // every cell in the panel regardless of zoom, so a level means the same thing before and after a drill.
+      var scale = null;
+      if (d.kind === "ramp" || d.kind === "ramp-window") {
+        var min = Infinity, max = 0;
+        NODES.forEach(function (n) {
+          if (!n.metrics) return;
+          var v = dimValue(n, d);
+          if (v === null) return;
+          if (v > max) max = v;
+          if (v < min) min = v;
+        });
+        scale = { min: isFinite(min) ? min : 0, max: max, window: d.kind === "ramp-window" };
+      }
+
+      NODES.forEach(function (n) {
+        // Structural nodes — directories and the synthesized root — carry no metric bag and never participate in
+        // a dimension. The SVG never recoloured a directory rect either; a directory has no dominant author.
+        if (!n.metrics) return;
+        var out = classifyNode(n, d, scale);
+        if (!out) return;
+        dimClassOf[n.id] = (n.colorClass ? n.colorClass + " " : "") + out.cls;
+        dimTextOf[n.id] = out.text;
+      });
+    }
+
+    // The one place fill, hatch and stroke all read a node's class list from, so a dimension switch cannot move
+    // one channel and leave another behind.
+    function classOf(n) {
+      if (!n) return DEFAULT_COLOR_CLASS;
+      return dimClassOf[n.id] || n.colorClass || DEFAULT_COLOR_CLASS;
+    }
+
     function fillFor(n) {
-      var t = tokenFor(n && n.colorClass);
+      var t = tokenFor(classOf(n));
       var f = t.fill;
       // Last-resort fallback for a class whose shipped rule paints no fill at all. It is deliberately NOT how
       // no-plan is resolved any more: falling back to the STROKE token gave `.sb-noplan` the value of
@@ -1604,15 +1419,27 @@
       if (!f || f === "none" || f === "transparent" || f === "rgba(0, 0, 0, 0)") return t.stroke;
       return f;
     }
-    // The hatch channel resolves from the SAME class list as the fill, so a family declares both together.
+    // The hatch channel resolves from the SAME class list as the fill, so a family declares both together — and
+    // so a dimension switch moves both at once.
     function patternFor(n) {
-      var cls = (n && n.colorClass) || "";
+      var cls = classOf(n);
       if (!cls) return "";
       var tokens = cls.split(/\s+/);
       for (var i = 0; i < tokens.length; i++) {
         if (PATTERN_SHAPE[tokens[i]]) return PATTERN_SHAPE[tokens[i]];
       }
       return "";
+    }
+    // Per-sector stroke, resolved from the same class list. `.spotlight-touched` is the state that needs it: it
+    // layers a darker, wider stroke on top of a level ramp, which is a second channel on the same node and the
+    // only thing keeping that dimension from being colour-only.
+    function strokeFor(n) {
+      var s = tokenFor(classOf(n)).stroke;
+      return (!s || s === "none") ? edgeColor : s;
+    }
+    function strokeWidthFor(n) {
+      var w = tokenFor(classOf(n)).width;
+      return isFinite(w) && w > 0 ? w : 1;
     }
     var inkColor = tokenFor("sb-seg sb-unrecognized").fill;
     var edgeColor = tokenFor("sb-seg sb-done").stroke || inkColor;
@@ -1651,6 +1478,10 @@
     // deliberately absent: the owner's verify round called it "a confusing value ... not helpful or intuitive for
     // the reader", and it is a rendering input, not a fact about the work.
     function tipCardFor(n) {
+      // A surface that ships its own card wins. Story 20.5 made `.ss-tooltip` + `data-tip-html` the one tooltip
+      // system site-wide precisely so swapping the drawing engine never swaps the tooltip's look — and the two
+      // colorize surfaces' cards carry per-file git metrics the generic card has no field for. [Story 20.9 F8]
+      if (n && n.tip) return n.tip;
       var out = '<span class="ss-hierarchy-card">';
       out += '<span class="ss-hierarchy-card-kind">' + esc(kindWord(n)) + "</span>";
       out += '<span class="ss-hierarchy-card-name">' + esc(n.label) + "</span>";
@@ -1753,9 +1584,10 @@
           // Width AND colour both change, so the selection is never signalled by colour alone (UX-DR17).
           line: {
             // The ring takes the SAME per-sector contrast pick the labels use, not one fixed accent: a gold ring
-            // on a gold "ready" sector is invisible, and the selection can land on any status.
-            color: VIS.map(function (n) { return n.id === state.selected ? textOn(n) : edgeColor; }),
-            width: VIS.map(function (n) { return n.id === state.selected ? 4 : 1; })
+            // on a gold "ready" sector is invisible, and the selection can land on any status. When nothing is
+            // selected the sector's OWN resolved stroke is used, which is what carries `.spotlight-touched`.
+            color: VIS.map(function (n) { return n.id === state.selected ? textOn(n) : strokeFor(n); }),
+            width: VIS.map(function (n) { return n.id === state.selected ? 4 : strokeWidthFor(n); })
           },
           pattern: {
             shape: VIS.map(function (n) { return patternFor(n); }),
@@ -1890,7 +1722,14 @@
           else el.removeAttribute("data-ss-selected");
           // Status as PROSE, never the CSS class. The 20.4 probe read "— done, weight 44" precisely because it
           // used the class; UX-DR17/19 want words.
-          el.setAttribute("aria-label", n.label + " — " + n.statusLabel + (n.detail ? ", " + n.detail : ""));
+          //
+          // The dimension suffix is appended to that BASE name, recomposed on every switch — never stacked onto a
+          // previously-appended one, because the base is rebuilt from the payload each time. This is the clause
+          // AC#1's "the non-colour channel holds across every dimension" actually refers to: a dimension whose
+          // fill changes and whose accessible name does not is a UX-DR17 failure that ships green. [Story 20.9 F3]
+          var name = n.label + (n.statusLabel ? " — " + n.statusLabel : "") + (n.detail ? ", " + n.detail : "");
+          if (dimTextOf[n.id]) name += " — " + dimTextOf[n.id];
+          el.setAttribute("aria-label", name);
           el.setAttribute("aria-level", String(depth(n.id) + 1));
           var sibs = n.parentId ? (childrenOf[n.parentId] || []) : [n];
           var pos = 0;
@@ -2185,6 +2024,15 @@
     root.style.height = hostHeight() + "px";
     root.setAttribute("data-hierarchy-ready", "1");
     state.level = scopeFromHash();
+    // Resolve the DEFAULT dimension before the first plot, so the chart is never drawn once in the payload's
+    // structural colours and then re-coloured a frame later.
+    if (DIMS) {
+      var argRoster = dimArgInput(HIERARCHY_ARG_ROSTER);
+      var argThreshold = dimArgInput(HIERARCHY_ARG_THRESHOLD);
+      dimState.roster = argRoster && argRoster.value ? argRoster.value : null;
+      dimState.threshold = readThreshold(argThreshold);
+      resolveDimension();
+    }
     // `Plotly.newPlot` returns a promise. A SYNCHRONOUS throw lands in the catch below; an ASYNCHRONOUS rejection
     // would sail straight past it, leaving the component reporting a successful mount — and hiding the server SVG —
     // over an empty panel. Both routes must reach the same failure exit. [Story 20.5 review]
@@ -2227,10 +2075,51 @@
       return e && e.nextLevel ? e.nextLevel : null;
     }
 
+    /* --- The surface's own dimension controls [Story 20.9 Task 1.3/1.6] --------------------------------------
+       Declarative markers, exactly like `data-hierarchy-filter`: nothing here knows what a dimension MEANS, only
+       that a control publishes a key and two optional inputs feed the two rules that cannot be precomputed. The
+       controls ride inside the SAME hidden bar as the shape selector, so they inherit the reveal handshake and a
+       JS-off visitor never sees an inert control. */
+    function dimArgInput(kind) {
+      return controls ? controls.querySelector("[data-hierarchy-arg=\"" + kind + "\"]") : null;
+    }
+    function readThreshold(input) {
+      if (!input) return null;
+      var v = parseInt(input.value, 10);
+      // The shipped fallback, preserved: an empty or nonsensical entry falls back rather than colouring nothing.
+      return (isNaN(v) || v < 1) ? 6 : v;
+    }
+
+    function applyDimension(announceIt) {
+      var d = activeDim();
+      if (!d) return;
+      // Show only the argument control this dimension actually takes.
+      Array.prototype.forEach.call(panel.querySelectorAll("[data-hierarchy-arg-wrap]"), function (wrap) {
+        wrap.hidden = wrap.getAttribute("data-hierarchy-arg-wrap") !== (d.arg || "");
+      });
+      // Exactly one legend block visible per active dimension, so the legend can never disagree with what is
+      // coloured. The caption is a TEMPLATE the surface wrote — the words are the surface's, not this file's.
+      Array.prototype.forEach.call(panel.querySelectorAll("[data-hierarchy-legend]"), function (block) {
+        block.hidden = block.getAttribute("data-hierarchy-legend") !== (d.legendKey || "");
+      });
+      var caption = panel.querySelector("[data-hierarchy-legend=\"" + (d.legendKey || "") + "\"] [data-hierarchy-legend-caption]");
+      var captionText = caption ? tmpl(caption.getAttribute("data-hierarchy-legend-caption"), { label: d.label }) : "";
+      if (caption) caption.textContent = captionText;
+      resolveDimension();
+      redraw();
+      // Re-run Story 20.5's survival predicate path: a dimension change is a RE-RENDER, and the a11y layer has to
+      // survive it exactly as it survives a drill. `plotly_afterplot` fires for this redraw and re-applies it.
+      if (announceIt) announce(captionText || d.label);
+    }
+
     // --- Shape selector. Revealed only now, because switching a trace type needs script: with JS off it would be
     // an inert control, which is why the server ships it [hidden].
     if (controls) {
       controls.hidden = false;
+      // A legend describes a CHART, and on a surface whose chart only exists once this file runs, so does its
+      // legend — same reveal-on-mount handshake the controls take, for the same reason. [Story 20.9 Task 1.6]
+      var legendBar = panel.querySelector(".ss-hierarchy-legends");
+      if (legendBar) legendBar.hidden = false;
       Array.prototype.forEach.call(controls.querySelectorAll(".ss-hierarchy-shape"), function (radio) {
         radio.addEventListener("change", function () {
           if (!radio.checked) return;
@@ -2239,6 +2128,54 @@
           announce("Showing the " + state.shape);
         });
       });
+
+      if (DIMS) {
+        var dimSelect = controls.querySelector("[data-hierarchy-dimension]");
+        var rosterInput = dimArgInput(HIERARCHY_ARG_ROSTER);
+        var thresholdInput = dimArgInput(HIERARCHY_ARG_THRESHOLD);
+
+        // Populate the roster picker from the payload itself — the alphabetical union of every node's own
+        // bounded list, never the panel-wide top-N palette and never sorted by volume (FR-10). Built here rather
+        // than server-side because the roster is a property of the DATA, and the emitter would otherwise publish
+        // the same list a second time.
+        if (rosterInput && rosterInput.tagName === "SELECT" && !rosterInput.options.length) {
+          for (var di = 0; di < DIMS.length; di++) {
+            if (DIMS[di].arg !== HIERARCHY_ARG_ROSTER) continue;
+            dimRoster(DIMS[di]).forEach(function (nm) {
+              var opt = document.createElement("option");
+              opt.value = nm;
+              opt.textContent = nm;
+              rosterInput.appendChild(opt);
+            });
+            break;
+          }
+          dimState.roster = rosterInput.value || null;
+        }
+
+        if (dimSelect) {
+          dimSelect.addEventListener("change", function () {
+            dimState.key = dimSelect.value;
+            applyDimension(true);
+          });
+        }
+        if (rosterInput) {
+          rosterInput.addEventListener("change", function () {
+            dimState.roster = rosterInput.value || null;
+            applyDimension(false);
+          });
+        }
+        if (thresholdInput) {
+          thresholdInput.addEventListener("input", function () {
+            dimState.threshold = readThreshold(thresholdInput);
+            applyDimension(false);
+          });
+        }
+        // Sync once at init rather than trusting the server-baked default to match the control: a bfcache or
+        // back-navigation restore of a non-default select value would otherwise leave the chart showing colours
+        // the visible control disagrees with. [Review 2026-07-22, preserved]
+        if (dimSelect && dimSelect.value) dimState.key = dimSelect.value;
+        applyDimension(false);
+      }
 
       // --- Root-subtree filter (config-gated). Same reveal, same bar: a surface's own controls inherit the
       // handshake rather than re-inventing it. The control's `value` IS a root child's node id — that pairing is

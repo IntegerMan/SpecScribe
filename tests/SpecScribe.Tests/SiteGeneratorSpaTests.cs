@@ -219,6 +219,37 @@ public class SiteGeneratorSpaTests : IDisposable
         }
         Assert.True(spaIndex.IndexOf("class=\"ss-hierarchy-data\"", StringComparison.Ordinal) > mainStart);
         Assert.True(spaIndex.IndexOf(twinId, StringComparison.Ordinal) > mainStart);
+
+        // STORY 20.9: the count went from five instances site-wide to TEN, and four of them are on ONE page. A
+        // collision there would not be subtle-in-theory - `code-map.html`'s four panels differ only by filter, so
+        // two sharing a DomId would leave one permanently unmountable and two sharing a HashKey would have them
+        // fighting over the fragment. Extended here rather than in a parallel test, per Task 5.3.
+        var spaCodeMap = gen.RenderSpaBundle().Pages.SingleOrDefault(p => p.OutputRelativePath == "code-map.html");
+        if (spaCodeMap is not null)
+        {
+            foreach (var key in new[] { "full", "no-spec", "no-tests", "no-spec-no-tests" })
+            {
+                Assert.Contains($"id=\"codemap-{key}-data\"", spaCodeMap.ContentHtml);
+            }
+            // The per-variant file table is this surface's twin (Story 20.6 D1), so IT is what has to ride the
+            // capture - the component emits no generic twin here at all.
+            Assert.Contains("class=\"codemap-table\"", spaCodeMap.ContentHtml);
+            Assert.DoesNotContain("ss-hierarchy-twin", spaCodeMap.ContentHtml);
+        }
+
+        // Every DomId across the WHOLE bundle is distinct: an SPA session can visit any two of these pages, and
+        // the component keys its host, island, selector radios and twin off that one id.
+        var allDomIds = gen.RenderSpaBundle().Pages
+            .SelectMany(p => System.Text.RegularExpressions.Regex.Matches(p.ContentHtml, "id=\"(?<d>[a-z0-9-]+)-data\" ?>")
+                .Select(m => m.Groups["d"].Value))
+            .ToList();
+        Assert.Equal(allDomIds.Count, allDomIds.Distinct(StringComparer.Ordinal).Count());
+
+        // The re-init seam every one of them depends on after an innerHTML swap. SAME SCOPE CAVEAT as above: this
+        // pins that the seam is WIRED in the shipped asset, never that a live swap re-enhanced anything.
+        var js = File.ReadAllText(Path.Combine(RepoSourceRoot(), "assets", "specscribe.js"));
+        Assert.Contains("specscribe:content-swapped", js);
+        Assert.Contains("initHierarchyExplorers(e && e.detail ? e.detail.root : document)", js);
     }
 
     [Fact]
@@ -787,4 +818,16 @@ public class SiteGeneratorSpaTests : IDisposable
         Assert.True(open >= 0 && close > open, "fixture page has a single <main id=\"main-content\"> landmark");
         return fullHtml[open..(close + "</main>".Length)];
     }
+
+    /// <summary>The shipped-asset directory, located from the test bin folder — the established pattern for
+    /// asserting a fact about specscribe.js content (StylesheetTests / HierarchyRolloutTests).</summary>
+    private static string RepoSourceRoot()
+    {
+        var dir = AppContext.BaseDirectory;
+        while (dir is { Length: > 0 } && !Directory.Exists(Path.Combine(dir, "src", "SpecScribe")))
+            dir = Path.GetDirectoryName(dir);
+        Assert.False(string.IsNullOrEmpty(dir), "could not locate the repository root from the test bin directory");
+        return Path.Combine(dir!, "src", "SpecScribe");
+    }
+
 }
