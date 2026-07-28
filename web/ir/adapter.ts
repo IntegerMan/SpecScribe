@@ -16,7 +16,7 @@
  *   IrHead   { title, description }
  *   IrPage   { path, title, head, breadcrumb: IrCrumb[], parent, children: string[],
  *              region: IrRegion, hasDataIsland, hasExecutableIsland }
- *   IrRegion { navHtml, wayfindingHtml, mainAttributes, mainAttrs, mainInnerHtml }
+ *   IrRegion { navHtml, wayfindingHtml, mainAttributes, mainAttrs, mainInnerHtml, degraded }
  *
  * ── Server-only by construction ────────────────────────────────────────────────────────────────────────
  *
@@ -154,14 +154,35 @@ function loadManifest(): RawManifest {
 
 const manifest = loadManifest()
 
-if (manifest.schemaVersion !== EXPECTED_SCHEMA_VERSION) {
-  // Loud, not fatal: an ADDITIVE bump is legal under the emitter's own compatibility rule (a monotonic
-  // integer, bumped only on a breaking change), so refusing to build would be wrong. A silent mismatch
-  // would not be.
+const actualSchemaVersion = manifest.schemaVersion ?? 0
+
+if (actualSchemaVersion < EXPECTED_SCHEMA_VERSION) {
+  // FATAL, not a warning. `SpaDelivery.SchemaVersion`'s own compatibility rule defines the integer as bumped
+  // ONLY on a breaking change, so an IR strictly below what this adapter expects is by definition unreadable
+  // — the fields below may be absent, renamed or differently shaped.
+  //
+  // This used to be the same `console.warn` the newer-version branch still uses, and that was a real hazard
+  // rather than a pedantic one: Story 22.4 also deleted the consumer-side wayfinding repair on the grounds
+  // that "the emitter no longer emits that shape". True of the CURRENT emitter — but a v1 IR on disk (a stale
+  // generated portal, an older checked-out binary, a CI cache) still carries it, and with the repair AND the
+  // balance throw both gone, warn-and-continue produced an unmatched `</div>` that re-parented `<main>` and
+  // `<footer>` into the wayfinding band with no error anywhere. Failing here is what closes that path.
+  // [Story 22.4 code review]
+  throw new Error(
+    `[ir/adapter] IR schemaVersion is ${manifest.schemaVersion ?? '(absent — pre-22.2)'}, but this adapter ` +
+      `requires ${EXPECTED_SCHEMA_VERSION}. A LOWER version is a breaking mismatch under ` +
+      `SpaDelivery.SchemaVersion's compatibility rule, not a tolerable one — the IR on disk predates fields ` +
+      `this adapter reads. Regenerate it:  dotnet run --project src/SpecScribe -- generate --spa`,
+  )
+}
+
+if (actualSchemaVersion > EXPECTED_SCHEMA_VERSION) {
+  // Loud, not fatal: an ADDITIVE bump is legal under the emitter's own compatibility rule, so refusing to
+  // build would be wrong. A silent mismatch would not be.
   console.warn(
-    `[ir/adapter] IR schemaVersion is ${manifest.schemaVersion ?? '(absent — pre-22.2)'}, this adapter was ` +
-      `written against ${EXPECTED_SCHEMA_VERSION}. Re-read SpaDelivery.SchemaVersion's compatibility rule ` +
-      `before trusting the fields below.`,
+    `[ir/adapter] IR schemaVersion is ${manifest.schemaVersion}, this adapter was written against ` +
+      `${EXPECTED_SCHEMA_VERSION}. Re-read SpaDelivery.SchemaVersion's compatibility rule before trusting ` +
+      `the fields below.`,
   )
 }
 
@@ -219,12 +240,20 @@ const WAYFINDING_MARKER = '<div class="page-wayfinding"'
 export function splitContentRegion(contentHtml: string, path: string): IrRegion {
   const mainOpen = contentHtml.indexOf(MAIN_MARKER)
   if (mainOpen < 0) {
-    // The emitter degrades a landmark-less page to nav-only rather than aborting the SPA emit, so this is a
-    // real (if rare) shape — but it is not something this app can render as a page.
-    throw new Error(
-      `IR page "${path}" carries no <main id="main-content"> landmark; its content region is nav-only. ` +
-        `Fix the page's templater (every SpecScribe page has carried the Story 1.4 landmark since 1.4).`,
-    )
+    // DEGRADE, don't throw. The emitter reduces a landmark-less page to nav-only rather than aborting the SPA
+    // emit, and ADR 0024 §Decision 3 ratifies that the SPA KEEPS it (only the webview skips). Throwing here
+    // made the two halves of that decision contradict each other: because Nuxt prerenders every route from the
+    // manifest, one such page failed the ENTIRE site build. The consumer now mirrors the webview's own
+    // `Degraded → continue` — a per-page degrade, which is what §Decision 3 always implied.
+    // [Story 22.4 code review — owner decision DR2]
+    return {
+      navHtml: contentHtml,
+      wayfindingHtml: '',
+      mainAttributes: '',
+      mainAttrs: {},
+      mainInnerHtml: '',
+      degraded: true,
+    }
   }
   const openTagEnd = contentHtml.indexOf('>', mainOpen)
   const mainClose = contentHtml.indexOf(MAIN_CLOSER, mainOpen)
@@ -251,6 +280,7 @@ export function splitContentRegion(contentHtml: string, path: string): IrRegion 
     mainAttributes,
     mainAttrs: parseAttributes(mainAttributes, path),
     mainInnerHtml: contentHtml.slice(openTagEnd + 1, mainClose),
+    degraded: false,
   }
 }
 

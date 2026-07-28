@@ -4,7 +4,7 @@ baseline_commit: 6017c2cd2d4e3928c4713ac369ac401fd9f1dbb7
 
 # Story 18.6: Module-Aware Artifact Coverage Families
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -274,6 +274,31 @@ run's `events` list).
         shipping a divergence (CLAUDE.md § Decision records). **No deviation arose; no ADR authored.**
   - [x] Record in Completion Notes: the Core-skill reachability proof, the GDS-family-set observation as a
         candidate follow-up, and the `RegenerateEpics` re-emission choice from Task 5.
+
+### Review Findings
+
+_Code review 2026-07-28 (`/bmad-code-review 18.6`), scoped to this story's own File List/symbols per CLAUDE.md
+(sibling stories 18.2/18.3/18.4/18.5/20.9/22.4 share `SiteGenerator.cs`/`ModuleContext.cs`/`.claude/launch.json`
+but were excluded from the reviewed diff). ⚠️ **Blind Hunter and Edge Case Hunter both failed** on the session's
+API usage limit (reset 2:30pm ET) — only the Acceptance Auditor layer completed. The user chose to proceed with
+Acceptance-only findings rather than wait. The Auditor's verdict: a faithful, literal implementation of AC #1/#2,
+D1/D2/D3, the anti-patterns list, and the non-goals section, with no violations found. Two low-severity patch
+items surfaced._
+
+- [x] [Review][Patch] D1's "no-`_bmad/` repo" generation test asserts the panel renders but never captures
+      `GenerateAll()`'s events to assert zero panel-omission diagnostics — Task 5's own text promises that
+      assertion for the BMM/GDS/no-`_bmad` triad and only BMM+GDS got it. Structurally safe today
+      (`AppendUnmodeledCoverageNotice`'s `if (!module.IsUnmodeled) return;` guard makes it impossible for
+      `BmadModule.Unknown` to emit the notice), so this is test-completeness, not a behavioral defect.
+      [tests/SpecScribe.Tests/SiteGeneratorCoverageTests.cs: `GenerateAll_NoBmadInstallAtAll_KeepsThePlanningArtifactsPanel`]
+      — **Applied**: test now captures `events` and asserts no `GenerationEvent` carries the panel-omission
+      message. Class re-run green (6/6).
+- [x] [Review][Patch] `.claude/launch.json` port collision: this story's own `bmm-control-18-6` entry and a
+      sibling (Story 20.9) `codemap-20-9` entry both claim port 8114. Not this story's authoring error — the two
+      entries landed in the same bundled commit range from concurrent sessions — but it lives on this story's own
+      File List and breaks running both preview slots at once. [.claude/launch.json]
+      — **Applied**: `codemap-20-9` moved to the next free port, 8119 (this story's own `bmm-control-18-6` entry
+      left untouched at 8114).
 
 ## Dev Notes
 

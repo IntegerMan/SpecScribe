@@ -11,18 +11,21 @@ public static class RetroTemplater
 {
     /// <summary>The retrospectives index page (<c>retros.html</c>): one card per retro (title, date, epic),
     /// each linking to its dedicated page. Mirrors the shared index-page shell. [Story 2.3 retro pages]</summary>
-    public static string RenderIndex(IReadOnlyList<RetroModel> retros, SiteNav nav)
+    public static string RenderIndex(IReadOnlyList<RetroModel> retros, SiteNav nav) =>
+        HtmlRenderAdapter.Shared.Render(BuildIndexPage(retros, nav)).Content;
+
+    /// <summary>Builds the index page's host-neutral <see cref="PageView"/> — see
+    /// <see cref="BuildPage"/> for why Story 23.4 moved every templater onto this contract.
+    /// ⚠️ <b>The body starts at <c>&lt;header class="doc-header"&gt;</c>, not at <c>&lt;main&gt;</c></b>: this page
+    /// emits its title block BEFORE the landmark, and the old region SLICE started at the breadcrumb, so that
+    /// header was inside the captured region. A body that began at <c>&lt;main&gt;</c> would still render the
+    /// static page correctly — the golden gate would stay green — while silently dropping the page's own title
+    /// block from the IR. [Story 23.4 AC #3, finding 1]</summary>
+    public static PageView BuildIndexPage(IReadOnlyList<RetroModel> retros, SiteNav nav)
     {
         var outputPath = SiteNav.RetrosOutputPath;
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen(
-            $"Retrospectives — {nav.SiteTitle}",
-            ForgeOptions.StylesheetName, ForgeOptions.ScriptName,
-            $"Epic retrospectives for {nav.SiteTitle}."));
-        sb.Append(nav.RenderNavBar(outputPath));
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[] { ("Home", "index.html"), ("Retrospectives", null) }));
-
         sb.Append("<header class=\"doc-header\">\n");
         sb.Append("  <h1>Retrospectives</h1>\n");
         sb.Append($"  <div class=\"doc-subtitle\">{PathUtil.Html(nav.SiteTitle)} &middot; {retros.Count} {Charts.Plural(retros.Count, "retrospective", "retrospectives")}</div>\n");
@@ -43,12 +46,36 @@ public static class RetroTemplater
         sb.Append("</div>\n\n");
         sb.Append("</main>\n\n");
 
-        sb.Append(PathUtil.RenderFooter());
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+        return new PageView
+        {
+            Kind = PageKind.Retro,
+            OutputRelativePath = outputPath,
+            Title = $"Retrospectives — {nav.SiteTitle}",
+            MetaDescription = $"Epic retrospectives for {nav.SiteTitle}.",
+            Nav = nav.ToNavigationView(outputPath),
+            Breadcrumb = BreadcrumbTrail.From(new (string, string?)[] { ("Home", "index.html"), ("Retrospectives", null) }),
+            Assets = new AssetManifest
+            {
+                StylesheetHref = ForgeOptions.StylesheetName,
+                ScriptHref = ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+            },
+            Interaction = InteractionState.None,
+            BodyHtml = sb.ToString(),
+        };
     }
 
-    public static string RenderPage(RetroModel retro, EpicsModel? epics, SiteNav nav, EntityPager? pager = null)
+    public static string RenderPage(RetroModel retro, EpicsModel? epics, SiteNav nav, EntityPager? pager = null) =>
+        HtmlRenderAdapter.Shared.Render(BuildPage(retro, epics, nav, pager)).Content;
+
+    /// <summary>Builds a retro page's host-neutral <see cref="PageView"/> — the AD-2 delivery contract. Story 23.4
+    /// moved every standalone templater onto it so the IR's content region can be COMPOSED
+    /// (<see cref="JsonSpaRenderAdapter.RenderContent"/>: nav markup + wayfinding + body) instead of sliced back
+    /// out of a rendered full page. <see cref="RenderPage"/> is the unchanged HTML projection of this same model,
+    /// so the bytes are identical. The TOC active-section script stays chrome-level:
+    /// <see cref="HtmlRenderAdapter.Render"/> emits it when the body carries a <c>toc-sidebar</c>, which is
+    /// exactly the old <c>toc.Count &gt; 0</c> condition. [Story 23.4 AC #3]</summary>
+    public static PageView BuildPage(RetroModel retro, EpicsModel? epics, SiteNav nav, EntityPager? pager = null)
     {
         var outputPath = retro.OutputRelativePath;
         var prefix = PathUtil.RelativePrefix(outputPath);
@@ -61,20 +88,6 @@ public static class RetroTemplater
             .ToList();
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen(
-            $"{retro.Title} — {nav.SiteTitle}",
-            prefix + ForgeOptions.StylesheetName,
-            prefix + ForgeOptions.ScriptName,
-            $"{retro.Title} — a retrospective for {nav.SiteTitle}."));
-        sb.Append(nav.RenderNavBar(outputPath));
-        // Sibling pager (Prev/next across retros in ascending epic order) rides the coherent wayfinding strip
-        // alongside the breadcrumb now, not the body's own header. [Story 10.11]
-        sb.Append(SiteNav.RenderWayfinding(outputPath, new (string, string?)[]
-        {
-            ("Home", "index.html"),
-            ("Sprint Status", "sprint.html"),
-            (retro.Title, null),
-        }, pager));
 
         var main = new StringBuilder();
         main.Append("<header class=\"doc-header retro-header\">\n");
@@ -129,19 +142,32 @@ public static class RetroTemplater
         sb.Append("<main id=\"main-content\">\n");
         sb.Append(Toc.WrapWithSidebar(main.ToString(), toc));
         sb.Append("</main>\n\n");
-        // Appended AFTER </main> (never inside it) — see HtmlTemplater.RenderPage for why. [Story 10.11]
-        if (toc.Count > 0)
-        {
-            sb.Append(Toc.ActiveSectionScript);
-        }
 
-        sb.Append(PathUtil.RenderFooter(prefix));
-        if (retro.HasMermaid)
+        return new PageView
         {
-            sb.Append(Mermaid.InitScript());
-        }
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+            Kind = PageKind.Retro,
+            OutputRelativePath = outputPath,
+            Title = $"{retro.Title} — {nav.SiteTitle}",
+            MetaDescription = $"{retro.Title} — a retrospective for {nav.SiteTitle}.",
+            Nav = nav.ToNavigationView(outputPath),
+            // Sibling pager (Prev/next across retros in ascending epic order) rides the coherent wayfinding strip
+            // alongside the breadcrumb now, not the body's own header. [Story 10.11]
+            Breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
+            {
+                ("Home", "index.html"),
+                ("Sprint Status", "sprint.html"),
+                (retro.Title, null),
+            }),
+            Pager = pager,
+            Assets = new AssetManifest
+            {
+                StylesheetHref = prefix + ForgeOptions.StylesheetName,
+                ScriptHref = prefix + ForgeOptions.ScriptName,
+                MermaidNeeded = retro.HasMermaid,
+            },
+            Interaction = InteractionState.None,
+            BodyHtml = sb.ToString(),
+        };
     }
 
     /// <summary>Plain-text label for the epics a retro covers: "Epic 1", "Epics 19 &amp; 21",

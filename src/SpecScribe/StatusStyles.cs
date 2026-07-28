@@ -10,8 +10,9 @@ namespace SpecScribe;
 /// <em>not</em> classify status — it emits raw native strings on the parsed models; classification stays here.</para>
 /// <para><b>Canonical lifecycle</b> (one vocabulary per entity type that uses it):
 /// <c>pending → drafted → ready → active → review → done</c>, plus <c>deferred</c> for requirements,
-/// <c>retired</c> for sprint-ledger history (removed from the active plan), and <c>unrecognized</c> when a
-/// present native word has no mapping. Entity → classifier:
+/// <c>retired</c> — a SECOND terminal stage alongside <c>done</c> for work removed from the active plan, reached
+/// from the sprint ledger AND from a story artifact's own <c>Status:</c> line (Story 8.9 / ADR 0025) — and
+/// <c>unrecognized</c> when a present native word has no mapping. Entity → classifier:
 /// stories / free-text Status lines → <see cref="ForStatus"/>; epics → <see cref="ForEpic"/> /
 /// <see cref="ForEpicWithRetrospective"/>; requirements → <see cref="ForRequirement"/>; sprint ledger →
 /// <see cref="ForSprint"/>.</para>
@@ -52,9 +53,40 @@ public static class StatusStyles
             "active" or "wip" or "in-progress" or "in-dev" or "progress" => "active",
             "ready" or "ready-for-dev" => "ready",
             "draft" or "drafted" => "drafted",
+            // Retirement is checked BEFORE the token fallback and never inside it: these are whole authored
+            // words, and the token pass exists to avoid substring traps, not to grow a second word list.
+            _ when IsRetirementWord(n) => "retired",
             _ => ForStatusFromTokens(n),
         };
     }
+
+    /// <summary>The retirement vocabulary — the ONE authored list of words that mean "removed from the active
+    /// plan" (Story 8.9 owner decision D3). <see cref="ForStatus"/> maps every one of them to the canonical
+    /// <c>retired</c> stage, and <c>EpicsParser.RetirementKeyword</c> builds its comment-detector regex from this
+    /// same array rather than keeping a second hand-maintained copy — the two seams disagreeing about what
+    /// retirement means is exactly the defect this story exists to close.
+    /// <para><b>Not shared with <see cref="ForSprint"/>, on purpose.</b> That classifier reads a closed set of
+    /// <c>sprint-status.yaml</c> ledger values, where only <c>retired</c> is ever written; it is also what
+    /// <see cref="FreeTextBadge"/> consults first, so teaching it <c>superseded</c> would flip an ADR whose status
+    /// line reads "Superseded" from its muted strikethrough pill to a canonical Retired badge. The asymmetry is
+    /// deliberate — see ADR 0025.</para>
+    /// <para><b>Not shared with <see cref="AdrAccentToken"/> either.</b> That reads an ADR's free-text status and
+    /// includes <c>rejected</c>, which is deliberately NOT a story-retirement word.</para></summary>
+    public static readonly IReadOnlyList<string> RetirementStatusWords =
+        new[] { "retired", "superseded", "deprecated", "cancelled", "obsolete", "wontfix" };
+
+    private static readonly HashSet<string> RetirementLookup =
+        new(RetirementStatusWords, StringComparer.Ordinal);
+
+    /// <summary>True when an already-<see cref="Normalize"/>d status word is one of
+    /// <see cref="RetirementStatusWords"/>. Separators and apostrophes are collapsed before the comparison, so
+    /// the six authored words cover the punctuation forms a human actually writes — <c>wont fix</c>,
+    /// <c>wont_fix</c> and <c>won't fix</c> all arrive here as <c>wont-fix</c> / <c>won't-fix</c> (Normalize
+    /// lowercases and kebabs but does not strip apostrophes) and all collapse to <c>wontfix</c>. Both the
+    /// typewriter <c>'</c> and the typographic <c>’</c> are handled, because an editor that smart-quotes a
+    /// status line must not silently change its meaning. [Story 8.9 AC #1]</summary>
+    private static bool IsRetirementWord(string normalized) =>
+        RetirementLookup.Contains(normalized.Replace("-", "").Replace("'", "").Replace("’", ""));
 
     /// <summary>Word-token fallback after exact synonym miss — matches known stage tokens as whole kebab
     /// segments so substring traps like <c>incomplete</c>⊇<c>complete</c> cannot invent a stage.
@@ -88,6 +120,10 @@ public static class StatusStyles
     public static string StoryLabel(string cssClass) => cssClass switch
     {
         "done" => "Done",
+        // Terminal alongside "done" (Story 8.9 D1). It MUST have an arm: the `_ =>` fallback below is "Pending",
+        // so a retired story added to StoryStages without this line would render active-plan language under a
+        // grey retired badge — a quieter mislabel than the "Unrecognized" one this story removes.
+        "retired" => "Retired",
         "review" => "In review",
         "active" => "In development",
         "ready" => "Ready for dev",
@@ -96,30 +132,49 @@ public static class StatusStyles
         _ => "Pending",
     };
 
-    /// <summary>The story-lifecycle css classes in narrative order (done → … → drafted), then
+    /// <summary>The story-lifecycle css classes in narrative order (done → retired → … → drafted), then
     /// <c>unrecognized</c>. The delivery mosaic and status roll-ups iterate this list so segments and legends
     /// stay consistent. "pending" is excluded: <see cref="ForStory"/>/<see cref="ForStatus"/> never produce it
     /// (an absent status falls back to "drafted"), so it would only ever be a dead stage here — unlike
-    /// <see cref="ForEpic"/>, which does have a real "pending" tier. [Story 8.2]</summary>
+    /// <see cref="ForEpic"/>, which does have a real "pending" tier. [Story 8.2]
+    /// <para><c>retired</c> sits immediately after <c>done</c> because Story 8.9's owner decision D1 makes it the
+    /// second TERMINAL stage: everything below it is work still owed. Adding it here is what makes the defined
+    /// (epics.md) tally name the same stage as the tracked (yaml) tally for the same story, restoring Story 8.3's
+    /// "every count agrees" invariant that the two-classifier gap broke by construction.</para></summary>
     public static readonly IReadOnlyList<string> StoryStages =
-        new[] { "done", "review", "active", "ready", "drafted", "unrecognized" };
+        new[] { "done", "retired", "review", "active", "ready", "drafted", "unrecognized" };
 
-    /// <summary>CSS class for an epic, derived from its stories: green only when every story is done;
+    /// <summary>CSS class for an epic, derived from its stories: green only when every story is done or retired;
     /// teal once any story has entered dev; gold "ready" once any story is ready-for-dev (mirroring the
-    /// "any active → active" rule); gold "drafted" while merely drafted; parchment when pending.</summary>
+    /// "any active → active" rule); gold "drafted" while merely drafted; parchment when pending.
+    /// <para><b>Retired is TERMINAL here (Story 8.9 owner decision D1).</b> Before this story the gate was
+    /// <c>All(c =&gt; c == "done")</c>, which meant an epic that retired a single story could NEVER read done, no
+    /// matter how much of it shipped — a documented planning decision permanently reported as incompleteness. An
+    /// epic whose stories are all done-or-retired is closed; an epic whose stories are ALL retired reads
+    /// <c>retired</c> (abandoned, not finished). Retired stays IN the roll-up rather than being dropped from the
+    /// denominator — deliberately the opposite of <c>SprintTemplater.DeliveryWheel</c>, which excludes it from its
+    /// <c>M</c> so ledger history cannot inflate "how much of the active plan is done". The two questions are
+    /// different ("is this epic closed" vs. "how much of the plan remains") and both rules are right; ADR 0025
+    /// records the distinction so a later reader does not "align" them and break one. </para></summary>
     public static string ForEpic(EpicInfo epic)
     {
         if (epic.Status == EpicStatus.Pending || epic.Stories.Count == 0) return "pending";
 
         var storyClasses = epic.Stories.Select(ForStory).ToList();
-        if (storyClasses.All(c => c == "done")) return "done";
+        if (storyClasses.All(c => c is "done" or "retired"))
+            return storyClasses.Any(c => c == "done") ? "done" : "retired";
         if (storyClasses.Any(c => c is "active" or "review" or "done")) return "active";
         // Any ready-for-dev story (with none further along) lifts the epic to the ready tier the story layer
         // already distinguishes, so the epic ring stops reading as merely "drafted" under ready stories.
         if (storyClasses.Any(c => c == "ready")) return "ready";
         // All present-but-unmapped stories → visible unrecognized (never silently "drafted"). Mixed
         // unrecognized + drafted (or empty Status → drafted) stays drafted. [Story 8.2 review]
-        if (storyClasses.Count > 0 && storyClasses.All(c => c == "unrecognized")) return "unrecognized";
+        // Retired stories are excluded from this all-or-nothing test rather than blocking it: terminal ledger
+        // history says nothing about whether the REST of the epic is merely unmapped, and letting one retired
+        // story silently downgrade an otherwise all-unrecognized epic to "drafted" would hide the notice
+        // Story 8.2 AC #3 exists to raise. [Story 8.9]
+        var live = storyClasses.Where(c => c != "retired").ToList();
+        if (live.Count > 0 && live.All(c => c == "unrecognized")) return "unrecognized";
         return "drafted";
     }
 
@@ -129,7 +184,10 @@ public static class StatusStyles
     /// don't call an epic finished until its retro closes it out. Every other tier defers to
     /// <see cref="ForEpic"/>. Kept SEPARATE from <see cref="ForEpic"/> on purpose: requirements roll-up
     /// (<c>RequirementsParser.DeriveStatus</c>) maps epic status onto implementation-completeness, where a retro
-    /// (a closure ritual, not an implementation signal) must never downgrade a fully-built epic. [spec-sunburst-retro]</summary>
+    /// (a closure ritual, not an implementation signal) must never downgrade a fully-built epic. [spec-sunburst-retro]
+    /// <para>The gate is keyed on <c>done</c> alone, so Story 8.9's new all-retired <c>retired</c> tier passes
+    /// through untouched: a fully-abandoned epic is not awaiting a retrospective, and reading it as "In review"
+    /// would put it back on the list of things someone still owes work on.</para></summary>
     public static string ForEpicWithRetrospective(EpicInfo epic)
     {
         var cls = ForEpic(epic);
@@ -139,13 +197,18 @@ public static class StatusStyles
     /// <summary>The complete set of css classes <see cref="ForEpic"/> can return, in narrative order
     /// (done → … → pending). Mirrors <see cref="StoryStages"/>: one authored list, iterated by every epic
     /// roll-up consumer (e.g. the Epic Status donut), so a class can never be silently dropped by a consumer
-    /// that forgot to bucket it. Unlike <see cref="StoryStages"/>, "pending" is a real reachable tier here.</summary>
+    /// that forgot to bucket it. Unlike <see cref="StoryStages"/>, "pending" is a real reachable tier here.
+    /// <para><c>retired</c> joins for the same reason <c>unrecognized</c> is already here: <see cref="ForEpic"/>
+    /// can now return it (an epic whose every story is retired), so a consumer that iterates this list to bucket
+    /// epics would otherwise drop that epic silently rather than draw it. [Story 8.9]</para></summary>
     public static readonly IReadOnlyList<string> EpicStages =
-        new[] { "done", "review", "active", "ready", "drafted", "pending", "unrecognized" };
+        new[] { "done", "retired", "review", "active", "ready", "drafted", "pending", "unrecognized" };
 
     public static string EpicLabel(string cssClass) => cssClass switch
     {
         "done" => "Done",
+        // Same `_ => "Pending"` trap as StoryLabel: the class without the word is a silent mislabel.
+        "retired" => "Retired",
         "review" => "In review",
         "active" => "In development",
         "ready" => "Ready for dev",
@@ -389,7 +452,9 @@ public static class StatusStyles
     {
         "deferred" => RequirementLabel(RequirementStatus.Deferred),
         "unmapped" => RequirementLabel(RequirementStatus.Unmapped),
-        "retired" => SprintLabel("retired"),
+        // "retired" no longer needs its own arm routing to SprintLabel: Story 8.9 made it a story stage, so
+        // StoryLabel is now the story-side source for the word and the fallback reaches it. Both returned
+        // "Retired", so the legend text is unchanged — what goes away is a second place the word was authored.
         _ => StoryLabel(cssClass),
     };
 

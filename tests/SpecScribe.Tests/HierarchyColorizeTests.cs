@@ -115,6 +115,34 @@ public class HierarchyColorizeTests
     }
 
     [Fact]
+    public void ProjectCodeMap_AboveTheDetailCap_LongTailKeepsGeometryButLosesTheCard()
+    {
+        // [Review][Patch] The one payload-layer regression net for MaxDetailedCodeMapFiles/SelectDetailedCodeMapFiles
+        // — the mechanism responsible for the real code-map.html ~82.5MB incident (Story 6.6). The old SVG-layer
+        // test asserting this (the retired CodeTreemap's own detail-cap test) was correctly deleted with the SVG
+        // renderer; nothing replaced it at the payload layer this story introduced until now.
+        var cap = Charts.MaxDetailedCodeMapFiles;
+        var fileCount = cap + 5;
+        var files = Enumerable.Range(1, fileCount).Select(i => ($"src/file-{i:00000}.cs", (long)i)).ToArray();
+        var variant = CodeMap.BuildVariants(files, new Dictionary<string, CodeFileMetrics>()).First(v => v.Key == "full");
+
+        var model = HierarchyExplorer.ProjectCodeMap(variant, Config(HierarchyExplorer.CodeMapDimensions(hasMetrics: false)));
+        var fileNodes = model.Nodes.Where(n => n.Kind == "file").ToList();
+
+        // Every file still gets its own node — geometry (a real Value/size) and accessible name never drop.
+        Assert.Equal(fileCount, fileNodes.Count);
+        Assert.All(fileNodes, n => Assert.True(n.Value >= 1, $"{n.Id} sized {n.Value}"));
+
+        // …but only the top `cap` most-significant (highest Lines here, since none carry Changes) keep the
+        // expensive rich hover card — the per-node cost this cap exists to bound.
+        Assert.Equal(cap, fileNodes.Count(n => n.TipHtml is not null));
+        var smallest = fileNodes.Single(n => n.Id == "src/file-00001.cs");
+        Assert.Null(smallest.TipHtml);
+        var largest = fileNodes.Single(n => n.Id == $"src/file-{fileCount:00000}.cs");
+        Assert.NotNull(largest.TipHtml);
+    }
+
+    [Fact]
     public void Projector_LiftsTheMetricBagFromTheSameValuesTheRetiredSvgEmbedded()
     {
         // "Lift, do not re-derive" (Task 1.1). The keys and the UNITS both matter: a date carried as an ISO

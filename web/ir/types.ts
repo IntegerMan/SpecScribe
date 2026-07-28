@@ -49,6 +49,17 @@ export interface IrRegion {
   mainAttrs: Record<string, string>
   /** Everything BETWEEN `<main …>` and `</main>`. This is what gets injected. */
   mainInnerHtml: string
+  /**
+   * The emitter degraded this page to nav-only: it carries no `<main id="main-content">` landmark, so there is
+   * no page body to render. ADR 0024 §Decision 3 keeps such pages in the IR deliberately (the SPA retains what
+   * the webview skips), which means a consumer MUST be able to skip one — before Story 22.4's code review
+   * `splitContentRegion` threw instead, and because Nuxt prerenders from the manifest, a single landmark-less
+   * page failed the WHOLE site build rather than degrading itself.
+   *
+   * This is NOT the deleted `wayfindingRepaired` flag: that recorded a consumer-side REPAIR of an emitter bug
+   * (rightly deleted with the bug). This records an emitter STATE the ADR ratifies.
+   */
+  degraded: boolean
 }
 
 export interface IrPage {

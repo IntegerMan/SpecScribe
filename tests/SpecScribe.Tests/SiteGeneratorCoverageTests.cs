@@ -167,11 +167,17 @@ public class SiteGeneratorCoverageTests : IDisposable
         Assert.False(Directory.Exists(Path.Combine(_root, "_bmad")));
 
         var gen = new SiteGenerator(Options());
-        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+        var events = gen.GenerateAll().ToList();
+        Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
 
         var html = File.ReadAllText(IndexPage);
         Assert.Contains("coverage-panel", html);
         Assert.Contains("Planning Artifacts", html);
         Assert.Contains(">Epics<", html);
+
+        // Task 5's third case (BMM / GDS / no-`_bmad`, all emit zero panel-omission diagnostics): the other two
+        // are pinned in SiteGeneratorModuleCoverageTests; this completes the triad for BmadModule.Unknown.
+        Assert.DoesNotContain(events, e => e.FromAdapterDiagnostic
+            && e.Message is { } m && m.Contains("no modeled planning-artifact family set", StringComparison.Ordinal));
     }
 }

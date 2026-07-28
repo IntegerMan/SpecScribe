@@ -270,7 +270,12 @@ public sealed partial class HtmlRenderAdapter
 
     private void AppendStoryCard(StringBuilder sb, StoryCardView card)
     {
-        sb.Append($"<div class=\"story-card\" id=\"{card.AnchorId}\">\n");
+        // Owner decision D2 (Story 8.9): a retired story stays INLINE in story order and demotes itself visibly
+        // rather than being hoisted into the collapsed retired-notices section. Only `retired` earns a card-level
+        // modifier — no other stage has card-level styling today, and emitting every stage's class here would
+        // rewrite every story card on every epic page for one story's sake.
+        var demotion = card.StatusStage == "retired" ? " retired" : string.Empty;
+        sb.Append($"<div class=\"story-card{demotion}\" id=\"{card.AnchorId}\">\n");
         sb.Append("  <div class=\"story-card-header\">\n");
         sb.Append($"    <span class=\"story-id\">{PathUtil.Html(card.Id)}</span>\n");
         sb.Append($"    <a class=\"story-title story-title-link\" href=\"{PathUtil.Html(card.TitleHref)}\">{card.TitleHtml}</a>\n");

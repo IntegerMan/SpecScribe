@@ -12,14 +12,14 @@
     }
   },
   "golden": {
-    "pages": 1408,
-    "files": 1497,
+    "pages": 1112,
+    "files": 1178,
     "counts": {
-      "total": 224811,
-      "skipped": 12202,
-      "internal": 212609,
-      "resolved": 211461,
-      "dangling": 1148
+      "total": 106345,
+      "skipped": 10750,
+      "internal": 95595,
+      "resolved": 94452,
+      "dangling": 1143
     }
   },
   "regressions": [],

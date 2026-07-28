@@ -382,6 +382,12 @@ public class EpicsParserTests
     [InlineData("superseded")]
     [InlineData("deprecated")]
     [InlineData("RETIRED")]
+    // Story 8.9 D3 widened the vocabulary from three words to six, and the regex is now BUILT from
+    // StatusStyles.RetirementStatusWords rather than typed here — so these three rows are the check that the
+    // shared list actually reaches this seam, not just ForStatus.
+    [InlineData("cancelled")]
+    [InlineData("Obsolete")]
+    [InlineData("wontfix")]
     public void Parse_RetirementKeyword_IsCaseInsensitiveAndRecognizesAllThreeWords(string keyword)
     {
         var md = $$"""
@@ -420,6 +426,53 @@ public class EpicsParserTests
 
         var epic = EpicsParser.Parse(md).Epics[0];
         Assert.Single(epic.RetiredNoticesHtml);
+    }
+
+    [Fact]
+    public void Parse_RetirementKeyword_ReadsTheSharedVocabulary_NotASecondCopy()
+    {
+        // Story 8.9 AC #1: one authored list, two consumers. If a word is ever added to
+        // StatusStyles.RetirementStatusWords, this seam must widen with it automatically — a hand-maintained
+        // second copy here is precisely how the two halves of the retirement question came to disagree.
+        foreach (var word in StatusStyles.RetirementStatusWords)
+        {
+            var md = $$"""
+                # Epics
+
+                ## Epic List
+
+                ### Epic 1: Foundation
+
+                Goal.
+
+                ## Epic 1: Foundation
+
+                ### Story 1.1: Kept story
+
+                As a developer, I want the first story, so that work starts.
+
+                **Acceptance Criteria:**
+
+                **Given** nothing
+                **When** it builds
+                **Then** it succeeds
+
+                ### Story 1.2: Successor story
+
+                <!-- Story 3.4 is {{word}} as of 2026-07-08. -->
+
+                As a developer, I want the successor, so that work continues.
+
+                **Acceptance Criteria:**
+
+                **Given** nothing
+                **When** it builds
+                **Then** it succeeds
+                """;
+
+            var epic = EpicsParser.Parse(md).Epics[0];
+            Assert.True(epic.RetiredNoticesHtml.Count == 1, $"'{word}' should divert the comment to RetiredNoticesHtml");
+        }
     }
 
     private const string TrailingNoteEpicsMd = """

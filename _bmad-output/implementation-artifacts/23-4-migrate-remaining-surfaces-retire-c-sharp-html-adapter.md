@@ -188,7 +188,8 @@ retirement condition._
         when a harness or a prerender hangs.
 
 - [ ] **Task 2 — Stand up the C# region-composition path BEFORE removing anything** (AC: #3)
-  - [ ] ↻ **Work from the retired [Story 22.3 file](22-3-static-html-rendered-from-the-ir.md), not from
+      **Templater migration COMPLETE (25/25); the capture switch is NOT — see the `ApplyReferenceLinks` finding.**
+  - [x] ↻ **Work from the retired [Story 22.3 file](22-3-static-html-rendered-from-the-ir.md), not from
         scratch.** It is the spec for this task and it is already elicited: the 25-templater inventory with
         the six axes on which they actually differ (`extraHead` used **exactly once**; **12 distinct `<main>`
         class values**; 6 templaters render a pager and the rest call `RenderBreadcrumb`, which is
@@ -196,7 +197,11 @@ retirement condition._
         one piece of content after `</main>`; four sites deliberately **not** reference-linkified), plus its
         batching advice — **migrate in reverse order of volume**, singletons first, `CodeFileTemplater`
         (~hundreds of pages) last.
-  - [ ] ⚠️ **Do its Task 1 first: there is no `path → NavLocalContext` resolver, and this blocks everything
+  - [x] ✅ **NOT REAL — closed.** `SiteNav.ToNavigationView` already takes a `NavLocalContext?` and every templater
+        already builds one, so composing from the page's own `PageView` keeps the local-context band by
+        construction. All 25 templaters now thread their existing context straight through; no resolver, no
+        ~8-call-site plumbing. Seeded text follows:
+        ⚠️ **Do its Task 1 first: there is no `path → NavLocalContext` resolver, and this blocks everything
         else.** `SpaDelivery.ExtractNavMarkup` slices the page-local nav band out of the rendered page because
         every producer builds a `NavLocalContext` inline at render time and **discards it**. The moment the
         region comes from `RenderNavMarkup(page.Nav)` instead of a slice, `nav.ToNavigationView(path)` takes no
@@ -204,15 +209,24 @@ retirement condition._
         difference #2 that Story 22.2 just fixed. Two tests fail immediately and byte-for-byte:
         `SiteGeneratorSpaTests.cs:387` and `SiteGeneratorWebviewTests.cs:547`. ~8 call sites of plumbing is
         the real cost of this story's correctness; pay it up front, not 20 templaters in.
-  - [ ] Add a region-render seam that composes `navMarkup + wayfinding + <main …>…</main>` **directly from
+  - [x] ✅ **Already existed — nothing new written.** `JsonSpaRenderAdapter.RenderContent(PageView)` *is* AC #3's
+        composer (`RenderNavMarkup(page.Nav)` + `RenderWayfinding(...)` + `page.BodyHtml`). The whole of this
+        bullet was therefore "put the remaining pages on `PageView`", now done for all 25. Seeded text follows:
+        Add a region-render seam that composes `navMarkup + wayfinding + <main …>…</main>` **directly from
         `PageView`** — the same concatenation `Render` does at
         [HtmlRenderAdapter.cs:31–51](src/SpecScribe/HtmlRenderAdapter.cs:31) minus `RenderHeadOpen`,
         `RenderFooter`, the script tags and `</body></html>`. ↻ After Story 22.4 there is **one** region
         builder to extend, not two — read it and reuse it; do not write a third region composer.
-  - [ ] Prove the new path emits **byte-identical regions** to today's `ExtractContentRegion` slice for all
+  - [ ] ⛔ **BLOCKED ON A NEWLY-FOUND CONSTRAINT THE STORY DOES NOT MENTION — see Completion Notes → finding 3
+        (`ApplyReferenceLinks`).** The captured page is linkified as a WHOLE DOCUMENT before the region is sliced
+        out of it, so a region composed from raw `PageView.BodyHtml` would ship 1,217 pages with no FR/story/code
+        links, no reference chips and no `<abbr>` expansions. Byte-equality against the slice is *unreachable*
+        until that is resolved. Seeded text follows:
+        Prove the new path emits **byte-identical regions** to today's `ExtractContentRegion` slice for all
         1,046+ pages before deleting the slice. This is a strictly mechanical equality check and it is the
         only thing standing between you and a silently-degraded IR.
-  - [ ] ↻ The two-region-shape hazard that bit 23.3 (Debug Log #6) is **Story 22.4's to fix** — a one-marker
+  - [x] ✅ **Confirmed landed** — `wayfindingRepaired` + `stillUnbalanced` are gone from `web/ir/adapter.ts`.
+        Seeded text follows: ↻ The two-region-shape hazard that bit 23.3 (Debug Log #6) is **Story 22.4's to fix** — a one-marker
         change in `HtmlRenderAdapter.RenderWayfinding`, which emits the `page-wayfinding` wrapper only when a
         pager renders while `ExtractContentRegion` slices from the *inner* breadcrumb. Confirm it landed:
         `web/ir/adapter.ts`'s `wayfindingRepaired` + `stillUnbalanced` throw should be **gone**. If they are
@@ -663,6 +677,28 @@ working tree at `b696485`.
   four edits intact. Nothing was re-applied and nothing was reset — per
   `shared-main-concurrent-edit-loss-verify-after-edit`, the correct response to a zero-grep is to re-confirm,
   not to re-write. Re-writing here would have duplicated the edit.
+- **Session 2 (2026-07-28, run at `755bd7a`): the "verify in isolation" technique that made byte-proof possible
+  under a live concurrent session.** A sibling agent was mid-flight on Story 24.1 (`CoupledFile`,
+  `DirectedCouple`, `GitMetrics`, `Charts`) and Story 8.9 (`StatusStyles`), and it edited **inside**
+  `DeepAnalyticsTemplater.BuildPage` and `CodeFileTemplater` while this story was migrating them. Two consequences:
+  (1) the main tree's build broke twice in files this story never touched — the correct response was to keep to
+  non-colliding files and re-check, never to "fix" or revert theirs; (2) a golden-fingerprint result in the main
+  tree could no longer attribute a moved hash. **The fix: two throwaway clones in the scratchpad** — `base`
+  (pristine `755bd7a`) and `iso` (`755bd7a` + ONLY this story's files, with the sibling's `DirectedCoupling` edit
+  hand-excluded from the copied `DeepAnalyticsTemplater`). The golden gate then answers about *this* story alone.
+  Nothing in `C:\Dev\SpecScribe` was reset, checked out or cleaned.
+- **⚠️ `--no-build` on a tree whose TEST project does not compile silently runs the STALE dll.** Mid-session the
+  main tree's `dotnet test --no-build` reported `11 passed / 1 failed` while `dotnet build` was failing with 5
+  `CS1503`s in the sibling's `CodeFileTemplaterTests`/`DeepAnalyticsTemplaterTests`. That "failure" was a stale
+  binary, not a result. This is the `golden-diff-normalization-gotchas` stale-build trap wearing a different hat:
+  **always read the build's error count before trusting a `--no-build` test run.**
+- **The full-suite deep-git failures are ENVIRONMENTAL, and the baseline is far worse than this story's tree.**
+  Measured back-to-back on the same box: pristine `755bd7a` fails **18** tests; the same tree plus this story's
+  migrations fails **3** — a strict subset, and the failing set *changes between runs* (one run's 3 all passed on
+  re-run of the identical filter, 17/17). Every failure is a missing `commit/` directory, i.e. deep-git produced
+  nothing: `GitMetrics`' hard-coded **3,000 ms** budget losing to `git log --numstat` under parallel test load.
+  This is `gitmetrics-3s-timeout-silent-deep-git-loss` and AC #8's hazard firing in the TEST harness rather than
+  in a generate. Report it as a flake honestly; it is not this story's regression and this story does not fix it.
 - **The golden fingerprint is the right gate for Task 2 and must stay STATIONARY until it finishes.** It is the
   inverse of AC #5's end state: while templaters are being moved onto `PageView`, a moved hash means the page
   render changed, which it must not. It has not moved. ⚠️ Its current constant is **`e384cbde…`**
@@ -671,8 +707,9 @@ working tree at `b696485`.
 
 ### Completion Notes List
 
-**Status: Tasks 0 and 1 complete; Task 2 substantially under way (8 of ~25 templaters). Tasks 3–10 not started.**
-Reported honestly rather than as a finished story — see the scope note at the end.
+**Status after session 2 (2026-07-28, run at `755bd7a`): Tasks 0 and 1 complete; Task 2's TEMPLATER MIGRATION is
+COMPLETE (25/25) and byte-proven; Task 2's CAPTURE SWITCH is blocked on a newly-found constraint (finding 3).
+Tasks 3–10 not started.** Reported honestly rather than as a finished story — see the scope note at the end.
 
 **Task 0 — gates.** Both open (see Debug Log). Read 23.5's packaging report, 22.4's delivery record, and the
 retired 22.3 file. ⚠️ **22.3's headline blocker is no longer true as stated.** It says "there is no `path →
@@ -760,12 +797,54 @@ additions) alongside `HierarchyEngineNeeded` (the engine script only). `ExtraHea
 used twice by construction. Both placements stay OUTSIDE the IR region either way, which is why `IrSurface.vue`
 re-emits the marker from the head (Trap 3).
 
-**Still to migrate (11):** `AboutSddTemplater` (hub + 6 framework pages), `DeepAnalyticsTemplater` (the post-main
-lightbox above), `GitInsightsTemplater`, `IdeasTemplater` (list + detail), `TestArtifactsTemplater`,
-`RetroTemplater`, `RequirementsTemplater` (80), `CommitDayTemplater` (25), `CommitDetailTemplater` (300),
-`FollowUpDetailTemplater` + `FollowUpGroupTemplater` (376), `CodeFileTemplater` (254, needs `ExtraHead`), and
-`HtmlTemplater.RenderPage` (the generic doc path — 156 pages across `adrs/`, `implementation-artifacts/`,
-`planning-artifacts/`, `specs/`, `readme.html`).
+**↻ SESSION 2 — the remaining 11 are DONE. All 25 templaters are now on `PageView`.** Migrated this session, each
+as `RenderX(...) => HtmlRenderAdapter.Shared.Render(BuildX(...)).Content` with the head/nav/wayfinding/footer/
+`</body>` string-building DELETED because `Render` already emits exactly those bytes:
+
+| templater | entry points added | pages | note |
+| --- | --- | --- | --- |
+| `DeepAnalyticsTemplater` | `BuildPage` | 1 | body extends PAST `</main>` (the lightbox — finding 2) |
+| `GitInsightsTemplater` | `BuildPage` | 1 | engine via `HierarchyEngineNeeded`, computed from the rendered body; no boot marker |
+| `RetroTemplater` | `BuildIndexPage`, `BuildPage` | 1 + n | index body starts at the doc-header (finding 1); detail carries a `Pager` |
+| `AboutSddTemplater` | `BuildHubPage`, `BuildFrameworkPage` | 7 | `Begin`/`End` now pass a private `SddPage` record; bodies start at the doc-header |
+| `IdeasTemplater` | `BuildListPage`, `BuildDetailPage` | n | — |
+| `TestArtifactsTemplater` | `BuildListPage` | 1 | — |
+| `CommitDayTemplater` | `BuildPage` | 25 | `Pager` + caller's `NavLocalContext` |
+| `CommitDetailTemplater` | `BuildPage` | 300 | `Pager` + caller's `NavLocalContext` |
+| `FollowUpDetailTemplater` | `BuildActionPage`, `BuildDeferredPage` | 376 | `AppendShellOpen`/`AppendShellClose` replaced by one private `ComposePage` |
+| `FollowUpGroupTemplater` | `BuildPage` | — | body starts at the doc-header (finding 1) |
+| `RequirementsTemplater` | `BuildIndexPage`, `BuildRequirementPage` | 80 | index passes NO description ⇒ `MetaDescription` stays **null** so `RenderHeadOpen`'s title fallback emits the same byte |
+| `HtmlTemplater` | `BuildDocPage` | 156 | the generic doc path — `adrs/`, `implementation-artifacts/`, `planning-artifacts/`, `specs/`, `readme.html` |
+| `CodeFileTemplater` | `BuildPage`, `BuildPlaceholderPage` | 254 | `Begin`/`End` now pass a private `CodeShell` record; Prism rides `AssetManifest.ExtraHead` |
+
+**How byte-identity was proven, and its ONE stated gap.** In the isolated `iso` clone (see Debug Log) the golden
+fingerprint + golden inventory pass with 12 of the 13 applied — that is a clean attribution to this story alone.
+In the main tree, with all 13 applied on top of the sibling session's work, **85/85** targeted tests pass:
+`SiteGeneratorAdapterTests` (both golden gates), `CodeFileTemplaterTests`, `RenderParityTests`,
+`RenderSpaParityTests`, `WebviewRenderAdapterTests`.
+⚠️ **The gap, stated rather than glossed:** the golden fixture **cites no real repo files, so it emits no code
+page at all** (its own comment block says so) — therefore the golden hash does **not** cover
+`CodeFileTemplater`'s 254 pages. `CodeFileTemplaterTests` passing is a markup gate, not a byte gate. A real
+`--deep-git --spa` generate diffed against a captured oracle is what would close it, and that is Task 5's oracle
+capture; it has NOT been run for this batch.
+
+**⚠️ FINDING 3 — the capture switch cannot be a straight swap: `ApplyReferenceLinks` runs on the WHOLE DOCUMENT.**
+This is the session's most important result and the story does not mention it anywhere. Every `WriteOutput` call
+site passes `ApplyReferenceLinks(SomeTemplater.RenderPage(...), path)` — head + nav + wayfinding + body + footer —
+and `SpaDelivery.ExtractContentRegion` then slices the region out of that **already-linkified** page. So today's
+IR regions carry FR/story/code links, `[[wiki-link]]`/assumption chips and first-use `<abbr>` expansions.
+Composing the region from raw `PageView.BodyHtml` would ship **1,217 pages with all of that silently gone** — the
+same invisible-to-every-harness class as 23.3's double-wrapped band, and strictly worse in blast radius.
+It is not merely "linkify the body instead", because two of the five passes are **document-scoped, not
+body-scoped**: `AbbreviationExpander.Expand` is explicitly **first-use** (`Story 10.3`), so whether a term is
+expanded depends on whether it already appeared in the nav or breadcrumb; and `RequirementLinkifier` /
+`StoryEpicLinkifier` take skip-ids keyed to the page's own identity. Task 2's byte-equality proof is therefore
+**unreachable** until this is designed, and the honest options are (a) compose the region and then run
+`ApplyReferenceLinks` over the composed region — cheap, but changes first-use scope from "document" to "region",
+which is a real byte delta that must be measured and attributed, or (b) keep capturing the linkified page purely
+as the equality ORACLE while the composed path is proven against it, then retire the capture. **This is a
+decision the owner should see, not one to take silently** — it is the last structural unknown between here and
+AC #3.
 
 **⚠️ Two structural findings that the remaining 17 migrations depend on:**
 
@@ -796,12 +875,19 @@ rather than decided unilaterally, because each changes what Task 3/Task 4 actual
    carries no explorer renders (the CORA 32/33 failure). 23.5's open-items table row 1 moves from Story 23.3 to
    Story 23.4, because the record currently points at the wrong story.
 
-**Scope, stated plainly.** Task 1 is done and Task 2's design is settled and proven on 8 templaters, but the
-remaining work is 17 more templater migrations, then ~11 Vue family components covering 1,217 pages (Task 3), the
+**↻ Scope after session 2, stated plainly.** Task 1 is done. Task 2's **templater migration is finished — 25/25,
+byte-proven** except for the stated code-page gap. What remains is: the **capture switch**, now gated on
+finding 3's `ApplyReferenceLinks` decision; then ~11 Vue family components covering 1,217 pages (Task 3), the
 906-rule `ir-content.css` retirement (Task 4), whole-site harnesses (Task 5), the ADR 0005 amendment (Task 6),
 13 test files' triage plus the fingerprint decision (Task 7), the `epics.md`/`sprint-status.yaml` bookkeeping
-(Task 8) and live-browser verification (Task 9). Two of the story's own **open owner questions gate Task 4** and
-are asked below rather than decided unilaterally.
+(Task 8) and live-browser verification (Task 9). D5 and D6 (below) already answered the story's own Q3 and Q5,
+so Task 4 is unblocked; **finding 3 is the one new question that is not**.
+
+**Nothing has been deleted yet, and that is deliberate.** `HtmlRenderAdapter.Render`'s page composition,
+`WriteOutput`'s HTML writes and `SpaDelivery.ExtractContentRegion` are all still in place and still the IR's
+producer. Per the story's own circularity note there is no version of this work where the deletion comes before
+the byte-equality proof — and that proof is exactly what finding 3 blocks. The site and the IR are unchanged and
+fully working at this checkpoint.
 
 ### File List
 
@@ -826,10 +912,36 @@ are asked below rather than decided unilaterally.
 - `src/SpecScribe/HtmlTemplater.cs` — 1 site, same
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` — status `ready-for-dev` → `in-progress` + findings
 
+**Session 2 (2026-07-28) — the remaining 13 templater migrations.** Each: `BuildX` returning `PageView` added;
+`RenderX` reduced to `HtmlRenderAdapter.Shared.Render(BuildX(...)).Content`; head/nav/wayfinding/footer/`</body>`
+string-building deleted.
+
+- `src/SpecScribe/DeepAnalyticsTemplater.cs` — `BuildPage`; body deliberately extends past `</main>`
+- `src/SpecScribe/GitInsightsTemplater.cs` — `BuildPage`; hierarchy engine moved onto `AssetManifest.HierarchyEngineNeeded`
+- `src/SpecScribe/RetroTemplater.cs` — `BuildIndexPage` + `BuildPage`; index body starts at the doc-header; detail carries `Pager`
+- `src/SpecScribe/AboutSddTemplater.cs` — `BuildHubPage` + `BuildFrameworkPage`; new private `SddPage` record replaces the `Begin`/`End` string pair
+- `src/SpecScribe/IdeasTemplater.cs` — `BuildListPage` + `BuildDetailPage`
+- `src/SpecScribe/TestArtifactsTemplater.cs` — `BuildListPage`
+- `src/SpecScribe/CommitDayTemplater.cs` — `BuildPage`; `Pager` + caller's `NavLocalContext` threaded to `ToNavigationView`
+- `src/SpecScribe/CommitDetailTemplater.cs` — `BuildPage`; same
+- `src/SpecScribe/FollowUpDetailTemplater.cs` — `BuildActionPage` + `BuildDeferredPage`; `AppendShellOpen`/`AppendShellClose` **deleted**, replaced by one private `ComposePage`
+- `src/SpecScribe/FollowUpGroupTemplater.cs` — `BuildPage`; body starts at the doc-header
+- `src/SpecScribe/RequirementsTemplater.cs` — `BuildIndexPage` + `BuildRequirementPage`; index keeps a **null** `MetaDescription` on purpose
+- `src/SpecScribe/HtmlTemplater.cs` — `BuildDocPage` (the generic doc path, 156 pages)
+- `src/SpecScribe/CodeFileTemplater.cs` — `BuildPage` + `BuildPlaceholderPage`; new private `CodeShell` record replaces the `BeginShell`/`EndShell` string pair; Prism head moved onto `AssetManifest.ExtraHead`
+
+**Not this story's, present in the same working tree** (sibling session, Stories 24.1 + 8.9 — listed so a review
+scopes correctly per CLAUDE.md): `GitMetrics.cs`, `StatusStyles.cs`, `EpicsParser.cs`, `Charts.cs`,
+`HierarchyExplorer.cs`, `HtmlRenderAdapter.Epics.cs`, `RenderParity.cs`, `assets/specscribe.css`,
+`tests/SpecScribe.Tests/GitMetricsCouplingTests.cs`, `tools/analysis-digest/`. ⚠️ Two files carry **both**
+sessions' work: `DeepAnalyticsTemplater.cs` (their `DirectedCoupling` ranked-pairs change landed *inside* this
+story's `BuildPage`) and `CodeFileTemplater.cs`.
+
 ## Change Log
 
 | Date | Change |
 | --- | --- |
+| 2026-07-28 | **dev-story session 2 (run at `755bd7a`; baseline `32fd282` preserved). Task 2's templater migration COMPLETE — 25/25 on `PageView`** (13 migrated this session: DeepAnalytics, GitInsights, Retro×2, AboutSdd×2, Ideas×2, TestArtifacts, CommitDay, CommitDetail, FollowUpDetail×2, FollowUpGroup, Requirements×2, HtmlTemplater's generic doc path, CodeFile×2). **Byte-identity proven** — golden fingerprint + golden inventory green in an ISOLATED clone carrying only this story's files, and **85/85** targeted tests green in the main tree (both golden gates, `CodeFileTemplaterTests`, `RenderParityTests`, `RenderSpaParityTests`, `WebviewRenderAdapterTests`). ⚠️ **Stated gap:** the golden fixture emits **no code page**, so the hash does not cover `CodeFileTemplater`'s 254 pages; that needs Task 5's generate-and-diff oracle. **⚠️ FINDING 3, new and structural: the capture switch is NOT a straight swap.** `ApplyReferenceLinks` runs over the **whole document** at every `WriteOutput` call site and the region is sliced out of the *already-linkified* page — so composing from raw `PageView.BodyHtml` would ship **1,217 pages with every FR/story/code link, reference chip and `<abbr>` expansion silently gone**. And it is not simply "linkify the body": `AbbreviationExpander` is **first-use scoped across the document**, so region-scoping it is itself a measurable byte delta. Task 2's byte-equality proof is unreachable until this is decided; **raised for the owner rather than taken silently.** Two blockers from session 1 closed instead: 22.3's `NavLocalContext` plumbing is **not needed** (`ToNavigationView` already takes one, and all 25 templaters now thread their existing context through), and AC #3's region composer **already existed** (`JsonSpaRenderAdapter.RenderContent`). **Nothing deleted yet** — `Render`'s page composition, `WriteOutput`'s HTML writes and `ExtractContentRegion` are all still in place, per the story's own circularity rule. Method note: with a sibling session live in the same tree (Stories 24.1 + 8.9, editing *inside* two of this story's files), attribution was recovered with two throwaway scratch clones — pristine HEAD vs HEAD-plus-only-this-story — and **nothing in the working tree was reset, checked out or cleaned.** Also measured: the full suite's deep-git failures are **environmental, and worse on pristine HEAD (18) than with this story applied (3)** — the 3,000 ms `GitMetrics` budget losing under parallel test load, an unstable set run-to-run. And a trap worth keeping: **`--no-build` on a tree whose test project does not compile silently runs the STALE dll** — read the build's error count before trusting it. |
 | 2026-07-28 | **dev-story started (baseline `b696485`); status `ready-for-dev` → `in-progress`. Tasks 0 and 1 COMPLETE, Task 2 substantially under way (8 of ~25 templaters), Tasks 3–10 not started.** Both gates verified open: 22.4 is at `review`, its region seam is in `SiteGenerator.cs`, and `wayfindingRepaired`/`stillUnbalanced` are gone from `web/ir/adapter.ts`. **Task 1's inventory replaces the seeded one wholesale: 1,408 IR pages / 1,409 `.html`, not 1,046** — all three deep-git surfaces and 300 `commit/` pages present (budget measured 2.42 s warm vs the 3,000 ms cap, so AC #8's hazard is real but did not fire), and **`oversizedPages` has TWO entries, not one**: `code-map.html` at 8,012,656 B (grown ~19 % from the story's figure) and **`git-insights.html` at 2,508,588 B**, which the story never mentions. **Task 2's declared long pole is not real.** 22.3's `NavLocalContext` blocker ("~8 call sites of plumbing is the real cost of this story's correctness") applies only to the path that re-derives nav from `nav.ToNavigationView(path)`; `ToNavigationView` **already takes a `NavLocalContext?`** and every templater already builds one, so composing the region from the page's own `PageView` keeps the local-context band by construction. And the AC #3 region composer **already exists** — `JsonSpaRenderAdapter.RenderContent(PageView)` is exactly `navMarkup + wayfinding + BodyHtml` — so Task 2 is not "write a region path", it is "put the remaining 1,217 pages on `PageView`". 8 templaters migrated byte-identically with the golden fingerprint stationary throughout (correct: it must NOT move until Task 2 ends). **Two findings the remaining migrations depend on:** (1) four pages emit `<header class="doc-header">` BEFORE `<main>`, so `BodyHtml` must start at that header — starting at `<main>` keeps the golden gate green while silently dropping the page's own title block from the IR, the same invisible-to-every-harness class as 23.3's double-wrapped band; (2) **`deep-analytics.html`'s `:target` lightbox sits after `</main>` and is therefore already missing from today's IR** — an inherited capture defect the composed region fixes, and AC #1's first documented delta. ⚠️ The golden constant is **`e384cbde…`**, not the `f4a7cbac…` this file quotes — stale for the fourth story running. |
 | 2026-07-28 | **Revisited and re-measured at `811ba17`; status reconciled `blocked` → `ready-for-dev`** (the file said `blocked` while `sprint-status.yaml` had said `ready-for-dev` since 23.5 landed — a one-artifact drift, now closed). **The packaging gate is CLEARED**: ADR 0022 makes Node a build/CI-time toolchain *and* a generate-time runtime, the shipped artefact is a project-independent 3.78 MB prebuilt `.output/` proven against a second project's IR (1056/1056 + 32/33 at ~4 ms/route), and the standalone binary takes a **documented Node prerequisite** rather than degrading to the C# renderer — so **Q1 and Q2 are answered**. **One new gate replaces it: Story 22.4 runs BEFORE this story** (owner D2), unifying the two region builders, converging the 46-delta and fixing the two-region-shape trap — so Task 2 inherits one region producer, not two. **Story 22.3's retired 50 KB file is now Task 2's spec** (the `NavLocalContext` blocker — there is no `path → NavLocalContext` resolver and ~8 call sites of plumbing is the real cost of correctness — the 25-templater inventory, eight pre-resolved traps, the ranked test-gate map). Stale premises corrected: **Nuxt 3 → `^4.5.1`** with `engines.node` pinned (the EOL trap is closed), **`web/` now has a vitest suite and a coverage gate** (the "zero tests" fact is false), the **next uncontested ADR number is 0023** (0019 claimed-unwritten by 18.3; 0020–0022 exist), and the golden fingerprint has moved four times in two days to `f4a7cbac…` at `SiteGeneratorAdapterTests.cs:1242` — read it, never quote it. Two items inherited from 23.5 and named rather than patched by it: **`DashboardSurface.vue` hard-throws on any project with no Hierarchy Explorer** (the one thing that broke in the two-IR run) and **the ADR 0005 CSP amendment is still this story's** — ADR 0022 deliberately does not touch CSP. |
 | 2026-07-27 | Story 23.4 created (baseline `32fd282`), seeded **`blocked`** on Story 23.5. Four owner decisions locked: (D1) seed now but blocked; (D2) "retire the `HtmlRenderAdapter`" means C# stops **writing** `.html` while keeping a **region-composition** path that feeds the IR and the webview/SPA; (D3) **full componentization** of the remaining 857 pages with `ir-content.css` retired to empty per ADR 0018; (D4) **Story 22.3 is retired** and 23.4 is the answer to "who renders static HTML from the IR." ACs 3–8 extend the epic's two. Three structural findings drove the shape: the IR for 82 % of the site is **produced by the code this story retires** (`ExtractContentRegion` slices the C# renderer's own full-page output), so the region path must be stood up and proven byte-equal **before** any deletion; D2 and D3 are in apparent tension and are reconciled on **provenance** (after C# stops writing pages, `specscribe.css` serves only the webview/SPA, so `web/` owning authored styles completes rather than reverses 23.2's decision); and the owed **ADR 0005 CSP amendment is probably now documentation-only**, because 23.3's `noScripts: true` removed the hydration that 23.1's `'strict-dynamic'` finding was about. `GoldenContentFingerprint` **inverts** here — 23.3 asserted it stationary; this story must move or retire it, by design. |

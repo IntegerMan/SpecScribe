@@ -30,6 +30,18 @@ public static class CommitDetailTemplater
         SiteNav nav,
         Func<string, string?>? fileHref = null,
         EntityPager? pager = null,
+        NavLocalContext? localContext = null) =>
+        HtmlRenderAdapter.Shared.Render(BuildPage(commit, nav, fileHref, pager, localContext)).Content;
+
+    /// <summary>Builds a per-commit page's host-neutral <see cref="PageView"/> — the AD-2 delivery contract, so
+    /// the IR's content region can be COMPOSED (<see cref="JsonSpaRenderAdapter.RenderContent"/>: nav markup +
+    /// wayfinding + body) instead of sliced back out of a rendered full page. <see cref="RenderPage"/> is the
+    /// unchanged HTML projection of this same model, so the bytes are identical. [Story 23.4 AC #3]</summary>
+    public static PageView BuildPage(
+        DeepCommit commit,
+        SiteNav nav,
+        Func<string, string?>? fileHref = null,
+        EntityPager? pager = null,
         NavLocalContext? localContext = null)
     {
         var shortHash = ShortHash(commit.Hash);
@@ -38,20 +50,6 @@ public static class CommitDetailTemplater
         var subject = string.IsNullOrWhiteSpace(commit.Subject) ? "(no subject)" : commit.Subject;
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen(
-            $"Commit {shortHash} — {nav.SiteTitle}",
-            prefix + ForgeOptions.StylesheetName,
-            prefix + ForgeOptions.ScriptName,
-            $"Commit {shortHash} in {nav.SiteTitle}: {subject}"));
-        sb.Append(nav.RenderNavBar(outputPath, localContext));
-        // Sibling pager (Prev = newer commit, Next = older) rides the coherent wayfinding strip alongside the
-        // breadcrumb now, not the body's own header. [Story 10.11]
-        sb.Append(SiteNav.RenderWayfinding(outputPath, new (string, string?)[]
-        {
-            ("Home", "index.html"),
-            ($"Commit {shortHash}", null),
-        }, pager));
-
         // Single <main id="main-content"> landmark / skip-link target. [Story 1.4 AC #1]
         sb.Append("<main id=\"main-content\" class=\"commit-detail\">\n");
         sb.Append("<header class=\"doc-header\">\n");
@@ -82,9 +80,31 @@ public static class CommitDetailTemplater
 
         sb.Append("</article>\n\n");
         sb.Append("</main>\n\n");
-        sb.Append(PathUtil.RenderFooter(prefix));
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+
+        return new PageView
+        {
+            Kind = PageKind.Doc,
+            OutputRelativePath = outputPath,
+            Title = $"Commit {shortHash} — {nav.SiteTitle}",
+            MetaDescription = $"Commit {shortHash} in {nav.SiteTitle}: {subject}",
+            Nav = nav.ToNavigationView(outputPath, localContext),
+            Breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
+            {
+                ("Home", "index.html"),
+                ($"Commit {shortHash}", null),
+            }),
+            // Sibling pager (Prev = newer commit, Next = older) rides the coherent wayfinding strip alongside the
+            // breadcrumb now, not the body's own header. [Story 10.11]
+            Pager = pager,
+            Assets = new AssetManifest
+            {
+                StylesheetHref = prefix + ForgeOptions.StylesheetName,
+                ScriptHref = prefix + ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+            },
+            Interaction = InteractionState.None,
+            BodyHtml = sb.ToString(),
+        };
     }
 
     /// <summary>The commit's display short hash: the first <see cref="ShortHashLength"/> chars of the full

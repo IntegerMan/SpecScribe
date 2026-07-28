@@ -140,7 +140,12 @@ public static class CodeMapTemplater
     /// selected.</summary>
     private static void AppendVariantPanel(StringBuilder sb, CodeMapVariant variant, Func<string, string?>? fileHref, string prefix)
     {
-        sb.Append($"<div class=\"codemap-view\" data-view=\"{PathUtil.Html(variant.Key)}\">\n");
+        // [Review][Patch] Declares which of the two pure-CSS filter checkboxes need which checked state to reveal
+        // THIS panel — read by specscribe.js's boot-time hash reveal so a deep link into a non-default panel (e.g.
+        // "no-tests") auto-checks the right box instead of silently doing nothing, since only the default-visible
+        // panel's own init runs `scopeFromHash()` at load. Declarative, not a surface name in the shared component.
+        var revealWhen = $"cm-exclude-spec={(variant.ExcludesSpecDev ? "1" : "0")};cm-exclude-tests={(variant.ExcludesTests ? "1" : "0")}";
+        sb.Append($"<div class=\"codemap-view\" data-view=\"{PathUtil.Html(variant.Key)}\" data-hierarchy-reveal-when=\"{PathUtil.Html(revealWhen)}\">\n");
 
         if (variant.Map.IsEmpty)
         {

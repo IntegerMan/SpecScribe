@@ -177,6 +177,7 @@ body {
 [data-explorer][data-sb-scope][data-tok-active] .sunburst-legend .sb-active-item,
 [data-explorer][data-sb-scope][data-tok-review] .sunburst-legend .sb-review-item,
 [data-explorer][data-sb-scope][data-tok-done] .sunburst-legend .sb-done-item,
+[data-explorer][data-sb-scope][data-tok-retired] .sunburst-legend .sb-retired-item,
 [data-explorer][data-sb-scope][data-tok-noplan] .sunburst-legend .sb-noplan-item,
 [data-explorer][data-sb-scope][data-tok-followup-open] .sunburst-legend .sb-followup-open-item,
 [data-explorer][data-sb-scope][data-tok-followup-done] .sunburst-legend .sb-followup-done-item,
@@ -387,6 +388,7 @@ body {
 .ss-hierarchy-sw.sb-active { background: var(--status-active); }
 .ss-hierarchy-sw.sb-review { background: var(--status-review); }
 .ss-hierarchy-sw.sb-done { background: var(--status-done); }
+.ss-hierarchy-sw.sb-retired { background: var(--status-deferred); }
 .ss-hierarchy-sw.sb-unrecognized { background: var(--status-unrecognized); }
 /* The four hatched ones. Backgrounds match `fillFor()` in specscribe.js exactly — including no-plan, which the
    component paints `--parchment-dark` (the same token the shipped SVG's `.sb-noplan:hover` uses) rather than
@@ -3268,6 +3270,10 @@ a.work-node:focus-visible {
 .sb-ready { fill: var(--status-ready); }
 .sb-drafted { fill: var(--status-drafted); }
 .sb-pending { fill: var(--status-pending); }
+/* Retired shares deferred's grey (Story 8.9 D2, no 7th token). Without this rule
+   HierarchyExplorer.PlanningColorClass falls back to sb-unrecognized and a deliberately retired story is
+   painted as an unmapped word — the exact mislabel this story exists to remove. */
+.sb-retired { fill: var(--status-deferred); }
 .sb-unrecognized { fill: var(--status-unrecognized); }
 
 /* Middle-ring stories with no task plan (TasksTotal == 0): faint dashed outline, transparent fill.
@@ -3333,6 +3339,7 @@ a.work-node:focus-visible {
 .sunburst-legend .sb-active-sw { background: var(--status-active); }
 .sunburst-legend .sb-review-sw { background: var(--status-review); }
 .sunburst-legend .sb-done-sw { background: var(--status-done); }
+.sunburst-legend .sb-retired-sw { background: var(--status-deferred); }
 .sunburst-legend .sb-noplan-sw {
   background: transparent;
   box-shadow: inset 0 0 0 1px var(--status-pending);
@@ -3372,6 +3379,8 @@ a.work-node:focus-visible {
 .sunburst-panel:has(.sb-review-item:focus-visible) .sb-seg:not(.sb-review),
 .sunburst-panel:has(.sb-done-item:hover) .sb-seg:not(.sb-done),
 .sunburst-panel:has(.sb-done-item:focus-visible) .sb-seg:not(.sb-done),
+.sunburst-panel:has(.sb-retired-item:hover) .sb-seg:not(.sb-retired),
+.sunburst-panel:has(.sb-retired-item:focus-visible) .sb-seg:not(.sb-retired),
 .sunburst-panel:has(.sb-followup-open-item:hover) .sb-seg:not(.sb-followup-open),
 .sunburst-panel:has(.sb-followup-open-item:focus-visible) .sb-seg:not(.sb-followup-open),
 .sunburst-panel:has(.sb-followup-done-item:hover) .sb-seg:not(.sb-followup-done),
@@ -4579,25 +4588,52 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Numeric columns are sized to their VALUES ("14×", "100%"), not to their headers — Story 24.1 added a second
+   one (Confidence) to a panel only ~455px wide, and letting the word "Confidence" set the column width starved
+   the two path columns down to ~60px each (verified in-browser: paths truncated to "tests…"/"src/S…", which
+   defeats the point of the table). The header wraps instead; the paths get the reclaimed space. */
 .coupling-table .coupling-num {
   text-align: right;
-  width: 4.5rem;
+  width: 4.1rem;
   font-family: 'Courier New', monospace;
   color: var(--rust);
   white-space: nowrap;
 }
+/* Under table-layout:fixed a single-word header cannot wrap, so "Together"/"Confidence" would overrun their
+   own columns and run into the next header ("TOGETHERCONFIDENCEKIND" — seen in-browser). These headers get a
+   slightly smaller type size and no letter-spacing so each fits its column at the width the VALUES need. */
+.coupling-table th.coupling-num {
+  font-size: 0.6rem;
+  letter-spacing: 0;
+  padding-right: 0.35rem;
+}
 /* Kind column (Story 10.6, AC1): narrow, only process pairs carry a visible badge — code pairs (the
-   majority case) leave the cell blank rather than a redundant "Code" label on every row. */
-.coupling-table .coupling-kind { width: 5.5rem; white-space: nowrap; }
-.coupling-kind-badge {
+   majority case) leave the cell blank rather than a redundant "Code" label on every row.
+   Story 24.1 added a second, INDEPENDENT badge (cross-boundary) to the same cell — the lenses are orthogonal
+   and a pair can legitimately carry both, so the badges STACK (white-space: normal) rather than widening the
+   column to fit them side by side. The column sizes to ONE badge, which is what keeps the path columns
+   readable in this narrow panel. */
+.coupling-table .coupling-kind { width: 5.6rem; white-space: normal; }
+.coupling-table th.coupling-kind { font-size: 0.6rem; letter-spacing: 0; }
+.coupling-kind-badge,
+.coupling-boundary-badge {
   display: inline-block;
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  /* Sentence case, not uppercase: "CROSS-BOUNDARY" set in caps with letter-spacing measured 120px and was
+     single-handedly setting the column width. The same word in sentence case reads identically and fits. */
+  font-size: 0.62rem;
+  letter-spacing: 0.01em;
+  border-radius: 3px;
+  padding: 0.05rem 0.28rem;
+}
+.coupling-kind-badge {
   color: var(--rust);
   border: 1px dashed var(--rust-light);
-  border-radius: 3px;
-  padding: 0.08rem 0.35rem;
+}
+/* Distinguished from the process badge by BORDER STYLE (solid vs dashed) as well as hue, so the two never
+   rely on colour alone to be told apart (UX-DR19/NFR8) — and both read as words regardless. */
+.coupling-boundary-badge {
+  color: var(--ink-light);
+  border: 1px solid var(--parchment-deep);
 }
 
 /* Pure-CSS :target lightbox for the enlarged graph — hidden until the "Expand" link targets it. */
@@ -4924,6 +4960,19 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
   background: var(--cream);
   padding: 0.9rem 1.1rem 1.1rem;
 }
+
+/* A retired story stays INLINE in story order and demotes itself (Story 8.9 owner decision D2): a grey
+   --status-deferred edge and a softened title, so the eye skips it while scanning live work without the card
+   disappearing or becoming unreadable. Retirement is a decision, not a defect — it must not read as an error
+   state, and it must not read as active work either.
+   Deliberately NOT `opacity`: that would dim the body text and the status badge below their contrast floors,
+   and the badge is the thing carrying the word + glyph this state depends on (UX-DR17, no colour-alone). The
+   grey is shared with `deferred` — no 7th --status-* token (Story 9.3 owner decision #1, held by D2). */
+.story-card.retired {
+  border-left: 3px solid var(--status-deferred);
+  background: color-mix(in srgb, var(--cream) 92%, var(--ink) 8%);
+}
+.story-card.retired .story-title { color: var(--ink-light); font-weight: normal; }
 
 .story-card-header {
   display: flex;
@@ -5914,6 +5963,13 @@ body:has(main.req-detail) .doc-header {
 .coverage-story-card.drafted { border-left-color: var(--status-drafted); }
 .coverage-story-card.pending { border-left-color: var(--status-pending); }
 .coverage-story-card.unrecognized { border-left-color: var(--status-unrecognized); }
+/* Retired shares --status-deferred with deferred (Story 8.9 D2 holds Story 9.3's no-7th-token decision); the
+   crossed-circle glyph and the word "Retired" are what keep the two distinct, never the colour. The card also
+   demotes itself: retirement is a closed decision, so it should read quieter than live work while staying in
+   story order and staying fully legible (opacity would dim its text below contrast). */
+.coverage-story-card.retired { border-left-color: var(--status-deferred); }
+.coverage-story-card.retired .epic-mosaic-num,
+.coverage-story-card.retired .epic-mosaic-title { color: var(--ink-light); }
 
 @media (max-width: 640px) {
   /* Journey menu collapses behind the toggle; key-views chips stay visible and wrap. */

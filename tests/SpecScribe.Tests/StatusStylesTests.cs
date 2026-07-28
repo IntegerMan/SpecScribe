@@ -84,6 +84,9 @@ public class StatusStylesTests
         var outputs = new[]
         {
             StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story("done"))),                          // done
+            // Story 8.9: `retired` is reachable ONLY from an all-retired epic (a mixed done+retired epic reads
+            // done, per owner decision D1), so that is the representative this list needs to stay non-dead.
+            StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story("retired"))),                       // retired
             StatusStyles.ForEpicWithRetrospective(Epic(EpicStatus.Drafted, Story("done"))),         // review (no retro)
             StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story("in progress"))),                   // active
             StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story("ready-for-dev"))),                 // ready
@@ -151,8 +154,25 @@ public class StatusStylesTests
     [InlineData("drafted", "Drafted")]
     [InlineData("pending", "Pending")]
     [InlineData("unrecognized", "Unrecognized")]
+    // Story 8.9: without its own arm "retired" lands on the `_ => "Pending"` fallback and a grey retired badge
+    // would read as active-plan language — a quieter mislabel than the "Unrecognized" this story removes.
+    [InlineData("retired", "Retired")]
     public void StoryLabel_MapsEachStage(string cssClass, string expected)
         => Assert.Equal(expected, StatusStyles.StoryLabel(cssClass));
+
+    [Fact]
+    public void StoryLabel_AndEpicLabel_CoverEveryStageTheirOwnListDeclares()
+    {
+        // The partition lists and the label switches are two halves of one contract: a stage present in the
+        // list but absent from the switch renders the fallback word under its own class. Asserting "not the
+        // fallback" catches a future stage added to one half only — which is exactly how `retired` shipped
+        // with a first-class colour and no first-class word. [Story 8.9 Trap 1]
+        foreach (var stage in StatusStyles.StoryStages)
+            Assert.NotEqual("Pending", StatusStyles.StoryLabel(stage));
+        foreach (var stage in StatusStyles.EpicStages.Where(s => s != "pending"))
+            Assert.NotEqual("Pending", StatusStyles.EpicLabel(stage));
+        Assert.Equal("Pending", StatusStyles.EpicLabel("pending"));
+    }
 
     [Theory]
     [InlineData("done", "done")]
@@ -171,8 +191,61 @@ public class StatusStylesTests
     [InlineData("frobnicated", "unrecognized")]
     [InlineData(null, "drafted")]
     [InlineData("", "drafted")]
+    // ---- Story 8.9 AC #1: the six-word retirement vocabulary, in every form ForStatus already tolerates ----
+    [InlineData("retired", "retired")]
+    [InlineData("Retired", "retired")]
+    [InlineData("RETIRED", "retired")]
+    [InlineData("retired.", "retired")]
+    [InlineData("  retired  ", "retired")]
+    [InlineData("superseded", "retired")]
+    [InlineData("Superseded", "retired")]
+    [InlineData("deprecated", "retired")]
+    [InlineData("cancelled", "retired")]
+    [InlineData("obsolete", "retired")]
+    [InlineData("wontfix", "retired")]
+    [InlineData("wont-fix", "retired")]
+    [InlineData("wont_fix", "retired")]
+    [InlineData("wont fix", "retired")]
+    [InlineData("WontFix", "retired")]
+    // The apostrophe forms are SUPPORTED, not merely tolerated: Normalize lowercases and kebabs but leaves the
+    // apostrophe, so "won't fix" arrives as "won't-fix"; IsRetirementWord strips it (and the typographic ’ a
+    // smart-quoting editor produces) before matching. Pinning both so neither can silently regress.
+    [InlineData("won't fix", "retired")]
+    [InlineData("Won't Fix", "retired")]
+    [InlineData("won’t fix", "retired")]
+    // Narrowed, never removed (Story 8.2 AC #3): a genuinely unmapped word still reads unrecognized, and a
+    // retirement word embedded in a longer phrase is NOT a retirement — the exact-match discipline holds.
+    [InlineData("not-retired", "unrecognized")]
+    [InlineData("retired?maybe", "unrecognized")]
+    [InlineData("rejected", "unrecognized")]
     public void ForStatus_MapsRawStatusText(string? status, string expected)
         => Assert.Equal(expected, StatusStyles.ForStatus(status));
+
+    [Fact]
+    public void RetirementStatusWords_IsTheOwnerLockedSixWordVocabulary()
+    {
+        // Owner decision D3. The list is the CONTRACT, not an implementation detail: EpicsParser's
+        // comment detector builds its regex from this same array, so a word added here widens both seams at
+        // once and a word added anywhere else is a finding. [Story 8.9 AC #1]
+        Assert.Equal(
+            new[] { "retired", "superseded", "deprecated", "cancelled", "obsolete", "wontfix" },
+            StatusStyles.RetirementStatusWords);
+        foreach (var word in StatusStyles.RetirementStatusWords)
+            Assert.Equal("retired", StatusStyles.ForStatus(word));
+    }
+
+    [Fact]
+    public void ForSprint_StaysNarrowerThanForStatus_OnPurpose()
+    {
+        // Story 8.9 Trap 8 / scope guard #1: ForSprint reads a CLOSED set of sprint-status.yaml values where
+        // only "retired" is ever written, and FreeTextBadge consults it FIRST — so teaching it "superseded"
+        // would flip an ADR whose status line reads "Superseded" from its muted strikethrough pill to a
+        // canonical Retired badge. The asymmetry is deliberate; this test is what keeps it from being "fixed".
+        Assert.Equal("retired", StatusStyles.ForSprint("retired"));
+        Assert.Equal("unrecognized", StatusStyles.ForSprint("superseded"));
+        Assert.Equal("unrecognized", StatusStyles.ForSprint("wontfix"));
+        Assert.Contains("pill status-superseded", StatusStyles.FreeTextBadge("Superseded by ADR 2"));
+    }
 
     [Fact]
     public void LegendKey_StageWordsComeFromLabelHelpers()
@@ -360,6 +433,111 @@ public class StatusStylesTests
     [Fact]
     public void StoryStages_IncludesUnrecognized()
         => Assert.Contains("unrecognized", StatusStyles.StoryStages);
+
+    // ============ Story 8.9: `retired` is a first-class STORY status ============
+
+    [Fact]
+    public void StoryStages_IncludesRetired_DirectlyAfterDone()
+    {
+        // Membership is what makes the defined (epics.md) tally able to name the stage the tracked (yaml)
+        // tally already names — Story 8.3's "every count agrees" invariant. Position is narrative: retired is
+        // the SECOND terminal stage (owner decision D1), so everything below it is still work owed.
+        Assert.Contains("retired", StatusStyles.StoryStages);
+        Assert.Equal(1, StatusStyles.StoryStages.ToList().IndexOf("retired"));
+        Assert.Equal(0, StatusStyles.StoryStages.ToList().IndexOf("done"));
+    }
+
+    [Fact]
+    public void EpicStages_IncludesRetired_SoNoRollUpConsumerCanDropIt()
+    {
+        // Same reason "unrecognized" is already here: ForEpic can now RETURN it, and a consumer that buckets
+        // epics by iterating this list would otherwise draw nothing for an all-retired epic.
+        Assert.Contains("retired", StatusStyles.EpicStages);
+        Assert.Equal("Retired", StatusStyles.EpicLabel("retired"));
+    }
+
+    [Fact]
+    public void RetiredStatus_IsNotADiagnostic_ButAnUnmappedWordStillIs()
+    {
+        // AC #2, both halves against the same code path. IsUnrecognizedStatus follows ForStatus, so this
+        // needed no edit of its own — which is exactly why it needs a test that says so.
+        foreach (var word in StatusStyles.RetirementStatusWords)
+            Assert.False(StatusStyles.IsUnrecognizedStatus(word), $"'{word}' must not raise a notice");
+        Assert.False(StatusStyles.IsUnrecognizedStatus("Superseded"));
+        Assert.False(StatusStyles.IsUnrecognizedStatus("won't fix"));
+        Assert.True(StatusStyles.IsUnrecognizedStatus("frobnicated"));
+    }
+
+    [Fact]
+    public void ForEpic_DoneOrRetiredReadsDone_AllRetiredReadsRetired()
+    {
+        // Owner decision D1. Before Story 8.9 the gate was All(c => c == "done"), so an epic that retired a
+        // single story could NEVER read done no matter how much of it shipped.
+        Assert.Equal("done", StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story("done"), Story("retired"))));
+        Assert.Equal("done", StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story("retired"), Story("complete"))));
+        // All retired = abandoned, not finished. A distinct word, so no surface can claim delivery.
+        Assert.Equal("retired", StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story("retired"), Story("superseded"))));
+        // Retired never LIFTS a live epic: outstanding work still decides the tier.
+        Assert.Equal("active", StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story("retired"), Story("in-progress"))));
+        Assert.Equal("ready", StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story("retired"), Story("ready-for-dev"))));
+        Assert.Equal("drafted", StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story("retired"), Story("drafted"))));
+    }
+
+    [Fact]
+    public void ForEpic_RetiredDoesNotMaskAnAllUnrecognizedEpic()
+    {
+        // Terminal ledger history says nothing about whether the REST of the epic is merely unmapped. Letting
+        // one retired story downgrade this to "drafted" would hide the notice Story 8.2 AC #3 exists to raise.
+        Assert.Equal("unrecognized", StatusStyles.ForEpic(
+            Epic(EpicStatus.Drafted, Story("retired"), Story("frobnicated"))));
+        Assert.Equal("drafted", StatusStyles.ForEpic(
+            Epic(EpicStatus.Drafted, Story("retired"), Story("frobnicated"), Story("drafted"))));
+    }
+
+    [Fact]
+    public void ForEpicWithRetrospective_GatesTheDoneCase_ButNotTheAllRetiredCase()
+    {
+        // A delivered epic still owes a retro; a fully-abandoned one does not — reading it "In review" would
+        // put it back on the list of things someone owes work on. [AC #4]
+        var delivered = Epic(EpicStatus.Drafted, Story("done"), Story("retired"));
+        Assert.Equal("review", StatusStyles.ForEpicWithRetrospective(delivered));
+        delivered.HasRetrospective = true;
+        Assert.Equal("done", StatusStyles.ForEpicWithRetrospective(delivered));
+
+        var abandoned = Epic(EpicStatus.Drafted, Story("retired"), Story("cancelled"));
+        Assert.Equal("retired", StatusStyles.ForEpicWithRetrospective(abandoned));
+        abandoned.HasRetrospective = true;
+        Assert.Equal("retired", StatusStyles.ForEpicWithRetrospective(abandoned));
+    }
+
+    [Fact]
+    public void ForEpic_PinsEpic22Shape_FiveLiveStoriesPlusOneRetired()
+    {
+        // The concrete case that provoked the story: Epic 22 is 22.1/22.2/22.4/22.5/22.6 plus retired 22.3.
+        // While work remains it reads active; once the five close it reaches done instead of being stuck
+        // permanently short of it. [AC #4]
+        var midFlight = Epic(EpicStatus.Drafted,
+            Story("done"), Story("review"), Story("retired"),
+            Story("ready-for-dev"), Story("drafted"), Story("drafted"));
+        Assert.Equal("active", StatusStyles.ForEpic(midFlight));
+
+        var closed = Epic(EpicStatus.Drafted,
+            Story("done"), Story("done"), Story("retired"), Story("done"), Story("done"), Story("done"));
+        Assert.Equal("done", StatusStyles.ForEpic(closed));
+    }
+
+    [Fact]
+    public void RetiredBadge_CarriesColourAndGlyphAndWord_NeverColourAlone()
+    {
+        // UX-DR17. Trap 6: Icons.ForStatus("retired") and ("deferred") are BYTE-IDENTICAL glyphs by design, so
+        // asserting on the icon alone cannot distinguish them — the class and the word are what must be pinned.
+        var html = StatusStyles.Badge("retired", StatusStyles.StoryLabel("retired"));
+        Assert.Contains("status-badge retired", html);
+        Assert.Contains(">Retired</span>", html);
+        Assert.Contains(StatusStyles.StageMeaning("retired"), html);
+        Assert.Equal(Icons.ForStatus("deferred"), Icons.ForStatus("retired"));
+        Assert.DoesNotContain("status-badge deferred", html);
+    }
 
     // ---- Story 9.3: Unmapped requirement tier ----
 

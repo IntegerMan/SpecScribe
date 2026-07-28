@@ -131,9 +131,15 @@ public class SiteGeneratorCodeInsightsTests : IDisposable
         // file gets no page — on Referenced.cs's graph it must be a non-link chip (still shown + tooltipped from the
         // co-change history), never a dead link. (A coupled file that still exists now DOES get a page; see
         // GenerateAll_CoupledUncitedFile_NowGetsInPortalCodePage.)
+        // TWO co-change commits, because Story 24.1's support floor (GitMetrics.CouplingMinSupport) treats a single
+        // shared commit as coincidence rather than coupling — a one-off pair would be filtered before it could ever
+        // reach the chip path this test is about.
         File.WriteAllText(Path.Combine(SrcDir, "Uncited.cs"), "namespace Lib;\npublic class Uncited { }\n");
         File.WriteAllText(Path.Combine(SrcDir, "Referenced.cs"), "namespace Lib;\npublic class Referenced { /* v3 */ }\n");
         Assert.True(RunGit("add .") && Commit("Change Referenced alongside an uncited helper"));
+        File.WriteAllText(Path.Combine(SrcDir, "Uncited.cs"), "namespace Lib;\npublic class Uncited { /* v2 */ }\n");
+        File.WriteAllText(Path.Combine(SrcDir, "Referenced.cs"), "namespace Lib;\npublic class Referenced { /* v4 */ }\n");
+        Assert.True(RunGit("add .") && Commit("Change them together again (support clears the floor)"));
         File.Delete(Path.Combine(SrcDir, "Uncited.cs"));
         Assert.True(RunGit("add -A") && Commit("Remove the uncited helper (co-change history remains)"));
 

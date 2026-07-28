@@ -72,7 +72,8 @@ public class GitMetricsFileInsightsTests
     [Fact]
     public void BuildFileInsights_CoupledFilesAreTheOtherMemberOfEachPairDescending()
     {
-        // (A,B) co-change twice, (A,C) once. A's coupled list: B (2) before C (1).
+        // (A,B) co-change twice, (A,C) once. At the default support floor of 2 (Story 24.1) the (A,C) couple is
+        // coincidence and drops out entirely, leaving B as A's only qualifying couple.
         var commits = new[]
         {
             Commit("h3", "Alice", "2026-07-03T10:00", "s3", "A.cs", "C.cs"),
@@ -82,9 +83,131 @@ public class GitMetricsFileInsightsTests
 
         var map = GitMetrics.BuildFileInsights(commits);
 
-        Assert.Equal(new[] { ("B.cs", 2), ("C.cs", 1) }, map["A.cs"].CoupledFiles);
-        // Symmetric: B's list contains A with the same count.
-        Assert.Contains(("A.cs", 2), map["B.cs"].CoupledFiles);
+        var b = Assert.Single(map["A.cs"].CoupledFiles);
+        Assert.Equal("B.cs", b.Path);
+        Assert.Equal(2, b.Support);
+        Assert.DoesNotContain(map["A.cs"].CoupledFiles, c => c.Path == "C.cs");
+        // The PAIR is symmetric (same support both ways) even though its confidence is not.
+        Assert.Contains(map["B.cs"].CoupledFiles, c => c.Path == "A.cs" && c.Support == 2);
+    }
+
+    [Fact]
+    public void BuildFileInsights_SupportFloorIsConfigurableAndAdmitsOneOffCouplesWhenLowered()
+    {
+        // Same fixture, floor lowered to 1: the coincidental (A,C) couple is now admitted and ranks BELOW B —
+        // A changed 3 times, so B rides 2/3 (67%) and C rides 1/3 (33%). Confidence-desc ordering (Q4).
+        var commits = new[]
+        {
+            Commit("h3", "Alice", "2026-07-03T10:00", "s3", "A.cs", "C.cs"),
+            Commit("h2", "Alice", "2026-07-02T10:00", "s2", "A.cs", "B.cs"),
+            Commit("h1", "Alice", "2026-07-01T10:00", "s1", "A.cs", "B.cs"),
+        };
+
+        var coupled = GitMetrics.BuildFileInsights(commits, minSupport: 1)["A.cs"].CoupledFiles;
+
+        Assert.Equal(new[] { "B.cs", "C.cs" }, coupled.Select(c => c.Path));
+        Assert.Equal(2.0 / 3, coupled[0].Confidence, 6);
+        Assert.Equal(1.0 / 3, coupled[1].Confidence, 6);
+    }
+
+    // ---- Story 24.1: directional confidence / lift / cross-boundary on the per-file list ----
+
+    [Fact]
+    public void BuildFileInsights_ConfidenceIsAsymmetricUsingEachFocalFilesOwnChangeCount()
+    {
+        // A.cs changes 4 times; B.cs changes twice, always alongside A. So B is 100% confident about A
+        // ("whenever I change, A changes too") while A is only 50% confident about B. A raw shared-commit count
+        // reports 2 in both directions and loses exactly this finding.
+        var commits = new[]
+        {
+            Commit("h4", "Alice", "2026-07-04T10:00", "s4", "src/A.cs"),
+            Commit("h3", "Alice", "2026-07-03T10:00", "s3", "src/A.cs"),
+            Commit("h2", "Alice", "2026-07-02T10:00", "s2", "src/A.cs", "src/B.cs"),
+            Commit("h1", "Alice", "2026-07-01T10:00", "s1", "src/A.cs", "src/B.cs"),
+        };
+
+        var map = GitMetrics.BuildFileInsights(commits);
+
+        var aToB = Assert.Single(map["src/A.cs"].CoupledFiles);
+        var bToA = Assert.Single(map["src/B.cs"].CoupledFiles);
+        Assert.Equal(0.5, aToB.Confidence, 6);   // 2 shared / 4 of A's own changes
+        Assert.Equal(1.0, bToA.Confidence, 6);   // 2 shared / 2 of B's own changes
+        // Support is the same shared count in both directions — it is confidence that is directional.
+        Assert.Equal(2, aToB.Support);
+        Assert.Equal(2, bToA.Support);
+    }
+
+    [Fact]
+    public void BuildFileInsights_LiftMeasuresConfidenceAgainstTheTargetsOwnBaseRate()
+    {
+        // 4 analyzed commits. A changes 4×, B changes 2× (both alongside A).
+        // A→B: confidence 0.5, B's base rate 2/4 = 0.5 → lift 1.0 (B shows up exactly as often as chance predicts).
+        // B→A: confidence 1.0, A's base rate 4/4 = 1.0 → lift 1.0 — the always-churning file self-demotes rather
+        // than looking like a strong dependency, which is the whole reason lift is carried alongside confidence.
+        var commits = new[]
+        {
+            Commit("h4", "Alice", "2026-07-04T10:00", "s4", "src/A.cs"),
+            Commit("h3", "Alice", "2026-07-03T10:00", "s3", "src/A.cs"),
+            Commit("h2", "Alice", "2026-07-02T10:00", "s2", "src/A.cs", "src/B.cs"),
+            Commit("h1", "Alice", "2026-07-01T10:00", "s1", "src/A.cs", "src/B.cs"),
+        };
+
+        var map = GitMetrics.BuildFileInsights(commits);
+
+        Assert.Equal(1.0, Assert.Single(map["src/A.cs"].CoupledFiles).Lift!.Value, 6);
+        Assert.Equal(1.0, Assert.Single(map["src/B.cs"].CoupledFiles).Lift!.Value, 6);
+    }
+
+    [Fact]
+    public void Lift_UndefinedDenominator_IsNullNeverNaNOrInfinity()
+    {
+        // The guard exists because NaN/Infinity render as literal "NaN"/"∞" in markup — a null is renderable as "—".
+        Assert.Null(GitMetrics.Lift(0.5, targetChangeCount: 0, analyzedCommits: 10));
+        Assert.Null(GitMetrics.Lift(0.5, targetChangeCount: 10, analyzedCommits: 0));
+        Assert.Equal(2.0, GitMetrics.Lift(0.5, targetChangeCount: 5, analyzedCommits: 20)!.Value, 6);
+    }
+
+    [Fact]
+    public void BuildFileInsights_FlagsCrossBoundaryCouplesAndPreservesTheProcessKind()
+    {
+        // A.cs (src/) couples with same-module B.cs, with cross-module tests/T.cs, and with a root-level config
+        // that is ALSO process signal — so one fixture proves the two lenses are carried independently.
+        var commits = new[]
+        {
+            Commit("h2", "Alice", "2026-07-02T10:00", "s2", "src/A.cs", "src/B.cs", "tests/T.cs", "app.yaml"),
+            Commit("h1", "Alice", "2026-07-01T10:00", "s1", "src/A.cs", "src/B.cs", "tests/T.cs", "app.yaml"),
+        };
+
+        var coupled = GitMetrics.BuildFileInsights(commits)["src/A.cs"].CoupledFiles
+            .ToDictionary(c => c.Path, StringComparer.Ordinal);
+
+        Assert.False(coupled["src/B.cs"].CrossBoundary);
+        Assert.True(coupled["tests/T.cs"].CrossBoundary);
+        Assert.True(coupled["app.yaml"].CrossBoundary);
+        // ClassifyCoupling is preserved verbatim and is orthogonal to the boundary flag.
+        Assert.Equal(GitMetrics.CouplingKind.Code, coupled["src/B.cs"].Kind);
+        Assert.Equal(GitMetrics.CouplingKind.Code, coupled["tests/T.cs"].Kind);
+        Assert.Equal(GitMetrics.CouplingKind.Process, coupled["app.yaml"].Kind);
+    }
+
+    [Fact]
+    public void BuildFileInsights_SupportFloorAppliesBeforeTheCapSoNoiseCannotCrowdOutRealCouples()
+    {
+        // A.cs is coupled once each with 12 one-off partners (noise) and twice with one real partner. With the
+        // floor applied AFTER a cap of 4, the real couple could be pushed out entirely; applied BEFORE, it is the
+        // only survivor. Ordering the noise ahead of it is deliberate — one-off couples score 100% confidence.
+        var oneOffs = Enumerable.Range(0, 12)
+            .Select(i => Commit($"n{i:00}0000", "Alice", $"2026-06-{i + 1:00}T10:00", $"noise {i}",
+                "src/A.cs", $"src/Noise{i:00}.cs"));
+        var real = new[]
+        {
+            Commit("r2000000", "Alice", "2026-07-02T10:00", "real 2", "src/A.cs", "src/Real.cs"),
+            Commit("r1000000", "Alice", "2026-07-01T10:00", "real 1", "src/A.cs", "src/Real.cs"),
+        };
+
+        var coupled = GitMetrics.BuildFileInsights(real.Concat(oneOffs).ToArray(), coupledCap: 4)["src/A.cs"].CoupledFiles;
+
+        Assert.Equal("src/Real.cs", Assert.Single(coupled).Path);
     }
 
     [Fact]
@@ -106,7 +229,9 @@ public class GitMetricsFileInsightsTests
         // ...but it still counts as a change for that file (the cap is coupling-only).
         Assert.Equal(1, map["bulk/File00.cs"].ChangeCount);
         // The real (A,B) coupling survives untouched.
-        Assert.Equal(("B.cs", 2), Assert.Single(map["A.cs"].CoupledFiles));
+        var coupled = Assert.Single(map["A.cs"].CoupledFiles);
+        Assert.Equal("B.cs", coupled.Path);
+        Assert.Equal(2, coupled.Support);
     }
 
     [Fact]
@@ -183,7 +308,10 @@ public class GitMetricsFileInsightsTests
                 "A.cs", $"partner/File{i:00}.cs"))
             .ToArray();
 
-        var insight = GitMetrics.BuildFileInsights(commits, historyCap: 5, contributorCap: 3, coupledCap: 4)["A.cs"];
+        // minSupport: 1 because every partner here co-changes exactly once — this test is about the CAPS, and the
+        // Story 24.1 support floor would otherwise empty the coupled list before the cap could be observed.
+        var insight = GitMetrics.BuildFileInsights(
+            commits, historyCap: 5, contributorCap: 3, coupledCap: 4, minSupport: 1)["A.cs"];
 
         Assert.Equal(3, insight.Contributors.Count);
         Assert.Equal(4, insight.CoupledFiles.Count);
@@ -227,7 +355,9 @@ public class GitMetricsFileInsightsTests
         var a = deep.FileInsights["src/A.cs"];
         Assert.Equal(1, a.ChangeCount);
         Assert.Equal(("Alice", 1), Assert.Single(a.Contributors));
-        Assert.Equal(("src/B.cs", 1), Assert.Single(a.CoupledFiles));
+        // A single commit gives the (A,B) couple support 1 — below the default floor, so no couple survives. The
+        // rest of the per-file insight (change count, contributors, history) is unaffected by the coupling floor.
+        Assert.Empty(a.CoupledFiles);
         Assert.Equal("abcdef1", Assert.Single(a.History).ShortHash);
     }
 

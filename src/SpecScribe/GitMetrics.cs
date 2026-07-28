@@ -81,6 +81,20 @@ public sealed record DeepGitPulse(
     /// deep-git found no non-bulk multi-file commits. [reference-graph epic grouping + relationships]</summary>
     public IReadOnlyDictionary<(string FileA, string FileB), int> CoChangePairs { get; init; }
         = new Dictionary<(string, string), int>();
+
+    /// <summary>The whole-repo coupling view expressed DIRECTIONALLY (Story 24.1): the same top-N surface as
+    /// <see cref="Coupling"/>, but each row is a <see cref="DirectedCouple"/> carrying confidence / support / lift /
+    /// cross-boundary rather than an unordered pair and a raw shared-commit count — so the hub's ranked table can
+    /// say "when A changes, B usually changes too" and rank by how strong that pull actually is, instead of letting
+    /// an always-churning file top the list simply by appearing everywhere.
+    /// <para>Computed once from the SAME single numstat parse that produces <see cref="Coupling"/> (the co-change
+    /// pair tally, the per-file change counts, and <see cref="AnalyzedCommits"/> are all already in hand) — no
+    /// second git call, no second commit scan — and surfaced here so every consuming view reads one shared
+    /// computation (AC #2) instead of re-deriving the metric per surface. Ranked by confidence desc, then support
+    /// desc, then ordinal path (owner decision Q4). Empty (never null) when deep-git found no qualifying couples.
+    /// <see cref="Coupling"/> is retained alongside it: the node-link graph still encodes shared commits on
+    /// undirected edges, and a directed list is the wrong input for that. [Story 24.1]</para></summary>
+    public IReadOnlyList<DirectedCouple> DirectedCoupling { get; init; } = Array.Empty<DirectedCouple>();
 }
 
 /// <summary>The per-file git-derived signals a source-code treemap colorizes by (Story 7.6). <paramref name="Changes"/>
@@ -169,9 +183,57 @@ public sealed record CommitTouch(string ShortHash, DateOnly? Date, string Author
 public sealed record FileInsight(
     int ChangeCount,
     IReadOnlyList<(string Author, int Commits)> Contributors,
-    IReadOnlyList<(string Path, int CoChanges)> CoupledFiles,
+    IReadOnlyList<CoupledFile> CoupledFiles,
     IReadOnlyList<CommitTouch> History,
     int TotalContributors);
+
+/// <summary>One entry in a focal file's "changes with" list, expressed as DIRECTIONAL coupling strength rather than
+/// an unnormalized symmetric tally (Story 24.1, AC #1). <paramref name="Path"/> is the OTHER file;
+/// every metric here is read from the focal file's point of view, so the same pair yields different numbers in each
+/// file's list.
+/// <list type="bullet">
+/// <item><description><paramref name="Support"/> — the shared-commit count (the old <c>CoChanges</c>): how many
+/// commits changed both files. Filtered by <see cref="GitMetrics.CouplingMinSupport"/> upstream so a single
+/// coincidental co-commit never reads as a relationship.</description></item>
+/// <item><description><paramref name="Confidence"/> — <c>Support / ChangeCount[focal]</c>, in <c>[0,1]</c>: "when I
+/// touch this file, I touch <paramref name="Path"/> this often". ASYMMETRIC — a rarely-changed file can be 100%
+/// confident about a churning one while the reverse is 5% — which is the whole point: a raw shared count makes
+/// always-churning files look coupled to everything.</description></item>
+/// <item><description><paramref name="Lift"/> — <c>Confidence ÷ (ChangeCount[Path] ÷ analyzed commits)</c>: how much
+/// the pairing beats <paramref name="Path"/>'s own base rate. Above 1 means genuinely more together than chance; a
+/// file touched in every commit has a base rate near 1 and self-demotes. NULL (never <c>NaN</c>/<c>Infinity</c>)
+/// when the denominator is 0 — render it as "—" or omit it, never as a number.</description></item>
+/// <item><description><paramref name="CrossBoundary"/> — <see cref="GitMetrics.IsCrossBoundary"/>, computed once
+/// here so every downstream surface reads the SAME flag (AC #2) instead of re-deriving it per view.</description></item>
+/// <item><description><paramref name="Kind"/> — the preserved Code-vs-Process lens
+/// (<see cref="GitMetrics.ClassifyCoupling"/>, Story 10.6). Orthogonal to
+/// <paramref name="CrossBoundary"/>: a pair can be both.</description></item>
+/// </list>
+/// [Story 24.1; replaces Story 7.4's <c>(Path, CoChanges)</c> tuple]</summary>
+public sealed record CoupledFile(
+    string Path,
+    int Support,
+    double Confidence,
+    double? Lift,
+    bool CrossBoundary,
+    GitMetrics.CouplingKind Kind);
+
+/// <summary>One DIRECTED edge of the whole-repo coupling view behind the Git Insights hub (Story 24.1, AC #1/#3):
+/// the same metric spine as <see cref="CoupledFile"/>, but carrying its own <paramref name="FromPath"/> so the hub's
+/// ranked table can read as "when <paramref name="FromPath"/> changes, <paramref name="ToPath"/> usually changes
+/// too" instead of an unordered pair. Both directions of a pair are emitted (they carry different confidence), then
+/// ranked together — so a strongly one-way relationship surfaces on its strong side rather than being averaged away.
+/// Computed ONCE in <see cref="GitMetrics.ParseNumstatLog"/> from the already-parsed co-change pairs, per-file change
+/// counts, and analyzed-commit total — no second git call, no second commit scan — and surfaced on
+/// <see cref="DeepGitPulse.DirectedCoupling"/> so every view reuses it. [Story 24.1]</summary>
+public sealed record DirectedCouple(
+    string FromPath,
+    string ToPath,
+    int Support,
+    double Confidence,
+    double? Lift,
+    bool CrossBoundary,
+    GitMetrics.CouplingKind Kind);
 
 /// <summary>The aggregate views behind the Git Insights hub page (FR-10), all derived from the one shared
 /// bounded numstat fetch: per-file change frequency + churn + the file's contributors (the master-detail
@@ -201,6 +263,18 @@ public static class GitMetrics
     /// file set exceeds this are skipped when building coupling pairs (they are almost never meaningful
     /// co-change signal) — they still count toward hotspot frequency. [Story 3.2 Subtask 2.5]</summary>
     private const int CouplingFileSetCap = 50;
+
+    /// <summary>Minimum shared-commit count (support) for a co-change pair to count as coupling at all (Story 24.1,
+    /// AC #1). Two files that happened to land in ONE commit together are coincidence, not a relationship — and
+    /// confidence alone can't tell the difference (a file changed once, alongside one other file, scores a
+    /// meaningless 100%). The floor is what makes confidence trustworthy.
+    /// <para>This is the SHARED source both the hub's directed view and each file's "changes with" list apply, for
+    /// the same reason <see cref="CouplingFileSetCap"/> is shared: the per-file list and the hub must agree about
+    /// what counts as a couple, and two literals in two methods is how they silently stop agreeing. Public so
+    /// callers/tests can state the threshold instead of restating the number. "Configurable" here means a named
+    /// parameter with a sensible default (owner decision Q3) — <see cref="BuildFileInsights"/> and
+    /// <see cref="ParseNumstatLog"/> both take it as an argument — not a new user-facing CLI flag.</para></summary>
+    public const int CouplingMinSupport = 2;
 
     /// <summary>Extensions that are process signal for <b>coupling</b> classification only (Story 10.6, AC1):
     /// config/status/lockfile formats plus stylesheet extensions — the live symptom class ("sprint-status.yaml
@@ -270,6 +344,41 @@ public static class GitMetrics
     /// stay <see cref="CouplingKind.Code"/>. Pure and repo-free.</summary>
     public static CouplingKind ClassifyCoupling(string pathA, string pathB) =>
         IsProcessPath(pathA) || IsProcessPath(pathB) ? CouplingKind.Process : CouplingKind.Code;
+
+    /// <summary>The module/boundary a path belongs to for cross-boundary coupling: its FIRST path segment (the
+    /// top-level directory), or the empty string for a root-level file. Divergence below that segment is still the
+    /// same boundary — the top-level directory is the coarsest structural unit every repository has, and the one a
+    /// "these two modules move together" signal is about. Null/empty/separator-only paths yield null, which
+    /// <see cref="IsCrossBoundary"/> reads as "unknowable" rather than as a boundary of its own. [Story 24.1]</summary>
+    private static string? BoundaryOf(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return null;
+
+        var normalized = path.Replace('\\', '/');
+        var segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        // 0 segments = nothing but separators — unknowable. 1 segment = a root-level file, whose boundary is the
+        // repository root itself (shared with every other root-level file, distinct from any nested module).
+        return segments.Length == 0 ? null : segments.Length == 1 ? string.Empty : segments[0];
+    }
+
+    /// <summary>True when a coupled pair crosses a module boundary — "surprising" coupling (Story 24.1, AC #2): the
+    /// two files live under DIFFERENT top-level directories, so their co-change is an architectural signal (a
+    /// dependency that spans modules) rather than the unremarkable case of two files in the same area moving
+    /// together. Root-level files share the repository-root boundary with each other and are cross-boundary against
+    /// anything nested (owner decision Q2).
+    /// <para>Computed ONCE and carried as a shared property on <see cref="CoupledFile.CrossBoundary"/> /
+    /// <see cref="DirectedCouple.CrossBoundary"/> so no downstream view re-derives it divergently. Orthogonal to and
+    /// layered on top of <see cref="ClassifyCoupling"/>'s Code-vs-Process lens — a pair can be both. Pure, repo-free
+    /// (no SpecScribe path literals, NFR8), symmetric, deterministic, and never throws: an empty or unknowable path
+    /// degrades to <c>false</c>, because asserting an architectural smell on a path we cannot read is worse than
+    /// staying quiet.</para></summary>
+    public static bool IsCrossBoundary(string pathA, string pathB)
+    {
+        var a = BoundaryOf(pathA);
+        var b = BoundaryOf(pathB);
+        if (a is null || b is null) return false;
+        return !string.Equals(a, b, StringComparison.Ordinal);
+    }
 
     public static GitPulse? TryCompute(string repoRoot)
     {
@@ -492,7 +601,8 @@ public static class GitMetrics
     /// (<see cref="DeepGitPulse.Insights"/>) computed from the same parsed records. [Story 3.8]</para>
     /// Pure and repo-free (mirrors <see cref="ParseLog"/>) so the format contract is unit-testable; malformed
     /// lines are skipped rather than throwing.</summary>
-    public static DeepGitPulse ParseNumstatLog(string logText, int topHotspots = 10, int topCoupling = 10)
+    public static DeepGitPulse ParseNumstatLog(
+        string logText, int topHotspots = 10, int topCoupling = 10, int minSupport = CouplingMinSupport)
     {
         var changeCounts = new Dictionary<string, int>();
         // Canonicalized (ordinal-ordered) file pair -> number of commits changing both together.
@@ -539,7 +649,7 @@ public static class GitMetrics
             .ToList();
 
         var coupling = pairCounts
-            .Where(kv => kv.Value >= 2)
+            .Where(kv => kv.Value >= minSupport)
             .OrderByDescending(kv => kv.Value)
             .ThenBy(kv => kv.Key.Item1, StringComparer.Ordinal)
             .ThenBy(kv => kv.Key.Item2, StringComparer.Ordinal)
@@ -547,7 +657,7 @@ public static class GitMetrics
             .Select(kv => (kv.Key.Item1, kv.Key.Item2, kv.Value))
             .ToList();
 
-        var fileInsights = BuildFileInsights(commits, out var coChangePairs);
+        var fileInsights = BuildFileInsights(commits, out var coChangePairs, minSupport: minSupport);
         return new DeepGitPulse(hotspots, coupling, AnalyzedCommits: commits.Count)
         {
             Insights = BuildInsights(commits),
@@ -555,7 +665,59 @@ public static class GitMetrics
             FileInsights = fileInsights,
             CodeMapMetrics = BuildCodeMapMetrics(commits),
             CoChangePairs = coChangePairs,
+            DirectedCoupling = BuildDirectedCoupling(pairCounts, changeCounts, commits.Count, topCoupling, minSupport),
         };
+    }
+
+    /// <summary>Projects the already-tallied co-change pairs into the hub's ranked DIRECTED view (Story 24.1, AC #1/#3)
+    /// — the whole-repo analog of <see cref="FileInsight.CoupledFiles"/>, sharing its metric definitions, its
+    /// <paramref name="minSupport"/> floor, and its confidence-first ordering so the two surfaces can never disagree
+    /// about what counts as a couple or which couples matter most.
+    /// <para>BOTH directions of each qualifying pair are emitted and then ranked together, because they carry
+    /// different confidence: a helper file dragged along by a hub file is a real finding on one side and noise on the
+    /// other, and collapsing them to one row would average that away. The top-N take therefore selects the strongest
+    /// DIRECTED relationships, which is the ranking AC #3 asks for — it is not the same population as
+    /// <see cref="DeepGitPulse.Coupling"/>'s top-N by shared commits, and the hub's ranking caption says so.</para>
+    /// <para>Derived entirely from maps the single numstat parse already built (no extra git call, no second commit
+    /// scan). Pure and repo-free; empty in, empty out; never throws.</para></summary>
+    private static IReadOnlyList<DirectedCouple> BuildDirectedCoupling(
+        IReadOnlyDictionary<(string, string), int> pairCounts,
+        IReadOnlyDictionary<string, int> changeCounts,
+        int analyzedCommits,
+        int topCoupling,
+        int minSupport)
+    {
+        var directed = new List<DirectedCouple>();
+        foreach (var (key, support) in pairCounts)
+        {
+            if (support < minSupport) continue;
+            var (a, b) = key;
+            var crossBoundary = IsCrossBoundary(a, b);
+            var kind = ClassifyCoupling(a, b);
+            Add(a, b);
+            Add(b, a);
+
+            void Add(string from, string to)
+            {
+                // A file present in a pair was touched, so its change count is >= the pair's support; the guard
+                // keeps a malformed/partial map from dividing by zero rather than expressing a real case.
+                var fromChanges = changeCounts.GetValueOrDefault(from);
+                if (fromChanges <= 0) return;
+                var confidence = (double)support / fromChanges;
+                directed.Add(new DirectedCouple(
+                    from, to, support, confidence,
+                    Lift(confidence, changeCounts.GetValueOrDefault(to), analyzedCommits),
+                    crossBoundary, kind));
+            }
+        }
+
+        return directed
+            .OrderByDescending(d => d.Confidence)
+            .ThenByDescending(d => d.Support)
+            .ThenBy(d => d.FromPath, StringComparer.Ordinal)
+            .ThenBy(d => d.ToPath, StringComparer.Ordinal)
+            .Take(topCoupling)
+            .ToList();
     }
 
     /// <summary>Commit-record boundary sentinel in the shared deep-git fetch (<c>%x01</c>): marks where each
@@ -791,8 +953,9 @@ public static class GitMetrics
         IReadOnlyList<DeepCommit> commits,
         int historyCap = FileInsightHistoryCap,
         int contributorCap = FileInsightContributorCap,
-        int coupledCap = FileInsightCoupledCap)
-        => BuildFileInsights(commits, out _, historyCap, contributorCap, coupledCap);
+        int coupledCap = FileInsightCoupledCap,
+        int minSupport = CouplingMinSupport)
+        => BuildFileInsights(commits, out _, historyCap, contributorCap, coupledCap, minSupport);
 
     /// <summary>Same as the four-argument overload, but also surfaces the full (uncapped) canonical file-pair
     /// co-change map it computes internally via <paramref name="coChangePairs"/> — the ONE dictionary this method
@@ -804,7 +967,8 @@ public static class GitMetrics
         out IReadOnlyDictionary<(string FileA, string FileB), int> coChangePairs,
         int historyCap = FileInsightHistoryCap,
         int contributorCap = FileInsightContributorCap,
-        int coupledCap = FileInsightCoupledCap)
+        int coupledCap = FileInsightCoupledCap,
+        int minSupport = CouplingMinSupport)
     {
         var accum = new Dictionary<string, FileInsightAccum>(StringComparer.Ordinal);
         // Canonical unordered file pair -> co-change count. Same rule as ParseNumstatLog's coupling so the per-file
@@ -856,15 +1020,27 @@ public static class GitMetrics
         }
 
         // Fan each unordered pair out to both members' "changes with" lists (the other file + shared-commit count).
-        var coupledByFile = new Dictionary<string, List<(string Path, int CoChanges)>>(StringComparer.Ordinal);
+        // The DIRECTIONAL metrics (Story 24.1) are deliberately NOT computed here: a pair's confidence depends on
+        // whose list it lands in, and the per-file loop below is where the focal file's own ChangeCount is in hand.
+        // Support is filtered here rather than downstream so a below-floor couple never occupies a capped slot.
+        var coupledByFile = new Dictionary<string, List<(string Path, int Support)>>(StringComparer.Ordinal);
         foreach (var (key, count) in pairCounts)
         {
+            if (count < minSupport) continue;
             var (a, b) = key;
             if (!coupledByFile.TryGetValue(a, out var listA)) coupledByFile[a] = listA = new();
             listA.Add((b, count));
             if (!coupledByFile.TryGetValue(b, out var listB)) coupledByFile[b] = listB = new();
             listB.Add((a, count));
         }
+
+        // Lift's denominator: the other file's base rate = ChangeCount[other] / analyzed commits. Records with no
+        // files were skipped above, so commits.Count is the honest analyzed-window size, matching DeepGitPulse's.
+        var analyzedCommits = commits.Count;
+
+        // Both members of every surviving pair were touched, so both are in accum by construction; the guard is
+        // defensive only (0 makes Lift return null rather than dividing by zero).
+        int OtherChangeCount(string other) => accum.TryGetValue(other, out var o) ? o.ChangeCount : 0;
 
         var result = new Dictionary<string, FileInsight>(StringComparer.Ordinal);
         foreach (var (path, a) in accum)
@@ -876,13 +1052,24 @@ public static class GitMetrics
                 .Select(kv => (Author: kv.Key, Commits: kv.Value))
                 .ToList();
 
+            // Directional coupling (Story 24.1): confidence is computed from THIS file's change count, so the same
+            // pair reads differently in each member's list. a.ChangeCount is >= 1 for every file in accum (it is
+            // only created on a touch) and can never be less than a pair's support, so confidence lands in [0,1].
             var coupled = coupledByFile.TryGetValue(path, out var pairs)
                 ? pairs
-                    .OrderByDescending(p => p.CoChanges)
+                    .Select(p => new CoupledFile(
+                        p.Path,
+                        p.Support,
+                        Confidence: (double)p.Support / a.ChangeCount,
+                        Lift: Lift((double)p.Support / a.ChangeCount, OtherChangeCount(p.Path), analyzedCommits),
+                        CrossBoundary: IsCrossBoundary(path, p.Path),
+                        Kind: ClassifyCoupling(path, p.Path)))
+                    .OrderByDescending(p => p.Confidence)
+                    .ThenByDescending(p => p.Support)
                     .ThenBy(p => p.Path, StringComparer.Ordinal)
                     .Take(coupledCap)
                     .ToList()
-                : new List<(string Path, int CoChanges)>();
+                : new List<CoupledFile>();
 
             result[path] = new FileInsight(a.ChangeCount, contributors, coupled, a.History, TotalContributors: a.Contributors.Count);
         }
@@ -902,6 +1089,21 @@ public static class GitMetrics
         if (pairs is null || pairs.Count == 0 || a.Length == 0 || b.Length == 0) return 0;
         var key = string.CompareOrdinal(a, b) <= 0 ? (a, b) : (b, a);
         return pairs.GetValueOrDefault(key);
+    }
+
+    /// <summary>Lift for a directed couple (Story 24.1): <c>confidence ÷ (targetChangeCount ÷ analyzedCommits)</c> —
+    /// how much the pairing beats the target file's own base rate of appearing in any commit. Above 1 the two really
+    /// do travel together; at 1 the target simply shows up that often anyway, which is exactly how an
+    /// always-churning file self-demotes instead of looking coupled to everything.
+    /// <para>The ONE place this division happens, so no surface can compute it differently or forget the guard.
+    /// Returns null — never <c>NaN</c> or <c>Infinity</c>, which would leak into rendered markup as literal
+    /// "NaN"/"∞" — when the base rate is undefined (no analyzed commits, or a target with no recorded changes).
+    /// Pure, repo-free, never throws.</para></summary>
+    public static double? Lift(double confidence, int targetChangeCount, int analyzedCommits)
+    {
+        if (targetChangeCount <= 0 || analyzedCommits <= 0) return null;
+        var baseRate = (double)targetChangeCount / analyzedCommits;
+        return baseRate <= 0 ? null : confidence / baseRate;
     }
 
     /// <summary>Per-file accumulator for <see cref="BuildCodeMapMetrics"/>: change frequency, total churn, and the

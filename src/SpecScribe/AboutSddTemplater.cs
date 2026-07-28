@@ -17,11 +17,19 @@ public static class AboutSddTemplater
         ("superpowers", "Superpowers", SiteNav.AboutSddSuperpowersOutputPath, false),
     ];
 
-    public static string RenderHub(SiteNav nav, bool methodPresent, bool gdsPresent)
+    public static string RenderHub(SiteNav nav, bool methodPresent, bool gdsPresent) =>
+        HtmlRenderAdapter.Shared.Render(BuildHubPage(nav, methodPresent, gdsPresent)).Content;
+
+    /// <summary>Builds the hub page's host-neutral <see cref="PageView"/> — the AD-2 delivery contract, so the
+    /// IR's content region can be COMPOSED (<see cref="JsonSpaRenderAdapter.RenderContent"/>) instead of sliced
+    /// back out of a rendered full page. <see cref="RenderHub"/> is the unchanged HTML projection of this same
+    /// model, so the bytes are identical. [Story 23.4 AC #3]</summary>
+    public static PageView BuildHubPage(SiteNav nav, bool methodPresent, bool gdsPresent)
     {
         var outputPath = SiteNav.AboutSddOutputPath;
-        var sb = Begin(nav, outputPath, "About Spec-Driven Development",
+        var page = Begin(nav, outputPath, "About Spec-Driven Development",
             "Which Spec-Driven Development frameworks SpecScribe understands, and how to get started.");
+        var sb = page.Body;
 
         sb.Append("  <p>Spec-Driven Development (SDD) means planning and shipping with AI-assisted methodologies ");
         sb.Append("that keep briefs, requirements, stories, and decisions as first-class artifacts. SpecScribe ");
@@ -57,10 +65,15 @@ public static class AboutSddTemplater
         }
         sb.Append("  </ul>\n");
 
-        return End(sb, hasMermaid: false);
+        return End(page, hasMermaid: false);
     }
 
-    public static string RenderFrameworkPage(SiteNav nav, string frameworkId, bool methodPresent, bool gdsPresent)
+    public static string RenderFrameworkPage(SiteNav nav, string frameworkId, bool methodPresent, bool gdsPresent) =>
+        HtmlRenderAdapter.Shared.Render(BuildFrameworkPage(nav, frameworkId, methodPresent, gdsPresent)).Content;
+
+    /// <summary>Builds a framework page's host-neutral <see cref="PageView"/> — see <see cref="BuildHubPage"/>.
+    /// [Story 23.4 AC #3]</summary>
+    public static PageView BuildFrameworkPage(SiteNav nav, string frameworkId, bool methodPresent, bool gdsPresent)
     {
         var fw = Frameworks.First(f => f.Id == frameworkId);
         var detected = frameworkId switch
@@ -70,8 +83,9 @@ public static class AboutSddTemplater
             _ => false,
         };
 
-        var sb = Begin(nav, fw.OutputPath, fw.Label,
+        var page = Begin(nav, fw.OutputPath, fw.Label,
             $"About {fw.Label} for Spec-Driven Development — orientation, SpecScribe support, and getting started.");
+        var sb = page.Body;
 
         if (detected)
             sb.Append("  <p class=\"sdd-detected-banner\" role=\"status\"><span class=\"sdd-detected\">Detected</span> in this project</p>\n");
@@ -80,13 +94,13 @@ public static class AboutSddTemplater
         {
             case "bmad":
                 AppendBmadBody(sb, detected);
-                return End(sb, hasMermaid: true);
+                return End(page, hasMermaid: true);
             case "gds":
                 AppendGdsBody(sb, detected);
-                return End(sb, hasMermaid: true);
+                return End(page, hasMermaid: true);
             default:
                 AppendComingSoonBody(sb, fw.Label);
-                return End(sb, hasMermaid: false);
+                return End(page, hasMermaid: false);
         }
     }
 
@@ -230,15 +244,13 @@ public static class AboutSddTemplater
         AppendFamilySupportTable(sb, supported: false);
     }
 
-    private static StringBuilder Begin(SiteNav nav, string outputPath, string title, string description)
-    {
-        var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen(
-            $"{title} — {nav.SiteTitle}",
-            ForgeOptions.StylesheetName, ForgeOptions.ScriptName,
-            description));
-        sb.Append(nav.RenderNavBar(outputPath, nav.BuildSddLocalContext(outputPath)));
+    /// <summary>The identity every SDD page shares, carried from <see cref="Begin"/> to <see cref="End"/> so the
+    /// page's chrome facts reach its <see cref="PageView"/> instead of being string-built and discarded. Story 23.4
+    /// moved this templater onto the delivery contract; the two-phase Begin/End shape is unchanged.</summary>
+    private sealed record SddPage(SiteNav Nav, string OutputPath, string Title, string Description, IReadOnlyList<(string, string?)> Trail, StringBuilder Body);
 
+    private static SddPage Begin(SiteNav nav, string outputPath, string title, string description)
+    {
         var trail = new List<(string, string?)>
         {
             ("Home", SiteNav.HomeOutputPath),
@@ -252,25 +264,43 @@ public static class AboutSddTemplater
         {
             trail.Add(("About Spec-Driven Development", null));
         }
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, trail));
 
+        // ⚠️ The body starts at the doc-header, NOT at <main> — these pages emit their title block BEFORE the
+        // landmark, and the old region slice began at the breadcrumb, so the header was inside the captured
+        // region. Starting at <main> would keep the golden gate green while silently dropping the title block
+        // from the IR. [Story 23.4 AC #3, finding 1]
+        var sb = new StringBuilder();
         sb.Append("<header class=\"doc-header\">\n");
         sb.Append($"  <h1>{PathUtil.Html(title)}</h1>\n");
         sb.Append($"  <div class=\"doc-subtitle\">{PathUtil.Html(description)}</div>\n");
         sb.Append("</header>\n\n");
         sb.Append("<main id=\"main-content\" class=\"info-page\">\n");
         sb.Append("<section class=\"chart-panel about-sdd-panel\">\n");
-        return sb;
+        return new SddPage(nav, outputPath, title, description, trail, sb);
     }
 
-    private static string End(StringBuilder sb, bool hasMermaid)
+    private static PageView End(SddPage page, bool hasMermaid)
     {
+        var sb = page.Body;
         sb.Append("</section>\n");
         sb.Append("</main>\n\n");
-        sb.Append(PathUtil.RenderFooter());
-        if (hasMermaid)
-            sb.Append(Mermaid.InitScript());
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+
+        return new PageView
+        {
+            Kind = PageKind.About,
+            OutputRelativePath = page.OutputPath,
+            Title = $"{page.Title} — {page.Nav.SiteTitle}",
+            MetaDescription = page.Description,
+            Nav = page.Nav.ToNavigationView(page.OutputPath, page.Nav.BuildSddLocalContext(page.OutputPath)),
+            Breadcrumb = BreadcrumbTrail.From(page.Trail),
+            Assets = new AssetManifest
+            {
+                StylesheetHref = ForgeOptions.StylesheetName,
+                ScriptHref = ForgeOptions.ScriptName,
+                MermaidNeeded = hasMermaid,
+            },
+            Interaction = InteractionState.None,
+            BodyHtml = sb.ToString(),
+        };
     }
 }

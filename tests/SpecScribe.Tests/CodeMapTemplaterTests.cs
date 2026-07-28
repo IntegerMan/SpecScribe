@@ -141,6 +141,24 @@ public class CodeMapTemplaterTests
     }
 
     [Fact]
+    public void RenderPage_FileTableIsASetMatchAgainstTheChartPayload_NotJustACountMatch()
+    {
+        // [Review][Patch] Git Insights' own twin test does this SET match (Story 20.6 Task 1.3b's predicate: a
+        // count match is not a set match), but Code Map's file table — this surface's declared twin (D1) — had no
+        // equivalent; only row-count assertions existed at the detail-cap boundary. Every path the "full" panel's
+        // chart payload charts must have a resolving row in that SAME panel's table.
+        var html = CodeMapTemplater.RenderPage(VariantsWithMetrics(), Nav());
+        var fullTable = html[html.IndexOf("data-view=\"full\"", StringComparison.Ordinal)..html.IndexOf("data-view=\"no-spec\"", StringComparison.Ordinal)];
+
+        var charted = System.Text.RegularExpressions.Regex.Matches(Island(html, "full"), "\"path\":\"(?<p>[^\"]+)\"");
+        Assert.True(charted.Count > 0, "fixture must chart at least one file");
+        foreach (System.Text.RegularExpressions.Match m in charted)
+        {
+            Assert.Contains(m.Groups["p"].Value, fullTable, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void RenderPage_EmitsFourPanelsAndTwoPureCssFilterCheckboxes()
     {
         var variants = VariantsWithoutMetrics(

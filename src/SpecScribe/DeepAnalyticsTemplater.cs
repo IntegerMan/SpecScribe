@@ -14,25 +14,27 @@ namespace SpecScribe;
 /// [Story 3.2; Story 10.2]</summary>
 public static class DeepAnalyticsTemplater
 {
-    public static string RenderPage(DeepGitPulse deep, SiteNav nav, Func<string, string?>? fileHref = null)
+    public static string RenderPage(DeepGitPulse deep, SiteNav nav, Func<string, string?>? fileHref = null) =>
+        HtmlRenderAdapter.Shared.Render(BuildPage(deep, nav, fileHref)).Content;
+
+    /// <summary>Builds this page's host-neutral <see cref="PageView"/> — the AD-2 delivery contract. Story 23.4
+    /// moved every standalone templater onto it so the IR's content region can be COMPOSED
+    /// (<see cref="JsonSpaRenderAdapter.RenderContent"/>: nav markup + wayfinding + body) instead of sliced back
+    /// out of a rendered full page. <see cref="RenderPage"/> is the unchanged HTML projection of this same model,
+    /// so the bytes are identical.
+    /// <para>⚠️ <b>This page's body deliberately extends PAST <c>&lt;/main&gt;</c>.</b> The <c>:target</c> zoom
+    /// lightbox is a sibling of the landmark, not a child of it, and the old
+    /// <c>SpaDelivery.ExtractContentRegion</c> slice truncated at <c>&lt;/main&gt;</c> — so the "Expand" link
+    /// resolved to nothing on every non-HTML surface. Composing the region from this <see cref="PageView"/> FIXES
+    /// that inherited capture defect; it is a documented, attributed non-zero parity delta, not a regression.
+    /// [Story 23.4 AC #1, AC #3]</para></summary>
+    public static PageView BuildPage(DeepGitPulse deep, SiteNav nav, Func<string, string?>? fileHref = null)
     {
         var outputPath = SiteNav.DeepAnalyticsOutputPath;
         var prefix = PathUtil.RelativePrefix(outputPath);
         var window = AnalyzedWindow(deep);
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen(
-            $"Deep Git Analytics — {nav.SiteTitle}",
-            prefix + ForgeOptions.StylesheetName,
-            prefix + ForgeOptions.ScriptName,
-            $"Deeper git insights for {nav.SiteTitle}: change coupling between files and the repository's change hotspots."));
-        sb.Append(nav.RenderNavBar(outputPath, nav.BuildInsightsLocalContext(outputPath)));
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
-        {
-            ("Home", "index.html"),
-            ("Deep Analytics", null),
-        }));
-
         sb.Append("<main id=\"main-content\" class=\"deep-page\">\n");
         sb.Append("<header class=\"doc-header\">\n");
         sb.Append("  <div class=\"story-kicker\">Deep Analytics &middot; opt-in</div>\n");
@@ -82,15 +84,20 @@ public static class DeepAnalyticsTemplater
         sb.Append("<section class=\"deep-page-section\">\n");
         sb.Append("  <div class=\"deep-page-lower\">\n");
 
+        // Story 24.1: the ranked table reads the DIRECTED view (confidence-ranked) while the graph above stays on
+        // the symmetric shared-commit pairs, so the caption must name which ranking THIS panel used — the two are
+        // deliberately different populations, and a caption inherited from the graph's would misdescribe the rows.
+        // The ranking caption lives here in ChartMeta.Ranking, never in the shared WhyText (Story 10.2).
+        var directed = deep.DirectedCoupling;
         sb.Append(Charts.Framed(
             new Charts.ChartMeta(
                 Title: "Ranked Pairs",
                 Window: window,
-                Ranking: hasCoupling
-                    ? $"Top {N(deep.Coupling.Count)} coupled {Charts.Plural(deep.Coupling.Count, "pair", "pairs")} by shared commits"
+                Ranking: directed.Count > 0
+                    ? $"Top {N(directed.Count)} directed {Charts.Plural(directed.Count, "couple", "couples")} by confidence — how often the first file's changes bring the second along"
                     : null,
                 Why: Charts.WhyText(Charts.ChartMetric.ChangeCoupling)),
-            Charts.CouplingTable(deep.Coupling, fileHref),
+            Charts.CouplingTable(directed, fileHref),
             panelClass: "chart-panel deep-page-list-panel"));
 
         sb.Append(Charts.Framed(
@@ -122,9 +129,27 @@ public static class DeepAnalyticsTemplater
             sb.Append("</div>\n\n");
         }
 
-        sb.Append(PathUtil.RenderFooter());
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+        return new PageView
+        {
+            Kind = PageKind.DeepAnalytics,
+            OutputRelativePath = outputPath,
+            Title = $"Deep Git Analytics — {nav.SiteTitle}",
+            MetaDescription = $"Deeper git insights for {nav.SiteTitle}: change coupling between files and the repository's change hotspots.",
+            Nav = nav.ToNavigationView(outputPath, nav.BuildInsightsLocalContext(outputPath)),
+            Breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
+            {
+                ("Home", "index.html"),
+                ("Deep Analytics", null),
+            }),
+            Assets = new AssetManifest
+            {
+                StylesheetHref = prefix + ForgeOptions.StylesheetName,
+                ScriptHref = prefix + ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+            },
+            Interaction = InteractionState.None,
+            BodyHtml = sb.ToString(),
+        };
     }
 
     private static string? AnalyzedWindow(DeepGitPulse deep) =>

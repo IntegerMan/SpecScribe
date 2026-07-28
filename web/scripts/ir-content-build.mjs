@@ -47,6 +47,10 @@ export async function buildIrContentCss() {
   for (const path of ir.site.paths) {
     const page = ir.page(path)
     const r = page.region
+    // A degraded page carries no <main> landmark and therefore no body to harvest rules from. Skip it rather
+    // than folding its raw nav markup into the used/other sets, which would attribute nav-only selectors to a
+    // page that renders nothing. [Story 22.4 code review — owner decision DR2]
+    if (r.degraded) continue
     const markup = `${r.navHtml}${r.wayfindingHtml}${r.mainInnerHtml}`
     if (isMigrated(path)) {
       migratedPages += 1

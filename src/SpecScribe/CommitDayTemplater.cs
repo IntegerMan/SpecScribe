@@ -19,6 +19,23 @@ public static class CommitDayTemplater
         EntityPager? pager,
         SiteNav nav,
         Func<string, string?>? commitHref = null,
+        NavLocalContext? localContext = null) =>
+        HtmlRenderAdapter.Shared.Render(BuildPage(day, commits, artifacts, pager, nav, commitHref, localContext)).Content;
+
+    /// <summary>Builds a date page's host-neutral <see cref="PageView"/> — the AD-2 delivery contract. Story 23.4
+    /// moved every standalone templater onto it so the IR's content region can be COMPOSED
+    /// (<see cref="JsonSpaRenderAdapter.RenderContent"/>: nav markup + wayfinding + body) instead of sliced back
+    /// out of a rendered full page. <see cref="RenderPage"/> is the unchanged HTML projection of this same model,
+    /// so the bytes are identical. The caller's <paramref name="localContext"/> reaches the nav through
+    /// <see cref="SiteNav.ToNavigationView"/>, which has always accepted one — so the page-local nav band survives
+    /// composition by construction rather than needing a path→context resolver. [Story 23.4 AC #3]</summary>
+    public static PageView BuildPage(
+        DateOnly day,
+        IReadOnlyList<CommitInfo> commits,
+        IReadOnlyList<(string Label, string Href)> artifacts,
+        EntityPager? pager,
+        SiteNav nav,
+        Func<string, string?>? commitHref = null,
         NavLocalContext? localContext = null)
     {
         var readable = Charts.DReadable(day);
@@ -33,20 +50,6 @@ public static class CommitDayTemplater
         var kicker = hasCommits ? "Commit Activity" : "Activity";
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen(
-            $"{pageLabel} — {nav.SiteTitle}",
-            prefix + ForgeOptions.StylesheetName,
-            prefix + ForgeOptions.ScriptName,
-            BuildMetaDescription(readable, nav.SiteTitle, commits.Count, artifacts.Count)));
-        sb.Append(nav.RenderNavBar(outputPath, localContext));
-        // Sibling pager (Prev = newer day, Next = older) rides the coherent wayfinding strip alongside the
-        // breadcrumb now, not the body's own header. [Story 10.11]
-        sb.Append(SiteNav.RenderWayfinding(outputPath, new (string, string?)[]
-        {
-            ("Home", "index.html"),
-            (pageLabel, null),
-        }, pager));
-
         // Single <main id="main-content"> landmark / skip-link target. [Story 1.4 AC #1]
         sb.Append("<main id=\"main-content\">\n");
         sb.Append("<header class=\"doc-header\">\n");
@@ -122,9 +125,31 @@ public static class CommitDayTemplater
         // bottom-of-page nav so every entity family navigates identically. [Prev/next navigation]
 
         sb.Append("</main>\n\n");
-        sb.Append(PathUtil.RenderFooter(prefix));
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+
+        return new PageView
+        {
+            Kind = PageKind.CommitDay,
+            OutputRelativePath = outputPath,
+            Title = $"{pageLabel} — {nav.SiteTitle}",
+            MetaDescription = BuildMetaDescription(readable, nav.SiteTitle, commits.Count, artifacts.Count),
+            Nav = nav.ToNavigationView(outputPath, localContext),
+            Breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
+            {
+                ("Home", "index.html"),
+                (pageLabel, null),
+            }),
+            // Sibling pager (Prev = newer day, Next = older) rides the coherent wayfinding strip alongside the
+            // breadcrumb now, not the body's own header. [Story 10.11]
+            Pager = pager,
+            Assets = new AssetManifest
+            {
+                StylesheetHref = prefix + ForgeOptions.StylesheetName,
+                ScriptHref = prefix + ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+            },
+            Interaction = InteractionState.None,
+            BodyHtml = sb.ToString(),
+        };
     }
 
     /// <summary>The page's meta/OG description, phrased to match what the day actually carries: commits only

@@ -459,6 +459,54 @@ decision, not an omission, and the reason is worth keeping:
 | `external_roslyn:*` INFO band | 771 | **Accepted for now, not suppressed.** Revisit at Story 17.3 (the performance rules: `CA1861`, `CA1859`, `CA1822`) and as a bulk disposition for the rest. |
 | Everything else above the bar | — | Routed to Stories 17.1 / 17.3 / 17.5 — see the `25-2-quality-gate-and-findings-triage` group in `deferred-work.md`. |
 
+## The agent-facing digest (Story 25.4)
+
+The triage pass above is for a **human deciding project policy**. There is a second, narrower need: an agent
+running `create-story` or `dev-story` wants to know what analysis already says about *the three files it is
+about to touch* — and it wants that without reading 1,488 issues.
+
+`tools/analysis-digest/` fetches the same public endpoints this document already uses and writes the findings
+to `.specscribe/analysis/` as [ADR 0023](adrs/0023-agent-facing-analysis-observation-contract.md)
+`AnalysisObservation` records: one index plus one shard per source file.
+
+```bash
+node tools/analysis-digest/index.mjs
+```
+
+- **No token.** It uses the same anonymous access as every `curl` in this document. It never reads, prompts
+  for, or writes a credential.
+- **Gitignored** (`.gitignore`'s `.specscribe` entry — [ADR 0014](adrs/0014-specscribe-settings-folder-format.md)),
+  and it writes nothing into `SpecScribeOutput/`, so the golden fingerprint cannot move.
+- **Opt-in by invocation.** No hook, no watcher, no `postinstall`, no MSBuild target. If you do not run it,
+  nothing happens.
+- **A failed fetch leaves the previous digest untouched and exits 0.** It never writes an empty digest,
+  because an empty digest reads as *"this code is clean"*.
+- Refresh it after a new analysis lands. The consumption rules — including the read-time staleness rule — are
+  in `CLAUDE.md` § Analysis observations, which is auto-loaded into every session.
+
+```bash
+node tools/analysis-digest/index.mjs --check-staleness <revision>   # print the provenance block, write nothing
+node tools/analysis-digest/index.mjs --help
+```
+
+### The Sonar MCP server is a complement, not the contract
+
+SonarSource ships an official MCP server for SonarQube Cloud and documents Claude Code explicitly. For
+**interactive** questions — *"what does Sonar think of this file right now?"* — it is strictly better than
+anything this project would build, and it costs no code.
+
+**It is not the contract, and it cannot replace the digest.** Named plainly so nobody swaps one for the other:
+
+- It delivers **Sonar's** model, not the source-agnostic `AnalysisObservation` profile that Epic 26's product
+  surfaces bind to.
+- It **requires a token**; the digest is anonymous.
+- It **dies offline**; the digest is a local file that keeps working.
+- It **cannot see raw compiler output**, so the second proven source class is out of reach.
+- It **cannot attach observations to planning entities**, which is the whole point of ADR 0023 Decision 5.
+- It has **no provenance/staleness contract** — nothing tells you which revision an answer describes.
+
+Use both, with those roles.
+
 ## Security notes
 
 - The token is never committed. It exists only in SonarCloud and in GitHub's encrypted secret store.

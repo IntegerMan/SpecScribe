@@ -16,24 +16,19 @@ namespace SpecScribe;
 /// [Story 18.4]</summary>
 public static class IdeasTemplater
 {
-    public static string RenderListPage(IdeasModel model, SiteNav nav)
+    public static string RenderListPage(IdeasModel model, SiteNav nav) =>
+        HtmlRenderAdapter.Shared.Render(BuildListPage(model, nav)).Content;
+
+    /// <summary>Builds the list page's host-neutral <see cref="PageView"/> — the AD-2 delivery contract, so the
+    /// IR's content region can be COMPOSED (<see cref="JsonSpaRenderAdapter.RenderContent"/>: nav markup +
+    /// wayfinding + body) instead of sliced back out of a rendered full page. <see cref="RenderListPage"/> is the
+    /// unchanged HTML projection of this same model, so the bytes are identical. [Story 23.4 AC #3]</summary>
+    public static PageView BuildListPage(IdeasModel model, SiteNav nav)
     {
         var outputPath = SiteNav.IdeasOutputPath;
         var prefix = PathUtil.RelativePrefix(outputPath); // "" — ideas.html is at the output root.
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen(
-            $"Ideas — {nav.SiteTitle}",
-            prefix + ForgeOptions.StylesheetName,
-            prefix + ForgeOptions.ScriptName,
-            $"Forged ideas for {nav.SiteTitle} — what was pressure-tested, how each one turned out, and where it went next."));
-        sb.Append(nav.RenderNavBar(outputPath));
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
-        {
-            ("Home", SiteNav.HomeOutputPath),
-            ("Ideas", null),
-        }));
-
         sb.Append("<main id=\"main-content\" class=\"dashboard\">\n\n");
         sb.Append("<h1>Ideas</h1>\n");
         sb.Append($"<p class=\"doc-subtitle\">{PathUtil.Html(nav.SiteTitle)} &middot; ideas pressure-tested before they became work</p>\n\n");
@@ -48,9 +43,28 @@ public static class IdeasTemplater
         }
 
         sb.Append("</main>\n\n");
-        sb.Append(PathUtil.RenderFooter(prefix));
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+
+        return new PageView
+        {
+            Kind = PageKind.Structure,
+            OutputRelativePath = outputPath,
+            Title = $"Ideas — {nav.SiteTitle}",
+            MetaDescription = $"Forged ideas for {nav.SiteTitle} — what was pressure-tested, how each one turned out, and where it went next.",
+            Nav = nav.ToNavigationView(outputPath),
+            Breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
+            {
+                ("Home", SiteNav.HomeOutputPath),
+                ("Ideas", null),
+            }),
+            Assets = new AssetManifest
+            {
+                StylesheetHref = prefix + ForgeOptions.StylesheetName,
+                ScriptHref = prefix + ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+            },
+            Interaction = InteractionState.None,
+            BodyHtml = sb.ToString(),
+        };
     }
 
     private static string RenderSection(IdeaVerdict verdict, IReadOnlyList<IdeaEntry> ideas)
@@ -101,26 +115,17 @@ public static class IdeasTemplater
     /// idea went on to become. Synthesized because <c>forged-idea.md</c> exists ONLY on a hardened exit — linking
     /// straight to it would leave every killed, clarified and in-progress idea with no destination at all
     /// (owner decision D1).</summary>
-    public static string RenderDetailPage(IdeaEntry idea, SiteNav nav)
+    public static string RenderDetailPage(IdeaEntry idea, SiteNav nav) =>
+        HtmlRenderAdapter.Shared.Render(BuildDetailPage(idea, nav)).Content;
+
+    /// <summary>Builds a detail page's host-neutral <see cref="PageView"/> — see <see cref="BuildListPage"/>.
+    /// [Story 23.4 AC #3]</summary>
+    public static PageView BuildDetailPage(IdeaEntry idea, SiteNav nav)
     {
         var outputPath = idea.DetailOutputPath;
         var prefix = PathUtil.RelativePrefix(outputPath); // "../" — detail pages live under ideas/.
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen(
-            $"{idea.Title} — {nav.SiteTitle}",
-            prefix + ForgeOptions.StylesheetName,
-            prefix + ForgeOptions.ScriptName,
-            $"{idea.Title} — a forged idea for {nav.SiteTitle}: how the session went and how it ended."));
-        sb.Append(nav.RenderNavBar(outputPath));
-        // Crumb paths are ROOT-relative: RenderBreadcrumb applies the page's own relative prefix itself.
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
-        {
-            ("Home", SiteNav.HomeOutputPath),
-            ("Ideas", SiteNav.IdeasOutputPath),
-            (idea.Title, null),
-        }));
-
         sb.Append("<main id=\"main-content\" class=\"dashboard\">\n\n");
         sb.Append("<header class=\"doc-header\">\n");
         sb.Append($"  <h1>{PathUtil.Html(idea.Title)}</h1>\n");
@@ -160,9 +165,30 @@ public static class IdeasTemplater
 
         sb.Append("</article>\n");
         sb.Append("</main>\n\n");
-        sb.Append(PathUtil.RenderFooter(prefix));
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+
+        return new PageView
+        {
+            Kind = PageKind.Doc,
+            OutputRelativePath = outputPath,
+            Title = $"{idea.Title} — {nav.SiteTitle}",
+            MetaDescription = $"{idea.Title} — a forged idea for {nav.SiteTitle}: how the session went and how it ended.",
+            Nav = nav.ToNavigationView(outputPath),
+            // Crumb paths are ROOT-relative: the wayfinding renderer applies the page's own relative prefix itself.
+            Breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
+            {
+                ("Home", SiteNav.HomeOutputPath),
+                ("Ideas", SiteNav.IdeasOutputPath),
+                (idea.Title, null),
+            }),
+            Assets = new AssetManifest
+            {
+                StylesheetHref = prefix + ForgeOptions.StylesheetName,
+                ScriptHref = prefix + ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+            },
+            Interaction = InteractionState.None,
+            BodyHtml = sb.ToString(),
+        };
     }
 
     /// <summary>States how the session ACTUALLY ended, in words, including the exit the list's three buckets cannot

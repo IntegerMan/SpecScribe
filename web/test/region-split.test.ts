@@ -126,13 +126,30 @@ describe('splitContentRegion — pages with no wayfinding band', () => {
   })
 })
 
-describe('splitContentRegion — refusals', () => {
-  it('refuses a page with no <main> landmark', () => {
-    // The emitter degrades a landmark-less page to nav-only rather than aborting, so this shape is real —
-    // it just is not something this app can render as a page.
-    expect(() => splitContentRegion(`${NAV}<p>orphan</p>`, 'broken.html')).toThrow(/no <main id="main-content">/)
+describe('splitContentRegion — the degraded (landmark-less) shape', () => {
+  // ADR 0024 §Decision 3 keeps a landmark-less page IN the IR (the SPA retains what the webview skips), so
+  // this shape is real and a consumer must be able to skip it. It used to throw — and because Nuxt prerenders
+  // every route from the manifest, that turned one bad page into a whole-site build failure, which is the
+  // opposite of what §Decision 3 intends. [Story 22.4 code review — owner decision DR2]
+  const region = splitContentRegion(`${NAV}<p>orphan</p>`, 'broken.html')
+
+  it('flags it as degraded instead of throwing', () => {
+    expect(region.degraded).toBe(true)
   })
 
+  it('yields no page body, so a consumer that ignores the flag renders nothing rather than half a page', () => {
+    expect(region.mainInnerHtml).toBe('')
+    expect(region.wayfindingHtml).toBe('')
+    expect(region.mainAttributes).toBe('')
+    expect(region.mainAttrs).toEqual({})
+  })
+
+  it('keeps a well-formed page unflagged', () => {
+    expect(splitContentRegion(`${NAV}${MAIN_OPEN}${BODY}</main>`, 'index.html').degraded).toBe(false)
+  })
+})
+
+describe('splitContentRegion — refusals', () => {
   it('refuses an unterminated <main>', () => {
     expect(() => splitContentRegion(`${NAV}${MAIN_OPEN}${BODY}`, 'broken.html')).toThrow(/unterminated <main>/)
   })

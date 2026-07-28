@@ -1260,7 +1260,132 @@ public class SiteGeneratorAdapterTests : IDisposable
         // VERIFICATION: confirmed byte-identical across two consecutive runs after a rebuild. Single-box only —
         // the cross-environment caveat above still stands.
         // [Code review of Story 20.7, 2026-07-28; CLAUDE.md shared-main + golden-diff-normalization-gotchas]
-        const string expected = "e384cbde3ddaa14e7d10178bc16fc0c79456622e49e5ab89af1e3a0efcf35ecc";
+        // ── STORY 8.9 REGENERATION (2026-07-28): `retired` as a first-class story status ─────────────────────
+        // e384cbde… -> 9bf8ac05…. MOVER SET: exactly ONE file, `specscribe.css`. Not "the pages I could think to
+        // check" — this was MEASURED, not argued (method below), so the enumeration is exhaustive by construction.
+        //
+        // Why no page moved. This fixture has NO retired story (statuses are `in-progress`, `done`, and one
+        // undrafted story with no artifact), and every one of Story 8.9's rendering-visible changes is gated on a
+        // story actually classifying as `retired`:
+        //   · `ForStatus`' new retirement arm      — fixture statuses never hit it.
+        //   · `StoryStages` += `retired`           — its two consumers (Charts.DeliverySentence / DeliverySegments)
+        //                                            drop zero-count stages; `RefinementFunnel` reads named stages
+        //                                            (done/review/active/ready) and never iterates the list.
+        //   · `EpicStages` += `retired`            — the Epic Status donut zero-suppresses (`nonZero` filter).
+        //   · `StoryLabel`/`EpicLabel` new arms    — unreachable without a retired story.
+        //   · `LegendWord`'s `retired` arm removed — it delegated to `SprintLabel("retired")` and now falls through
+        //                                            to `StoryLabel("retired")`; BOTH return "Retired", so the
+        //                                            legend key (rendered on every page) is byte-identical.
+        //   · `HtmlRenderAdapter.Epics` story-card — the stage modifier is the empty string unless retired, so
+        //                                            `<div class="story-card"` is byte-for-byte unchanged.
+        //   · `HierarchyExplorer.PaintedStatusTokens` += `retired` — only alters `PlanningColorClass("retired")`.
+        //   · `EpicsParser.RetirementKeyword` 3→6 words — the fixture's epics.md contains no HTML comments at all.
+        //
+        // METHOD (the claim above is measured, not reasoned). Three fingerprints, each from a FULL rebuild:
+        //   A. Pure HEAD (`git archive HEAD` into a scratch dir — no worktree, no reset, working tree untouched)
+        //      reproduces `e384cbde…` EXACTLY. That is the control: it proves the outgoing constant was not stale
+        //      on this runner, which is the trap that made the Story 8.3 entry above a "baseline refresh".
+        //   B. Pure HEAD + ONLY this working tree's `specscribe.css` copied in == `9bf8ac05…`.
+        //   C. The working tree itself == `9bf8ac05…`.
+        //   B == C proves NO C# change in this tree — not Story 8.9's, and not the two concurrent sessions'
+        //   either — moves a single rendered byte here. The stylesheet is the entire delta.
+        // ⚠ Variant B FIRST reported a false PASS on an incremental build: `dotnet test` reused a cached assembly
+        // and never re-embedded the changed asset. Only `dotnet build --no-incremental` surfaced the real hash.
+        // That is exactly the stale-build trap in [[golden-diff-normalization-gotchas]]; a golden regeneration
+        // measured on an incremental build is worthless.
+        //
+        // CSS DELTA ATTRIBUTION — 8 hunks, and one of them is NOT this story's:
+        //   · 7 hunks are Story 8.9's: the `data-tok-retired` drilled-legend row (:177), `.ss-hierarchy-sw.sb-retired`
+        //     (:387), the `.sb-retired` wedge fill (:3268), `.sunburst-legend .sb-retired-sw` (:3333), the
+        //     `:has(.sb-retired-item…)` emphasis pair (:3372), `.story-card.retired` (:4925), and
+        //     `.coverage-story-card.retired` (:5914). All read `--status-deferred` — no 7th `--status-*` token.
+        //   · 1 hunk (:4587, `.coupling-boundary-badge` + the widened `.coupling-kind` column) is STORY 24.1's,
+        //     from a concurrent session. It is a real co-mover of this hash and is named rather than absorbed.
+        //
+        // PROVENANCE (shared main) — this hash is NOT this story's work alone. `git status` at capture time showed
+        // THREE sessions live in one tree: Story 8.9 (this one), Story 24.1 (directional change-coupling —
+        // `GitMetrics.cs`, `CodeFileTemplater.cs`, `DeepAnalyticsTemplater.cs`, `GitInsightsTemplater.cs`, plus the
+        // CSS hunk above), and Story 23.4 (the `PageView` inversion of `AboutSddTemplater`, `RetroTemplater`,
+        // `IdeasTemplater`, `FollowUp*`, `TestArtifactsTemplater`, `CommitDay/CommitDetailTemplater` — several of
+        // which DO render in this fixture: `about-sdd*.html`, `retros.html`, the epic-1 retro page). Variant B==C
+        // is also the independent confirmation of Story 23.4's "the bytes are identical" claim for those pages, and
+        // of Story 24.1's C# being invisible to a fixture that is not a git repo. Per CLAUDE.md § Concurrent work,
+        // nothing was reset and nothing of theirs was reverted.
+        //
+        // VERIFICATION: `9bf8ac05…` confirmed byte-identical across two consecutive runs after a full rebuild.
+        // Single-box only — the cross-environment caveat above still stands.
+        //
+        // ⚠ KNOWN-RED AT HAND-OFF, AND DELIBERATELY NOT RE-BLESSED. Roughly 90 minutes after the measurement
+        // above, the sibling sessions moved the tree again: `src/SpecScribe/assets/specscribe.js` gained 40 lines
+        // from a STORY 20.9 CODE-REVIEW patch (a reveal-by-hash fix; zero `retired` content), and
+        // `HtmlTemplater.cs`, `RequirementsTemplater.cs`, `CodeMapTemplater.cs` and `SiteGenerator.cs` entered
+        // Story 23.4's `PageView` inversion — `SiteGenerator.cs` does not currently compile mid-edit, so the
+        // working tree's hash cannot even be measured right now. Re-running variant B with HEAD + the CURRENT
+        // assets (css AND js) yields `d7a719ad…`: the js patch ALONE moves this hash off `9bf8ac05…`.
+        // The constant is therefore left at the value Story 8.9 actually produces on an otherwise-HEAD tree —
+        // the one measured by the A/B/C method above — rather than chasing a number that bakes another story's
+        // unfinished, uncommitted work into a byte gate. AC #6 says an unexplained mover is a defect to diagnose
+        // rather than a constant to re-bless; this mover IS explained, just not by this story.
+        // ➜ WHOEVER COMMITS THIS BUNDLE LAST must re-measure with the same A/B/C method and record the split.
+        // [Story 8.9 AC #6; ADR 0025; CLAUDE.md shared-main + [[golden-diff-normalization-gotchas]]]
+        // ── STORY 20.9 CODE-REVIEW REGENERATION (2026-07-28) ─────────────────────────────────────────────────
+        // 9bf8ac05… -> f12b1ff2…. One rendering-visible patch from this review reaches the fixture:
+        // `CodeMapTemplater.AppendVariantPanel` now emits `data-hierarchy-reveal-when="cm-exclude-spec=…;
+        // cm-exclude-tests=…"` on every `.codemap-view` panel wrapper (including the empty "No files match this
+        // filter" panels the golden fixture's file-less repo renders), so a deep-linked hash naming a scope inside
+        // a non-default filter panel can auto-reveal it at load — the panel-selection state was previously only
+        // reachable by manually toggling a checkbox. The companion `specscribe.js` change (a boot-time
+        // `revealPanelsNamedByHash` function) is asset content, not rendered markup, and does not itself move a
+        // page's HTML bytes.
+        //
+        // PROVENANCE (shared main) — this hash is NOT this review's patch alone. `git status` at capture time
+        // showed substantial other concurrent uncommitted work already in the tree (a Story 18.6 review session's
+        // `.claude/launch.json` port fix, plus modifications to `Charts.cs`, `GitInsightsTemplater.cs`,
+        // `HierarchyExplorer.cs`, `specscribe.css`, and roughly a dozen other templaters —
+        // `AboutSddTemplater.cs`/`CodeFileTemplater.cs`/`CommitDay-`/`CommitDetailTemplater.cs`/
+        // `DeepAnalyticsTemplater.cs`/`EpicsParser.cs`/`FollowUpDetailTemplater.cs`/`FollowUpGroupTemplater.cs`/
+        // `GitMetrics.cs`/`HtmlRenderAdapter.Epics.cs`/`HtmlTemplater.cs`/`IdeasTemplater.cs`/`RenderParity.cs`/
+        // `RequirementsTemplater.cs`/`RetroTemplater.cs`/`StatusStyles.cs`/`TestArtifactsTemplater.cs` — none of
+        // them this review's own File List). Full attribution of which of those also render into this fixture was
+        // not isolated separately (unlike the Story 8.9 entry above's A/B/C method) given the volume of concurrent
+        // change; this entry names what is KNOWN to move the hash (the `data-hierarchy-reveal-when` attribute) and
+        // discloses rather than hides that other uncommitted work shares the tree. Per CLAUDE.md § Concurrent
+        // work, nothing was reset and nothing of theirs was reverted.
+        //
+        // VERIFICATION: `f12b1ff2…` confirmed byte-identical across two consecutive runs after a rebuild.
+        // Single-box only — the cross-environment caveat above still stands.
+        // [Code review of Story 20.9, 2026-07-28, Patch; CLAUDE.md shared-main + [[golden-diff-normalization-gotchas]]]
+        // ── STORY 24.1 REGENERATION (2026-07-28) ─────────────────────────────────────────────────────────────
+        // f12b1ff2… -> ee00f947…. Story 24.1's ONLY delta into this fixture is `specscribe.css` — the fixture is
+        // not a git repo, so `--deep-git` yields nothing and none of 24.1's C# (the `CoupledFile`/`DirectedCouple`
+        // spine, the confidence-ranked hub table, the per-file text twin) renders a byte here. That is the same
+        // conclusion the Story 8.9 entry above reached independently via its A/B/C control ("no C# change in this
+        // tree moves a rendered byte here; the stylesheet is the entire delta"), and it still holds.
+        //
+        // The css delta is the coupling-table rules. Its FIRST hunk (`.coupling-boundary-badge` + the widened
+        // `.coupling-kind`) was already named as a co-mover in the Story 8.9 entry above; what this regeneration
+        // adds is that hunk's REFINEMENT, which came out of the live-browser pass CLAUDE.md § Verification
+        // requires and which NO test in this suite could have caught — both defects were pure rendered geometry:
+        //   (a) at the real rendered width the Ranked Pairs panel is ~455 px, and the new Confidence column had
+        //       starved the two path columns to 60 px each, truncating them to "tests…"/"src/S…" and defeating
+        //       the point of the table (they were ~124 px before 24.1 added the column);
+        //   (b) the first fix then exposed single-word headers overrunning their own columns under
+        //       `table-layout: fixed`, rendering as one run-on string "TOGETHERCONFIDENCEKIND".
+        // Final rules: `.coupling-num` 4.1rem with a smaller unspaced header, `.coupling-kind` 5.6rem, badges
+        // sentence-case at 0.62rem (uppercase + letter-spacing was what made "CROSS-BOUNDARY" 120 px wide and
+        // single-handedly set the column width). Measured in-browser after: paths 94 px, zero header overflow,
+        // zero clipped cells, both badges still stacking on the 3 rows that carry Process AND Cross-boundary.
+        //
+        // PROVENANCE (shared main) — `git status` at capture time still showed the Story 23.4 `PageView`
+        // inversion mid-flight across a dozen templaters, plus Story 8.9 and the 20.9 review patch above. This
+        // regeneration sits ON TOP of `f12b1ff2…`, i.e. it inherits all of that; it does not re-litigate or
+        // re-measure it. Per CLAUDE.md § Concurrent work, nothing was reset and nothing of theirs was reverted.
+        //
+        // VERIFICATION: `ee00f947…` confirmed byte-identical across two consecutive runs after an explicit
+        // `dotnet build --no-incremental` — an incremental run re-uses the cached assembly and never re-embeds a
+        // changed .css asset, which is exactly the stale-build trap in [[golden-diff-normalization-gotchas]].
+        // [Story 24.1; CLAUDE.md shared-main + Verification; [[golden-diff-normalization-gotchas]]]
+        const string expected = "ee00f94746bd56b7786a4603ad90680ea17797dffbb8fcdcd497546171338d6d";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

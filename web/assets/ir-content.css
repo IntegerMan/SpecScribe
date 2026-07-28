@@ -58,6 +58,7 @@
 .ir-content [data-explorer][data-sb-scope][data-tok-active] .sunburst-legend .sb-active-item,
 .ir-content [data-explorer][data-sb-scope][data-tok-review] .sunburst-legend .sb-review-item,
 .ir-content [data-explorer][data-sb-scope][data-tok-done] .sunburst-legend .sb-done-item,
+.ir-content [data-explorer][data-sb-scope][data-tok-retired] .sunburst-legend .sb-retired-item,
 .ir-content [data-explorer][data-sb-scope][data-tok-noplan] .sunburst-legend .sb-noplan-item,
 .ir-content [data-explorer][data-sb-scope][data-tok-followup-open] .sunburst-legend .sb-followup-open-item,
 .ir-content [data-explorer][data-sb-scope][data-tok-followup-done] .sunburst-legend .sb-followup-done-item,
@@ -1778,6 +1779,8 @@
 
 .ir-content .sunburst-legend .sb-done-sw { background: var(--status-done); }
 
+.ir-content .sunburst-legend .sb-retired-sw { background: var(--status-deferred); }
+
 .ir-content .sunburst-legend .sb-noplan-sw {
   background: transparent;
   box-shadow: inset 0 0 0 1px var(--status-pending);
@@ -2736,6 +2739,13 @@
   background: var(--cream);
   padding: 0.9rem 1.1rem 1.1rem;
 }
+
+.ir-content .story-card.retired {
+  border-left: 3px solid var(--status-deferred);
+  background: color-mix(in srgb, var(--cream) 92%, var(--ink) 8%);
+}
+
+.ir-content .story-card.retired .story-title { color: var(--ink-light); font-weight: normal; }
 
 .ir-content .story-card-header {
   display: flex;

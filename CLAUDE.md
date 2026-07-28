@@ -60,6 +60,55 @@ range"). Verify a story's claimed symbols actually exist before trusting its Fil
   change.** A renumber, spike insertion, or story add/remove recorded in only one
   artifact is a drift bug.
 
+## Analysis observations — read the digest for files you are about to touch
+
+`.specscribe/analysis/` holds this repository's current SonarCloud findings as
+[ADR 0023](docs/adrs/0023-agent-facing-analysis-observation-contract.md) `AnalysisObservation`
+records. It is gitignored, dev-time only, and refreshed by hand:
+
+```sh
+node tools/analysis-digest/index.mjs
+```
+
+**How to read it — do not read the whole thing.**
+
+1. **Go straight to the shard for a file you are about to touch.** The path is derivable:
+   `src/SpecScribe/Charts.cs` → `.specscribe/analysis/files/src/SpecScribe/Charts.cs.json`.
+   No shard means no open observations on that file. A shard carries the full provenance
+   block, so it is safe to read on its own.
+2. **`index.json` is for the repo-wide view only** — totals, and which files have
+   observations. It is ~31 KB; the median shard is ~4 KB. Reading three shards costs
+   ~13 KB. Reading everything costs 1.34 MB. Read shards.
+3. Project-level observations with no file live in `unlocated.json`.
+
+**Absent means UNKNOWN, never clean.** No `.specscribe/analysis/` means the digest was never
+generated or the fetch failed — the emitter deliberately leaves the old digest alone and
+writes nothing rather than emitting an empty one, because an empty digest reads as "this code
+is clean". A digest that exists with zero observations for a file *is* a real "clean" answer;
+a missing digest is not.
+
+**Staleness — check it before you trust a line number.** Every shard and the index carry a
+`provenance` block:
+
+- **The read-time rule, which overrides everything else:** if `git rev-parse HEAD` differs
+  from `provenance.evaluatedAtRevision`, the digest is stale **regardless of what `isStale`
+  says**. `isStale` was frozen when the digest was written and ages into a lie on the next
+  commit. Re-run the emitter.
+- `isStale` **fails closed** — it is `true` whenever staleness cannot be computed.
+  `staleReasons` says which of `analysis-behind-working-tree`, `working-tree-dirty`,
+  `commits-behind-not-computable`, or `analysis-revision-unknown` applies.
+- `workingTreeDirty: true` is itself a staleness condition: line numbers are anchored to
+  `analysisRevision`, and uncommitted edits move them. Given § Concurrent work above, expect
+  this to be true most of the time — treat cited lines as approximate and confirm by symbol.
+- Staleness is **revision-first**. `analysisDate` can read "an hour ago" while the revision
+  is commits behind; only the revision is honest.
+
+**What the digest does not tell you.** `attachment.basis` is `"unavailable"` on every record:
+the code→planning join is not computed here (it needs `--deep-git` and its fan-out bounding
+rule is Story 26.5's). The digest is file-keyed, which is enough — you already know your files.
+Severity is SARIF's four-level scale, so Sonar's single `BLOCKER` is indistinguishable from
+`HIGH` at `severity.normalized`; read `severity.provider` if that distinction matters.
+
 ## Verification
 
 - Generate to `SpecScribeOutput/` (the default). Never `--output docs/live` — that path

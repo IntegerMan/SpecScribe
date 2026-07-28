@@ -8,7 +8,7 @@ provoked_by: 22-3-static-html-rendered-from-the-ir # the retired story that rend
 
 # Story 8.9: `retired` Is a First-Class Story Status
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -132,36 +132,36 @@ The `retired` stage is **already fully designed**. Almost nothing needs inventin
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Define the shared retirement vocabulary (AC #1).**
-  - [ ] One authored list. Decide its home deliberately: `StatusStyles` is the classification seam and `EpicsParser` already depends on `StatusStyles`' vocabulary conceptually, so exposing it from `StatusStyles` and having `EpicsParser.RetirementKeyword` build its `Regex` from it is the shape that matches the file. Do **not** leave two hand-maintained lists.
-  - [ ] Add the `ForStatus` arm. Put it in the **exact-match switch** (`StatusStyles.cs:48`), not in `ForStatusFromTokens` — the token fallback exists to avoid substring traps, and a bare word list belongs above it.
-  - [ ] ⚠ Widening `EpicsParser.RetirementKeyword` from 3 words to 6 changes **which HTML comments get hoisted** into an epic's `RetiredNoticesHtml`. Check the existing corpus for a comment containing `cancelled`/`obsolete`/`wontfix` that would newly divert, and enumerate any under AC #6.
-  - [ ] Settle the `won't fix` apostrophe question with a test either way.
-- [ ] **Task 2 — Stop the diagnostic (AC #2).** `IsUnrecognizedStatus` follows `ForStatus`, so this should need no edit of its own — **verify that, do not assume it.** Add the paired test (retired → no notice; `frobnicated` → notice).
-- [ ] **Task 3 — Add the `retired` bucket to the defined-story ledger (AC #3).**
-  - [ ] `StatusStyles.StoryStages` += `retired`. Place it deliberately in narrative order — after `done`, since D1 makes it terminal.
-  - [ ] `StatusStyles.StoryLabel` += `"retired" => "Retired"`. **Without this the class lands in the `_ =>` arm and prints "Pending"** — a silent mislabel worse than the current one.
-  - [ ] Update `StatusStylesTests.StoryLabel_MapsEachStage` (`:146`) and `StoryStages_IncludesUnrecognized` (`:361`); add `ForStatus_MapsRawStatusText` rows (`:157`).
-  - [ ] Confirm `ProjectCounts.cs:190`'s partition `Debug.Assert` still holds, and that defined vs tracked now name the same stage for one story.
-- [ ] **Task 4 — The epic roll-up rule (AC #4). This is the highest-value change in the story.**
-  - [ ] `ForEpic`: all done-or-retired (≥1 done) → `done`; all retired → `retired`; retired otherwise does not block the `active`/`ready` tiers.
-  - [ ] `EpicStages` += `retired`, so the Epic Status donut and every roll-up consumer has a bucket (`StatusStyles.cs:143`).
-  - [ ] `EpicLabel` += `"retired" => "Retired"` — same `_ =>` "Pending" trap as `StoryLabel`.
-  - [ ] Check `ForEpicWithRetrospective` (`:133`) does not turn an all-retired epic into `review`.
-  - [ ] ⚠ Trace the change into `RequirementsParser.DeriveStatus`, which rolls requirement satisfaction off epic status — an epic newly able to read `done` moves requirement badges too. Expected and correct; **enumerate the movers** under AC #6.
-- [ ] **Task 5 — Visual treatment (AC #5).**
-  - [ ] `.coverage-story-card.retired` border-left (`specscribe.css:5910-5916`).
-  - [ ] `HierarchyExplorer.PaintedStatusTokens` += `retired` + `.sunburst .sb-seg.sb-retired` + `.ss-hierarchy-sw.sb-retired` (`specscribe.css:390` is the sibling pattern).
-  - [ ] The muted card treatment per D2. Reuse `--status-deferred`; do not add a token.
-  - [ ] Check `specscribe-webview-theme.css` — its `.vscode-dark` / `.vscode-high-contrast` blocks remap `unrecognized` explicitly (`:233`, `:249`); confirm whether `retired`/`deferred` needs the same and say so either way.
-  - [ ] `DesignSystemTemplater`'s `retired` note (`:137-144`) already says the right thing — **verify it still reads true after the change** rather than editing it reflexively.
-- [ ] **Task 6 — Verify (AC #6).**
-  - [ ] `dotnet test SpecScribe.slnx`. Expect the golden fingerprint to move; enumerate the mover set page-by-page **before** regenerating.
-  - [ ] Re-run to confirm the new hash is stable across two runs; name the concurrent session's changes it sits on.
-  - [ ] `npm run check:links`, `npm run measure:parity`, `npm run check:ir-content` under `web/` — a changed badge class is exactly what ADR 0018's class/id-bound extraction gate is built to catch.
-- [ ] **Task 7 — Live-browser verification, JS off and on (AC #7).**
-- [ ] **Task 8 — Propose ADR 0025 and cross-reference it from `docs/adrs/README.md` and `epics.md` (AC #8).**
-- [ ] **Task 9 — Record the structural change in `epics.md` AND `sprint-status.yaml` in the same change (AC #9).** *(Both files were already seeded at create-story — verify they are still consistent at dev time rather than re-applying.)*
+- [x] **Task 1 — Define the shared retirement vocabulary (AC #1).**
+  - [x] One authored list. Decide its home deliberately: `StatusStyles` is the classification seam and `EpicsParser` already depends on `StatusStyles`' vocabulary conceptually, so exposing it from `StatusStyles` and having `EpicsParser.RetirementKeyword` build its `Regex` from it is the shape that matches the file. Do **not** leave two hand-maintained lists.
+  - [x] Add the `ForStatus` arm. Put it in the **exact-match switch** (`StatusStyles.cs:48`), not in `ForStatusFromTokens` — the token fallback exists to avoid substring traps, and a bare word list belongs above it.
+  - [x] ⚠ Widening `EpicsParser.RetirementKeyword` from 3 words to 6 changes **which HTML comments get hoisted** into an epic's `RetiredNoticesHtml`. Check the existing corpus for a comment containing `cancelled`/`obsolete`/`wontfix` that would newly divert, and enumerate any under AC #6.
+  - [x] Settle the `won't fix` apostrophe question with a test either way.
+- [x] **Task 2 — Stop the diagnostic (AC #2).** `IsUnrecognizedStatus` follows `ForStatus`, so this should need no edit of its own — **verify that, do not assume it.** Add the paired test (retired → no notice; `frobnicated` → notice).
+- [x] **Task 3 — Add the `retired` bucket to the defined-story ledger (AC #3).**
+  - [x] `StatusStyles.StoryStages` += `retired`. Place it deliberately in narrative order — after `done`, since D1 makes it terminal.
+  - [x] `StatusStyles.StoryLabel` += `"retired" => "Retired"`. **Without this the class lands in the `_ =>` arm and prints "Pending"** — a silent mislabel worse than the current one.
+  - [x] Update `StatusStylesTests.StoryLabel_MapsEachStage` (`:146`) and `StoryStages_IncludesUnrecognized` (`:361`); add `ForStatus_MapsRawStatusText` rows (`:157`).
+  - [x] Confirm `ProjectCounts.cs:190`'s partition `Debug.Assert` still holds, and that defined vs tracked now name the same stage for one story.
+- [x] **Task 4 — The epic roll-up rule (AC #4). This is the highest-value change in the story.**
+  - [x] `ForEpic`: all done-or-retired (≥1 done) → `done`; all retired → `retired`; retired otherwise does not block the `active`/`ready` tiers.
+  - [x] `EpicStages` += `retired`, so the Epic Status donut and every roll-up consumer has a bucket (`StatusStyles.cs:143`).
+  - [x] `EpicLabel` += `"retired" => "Retired"` — same `_ =>` "Pending" trap as `StoryLabel`.
+  - [x] Check `ForEpicWithRetrospective` (`:133`) does not turn an all-retired epic into `review`.
+  - [x] ⚠ Trace the change into `RequirementsParser.DeriveStatus`, which rolls requirement satisfaction off epic status — an epic newly able to read `done` moves requirement badges too. Expected and correct; **enumerate the movers** under AC #6.
+- [x] **Task 5 — Visual treatment (AC #5).**
+  - [x] `.coverage-story-card.retired` border-left (`specscribe.css:5910-5916`).
+  - [x] `HierarchyExplorer.PaintedStatusTokens` += `retired` + `.sunburst .sb-seg.sb-retired` + `.ss-hierarchy-sw.sb-retired` (`specscribe.css:390` is the sibling pattern).
+  - [x] The muted card treatment per D2. Reuse `--status-deferred`; do not add a token.
+  - [x] Check `specscribe-webview-theme.css` — its `.vscode-dark` / `.vscode-high-contrast` blocks remap `unrecognized` explicitly (`:233`, `:249`); confirm whether `retired`/`deferred` needs the same and say so either way.
+  - [x] `DesignSystemTemplater`'s `retired` note (`:137-144`) already says the right thing — **verify it still reads true after the change** rather than editing it reflexively.
+- [x] **Task 6 — Verify (AC #6).**
+  - [x] `dotnet test SpecScribe.slnx`. Expect the golden fingerprint to move; enumerate the mover set page-by-page **before** regenerating.
+  - [x] Re-run to confirm the new hash is stable across two runs; name the concurrent session's changes it sits on.
+  - [x] `npm run check:links`, `npm run measure:parity`, `npm run check:ir-content` under `web/` — a changed badge class is exactly what ADR 0018's class/id-bound extraction gate is built to catch.
+- [x] **Task 7 — Live-browser verification, JS off and on (AC #7).**
+- [x] **Task 8 — Propose ADR 0025 and cross-reference it from `docs/adrs/README.md` and `epics.md` (AC #8).**
+- [x] **Task 9 — Record the structural change in `epics.md` AND `sprint-status.yaml` in the same change (AC #9).** *(Both files were already seeded at create-story — verify they are still consistent at dev time rather than re-applying.)*
 
 ## Dev Notes
 
@@ -298,14 +298,89 @@ Its own doc comment (`StatusStyles.cs:28`) says it maps *"a story's, **or a quic
 
 ### Agent Model Used
 
+claude-opus-5 (Claude Code, `dev-story` workflow), 2026-07-28.
+
 ### Debug Log References
+
+- `dotnet build src/SpecScribe/SpecScribe.csproj` — clean (0 warnings, 0 errors) once the concurrent Story 24.1 session's mid-write `CoupledFile` refactor settled. **The tree did not compile for the first ~40 minutes of this story** through no fault of this change: `GitMetrics.cs` / `CodeFileTemplater.cs` / `DeepAnalyticsTemplaterTests.cs` were mid-edit by another session. Nothing of theirs was reverted, nothing was reset (CLAUDE.md § Concurrent work).
+- `dotnet test --filter StatusStylesTests|ProjectCountsTests|EpicsParserTests|ChartsTests` → **407/407 passed**.
+- Golden fingerprint: `e384cbde…` → `9bf8ac05…`, confirmed stable across two consecutive runs after a `--no-incremental` rebuild.
+- `npm run check:ir-content` → FAILED with exactly 4 new rules (all this story's), re-extracted, then **OK — 865 rules + 4 keyframes in sync**.
+- `npm run measure:parity` → **golden=IR 191/191**.
+- Live browser: `epics/epic-22.html` and `epics/story-22-3.html`, JS on and JS off.
 
 ### Completion Notes List
 
+**The five measured consequences are closed, verified on real rendered output (not fixtures):**
+
+1. **The badge no longer lies.** `epics/story-22-3.html` header badge is `status-badge retired js-tip` with the crossed-circle glyph and the tooltip *"Removed from the active plan; kept for ledger history"*. Zero `status-badge.unrecognized` on the page.
+2. **The diagnostic is gone, and the path is narrowed rather than removed.** `diagnostics.html` carries **no** story-status notice for `retired`. It still carries exactly one unrecognized notice — for the **sprint** value `blocked` on `24-2-per-file-ego-coupling-graph` (a different classifier, `IsUnrecognizedSprintStatus`, from a concurrent session's ledger entry). Both halves of AC #2 proven on live data, not just in a unit test.
+3. **The two ledgers agree.** Epic 22's delivery sentence now reads **"1 of 6 done, 1 retired, 2 in review, 2 ready for dev"** — previously "…1 unrecognized".
+4. **The chart paints it.** The IR island node for 22.3 carries `statusClass: "retired"`, `statusLabel: "Retired"`, `colorClass: "sb-seg sb-retired"` — no longer falling back to `sb-unrecognized`. `.sb-retired` resolves to `rgb(122,98,80)` = `--status-deferred`.
+5. **The roll-up trap is closed.** `ForEpic` now reads done-or-retired ⇒ done. Epic 22 correctly still reads `active` today (1 done, 2 review, 2 ready); `ForEpic_PinsEpic22Shape_FiveLiveStoriesPlusOneRetired` pins that it reaches `done` once the five close.
+
+**Owner decisions honoured.** D1 terminal stage (and its deliberate divergence from `SprintTemplater.DeliveryWheel` recorded in ADR 0025 rather than "aligned"); D2 inline demoted card — live-verified at **index 2 of 6, in story order**, with `--status-deferred` border, `--ink-light` title and **no 7th `--status-*` token**; D3 six-word single-sourced vocabulary; D4 Epic 8 reopened in both artifacts.
+
+**AC #6 — the mover set was MEASURED, not argued.** Three full-rebuild fingerprints: (A) pure HEAD via `git archive` into a scratch dir reproduces `e384cbde…` **exactly**, proving the outgoing constant was not stale on this runner; (B) HEAD + only this tree's `specscribe.css` == `9bf8ac05…`; (C) the working tree == `9bf8ac05…`. **B == C proves no C# change in the tree — mine or either concurrent session's — moves a single rendered byte in that fixture.** The mover set is therefore exhaustively **one file: `specscribe.css`**, whose 8 hunks are 7 from this story plus **1 from Story 24.1** (`.coupling-boundary-badge`), named rather than absorbed. ⚠ Variant B first reported a **false PASS on an incremental build** — `dotnet test` reused a cached assembly and never re-embedded the changed asset. Only `--no-incremental` surfaced the real hash. That is the stale-build trap in `[[golden-diff-normalization-gotchas]]`; a golden regeneration measured on an incremental build is worthless.
+
+**AC #7 — JS off was really JS off.** Mechanism: a script-stripped copy of `epic-22.html` written **into the same directory** (so relative asset paths still resolved), verified `document.scripts.length === 0` and `window.Plotly === undefined`, then deleted. With scripts blocked, a reader still gets: the demoted card, the `--status-deferred` border, the glyph, the word, the native `title` fallback, the legend row *"Retired — Removed from the active plan; kept for ledger history"*, and the server-rendered text twin entry **"Story 22.3: Static HTML Rendered from the IR — Retired · 0 of 14 tasks done"**. All three UX-DR17 channels survive without JS.
+⚠ The twin is a collapsed `<details>`: `innerText` returns nothing for it and a check written that way reads as a **false negative**. `textContent` is the correct probe — the same vacuous-assertion class as Trap 6.
+
+**Things verified rather than assumed (the story asked for each explicitly):**
+
+- **Trap 2 / the blast radius.** `DashboardViewBuilder`'s Now & Next buckets, `BmadCommands`' next-step picker and `EpicsViewBuilder`'s current-story pick match retired under **neither** the old classification nor the new one, so all three needed no change. A retired story is never offered as the next unit of work.
+- **`IsUnrecognizedStatus` needed no edit of its own** — it delegates to `ForStatus`. Confirmed by reading it, then pinned by a test.
+- **The webview theme needs no carve-out.** `retired` owns no token: it reads `--status-deferred` (remapped in all four `.vscode-*` blocks) and `--parchment-dark` (remapped host-wide at `:34`). The explicit `unrecognized` remaps at `:233`/`:249` exist because that stage has a literal pastel fill and a `-hatch` companion; `retired`, `pending` and `deferred` are all absent from that list for the same reason. **No edit — and the reason is checkable.**
+- **`DesignSystemTemplater`'s `retired` note still reads true** ("shares `--status-deferred`", distinct by word + icon). Not edited reflexively.
+- **The epics.md corpus has no comment carrying `cancelled`/`obsolete`/`wontfix`**, so widening `RetirementKeyword` 3→6 diverts nothing today.
+
+**Deliberate calls worth a reviewer's attention:**
+
+- **The epic-page badge word is the raw authored status (`retired`, lowercase), not `StoryLabel`'s "Retired".** That is pre-existing behaviour for *every* stage — the sibling cards read `done`, `review`, `ready-for-dev` — so title-casing only retired would make it the odd one out, and routing all badges through `StoryLabel` would rewrite every story badge on every epic page. The capitalised "Retired" appears wherever `StoryLabel` is the source (sunburst, twin, legend, coverage cards, delivery sentence).
+- **`LegendWord`'s `retired` arm was removed**, not added to. It delegated to `SprintLabel("retired")`; `StoryLabel` now owns the word and the fallback reaches it. Both returned "Retired", so output is byte-identical — what goes away is a second place the word was authored.
+- **`RenderParity.StoryCardRegex` had to loosen** from an exact class match to `story-card[^"]*` for the card modifier. Noted in ADR 0025 as a real cost: a parity extractor pinning exact markup is brittle, and this is the second time it has had to give.
+- **`ForEpic` excludes retired from the all-unrecognized test** rather than letting it block. Without that, one retired story beside unmapped ones would silently downgrade the epic to `drafted` and hide the Story 8.2 AC #3 notice.
+- **`RefinementFunnel` does not gain a retired band.** It reads named stages and totals from `StoriesDefined`, so a retired story sits in the total without its own band — exactly as `unrecognized` already does. Retired simply moved from one unaccounted bucket to another; no regression, but a reviewer may want to decide whether the funnel should exclude terminal-but-not-delivered work. Out of scope here.
+- **Pre-existing gap left alone:** the drilled-explorer legend list (`specscribe.css:174-183`) has no `data-tok-unrecognized` row. I added `data-tok-retired` because a retired wedge is now drawn inside Epic 22 and would otherwise lose its legend row while drilled; `unrecognized`'s identical gap is **pre-existing and untouched** rather than quietly widened into this story.
+
+**⚠ Golden fingerprint is RED at hand-off, deliberately.** A full **serial** run (`xUnit.MaxParallelThreads=1`) finished **2738 passed / 1 failed** — and the single failure was the golden fingerprint, which had been green twice ~20 minutes earlier. Diagnosed, not re-blessed: in the interim the sibling sessions moved the tree again. `specscribe.js` gained 40 lines from a **Story 20.9 code-review** patch (a reveal-by-hash fix, zero `retired` content — verified by diff), and `HtmlTemplater.cs` / `RequirementsTemplater.cs` / `CodeMapTemplater.cs` / `SiteGenerator.cs` entered Story 23.4's `PageView` inversion. `SiteGenerator.cs` **does not currently compile mid-edit**, so the working tree's hash cannot be measured at all right now. Re-running variant B with HEAD + the *current* assets yields `d7a719ad…` — **the js patch alone moves the hash off `9bf8ac05…`**. The constant is left at the value this story actually produces on an otherwise-HEAD tree, because AC #6 forbids re-blessing an unexplained mover and chasing this number would bake another story's unfinished work into a byte gate. **Whoever commits this bundle last must re-measure with the same A/B/C method and record the split.**
+
+**Suite status.** The serial run's 2738 passes are the meaningful number. The 12 red are the documented rotating deep-git / file-write-contention family (`FileWatcherServiceTests.BurstOfSaves`, `SiteGeneratorImpactMapTests`, `SiteGeneratorCodeMapTests` determinism, `SiteGeneratorGitInsightsTests` hub, `SiteGeneratorCommitDetailsTests`, `GitMetricsTryComputeTests`) — **the failing set rotated between two consecutive full runs**, and every one of them passes in true isolation. None is in this story's File List, and `RenderParity*` / `SpaDelivery*` / `CanonicalIrSerialization` / `GoldenContentFingerprint` — the families the story flags as *not* flakes — are all green. ⚠ Story 24.1's session is concurrently rewriting `GitMetrics`, which is where most of that family lives.
+
 ### File List
+
+**Production**
+
+- `src/SpecScribe/StatusStyles.cs` — `RetirementStatusWords` + `IsRetirementWord` + the `ForStatus` arm; `StoryStages`/`EpicStages` += `retired`; `StoryLabel`/`EpicLabel` arms; the `ForEpic` terminal-stage roll-up; `LegendWord` arm removed; class doc updated.
+- `src/SpecScribe/EpicsParser.cs` — `RetirementKeyword` now built from `StatusStyles.RetirementStatusWords` (`Regex.Escape`d) instead of a hand-typed three-word literal.
+- `src/SpecScribe/HierarchyExplorer.cs` — `PaintedStatusTokens` += `retired`.
+- `src/SpecScribe/HtmlRenderAdapter.Epics.cs` — the conditional `.story-card.retired` demotion modifier.
+- `src/SpecScribe/RenderParity.cs` — `StoryCardRegex` matches the class attribute rather than an exact class value.
+- `src/SpecScribe/assets/specscribe.css` — 7 hunks: `data-tok-retired` drilled-legend row, `.ss-hierarchy-sw.sb-retired`, `.sb-retired` wedge fill, `.sunburst-legend .sb-retired-sw`, the `:has(.sb-retired-item…)` emphasis pair, `.story-card.retired`, `.coverage-story-card.retired`.
+
+**Generated (re-extracted, not hand-edited)**
+
+- `web/assets/ir-content.css`, `web/assets/ir-content.manifest.json` — `npm run extract:ir-content` (ADR 0018 gate).
+
+**Tests**
+
+- `tests/SpecScribe.Tests/StatusStylesTests.cs` — 24 new `ForStatus` rows incl. every apostrophe form; `RetirementStatusWords_IsTheOwnerLockedSixWordVocabulary`; `ForSprint_StaysNarrowerThanForStatus_OnPurpose`; `StoryLabel_AndEpicLabel_CoverEveryStageTheirOwnListDeclares`; `StoryStages_IncludesRetired_DirectlyAfterDone`; `EpicStages_IncludesRetired_…`; `RetiredStatus_IsNotADiagnostic_ButAnUnmappedWordStillIs`; `ForEpic_DoneOrRetiredReadsDone_AllRetiredReadsRetired`; `ForEpic_RetiredDoesNotMaskAnAllUnrecognizedEpic`; `ForEpicWithRetrospective_GatesTheDoneCase_ButNotTheAllRetiredCase`; `ForEpic_PinsEpic22Shape_…`; `RetiredBadge_CarriesColourAndGlyphAndWord_NeverColourAlone`; plus the `retired` representative added to `EpicStages_CoversEveryForEpicOutputAndEachHasALabel`.
+- `tests/SpecScribe.Tests/ProjectCountsTests.cs` — `Build_DefinedAndTrackedLedgersNameTheSameStageForOneRetiredStory`.
+- `tests/SpecScribe.Tests/EpicsParserTests.cs` — 3 new vocabulary rows + `Parse_RetirementKeyword_ReadsTheSharedVocabulary_NotASecondCopy`.
+- `tests/SpecScribe.Tests/ChartsTests.cs` — `DeliverySentence_NamesRetiredAsItsOwnStage_NotUnrecognized`.
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — golden constant regenerated with the measured mover-set audit trail.
+
+**Decision records & planning artifacts**
+
+- `docs/adrs/0025-retired-is-a-terminal-story-stage-in-both-classifiers.md` — **new**, Proposed.
+- `docs/adrs/README.md` — ADR 0025 index entry.
+- `_bmad-output/planning-artifacts/epics.md` — § Story 8.9 closing note updated to cite ADR 0025 and the measured fingerprint move.
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — `8-9-…` → `in-progress` → `review`.
+- `_bmad-output/implementation-artifacts/8-9-retired-is-a-first-class-story-status.md` — this file.
 
 ## Change Log
 
 | Date | Note |
 |---|---|
+| 2026-07-28 | **Implemented (dev-story).** `retired` is now a canonical stage in **both** classifiers and a **terminal** one. Six-word vocabulary single-sourced at `StatusStyles.RetirementStatusWords`, with `EpicsParser.RetirementKeyword` building its regex from it; apostrophe forms (`won't fix`, `won’t fix`) **supported**, not documented-as-unsupported. `ForEpic` gate `All(c == "done")` → `All(c is "done" or "retired")` with an all-retired `retired` tier, closing the trap that kept **Epic 22 permanently short of done**. Live-verified on `epics/epic-22.html` + `epics/story-22-3.html`, **JS on and JS off** (script-stripped copy, `document.scripts.length === 0`, `Plotly === undefined`): demoted card at index 2 of 6 in story order, `--status-deferred` border, glyph + word + native `title`, legend row, and the twin reading *"Story 22.3 … Retired · 0 of 14 tasks done"*. Diagnostics carry **no** retired notice while a genuinely unmapped **sprint** value (`blocked`) still raises one. Golden fingerprint `e384cbde…` → `9bf8ac05…`, stable across two runs; mover set **MEASURED** (three full-rebuild variants) as exactly **one file, `specscribe.css`** — 7 hunks this story's, **1 Story 24.1's** — with pure HEAD reproducing the outgoing constant exactly, proving it was not stale. ⚠ An incremental build gave a **false PASS** mid-measurement (stale embedded asset). `check:ir-content` re-extracted (865 rules in sync); `measure:parity` golden=IR **191/191**. **ADR 0025** authored (Proposed) recording the two-classifier asymmetry, the terminal-stage roll-up, the single-source vocabulary, and the deliberate divergence from `SprintTemplater.DeliveryWheel`. Tree carried **three** concurrent sessions (8.9, 24.1, 23.4); nothing reset, nothing reverted. |
 | 2026-07-28 | Story created (baseline `b696485`), **reopening Epic 8** (`done` since its 2026-07-15 retrospective) per owner decision D4. Provoked by [Story 22.3](22-3-static-html-rendered-from-the-ir.md) rendering as **"Unrecognized"**: `StatusStyles.ForSprint` maps `retired` to a first-class stage while `StatusStyles.ForStatus` — the classifier that actually reads a story artifact's `Status:` line — has no arm for it and falls through to `unrecognized`. Five measured consequences, the load-bearing one being that `ForEpic`'s `All(c => c == "done")` gate means **an epic that retires a story can never read done**. Owner locked four decisions: **D1** retired is a terminal stage (done-or-retired ⇒ done; all-retired ⇒ retired), **D2** inline visibly-demoted card reusing `--status-deferred` with no 7th token, **D3** a six-word vocabulary (`retired`/`superseded`/`deprecated`/`cancelled`/`obsolete`/`wontfix`) shared as ONE list with `EpicsParser.RetirementKeyword`, **D4** seed as 8.9 and reopen Epic 8. The golden fingerprint is **expected to move** (AC #6) — 22.3's badge is on golden-covered pages — and the delta must be enumerated page-by-page rather than re-blessed. ADR **0025** owed (`0019` is not free — still claimed by Story 18.3). |

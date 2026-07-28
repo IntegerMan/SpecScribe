@@ -44,6 +44,18 @@ public sealed class SiteGenerator
     private readonly Dictionary<string, DocModel> _docs = new(StringComparer.OrdinalIgnoreCase);
     private readonly object _gate = new();
 
+    /// <summary>Story ids whose artifact became unreadable during <see cref="BuildFamilySurfaces"/> and were
+    /// degraded to a placeholder in the IR while the static page kept its full content. Populated by that
+    /// catch, drained into ONE <see cref="GenerationEvent"/> after the emit. Exists because the degrade was
+    /// silent before the Story 22.4 code review: it forks the IR from the static HTML at <c>errors=0</c>, and
+    /// Story 23.4 renders the site from the IR.</summary>
+    private readonly List<string> _familyDegradedStories = new();
+
+    /// <summary>The one <see cref="SurfacePrelude"/> instance both surface consumers share within a single
+    /// generator operation. Null between operations. See <see cref="BuildSurfacePrelude"/> for the lifetime
+    /// rule and why this is not a <c>Lazy&lt;&gt;</c>. [Story 22.4 code review]</summary>
+    private SurfacePrelude? _prelude;
+
     // The ingestion seam (AD-1): all framework-specific discovery/parsing lives behind this adapter, so the
     // generator only ever consumes the normalized ArtifactBundle. Held as the concrete type (not
     // IArtifactAdapter) because the watch paths also need its scoped epics re-ingest; the adapter registry
@@ -212,6 +224,7 @@ public sealed class SiteGenerator
 
             EnsureScaffold();
             _docs.Clear();
+            _prelude = null; // see BuildSurfacePrelude's lifetime rule
 
             // Fresh capture buffer for this full build when the opt-in SPA form is on OR the webview asked for
             // page capture (null otherwise → no capture). Capture is memory-only either way.
@@ -551,7 +564,22 @@ public sealed class SiteGenerator
             // writes only its own files under OutputRoot, leaving every static page byte-identical (AC #3/#5/#6).
             if (_options.EmitSpa)
             {
+                _familyDegradedStories.Clear();
                 EmitSpaSite(nav);
+                // ONE event, only when a degrade actually happened — so the normal path's event stream (and
+                // therefore the diagnostics page and GoldenContentFingerprint, which are ordering-sensitive)
+                // is byte-unchanged, while a real IR/static fork can never again pass at errors=0.
+                // [Story 22.4 code review]
+                if (_familyDegradedStories.Count > 0)
+                {
+                    events.Add(new GenerationEvent(
+                        GenerationOutcome.Error,
+                        _epicsSourcePath ?? "epics.md",
+                        TimeSpan.Zero,
+                        $"{_familyDegradedStories.Count} story artifact(s) became unreadable during the SPA/webview " +
+                        $"bundle build and were degraded to placeholders in the IR while the static pages kept their " +
+                        $"full content: {string.Join("; ", _familyDegradedStories)}"));
+                }
             }
         }
         return events;
@@ -562,6 +590,7 @@ public sealed class SiteGenerator
         lock (_gate)
         {
             EnsureScaffold();
+            _prelude = null; // see BuildSurfacePrelude's lifetime rule
             var nav = _nav ?? BuildNav(Array.Empty<string>());
             var ev = GenerateOneInternal(sourceFullPath, nav);
             RefreshCoverage();
@@ -582,6 +611,7 @@ public sealed class SiteGenerator
 
         lock (_gate)
         {
+            _prelude = null; // see BuildSurfacePrelude's lifetime rule
             if (_docs.TryGetValue(relative, out var doc))
             {
                 var outputFullPath = Path.Combine(_options.OutputRoot, doc.OutputRelativePath);
@@ -668,6 +698,7 @@ public sealed class SiteGenerator
         lock (_gate)
         {
             EnsureScaffold();
+            _prelude = null; // see BuildSurfacePrelude's lifetime rule
 
             var files = EnumerateSourceFiles();
             var navDiagnostics = new List<AdapterDiagnostic>();
@@ -1032,6 +1063,7 @@ public sealed class SiteGenerator
         lock (_gate)
         {
             EnsureScaffold();
+            _prelude = null; // see BuildSurfacePrelude's lifetime rule
             var nav = _nav ?? BuildNav(Array.Empty<string>());
             var events = GenerateAdrsInternal(nav);
             RefreshCoverage();
@@ -2881,6 +2913,21 @@ public sealed class SiteGenerator
     /// </summary>
     private SurfacePrelude BuildSurfacePrelude(SiteNav nav)
     {
+        // ONE INSTANCE, not two equal ones. Both consumers call this, and before the Story 22.4 code review a
+        // `--webview` run built the prelude TWICE — once inside GenerateAll's EmitSpaSite and once in
+        // RenderWebviewSurfaces — from identical inputs. That is exactly the "equal-but-separately-constructed
+        // is the same defect waiting to drift again" case Task 3 named, and it was live in the seam that story
+        // built to end it.
+        //
+        // ⚠️ LIFETIME RULE, and the reason this is a field and not a Lazy<>: the prelude closes over _docs,
+        // _counts, _progress, _epicsModel, _requirements, _sprint, _retros, _coverage, _workGraph, _cadence,
+        // _testArtifacts and nav. A cache that outlived a state change would ship a STALE dashboard — a new
+        // correctness bug in the name of deduplication. So it is invalidated at the START of every MUTATING
+        // entry point (GenerateAll, GenerateOne, RemoveFor, RegenerateEpics/Adrs/Topology/FromDataSource) and
+        // never anywhere else. RenderWebviewSurfaces is a pure read and deliberately does NOT invalidate, which
+        // is what lets it reuse the instance GenerateAll's emit already built. [Story 22.4 code review]
+        if (_prelude is { } cached) return cached;
+
         var docs = _docs.Values.ToList();
         var work = WorkInventory.Build(docs);
         var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work, _epicsModel, _requirements);
@@ -2889,7 +2936,7 @@ public sealed class SiteGenerator
         var dashboardPage = HtmlTemplater.BuildIndexPage(
             docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
             work, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts: counts, followUps: followUps, unplanned: unplanned, cadence: _cadence, workGraph: _workGraph, dateCutoff: _today, testArtifacts: _testArtifacts);
-        return new SurfacePrelude(docs, work, counts, followUps, unplanned, dashboardPage);
+        return _prelude = new SurfacePrelude(docs, work, counts, followUps, unplanned, dashboardPage);
     }
 
     /// <summary>One dashboard/epics family surface: the <see cref="PageView"/> both consumers render, plus the
@@ -2961,8 +3008,20 @@ public sealed class SiteGenerator
                     {
                         // The artifact was deleted, ACL-denied, or otherwise became unreadable between
                         // GenerateAll() and this bundle build — degrade this ONE story to a placeholder rather
-                        // than aborting the whole bundle, mirroring RenderEpicsPages' resilience on the HTML path.
-                        // [Deferred item, Story 6.4 review; widened to the SPA by Story 22.4 — see Trap 4 above]
+                        // than aborting the whole bundle.
+                        //
+                        // ⚠️ This is NOT a mirror of RenderEpicsPages' behaviour, despite what this comment
+                        // claimed until the Story 22.4 code review corrected it. RenderEpicsPages has no
+                        // per-story degrade at all: its only handler is method-level and emits
+                        // GenerationOutcome.Error, abandoning the rest of the epics family. So the static page
+                        // on disk keeps the story's full content while the IR carries a placeholder for the
+                        // same path — a real fork between the two surfaces, and Story 23.4 renders the site
+                        // FROM the IR. Recording it is therefore mandatory: a story whose entire premise is
+                        // "one producer, so there is no second place to disagree" must not introduce a silent
+                        // disagreement. Reported as ONE event after the emit (see GenerateAll), never per page.
+                        // [Deferred item, Story 6.4 review; widened to the SPA by Story 22.4 — see Trap 4 above;
+                        //  made visible by the Story 22.4 code review]
+                        _familyDegradedStories.Add($"{story.Id} ({ex.GetType().Name}: {ex.Message})");
                         artifactSourcePath = null;
                         storyPage = EpicsTemplater.BuildStoryPlaceholderPage(epic, story, nav, _module.Commands, epicRetroPath, StoryPager(model, story));
                     }
@@ -3002,7 +3061,18 @@ public sealed class SiteGenerator
     /// the <c>SpaDelivery.Extract*</c> family remain the IR's producer for the ~1,200 non-family pages until
     /// Story 23.4 replaces them (23.4 AC #3 deliberately keeps one C# region-composition path). This method is
     /// where that path now lives, once. [Story 22.4 AC #1/#3]</para></summary>
-    private IEnumerable<CapturedRegion> CapturedRegions(SiteNav nav, HashSet<string> familyPaths)
+    /// <param name="skip">A consumer's exclusion predicate, applied to the normalized path BEFORE any slicing.
+    /// Optional: the SPA passes none and consumes the sequence whole. It exists because a consumer that filters
+    /// afterwards still pays for what it discards — <see cref="CapturedNavMarkup"/> (a Singleline regex over the
+    /// entire page), <see cref="SpaDelivery.ExtractContentRegion"/> (a full nav+band+main string concatenation)
+    /// and three more extractions run per page. The webview's exclusions are precisely the classes that scale
+    /// with the TARGET repo — the whole <c>_codePages</c> set (bounded only by <c>MaxCodeMapFiles</c> = 25,000),
+    /// every commit-day page and every <c>commit/</c> page — so on a large repo filtering afterwards means
+    /// materialising and dropping tens of thousands of region strings. Pre-22.4 those were cheap set lookups
+    /// that short-circuited first; this parameter restores that ordering without reintroducing a second
+    /// producer. [Story 22.4 code review]</param>
+    private IEnumerable<CapturedRegion> CapturedRegions(
+        SiteNav nav, HashSet<string> familyPaths, Func<string, bool>? skip = null)
     {
         if (_spaCapture is not { } capture) yield break;
 
@@ -3010,6 +3080,7 @@ public sealed class SiteGenerator
         {
             var normalized = PathUtil.NormalizeSlashes(path);
             if (familyPaths.Contains(normalized)) continue;
+            if (skip is not null && skip(normalized)) continue;
             var navMarkup = CapturedNavMarkup(fullHtml, nav, normalized);
             var region = SpaDelivery.ExtractContentRegion(fullHtml, navMarkup);
             yield return new CapturedRegion(
@@ -3091,10 +3162,14 @@ public sealed class SiteGenerator
                 //   3. the JSON-island strip
                 //   4. the SourcePath join
                 // The SPA consumes the same sequence unfiltered.
-                foreach (var captured in CapturedRegions(nav, familyPaths))
+                // Filter 1 runs INSIDE the producer (as a skip predicate) rather than over its output, so an
+                // excluded page is never sliced at all. Same set, same result, none of the discarded work.
+                // [Story 22.4 code review]
+                bool WebviewExcludes(string path) =>
+                    excluded.Contains(path) || path.StartsWith("commit/", StringComparison.OrdinalIgnoreCase);
+
+                foreach (var captured in CapturedRegions(nav, familyPaths, WebviewExcludes))
                 {
-                    if (excluded.Contains(captured.Path)) continue;
-                    if (captured.Path.StartsWith("commit/", StringComparison.OrdinalIgnoreCase)) continue;
                     if (captured.Degraded)
                     {
                         // No <main> landmark → the slice degraded to nav-only. A silently BLANK surface is
@@ -3205,7 +3280,22 @@ public sealed class SiteGenerator
                 // spec-address-deferred-next-steps]
                 var storyOpenDeferred = followUps?.DeferredForSource(story.Id)
                     ?.Where(s => !s.Item.Resolved).ToList();
-                stories?.Add(new OutlineStory(
+                // INVARIANT, not a null-check: BuildFamilySurfaces always emits an epic's page surface before
+                // that epic's story surfaces, which is what initialises `stories`. A null here means the family
+                // sequence arrived out of order — and ADR 0024 §Decision 2 explicitly licenses a consumer to
+                // FILTER the sequence, so that is a reachable mistake, not a theoretical one. The former
+                // `stories?.Add(...)` swallowed it: the story vanished from the outline tree AND from
+                // BuildOutlineSummary's counts (which tally the same list), with no exception and no failing
+                // test. Fail loudly instead — a webview outline that silently omits stories is worse than one
+                // that does not build. [Story 22.4 code review]
+                if (stories is null)
+                {
+                    throw new InvalidOperationException(
+                        $"BuildOutline received story '{story.Id}' before any epic page surface for epic " +
+                        $"{f.Epic.Number}. The FamilySurface sequence must place an epic's page before its " +
+                        "stories; a filtered sequence that drops epic pages breaks this contract.");
+                }
+                stories.Add(new OutlineStory(
                     story.Id, story.Title, storyStage, StatusStyles.StoryLabel(storyStage),
                     PathUtil.NormalizeSlashes(f.Page.OutputRelativePath),
                     f.ArtifactSourcePath,

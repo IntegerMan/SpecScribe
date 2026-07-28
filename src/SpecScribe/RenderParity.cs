@@ -303,8 +303,12 @@ public static class RenderParity
     private static readonly Regex EpicChipRegex = new(
         "<a class=\"epic-chip (?<stage>[^\"]+)\" href=\"(?<href>[^\"]*)\"><span class=\"num\">(?<num>\\d+)</span>",
         RegexOptions.Compiled);
+    // The wrapper may carry a stage modifier (`story-card retired`, Story 8.9 D2), so match the class ATTRIBUTE
+    // rather than an exact class value — the same tolerance StatCardRegex above already needs. The card's stage
+    // fact still comes from StoryStageRegex over the body, so this stays a structural anchor, not a second
+    // status source that could disagree with the badge.
     private static readonly Regex StoryCardRegex = new(
-        "<div class=\"story-card\" id=\"(?<id>[^\"]+)\">(?<body>.*?)</div>\\n\\n",
+        "<div class=\"story-card[^\"]*\" id=\"(?<id>[^\"]+)\">(?<body>.*?)</div>\\n\\n",
         RegexOptions.Compiled | RegexOptions.Singleline);
     // A story card's OWN status stage is a single-word status-badge class; the task badge (status-badge
     // task-badge …) has a hyphenated class and is deliberately excluded. Extra progressive-enhancement classes

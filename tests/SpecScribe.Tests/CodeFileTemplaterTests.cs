@@ -196,7 +196,15 @@ public class CodeFileTemplaterTests
     private static FileInsight SampleInsight() => new(
         ChangeCount: 7,
         Contributors: new[] { ("Alice", 5), ("Bob", 2) },
-        CoupledFiles: new[] { ("src/SpecScribe/Other.cs", 4), ("docs/notes.md", 1) },
+        // Story 24.1: directional. Other.cs rides 4 of this file's 7 changes (57%) and is same-module; notes.md
+        // rides 2 of 7 (29%) and is cross-boundary (docs/ vs src/) — so one fixture exercises both markers.
+        CoupledFiles: new[]
+        {
+            new CoupledFile("src/SpecScribe/Other.cs", Support: 4, Confidence: 4.0 / 7, Lift: 1.4,
+                CrossBoundary: false, Kind: GitMetrics.CouplingKind.Code),
+            new CoupledFile("docs/notes.md", Support: 2, Confidence: 2.0 / 7, Lift: null,
+                CrossBoundary: true, Kind: GitMetrics.CouplingKind.Code),
+        },
         History: new[]
         {
             new CommitTouch("abc1234", new DateOnly(2026, 7, 3), "Alice", "Refine the thing"),
@@ -256,15 +264,55 @@ public class CodeFileTemplaterTests
         Assert.Contains("class=\"ref-edge-file\"", html);
         Assert.Contains("class=\"ref-file-dot\"", html);
         Assert.Contains("class=\"ref-file-label\"", html);
-        // … each with a rich tooltip carrying the full path + co-change strength.
+        // … each with a rich tooltip carrying the full path + co-change strength. The graph itself still speaks in
+        // shared-commit counts — upgrading it to confidence-weighted edges is 24.2's job, not 24.1's.
         Assert.Contains("<title>src/SpecScribe/Other.cs — changed together 4 times</title>", html);
-        Assert.Contains("<title>docs/notes.md — changed together 1 time</title>", html);
+        Assert.Contains("<title>docs/notes.md — changed together 2 times</title>", html);
         // The relationships note now frames both populations (solid citations + dashed co-changes).
         Assert.Contains("changes alongside (dashed)", html);
         // The sr-only list carries the related files as a labelled text equivalent (path + co-change count).
         Assert.Contains("Files changed alongside this one:", html);
         Assert.Contains("src/SpecScribe/Other.cs &#8212; changed together 4 times", html);
-        Assert.Contains("docs/notes.md &#8212; changed together 1 time", html);
+        Assert.Contains("docs/notes.md &#8212; changed together 2 times", html);
+    }
+
+    // ---- Story 24.1: the sr-only coupled list is the canonical directional text twin ----
+
+    [Fact]
+    public void RenderPage_SrOnlyRelatedList_CarriesDirectionalConfidencePerEntry()
+    {
+        var html = CodeFileTemplater.RenderPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight());
+
+        // 4 of the focal file's 7 changes = 57%; 2 of 7 = 29%. Read from THIS file's side, per AC #3.
+        Assert.Contains("changed together 4 times &#183; confidence 57%", html);
+        Assert.Contains("changed together 2 times &#183; confidence 29%", html);
+    }
+
+    [Fact]
+    public void RenderPage_SrOnlyRelatedList_MarksCrossBoundaryCouplesAsWordsNotColour()
+    {
+        var html = CodeFileTemplater.RenderPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight());
+
+        // docs/notes.md crosses from src/ into docs/; src/SpecScribe/Other.cs does not. The marker must be readable
+        // text (UX-DR19/NFR8) and must attach only to the crossing entry.
+        Assert.Contains("confidence 29% &#183; cross-boundary", html);
+        Assert.DoesNotContain("confidence 57% &#183; cross-boundary", html);
+    }
+
+    [Fact]
+    public void RenderPage_SrOnlyRelatedList_CarriesLiftOnTheRowTitleAndOmitsItWhenUndefined()
+    {
+        var html = CodeFileTemplater.RenderPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight());
+
+        // Other.cs has lift 1.4; notes.md's lift is null (undefined denominator) and must simply not appear —
+        // never as "NaN"/"∞", which is what an unguarded division would have rendered.
+        Assert.Contains("Lift 1.4&#215; this file's usual rate", html);
+        Assert.Equal(1, CountOccurrences(html, "this file's usual rate"));
+        Assert.DoesNotContain("NaN", html);
+        Assert.DoesNotContain("Infinity", html);
     }
 
     [Fact]
@@ -335,7 +383,11 @@ public class CodeFileTemplaterTests
         var insight = new FileInsight(
             ChangeCount: 1,
             Contributors: new[] { ("A<b>&\"lice", 1) },
-            CoupledFiles: new[] { ("src/<x>&.cs", 1) },
+            CoupledFiles: new[]
+            {
+                new CoupledFile("src/<x>&.cs", Support: 1, Confidence: 1.0, Lift: null,
+                    CrossBoundary: false, Kind: GitMetrics.CouplingKind.Code),
+            },
             History: new[] { new CommitTouch("aaa1111", new DateOnly(2026, 7, 1), "E<v>il", "sub&<ject>\"") },
             TotalContributors: 1);
 
@@ -356,7 +408,7 @@ public class CodeFileTemplaterTests
         var insight = new FileInsight(
             ChangeCount: 3,
             Contributors: new[] { ("Alice", 3) },
-            CoupledFiles: Array.Empty<(string, int)>(),
+            CoupledFiles: Array.Empty<CoupledFile>(),
             History: Array.Empty<CommitTouch>(),
             TotalContributors: 1);
 
@@ -377,7 +429,7 @@ public class CodeFileTemplaterTests
         var insight = new FileInsight(
             ChangeCount: 12,
             Contributors: new[] { ("Alice", 5), ("Bob", 4) },
-            CoupledFiles: Array.Empty<(string, int)>(),
+            CoupledFiles: Array.Empty<CoupledFile>(),
             History: Array.Empty<CommitTouch>(),
             TotalContributors: 12);
 
@@ -393,7 +445,7 @@ public class CodeFileTemplaterTests
         var insight = new FileInsight(
             ChangeCount: 2,
             Contributors: new[] { ("Alice", 2) },
-            CoupledFiles: Array.Empty<(string, int)>(),
+            CoupledFiles: Array.Empty<CoupledFile>(),
             History: Array.Empty<CommitTouch>(),
             TotalContributors: 1);
 

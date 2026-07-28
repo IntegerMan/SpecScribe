@@ -1,0 +1,9 @@
+{
+  "name": "specscribe-analysis-digest",
+  "private": true,
+  "type": "module",
+  "description": "Dev-time emitter for the agent-facing analysis digest under .specscribe/analysis/. Fetches this repository's current SonarCloud findings ANONYMOUSLY (IntegerMan_SpecScribe is a public free-tier project — no token is read, written, or required anywhere) and projects them into the ADR 0023 AnalysisObservation contract as a sharded, gitignored digest. Ships NO product code and touches no generated output, so the golden fingerprint cannot move. Zero runtime dependencies.",
+  "scripts": {
+    "digest": "node index.mjs"
+  }
+}

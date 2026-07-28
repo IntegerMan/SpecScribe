@@ -21,25 +21,20 @@ namespace SpecScribe;
 /// applies to.</para> [Story 18.5]</summary>
 public static class TestArtifactsTemplater
 {
-    public static string RenderListPage(TestArtifactsModel model, SiteNav nav)
+    public static string RenderListPage(TestArtifactsModel model, SiteNav nav) =>
+        HtmlRenderAdapter.Shared.Render(BuildListPage(model, nav)).Content;
+
+    /// <summary>Builds this page's host-neutral <see cref="PageView"/> — the AD-2 delivery contract, so the IR's
+    /// content region can be COMPOSED (<see cref="JsonSpaRenderAdapter.RenderContent"/>: nav markup + wayfinding +
+    /// body) instead of sliced back out of a rendered full page. <see cref="RenderListPage"/> is the unchanged HTML
+    /// projection of this same model, so the bytes are identical. [Story 23.4 AC #3]</summary>
+    public static PageView BuildListPage(TestArtifactsModel model, SiteNav nav)
     {
         var outputPath = SiteNav.TestArtifactsOutputPath;
         var prefix = PathUtil.RelativePrefix(outputPath); // "" — test-artifacts.html is at the output root.
         var moduleName = ModuleName(model);
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen(
-            $"Test Artifacts — {nav.SiteTitle}",
-            prefix + ForgeOptions.StylesheetName,
-            prefix + ForgeOptions.ScriptName,
-            $"Test artifacts for {nav.SiteTitle} — the quality gate verdict, coverage figures, and how deeply SpecScribe interprets each document."));
-        sb.Append(nav.RenderNavBar(outputPath));
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
-        {
-            ("Home", SiteNav.HomeOutputPath),
-            ("Test Artifacts", null),
-        }));
-
         sb.Append("<main id=\"main-content\" class=\"dashboard\">\n\n");
         sb.Append("<h1>Test Artifacts</h1>\n");
         sb.Append($"<p class=\"doc-subtitle\">{PathUtil.Html(nav.SiteTitle)} &middot; quality evidence produced by {PathUtil.Html(moduleName)}</p>\n\n");
@@ -52,9 +47,28 @@ public static class TestArtifactsTemplater
         sb.Append(RenderArtifactList(model, prefix));
 
         sb.Append("</main>\n\n");
-        sb.Append(PathUtil.RenderFooter(prefix));
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+
+        return new PageView
+        {
+            Kind = PageKind.Structure,
+            OutputRelativePath = outputPath,
+            Title = $"Test Artifacts — {nav.SiteTitle}",
+            MetaDescription = $"Test artifacts for {nav.SiteTitle} — the quality gate verdict, coverage figures, and how deeply SpecScribe interprets each document.",
+            Nav = nav.ToNavigationView(outputPath),
+            Breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
+            {
+                ("Home", SiteNav.HomeOutputPath),
+                ("Test Artifacts", null),
+            }),
+            Assets = new AssetManifest
+            {
+                StylesheetHref = prefix + ForgeOptions.StylesheetName,
+                ScriptHref = prefix + ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+            },
+            Interaction = InteractionState.None,
+            BodyHtml = sb.ToString(),
+        };
     }
 
     /// <summary>The dashboard's Module Coverage panel BODY — module label, gate badge, tier counts, and one link

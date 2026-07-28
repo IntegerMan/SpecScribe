@@ -51,10 +51,34 @@ public static class CodeFileTemplater
         EntityPager? pager = null,
         IReadOnlyList<(int RefIndex, int RelatedIndex)>? storyRelatedEdges = null,
         IReadOnlyList<(int RelatedIndexA, int RelatedIndexB)>? relatedRelatedEdges = null,
+        NavLocalContext? localContext = null) =>
+        HtmlRenderAdapter.Shared.Render(BuildPage(
+            repoRelativePath, outputRelativePath, lines, nav, referencedBy, externalSourceUrl, insight,
+            coupledFileHref, commitHref, dayHref, pager, storyRelatedEdges, relatedRelatedEdges, localContext)).Content;
+
+    /// <summary>Builds a code page's host-neutral <see cref="PageView"/> — the AD-2 delivery contract, so the IR's
+    /// content region can be COMPOSED (<see cref="JsonSpaRenderAdapter.RenderContent"/>: nav markup + wayfinding +
+    /// body) instead of sliced back out of a rendered full page. <see cref="RenderPage"/> is the unchanged HTML
+    /// projection of this same model, so the bytes are identical. [Story 23.4 AC #3]</summary>
+    public static PageView BuildPage(
+        string repoRelativePath,
+        string outputRelativePath,
+        IReadOnlyList<string> lines,
+        SiteNav nav,
+        IReadOnlyList<(string OutputUrl, string Title, (int Number, string Title)? Epic)>? referencedBy = null,
+        string? externalSourceUrl = null,
+        FileInsight? insight = null,
+        Func<string, string?>? coupledFileHref = null,
+        Func<string, string?>? commitHref = null,
+        Func<DateOnly, string?>? dayHref = null,
+        EntityPager? pager = null,
+        IReadOnlyList<(int RefIndex, int RelatedIndex)>? storyRelatedEdges = null,
+        IReadOnlyList<(int RelatedIndexA, int RelatedIndexB)>? relatedRelatedEdges = null,
         NavLocalContext? localContext = null)
     {
         var prefix = PathUtil.RelativePrefix(outputRelativePath);
-        var sb = BeginShell(repoRelativePath, outputRelativePath, prefix, nav, highlight: true, pager: pager, localContext: localContext);
+        var shell = BeginShell(repoRelativePath, outputRelativePath, prefix, nav, highlight: true, pager: pager, localContext: localContext);
+        var sb = shell.Body;
 
         var count = lines.Count;
         sb.Append($"  <div class=\"meta-pills\"><span class=\"pill\">{count.ToString(CultureInfo.InvariantCulture)} {(count == 1 ? "line" : "lines")}</span></div>\n");
@@ -88,13 +112,13 @@ public static class CodeFileTemplater
             // Nothing to say about the file (uncited, no external link, no deep-git insight) — no point in tabs; the
             // source spans the full width exactly as the pre-tab layout did for an uncited file.
             sb.Append(source).Append('\n');
-            return EndShell(sb, prefix);
+            return EndShell(shell);
         }
 
         // A deep link to code/<path>.html#L42 still lands: a :target on a source line forces the code view forward in
         // CSS (see .code-tabs :target rules), so the locked #L{n} convention survives regardless of the default tab.
         AppendTabs(sb, outputRelativePath, tabs);
-        return EndShell(sb, prefix);
+        return EndShell(shell);
     }
 
     /// <summary>One tab in the code page's pure-CSS tab strip: a css modifier (<c>insights</c>/<c>relationships</c>/
@@ -251,30 +275,46 @@ public static class CodeFileTemplater
     }
 
     /// <summary>Maps the file's coupled-file list (Story 7.4's <see cref="FileInsight.CoupledFiles"/> — already
-    /// sorted, capped, and <c>--deep-git</c>-gated upstream) to related-file graph/list nodes (Story 7.8). Each entry
-    /// becomes <c>(Href?, fullPath, basename, coChanges)</c>: <c>Href</c> is the coupled file's <c>code/…html</c> page
+    /// confidence-sorted, support-floored, capped, and <c>--deep-git</c>-gated upstream) to related-file graph/list
+    /// nodes (Story 7.8). Each entry becomes a <see cref="RelatedNode"/> carrying the link/label triple plus Story
+    /// 24.1's directional metrics: <c>Href</c> is the coupled file's <c>code/…html</c> page
     /// resolved via <paramref name="coupledFileHref"/> and prefixed for this page — non-null only when that file has an
     /// in-portal page (it too is cited), so an uncited coupled file becomes a non-link chip, never a dead link. Full
     /// path rides the tooltip/list text; the basename is the on-graph label. A null insight or empty coupling yields an
     /// empty list, so the graph stays citations-only (byte-identical to a run without deep-git).</summary>
-    private static IReadOnlyList<(string? Href, string Title, string Short, int CoChanges)> BuildRelatedNodes(
+    /// <summary>One resolved related-file node: the link/label triple the graph draws, plus the Story 24.1
+    /// directional metrics the sr-only text twin reports. Kept as a named type rather than widening the tuple
+    /// <see cref="Charts.ReferenceGraph"/> accepts — the graph reads only the first four members and stays a 24.2
+    /// concern, so its signature deliberately does not drift here.</summary>
+    private sealed record RelatedNode(
+        string? Href, string Title, string Short, int Support, double Confidence, double? Lift, bool CrossBoundary);
+
+    private static IReadOnlyList<RelatedNode> BuildRelatedNodes(
         string prefix, FileInsight? insight, Func<string, string?>? coupledFileHref)
     {
         if (insight is null || insight.CoupledFiles.Count == 0)
         {
-            return Array.Empty<(string?, string, string, int)>();
+            return Array.Empty<RelatedNode>();
         }
 
-        var list = new List<(string? Href, string Title, string Short, int CoChanges)>(insight.CoupledFiles.Count);
-        foreach (var (path, coChanges) in insight.CoupledFiles)
+        var list = new List<RelatedNode>(insight.CoupledFiles.Count);
+        foreach (var coupled in insight.CoupledFiles)
         {
-            var norm = PathUtil.NormalizeSlashes(path);
-            var target = coupledFileHref?.Invoke(path);
+            var norm = PathUtil.NormalizeSlashes(coupled.Path);
+            var target = coupledFileHref?.Invoke(coupled.Path);
             var href = target is { Length: > 0 } ? prefix + PathUtil.NormalizeSlashes(target) : null;
-            list.Add((href, norm, BaseName(path), coChanges));
+            list.Add(new RelatedNode(
+                href, norm, BaseName(coupled.Path),
+                coupled.Support, coupled.Confidence, coupled.Lift, coupled.CrossBoundary));
         }
         return list;
     }
+
+    /// <summary>The related-file population as the 4-tuple <see cref="Charts.ReferenceGraph"/> consumes — the
+    /// projection seam that lets the node model carry Story 24.1's metrics without changing the chart's contract.</summary>
+    private static IReadOnlyList<(string? Href, string Title, string Short, int CoChanges)> ToGraphNodes(
+        IReadOnlyList<RelatedNode> related) =>
+        related.Select(r => (r.Href, r.Title, r.Short, r.Support)).ToList();
 
     /// <summary>Builds the <em>History</em> panel: the bounded, newest-first change-history table (Story 7.4) — each
     /// row's hash a guarded link to its per-commit page (null → plain <c>&lt;code&gt;</c>), and its date a guarded
@@ -427,7 +467,7 @@ public static class CodeFileTemplater
     private static string BuildRelationshipsCard(
         string prefix, string repoRelativePath, string outputRelativePath,
         IReadOnlyList<(string OutputUrl, string Title, (int Number, string Title)? Epic)> referencedBy,
-        IReadOnlyList<(string? Href, string Title, string Short, int CoChanges)> related,
+        IReadOnlyList<RelatedNode> related,
         IReadOnlyList<(int RefIndex, int RelatedIndex)>? storyRelatedEdges,
         IReadOnlyList<(int RelatedIndexA, int RelatedIndexB)>? relatedRelatedEdges)
     {
@@ -456,6 +496,7 @@ public static class CodeFileTemplater
         // data — AC "both checkboxes present ... no exception"). Page-unique ids only for the <label for>/<input id>
         // pair's correctness under document consolidation (mirrors TabGroupName); the CSS toggle logic itself keys
         // off the checkbox CLASSES, which are the same on every code page.
+        var graphNodes = ToGraphNodes(related);
         var group = RefGraphGroupSlug(outputRelativePath);
         sb.Append($"  <input type=\"checkbox\" id=\"refgraph-epic-{group}\" class=\"refgraph-toggle refgraph-toggle-epic\">");
         sb.Append($"<label for=\"refgraph-epic-{group}\" class=\"refgraph-toggle-label\">Group by epic</label>\n");
@@ -466,7 +507,7 @@ public static class CodeFileTemplater
         {
             sb.Append($"  <div class=\"ref-graph-wrap ref-graph-view\" data-view=\"{key}\">\n");
             sb.Append(Charts.ReferenceGraph(
-                BaseName(repoRelativePath), nodes, 0, related,
+                BaseName(repoRelativePath), nodes, 0, graphNodes,
                 refEpics: epicOn ? refEpics : null,
                 groupByEpic: epicOn,
                 crossEdges: relOn ? storyRelatedEdges : null,
@@ -488,17 +529,26 @@ public static class CodeFileTemplater
             // path + co-change strength, linked to the coupled file's code page when it has one, plain text otherwise.
             // Also enumerates any "Show relationships" cross edges touching each related file, so the sr-only text
             // stays complete regardless of which toggle combination happens to be visible.
+            // Story 24.1 (AC #3): this list is the CANONICAL text twin the Epic 24 graph stories reuse rather than
+            // replace, so it carries the full directional metric — directional confidence read from this file's
+            // side, and a cross-boundary marker as real WORDS (never colour or a glyph alone, UX-DR19/NFR8). Lift
+            // rides the row's title attribute: it is the specialist's number, and spending sr-only reading time on
+            // it would bury the confidence the row is actually about.
             sb.Append("    <li class=\"ref-list-related\">Files changed alongside this one:\n");
             sb.Append("      <ul>\n");
             for (var j = 0; j < related.Count; j++)
             {
-                var (href, title, _, coChanges) = related[j];
-                var pathHtml = PathUtil.Html(title);
-                var nameCell = href is { Length: > 0 }
-                    ? $"<a href=\"{PathUtil.Html(href)}\">{pathHtml}</a>"
+                var r = related[j];
+                var pathHtml = PathUtil.Html(r.Title);
+                var nameCell = r.Href is { Length: > 0 }
+                    ? $"<a href=\"{PathUtil.Html(r.Href)}\">{pathHtml}</a>"
                     : pathHtml;
                 var relatedCrossSuffix = BuildRelatedCrossSuffix(j, storyRelatedEdges, relatedRelatedEdges, nodes, related);
-                sb.Append($"        <li>{nameCell} &#8212; changed together {coChanges.ToString(CultureInfo.InvariantCulture)} {Charts.Plural(coChanges, "time", "times")}{relatedCrossSuffix}</li>\n");
+                var boundarySuffix = r.CrossBoundary ? " &#183; cross-boundary" : "";
+                var liftAttr = r.Lift is { } lift
+                    ? $" title=\"Lift {lift.ToString("0.0", CultureInfo.InvariantCulture)}&#215; this file's usual rate\""
+                    : "";
+                sb.Append($"        <li{liftAttr}>{nameCell} &#8212; changed together {r.Support.ToString(CultureInfo.InvariantCulture)} {Charts.Plural(r.Support, "time", "times")} &#183; confidence {Charts.Percent(r.Confidence)}{boundarySuffix}{relatedCrossSuffix}</li>\n");
             }
             sb.Append("      </ul>\n");
             sb.Append("    </li>\n");
@@ -512,7 +562,7 @@ public static class CodeFileTemplater
     /// "Show relationships" story&#8596;related-file edge's text equivalent).</summary>
     private static string BuildStoryCrossSuffix(
         int refIndex, IReadOnlyList<(int RefIndex, int RelatedIndex)>? storyRelatedEdges,
-        IReadOnlyList<(string? Href, string Title, string Short, int CoChanges)> related)
+        IReadOnlyList<RelatedNode> related)
     {
         if (storyRelatedEdges is not { Count: > 0 }) return "";
         var names = storyRelatedEdges
@@ -531,7 +581,7 @@ public static class CodeFileTemplater
         IReadOnlyList<(int RefIndex, int RelatedIndex)>? storyRelatedEdges,
         IReadOnlyList<(int RelatedIndexA, int RelatedIndexB)>? relatedRelatedEdges,
         IReadOnlyList<(string Href, string Title, string Short)> nodes,
-        IReadOnlyList<(string? Href, string Title, string Short, int CoChanges)> related)
+        IReadOnlyList<RelatedNode> related)
     {
         var parts = new List<string>();
         if (storyRelatedEdges is { Count: > 0 })
@@ -679,10 +729,33 @@ public static class CodeFileTemplater
         Func<string, string?>? commitHref = null,
         Func<DateOnly, string?>? dayHref = null,
         IReadOnlyList<(int RefIndex, int RelatedIndex)>? storyRelatedEdges = null,
+        IReadOnlyList<(int RelatedIndexA, int RelatedIndexB)>? relatedRelatedEdges = null) =>
+        HtmlRenderAdapter.Shared.Render(BuildPlaceholderPage(
+            repoRelativePath, outputRelativePath, reason, nav, referencedBy, externalSourceUrl, pager, localContext,
+            insight, coupledFileHref, commitHref, dayHref, storyRelatedEdges, relatedRelatedEdges)).Content;
+
+    /// <summary>Builds a not-rendered code page's host-neutral <see cref="PageView"/> — see
+    /// <see cref="BuildPage"/>. No Prism head here: a placeholder renders no <c>&lt;code&gt;</c> block.
+    /// [Story 23.4 AC #3]</summary>
+    public static PageView BuildPlaceholderPage(
+        string repoRelativePath,
+        string outputRelativePath,
+        string reason,
+        SiteNav nav,
+        IReadOnlyList<(string OutputUrl, string Title, (int Number, string Title)? Epic)>? referencedBy = null,
+        string? externalSourceUrl = null,
+        EntityPager? pager = null,
+        NavLocalContext? localContext = null,
+        FileInsight? insight = null,
+        Func<string, string?>? coupledFileHref = null,
+        Func<string, string?>? commitHref = null,
+        Func<DateOnly, string?>? dayHref = null,
+        IReadOnlyList<(int RefIndex, int RelatedIndex)>? storyRelatedEdges = null,
         IReadOnlyList<(int RelatedIndexA, int RelatedIndexB)>? relatedRelatedEdges = null)
     {
         var prefix = PathUtil.RelativePrefix(outputRelativePath);
-        var sb = BeginShell(repoRelativePath, outputRelativePath, prefix, nav, pager: pager, localContext: localContext);
+        var shell = BeginShell(repoRelativePath, outputRelativePath, prefix, nav, pager: pager, localContext: localContext);
+        var sb = shell.Body;
 
         sb.Append("  <div class=\"meta-pills\"><span class=\"pill\">Not rendered</span></div>\n");
         sb.Append("</header>\n\n");
@@ -706,7 +779,7 @@ public static class CodeFileTemplater
         if (!hasExtraTabs)
         {
             AppendBody(sb, BuildAside(prefix, repoRelativePath, referencedBy, externalSourceUrl), source);
-            return EndShell(sb, prefix);
+            return EndShell(shell);
         }
 
         // Deep-git / relationships present: same tab shell as RenderPage; Code panel is the placeholder reason.
@@ -717,7 +790,7 @@ public static class CodeFileTemplater
         tabs.Add(new CodeTab("source", "Code", source));
 
         AppendTabs(sb, outputRelativePath, tabs);
-        return EndShell(sb, prefix);
+        return EndShell(shell);
     }
 
     /// <summary>Emits the head + nav + breadcrumb + open <c>&lt;main&gt;</c>/<c>&lt;header&gt;</c> shared by both the
@@ -725,24 +798,17 @@ public static class CodeFileTemplater
     /// it — mirroring the synthesized-page shape of <see cref="CommitDayTemplater"/>. <paramref name="highlight"/>
     /// adds the vendored Prism stylesheet + highlighter to the head (only the full page, which actually renders a
     /// <c>&lt;code&gt;</c> block, asks for them).</summary>
-    private static StringBuilder BeginShell(string repoRelativePath, string outputRelativePath, string prefix, SiteNav nav, bool highlight = false, EntityPager? pager = null, NavLocalContext? localContext = null)
+    /// <summary>The identity every code page shares, carried from <see cref="BeginShell"/> to
+    /// <see cref="EndShell"/> so the page's chrome facts reach its <see cref="PageView"/> instead of being
+    /// string-built into a full document and discarded. Story 23.4 moved this templater onto the delivery
+    /// contract; the two-phase Begin/End shape is unchanged.</summary>
+    private sealed record CodeShell(
+        SiteNav Nav, string RepoRelativePath, string OutputRelativePath, string Prefix,
+        bool Highlight, EntityPager? Pager, NavLocalContext? LocalContext, StringBuilder Body);
+
+    private static CodeShell BeginShell(string repoRelativePath, string outputRelativePath, string prefix, SiteNav nav, bool highlight = false, EntityPager? pager = null, NavLocalContext? localContext = null)
     {
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen(
-            $"{repoRelativePath} — {nav.SiteTitle}",
-            prefix + ForgeOptions.StylesheetName,
-            prefix + ForgeOptions.ScriptName,
-            $"Source file {repoRelativePath} in {nav.SiteTitle}.",
-            highlight ? HighlightHead(prefix) : null));
-        sb.Append(nav.RenderNavBar(outputRelativePath, localContext));
-        // Sibling pager (prev/next across sibling files, alphabetical) rides the coherent wayfinding strip
-        // alongside the breadcrumb now, not the body's own header. [Story 10.11]
-        sb.Append(SiteNav.RenderWayfinding(outputRelativePath, new (string, string?)[]
-        {
-            ("Home", "index.html"),
-            (repoRelativePath, null),
-        }, pager));
-
         // Single <main id="main-content"> landmark / skip-link target. [Story 1.4 AC #1] The .code-page wrapper
         // gives the header + two-column body a centered max-width with side gutters (this synthesized page has no
         // markdown .doc-body of its own to supply them, so content otherwise ran to the window edge).
@@ -751,15 +817,43 @@ public static class CodeFileTemplater
         sb.Append("<header class=\"doc-header\">\n");
         sb.Append("  <div class=\"story-kicker\">Source File</div>\n");
         sb.Append($"  <h1>{PathUtil.Html(repoRelativePath)}</h1>\n");
-        return sb;
+        return new CodeShell(nav, repoRelativePath, outputRelativePath, prefix, highlight, pager, localContext, sb);
     }
 
-    private static string EndShell(StringBuilder sb, string prefix)
+    /// <summary>Closes the shared shell and returns the page as a <see cref="PageView"/>. The Prism theme +
+    /// highlighter ride <see cref="AssetManifest.ExtraHead"/> — the second real user of that field, alongside the
+    /// Impact Map's head-placed hierarchy boot marker. Only the full page (which actually renders a
+    /// <c>&lt;code&gt;</c> block) asks for them. [Story 23.4 AC #3]</summary>
+    private static PageView EndShell(CodeShell shell)
     {
+        var sb = shell.Body;
         sb.Append("</div>\n</main>\n\n");
-        sb.Append(PathUtil.RenderFooter(prefix));
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+
+        return new PageView
+        {
+            Kind = PageKind.Doc,
+            OutputRelativePath = shell.OutputRelativePath,
+            Title = $"{shell.RepoRelativePath} — {shell.Nav.SiteTitle}",
+            MetaDescription = $"Source file {shell.RepoRelativePath} in {shell.Nav.SiteTitle}.",
+            Nav = shell.Nav.ToNavigationView(shell.OutputRelativePath, shell.LocalContext),
+            Breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
+            {
+                ("Home", "index.html"),
+                (shell.RepoRelativePath, null),
+            }),
+            // Sibling pager (prev/next across sibling files, alphabetical) rides the coherent wayfinding strip
+            // alongside the breadcrumb now, not the body's own header. [Story 10.11]
+            Pager = shell.Pager,
+            Assets = new AssetManifest
+            {
+                StylesheetHref = shell.Prefix + ForgeOptions.StylesheetName,
+                ScriptHref = shell.Prefix + ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+                ExtraHead = shell.Highlight ? HighlightHead(shell.Prefix) : null,
+            },
+            Interaction = InteractionState.None,
+            BodyHtml = sb.ToString(),
+        };
     }
 
     /// <summary>The extra head tags a highlighted code page needs: the vendored Prism theme stylesheet and the

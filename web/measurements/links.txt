@@ -3,13 +3,13 @@ Story 23.3 AC #4 — internal link resolution, Nuxt output vs the golden site
 
                         nuxt          golden
 ----------------------------------------------------
-  pages walked          1414          1408
-  files emitted         1451          1497
-  <a href> total        220118        224811
-  external/anchor       10569         12202
-  internal              209549        212609
-  resolved              208419        211461
-  dangling              1130          1148
+  pages walked          1414          1112
+  files emitted         1451          1178
+  <a href> total        220118        106345
+  external/anchor       10569         10750
+  internal              209549        95595
+  resolved              208419        94452
+  dangling              1130          1143
 
 Link-for-link against the golden site:
 

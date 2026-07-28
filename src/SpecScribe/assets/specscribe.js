@@ -1098,6 +1098,45 @@
     if (t && t.getAttribute && t.getAttribute("data-hierarchy-reveal") !== null) flushHierarchyReveals();
   });
 
+  /* --- Reveal-by-hash: a fragment naming a scope inside a not-yet-mounted panel must get a chance to apply too
+     [Story 20.9 code review] ---------------------------------------------------------------------------------
+     Only the default-visible panel's own `initHierarchyExplorer` runs at load, so `scopeFromHash()` never sees a
+     hash naming a scope inside one of the OTHER panels until the reader manually reveals it. Each instance's
+     `hashKey` lives in its own data island, readable without mounting it, so this runs once at boot — cheap, and
+     before the deferred-mount pass below gets to them.
+     Never forces `display` directly: the checkbox state IS the reader-visible "which filter is active" affordance,
+     so revealing a panel any other way would desync it from what the page's own controls show. A panel declares
+     which `[data-hierarchy-reveal]` controls need which checked state on the nearest ancestor carrying
+     `data-hierarchy-reveal-when="id=0|1;id=0|1"` — generic by construction, no surface name reaches this file. */
+  function revealPanelsNamedByHash() {
+    if (!location.hash) return;
+    var parts = location.hash.replace(/^#/, "").split("&");
+    var matched = false;
+    Array.prototype.forEach.call(document.querySelectorAll("[data-hierarchy]"), function (root) {
+      if (hierarchyPanelOf(root).clientWidth) return; // already visible — its own init reads the hash directly
+      var dataEl = document.getElementById(root.id + "-data");
+      if (!dataEl) return;
+      var cfg;
+      try { cfg = (JSON.parse(dataEl.textContent) || {}).config; } catch (e) { return; }
+      if (!cfg) return;
+      var key = (cfg.hashKey || "sb") + "=";
+      var named = false;
+      for (var i = 0; i < parts.length; i++) { if (parts[i].indexOf(key) === 0) { named = true; break; } }
+      if (!named) return;
+      var revealer = root.closest("[data-hierarchy-reveal-when]");
+      if (!revealer) return;
+      revealer.getAttribute("data-hierarchy-reveal-when").split(";").forEach(function (pair) {
+        var eq = pair.indexOf("=");
+        if (eq < 1) return;
+        var el = document.getElementById(pair.slice(0, eq));
+        if (el) { el.checked = pair.slice(eq + 1) === "1"; matched = true; }
+      });
+    });
+    // One flush covers every panel this hash named — flushHierarchyReveals() scans every deferred host itself,
+    // it does not need to be told which ones just became visible.
+    if (matched) flushHierarchyReveals();
+  }
+
   // The two runtime-argument kinds a dimension may take (HierarchyDimensionArg). Named once so the marker
   // attribute and the emitted declaration cannot drift on a typo.
   var HIERARCHY_ARG_ROSTER = "roster";
@@ -2277,6 +2316,7 @@
     return true;
   }
 
+  revealPanelsNamedByHash();
   initHierarchyExplorers(document);
   document.addEventListener("specscribe:content-swapped", function (e) {
     initHierarchyExplorers(e && e.detail ? e.detail.root : document);

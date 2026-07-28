@@ -1741,14 +1741,24 @@ public static partial class Charts
     }
 
     /// <summary>Change coupling as a ranked table (the precise, screen-reader-friendly companion to the
-    /// <see cref="CouplingGraph"/>): one row per coupled file pair with its co-change count, headed and aligned
-    /// so the counts scan as a column. Full paths shown as real text (ellipsis-truncated via CSS, full value in
-    /// the cell <c>title</c>) so the visual graph is never the sole information carrier. Not statuses, so no
-    /// <c>--status-*</c> tokens. A trailing "Kind" column carries a visible "Process" text badge
-    /// (<see cref="GitMetrics.ClassifyCoupling"/>) when either file in the pair is process signal; code pairs
-    /// leave the cell blank rather than a redundant "Code" label on the majority case (Story 10.6, AC1). Degrades
-    /// to a friendly note when nothing crosses the coupling threshold. [Story 3.2; Kind column: Story 10.6]</summary>
-    public static string CouplingTable(IReadOnlyList<(string FileA, string FileB, int CoChanges)> coupling, Func<string, string?>? fileHref = null)
+    /// <see cref="CouplingGraph"/>): one row per DIRECTED couple, headed and aligned so the counts scan as columns.
+    /// Full paths shown as real text (ellipsis-truncated via CSS, full value in the cell <c>title</c>) so the visual
+    /// graph is never the sole information carrier. Not statuses, so no <c>--status-*</c> tokens. Degrades to a
+    /// friendly note when nothing crosses the coupling threshold.
+    /// <para><b>Story 24.1</b> made the rows directional (<see cref="DirectedCouple"/>, ranked by confidence
+    /// upstream in <see cref="DeepGitPulse.DirectedCoupling"/>) and added the <b>Confidence</b> column: "when the
+    /// first file changes, the second changes this often". The old symmetric "N× together" count survives as the
+    /// Together column — support is what makes a confidence trustworthy, so both are shown rather than one
+    /// replacing the other. Because rows are directed, the same pair may legitimately appear in both directions
+    /// with different confidence; that asymmetry is the finding, not a duplicate.</para>
+    /// <para>The trailing "Kind" cell carries up to two independent TEXT badges (never colour alone, UX-DR19/NFR8):
+    /// "Process" when either file is process signal (<see cref="GitMetrics.ClassifyCoupling"/>, Story 10.6) and
+    /// "Cross-boundary" when the pair spans top-level directories (<see cref="GitMetrics.IsCrossBoundary"/>, Story
+    /// 24.1). Both flags are read off the record — computed once upstream, never re-derived here. An ordinary
+    /// same-module code pair leaves the cell blank rather than carrying a redundant label on the majority
+    /// case.</para>
+    /// [Story 3.2; Kind column: Story 10.6; directional + Confidence + Cross-boundary: Story 24.1]</summary>
+    public static string CouplingTable(IReadOnlyList<DirectedCouple> coupling, Func<string, string?>? fileHref = null)
     {
         if (coupling.Count == 0) return "<div class=\"chart-empty\">No significant change coupling detected.</div>\n";
 
@@ -1758,21 +1768,37 @@ public static partial class Charts
                   "<th scope=\"col\">File</th>" +
                   "<th scope=\"col\">Coupled with</th>" +
                   "<th scope=\"col\" class=\"coupling-num\">Together</th>" +
+                  "<th scope=\"col\" class=\"coupling-num\">Confidence</th>" +
                   "<th scope=\"col\" class=\"coupling-kind\">Kind</th>" +
                   "</tr></thead>\n");
         sb.Append("  <tbody>\n");
-        foreach (var (fileA, fileB, coChanges) in coupling)
+        foreach (var couple in coupling)
         {
-            var isProcess = GitMetrics.ClassifyCoupling(fileA, fileB) == GitMetrics.CouplingKind.Process;
-            var kindCell = isProcess
-                ? "<span class=\"coupling-kind-badge\" title=\"At least one file is config, lockfile, build output, or a stylesheet — routine upkeep, not necessarily a code dependency.\">Process</span>"
-                : string.Empty;
+            var isProcess = couple.Kind == GitMetrics.CouplingKind.Process;
+            // Both markers are TEXT inside one cell (never colour alone, UX-DR19/NFR8) and independent, because the
+            // two lenses are orthogonal: a pair can be routine upkeep AND span a module boundary.
+            var badges = new StringBuilder();
+            if (isProcess)
+            {
+                badges.Append("<span class=\"coupling-kind-badge\" title=\"At least one file is config, lockfile, build output, or a stylesheet — routine upkeep, not necessarily a code dependency.\">Process</span>");
+            }
+            if (couple.CrossBoundary)
+            {
+                if (badges.Length > 0) badges.Append(' ');
+                badges.Append("<span class=\"coupling-boundary-badge\" title=\"These two files live in different top-level directories — coupling that crosses a module boundary is a stronger architectural signal.\">Cross-boundary</span>");
+            }
+            // Confidence is directional and read from the FROM file: "when this file changes, the other usually
+            // changes too". Lift rides the cell's title — the specialist's number, not the headline.
+            var confidenceTitle = couple.Lift is { } lift
+                ? $" title=\"When {Html(Basename(couple.FromPath))} changes, {Html(Basename(couple.ToPath))} changes {Percent(couple.Confidence)} of the time — {F(lift)}&#215; its usual rate\""
+                : $" title=\"When {Html(Basename(couple.FromPath))} changes, {Html(Basename(couple.ToPath))} changes {Percent(couple.Confidence)} of the time\"";
             sb.Append(
                 "    <tr>" +
-                $"<td class=\"coupling-file\" title=\"{Html(fileA)}\">{CodeItemLink(fileA, fileHref)}</td>" +
-                $"<td class=\"coupling-file\" title=\"{Html(fileB)}\">{CodeItemLink(fileB, fileHref)}</td>" +
-                $"<td class=\"coupling-num\">{coChanges}&times;</td>" +
-                $"<td class=\"coupling-kind\">{kindCell}</td></tr>\n");
+                $"<td class=\"coupling-file\" title=\"{Html(couple.FromPath)}\">{CodeItemLink(couple.FromPath, fileHref)}</td>" +
+                $"<td class=\"coupling-file\" title=\"{Html(couple.ToPath)}\">{CodeItemLink(couple.ToPath, fileHref)}</td>" +
+                $"<td class=\"coupling-num\">{couple.Support}&times;</td>" +
+                $"<td class=\"coupling-num\"{confidenceTitle}>{Percent(couple.Confidence)}</td>" +
+                $"<td class=\"coupling-kind\">{badges}</td></tr>\n");
         }
         sb.Append("  </tbody>\n</table>\n");
         return sb.ToString();
@@ -3105,8 +3131,10 @@ public static partial class Charts
     /// <summary>The top-contributors discrete-palette legend (JS-only mode): one named swatch per bounded
     /// top-author (<see cref="OwnershipTopAuthorPaletteSize"/>, the SAME 7-hue categorical palette Story 7.9's
     /// file-type legend uses), plus the shared "Other"/"No git history" swatches. Ships <c>hidden</c> — the mode
-    /// selector that reaches this mode is itself hidden without JS (ADR 0010); <c>specscribe.js</c>'s
-    /// <c>initOwnershipSunburst</c> reveals exactly one of the four legend blocks per the active mode.</summary>
+    /// selector that reaches this mode rides inside the Hierarchy Explorer component's own hidden control bar, and
+    /// the component's dimension-driven <c>data-hierarchy-legend</c> swap (Story 20.9 Task 1.6) reveals exactly one
+    /// of the four legend blocks per the active dimension. [Review][Patch: was stale, still named the retired
+    /// <c>initOwnershipSunburst</c> renderer this legend no longer routes through.]</summary>
     public static string OwnershipTopAuthorsLegend(IReadOnlyList<string> topAuthors, string attributes = "")
     {
         var sb = new StringBuilder();
@@ -3891,6 +3919,18 @@ public static partial class Charts
     /// <summary>Grammatical pluralization for accessible names and count-bearing labels — a one-count value
     /// reads "1 story"/"1 commit", not "1 stories"/"1 commits". Shared with dashboard stat labels. [Story 1.4 AC #1, Story 1.5 A2]</summary>
     public static string Plural(int n, string singular, string plural) => n == 1 ? singular : plural;
+
+    /// <summary>Renders a <c>[0,1]</c> ratio as a whole-number percent label ("80%") — the ONE formatter for Story
+    /// 24.1's directional coupling confidence, so the per-file text twin and the hub's table can never disagree
+    /// about rounding. Invariant culture (matching every other numeric render here) so a comma-decimal locale can
+    /// never emit "0,8". Rounds away from zero at the midpoint for stable, reproducible output, and clamps into
+    /// <c>[0,1]</c> defensively so a malformed ratio degrades to a sane label instead of "-40%"/"250%".</summary>
+    public static string Percent(double ratio)
+    {
+        if (double.IsNaN(ratio)) return "0%";
+        var clamped = Math.Clamp(ratio, 0.0, 1.0);
+        return Math.Round(clamped * 100, MidpointRounding.AwayFromZero).ToString("0", CultureInfo.InvariantCulture) + "%";
+    }
 
     private static string Html(string s) => PathUtil.Html(s);
 }

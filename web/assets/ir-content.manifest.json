@@ -10,11 +10,11 @@
     "epics/story-{id}.html"
   ],
   "stats": {
-    "carriedRules": 862,
-    "carriedSelectors": 983,
+    "carriedRules": 865,
+    "carriedSelectors": 987,
     "carriedKeyframes": 4,
     "droppedRoot": 4,
-    "generatedBytes": 109635
+    "generatedBytes": 110065
   },
   "rules": [
     {
@@ -49,7 +49,7 @@
       "carried": true
     },
     {
-      "selector": "[data-explorer][data-sb-scope][data-tok-pending] .sunburst-legend .sb-pending-item, [data-explorer][data-sb-scope][data-tok-drafted] .sunburst-legend .sb-drafted-item, [data-explorer][data-sb-scope][data-tok-ready] .sunburst-legend .sb-ready-item, [data-explorer][data-sb-scope][data-tok-active] .sunburst-legend .sb-active-item, [data-explorer][data-sb-scope][data-tok-review] .sunburst-legend .sb-review-item, [data-explorer][data-sb-scope][data-tok-done] .sunburst-legend .sb-done-item, [data-explorer][data-sb-scope][data-tok-noplan] .sunburst-legend .sb-noplan-item, [data-explorer][data-sb-scope][data-tok-followup-open] .sunburst-legend .sb-followup-open-item, [data-explorer][data-sb-scope][data-tok-followup-done] .sunburst-legend .sb-followup-done-item, [data-explorer][data-sb-scope][data-tok-unplanned] .sunburst-legend .sb-unplanned-item",
+      "selector": "[data-explorer][data-sb-scope][data-tok-pending] .sunburst-legend .sb-pending-item, [data-explorer][data-sb-scope][data-tok-drafted] .sunburst-legend .sb-drafted-item, [data-explorer][data-sb-scope][data-tok-ready] .sunburst-legend .sb-ready-item, [data-explorer][data-sb-scope][data-tok-active] .sunburst-legend .sb-active-item, [data-explorer][data-sb-scope][data-tok-review] .sunburst-legend .sb-review-item, [data-explorer][data-sb-scope][data-tok-done] .sunburst-legend .sb-done-item, [data-explorer][data-sb-scope][data-tok-retired] .sunburst-legend .sb-retired-item, [data-explorer][data-sb-scope][data-tok-noplan] .sunburst-legend .sb-noplan-item, [data-explorer][data-sb-scope][data-tok-followup-open] .sunburst-legend .sb-followup-open-item, [data-explorer][data-sb-scope][data-tok-followup-done] .sunburst-legend .sb-followup-done-item, [data-explorer][data-sb-scope][data-tok-unplanned] .sunburst-legend .sb-unplanned-item",
       "carried": true
     },
     {
@@ -1510,6 +1510,10 @@
       "carried": true
     },
     {
+      "selector": ".sunburst-legend .sb-retired-sw",
+      "carried": true
+    },
+    {
       "selector": ".sunburst-legend .sb-noplan-sw",
       "carried": true
     },
@@ -2563,6 +2567,14 @@
     },
     {
       "selector": ".story-card",
+      "carried": true
+    },
+    {
+      "selector": ".story-card.retired",
+      "carried": true
+    },
+    {
+      "selector": ".story-card.retired .story-title",
       "carried": true
     },
     {

@@ -19,6 +19,24 @@ public static class FollowUpDetailTemplater
         EpicsModel? epicsModel = null,
         IReadOnlyDictionary<string, string>? hrefMap = null,
         IReadOnlyDictionary<SprintActionItem, IReadOnlyList<int>>? crossLinks = null,
+        NavLocalContext? localContext = null) =>
+        HtmlRenderAdapter.Shared.Render(BuildActionPage(
+            item, slug, nav, commands, epicRetroMap, deferredWorkHref, epicsModel, hrefMap, crossLinks, localContext)).Content;
+
+    /// <summary>Builds an action-item page's host-neutral <see cref="PageView"/> — the AD-2 delivery contract, so
+    /// the IR's content region can be COMPOSED (<see cref="JsonSpaRenderAdapter.RenderContent"/>: nav markup +
+    /// wayfinding + body) instead of sliced back out of a rendered full page. <see cref="RenderActionPage"/> is
+    /// the unchanged HTML projection of this same model, so the bytes are identical. [Story 23.4 AC #3]</summary>
+    public static PageView BuildActionPage(
+        SprintActionItem item,
+        string slug,
+        SiteNav nav,
+        CommandCatalog commands,
+        IReadOnlyDictionary<int, string>? epicRetroMap = null,
+        string? deferredWorkHref = null,
+        EpicsModel? epicsModel = null,
+        IReadOnlyDictionary<string, string>? hrefMap = null,
+        IReadOnlyDictionary<SprintActionItem, IReadOnlyList<int>>? crossLinks = null,
         NavLocalContext? localContext = null)
     {
         var outputPath = FollowUpSlug.OutputPath(slug);
@@ -28,9 +46,6 @@ public static class FollowUpDetailTemplater
         var statusLabel = StatusStyles.SprintLabel(item.Status);
 
         var sb = new StringBuilder();
-        AppendShellOpen(sb, nav, outputPath, prefix, title, "Action item",
-            ("Open Action Items", SiteNav.ActionItemsOutputPath), localContext);
-
         sb.Append("<main id=\"main-content\" class=\"followup-detail\">\n");
         sb.Append("<header class=\"doc-header\">\n");
         sb.Append("  <div class=\"story-kicker\">Action item</div>\n");
@@ -88,8 +103,9 @@ public static class FollowUpDetailTemplater
 
         AppendBackLink(sb, prefix + SiteNav.ActionItemsOutputPath, "All open action items");
         sb.Append("</main>\n\n");
-        AppendShellClose(sb, prefix);
-        return sb.ToString();
+
+        return ComposePage(sb, nav, outputPath, prefix, title, "Action item",
+            ("Open Action Items", SiteNav.ActionItemsOutputPath), localContext);
     }
 
     /// <summary>Renders a deferred-work item detail page. Address/Close Next Steps embed
@@ -98,6 +114,21 @@ public static class FollowUpDetailTemplater
     /// output-root-relative (or deferred-work-page depth); re-prefix for <c>follow-ups/</c>.
     /// [Story 9.11]</summary>
     public static string RenderDeferredPage(
+        DeferredWorkItem item,
+        string provenanceLabel,
+        string? sourceStoryHref,
+        string slug,
+        SiteNav nav,
+        string listOutputPath,
+        CommandCatalog? commands = null,
+        int? epicNumber = null,
+        NavLocalContext? localContext = null) =>
+        HtmlRenderAdapter.Shared.Render(BuildDeferredPage(
+            item, provenanceLabel, sourceStoryHref, slug, nav, listOutputPath, commands, epicNumber, localContext)).Content;
+
+    /// <summary>Builds a deferred-work page's host-neutral <see cref="PageView"/> — see
+    /// <see cref="BuildActionPage"/>. [Story 23.4 AC #3]</summary>
+    public static PageView BuildDeferredPage(
         DeferredWorkItem item,
         string provenanceLabel,
         string? sourceStoryHref,
@@ -116,9 +147,6 @@ public static class FollowUpDetailTemplater
             : (StatusStyles.ForSprint("open"), "Open");
 
         var sb = new StringBuilder();
-        AppendShellOpen(sb, nav, outputPath, prefix, title, "Deferred work",
-            ("Deferred Work", PathUtil.NormalizeSlashes(listOutputPath)), localContext);
-
         sb.Append("<main id=\"main-content\" class=\"followup-detail\">\n");
         sb.Append("<header class=\"doc-header\">\n");
         sb.Append("  <div class=\"story-kicker\">Deferred work</div>\n");
@@ -169,33 +197,42 @@ public static class FollowUpDetailTemplater
         var listHref = PathUtil.NormalizeSlashes(prefix + PathUtil.NormalizeSlashes(listOutputPath));
         AppendBackLink(sb, listHref, "All deferred work");
         sb.Append("</main>\n\n");
-        AppendShellClose(sb, prefix);
-        return sb.ToString();
+
+        return ComposePage(sb, nav, outputPath, prefix, title, "Deferred work",
+            ("Deferred Work", PathUtil.NormalizeSlashes(listOutputPath)), localContext);
     }
 
-    private static void AppendShellOpen(
-        StringBuilder sb, SiteNav nav, string outputPath, string prefix, string title, string kindLabel,
-        (string Label, string Href) listCrumb, NavLocalContext? localContext = null)
-    {
-        sb.Append(PathUtil.RenderHeadOpen(
-            $"{title} — {nav.SiteTitle}",
-            prefix + ForgeOptions.StylesheetName,
-            prefix + ForgeOptions.ScriptName,
-            $"{kindLabel} follow-up for {nav.SiteTitle}."));
-        sb.Append(nav.RenderNavBar(outputPath, localContext));
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
+    /// <summary>The one shell both follow-up kinds share, as a <see cref="PageView"/>. Replaces the old
+    /// AppendShellOpen/AppendShellClose string pair: the same identity facts now REACH the delivery contract
+    /// instead of being string-built into a full page and discarded. The caller's
+    /// <paramref name="localContext"/> is threaded straight to <see cref="SiteNav.ToNavigationView"/>, which has
+    /// always accepted one — so the page-local nav band survives region composition by construction.
+    /// [Story 23.4 AC #3]</summary>
+    private static PageView ComposePage(
+        StringBuilder body, SiteNav nav, string outputPath, string prefix, string title, string kindLabel,
+        (string Label, string Href) listCrumb, NavLocalContext? localContext) =>
+        new()
         {
-            ("Home", "index.html"),
-            (listCrumb.Label, listCrumb.Href),
-            (title, null),
-        }));
-    }
-
-    private static void AppendShellClose(StringBuilder sb, string prefix)
-    {
-        sb.Append(PathUtil.RenderFooter(prefix));
-        sb.Append("</body>\n</html>\n");
-    }
+            Kind = PageKind.Doc,
+            OutputRelativePath = outputPath,
+            Title = $"{title} — {nav.SiteTitle}",
+            MetaDescription = $"{kindLabel} follow-up for {nav.SiteTitle}.",
+            Nav = nav.ToNavigationView(outputPath, localContext),
+            Breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
+            {
+                ("Home", "index.html"),
+                (listCrumb.Label, listCrumb.Href),
+                (title, null),
+            }),
+            Assets = new AssetManifest
+            {
+                StylesheetHref = prefix + ForgeOptions.StylesheetName,
+                ScriptHref = prefix + ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+            },
+            Interaction = InteractionState.None,
+            BodyHtml = body.ToString(),
+        };
 
     private static void AppendBackLink(StringBuilder sb, string href, string label)
     {

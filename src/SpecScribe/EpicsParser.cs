@@ -34,8 +34,19 @@ public static class EpicsParser
     /// comments authors already write, e.g. <c>&lt;!-- Story 3.4 retired 2026-07-08 ... --&gt;</c>). A matched
     /// comment is classified as a retired notice and diverted away from <see cref="StoryInfo.UserStoryNoteHtml"/>
     /// to the epic's <see cref="EpicInfo.RetiredNoticesHtml"/> collection instead of being attached to the next
-    /// story card.</summary>
-    private static readonly Regex RetirementKeyword = new(@"\b(retired|superseded|deprecated)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    /// story card.
+    /// <para><b>Built from <see cref="StatusStyles.RetirementStatusWords"/>, not typed here</b> (Story 8.9 AC #1).
+    /// This detector and <see cref="StatusStyles.ForStatus"/> are the two halves of one question — "does this
+    /// artifact say the work was removed from the plan?" — and a second hand-maintained word list is precisely how
+    /// the two halves came to disagree in the first place. <see cref="Regex.Escape"/> is applied because the list
+    /// is a vocabulary, not a pattern: a future word containing a regex metacharacter must not silently become
+    /// one. Each word is matched on its own word boundaries, so <c>wontfix</c> here does NOT match the spaced
+    /// <c>won't fix</c> that <c>ForStatus</c> tolerates — this side reads authored PROSE about a story, where the
+    /// canonical spelling is what gets written, while that side reads a machine-ish <c>Status:</c> value a human
+    /// may punctuate freely.</para></summary>
+    private static readonly Regex RetirementKeyword = new(
+        @"\b(" + string.Join("|", StatusStyles.RetirementStatusWords.Select(Regex.Escape)) + @")\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static EpicsModel Parse(string raw)
     {

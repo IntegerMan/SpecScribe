@@ -163,6 +163,50 @@ public class ProjectCountsTests
     }
 
     [Fact]
+    public void Build_DefinedAndTrackedLedgersNameTheSameStageForOneRetiredStory()
+    {
+        // Story 8.9 AC #3 — the invariant Story 8.3 declared and the two-classifier gap broke by construction.
+        // ForSprint (yaml) filed a retired story under `retired` while StoryStages (epics.md) had no such
+        // bucket, so BuildDefinedStoryStages filed the SAME story under `unrecognized`. Both sides must agree.
+        var epics = EpicsWith(Epic(1, "Foundation", EpicStatus.Drafted,
+            Story("1.1", 1, "A", "done"),
+            Story("1.2", 1, "B", "retired")));
+        var dir = Directory.CreateTempSubdirectory("pc-retired-").FullName;
+        try
+        {
+            var a1 = Path.Combine(dir, "1-1.md");
+            var a2 = Path.Combine(dir, "1-2.md");
+            File.WriteAllText(a1, "# Story 1.1\nStatus: done\n");
+            File.WriteAllText(a2, "# Story 1.2\nStatus: retired\n");
+            var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>
+            {
+                ["1.1"] = a1,
+                ["1.2"] = a2,
+            }, git: null);
+            var sprint = SprintStatusParser.Parse("""
+                development_status:
+                  1-1-a: done
+                  1-2-b: retired
+                """)!;
+
+            var counts = ProjectCounts.Build(progress, sprint, WorkInventory.Empty, epics);
+
+            var defined = Assert.Single(counts.DefinedStoryStages, s => s.CssClass == "retired");
+            var tracked = Assert.Single(counts.TrackedStoryStages, s => s.CssClass == "retired");
+            Assert.Equal(1, defined.Count);
+            Assert.Equal(1, tracked.Count);
+            Assert.Equal(tracked.Label, defined.Label);
+            Assert.Equal("Retired", defined.Label);
+            // Not reported as a problem on either side, and the partition still totals.
+            Assert.Equal(0, counts.DefinedStoryStages.Single(s => s.CssClass == "unrecognized").Count);
+            Assert.Equal(0, counts.TrackedStoryStages.Single(s => s.CssClass == "unrecognized").Count);
+            Assert.Equal(counts.StoriesDefined, counts.DefinedStoryStages.Sum(s => s.Count));
+            Assert.Equal(counts.StoriesTracked, counts.TrackedStoryStages.Sum(s => s.Count));
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Fact]
     public void Build_OpenActionItemsWhenDevelopmentStatusEmpty()
     {
         var sprint = new SprintStatus

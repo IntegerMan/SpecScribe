@@ -318,16 +318,28 @@
       "port": 8118
     },
     {
+      "name": "coupling-24-1",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8120",
+        "--directory",
+        "C:/Users/MattE/AppData/Local/Temp/claude/C--Dev-SpecScribe/b4f670c9-39c3-44cf-b30b-c95118255fcd/scratchpad/verify-24-1"
+      ],
+      "port": 8120
+    },
+    {
       "name": "codemap-20-9",
       "runtimeExecutable": "python",
       "runtimeArgs": [
         "-m",
         "http.server",
-        "8114",
+        "8119",
         "--directory",
         "SpecScribeOutput"
       ],
-      "port": 8114
+      "port": 8119
     }
   ]
 }

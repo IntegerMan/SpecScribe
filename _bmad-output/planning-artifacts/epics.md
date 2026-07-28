@@ -1983,7 +1983,14 @@ So that a deliberate, documented planning decision stops being reported as a def
 
 <!-- Full context, the five measured consequences, six traps and the four owner decisions (D1 terminal stage ·
      D2 inline demoted card, no 7th --status token · D3 six-word shared vocabulary · D4 reopen Epic 8) are in
-     `8-9-retired-is-a-first-class-story-status.md`. The golden fingerprint is EXPECTED to move. ADR 0025 owed. -->
+     `8-9-retired-is-a-first-class-story-status.md`. The golden fingerprint moved as expected
+     (e384cbde… -> 9bf8ac05…; measured mover set: `specscribe.css` ONLY — no page moved, because this fixture has
+     no retired story). Decisions ratified in
+     [ADR 0025](../../docs/adrs/0025-retired-is-a-terminal-story-stage-in-both-classifiers.md): `retired` is a
+     TERMINAL stage in both classifiers; the epic roll-up COUNTS it (deliberately diverging from
+     `SprintTemplater.DeliveryWheel`, which excludes it — both rules are right); the six-word vocabulary is
+     single-sourced; and `ForSprint` stays narrower than `ForStatus` on purpose, because `FreeTextBadge` routes
+     ADR status lines through it. -->
 
 ## Epic 9: Traceability and Review Follow-Through
 
@@ -3865,6 +3872,35 @@ So that "exactly one implementation of a hierarchy chart exists in the codebase"
 **Then** they are removed, Story 20.7's rollout-completeness allowlist shrinks to empty, and no code path constructs a sunburst or treemap by any route other than the component — **verified by search, not assumed**
 **And** the byte accounting is reported against the Story 20.4 spike's projection, since `code-map.html` (−3,493,000 B) and `git-insights.html` (−1,510,735 B) are where the entire portal-wide −4,787,124 B net delta actually lives.
 
+### Story 20.10: Shared Hierarchy Payload Across Code Map's Filter Variants
+
+<!-- Seated 2026-07-28 from Story 20.9's code review (a decision-needed finding the owner asked to be investigated and
+     proposed as its own story rather than logged as a bare deferred-work bullet): Code Map's four filter-variant
+     panels (full / no-spec / no-tests / no-spec-no-tests) each independently serialize every file in their subset's
+     full metric bag + rich hover card, so a file with neither spec/dev nor test status is duplicated 4×. Task 7.7's
+     own reported numbers (1421/487/1254/350 sectors per panel) show 3,512 total file-instances serialized across 4
+     payloads against 1,421 distinct files — a 2.47× average duplication factor, and it is exactly the "the four
+     payloads dominate the page" trigger condition Story 20.9's Open Question #1 pre-registered for revisiting the
+     one-payload-per-panel decision (the island is ~74% of code-map.html's current bytes). Backlog, not yet spiked or
+     estimated — this entry exists so the investigation's numbers aren't lost, not to commit to an approach. -->
+
+As a maintainer who wants Code Map's byte cost to reflect real information rather than serialization overhead,
+I want the four filter-variant panels to stop each independently re-serializing shared files' full payload,
+So that `code-map.html`'s size reflects the number of distinct files analyzed, not the number of filter combinations that happen to include them.
+
+**Why now:** Story 20.9's Task 7.7 byte accounting measured `code-map.html` landing at 57% of the Story 20.4 spike's projected saving (−2,146,545 B against a projected −3,493,000 B). The gap is explained almost entirely by rich per-file hover cards, which is expected and accepted — but a `code-review` investigation of the same numbers found that eliminating the four-panel duplication specifically (independent of the hover-card question) could plausibly close most of the remaining gap: roughly 1.96 MB of code-map.html's 4,451,207 B current total, landing at or past the spike's original projection.
+
+**What makes this non-trivial, and why it wasn't done inline in 20.9:** today each of the four panels is an independently server-computed treemap/sunburst layout (position and size of every rect derived from that panel's own file subset). A shared payload requires the CLIENT to recompute area allocation for a filtered subset on every checkbox toggle — a capability that doesn't exist yet. Story 20.7's client-side node filter handles drill-in visibility within an already-laid-out tree; it does not re-lay-out a treemap for a genuinely different node subset. This story would need: a payload shape where each file node carries which of the four variants it belongs to; a client-side port of `HierarchyExplorer.Reparent`/`RollUpParentValues`'s roll-up math (today C#-only); a `DomId`/`HashKey` scheme rework (one instance switching subsets vs. today's four independent instances); new tests; and a re-measurement against Story 20.9's numbers.
+
+**What this story does NOT touch:** owner decision D2 (Story 20.9) keeps the pure-CSS exclude-spec/exclude-tests toggle specifically because it is the one filter on the page that works with JavaScript off — but that guarantee is about the **file table** (the twin) remaining filterable without JS, not about the Plotly chart, which already requires JavaScript regardless of how many payloads back it. A shared chart payload does not weaken that guarantee.
+
+**Acceptance Criteria (draft — refine at create-story):**
+
+1. **Given** the four Code Map filter-variant panels **When** a file appears in more than one variant **Then** its metric bag and hover card are serialized once, not once per variant it appears in.
+2. **Given** a filter checkbox toggle **When** the visible panel changes **Then** the treemap/sunburst re-lays-out correctly for the newly-active subset, with the same geometry a from-scratch server render of that subset would have produced (Story 20.4's four invariants still hold: exactly one root, no `null` in values, `parent == Σ children`, `branchvalues` correct).
+3. **Given** the pure-CSS exclude-spec/exclude-tests toggle (D2) **When** JavaScript is disabled **Then** the file table continues to filter correctly, unaffected by this story's payload change.
+4. **Given** the re-architected payload **Then** the measured byte delta on `code-map.html` is reported against both Story 20.9's post-conversion baseline (4,451,207 B) and the Story 20.4 spike's original projection (−3,493,000 B), with the duplication-elimination savings isolated from any hover-card or encoding changes.
+
 <!-- Epic 21 added 2026-07-19 (SCP 2026-07-19, correct-course): value & correlation insights — cross-cutting displays
      that make product value legible and surface correlations across work items AND code. Distinct from Epic 7's
      code-only signals (Stories 7.10–7.12) and from the graph/explorer surfaces (Epics 19/20). Seated as Epic 21
@@ -4111,7 +4147,11 @@ So that Story 6.7's SPA adapter and the webview stay consistent with static HTML
 > 2. **AC #1's "and re-emitted" half is deliberately NOT in scope (owner decision D2).** Every incremental route already calls `EmitSpaSite`, which rewrites the **whole** manifest and every chunk. AC #1 is read as *recompute*, not *emit incrementally*. Selective emission belongs with the transport it serves — [Story 22.6](#story-226-spike-gated-client-server-delta-channel), which was seeded the same day, is gated on **22.2**'s per-page `contentHash` rather than on this story, and **runs first**. The two are orthogonal: 22.5 makes recompute correct; 22.6 makes transport cheap.
 > 3. **AC #2's "rebuild scope escalates as needed" is now specific (owner decision D3).** Full rebuild escalates for **topology** changes only; the narrow route is **kept** for content-only edits — including the epics/story family once parity is fixed — because a story-file save is the dominant edit class in this repo. Note that file-level topology does not escalate today: `RegenerateTopology` and `RegenerateFromDataSource` call `GenerateAll`, but an add/rename/delete of a single `.md` does not.
 > 4. **AC #3's "equivalent to a full regeneration" becomes a permanent test (owner decision D4).** 22.1's oracle-diff harness is productionized into `tests/SpecScribe.Tests/`. **No test in the suite today compares an incremental route to a full regeneration** — which is exactly why the 56-page divergence shipped and stayed shipped.
-> 5. **Sequencing (owner decision D1):** 22.5 is **gated on [Story 22.4](#story-224-spa--webview-as-ir-consumers)**, whose AC #5 / Task 3 fixes the *same* `_docs`-population ordering seam and shares one `WorkInventory` across the epics-page, SPA and webview builders. The parity gap is **re-measured after 22.4 lands** — the residue may be only the pre-nav `_workGraph` build, which 22.4 does not touch.
+> 5. **Sequencing (owner decision D1):** 22.5 is **gated on [Story 22.4](#story-224-spa--webview-as-ir-consumers)**, whose AC #5 fixes the *same* `_docs`-population ordering seam. The parity gap is **re-measured after 22.4 lands.**
+>
+>    ⚠️ **CORRECTED by Story 22.4's code review (2026-07-28) — this clause previously stated two things that are false against the shipped code, and 22.5 must not inherit either:**
+>    - *"shares one `WorkInventory` across the epics-page, SPA and webview builders"* — **it does not.** 22.4 shipped a narrower fix: a shared *href map* (`FollowUpRefs.BuildHrefMap`'s pair-based overload, reached from `ResolveDeferredModel`). `RenderEpicsPages` still builds its own `WorkInventory` / `ProjectCounts` / `FollowUpGeometry` / `UnplannedWorkGeometry`. The review DID make the SPA and webview share **one** `BuildSurfacePrelude` instance (they previously built two equal ones), but `RenderEpicsPages` cannot join them without moving the golden fingerprint — it runs before the pages loop fills `_docs`, and relocating it reorders the diagnostics stream, which 22.4 AC #7 and 22.5 AC #6 both forbid. **That remaining third is 22.5's, and it is exactly 22.5's own Trap 1 (the nav-gate circularity).**
+>    - *"the residue may be only the pre-nav `_workGraph` build, which 22.4 does not touch"* — **22.4 did touch it.** `BuildWorkGraphModel` calls `ResolveDeferredModel`, which is precisely the call 22.4 rerouted; its Completion Notes credit that path for moving 9 epic pages and `work-graph.html` (Epic 1: 13 items/12 links → 16/20). So the static side has ALREADY moved toward the docs-derived answer, and 22.5's Task 1 re-measure must start from that, not from Story 22.1's `811ba17` figures.
 > 6. ⚠️ **22.1's stranded-surface list is a lower bound.** Its correctness matrix ran with **deep-git OFF**, so per-commit pages, hotspot/coupling insights, the impact map and git-derived cadence were structurally invisible to the diff. The re-run is deep-git ON.
 
 As a maintainer running watch mode on a large or actively-changing repository,

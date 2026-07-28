@@ -15,7 +15,25 @@ public class DeepAnalyticsTemplaterTests
         {
             ("src/SpecScribe/Charts.cs", "src/SpecScribe/HtmlTemplater.cs", 5),
             ("src/SpecScribe/Charts.cs", "src/SpecScribe/SiteGenerator.cs", 3),
-        });
+        })
+    {
+        DirectedCoupling = DirectedFrom(
+            ("src/SpecScribe/Charts.cs", "src/SpecScribe/HtmlTemplater.cs", 5),
+            ("src/SpecScribe/Charts.cs", "src/SpecScribe/SiteGenerator.cs", 3)),
+    };
+
+    /// <summary>Story 24.1: the page's Ranked Pairs panel reads <see cref="DeepGitPulse.DirectedCoupling"/>, not the
+    /// symmetric <see cref="DeepGitPulse.Coupling"/> the graph draws — so a hand-built pulse must carry both, exactly
+    /// as <c>ParseNumstatLog</c> populates them from one parse. Confidence here is synthetic (these fixtures have no
+    /// per-file change counts to divide by); the metric math itself is covered in <c>GitMetricsFileInsightsTests</c>,
+    /// so what these page tests need is only a populated, correctly-shaped directed view.</summary>
+    private static IReadOnlyList<DirectedCouple> DirectedFrom(params (string A, string B, int Support)[] pairs) =>
+        pairs.Select((p, i) => new DirectedCouple(
+            p.A, p.B, p.Support,
+            Confidence: 0.9 - (0.1 * i),
+            Lift: null,
+            CrossBoundary: GitMetrics.IsCrossBoundary(p.A, p.B),
+            Kind: GitMetrics.ClassifyCoupling(p.A, p.B))).ToList();
 
     private static int Count(string haystack, string needle)
     {
@@ -59,13 +77,16 @@ public class DeepAnalyticsTemplaterTests
                 CommitCount: 42,
                 ContributorCount: 1,
                 TotalFilesTouched: 100),
+            DirectedCoupling = DirectedFrom(("src/A.cs", "src/B.cs", 5)),
         };
 
         var html = DeepAnalyticsTemplater.RenderPage(deep, Nav());
 
         Assert.Contains("Last 42 commits", html);
         Assert.Contains("Top 2 of 100 files by change count", html);
-        Assert.Contains("Top 1 coupled pair by shared commits", html);
+        // Story 24.1: the ranked panel is directed and confidence-ranked, so its caption names that ranking rather
+        // than the graph's shared-commit one — the two panels are deliberately different populations.
+        Assert.Contains("Top 1 directed couple by confidence", html);
         Assert.Contains("class=\"chart-frame-window\"", html);
         Assert.Contains("class=\"chart-frame-ranking\"", html);
         // Framing sentences come from Charts.WhyText — no project-specific filenames in the why copy.
@@ -192,7 +213,12 @@ public class DeepAnalyticsTemplaterTests
             {
                 ("src/A.cs", "src/B.cs", 5),               // code <-> code
                 ("sprint-status.yaml", "theme.css", 4),      // process <-> process
-            });
+            })
+        {
+            DirectedCoupling = DirectedFrom(
+                ("src/A.cs", "src/B.cs", 5),
+                ("sprint-status.yaml", "theme.css", 4)),
+        };
 
         var html = DeepAnalyticsTemplater.RenderPage(deep, Nav());
 
@@ -224,16 +250,103 @@ public class DeepAnalyticsTemplaterTests
     [Fact]
     public void CouplingTable_ProcessPairGetsBadgeCodePairDoesNot()
     {
-        var coupling = new (string, string, int)[]
+        var coupling = new[]
         {
-            ("src/A.cs", "src/B.cs", 3),
-            ("src/A.cs", "package-lock.json", 2),
+            Directed("src/A.cs", "src/B.cs", 3, 0.75),
+            Directed("src/A.cs", "package-lock.json", 2, 0.5, kind: GitMetrics.CouplingKind.Process),
         };
 
         var table = Charts.CouplingTable(coupling);
 
         Assert.Contains("<th scope=\"col\" class=\"coupling-kind\">Kind</th>", table);
         Assert.Equal(1, Count(table, "coupling-kind-badge"));
+    }
+
+    // ---- Story 24.1: the hub table is directed, confidence-ranked, and marks cross-boundary couples ----
+
+    private static DirectedCouple Directed(
+        string from, string to, int support, double confidence, double? lift = null,
+        bool crossBoundary = false, GitMetrics.CouplingKind kind = GitMetrics.CouplingKind.Code)
+        => new(from, to, support, confidence, lift, crossBoundary, kind);
+
+    [Fact]
+    public void CouplingTable_RendersADirectionalConfidenceColumnAlongsideTheSharedCommitCount()
+    {
+        var table = Charts.CouplingTable(new[] { Directed("src/A.cs", "src/B.cs", 4, 0.8) });
+
+        Assert.Contains("<th scope=\"col\" class=\"coupling-num\">Confidence</th>", table);
+        Assert.Contains(">80%</td>", table);
+        // Support is kept, not replaced — it is what makes a confidence trustworthy.
+        Assert.Contains(">4&times;</td>", table);
+    }
+
+    [Fact]
+    public void CouplingTable_CrossBoundaryCoupleCarriesAWordBadgeNotColourAlone()
+    {
+        var table = Charts.CouplingTable(new[] { Directed("src/A.cs", "tests/B.cs", 3, 0.6, crossBoundary: true) });
+
+        Assert.Contains("coupling-boundary-badge", table);
+        Assert.Contains(">Cross-boundary</span>", table);
+    }
+
+    [Fact]
+    public void CouplingTable_ProcessAndCrossBoundaryAreIndependentAndCanBothAppear()
+    {
+        // The two lenses are orthogonal: a config file in another module is both routine upkeep AND a boundary
+        // crossing. Neither badge may suppress the other.
+        var table = Charts.CouplingTable(new[]
+        {
+            Directed("src/A.cs", "config/app.yaml", 3, 0.6, crossBoundary: true, kind: GitMetrics.CouplingKind.Process),
+        });
+
+        Assert.Contains("coupling-kind-badge", table);
+        Assert.Contains("coupling-boundary-badge", table);
+    }
+
+    [Fact]
+    public void CouplingTable_OrdinaryCodePairLeavesTheKindCellBlank()
+    {
+        var table = Charts.CouplingTable(new[] { Directed("src/A.cs", "src/B.cs", 3, 0.6) });
+
+        Assert.Contains("<td class=\"coupling-kind\"></td>", table);
+    }
+
+    [Fact]
+    public void CouplingTable_UndefinedLift_OmitsItFromTheTooltipRatherThanRenderingNaN()
+    {
+        var withLift = Charts.CouplingTable(new[] { Directed("src/A.cs", "src/B.cs", 4, 0.8, lift: 2.5) });
+        var without = Charts.CouplingTable(new[] { Directed("src/A.cs", "src/B.cs", 4, 0.8, lift: null) });
+
+        Assert.Contains("2.5&#215; its usual rate", withLift);
+        Assert.DoesNotContain("usual rate", without);
+        Assert.DoesNotContain("NaN", without);
+        Assert.DoesNotContain("Infinity", without);
+    }
+
+    [Fact]
+    public void CouplingTable_EmptyDirectedList_StillRendersTheFriendlyEmptyState()
+    {
+        var table = Charts.CouplingTable(Array.Empty<DirectedCouple>());
+
+        Assert.Contains("chart-empty", table);
+        Assert.Contains("No significant change coupling detected.", table);
+    }
+
+    [Fact]
+    public void RenderPage_RankingCaptionNamesTheConfidenceRankingTheTableActuallyUsed()
+    {
+        // The graph above ranks by shared commits and the table by confidence — two different populations, so the
+        // caption must describe THIS panel's ranking rather than inherit the graph's.
+        var deep = SampleDeep() with
+        {
+            DirectedCoupling = new[] { Directed("src/A.cs", "src/B.cs", 3, 0.75) },
+        };
+
+        var html = DeepAnalyticsTemplater.RenderPage(deep, Nav());
+
+        Assert.Contains("directed couple", html);
+        Assert.Contains("by confidence", html);
+        Assert.DoesNotContain("coupled pairs by shared commits", html);
     }
 
     [Fact]

@@ -43,24 +43,30 @@ public static class GitInsightsTemplater
         CodeMap codeMap,
         IReadOnlyList<string> topAuthors,
         Func<string, string?>? fileHref = null,
+        DateOnly? today = null) =>
+        HtmlRenderAdapter.Shared.Render(BuildPage(insights, git, nav, codeMap, topAuthors, fileHref, today)).Content;
+
+    /// <summary>Builds this page's host-neutral <see cref="PageView"/> — the AD-2 delivery contract. Story 23.4
+    /// moved every standalone templater onto it so the IR's content region can be COMPOSED
+    /// (<see cref="JsonSpaRenderAdapter.RenderContent"/>: nav markup + wayfinding + body) instead of sliced back
+    /// out of a rendered full page. <see cref="RenderPage"/> is the unchanged HTML projection of this same model,
+    /// so the bytes are identical. The hierarchy engine now rides
+    /// <see cref="AssetManifest.HierarchyEngineNeeded"/> — computed from the RENDERED BODY exactly as this page
+    /// computed it inline, so the flag still cannot disagree with what the page contains, and with NO inline boot
+    /// marker (the Code Map's shape, not the dashboard's). [Story 23.4 AC #3]</summary>
+    public static PageView BuildPage(
+        GitInsightsData insights,
+        GitPulse? git,
+        SiteNav nav,
+        CodeMap codeMap,
+        IReadOnlyList<string> topAuthors,
+        Func<string, string?>? fileHref = null,
         DateOnly? today = null)
     {
         var outputPath = SiteNav.GitInsightsOutputPath;
         var prefix = PathUtil.RelativePrefix(outputPath); // "" — git-insights.html is at the output root.
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen(
-            $"Git Insights — {nav.SiteTitle}",
-            prefix + ForgeOptions.StylesheetName,
-            prefix + ForgeOptions.ScriptName,
-            $"Aggregate git insights for {nav.SiteTitle}: code ownership concentration and activity over time."));
-        sb.Append(nav.RenderNavBar(outputPath, nav.BuildInsightsLocalContext(outputPath)));
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
-        {
-            ("Home", "index.html"),
-            ("Git Insights", null),
-        }));
-
         sb.Append("<main id=\"main-content\" class=\"deep-page git-insights\">\n");
         sb.Append("<header class=\"doc-header\">\n");
         sb.Append("  <div class=\"story-kicker\">Git Insights &middot; opt-in</div>\n");
@@ -78,17 +84,34 @@ public static class GitInsightsTemplater
         AppendOwnershipSection(sb, insights, codeMap, topAuthors, fileHref);
 
         sb.Append("</main>\n\n");
-        sb.Append(PathUtil.RenderFooter());
-        // The vendored plotly.js hierarchy engine — same seam and same terms as the Impact Map and the Code Map:
-        // this page builds its own document, so the AssetManifest flag never reaches it. Conditional on a host
-        // actually being present, so the solo-maintainer reframe and the no-file-data empty state both ship no
-        // engine they cannot use. [Story 20.9 Task 5]
-        if (HierarchyExplorer.ContainsHost(sb.ToString()))
+
+        var body = sb.ToString();
+        return new PageView
         {
-            sb.Append($"<script src=\"{prefix}{ForgeOptions.HierarchyEngineScriptName}\"></script>\n");
-        }
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+            Kind = PageKind.GitInsights,
+            OutputRelativePath = outputPath,
+            Title = $"Git Insights — {nav.SiteTitle}",
+            MetaDescription = $"Aggregate git insights for {nav.SiteTitle}: code ownership concentration and activity over time.",
+            Nav = nav.ToNavigationView(outputPath, nav.BuildInsightsLocalContext(outputPath)),
+            Breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
+            {
+                ("Home", "index.html"),
+                ("Git Insights", null),
+            }),
+            Assets = new AssetManifest
+            {
+                StylesheetHref = prefix + ForgeOptions.StylesheetName,
+                ScriptHref = prefix + ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+                // The vendored plotly.js hierarchy engine — same seam and same terms as the Impact Map and the
+                // Code Map. Conditional on a host actually being present, so the solo-maintainer reframe and the
+                // no-file-data empty state both ship no engine they cannot use. No inline boot marker: this page
+                // never emitted one. [Story 20.9 Task 5; Story 23.4]
+                HierarchyEngineNeeded = HierarchyExplorer.ContainsHost(body),
+            },
+            Interaction = InteractionState.None,
+            BodyHtml = body,
+        };
     }
 
     /// <summary>Code ownership &amp; bus-factor: ONE Hierarchy Explorer instance over EVERY source file (not a

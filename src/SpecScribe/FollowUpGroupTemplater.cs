@@ -9,7 +9,17 @@ namespace SpecScribe;
 /// [Story 9.13; spec-follow-up-list-batch-actions]</summary>
 public static class FollowUpGroupTemplater
 {
-    public static string RenderPage(FollowUpGroupSpec group, SiteNav nav, CommandCatalog? commands = null)
+    public static string RenderPage(FollowUpGroupSpec group, SiteNav nav, CommandCatalog? commands = null) =>
+        HtmlRenderAdapter.Shared.Render(BuildPage(group, nav, commands)).Content;
+
+    /// <summary>Builds a group page's host-neutral <see cref="PageView"/> — the AD-2 delivery contract, so the
+    /// IR's content region can be COMPOSED (<see cref="JsonSpaRenderAdapter.RenderContent"/>: nav markup +
+    /// wayfinding + body) instead of sliced back out of a rendered full page. <see cref="RenderPage"/> is the
+    /// unchanged HTML projection of this same model, so the bytes are identical.
+    /// ⚠️ The body starts at <c>&lt;header class="doc-header"&gt;</c>, not at <c>&lt;main&gt;</c> — this page emits
+    /// its title block BEFORE the landmark, and the old region slice began at the breadcrumb, so the header was
+    /// inside the captured region. [Story 23.4 AC #3, finding 1]</summary>
+    public static PageView BuildPage(FollowUpGroupSpec group, SiteNav nav, CommandCatalog? commands = null)
     {
         if (group.Count == 0)
             throw new ArgumentException("NFR8: never render an empty follow-up group page.", nameof(group));
@@ -18,19 +28,6 @@ public static class FollowUpGroupTemplater
         var prefix = PathUtil.RelativePrefix(outputPath);
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen(
-            $"{group.Title} — {nav.SiteTitle}",
-            prefix + ForgeOptions.StylesheetName,
-            prefix + ForgeOptions.ScriptName,
-            $"{group.Title}: {group.Count} {Charts.Plural(group.Count, "item", "items")} for {nav.SiteTitle}."));
-        sb.Append(nav.RenderNavBar(outputPath));
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
-        {
-            ("Home", "index.html"),
-            ("Sprint Status", "sprint.html"),
-            (group.Title, null),
-        }));
-
         sb.Append("<header class=\"doc-header\">\n");
         sb.Append($"  <div class=\"story-kicker\">Follow-up group</div>\n");
         sb.Append($"  <h1>{PathUtil.Html(group.Title)}</h1>\n");
@@ -68,9 +65,29 @@ public static class FollowUpGroupTemplater
         }
 
         sb.Append("</section>\n</main>\n\n");
-        sb.Append(PathUtil.RenderFooter());
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+
+        return new PageView
+        {
+            Kind = PageKind.Doc,
+            OutputRelativePath = outputPath,
+            Title = $"{group.Title} — {nav.SiteTitle}",
+            MetaDescription = $"{group.Title}: {group.Count} {Charts.Plural(group.Count, "item", "items")} for {nav.SiteTitle}.",
+            Nav = nav.ToNavigationView(outputPath),
+            Breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
+            {
+                ("Home", "index.html"),
+                ("Sprint Status", "sprint.html"),
+                (group.Title, null),
+            }),
+            Assets = new AssetManifest
+            {
+                StylesheetHref = prefix + ForgeOptions.StylesheetName,
+                ScriptHref = prefix + ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+            },
+            Interaction = InteractionState.None,
+            BodyHtml = sb.ToString(),
+        };
     }
 
     /// <summary>Open deferred/action members (never <c>Kind == "direct"</c>) projected as list-batch

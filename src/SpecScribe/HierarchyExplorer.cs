@@ -331,7 +331,7 @@ public static partial class HierarchyExplorer
     /// what lets a second family (the Impact Map's ramp, and Story 20.9's eleven dimensions) exist at all.</summary>
     private static readonly HashSet<string> PaintedStatusTokens = new(StringComparer.Ordinal)
     {
-        "done", "active", "review", "ready", "drafted", "pending", "noplan",
+        "done", "retired", "active", "review", "ready", "drafted", "pending", "noplan",
         "followup-open", "followup-done", "unplanned", "unrecognized",
     };
 

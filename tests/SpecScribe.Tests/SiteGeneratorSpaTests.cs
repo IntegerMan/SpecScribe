@@ -109,7 +109,35 @@ public class SiteGeneratorSpaTests : IDisposable
         File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "1-1-foundation.md"), Story11Md);
         File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "2-1-delivery.md"), Story21Md);
         File.WriteAllText(Path.Combine(Adrs, "0001-a-decision.md"), "# ADR 0001: A Decision\n\n**Status:** Accepted\n\nBody.\n");
+        File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "deferred-work.md"), DeferredWorkMd);
+        File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "spec-a-followup.md"), SpecFollowUpMd);
     }
+
+    /// <summary>Deferred work that STEMS FROM Story 1.1 and is RESOLVED by a spec doc rather than by a dotted
+    /// story id — the exact shape <c>WorkGraph.BuildStory</c> routes through <c>ResolvingHref</c>, which is the
+    /// field Story 22.4's AC #5 defect nulled on the <c>RenderEpicsPages</c> route. Without this the fixture
+    /// renders no work graph at all and the parity assertion is vacuous. [Story 22.4 code review]</summary>
+    private const string DeferredWorkMd = """
+        # Deferred Work
+
+        ## Deferred from: Story 1.1 Foundation Story
+
+        - source_spec: `1-1-foundation.md`
+          summary: **[RESOLVED]** ~~Harden the foundation's error path.~~ Picked up by `spec-a-followup.md`.
+          evidence: Fixture item exercising the resolver-node/edge pair.
+
+        - source_spec: `1-1-foundation.md`
+          summary: An open follow-up from the foundation story, deliberately unresolved.
+          evidence: Fixture item exercising the unresolved branch.
+        """;
+
+    private const string SpecFollowUpMd = """
+        # Spec: A Follow-up
+
+        route: one-shot
+
+        Resolves the deferred foundation item.
+        """;
 
     public void Dispose()
     {
@@ -918,6 +946,67 @@ public class SiteGeneratorSpaTests : IDisposable
             dir = Path.GetDirectoryName(dir);
         Assert.False(string.IsNullOrEmpty(dir), "could not locate the repository root from the test bin directory");
         return Path.Combine(dir!, "src", "SpecScribe");
+    }
+
+    /// <summary>The work-graph accessible summary <c>Charts</c> renders for an epic subgraph — the ONE string
+    /// that carries both counts the 46-delta moved. Two shapes exist (with and without circular provenance), so
+    /// this matches the stable prefix and returns the whole sentence for comparison.</summary>
+    private static IReadOnlyList<string> WorkGraphSummaries(string html)
+    {
+        var found = new List<string>();
+        const string marker = "Work graph for ";
+        for (var i = html.IndexOf(marker, StringComparison.Ordinal); i >= 0;
+             i = html.IndexOf(marker, i + marker.Length, StringComparison.Ordinal))
+        {
+            var end = html.IndexOf("The list below enumerates", i, StringComparison.Ordinal);
+            if (end < 0) { found.Add(html[i..]); break; }
+            found.Add(html[i..end].Trim());
+        }
+        return found;
+    }
+
+    /// <summary>
+    /// AC #5's regression guard: the static page and the IR must report the SAME work-graph node and edge
+    /// counts for every surface that carries one.
+    ///
+    /// <para>This is the test AC #5 required ("asserted by a test that would have caught the 46-delta") and that
+    /// Story 22.4 shipped without — its Task 3 subtask was marked complete while no such test existed, found by
+    /// the story's code review. The defect it guards: <c>ResolveDeferredModel</c> handed an EMPTY <c>_docs</c> to
+    /// <c>FollowUpRefs.BuildHrefMap</c> on the <c>RenderEpicsPages</c> route, so every spec resolver's
+    /// <c>ResolvingHref</c> came back null and <c>WorkGraph.BuildStory</c> dropped the resolver node AND its
+    /// edge — the static page drew "4 work items and 3 provenance links" where the IR drew "5 and 5", across 46
+    /// story surfaces plus 9 epic pages and <c>work-graph.html</c>.</para>
+    ///
+    /// <para>⚠️ The assertion is guarded against vacuity on purpose. Story 22.4's own parity measurement first
+    /// reported a meaningless "822/822 identical" because it compared <c>undefined</c> to <c>undefined</c> on a
+    /// misspelled field. A comparison that finds nothing to compare must FAIL, not pass.</para>
+    /// </summary>
+    [Fact]
+    public void EverySurface_ReportsTheSameWorkGraphCounts_InTheStaticPageAndTheIr()
+    {
+        var gen = GeneratedSite();
+        var bundle = gen.RenderSpaBundle();
+
+        var compared = 0;
+        foreach (var page in bundle.Pages)
+        {
+            var staticFile = Path.Combine(Site, page.OutputRelativePath.Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(staticFile)) continue;
+
+            var fromStatic = WorkGraphSummaries(File.ReadAllText(staticFile));
+            var fromIr = WorkGraphSummaries(page.ContentHtml);
+
+            // Same NUMBER of work graphs on the page, and the same counts in each — compared as the rendered
+            // sentence, so a node/edge divergence and a label divergence are both caught by one assertion.
+            Assert.Equal(fromStatic, fromIr);
+            compared += fromStatic.Count;
+        }
+
+        Assert.True(
+            compared > 0,
+            "VACUOUS: no page in this fixture rendered a work graph, so this test proved nothing. The fixture " +
+            "must keep at least one epic whose stories carry provenance (Story 1.1 'Builds toward Story 2.1'). " +
+            "Fix the fixture rather than deleting this guard.");
     }
 
 }

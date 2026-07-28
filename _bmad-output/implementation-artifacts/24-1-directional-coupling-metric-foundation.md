@@ -1,6 +1,10 @@
+---
+baseline_commit: 755bd7a8d1679594dc48bb04fe5ac11473484618
+---
+
 # Story 24.1: Directional Coupling Metric Foundation (Confidence, Support, Lift, Cross-Boundary) + Upgraded List
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -29,43 +33,43 @@ so that I can read "when I touch this file, I usually touch X" instead of an unn
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Cross-boundary classifier (pure, shared)** (AC: #2)
-  - [ ] Add `public static bool IsCrossBoundary(string pathA, string pathB)` to `GitMetrics` (near `ClassifyCoupling`, [GitMetrics.cs:271](src/SpecScribe/GitMetrics.cs)). Compare the **first path segment** (top-level directory) after normalizing `\`→`/` and splitting on `/`. Two files under the same top-level dir → same-boundary; different top-level dirs → cross-boundary. Decide root-level handling per **Q2** (recommended: a root-level file — no directory — shares a boundary with other root-level files, and is cross-boundary vs any nested file).
-  - [ ] Pure and repo-free (no SpecScribe path literals, NFR8), never throws, deterministic.
-  - [ ] Unit tests in `GitMetricsTests.cs` (or a new `GitMetricsCouplingTests.cs`): same-dir, cross-dir, root-vs-nested, root-vs-root, empty-path guards.
+- [x] **Task 1 — Cross-boundary classifier (pure, shared)** (AC: #2)
+  - [x] Add `public static bool IsCrossBoundary(string pathA, string pathB)` to `GitMetrics` (near `ClassifyCoupling`, [GitMetrics.cs:271](src/SpecScribe/GitMetrics.cs)). Compare the **first path segment** (top-level directory) after normalizing `\`→`/` and splitting on `/`. Two files under the same top-level dir → same-boundary; different top-level dirs → cross-boundary. Decide root-level handling per **Q2** (recommended: a root-level file — no directory — shares a boundary with other root-level files, and is cross-boundary vs any nested file).
+  - [x] Pure and repo-free (no SpecScribe path literals, NFR8), never throws, deterministic.
+  - [x] Unit tests in `GitMetricsTests.cs` (or a new `GitMetricsCouplingTests.cs`): same-dir, cross-dir, root-vs-nested, root-vs-root, empty-path guards.
 
-- [ ] **Task 2 — Directional metric model (the shared spine)** (AC: #1, #2)
-  - [ ] Introduce a record `public sealed record CoupledFile(string Path, int Support, double Confidence, double? Lift, bool CrossBoundary, GitMetrics.CouplingKind Kind)` in `GitMetrics.cs` (beside `FileInsight`, [GitMetrics.cs:169](src/SpecScribe/GitMetrics.cs)). `Support` = the shared-commit count (today's `CoChanges`). `Lift` is nullable — undefined when `ChangeCount[B]` or `AnalyzedCommits` is 0 (guard divide-by-zero; render as "—"/omit, never `NaN`/`Infinity`).
-  - [ ] Change `FileInsight.CoupledFiles` from `IReadOnlyList<(string Path, int CoChanges)>` to `IReadOnlyList<CoupledFile>` ([GitMetrics.cs:172](src/SpecScribe/GitMetrics.cs)). This is the load-bearing shape all downstream surfaces read; every consumer below must be updated in this story (regression guardrail — see Task 6).
-  - [ ] Compute the directional fields inside `BuildFileInsights` where the pairs are already fanned out to both members ([GitMetrics.cs:858-888](src/SpecScribe/GitMetrics.cs)). In that loop **both** `a`, `b` and their `FileInsightAccum.ChangeCount` are in hand, so directional confidence is computed with the CORRECT numerator per direction: file A's list entry for B carries `confidence = count / ChangeCount[A]`; file B's entry for A carries `count / ChangeCount[B]`. `commits.Count` (== `AnalyzedCommits`) is available in `BuildFileInsights` for lift's denominator.
-  - [ ] Keep the sort **within** the cap as confidence-desc, then Support-desc, then ordinal path (was `CoChanges`-desc). Apply the min-support floor (Task 4) BEFORE the `coupledCap` take so low-support noise never crowds out real couples. Preserve `FileInsightCoupledCap` ([GitMetrics.cs:764](src/SpecScribe/GitMetrics.cs)).
-  - [ ] Preserve `ClassifyCoupling` — set `CoupledFile.Kind` from it; do not alter the Code-vs-Process rules.
+- [x] **Task 2 — Directional metric model (the shared spine)** (AC: #1, #2)
+  - [x] Introduce a record `public sealed record CoupledFile(string Path, int Support, double Confidence, double? Lift, bool CrossBoundary, GitMetrics.CouplingKind Kind)` in `GitMetrics.cs` (beside `FileInsight`, [GitMetrics.cs:169](src/SpecScribe/GitMetrics.cs)). `Support` = the shared-commit count (today's `CoChanges`). `Lift` is nullable — undefined when `ChangeCount[B]` or `AnalyzedCommits` is 0 (guard divide-by-zero; render as "—"/omit, never `NaN`/`Infinity`).
+  - [x] Change `FileInsight.CoupledFiles` from `IReadOnlyList<(string Path, int CoChanges)>` to `IReadOnlyList<CoupledFile>` ([GitMetrics.cs:172](src/SpecScribe/GitMetrics.cs)). This is the load-bearing shape all downstream surfaces read; every consumer below must be updated in this story (regression guardrail — see Task 6).
+  - [x] Compute the directional fields inside `BuildFileInsights` where the pairs are already fanned out to both members ([GitMetrics.cs:858-888](src/SpecScribe/GitMetrics.cs)). In that loop **both** `a`, `b` and their `FileInsightAccum.ChangeCount` are in hand, so directional confidence is computed with the CORRECT numerator per direction: file A's list entry for B carries `confidence = count / ChangeCount[A]`; file B's entry for A carries `count / ChangeCount[B]`. `commits.Count` (== `AnalyzedCommits`) is available in `BuildFileInsights` for lift's denominator.
+  - [x] Keep the sort **within** the cap as confidence-desc, then Support-desc, then ordinal path (was `CoChanges`-desc). Apply the min-support floor (Task 4) BEFORE the `coupledCap` take so low-support noise never crowds out real couples. Preserve `FileInsightCoupledCap` ([GitMetrics.cs:764](src/SpecScribe/GitMetrics.cs)).
+  - [x] Preserve `ClassifyCoupling` — set `CoupledFile.Kind` from it; do not alter the Code-vs-Process rules.
 
-- [ ] **Task 3 — Whole-repo directional view for the hub** (AC: #1, #3)
-  - [ ] The hub's top-N `Coupling` list (`DeepGitPulse.Coupling`, built in `ParseNumstatLog` [GitMetrics.cs:541-548](src/SpecScribe/GitMetrics.cs)) is today symmetric `(FileA, FileB, int CoChanges)` sorted by shared-commit count. Add a directional projection the hub table/graph consume. Recommended: a new `public static IReadOnlyList<CoupledFile-with-source>` shaped list keyed by a source file, OR a sibling record `DirectedCouple(string FromPath, string ToPath, int Support, double Confidence, double? Lift, bool CrossBoundary, CouplingKind Kind)` computed from `CoChangePairs` + per-file `ChangeCount` (available via the `changeCounts` dict in `ParseNumstatLog`, [GitMetrics.cs:497](src/SpecScribe/GitMetrics.cs)) + `AnalyzedCommits`. See **Q1** for the directed-vs-symmetric decision.
-  - [ ] Reuse the SAME min-support floor const (Task 4) and confidence sort. Surface it on `DeepGitPulse` (a new `init` property, mirroring how `CoChangePairs` was added at [GitMetrics.cs:82](src/SpecScribe/GitMetrics.cs)) so it is computed once and reused, not recomputed per view (AC #2).
-  - [ ] Do NOT add a second git call or second commit scan — derive entirely from already-parsed records/maps (one fetch, one parse, several views).
+- [x] **Task 3 — Whole-repo directional view for the hub** (AC: #1, #3)
+  - [x] The hub's top-N `Coupling` list (`DeepGitPulse.Coupling`, built in `ParseNumstatLog` [GitMetrics.cs:541-548](src/SpecScribe/GitMetrics.cs)) is today symmetric `(FileA, FileB, int CoChanges)` sorted by shared-commit count. Add a directional projection the hub table/graph consume. Recommended: a new `public static IReadOnlyList<CoupledFile-with-source>` shaped list keyed by a source file, OR a sibling record `DirectedCouple(string FromPath, string ToPath, int Support, double Confidence, double? Lift, bool CrossBoundary, CouplingKind Kind)` computed from `CoChangePairs` + per-file `ChangeCount` (available via the `changeCounts` dict in `ParseNumstatLog`, [GitMetrics.cs:497](src/SpecScribe/GitMetrics.cs)) + `AnalyzedCommits`. See **Q1** for the directed-vs-symmetric decision.
+  - [x] Reuse the SAME min-support floor const (Task 4) and confidence sort. Surface it on `DeepGitPulse` (a new `init` property, mirroring how `CoChangePairs` was added at [GitMetrics.cs:82](src/SpecScribe/GitMetrics.cs)) so it is computed once and reused, not recomputed per view (AC #2).
+  - [x] Do NOT add a second git call or second commit scan — derive entirely from already-parsed records/maps (one fetch, one parse, several views).
 
-- [ ] **Task 4 — Configurable minimum-support floor** (AC: #1)
-  - [ ] Introduce a named const (e.g. `CouplingMinSupport = 2`) replacing the hard-coded `kv.Value >= 2` at [GitMetrics.cs:542](src/SpecScribe/GitMetrics.cs). Thread it through both the hub directional list (Task 3) and the per-file `BuildFileInsights` filter (Task 2) so the two surfaces agree, exactly as `CouplingFileSetCap` is shared today.
-  - [ ] Keep the default at **2** so the baseline output is unchanged except for the new metric columns/sort (see golden-fingerprint note). "Configurable" = a parameter/const with a sensible default, not necessarily a new CLI flag — confirm scope in **Q3**.
+- [x] **Task 4 — Configurable minimum-support floor** (AC: #1)
+  - [x] Introduce a named const (e.g. `CouplingMinSupport = 2`) replacing the hard-coded `kv.Value >= 2` at [GitMetrics.cs:542](src/SpecScribe/GitMetrics.cs). Thread it through both the hub directional list (Task 3) and the per-file `BuildFileInsights` filter (Task 2) so the two surfaces agree, exactly as `CouplingFileSetCap` is shared today.
+  - [x] Keep the default at **2** so the baseline output is unchanged except for the new metric columns/sort (see golden-fingerprint note). "Configurable" = a parameter/const with a sensible default, not necessarily a new CLI flag — confirm scope in **Q3**.
 
-- [ ] **Task 5 — Upgrade the two render surfaces (the "upgraded list")** (AC: #3)
-  - [ ] **Per-file text-twin** (`CodeFileTemplater.BuildRelatedNodes` + sr-only related list, [CodeFileTemplater.cs:261-272](src/SpecScribe/CodeFileTemplater.cs) and [CodeFileTemplater.cs:491-505](src/SpecScribe/CodeFileTemplater.cs)): each entry shows directional confidence ("changed together N× · confidence M%") and a **text** cross-boundary marker (never color-only — UX-DR19/NFR8), e.g. append " · cross-boundary". Lift belongs in the `<title>`/tooltip. This sr-only list is the accessible text-twin the graph stories reuse — keep it complete and readable with JS off. Do NOT redesign the visible code-page surface (the reference graph is 24.2's job); 24.1 upgrades the metric + text list only.
-  - [ ] **Hub coupling table** (`Charts.CouplingTable`, [Charts.cs:2090](src/SpecScribe/Charts.cs)): add a **Confidence** column (directional %), sort rows by confidence with the support floor applied, and add a cross-boundary text marker/badge alongside the existing "Process" Kind badge ([Charts.cs:2100-2114](src/SpecScribe/Charts.cs)). Keep the process-vs-code badge behavior intact.
-  - [ ] **Hub coupling graph legend** (`DeepAnalyticsTemplater`, [DeepAnalyticsTemplater.cs:60-77](src/SpecScribe/DeepAnalyticsTemplater.cs)): update the legend copy to explain the new edge/weight semantics if edges now encode confidence; the `CouplingGraph` SVG itself ([Charts.cs:2128](src/SpecScribe/Charts.cs)) may stay weight-by-shared-commits in 24.1 (interactive/confidence-weighted graph is 24.2+) — confirm in **Q1**. The `role="img"` aria label and `<title>` tooltips must stay truthful to whatever they encode.
-  - [ ] **Framing (Story 10.2)**: the `ChartMetric.ChangeCoupling` `WhyText` sentence already exists ([Charts.cs:58](src/SpecScribe/Charts.cs)); reuse it — do NOT hand-roll new "why" copy at call sites. If confidence changes what the ranking caption should say, update the `ChartMeta.Ranking` string in `DeepAnalyticsTemplater` ([DeepAnalyticsTemplater.cs:89-91](src/SpecScribe/DeepAnalyticsTemplater.cs)), not the shared `WhyText`.
+- [x] **Task 5 — Upgrade the two render surfaces (the "upgraded list")** (AC: #3)
+  - [x] **Per-file text-twin** (`CodeFileTemplater.BuildRelatedNodes` + sr-only related list, [CodeFileTemplater.cs:261-272](src/SpecScribe/CodeFileTemplater.cs) and [CodeFileTemplater.cs:491-505](src/SpecScribe/CodeFileTemplater.cs)): each entry shows directional confidence ("changed together N× · confidence M%") and a **text** cross-boundary marker (never color-only — UX-DR19/NFR8), e.g. append " · cross-boundary". Lift belongs in the `<title>`/tooltip. This sr-only list is the accessible text-twin the graph stories reuse — keep it complete and readable with JS off. Do NOT redesign the visible code-page surface (the reference graph is 24.2's job); 24.1 upgrades the metric + text list only.
+  - [x] **Hub coupling table** (`Charts.CouplingTable`, [Charts.cs:2090](src/SpecScribe/Charts.cs)): add a **Confidence** column (directional %), sort rows by confidence with the support floor applied, and add a cross-boundary text marker/badge alongside the existing "Process" Kind badge ([Charts.cs:2100-2114](src/SpecScribe/Charts.cs)). Keep the process-vs-code badge behavior intact.
+  - [x] **Hub coupling graph legend** (`DeepAnalyticsTemplater`, [DeepAnalyticsTemplater.cs:60-77](src/SpecScribe/DeepAnalyticsTemplater.cs)): update the legend copy to explain the new edge/weight semantics if edges now encode confidence; the `CouplingGraph` SVG itself ([Charts.cs:2128](src/SpecScribe/Charts.cs)) may stay weight-by-shared-commits in 24.1 (interactive/confidence-weighted graph is 24.2+) — confirm in **Q1**. The `role="img"` aria label and `<title>` tooltips must stay truthful to whatever they encode.
+  - [x] **Framing (Story 10.2)**: the `ChartMetric.ChangeCoupling` `WhyText` sentence already exists ([Charts.cs:58](src/SpecScribe/Charts.cs)); reuse it — do NOT hand-roll new "why" copy at call sites. If confidence changes what the ranking caption should say, update the `ChartMeta.Ranking` string in `DeepAnalyticsTemplater` ([DeepAnalyticsTemplater.cs:89-91](src/SpecScribe/DeepAnalyticsTemplater.cs)), not the shared `WhyText`.
 
-- [ ] **Task 6 — Update every `CoupledFiles` consumer (no regressions)** (AC: #3)
-  - [ ] `CodeFileTemplater.cs`: `BuildRelatedNodes` destructure `foreach (var (path, coChanges) in insight.CoupledFiles)` ([CodeFileTemplater.cs:269](src/SpecScribe/CodeFileTemplater.cs)) → read `CoupledFile.Path`/`.Support`/`.Confidence`/`.CrossBoundary`; the `related` node tuple + its consumer at [CodeFileTemplater.cs:495](src/SpecScribe/CodeFileTemplater.cs).
-  - [ ] `SiteGenerator.cs`: `BuildStoryRelatedEdges`/`BuildRelatedRelatedEdges` read `insight.CoupledFiles[j].Path` and `.CoChanges` ([SiteGenerator.cs:1966-2004](src/SpecScribe/SiteGenerator.cs)) → `.Path`/`.Support`. These index-align with the reference-graph related nodes ([SiteGenerator.cs:1960](src/SpecScribe/SiteGenerator.cs) comment) — keep the ordering contract intact after the sort change.
-  - [ ] `Charts.ReferenceGraph` related-node title ("changed together N times", [Charts.cs:2509](src/SpecScribe/Charts.cs)) stays valid (it reads the passed related tuple, not `CoupledFiles` directly) — verify no signature drift.
-  - [ ] Grep the whole `src/` + `tests/` for `CoupledFiles` / `.CoChanges` before finishing; every read site must compile against the new record.
+- [x] **Task 6 — Update every `CoupledFiles` consumer (no regressions)** (AC: #3)
+  - [x] `CodeFileTemplater.cs`: `BuildRelatedNodes` destructure `foreach (var (path, coChanges) in insight.CoupledFiles)` ([CodeFileTemplater.cs:269](src/SpecScribe/CodeFileTemplater.cs)) → read `CoupledFile.Path`/`.Support`/`.Confidence`/`.CrossBoundary`; the `related` node tuple + its consumer at [CodeFileTemplater.cs:495](src/SpecScribe/CodeFileTemplater.cs).
+  - [x] `SiteGenerator.cs`: `BuildStoryRelatedEdges`/`BuildRelatedRelatedEdges` read `insight.CoupledFiles[j].Path` and `.CoChanges` ([SiteGenerator.cs:1966-2004](src/SpecScribe/SiteGenerator.cs)) → `.Path`/`.Support`. These index-align with the reference-graph related nodes ([SiteGenerator.cs:1960](src/SpecScribe/SiteGenerator.cs) comment) — keep the ordering contract intact after the sort change.
+  - [x] `Charts.ReferenceGraph` related-node title ("changed together N times", [Charts.cs:2509](src/SpecScribe/Charts.cs)) stays valid (it reads the passed related tuple, not `CoupledFiles` directly) — verify no signature drift.
+  - [x] Grep the whole `src/` + `tests/` for `CoupledFiles` / `.CoChanges` before finishing; every read site must compile against the new record.
 
-- [ ] **Task 7 — Tests + golden fingerprint** (AC: #1, #2, #3)
-  - [ ] `GitMetricsFileInsightsTests.cs`: assert confidence = count/ChangeCount[focal] with the correct direction (build a fixture where A→B ≠ B→A), lift math + divide-by-zero → null, min-support floor filters a support-1 couple, cross-boundary flag, `Kind` preserved.
-  - [ ] `ChartsTests.cs` (+ `SiteGeneratorCodeInsightsTests.cs`): `CouplingTable` renders the confidence column + cross-boundary marker + confidence sort; the per-file sr-only list carries confidence + cross-boundary text; empty/degenerate inputs still render the friendly empty state ([Charts.cs:2092](src/SpecScribe/Charts.cs)).
-  - [ ] Run the full suite. The golden fingerprint **WILL move** (coupling list text + sort change); regenerate it deliberately and confirm the move is only the intended coupling copy/order — see [[golden-diff-normalization-gotchas]]. RenderParity/SPA/webview: the coupled list lives inside code pages + the hub, both already captured by existing coherence tests — extend them, don't add a new page.
+- [x] **Task 7 — Tests + golden fingerprint** (AC: #1, #2, #3)
+  - [x] `GitMetricsFileInsightsTests.cs`: assert confidence = count/ChangeCount[focal] with the correct direction (build a fixture where A→B ≠ B→A), lift math + divide-by-zero → null, min-support floor filters a support-1 couple, cross-boundary flag, `Kind` preserved.
+  - [x] `ChartsTests.cs` (+ `SiteGeneratorCodeInsightsTests.cs`): `CouplingTable` renders the confidence column + cross-boundary marker + confidence sort; the per-file sr-only list carries confidence + cross-boundary text; empty/degenerate inputs still render the friendly empty state ([Charts.cs:2092](src/SpecScribe/Charts.cs)).
+  - [x] Run the full suite. The golden fingerprint **WILL move** (coupling list text + sort change); regenerate it deliberately and confirm the move is only the intended coupling copy/order — see [[golden-diff-normalization-gotchas]]. RenderParity/SPA/webview: the coupled list lives inside code pages + the hub, both already captured by existing coherence tests — extend them, don't add a new page.
 
 ## Dev Notes
 
@@ -140,8 +144,115 @@ Pure function of the two paths — top-level directory segments differ ⇒ archi
 
 ### Agent Model Used
 
+claude-opus-5 (Amelia / dev-story), 2026-07-28.
+
 ### Debug Log References
+
+- `dotnet test` full suite — 2740+ tests. Final green run: 0 failures attributable to this story.
+- Golden fingerprint regenerated `f12b1ff2…` → `ee00f947…`, stable across two runs after
+  `dotnet build --no-incremental`. Full provenance split recorded in `SiteGeneratorAdapterTests.cs`.
+- Live-browser verification of the hub table at `http://localhost:8110/deep-analytics.html`
+  (real `--deep-git` render of this repo, 300 commits, 692 files).
 
 ### Completion Notes List
 
+**Owner questions — all four taken at the story's recommended default. Flagging Q4 for the verify round.**
+
+- **Q1** — hub *table* is directed and confidence-ranked; hub *graph* SVG left weighted by shared commits
+  (confidence-weighted/directed edges stay 24.2+). Because the two panels now rank different populations, the
+  Ranked Pairs caption was rewritten to name *its own* ranking rather than inherit the graph's.
+- **Q2** — root-level files share the repository-root boundary with each other, and are cross-boundary against
+  anything nested.
+- **Q3** — shared named const `GitMetrics.CouplingMinSupport = 2`, threaded as an optional parameter through
+  `BuildFileInsights` and `ParseNumstatLog`. No new CLI flag.
+- **Q4** — sorted by confidence, tie-broken support-desc then ordinal path; lift rides the tooltip.
+  ⚠️ **Worth an owner look in the verify round:** on this repo the entire top-10 comes back at **100%
+  confidence**, so the Confidence column reads as a constant and does no ranking work in the visible window.
+  Lift *does* separate those rows (15.0× vs 2.16× for two otherwise identical-looking 100% rows) but is only in
+  the tooltip. Sorting by lift, or showing lift as a column, would make the panel discriminate. Left as
+  specified rather than changed unilaterally — this is a ranking-policy call, not a defect.
+
+**What shipped**
+
+- `IsCrossBoundary` + a private `BoundaryOf` helper: pure, symmetric, repo-free, never throws; an unreadable
+  path degrades to "not cross-boundary" rather than asserting an architectural smell it cannot see.
+- `CoupledFile` (per-file, directional) and `DirectedCouple` (whole-repo, carries its own `FromPath`) share one
+  metric definition. `FileInsight.CoupledFiles` changed shape from `(string, int)` to `CoupledFile`.
+- `GitMetrics.Lift(confidence, targetChangeCount, analyzedCommits)` is the ONE place the division happens, so
+  no surface can forget the guard. Returns `null` — never `NaN`/`Infinity`, which would reach markup as literal
+  text.
+- Confidence is computed in the per-file loop where the focal file's own `ChangeCount` is in hand, which is what
+  makes A→B and B→A genuinely differ. Verified live: `GitMetricsTests.cs → GitMetrics.cs` is 100% confident at
+  15.0× lift and cross-boundary — a real, correct finding a symmetric count cannot express.
+- `DeepGitPulse.DirectedCoupling` is computed once in `ParseNumstatLog` from maps the single numstat parse
+  already built. **No second git call and no second commit scan** (AC #1).
+- Both directions of a qualifying pair are emitted and then ranked together, so a strongly one-way relationship
+  surfaces on its strong side instead of being averaged away.
+
+**Consequences worth knowing (deliberate, per AC #1)**
+
+- The support floor now applies to the **per-file** list too, which it did not before. One-off couples disappear
+  from code pages site-wide. This is the AC's "filters coincidental couples", but it is a visible behaviour
+  change and it moved three existing tests, each updated with a comment saying why rather than silently
+  re-baselined.
+- `Charts.ReferenceGraph`'s signature was deliberately NOT widened (Task 6 asked to verify no drift). The richer
+  metric rides a private `RelatedNode` record in `CodeFileTemplater`, projected down to the graph's existing
+  4-tuple via `ToGraphNodes`. This kept ~15 `ChartsTests` call sites untouched.
+- `SiteGenerator.cs` needed **no change**: its two `CoupledFiles` consumers read only `.Path`. The story's Task 6
+  predicted a `.CoChanges` read there; that read no longer existed. Verified by grep, not assumed.
+
+**Live-browser pass caught two defects the test suite structurally could not** (CLAUDE.md § Verification)
+
+Both were pure rendered geometry in the ~455px Ranked Pairs panel, invisible to string-assertion tests:
+
+1. The new Confidence column starved the two path columns from ~124px to **60px each**, truncating them to
+   "tests…"/"src/S…" and defeating the table's purpose.
+2. The first fix then exposed single-word headers overrunning their columns under `table-layout: fixed`,
+   rendering as one run-on string **"TOGETHERCONFIDENCEKIND"**.
+
+Fixed by sizing the numeric columns to their *values* (with smaller unspaced headers), narrowing `.coupling-kind`
+to one badge width, and setting the badges in sentence case — uppercase + letter-spacing was what made
+"CROSS-BOUNDARY" 120px wide and single-handedly set the column width. Re-measured after: paths 94px, **zero**
+header overflow, **zero** clipped cells, no horizontal body overflow, and the 3 rows carrying both Process and
+Cross-boundary still stack correctly.
+
+**Shared-main notes**
+
+- Story 23.4's `PageView` inversion rewrote `CodeFileTemplater.cs` underneath this work mid-story. All Story 24.1
+  symbols were grep-verified present afterwards ([[shared-main-concurrent-edit-loss-verify-after-edit]]).
+- The golden fingerprint moved three times during this story from *other* sessions' work. The regeneration note
+  names which portion is 24.1's and which is not, rather than absorbing theirs.
+- Full-suite runs showed 5–15 failures in git-shelling tests under concurrent CPU load; all 54 pass in isolation.
+  This is the known deep-git 3s-timeout flake ([[gitmetrics-3s-timeout-silent-deep-git-loss]]), not a regression.
+  It also cost two `--deep-git` generation attempts, which silently produced no deep surfaces at all.
+
 ### File List
+
+- `src/SpecScribe/GitMetrics.cs` — `IsCrossBoundary`/`BoundaryOf`, `CouplingMinSupport`, `CoupledFile`,
+  `DirectedCouple`, `Lift`, `DeepGitPulse.DirectedCoupling`, `BuildDirectedCoupling`, directional math + floor +
+  confidence sort in `BuildFileInsights`, `minSupport` parameter on `BuildFileInsights`/`ParseNumstatLog`.
+- `src/SpecScribe/Charts.cs` — `CouplingTable` now takes `IReadOnlyList<DirectedCouple>`, adds the Confidence
+  column and the cross-boundary badge; new shared `Percent` formatter.
+- `src/SpecScribe/CodeFileTemplater.cs` — private `RelatedNode` record + `ToGraphNodes` projection;
+  `BuildRelatedNodes` and the sr-only text twin carry confidence, cross-boundary words, and lift-on-title.
+- `src/SpecScribe/DeepAnalyticsTemplater.cs` — Ranked Pairs panel reads `DirectedCoupling`; ranking caption
+  rewritten to name the confidence ranking.
+- `src/SpecScribe/assets/specscribe.css` — `.coupling-boundary-badge`, badge sizing, and the coupling-table
+  column rebalance from the live-browser pass.
+- `tests/SpecScribe.Tests/GitMetricsCouplingTests.cs` — **new**: `IsCrossBoundary` + floor contract.
+- `tests/SpecScribe.Tests/GitMetricsFileInsightsTests.cs` — asymmetric confidence, lift + divide-by-zero,
+  cross-boundary + preserved Kind, floor-before-cap, configurable floor.
+- `tests/SpecScribe.Tests/DeepAnalyticsTemplaterTests.cs` — directed-table fixtures + `DirectedFrom` helper;
+  Confidence column, cross-boundary badge, both-badge independence, lift omission, empty state, caption.
+- `tests/SpecScribe.Tests/CodeFileTemplaterTests.cs` — directional fixture; sr-only confidence, cross-boundary
+  words, lift-on-title.
+- `tests/SpecScribe.Tests/SiteGeneratorCodeInsightsTests.cs` — chip fixture given real support (2 co-change
+  commits) so the floor does not filter the case under test.
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — golden fingerprint regenerated + provenance split.
+- `.claude/launch.json` — added the `coupling-24-1` verification server entry.
+
+## Change Log
+
+| Date | Change |
+| --- | --- |
+| 2026-07-28 | Story 24.1 implemented: directional coupling spine (confidence/support/lift/cross-boundary) over the existing single deep-git parse, plus the upgraded per-file text twin and confidence-ranked hub table. All four owner questions taken at their recommended defaults (Q4 flagged for the verify round — the visible top-10 is all 100% confidence). Two rendered-geometry defects found and fixed in a live browser. Golden fingerprint regenerated `f12b1ff2…` → `ee00f947…` with an explicit split of which sessions moved it. Status → review. |

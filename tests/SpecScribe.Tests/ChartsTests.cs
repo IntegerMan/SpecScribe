@@ -1369,6 +1369,30 @@ public class ChartsTests
     }
 
     [Fact]
+    public void DeliverySentence_NamesRetiredAsItsOwnStage_NotUnrecognized()
+    {
+        // Story 8.9 AC #3: before `retired` joined StoryStages this epic read "5 of 6 done, 1 unrecognized",
+        // reporting a deliberate planning decision as an unmapped word. Order is narrative — retired is the
+        // second TERMINAL stage, so it follows done and precedes everything still owed.
+        var sentence = Charts.DeliverySentence(new Dictionary<string, int>
+        {
+            ["done"] = 5,
+            ["retired"] = 1,
+        });
+
+        Assert.Equal("5 of 6 done, 1 retired", sentence);
+        Assert.DoesNotContain("unrecognized", sentence);
+
+        var mixed = Charts.DeliverySentence(new Dictionary<string, int>
+        {
+            ["done"] = 3,
+            ["retired"] = 1,
+            ["review"] = 2,
+        });
+        Assert.Equal("3 of 6 done, 1 retired, 2 in review", mixed);
+    }
+
+    [Fact]
     public void DeliverySentence_SingleStage_HasNoTrailingClause()
     {
         Assert.Equal("7 of 7 done", Charts.DeliverySentence(new Dictionary<string, int> { ["done"] = 7 }));

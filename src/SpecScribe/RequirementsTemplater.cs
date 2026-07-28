@@ -8,6 +8,17 @@ namespace SpecScribe;
 public static class RequirementsTemplater
 {
     public static string RenderIndex(RequirementsModel model, EpicsModel epics, ProgressModel progress, SiteNav nav,
+        ProjectCounts? counts = null) =>
+        HtmlRenderAdapter.Shared.Render(BuildIndexPage(model, epics, progress, nav, counts)).Content;
+
+    /// <summary>Builds the index page's host-neutral <see cref="PageView"/> — the AD-2 delivery contract. Story
+    /// 23.4 moved every standalone templater onto it so the IR's content region can be COMPOSED
+    /// (<see cref="JsonSpaRenderAdapter.RenderContent"/>: nav markup + wayfinding + body) instead of sliced back
+    /// out of a rendered full page. <see cref="RenderIndex"/> is the unchanged HTML projection of this same model,
+    /// so the bytes are identical. <c>MetaDescription</c> is null because this page never passed a description —
+    /// <see cref="PathUtil.RenderHeadOpen"/> falls back to the title, which is the byte this page already emitted.
+    /// [Story 23.4 AC #3]</summary>
+    public static PageView BuildIndexPage(RequirementsModel model, EpicsModel epics, ProgressModel progress, SiteNav nav,
         ProjectCounts? counts = null)
     {
         var outputPath = SiteNav.RequirementsOutputPath;
@@ -16,10 +27,6 @@ public static class RequirementsTemplater
             .RequirementsOverall;
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen($"Requirements — {nav.SiteTitle}", PathUtil.RelativePrefix(outputPath) + ForgeOptions.StylesheetName, PathUtil.RelativePrefix(outputPath) + ForgeOptions.ScriptName));
-        sb.Append(nav.RenderNavBar(outputPath, nav.BuildDeliveryLocalContext(outputPath)));
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[] { ("Home", "index.html"), ("Requirements", null) }));
-
         var countParts = new List<string>
         {
             $"{model.Functional.Count} functional",
@@ -131,9 +138,22 @@ public static class RequirementsTemplater
 
         sb.Append("</main>\n\n");
 
-        sb.Append(PathUtil.RenderFooter());
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+        return new PageView
+        {
+            Kind = PageKind.Requirements,
+            OutputRelativePath = outputPath,
+            Title = $"Requirements — {nav.SiteTitle}",
+            Nav = nav.ToNavigationView(outputPath, nav.BuildDeliveryLocalContext(outputPath)),
+            Breadcrumb = BreadcrumbTrail.From(new (string, string?)[] { ("Home", "index.html"), ("Requirements", null) }),
+            Assets = new AssetManifest
+            {
+                StylesheetHref = PathUtil.RelativePrefix(outputPath) + ForgeOptions.StylesheetName,
+                ScriptHref = PathUtil.RelativePrefix(outputPath) + ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+            },
+            Interaction = InteractionState.None,
+            BodyHtml = sb.ToString(),
+        };
     }
 
     /// <summary>Four-reading "Satisfaction at a glance" band over <see cref="RequirementsModel.Everything"/>.
@@ -183,6 +203,14 @@ public static class RequirementsTemplater
     }
 
     public static string RenderRequirement(RequirementInfo req, ProgressModel progress, SiteNav nav, EpicsModel epics,
+        IReadOnlyDictionary<int, string>? epicRetroMap = null, string? deferredWorkHref = null, RequirementsModel? requirements = null) =>
+        HtmlRenderAdapter.Shared.Render(BuildRequirementPage(req, progress, nav, epics, epicRetroMap, deferredWorkHref, requirements)).Content;
+
+    /// <summary>Builds a requirement detail page's host-neutral <see cref="PageView"/> — see
+    /// <see cref="BuildIndexPage"/>. The per-requirement nav local context is threaded straight to
+    /// <see cref="SiteNav.ToNavigationView"/>, so the page-local band survives region composition by construction.
+    /// [Story 23.4 AC #3]</summary>
+    public static PageView BuildRequirementPage(RequirementInfo req, ProgressModel progress, SiteNav nav, EpicsModel epics,
         IReadOnlyDictionary<int, string>? epicRetroMap = null, string? deferredWorkHref = null, RequirementsModel? requirements = null)
     {
         var outputPath = $"requirements/{req.Slug}.html";
@@ -195,15 +223,6 @@ public static class RequirementsTemplater
         };
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen($"{req.Id} — {nav.SiteTitle}", prefix + ForgeOptions.StylesheetName, prefix + ForgeOptions.ScriptName));
-        sb.Append(nav.RenderNavBar(outputPath, requirements is null ? null : BuildRequirementLocalContext(req, prefix, requirements)));
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
-        {
-            ("Home", "index.html"),
-            ("Requirements", SiteNav.RequirementsOutputPath),
-            (req.Id, null),
-        }));
-
         // Single <main id="main-content"> landmark / skip-link target for the requirement detail page. [Story 1.4 AC #1]
         // req-detail stretches the page to the same 1100px column as the index. [Story 9.2 UX]
         sb.Append("<main id=\"main-content\" class=\"req-detail\">\n");
@@ -300,9 +319,28 @@ public static class RequirementsTemplater
         sb.Append("</div>\n\n");
 
         sb.Append("</main>\n\n");
-        sb.Append(PathUtil.RenderFooter(prefix));
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+
+        return new PageView
+        {
+            Kind = PageKind.Requirements,
+            OutputRelativePath = outputPath,
+            Title = $"{req.Id} — {nav.SiteTitle}",
+            Nav = nav.ToNavigationView(outputPath, requirements is null ? null : BuildRequirementLocalContext(req, prefix, requirements)),
+            Breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
+            {
+                ("Home", "index.html"),
+                ("Requirements", SiteNav.RequirementsOutputPath),
+                (req.Id, null),
+            }),
+            Assets = new AssetManifest
+            {
+                StylesheetHref = prefix + ForgeOptions.StylesheetName,
+                ScriptHref = prefix + ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+            },
+            Interaction = InteractionState.None,
+            BodyHtml = sb.ToString(),
+        };
     }
 
     /// <summary>Best-effort deferral-source links for a deferred requirement (AC #2): when its free-text
