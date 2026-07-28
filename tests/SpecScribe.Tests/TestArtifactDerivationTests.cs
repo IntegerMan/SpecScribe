@@ -219,7 +219,11 @@ public class TestArtifactDerivationTests
     {
         // step-05 only appends gate_status/gate_criteria inside `if (gateEligible)`. A reader that requires
         // them would report every inventory-only run as malformed.
-        var json = TraceSummaryJson
+        // A raw string literal keeps the SOURCE FILE's line endings, so on a CRLF checkout (what a Windows CI
+        // runner produces from an LF-committed file under core.autocrlf) every "\n"-anchored Replace below
+        // silently matched nothing and the gate keys survived — the assert then read "CONCERNS", not null.
+        // Normalize first so this surgery is line-ending agnostic on every host.
+        var json = TraceSummaryJson.ReplaceLineEndings("\n")
             .Replace("  \"gate_status\": \"CONCERNS\",\n", string.Empty)
             .Replace("  \"gate_criteria\": { \"p0_coverage_required\": \"100%\", \"p0_status\": \"MET\", \"p1_status\": \"PARTIAL\", \"overall_status\": \"MET\" }\n", string.Empty)
             .Replace("\"journey_evidence_url\": \"\" },\n}", "\"journey_evidence_url\": \"\" }\n}");

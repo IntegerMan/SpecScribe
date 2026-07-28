@@ -24,8 +24,7 @@ public class PathUtilTests
         => Assert.Equal("docs/spec.html", PathUtil.ToOutputRelative("docs/spec.md"));
 
     [Theory]
-    [InlineData("C:/Dev/SpecScribe/file.md", true)] // rooted — the "no common root" GetRelativePath fallback
-    [InlineData("/etc/passwd", true)] // rooted on POSIX
+    [InlineData("/etc/passwd", true)] // rooted on POSIX — and still the "no common root" shape on Windows
     [InlineData("..", true)]
     [InlineData("../sibling/file.md", true)]
     [InlineData("../../file.md", true)]
@@ -36,6 +35,19 @@ public class PathUtilTests
     [InlineData("..cache/notes.md", false)]
     public void EscapesRepoRoot_ChecksTheLeadingSegment_NotABareSubstring(string relativePath, bool expected)
         => Assert.Equal(expected, PathUtil.EscapesRepoRoot(relativePath));
+
+    [SkippableFact]
+    public void EscapesRepoRoot_WindowsDriveRootedFallback_IsAnEscape()
+    {
+        // The drive-letter form of the "no common root" GetRelativePath fallback (a DIFFERENT DRIVE on Windows).
+        // It is only ROOTED on Windows: on POSIX "C:/Dev/..." is a perfectly legal RELATIVE directory named "C:",
+        // and Path.GetRelativePath there can never emit it as that fallback — the POSIX fallback is "/"-rooted,
+        // which the theory above already covers. Asserting it unconditionally is what failed the Linux
+        // portability probe, so the drive-letter case is pinned here, on the only platform where it means anything.
+        Skip.IfNot(OperatingSystem.IsWindows(), "A drive-letter path is only rooted on Windows — skipped, not failed.");
+
+        Assert.True(PathUtil.EscapesRepoRoot("C:/Dev/SpecScribe/file.md"));
+    }
 
     [Fact]
     public void ResolveRealPath_NoSymlinksInvolved_ReturnsTheFullNormalizedPath()

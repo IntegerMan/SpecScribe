@@ -10,14 +10,14 @@
     "epics/story-{id}.html"
   ],
   "stats": {
-    "sourceRules": 1799,
-    "carriedRules": 863,
-    "carriedSelectors": 984,
-    "droppedUnused": 932,
+    "sourceRules": 1829,
+    "carriedRules": 862,
+    "carriedSelectors": 983,
+    "droppedUnused": 963,
     "droppedRoot": 4,
     "carriedKeyframes": 4,
-    "sourceBytes": 310966,
-    "generatedBytes": 109719
+    "sourceBytes": 315363,
+    "generatedBytes": 109635
   },
   "rules": [
     {
@@ -1949,11 +1949,6 @@
     {
       "selector": ".epic-remaining-followups",
       "lines": "3465-3465",
-      "carried": true
-    },
-    {
-      "selector": ".epic-remaining-review",
-      "lines": "3467-3467",
       "carried": true
     },
     {
@@ -4361,64 +4356,64 @@
     },
     {
       "selector": ".followup-row.resolved",
-      "lines": "7097-7101",
+      "lines": "7101-7105",
       "carried": true,
       "note": "1 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": ".followup-row-scan",
-      "lines": "7102-7106",
+      "lines": "7106-7110",
       "carried": true,
       "note": "1 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": ".followup-row-summary",
-      "lines": "7107-7112",
+      "lines": "7111-7116",
       "carried": true,
       "note": "1 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": ".followup-row-meta",
-      "lines": "7113-7117",
+      "lines": "7117-7121",
       "carried": true,
       "note": "1 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": ".followup-row-source",
-      "lines": "7118-7119",
+      "lines": "7122-7123",
       "carried": true,
       "note": "1 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": ".followup-row-primary",
-      "lines": "7120-7125",
+      "lines": "7124-7129",
       "carried": true,
       "note": "1 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": "a.followup-row-primary:hover",
-      "lines": "7126-7127",
+      "lines": "7130-7131",
       "carried": true,
       "note": "1 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": "body:has(main.followup-detail) .doc-header",
-      "lines": "7169-7175",
+      "lines": "7173-7179",
       "carried": true
     },
     {
       "selector": ".epic-retro-affordance",
-      "lines": "7240-7240",
+      "lines": "7244-7244",
       "carried": true
     },
     {
       "selector": ".epic-retro-link",
-      "lines": "7241-7241",
+      "lines": "7245-7245",
       "carried": true
     },
     {
       "selector": ".epic-retro-link:hover",
-      "lines": "7242-7242",
+      "lines": "7246-7246",
       "carried": true
     },
     {

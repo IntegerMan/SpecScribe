@@ -137,7 +137,7 @@
   white-space: normal;
   border: 1px solid var(--teal);
   border-radius: 4px;
-  background: var(--surface, #fff);
+  background: var(--warm-white);
 }
 
 .ir-content .ss-hierarchy-twin-title { margin: 0 0 0.35rem; font-size: 0.8rem; color: var(--ink-light); }
@@ -1865,8 +1865,6 @@
 .ir-content .epic-remaining-count { font-size: 0.72rem; color: var(--ink-faded); }
 
 .ir-content .epic-remaining-followups { color: var(--sb-followup-open, #d97706); }
-
-.ir-content .epic-remaining-review { border-left-color: var(--status-review); }
 
 .ir-content .epic-remaining-active { border-left-color: var(--status-active); }
 
