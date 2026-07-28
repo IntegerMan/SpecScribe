@@ -1869,13 +1869,19 @@
 
 .ir-content .epic-remaining-followups { color: var(--sb-followup-open, #d97706); }
 
+.ir-content .epic-remaining-review { border-left-color: var(--status-review); }
+
 .ir-content .epic-remaining-active { border-left-color: var(--status-active); }
 
 .ir-content .epic-remaining-ready { border-left-color: var(--status-ready); }
 
 .ir-content .epic-remaining-drafted { border-left-color: var(--status-drafted); }
 
+.ir-content .epic-remaining-pending { border-left-color: var(--status-pending); }
+
 .ir-content .epic-remaining-done { border-left-color: var(--status-done); }
+
+.ir-content .epic-remaining-unrecognized { border-left-color: var(--status-unrecognized); }
 
 .ir-content .epic-remaining-unplanned { border-left-color: var(--sb-unplanned, #0e7490); }
 
@@ -2470,6 +2476,8 @@
 
 .ir-content .mini-donut .donut-track,
 .ir-content .mini-donut .donut-seg { stroke-width: 4; }
+
+.ir-content .chart-empty { font-size: 0.82rem; color: var(--ink-light); font-style: italic; }
 
 .ir-content .git-pulse { display: flex; flex-direction: column; gap: 1.2rem; }
 
@@ -3788,6 +3796,14 @@ body:has(.followup-group-wrap) .ir-content .doc-header {
 }
 
 .ir-content .followup-row { border-left: 3px solid var(--status-review); }
+
+.ir-content .list-row-accent-done { --list-row-accent: var(--status-done); }
+
+.ir-content .list-row-accent-pending { --list-row-accent: var(--status-pending); }
+
+.ir-content .list-row-accent-deferred { --list-row-accent: var(--status-deferred); }
+
+.ir-content .list-row-accent-ready { --list-row-accent: var(--status-ready); }
 
 .ir-content .followup-row.resolved {
   border-left-color: var(--status-done);

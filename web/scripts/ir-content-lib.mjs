@@ -54,6 +54,78 @@ export const MIGRATED = {
 
 export const isMigrated = (path) => Object.values(MIGRATED).some((f) => f(path))
 
+// ── Data-conditional classes ─────────────────────────────────────────────────────────────────────────────
+//
+// ⚠️ The extraction below asks "does this class appear in the markup the migrated families render RIGHT
+// NOW?". For most selectors that is the right question. For a class whose presence is a function of
+// PROJECT DATA rather than of the templates, it is the wrong one, and it fails in both directions:
+//
+//   1. FALSE DRIFT. `check:ir-content` re-derives from the live IR, so moving an epic into review or
+//      filling the last empty sprint lane reddens the gate on a commit that touched neither the stylesheet
+//      nor a template. Observed 2026-07-28: `.epic-remaining-review` appeared and `.sprint-lane-empty`
+//      vanished in the same run, from sprint work alone.
+//   2. SILENT STYLE LOSS — the worse half. The committed sheet carried only the four `epic-remaining-*`
+//      variants that happened to exist at extraction time, so when an epic first entered review its
+//      dashboard tile rendered with NO `border-left-color` rule at all. Nothing failed; the tile was just
+//      quietly unstyled until somebody regenerated.
+//
+// The fix is to seed the CLOSED DOMAIN a class is drawn from rather than the subset observed today. A rule
+// is still carried only when EVERY class it names is present, so seeding is self-limiting: seeding
+// `deferred` cannot carry `.req-card.deferred` onto a migrated page that has no `.req-card`.
+//
+// ⚠️ THIS IS A HAND-MAINTAINED DUPLICATE of vocabularies authored in C# (`StatusStyles.LegendStages`,
+// `SprintTemplater.BoardColumns`), and duplicating a list is the same class of defect it fixes — it goes
+// stale when a stage is added. It is deliberate and temporary: the durable form has the C# side publish
+// these domains into the IR so this file reads them instead. See ADR 0026. Until that lands, a new stage
+// must be added HERE as well as in `StatusStyles`.
+
+/**
+ * Every canonical lifecycle stage token, from `StatusStyles.LegendStages` — the superset of `StoryStages`
+ * and `EpicStages`. These appear BARE alongside a base class (`.status-badge.review`, `.donut-seg.done`,
+ * `.sprint-card.active`, `.now-next-card.ready`), so seeding the tokens themselves covers those families.
+ */
+export const STAGES = [
+  'pending', 'drafted', 'ready', 'active', 'review', 'done',
+  'deferred', 'unmapped', 'retired', 'unrecognized',
+]
+
+/**
+ * Families that build a COMPOUND class name from a stage token. Each entry is a `%s` template; the stage is
+ * substituted in. Unlike the bare tokens above, no amount of markup harvesting finds `.epic-remaining-review`
+ * unless an epic is in review at extraction time — which is exactly the bug.
+ */
+export const STAGE_CLASS_TEMPLATES = [
+  'epic-remaining-%s', // Charts.cs — dashboard "remaining work" tiles, keyed on ForEpicWithRetrospective
+  'dn-%s-item', //        Charts.cs — donut legend row
+  'sb-%s-item', //        Charts.cs — stacked-bar legend row
+  'sb-%s-sw', //          Charts.cs — stacked-bar legend swatch
+  'list-row-accent-%s', // StatusStyles.AdrAccentToken — list-row left accent bar
+]
+
+/**
+ * Classes emitted only when a data condition holds on a MIGRATED surface, and therefore absent from a
+ * harvest taken while that condition is false. Not a general "every empty state" list — these are the ones
+ * the four migrated families can render.
+ *
+ * `sprint-lane-empty` is the worked example: `SprintTemplater` emits it only `if (col.Count == 0)`, so a
+ * board with every lane populated drops twelve declarations of dashed-border empty-state styling from the
+ * generated layer, and the next genuinely empty lane renders bare.
+ */
+export const CONDITIONAL_CLASSES = [
+  'sprint-lane-empty', //   SprintTemplater — a board column with no cards
+  'sprint-filter-empty', // SprintTemplater — the epic filter emptied a lane
+  'sprint-lane-more', //    SprintTemplater — per-column cap overflow
+  'unplanned-card', //      SprintTemplater — ledger entries with no story artifact
+  'chart-empty', //         Charts — a chart with nothing to plot
+]
+
+/** Every class name the seeding above contributes, flattened. */
+export const conditionalClassNames = () => [
+  ...STAGES,
+  ...STAGE_CLASS_TEMPLATES.flatMap((t) => STAGES.map((s) => t.replace('%s', s))),
+  ...CONDITIONAL_CLASSES,
+]
+
 // ── A small, comment-aware CSS reader ────────────────────────────────────────────────────────────────────
 //
 // No npm CSS parser: `web/` runs on nuxt + vue + vue-router and the vendored Plotly build, and ADR 0010's

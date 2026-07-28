@@ -10,11 +10,11 @@
     "epics/story-{id}.html"
   ],
   "stats": {
-    "carriedRules": 865,
-    "carriedSelectors": 987,
+    "carriedRules": 873,
+    "carriedSelectors": 995,
     "carriedKeyframes": 4,
     "droppedRoot": 4,
-    "generatedBytes": 110065
+    "generatedBytes": 110745
   },
   "rules": [
     {
@@ -1570,6 +1570,10 @@
       "carried": true
     },
     {
+      "selector": ".epic-remaining-review",
+      "carried": true
+    },
+    {
       "selector": ".epic-remaining-active",
       "carried": true
     },
@@ -1582,7 +1586,15 @@
       "carried": true
     },
     {
+      "selector": ".epic-remaining-pending",
+      "carried": true
+    },
+    {
       "selector": ".epic-remaining-done",
+      "carried": true
+    },
+    {
+      "selector": ".epic-remaining-unrecognized",
       "carried": true
     },
     {
@@ -2273,6 +2285,10 @@
     },
     {
       "selector": ".mini-donut .donut-track, .mini-donut .donut-seg",
+      "carried": true
+    },
+    {
+      "selector": ".chart-empty",
       "carried": true
     },
     {
@@ -3506,6 +3522,22 @@
     },
     {
       "selector": ".followup-row",
+      "carried": true
+    },
+    {
+      "selector": ".list-row-accent-done",
+      "carried": true
+    },
+    {
+      "selector": ".list-row-accent-pending",
+      "carried": true
+    },
+    {
+      "selector": ".list-row-accent-deferred",
+      "carried": true
+    },
+    {
+      "selector": ".list-row-accent-ready",
       "carried": true
     },
     {

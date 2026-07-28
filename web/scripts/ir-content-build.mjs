@@ -4,6 +4,7 @@
 
 import { readFileSync } from 'node:fs'
 import {
+  conditionalClassNames,
   isMigrated,
   readBlocks,
   scopePrelude,
@@ -66,6 +67,14 @@ export async function buildIrContentCss() {
   used.elements.add('html')
   used.elements.add('body')
   used.elements.add('main')
+
+  // Classes the migrated families CAN render but happen not to be rendering in this IR — status stages with
+  // no member today, empty states whose lane is currently full. Seeded from their closed domains rather than
+  // harvested, because harvesting them makes both this file and the gate a function of project DATA: the
+  // sheet loses `.epic-remaining-review` styling until an epic enters review, and CI reddens the day one
+  // does. See the CONDITIONAL_CLASSES block in ir-content-lib.mjs for the full rationale and ADR 0026 for
+  // the durable fix. This is what makes the layer a function of the TEMPLATES, not of the sprint.
+  for (const name of conditionalClassNames()) used.classes.add(name)
 
   // ── 2. Carry the matching rules ────────────────────────────────────────────────────────────────────────
   const source = readFileSync(SOURCE_CSS, 'utf8').replace(/\r\n/g, '\n')
