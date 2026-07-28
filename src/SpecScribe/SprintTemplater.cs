@@ -79,6 +79,12 @@ public static class SprintTemplater
         StoryStageCounts(ProjectCounts.Build(ProgressModel.Empty, sprint, WorkInventory.Empty));
 
     public static string RenderIndex(SprintStatus sprint, EpicsModel? epics, SiteNav nav, CommandCatalog commands,
+        IReadOnlyList<RetroModel>? retros = null, ProjectCounts? counts = null, UnplannedWorkGeometry? unplanned = null) =>
+        HtmlRenderAdapter.Shared.Render(BuildIndexPage(sprint, epics, nav, commands, retros, counts, unplanned)).Content;
+
+    /// <summary>Builds this page's host-neutral <see cref="PageView"/> — see
+    /// <see cref="RiskQuadrantTemplater.BuildPage"/> for why every standalone templater grew one. [Story 23.4 AC #3]</summary>
+    public static PageView BuildIndexPage(SprintStatus sprint, EpicsModel? epics, SiteNav nav, CommandCatalog commands,
         IReadOnlyList<RetroModel>? retros = null, ProjectCounts? counts = null, UnplannedWorkGeometry? unplanned = null)
     {
         var ledger = counts ?? ProjectCounts.Build(ProgressModel.Empty, sprint, WorkInventory.Empty);
@@ -86,14 +92,6 @@ public static class SprintTemplater
         var prefix = PathUtil.RelativePrefix(outputPath); // "" — sprint.html is at the output root.
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen(
-            $"Sprint Status — {nav.SiteTitle}",
-            prefix + ForgeOptions.StylesheetName,
-            prefix + ForgeOptions.ScriptName,
-            $"Sprint delivery status for {nav.SiteTitle} — a board of every epic and story by lifecycle stage."));
-        sb.Append(nav.RenderNavBar(outputPath, nav.BuildDeliveryLocalContext(outputPath)));
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[] { ("Home", "index.html"), ("Sprint Status", null) }));
-
         var epicCount = ledger.EpicsTracked;
         var storyCount = ledger.StoriesTracked;
         var updated = sprint.LastUpdated is { Length: > 0 } lu ? $" &middot; updated {PathUtil.Html(lu)}" : string.Empty;
@@ -128,9 +126,24 @@ public static class SprintTemplater
         AppendBoardViews(sb, sprint, epics, prefix, commands, unplanned);
 
         sb.Append("</main>\n\n");
-        sb.Append(PathUtil.RenderFooter());
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+
+        return new PageView
+        {
+            Kind = PageKind.Sprint,
+            OutputRelativePath = outputPath,
+            Title = $"Sprint Status — {nav.SiteTitle}",
+            MetaDescription = $"Sprint delivery status for {nav.SiteTitle} — a board of every epic and story by lifecycle stage.",
+            Nav = nav.ToNavigationView(outputPath, nav.BuildDeliveryLocalContext(outputPath)),
+            Breadcrumb = BreadcrumbTrail.From(new (string, string?)[] { ("Home", "index.html"), ("Sprint Status", null) }),
+            Assets = new AssetManifest
+            {
+                StylesheetHref = prefix + ForgeOptions.StylesheetName,
+                ScriptHref = prefix + ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+            },
+            Interaction = InteractionState.None,
+            BodyHtml = sb.ToString(),
+        };
     }
 
     /// <summary>Epics that should be selected by default on sprint boards: any epic with ≥1 story in

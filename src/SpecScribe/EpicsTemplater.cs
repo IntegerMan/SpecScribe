@@ -47,6 +47,8 @@ public static class EpicsTemplater
                 // miss one it does. Omitting it was silent: the page rendered, the island shipped, the twin stood
                 // in, and only a live browser showed the chart never mounting.
                 HierarchyEngineNeeded = HierarchyExplorer.ContainsHost(body),
+                // Both: this family emits the boot marker INLINE (pre-body) and pulls the engine. [Story 23.4]
+                HierarchyBootInline = HierarchyExplorer.ContainsHost(body),
             },
             Interaction = new InteractionState
             {
@@ -108,6 +110,8 @@ public static class EpicsTemplater
                 // miss one it does. Omitting it was silent: the page rendered, the island shipped, the twin stood
                 // in, and only a live browser showed the chart never mounting.
                 HierarchyEngineNeeded = HierarchyExplorer.ContainsHost(body),
+                // Both: this family emits the boot marker INLINE (pre-body) and pulls the engine. [Story 23.4]
+                HierarchyBootInline = HierarchyExplorer.ContainsHost(body),
             },
             Interaction = new InteractionState
             {
@@ -212,6 +216,8 @@ public static class EpicsTemplater
                 // miss one it does. Omitting it was silent: the page rendered, the island shipped, the twin stood
                 // in, and only a live browser showed the chart never mounting.
                 HierarchyEngineNeeded = HierarchyExplorer.ContainsHost(body),
+                // Both: this family emits the boot marker INLINE (pre-body) and pulls the engine. [Story 23.4]
+                HierarchyBootInline = HierarchyExplorer.ContainsHost(body),
             },
             Interaction = new InteractionState
             {
@@ -273,6 +279,8 @@ public static class EpicsTemplater
                 // miss one it does. Omitting it was silent: the page rendered, the island shipped, the twin stood
                 // in, and only a live browser showed the chart never mounting.
                 HierarchyEngineNeeded = HierarchyExplorer.ContainsHost(body),
+                // Both: this family emits the boot marker INLINE (pre-body) and pulls the engine. [Story 23.4]
+                HierarchyBootInline = HierarchyExplorer.ContainsHost(body),
             },
             Interaction = new InteractionState
             {

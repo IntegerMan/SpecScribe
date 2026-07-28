@@ -4,7 +4,7 @@ baseline_commit: 611097d
 
 # Story 20.8: Dashboard Details Pane — `select` Mode in Practice
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -306,6 +306,50 @@ completes it for the remaining selectable wedges (D3) and must **re-verify it li
 ### Review Findings
 
 *(populated by code-review at epic end — Epic 20's review runs once every story is complete and the owner is satisfied)*
+
+**Code review (2026-07-28), scoped to this story's own File List** (commit `c1a6ee5` isolated from the wider
+`bcca682..c1a6ee5` range, which would have pulled in sibling stories 20.5/20.7/22.2/23.2's own edits to the shared
+`specscribe.js`/`.css` files). Three parallel layers (Blind Hunter, Edge Case Hunter, Acceptance Auditor vs. AC
+#1-3/D1-D3/ADR 0012§3/ADR 0013), findings deduplicated and read against the current source before rating.
+
+- [x] [Review][Patch] `data-related-alias` is silently dropped when a canonical redirect target's card is built via
+      either fallback pass instead of the primary draw-order loop [`src/SpecScribe/RelatedWorkCards.cs:192-214`] —
+      only the `orderedIds` loop (:174-184) consults `aliasesByCanonical`; the "undrawn work-graph nodes" pass and
+      the `epicFoldOrder` fallback pass both called `BuildCard` directly and never attached `Aliases`. Reachable
+      whenever a dense epic's own wedge isn't drawn but its `~summary` roll-up is selectable (i.e.
+      `expandDenseEpics: false`) — exactly the shape the Dev Agent Record admits is untested live because this
+      portal always passes `expandDenseEpics: true`. **Fixed:** both fallback passes now consult
+      `aliasesByCanonical` the same way the primary loop does.
+- [x] [Review][Patch] Stale/phantom epic fold-host handling was inconsistent
+      [`src/SpecScribe/RelatedWorkCards.cs:207-214,318-329`]: (a) when `FoldHostFor` derives an epic host with no
+      matching `EpicInfo` AND no work-graph node, `BuildCard` fell through to `if (payload is null) return null;`
+      and the entire folded story-subject list for that host was silently discarded; (b) when the graph *did* carry
+      a node for that phantom epic (the `known is not null` branch), the card's "N related items" summary was
+      computed from `known.EntryCount` before the fold, then folded subjects were appended after without
+      recomputing the count — so the displayed count undercounted what actually rendered. **Fixed:** (b) the count
+      is now computed after folding; (a) a new fallback branch materializes a minimal card
+      (`HostLabelFor` + `EmptyRelationships(...) with { Subjects = orphanFolded }`) for a fold host that resolves
+      to neither a real epic nor a graph node, mirroring `RelatedWork.Build`'s own `HostLabel` reasoning, instead
+      of dropping the content.
+- [x] [Review][Patch] D1's fold only copied a story node's `Groups` into the epic's `RelatedWorkSubject`, never its
+      `Subjects` [`src/SpecScribe/RelatedWorkCards.cs:124-139`, `node.Groups.Where(...)` at :130]. `RelatedWork.Build`
+      can itself attach non-empty `Subjects` to a WEDGED story node (`RelatedWork.cs:186-233`) when that story is
+      the nearest wedged ancestor of an unwedged descendant (deferred/action/spec item) — a real shape whenever a
+      story is drawn but its epic's own wedge collapsed. When that story's card goes empty under D1 and its content
+      moves to the epic, those upstream-folded `Subjects` were silently dropped rather than carried forward.
+      **Fixed:** the fold loop now also carries `node.Subjects` into the epic host's list, and no longer skips a
+      node whose `Groups` are empty but whose `Subjects` are not.
+
+**Patches verified:** `dotnet build` 0 errors; `dotnet test --filter "RelatedWork|SiteGeneratorSpa|SiteGeneratorAdapter"`
+73/73 passed, including the golden-fingerprint test — confirming these fixes only change currently-unexercised
+fallback paths (dense-epic-collapsed / stale-epic-number shapes) and don't alter this portal's shipped output.
+- [x] [Review][Defer] Two files on this story's own declared File List — `src/SpecScribe/assets/specscribe.css`
+      (the ~120-line "FORGED IDEAS (Story 18.4)" block) and `.claude/launch.json` (the `ideas-18-4` /
+      `ideas-18-4-jsoff` launch entries, one pointing at another session's now-gone scratch path) — carry
+      substantial Story 18.4 content bundled into the same landing commit, even though this story's File List
+      states sibling-story content was "excluded here." Not a defect in this story's own implementation; flagged
+      so a future review scoping by this File List knows those two files aren't cleanly 20.8-only. — deferred,
+      pre-existing (an artifact of landing concurrent sessions' work in one commit, per CLAUDE.md § Concurrent work)
 
 ---
 

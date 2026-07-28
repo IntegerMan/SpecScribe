@@ -120,22 +120,18 @@ public sealed record ProductMetadata(
 /// to <see cref="SiteNav.DiagnosticsOutputPath"/>. A small, static informational page (no JS). [Story 4.8 Task 5]</summary>
 public static class AboutTemplater
 {
-    public static string RenderPage(SiteNav nav)
+    public static string RenderPage(SiteNav nav) =>
+        HtmlRenderAdapter.Shared.Render(BuildPage(nav)).Content;
+
+    /// <summary>Builds this page's host-neutral <see cref="PageView"/> — see
+    /// <see cref="HowToReadTemplater.BuildPage"/> for why the body starts at the doc-header, not the landmark.
+    /// [Story 23.4 AC #3]</summary>
+    public static PageView BuildPage(SiteNav nav)
     {
         var outputPath = SiteNav.AboutOutputPath; // "" prefix — about.html is at the output root.
         var meta = ProductMetadata.FromAssembly();
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen(
-            $"About — {nav.SiteTitle}",
-            ForgeOptions.StylesheetName, ForgeOptions.ScriptName,
-            $"About SpecScribe, the generator behind {nav.SiteTitle}'s documentation portal."));
-        sb.Append(nav.RenderNavBar(outputPath));
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
-        {
-            ("Home", SiteNav.HomeOutputPath),
-            ("About", null),
-        }));
 
         // A "Preview" badge beside the title whenever the version is a pre-release, so the pre-release nature is
         // unmistakable at a glance (not just a "-preview" suffix that's easy to miss).
@@ -173,8 +169,26 @@ public static class AboutTemplater
         sb.Append("</section>\n");
         sb.Append("</main>\n\n");
 
-        sb.Append(PathUtil.RenderFooter());
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+        return new PageView
+        {
+            Kind = PageKind.About,
+            OutputRelativePath = outputPath,
+            Title = $"About — {nav.SiteTitle}",
+            MetaDescription = $"About SpecScribe, the generator behind {nav.SiteTitle}'s documentation portal.",
+            Nav = nav.ToNavigationView(outputPath),
+            Breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
+            {
+                ("Home", SiteNav.HomeOutputPath),
+                ("About", null),
+            }),
+            Assets = new AssetManifest
+            {
+                StylesheetHref = ForgeOptions.StylesheetName,
+                ScriptHref = ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+            },
+            Interaction = InteractionState.None,
+            BodyHtml = sb.ToString(),
+        };
     }
 }

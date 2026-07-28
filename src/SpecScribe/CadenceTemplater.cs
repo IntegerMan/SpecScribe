@@ -17,7 +17,12 @@ public static class CadenceTemplater
     /// the heatmap grid and the strip's recent-window so a from-scratch regen on unchanged inputs is byte-identical.
     /// <paramref name="data"/> is <see cref="DeliveryCadenceData.Empty"/> (not null) when there is simply nothing to
     /// chart yet.</summary>
-    public static string RenderPage(DeliveryCadenceData data, SiteNav nav, DateOnly today)
+    public static string RenderPage(DeliveryCadenceData data, SiteNav nav, DateOnly today) =>
+        HtmlRenderAdapter.Shared.Render(BuildPage(data, nav, today)).Content;
+
+    /// <summary>Builds this page's host-neutral <see cref="PageView"/> — see
+    /// <see cref="RiskQuadrantTemplater.BuildPage"/> for why every standalone templater grew one. [Story 23.4 AC #3]</summary>
+    public static PageView BuildPage(DeliveryCadenceData data, SiteNav nav, DateOnly today)
     {
         var outputPath = SiteNav.CadenceOutputPath;
         var prefix = PathUtil.RelativePrefix(outputPath); // "" — cadence.html is at the output root.
@@ -27,14 +32,6 @@ public static class CadenceTemplater
         Func<StoryInfo, string?> storyHref = s => prefix + (s.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(s.Id));
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen(
-            $"Delivery Cadence — {nav.SiteTitle}",
-            prefix + ForgeOptions.StylesheetName,
-            prefix + ForgeOptions.ScriptName,
-            $"Delivery cadence for {nav.SiteTitle} — when stories reached done over time, plus story cycle-time where it can be derived from git history."));
-        sb.Append(nav.RenderNavBar(outputPath, nav.BuildDeliveryLocalContext(outputPath)));
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[] { ("Home", "index.html"), ("Delivery Cadence", null) }));
-
         sb.Append("<main id=\"main-content\" class=\"dashboard\">\n\n");
         sb.Append("<h1>Delivery Cadence</h1>\n");
         sb.Append($"<p class=\"doc-subtitle\">{PathUtil.Html(nav.SiteTitle)} &middot; how story completions have flowed over time</p>\n\n");
@@ -72,8 +69,23 @@ public static class CadenceTemplater
             Charts.CycleTimeHistogram(data.CycleTimes)));
 
         sb.Append("</main>\n\n");
-        sb.Append(PathUtil.RenderFooter());
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+
+        return new PageView
+        {
+            Kind = PageKind.Structure,
+            OutputRelativePath = outputPath,
+            Title = $"Delivery Cadence — {nav.SiteTitle}",
+            MetaDescription = $"Delivery cadence for {nav.SiteTitle} — when stories reached done over time, plus story cycle-time where it can be derived from git history.",
+            Nav = nav.ToNavigationView(outputPath, nav.BuildDeliveryLocalContext(outputPath)),
+            Breadcrumb = BreadcrumbTrail.From(new (string, string?)[] { ("Home", "index.html"), ("Delivery Cadence", null) }),
+            Assets = new AssetManifest
+            {
+                StylesheetHref = prefix + ForgeOptions.StylesheetName,
+                ScriptHref = prefix + ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+            },
+            Interaction = InteractionState.None,
+            BodyHtml = sb.ToString(),
+        };
     }
 }

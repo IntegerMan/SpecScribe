@@ -18,7 +18,14 @@ namespace SpecScribe;
 /// [Story 21.3]</summary>
 public static class ImpactMapTemplater
 {
-    public static string RenderPage(EpicsModel epics, PlanningCodeImpactData data, SiteNav nav)
+    public static string RenderPage(EpicsModel epics, PlanningCodeImpactData data, SiteNav nav) =>
+        HtmlRenderAdapter.Shared.Render(BuildPage(epics, data, nav)).Content;
+
+    /// <summary>Builds this page's host-neutral <see cref="PageView"/> — see
+    /// <see cref="RiskQuadrantTemplater.BuildPage"/> for why every standalone templater grew one. This page is why
+    /// <see cref="AssetManifest.ExtraHead"/> and <see cref="AssetManifest.HierarchyBootInline"/> are separate
+    /// flags: its boot marker rides the HEAD, not the pre-body slot. [Story 23.4 AC #3]</summary>
+    public static PageView BuildPage(EpicsModel epics, PlanningCodeImpactData data, SiteNav nav)
     {
         var outputPath = SiteNav.ImpactMapOutputPath;
         var prefix = PathUtil.RelativePrefix(outputPath); // "" — impact-map.html is at the output root.
@@ -72,15 +79,6 @@ public static class ImpactMapTemplater
         var hasChart = HierarchyExplorer.ContainsHost(explorerHtml);
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen(
-            $"Impact Map — {nav.SiteTitle}",
-            prefix + ForgeOptions.StylesheetName,
-            prefix + ForgeOptions.ScriptName,
-            $"Planning-to-code impact map for {nav.SiteTitle} — an interactive treemap of which code areas each epic's commits touched, sized by churn and colored by commit activity.",
-            extraHead: hasChart ? HierarchyExplorer.BootScript : null));
-        sb.Append(nav.RenderNavBar(outputPath, nav.BuildDeliveryLocalContext(outputPath)));
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[] { ("Home", "index.html"), ("Impact Map", null) }));
-
         sb.Append("<main id=\"main-content\" class=\"dashboard\">\n\n");
         sb.Append("<h1>Planning &#8596; Code Impact Map</h1>\n");
         sb.Append($"<p class=\"doc-subtitle\">{PathUtil.Html(nav.SiteTitle)} &middot; the code areas each epic's work actually touched</p>\n\n");
@@ -107,18 +105,31 @@ public static class ImpactMapTemplater
         }
 
         sb.Append("</main>\n\n");
-        sb.Append(PathUtil.RenderFooter());
-        // The vendored plotly.js hierarchy engine. This page builds its own document rather than going through
-        // PageView/AssetManifest, so the flag-driven emission in HtmlRenderAdapter never reaches it — the engine
-        // is appended here on the same terms: AFTER the body, a local file reference, never a CDN (NFR-3).
-        // Conditional on the block actually carrying a host, so a deep-git-less run that renders the honest empty
-        // note ships no engine it cannot use. [Story 20.7 Task 7]
-        if (hasChart)
+
+        return new PageView
         {
-            sb.Append($"<script src=\"{prefix}{ForgeOptions.HierarchyEngineScriptName}\"></script>\n");
-        }
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+            Kind = PageKind.Structure,
+            OutputRelativePath = outputPath,
+            Title = $"Impact Map — {nav.SiteTitle}",
+            MetaDescription = $"Planning-to-code impact map for {nav.SiteTitle} — an interactive treemap of which code areas each epic's commits touched, sized by churn and colored by commit activity.",
+            Nav = nav.ToNavigationView(outputPath, nav.BuildDeliveryLocalContext(outputPath)),
+            Breadcrumb = BreadcrumbTrail.From(new (string, string?)[] { ("Home", "index.html"), ("Impact Map", null) }),
+            Assets = new AssetManifest
+            {
+                StylesheetHref = prefix + ForgeOptions.StylesheetName,
+                ScriptHref = prefix + ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+                // The boot marker rides the HEAD here (Story 21.3's convention), never the pre-body slot — hence
+                // ExtraHead rather than HierarchyBootInline. The engine <script src> still lands AFTER the body,
+                // a local file reference, never a CDN (NFR-3). Both conditional on the block actually carrying a
+                // host, so a deep-git-less run that renders the honest empty note ships no engine it cannot use.
+                // [Story 20.7 Task 7; Story 23.4 AC #3]
+                ExtraHead = hasChart ? HierarchyExplorer.BootScript : null,
+                HierarchyEngineNeeded = hasChart,
+            },
+            Interaction = InteractionState.None,
+            BodyHtml = sb.ToString(),
+        };
     }
 
     /// <summary>DOM id of this page's Hierarchy Explorer instance.</summary>

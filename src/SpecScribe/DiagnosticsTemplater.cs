@@ -193,22 +193,17 @@ public sealed record DiagnosticsConfig
     /// site-wide Help nav group and the footer → About path. [Story 4.8 Task 4; Help nav]</summary>
 public static class DiagnosticsTemplater
 {
-    public static string RenderPage(IReadOnlyList<DiagnosticNotice> notices, DiagnosticsConfig config, SiteNav nav)
+    public static string RenderPage(IReadOnlyList<DiagnosticNotice> notices, DiagnosticsConfig config, SiteNav nav) =>
+        HtmlRenderAdapter.Shared.Render(BuildPage(notices, config, nav)).Content;
+
+    /// <summary>Builds this page's host-neutral <see cref="PageView"/> — see
+    /// <see cref="HowToReadTemplater.BuildPage"/> for why the body starts at the doc-header, not the landmark.
+    /// [Story 23.4 AC #3]</summary>
+    public static PageView BuildPage(IReadOnlyList<DiagnosticNotice> notices, DiagnosticsConfig config, SiteNav nav)
     {
         var outputPath = SiteNav.DiagnosticsOutputPath;
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen(
-            $"Generation Diagnostics — {nav.SiteTitle}",
-            ForgeOptions.StylesheetName, ForgeOptions.ScriptName,
-            $"Run log and effective configuration for {nav.SiteTitle}'s last full generation."));
-        sb.Append(nav.RenderNavBar(outputPath));
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
-        {
-            ("Home", SiteNav.HomeOutputPath),
-            ("About", SiteNav.AboutOutputPath),
-            ("Diagnostics", null),
-        }));
 
         var noticeWord = Charts.Plural(notices.Count, "notice", "notices");
         sb.Append("<header class=\"doc-header\">\n");
@@ -222,9 +217,28 @@ public static class DiagnosticsTemplater
         sb.Append(RenderConfig(config));
         sb.Append("</main>\n\n");
 
-        sb.Append(PathUtil.RenderFooter());
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+        return new PageView
+        {
+            Kind = PageKind.Diagnostics,
+            OutputRelativePath = outputPath,
+            Title = $"Generation Diagnostics — {nav.SiteTitle}",
+            MetaDescription = $"Run log and effective configuration for {nav.SiteTitle}'s last full generation.",
+            Nav = nav.ToNavigationView(outputPath),
+            Breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
+            {
+                ("Home", SiteNav.HomeOutputPath),
+                ("About", SiteNav.AboutOutputPath),
+                ("Diagnostics", null),
+            }),
+            Assets = new AssetManifest
+            {
+                StylesheetHref = ForgeOptions.StylesheetName,
+                ScriptHref = ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+            },
+            Interaction = InteractionState.None,
+            BodyHtml = sb.ToString(),
+        };
     }
 
     /// <summary>The notices table — one row per notice — or, when there are none, the all-clear panel (so a

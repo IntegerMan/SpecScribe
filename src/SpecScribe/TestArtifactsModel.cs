@@ -154,6 +154,16 @@ public sealed record TestTraceSummary
 
     /// <summary>Present only on a gate-eligible run — see the type summary.</summary>
     public string? GateStatus { get; init; }
+
+    /// <summary>The <c>gate_criteria</c> sub-object's <c>p0_status</c>/<c>p1_status</c>/<c>overall_status</c> —
+    /// present only alongside <see cref="GateStatus"/> on a gate-eligible run. Read here so a repo with a trace
+    /// summary and no separate <c>gate-decision.json</c> still shows the P0/P1 breakdown rather than the bare
+    /// gate word alone; the data was already parsed into memory either way. [Review][Patch]</summary>
+    public string? P0Status { get; init; }
+
+    public string? P1Status { get; init; }
+
+    public string? OverallStatus { get; init; }
 }
 
 /// <summary>One row of TEA's Detailed Mapping: an oracle item, how well it is covered, and by how many tests.
@@ -247,10 +257,15 @@ public sealed record TestArtifactsModel
     /// — the panel then shows coverage without a verdict rather than inventing one.</summary>
     public string? GateWord => Gate?.Status ?? Trace?.GateStatus ?? Matrix.GateStatus;
 
+    /// <summary>Tier → render-rank, computed once rather than re-allocating a list and linear-scanning it with
+    /// <c>IndexOf</c> per artifact inside the <see cref="Ordered"/> comparator. [Review][Patch]</summary>
+    private static readonly IReadOnlyDictionary<CoverageTier, int> TierRank =
+        CoverageTiers.Order.Select((tier, rank) => (tier, rank)).ToDictionary(x => x.tier, x => x.rank);
+
     /// <summary>Artifacts in render order: tier group (Summarized → Rendered → Unsupported), then path, so a
     /// from-scratch regeneration is byte-identical.</summary>
     public IReadOnlyList<TestArtifactEntry> Ordered => Artifacts
-        .OrderBy(a => CoverageTiers.Order.ToList().IndexOf(a.Tier))
+        .OrderBy(a => TierRank[a.Tier])
         .ThenBy(a => a.SourceRelative, StringComparer.Ordinal)
         .ToList();
 }
@@ -453,6 +468,8 @@ public static class TestArtifactDerivation
             var inventory = coverage is { } c1 ? Obj(c1, "inventory") : null;
             var tests = Obj(root, "tests");
             var risk = Obj(root, "risk_summary");
+            // Present only alongside gate_status, on a gate-eligible run (same upstream `if (gateEligible)` guard).
+            var gateCriteria = Obj(root, "gate_criteria");
 
             summary = new TestTraceSummary
             {
@@ -469,6 +486,9 @@ public static class TestArtifactDerivation
                 TestCases = tests is { } t2 ? Int(t2, "cases") : null,
                 CriticalOpen = risk is { } r ? Int(r, "critical_open") : null,
                 GateStatus = Str(root, "gate_status")?.Trim().ToUpperInvariant(),
+                P0Status = gateCriteria is { } gc1 ? Str(gc1, "p0_status")?.Trim().ToUpperInvariant() : null,
+                P1Status = gateCriteria is { } gc2 ? Str(gc2, "p1_status")?.Trim().ToUpperInvariant() : null,
+                OverallStatus = gateCriteria is { } gc3 ? Str(gc3, "overall_status")?.Trim().ToUpperInvariant() : null,
             };
             return TeaJsonOutcome.Parsed;
         }
@@ -532,12 +552,24 @@ public static class TestArtifactDerivation
             string? openId = null, openDescription = null, openPriority = null, openCoverage = null;
             var openTestCount = 0;
             var inTestsBlock = false;
+            // Scopes TryReadPriorityRow to the "Coverage Summary" table only. Any `|`-prefixed line anywhere in
+            // the document used to be tried as a priority row — currently safe only because the sibling
+            // "Coverage by Test Level" table's row labels (E2E/API/Component/Unit) don't collide with the
+            // `P<digit>` shape it matches on, an incidental save rather than a structural guard. [Review][Patch]
+            var inCoverageSummary = false;
 
             void CloseOpenCriterion()
             {
                 if (openId is null) return;
+                // A missing OR unrecognized "- **Coverage:**" bullet both leave `openCoverage` null (see
+                // TryReadCoverageBullet) and used to default to "NONE" here — asserting zero coverage, a
+                // substantive claim, rather than admitting the value could not be read. "UNRECOGNIZED" is not one
+                // of the five words TryReadCoverageBullet accepts, so CoverageBadge's own fallback branch renders
+                // it distinctly (an "unrecognized" style, the word shown verbatim) instead of the "NONE" styling
+                // a real explicit NONE gets — an honest gap rather than a fabricated coverage claim, matching
+                // this story's own design principle. [Review][Patch]
                 criteria.Add(new TeaCriterionCoverage(
-                    openId, openDescription ?? string.Empty, openCoverage ?? "NONE", openPriority, openTestCount));
+                    openId, openDescription ?? string.Empty, openCoverage ?? "UNRECOGNIZED", openPriority, openTestCount));
                 openId = null; openDescription = null; openPriority = null; openCoverage = null;
                 openTestCount = 0; inTestsBlock = false;
             }
@@ -550,6 +582,7 @@ public static class TestArtifactDerivation
                 if (trimmed.StartsWith("#### ", StringComparison.Ordinal))
                 {
                     CloseOpenCriterion();
+                    inCoverageSummary = false;
                     if (TryReadCriterionHeading(trimmed[5..].Trim(), out var id, out var desc, out var priority))
                     {
                         openId = id; openDescription = desc; openPriority = priority;
@@ -560,6 +593,7 @@ public static class TestArtifactDerivation
                 if (trimmed.StartsWith("#", StringComparison.Ordinal))
                 {
                     CloseOpenCriterion();
+                    inCoverageSummary = trimmed.Contains("Coverage Summary", StringComparison.OrdinalIgnoreCase);
                     // "### GATE DECISION: CONCERNS" — the Phase 2 verdict as an h3. The template's own
                     // placeholder line reads "{PASS | CONCERNS | FAIL | WAIVED}", which TryReadGateWord rejects.
                     if (TryReadGateWord(trimmed, out var word)) gate = word;
@@ -577,7 +611,7 @@ public static class TestArtifactDerivation
                     continue;
                 }
 
-                if (TryReadPriorityRow(trimmed, out var row)) priorities.Add(row!);
+                if (inCoverageSummary && TryReadPriorityRow(trimmed, out var row)) priorities.Add(row!);
             }
 
             CloseOpenCriterion();
@@ -630,14 +664,21 @@ public static class TestArtifactDerivation
         value.StartsWith('{') && value.EndsWith('}');
 
     /// <summary>Reads <c>{CRITERION_ID}: {DESCRIPTION} ({PRIORITY})</c>. Rejects the template's own placeholder
-    /// heading and its two worked <c>Example:</c> blocks.</summary>
+    /// heading and its two worked <c>Example:</c> blocks.
+    /// <para>Splits on the first <c>": "</c> (colon-SPACE), not the first bare colon: <see cref="ResolveJoinTarget"/>
+    /// accepts <c>:</c> as one of the compound-id separators a criterion id may carry internally (e.g.
+    /// <c>18.4:AC-2</c>), and the template's own id/description boundary is always colon-space by construction.
+    /// A bare first-colon split would cut a colon-separated compound id in half. Falls back to the first bare
+    /// colon when no colon-space exists, so a template deviating from its own convention still parses.
+    /// [Review][Patch]</para></summary>
     private static bool TryReadCriterionHeading(string heading, out string id, out string description, out string? priority)
     {
         id = string.Empty; description = string.Empty; priority = null;
         if (heading.Length == 0) return false;
         if (heading.StartsWith("Example:", StringComparison.OrdinalIgnoreCase)) return false;
 
-        var colon = heading.IndexOf(':');
+        var colon = heading.IndexOf(": ", StringComparison.Ordinal);
+        if (colon < 0) colon = heading.IndexOf(':');
         if (colon <= 0) return false;
 
         var rawId = heading[..colon].Trim();

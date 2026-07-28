@@ -280,7 +280,9 @@ public class TestArtifactDiscoveryTests : IDisposable
         var notice = Assert.Single(diagnostics);
         Assert.Equal(AdapterDiagnosticCategory.Informational, notice.Category);
         // Story 18.5 non-goal: reading _bmad/tea/config.yaml to tell "overridden path" from "never run" apart.
-        Assert.Contains("points outside this tree", notice.Message);
+        // Review patch: the message no longer claims to know WHERE the path resolves (a nested-but-inside-tree
+        // directory is indistinguishable from a genuinely overridden one to this non-recursive, name-only scan).
+        Assert.Contains("this scan does not look", notice.Message);
         Assert.Equal(DiagnosticAnchorRoot.Source, notice.Anchor);
     }
 

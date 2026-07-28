@@ -50,17 +50,20 @@ public static class TestArtifactDiscovery
             var artifactsRoot = FindArtifactsRoot(sourceRoot);
             if (artifactsRoot is null)
             {
-                // The module is installed but its declared output directory is not inside the scanned source tree.
-                // Either `test_artifacts` was overridden to a path outside SourceRoot, or no TEA workflow has run
-                // yet. Reading `_bmad/tea/config.yaml` to tell those apart is an explicit non-goal — it needs the
-                // same cross-cutting config-reading decision Story 18.4 defers for `forge_output_path` — so this
-                // states what is observable and stops. One Informational notice, and nothing else. [Story 18.5]
+                // The module is installed but no directly-named `test-artifacts/` directory was found one level
+                // under the source root. Either `test_artifacts` was overridden to a different path (inside or
+                // outside SourceRoot), no TEA workflow has run yet, or the directory exists but nested deeper than
+                // this scan looks. Reading `_bmad/tea/config.yaml` to tell those apart is an explicit non-goal — it
+                // needs the same cross-cutting config-reading decision Story 18.4 defers for `forge_output_path` —
+                // so this states only what is actually observable (found vs not-found-at-this-level) and does not
+                // claim to know WHERE the path points. [Story 18.5; Review][Patch: no longer overclaims "outside
+                // this tree" for what may simply be a nested directory this non-recursive scan does not reach]
                 diagnostics?.Add(new AdapterDiagnostic(
                     AdapterDiagnosticCategory.Informational,
                     TestArtifactDerivation.ArtifactsDirName + "/",
                     $"The '{TestArtifactDerivation.ModuleCode}' module is installed but no '{TestArtifactDerivation.ArtifactsDirName}/' "
-                    + "directory was found in the scanned source tree, so no test artifacts are shown. Either none have been "
-                    + "produced yet, or the module's test_artifacts path points outside this tree."));
+                    + "directory was found directly under the scanned source root, so no test artifacts are shown. Either "
+                    + "none have been produced yet, or the module's test_artifacts path resolves somewhere this scan does not look."));
                 return TestArtifactsModel.Empty;
             }
 
@@ -121,7 +124,21 @@ public static class TestArtifactDiscovery
                     Headline: headline));
             }
 
-            if (entries.Count == 0) return TestArtifactsModel.Empty;
+            if (entries.Count == 0)
+            {
+                // The directory exists but nothing inside it was markdown or one of the two admitted JSON
+                // filenames — the module is installed and has a test-artifacts/ folder, but has not produced
+                // anything yet (or only wrote files this story doesn't look for). The sibling "no directory
+                // found" branch above already emits a notice for the analogous case; this one was silent,
+                // which read as inconsistent — a user with an installed-but-not-yet-run module got no
+                // explanation for the missing panel either way. [Review][Patch]
+                diagnostics?.Add(new AdapterDiagnostic(
+                    AdapterDiagnosticCategory.Informational,
+                    TestArtifactDerivation.ArtifactsDirName + "/",
+                    $"The '{TestArtifactDerivation.ModuleCode}' module's '{TestArtifactDerivation.ArtifactsDirName}/' "
+                    + "directory exists but contains no recognized test artifact yet, so no test artifacts are shown."));
+                return TestArtifactsModel.Empty;
+            }
 
             ReportUnmodelledFamilies(unmodelledFamilies, diagnostics);
 
@@ -161,7 +178,14 @@ public static class TestArtifactDiscovery
 
         var basis = model.Trace?.InventoryBasis ?? model.Matrix.CoverageBasis;
         var confidence = model.Trace?.Confidence ?? model.Matrix.OracleConfidence;
-        var synthetic = model.Trace?.SyntheticOracle ?? false;
+        // When no e2e-trace-summary.json exists (a Phase-1-only run), the JSON's own `oracle.synthetic` flag is
+        // unavailable — falling back to `false` would silently admit a synthetic oracle whose matrix frontmatter
+        // says so via `oracleResolutionMode` (e.g. 'synthetic_source'), fabricating a join. Fail CLOSED instead:
+        // treat the oracle as synthetic unless the matrix names the one value confirmed to mean a formal,
+        // non-synthetic resolution (`formal_requirements`) — an absent or unrecognized mode does not earn the
+        // join either, matching this story's own "honest gap over fabricated link" rule. [Review][Patch]
+        var synthetic = model.Trace?.SyntheticOracle
+            ?? !string.Equals(model.Matrix.OracleResolutionMode, "formal_requirements", StringComparison.OrdinalIgnoreCase);
 
         var requirementIds = requirements?.Everything.Select(r => r.Id).ToList() ?? new List<string>();
         var storyIds = epics?.Epics.SelectMany(e => e.Stories.Select(s => s.Id)).ToList() ?? new List<string>();
@@ -324,6 +348,12 @@ public static class TestArtifactDiscovery
         {
             parts.Add($"{cases} test {Charts.Plural(cases, "case", "cases")}");
         }
+        // The gate_criteria breakdown is present only alongside gate_status (both gated on upstream's
+        // `gateEligible`), so a repo with a trace summary and no separate gate-decision.json still shows the
+        // P0/P1 detail rather than the bare gate word alone — the data was already read into memory either way.
+        // [Review][Patch]
+        if (trace.P0Status is { Length: > 0 } p0) parts.Add($"P0 {Spoken(p0)}");
+        if (trace.P1Status is { Length: > 0 } p1) parts.Add($"P1 {Spoken(p1)}");
         if (trace.InventoryBasis is { Length: > 0 } basis) parts.Add($"basis: {basis.Replace('_', ' ')}");
         return parts.Count > 0 ? string.Join(" · ", parts) : "Machine-readable trace summary";
     }

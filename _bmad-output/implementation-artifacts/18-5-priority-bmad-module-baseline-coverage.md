@@ -4,7 +4,7 @@ baseline_commit: 40c7ee96f197a7907dbf8c8fe80c8e5c8fb575a3
 
 # Story 18.5: Priority BMad Module Baseline Coverage
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -410,6 +410,91 @@ Anchor root: TEA artifacts live under **SourceRoot**, so `DiagnosticAnchorRoot.S
   - [x] Generate to `SpecScribeOutput/` or an explicit scratch dir. **Never `--output docs/live`.**
   - [x] Add a `.claude/launch.json` entry following that file's existing convention if a preview slot is needed
         (18.2 used `tea-identity-18-2`, port 8108).
+
+### Review Findings
+
+Scope note: reviewed against Story 18.5's own File List and declared symbols, not a raw commit-range diff — the
+actual commits (`c1a6ee5` etc.) bundle sibling stories 18.2 (own code review), 18.4, 20.6, 20.7, 20.8, 22.4, 23.5,
+25.2, 25.3 into the same shared files (`SiteGenerator.cs`, `ModuleContext.cs`, `SiteNav.cs`,
+`DashboardViewBuilder.cs`, `specscribe.css`). Only hunks attributable to 18.5 were reviewed; sibling-story hunks in
+those files were excluded, per CLAUDE.md's "scope by File List, never by commit range." Three parallel review
+layers ran (Blind Hunter, Edge Case Hunter, Acceptance Auditor); the Acceptance Auditor found zero AC/decision
+violations — every owner decision (D1-D4), the join-admissibility design rule, and every Non-goal/Anti-pattern
+held. The findings below come from the two adversarial/edge-case layers.
+
+- [x] [Review][Patch] Colon-splitting disagreement between the heading reader and the join resolver — owner
+      decision: align the heading reader with the resolver [TestArtifactsModel.cs `TryReadCriterionHeading` /
+      `ResolveJoinTarget`]. `TryReadCriterionHeading` splits `#### {ID}: {DESCRIPTION} ({PRIORITY})` on the FIRST
+      colon, but `ResolveJoinTarget`'s Form 2 treats `:` as one of five valid separators for a compound id like
+      `18.4:AC-2` (pinned by a test literal), so a colon-separated compound heading ID gets truncated to the
+      story-id prefix and leaks the AC suffix into the description. Resolved 2026-07-28: treat `:` as a valid
+      compound-id separator in the heading reader too, using the same separator set `ResolveJoinTarget` already
+      accepts, so a heading like `18.4:AC-2: description` parses the full compound id rather than splitting at
+      the first colon.
+- [x] [Review][Patch] Join-admissibility check ignores the matrix's own synthetic-oracle signal when no JSON is
+      present [TestArtifactDiscovery.cs `WithJoin`; TestArtifactsModel.cs `TeaMatrix.OracleResolutionMode`] —
+      `WithJoin` reads `synthetic = model.Trace?.SyntheticOracle ?? false`, so a Phase-1-only run (no
+      `e2e-trace-summary.json`) always evaluates as non-synthetic regardless of what the markdown frontmatter's
+      `oracleResolutionMode` says — even though the story's own test fixture
+      (`TestArtifactDiscoveryTests.cs:159`, `oracleResolutionMode: 'synthetic_source'`) demonstrates that value IS
+      the synthetic signal in a matrix-only context. A run with `coverageBasis: acceptance_criteria`,
+      `oracleConfidence: high`, and `oracleResolutionMode: synthetic_source` is wrongly judged admissible and
+      produces a fabricated join row — the exact "phantom-covered requirement" class Story 21.1's review caught,
+      which Completion Note §5 claims the frontmatter alone is sufficient to prevent.
+- [x] [Review][Patch] Multiple TEA criteria resolving to the same requirement/story id render as separate,
+      identically-labelled table rows [TestArtifactsModel.cs `BuildJoin`; TestArtifactsTemplater.cs ~line 257] —
+      `BuildJoin` performs no grouping, so two criteria resolving to one id (which the story-id-prefix form
+      deliberately allows) produce two `<tr><th scope="row">` rows with an identical row header — confusing to a
+      reader and a minor table-semantics defect.
+- [x] [Review][Patch] Discovery misreports "outside this tree" for a nested `test-artifacts/` folder and matches
+      by name only [TestArtifactDiscovery.cs `FindArtifactsRoot`] — enumerates only DIRECT children of
+      `sourceRoot` (not recursive), so a `test-artifacts/` one level deeper is missed and the emitted diagnostic
+      incorrectly claims "the module's test_artifacts path points outside this tree" when it is actually just
+      nested. The same exact-name match also means a coincidentally-named unrelated folder would have its
+      contents attributed to TEA. Recommend softening the diagnostic wording; the non-recursive scan itself
+      mirrors `IdeaDiscovery`'s established convention so may be an accepted trade-off.
+- [x] [Review][Patch] `e2e-trace-summary.json`'s `gate_criteria` breakdown is read but never modeled or surfaced
+      [TestArtifactsModel.cs `TestTraceSummary`; TestArtifactDiscovery.cs `TraceHeadline`] — only
+      `gate-decision.json` populates `P0Status`/`P1Status`. A repo with a trace summary and no separate
+      gate-decision file (a case the story's own notes say is possible) shows the bare gate word with no priority
+      breakdown, though the data was already parsed into memory.
+- [x] [Review][Patch] An unrecognized `- **Coverage:** <word>` value silently becomes an asserted `"NONE"` rather
+      than an honest "not recognized" state [TestArtifactsModel.cs `CloseOpenCriterion` / `TryReadCoverageBullet`]
+      — reads as a positive claim of zero coverage rather than an admission the value could not be parsed, at
+      odds with this story's own "honest gap over fabricated claim" principle.
+- [x] [Review][Patch] A discovered-but-empty `test-artifacts/` directory returns `Empty` with no diagnostic, while
+      the sibling "no directory found" branch emits an Informational notice [TestArtifactDiscovery.cs `Discover`]
+      — asymmetric; a user with an installed-but-not-yet-run module gets no explanation for the missing panel.
+- [x] [Review][Patch] `TryReadPriorityRow` scans every `|`-prefixed line in the whole document rather than being
+      scoped to the "Coverage Summary" section [TestArtifactsModel.cs `TryReadPriorityRow` / `ParseMatrix`] —
+      currently safe only because the sibling "Coverage by Test Level" table's row labels don't collide with the
+      `P<digit>` shape it matches on; an incidental save, not a structural guard.
+- [x] [Review][Patch] `TestArtifactsModel.Ordered` allocates a new `List<CoverageTier>` and does a linear
+      `IndexOf` scan inside its `OrderBy` comparator per artifact, instead of precomputing a tier→rank map once.
+      Cosmetic performance cleanup, not a correctness issue.
+
+Dismissed as noise (3): a recursive-walk duplicate-JSON-clobber scenario with no realistic TEA output layout to
+trigger it; an unreachable `(int)Math.Round(d)` overflow in the JSON `Int()` helper (all real fields are small
+counts); and a missing longest-prefix tie-break in `ResolveJoinTarget` (this repo's story-id scheme has no
+colliding nested prefixes to tie-break between).
+
+**All 9 patches applied 2026-07-28.** Heading reader now splits on the first `": "` (colon-space) instead of the
+first bare colon, so a compound id like `18.4:AC-2` survives intact. `WithJoin` now fails closed on synthetic-ness
+when no trace JSON is present, trusting the matrix's own `oracleResolutionMode` (only `formal_requirements` counts
+as confirmed non-synthetic) instead of defaulting to `false`. The join table now groups rows by resolved
+target id so two criteria under one story render as one row with multiple lines, not two identically-labelled
+rows. The "no artifacts directory" diagnostic no longer claims to know the path resolves outside the tree (it
+only asserts what the non-recursive, name-only scan actually observed), and a directory that exists but holds
+nothing recognized now emits its own Informational notice, matching the sibling "not found" case. `TestTraceSummary`
+gained `P0Status`/`P1Status`/`OverallStatus` parsed from `e2e-trace-summary.json`'s `gate_criteria` object, surfaced
+in `TraceHeadline` — the same two lines `GateHeadline` already showed from `gate-decision.json`. An unrecognized
+`- **Coverage:**` word now yields `"UNRECOGNIZED"` (renders via `CoverageBadge`'s existing fallback style) rather
+than a fabricated `"NONE"`. `TryReadPriorityRow` is now scoped to lines between the "Coverage Summary" heading and
+the next heading, rather than the whole document. `Ordered` precomputes a tier→rank dictionary instead of an
+`IndexOf` scan per artifact. Verified: 74/74 tests in `TestArtifactDerivationTests`/`TestArtifactDiscoveryTests`
+pass, `GoldenContentFingerprint` unmoved (every patched path is gated on module presence, and the BMM-only golden
+fixture has no `_bmad/tea/`). One test assertion updated to match the softened diagnostic wording
+(`TestArtifactDiscoveryTests.cs`, `Discover_ModuleInstalledButNoArtifactsDirectory_IsOneInformationalNotice`).
 
 ## Dev Notes
 

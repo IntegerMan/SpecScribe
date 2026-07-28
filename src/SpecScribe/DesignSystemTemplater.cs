@@ -39,22 +39,17 @@ public static class DesignSystemTemplater
         ("--motion-stagger", "The delay between items when a group enters one after another."),
     ];
 
-    public static string RenderPage(SiteNav nav)
+    public static string RenderPage(SiteNav nav) =>
+        HtmlRenderAdapter.Shared.Render(BuildPage(nav)).Content;
+
+    /// <summary>Builds this page's host-neutral <see cref="PageView"/> — see
+    /// <see cref="HowToReadTemplater.BuildPage"/> for why the body starts at the doc-header, not the landmark.
+    /// [Story 23.4 AC #3]</summary>
+    public static PageView BuildPage(SiteNav nav)
     {
         var outputPath = SiteNav.DesignSystemOutputPath;
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen(
-            $"Design System — {nav.SiteTitle}",
-            ForgeOptions.StylesheetName, ForgeOptions.ScriptName,
-            "The design system behind this portal: the status and motion token families, and the shared visual primitives every page is built from."));
-        sb.Append(nav.RenderNavBar(outputPath));
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
-        {
-            ("Home", SiteNav.HomeOutputPath),
-            ("Design System", null),
-        }));
-
         sb.Append("<header class=\"doc-header\">\n");
         sb.Append("  <h1>Design System</h1>\n");
         sb.Append("  <div class=\"doc-subtitle\">The visual vocabulary this portal is built from — what each status colour means, and which token to reach for when you build on it.</div>\n");
@@ -108,9 +103,28 @@ public static class DesignSystemTemplater
             PanelBody()));
 
         sb.Append("</main>\n\n");
-        sb.Append(PathUtil.RenderFooter());
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+
+        return new PageView
+        {
+            Kind = PageKind.About,
+            OutputRelativePath = outputPath,
+            Title = $"Design System — {nav.SiteTitle}",
+            MetaDescription = "The design system behind this portal: the status and motion token families, and the shared visual primitives every page is built from.",
+            Nav = nav.ToNavigationView(outputPath),
+            Breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
+            {
+                ("Home", SiteNav.HomeOutputPath),
+                ("Design System", null),
+            }),
+            Assets = new AssetManifest
+            {
+                StylesheetHref = ForgeOptions.StylesheetName,
+                ScriptHref = ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+            },
+            Interaction = InteractionState.None,
+            BodyHtml = sb.ToString(),
+        };
     }
 
     private static string IntroBody()

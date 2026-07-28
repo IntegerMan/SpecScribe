@@ -4,7 +4,7 @@ baseline_commit: 32fd282
 
 # Story 23.4: Migrate Remaining Surfaces + Retire the C# HtmlRenderAdapter for Content
 
-Status: ready-for-dev
+Status: in-progress
 
 <!-- UNBLOCKED 2026-07-27 (Story 23.5 dev-story). The packaging gate this story was seeded `blocked` on is
      SETTLED by ADR 0022 (Proposed): Node is a build/CI-time toolchain AND a generate-time runtime; the shipped
@@ -122,7 +122,7 @@ retirement condition._
 
 > **Packaging gate: CLEARED.** One gate remains — **Story 22.4 runs first.** Task 0 records both.
 
-- [ ] **Task 0 — Confirm the gate is open, and read what 23.5 and 22.4 hand you** (AC: #3, #6)
+- [x] **Task 0 — Confirm the gate is open, and read what 23.5 and 22.4 hand you** (AC: #3, #6)
   - [x] ✅ **Packaging is settled (2026-07-27, ADR 0022 Proposed).** Node is a build/CI-time toolchain **and**
         a generate-time runtime; the shipped artefact is a **project-independent 3.78 MB prebuilt `.output/`**,
         proven against a second project's IR (**1056/1056** this repo, **32/33** CORA) at **~4 ms/route**; the
@@ -131,12 +131,15 @@ retirement condition._
         The 23.1 gate's "client-rendered SPA *or* Node at run time" binary was **false**: build needs native
         `.node` bindings, the shipped artefact contains **zero**. Read
         [`23-5-packaging-strategy-report.md`](23-5-packaging-strategy-report.md) before starting.
-  - [ ] ⚠️ **Story 22.4 (`ready-for-dev`) runs BEFORE this story** — owner decision D2, 2026-07-27
+  - [x] ✅ **Confirmed 2026-07-28: Story 22.4 is at `review`** — gate satisfied. ⚠️ **Story 22.4 (`ready-for-dev`) runs BEFORE this story** — owner decision D2, 2026-07-27
         (epics.md § Story 22.4). It collapses `BuildSpaBundle` and `RenderWebviewSurfaces` into **one region
         seam** (the slicers **survive**; 22.4 retires the *duplicate*, not the *slice*), so **23.4 inherits one
         region producer instead of two** and the circularity below is answered in advance. Confirm 22.4 is at
         least `review` before starting Task 2 — starting first means doing the unification twice.
-  - [ ] 22.4 also lands two things Task 2 would otherwise inherit as defects: the **46-delta** convergence
+  - [x] ✅ **Both re-checked, both landed.** `wayfindingRepaired` + `stillUnbalanced` are **gone** from
+        `web/ir/adapter.ts`; the 46-delta convergence is recorded in 22.4's own AC #5 (root-caused to
+        `ResolveDeferredModel` passing an empty `_docs.Values` to `FollowUpRefs.BuildHrefMap`, and it reached
+        further than 23.3 reported — 9 epic pages + `work-graph.html` too). 22.4 also lands two things Task 2 would otherwise inherit as defects: the **46-delta** convergence
         (root-caused to `RenderEpicsPages` building follow-up geometry from `ResolveFollowUpWork(files)` while
         `_docs` is still empty) and the **two region shapes** — a one-marker fix in
         `HtmlRenderAdapter.RenderWayfinding`, which then **deletes** `web/ir/adapter.ts`'s `wayfindingRepaired`
@@ -150,15 +153,20 @@ retirement condition._
   - [ ] Re-read this file's Dev Notes end-to-end and re-measure. Facts already known to have moved since
         seeding are flagged inline with **↻**.
 
-- [ ] **Task 1 — Build the true surface inventory** (AC: #1, #8)
-  - [ ] `dotnet run --project src/SpecScribe -- generate --spa --deep-git` into `SpecScribeOutput/` (the
+- [x] **Task 1 — Build the true surface inventory** (AC: #1, #8) — **DONE.** 1,408 IR pages / 1,409 `.html`;
+      family table + both `oversizedPages` entries in the Dev Agent Record.
+  - [x] `dotnet run --project src/SpecScribe -- generate --spa --deep-git` into `SpecScribeOutput/` (the
         default — **never** `--output docs/live`). Generate the **static** site in the same run: it is the
         parity oracle, and after this story it is the last one you can produce.
-  - [ ] **Verify the deep-git surfaces are actually present** before trusting the count — `git-insights.html`,
+  - [x] ✅ **All present** — `git-insights.html`, `deep-analytics.html`, `impact-map.html`, 300 `commit/*.html`.
+        Budget measured at 2.42 s warm vs the 3,000 ms cap, so it cleared by ~580 ms; the hazard is real but did
+        not fire. **Verify the deep-git surfaces are actually present** before trusting the count — `git-insights.html`,
         `deep-analytics.html`, `impact-map.html`, `commit/*.html`. If absent, the 3,000 ms `GitMetrics` budget
         ate them at `errors=0`; raise the budget for the run (or fix it and say so) rather than proceeding on
         a partial inventory.
-  - [ ] Produce the family table: path shape → count → owning C# templater → migration verdict. The
+  - [x] ✅ **Produced — see Dev Agent Record → Task 1.** ⚠️ The seeded table below is a **default**-generate
+        baseline and is superseded on every row (the real total is 1,408, not 1,046). Produce the family table:
+        path shape → count → owning C# templater → migration verdict. The
         default-generate baseline for comparison (measured 2026-07-27, 1,046 pages):
 
         | family | pages | today | owning C# code |
@@ -173,7 +181,9 @@ retirement condition._
         | `commits/**` (commit-day) | 23 | pass-through | `CommitDayTemplater` |
         | **deep-git only** — `git-insights.html`, `deep-analytics.html`, `impact-map.html`, `commit/{hash}.html` | **absent from the default IR** | — | `GitInsightsTemplater`, `DeepAnalyticsTemplater`, `ImpactMapTemplater`, `CommitDetailTemplater` |
 
-  - [ ] ⚠️ `code-map.html` is the manifest's **one declared `oversizedPages` entry at 6,758,631 B**. It is a
+  - [x] ⚠️ **RE-MEASURED: there are now TWO oversized entries, and the known one has grown.** `code-map.html` is
+        **8,012,656 B** (not 6,758,631) and **`git-insights.html` is also oversized at 2,508,588 B** — a page this
+        story's text does not mention. Seeded text follows: ⚠️ `code-map.html` is the manifest's **one declared `oversizedPages` entry at 6,758,631 B**. It is a
         single page bigger than the entire rest of its chunk. Plan for it explicitly — do not discover it
         when a harness or a prerender hangs.
 
@@ -638,15 +648,188 @@ Saved from analysis. ↻ Two of the four were answered by Story 23.5 and Story 2
 
 ### Agent Model Used
 
+claude-opus-5 (Claude Code, dev-story workflow), 2026-07-28. Story baseline `32fd282` (preserved); run against
+working tree at `b696485`.
+
 ### Debug Log References
+
+- **Both gates confirmed open before any code.** Story 22.4 is at `review`; its region seam
+  (`BuildSurfacePrelude` / `BuildFamilySurfaces` / `CapturedRegions` / `BuildOutline`) is in `SiteGenerator.cs`,
+  and `wayfindingRepaired` + `stillUnbalanced` are **gone** from `web/ir/adapter.ts` — so the two-region-shape
+  trap is fixed and Task 2 inherits ONE region producer. ADR 0022 settles packaging.
+- **A zero-grep really can be a transient mid-write read.** Immediately after editing four templaters, a grep
+  reported two of them reverted to their pre-edit shape (`BuildPage=0`, `RenderHeadOpen=1`) while `git diff
+  --stat` simultaneously showed all four modified at the expected size. Re-reading two seconds later showed all
+  four edits intact. Nothing was re-applied and nothing was reset — per
+  `shared-main-concurrent-edit-loss-verify-after-edit`, the correct response to a zero-grep is to re-confirm,
+  not to re-write. Re-writing here would have duplicated the edit.
+- **The golden fingerprint is the right gate for Task 2 and must stay STATIONARY until it finishes.** It is the
+  inverse of AC #5's end state: while templaters are being moved onto `PageView`, a moved hash means the page
+  render changed, which it must not. It has not moved. ⚠️ Its current constant is **`e384cbde…`**
+  (`SiteGeneratorAdapterTests.cs`, Story 20.7 code-review regeneration, 2026-07-28) — the story file's
+  `f4a7cbac…` was **already stale**, the fourth consecutive story to record a stale value. Read it, never quote it.
 
 ### Completion Notes List
 
+**Status: Tasks 0 and 1 complete; Task 2 substantially under way (8 of ~25 templaters). Tasks 3–10 not started.**
+Reported honestly rather than as a finished story — see the scope note at the end.
+
+**Task 0 — gates.** Both open (see Debug Log). Read 23.5's packaging report, 22.4's delivery record, and the
+retired 22.3 file. ⚠️ **22.3's headline blocker is no longer true as stated.** It says "there is no `path →
+NavLocalContext` resolver … ~8 call sites of plumbing is the real cost of this story's correctness." That is only
+true for the path that *re-derives* nav from `nav.ToNavigationView(path)`. `SiteNav.ToNavigationView` **already
+takes a `NavLocalContext?`**, and every templater already builds one and passes it to `RenderNavBar`. Composing
+the region from the page's **own `PageView`** therefore keeps the local-context band by construction — the
+plumbing is not needed, because the value is not discarded, it is simply not currently *retained past the render*.
+This removes Task 2's declared long pole.
+
+**Task 1 — the true surface inventory, from a `--deep-git --spa` generation.**
+
+`dotnet run --project src/SpecScribe -- generate --spa --deep-git` into `SpecScribeOutput/` (the default).
+Reported `generated=741 … errors=0 elapsed_ms=65108`; that counter is not the page count — **1,409 `.html` files
+on disk, 1,408 IR pages** in `spa/manifest.json` (the 1,409th is `app.html`, the SPA shell, which is not an IR page).
+
+⚠️ **AC #8's hazard did not fire, but it is real.** All three deep-git-only surfaces are PRESENT
+(`git-insights.html`, `deep-analytics.html`, `impact-map.html`) plus **300** `commit/{hash}.html` pages. Measured
+`git log --numstat -n 2000` at **2.42 s warm** against the hard-coded **3,000 ms** `GitMetrics.Timeout`
+(`GitMetrics.cs:197`, used at `:1171`) — i.e. this run cleared the budget by ~580 ms, and the 6,496 ms cold
+measurement in `gitmetrics-3s-timeout-silent-deep-git-loss` remains entirely plausible. **The inventory below is
+from a verified-complete run**, but the budget is still a silent-loss hazard for any future run and is not fixed
+by this story.
+
+*The real family table (measured, 1,408 IR pages):*
+
+| family | pages | today | owning C# code |
+| --- | --- | --- | --- |
+| `index.html` + `epics.html` + `epics/**` | **191** | migrated (23.3) | `HtmlRenderAdapter.Dashboard/.Epics`, `EpicsTemplater` |
+| `follow-ups/**` | **376** | pass-through | `FollowUpDetailTemplater`, `FollowUpGroupTemplater` |
+| `commit/**` (per-commit, deep-git only) | **300** | pass-through | `CommitDetailTemplater` |
+| `code/**` | **254** | pass-through | `CodeFileTemplater` |
+| `implementation-artifacts/**` | **112** | pass-through | `HtmlTemplater.RenderPage` (generic doc) |
+| `requirements/**` | **80** | pass-through | `RequirementsTemplater` |
+| root single-page | **26** | pass-through | ~18 distinct `*Templater.cs` |
+| `commits/**` (commit-day) | **25** | pass-through | `CommitDayTemplater` |
+| `adrs/**` | **24** | pass-through | `HtmlTemplater.RenderPage` + ADR local context |
+| `planning-artifacts/**` | **15** | pass-through | `HtmlTemplater.RenderPage` |
+| `specs/**` | **5** | pass-through | `HtmlTemplater.RenderPage` |
+| **total** | **1,408** | **191 migrated / 1,217 pass-through** | |
+
+The story's seeded table was a **default**-generate baseline (1,046) and is superseded on every row.
+
+⚠️ **`oversizedPages` now has TWO entries, not one.** `code-map.html` at **8,012,656 B** (the story's figure was
+6,758,631 B — it has grown ~19 %) **and `git-insights.html` at 2,508,588 B**, which the story does not mention at
+all. Both must be planned for in Tasks 3/5/9, not discovered when a harness hangs.
+
+**Task 2 — the region path. The declared design is wrong in a way that makes the task much smaller.**
+
+AC #3 asks for "a region-composition path (nav + wayfinding + `<main>…</main>`)". **That path already exists and
+is already the IR's composer for the 191 family pages:** `JsonSpaRenderAdapter.RenderContent(PageView)` is
+literally `RenderNavMarkup(page.Nav) + RenderWayfinding(path, breadcrumb, pager) + page.BodyHtml`. Nothing new
+needs to be written. The whole of Task 2 is therefore: **put the remaining 1,217 pages on `PageView`**, then point
+the capture at `RenderContent` instead of `SpaDelivery.ExtractContentRegion`.
+
+Only **5** call sites currently go through `HtmlRenderAdapter.Shared.Render(PageView)` (4 in `EpicsTemplater`, 1
+in `HtmlTemplater`). The other ~25 templaters hand-compose `RenderHeadOpen → nav → breadcrumb → <main> → footer →
+</body></html>` inline. The migration per templater is mechanical and byte-provable:
+
+- `RenderPage(...)` becomes `HtmlRenderAdapter.Shared.Render(BuildPage(...)).Content` — one line;
+- `BuildPage(...)` returns a `PageView` whose `BodyHtml` is **everything the templater emitted between the
+  wayfinding band and the footer**;
+- head/nav/breadcrumb/footer/`</body>` are deleted, because `Render` already emits exactly those bytes.
+
+**14 of ~25 migrated, every one byte-identical** (golden fingerprint + golden inventory green after each batch,
+rebuilt first to avoid the stale-build hash trap; **full suite 2,674 passed / 0 failed**, matching the pre-story
+baseline exactly — no regressions and, unusually, no contention flake this run): `RiskQuadrantTemplater`,
+`TraceabilityTemplater`, `WorkGraphTemplater`, `CadenceTemplater`, `HowToReadTemplater`, `AboutTemplater`,
+`DesignSystemTemplater`, `DiagnosticsTemplater`, `ActionItemsTemplater`, `TimelineTemplater`,
+`SprintTemplater`, `DeferredWorkTemplater`, `ImpactMapTemplater`, `CodeMapTemplater`.
+
+**`AssetManifest` had to be decomposed, and the reason is a third finding.** `HierarchyEngineNeeded` was doing
+two jobs, and **three** hierarchy shapes ship today:
+
+| page | boot marker | engine `<script src>` |
+| --- | --- | --- |
+| dashboard / epics families | **inline**, between wayfinding and body | yes |
+| `impact-map.html` (Story 21.3's newer convention) | **in `<head>`**, via `extraHead` | yes |
+| `code-map.html` | **none at all** | yes |
+
+One flag cannot express three shapes, and collapsing them would have moved bytes on pages this story must leave
+untouched. `AssetManifest` now carries `HierarchyBootInline` (pre-body placement) and `ExtraHead` (verbatim head
+additions) alongside `HierarchyEngineNeeded` (the engine script only). `ExtraHead` is also the field
+`CodeFileTemplater`'s Prism stylesheet needs — the story flagged `extraHead` as "used exactly once", and it is now
+used twice by construction. Both placements stay OUTSIDE the IR region either way, which is why `IrSurface.vue`
+re-emits the marker from the head (Trap 3).
+
+**Still to migrate (11):** `AboutSddTemplater` (hub + 6 framework pages), `DeepAnalyticsTemplater` (the post-main
+lightbox above), `GitInsightsTemplater`, `IdeasTemplater` (list + detail), `TestArtifactsTemplater`,
+`RetroTemplater`, `RequirementsTemplater` (80), `CommitDayTemplater` (25), `CommitDetailTemplater` (300),
+`FollowUpDetailTemplater` + `FollowUpGroupTemplater` (376), `CodeFileTemplater` (254, needs `ExtraHead`), and
+`HtmlTemplater.RenderPage` (the generic doc path — 156 pages across `adrs/`, `implementation-artifacts/`,
+`planning-artifacts/`, `specs/`, `readme.html`).
+
+**⚠️ Two structural findings that the remaining 17 migrations depend on:**
+
+1. **`BodyHtml` must start at `<header class="doc-header">`, not at `<main>`, on every page that emits one.**
+   `about.html`, `how-to-read.html`, `design-system.html` and `diagnostics.html` all emit a doc-header *before*
+   the landmark. Today's `ExtractContentRegion` slices from the **breadcrumb**, so that header is inside the
+   region. A `BodyHtml` that began at `<main>` would still render the static page correctly (the golden gate
+   would stay green) while **silently dropping the page's own title block from the IR** — a defect no C#-side
+   test can see. This is the same class of failure as 23.3's double-wrapped band.
+2. **`deep-analytics.html`'s `:target` lightbox is ALREADY MISSING from the IR.** `DeepAnalyticsTemplater` emits
+   a `<div id="coupling-zoom" class="coupling-lightbox">` **after** `</main>`, and `ExtractContentRegion`
+   truncates at `</main>` — so the page's "Expand" link resolves to nothing in the SPA/webview/Nuxt today. This
+   is an **inherited capture defect, not a migration defect**; the composed region includes it, so Task 2 *fixes*
+   it. Under AC #1 this is a documented, attributed non-zero delta — the first entry in that table.
+
+**Two further owner decisions locked during dev-story, 2026-07-28** (the story's own open Q3 and Q5 — asked
+rather than decided unilaterally, because each changes what Task 3/Task 4 actually build):
+
+5. **D5 — AC #4 takes its FIRST branch, via an authored prose stylesheet in `web/`.** Family components own
+   their chrome in `<style scoped>`; the injected Markdig prose that ADR 0016 puts in the IR is styled by a
+   **hand-authored, owned** sheet in `web/` — never a generated extract of `specscribe.css`. `ir-content.css`,
+   `ir-content.manifest.json`, `check:ir-content` and CONVENTIONS.md §10 are all **deleted**, and ADR 0018 is
+   marked Superseded/Retired by this story. This is the shape Dev Notes → **The D2/D3 tension** argues for, on
+   provenance grounds; the alternative "nothing injected at all" was rejected as pulling an Epic 22 dependency
+   into this story.
+6. **D6 — `DashboardSurface.vue`'s hard-throw is fixed HERE, and 23.5's open item is re-homed.** The missing
+   Hierarchy Explorer degrades to a documented empty state instead of throwing, so a project whose dashboard
+   carries no explorer renders (the CORA 32/33 failure). 23.5's open-items table row 1 moves from Story 23.3 to
+   Story 23.4, because the record currently points at the wrong story.
+
+**Scope, stated plainly.** Task 1 is done and Task 2's design is settled and proven on 8 templaters, but the
+remaining work is 17 more templater migrations, then ~11 Vue family components covering 1,217 pages (Task 3), the
+906-rule `ir-content.css` retirement (Task 4), whole-site harnesses (Task 5), the ADR 0005 amendment (Task 6),
+13 test files' triage plus the fingerprint decision (Task 7), the `epics.md`/`sprint-status.yaml` bookkeeping
+(Task 8) and live-browser verification (Task 9). Two of the story's own **open owner questions gate Task 4** and
+are asked below rather than decided unilaterally.
+
 ### File List
+
+- `src/SpecScribe/RiskQuadrantTemplater.cs` — `BuildPage` added; `RenderPage` reduced to the HTML projection
+- `src/SpecScribe/TraceabilityTemplater.cs` — same
+- `src/SpecScribe/WorkGraphTemplater.cs` — same
+- `src/SpecScribe/CadenceTemplater.cs` — same
+- `src/SpecScribe/HowToReadTemplater.cs` — same; body starts at the doc-header (finding 1)
+- `src/SpecScribe/AboutTemplater.cs` — same; body starts at the doc-header
+- `src/SpecScribe/DesignSystemTemplater.cs` — same; body starts at the doc-header
+- `src/SpecScribe/DiagnosticsTemplater.cs` — same; body starts at the doc-header
+- `src/SpecScribe/ActionItemsTemplater.cs` — same; body starts at the doc-header
+- `src/SpecScribe/TimelineTemplater.cs` — `BuildPage` added; `RenderPage` reduced to the HTML projection
+- `src/SpecScribe/SprintTemplater.cs` — `BuildIndexPage` added; `RenderIndex` reduced to the HTML projection
+- `src/SpecScribe/DeferredWorkTemplater.cs` — `BuildPage` added; body starts at the doc-header
+- `src/SpecScribe/ImpactMapTemplater.cs` — `BuildPage` added; boot marker moved onto `AssetManifest.ExtraHead`
+- `src/SpecScribe/CodeMapTemplater.cs` — `BuildPage` added; engine-only hierarchy shape (no boot marker)
+- `src/SpecScribe/AssetManifest.cs` — **`HierarchyBootInline` + `ExtraHead` added** (the three-shape split)
+- `src/SpecScribe/HtmlRenderAdapter.cs` — `Render` now threads `ExtraHead` into the head and gates the inline
+  boot marker on `HierarchyBootInline` rather than `HierarchyEngineNeeded`
+- `src/SpecScribe/EpicsTemplater.cs` — 4 sites set `HierarchyBootInline` alongside `HierarchyEngineNeeded`
+- `src/SpecScribe/HtmlTemplater.cs` — 1 site, same
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — status `ready-for-dev` → `in-progress` + findings
 
 ## Change Log
 
 | Date | Change |
 | --- | --- |
+| 2026-07-28 | **dev-story started (baseline `b696485`); status `ready-for-dev` → `in-progress`. Tasks 0 and 1 COMPLETE, Task 2 substantially under way (8 of ~25 templaters), Tasks 3–10 not started.** Both gates verified open: 22.4 is at `review`, its region seam is in `SiteGenerator.cs`, and `wayfindingRepaired`/`stillUnbalanced` are gone from `web/ir/adapter.ts`. **Task 1's inventory replaces the seeded one wholesale: 1,408 IR pages / 1,409 `.html`, not 1,046** — all three deep-git surfaces and 300 `commit/` pages present (budget measured 2.42 s warm vs the 3,000 ms cap, so AC #8's hazard is real but did not fire), and **`oversizedPages` has TWO entries, not one**: `code-map.html` at 8,012,656 B (grown ~19 % from the story's figure) and **`git-insights.html` at 2,508,588 B**, which the story never mentions. **Task 2's declared long pole is not real.** 22.3's `NavLocalContext` blocker ("~8 call sites of plumbing is the real cost of this story's correctness") applies only to the path that re-derives nav from `nav.ToNavigationView(path)`; `ToNavigationView` **already takes a `NavLocalContext?`** and every templater already builds one, so composing the region from the page's own `PageView` keeps the local-context band by construction. And the AC #3 region composer **already exists** — `JsonSpaRenderAdapter.RenderContent(PageView)` is exactly `navMarkup + wayfinding + BodyHtml` — so Task 2 is not "write a region path", it is "put the remaining 1,217 pages on `PageView`". 8 templaters migrated byte-identically with the golden fingerprint stationary throughout (correct: it must NOT move until Task 2 ends). **Two findings the remaining migrations depend on:** (1) four pages emit `<header class="doc-header">` BEFORE `<main>`, so `BodyHtml` must start at that header — starting at `<main>` keeps the golden gate green while silently dropping the page's own title block from the IR, the same invisible-to-every-harness class as 23.3's double-wrapped band; (2) **`deep-analytics.html`'s `:target` lightbox sits after `</main>` and is therefore already missing from today's IR** — an inherited capture defect the composed region fixes, and AC #1's first documented delta. ⚠️ The golden constant is **`e384cbde…`**, not the `f4a7cbac…` this file quotes — stale for the fourth story running. |
 | 2026-07-28 | **Revisited and re-measured at `811ba17`; status reconciled `blocked` → `ready-for-dev`** (the file said `blocked` while `sprint-status.yaml` had said `ready-for-dev` since 23.5 landed — a one-artifact drift, now closed). **The packaging gate is CLEARED**: ADR 0022 makes Node a build/CI-time toolchain *and* a generate-time runtime, the shipped artefact is a project-independent 3.78 MB prebuilt `.output/` proven against a second project's IR (1056/1056 + 32/33 at ~4 ms/route), and the standalone binary takes a **documented Node prerequisite** rather than degrading to the C# renderer — so **Q1 and Q2 are answered**. **One new gate replaces it: Story 22.4 runs BEFORE this story** (owner D2), unifying the two region builders, converging the 46-delta and fixing the two-region-shape trap — so Task 2 inherits one region producer, not two. **Story 22.3's retired 50 KB file is now Task 2's spec** (the `NavLocalContext` blocker — there is no `path → NavLocalContext` resolver and ~8 call sites of plumbing is the real cost of correctness — the 25-templater inventory, eight pre-resolved traps, the ranked test-gate map). Stale premises corrected: **Nuxt 3 → `^4.5.1`** with `engines.node` pinned (the EOL trap is closed), **`web/` now has a vitest suite and a coverage gate** (the "zero tests" fact is false), the **next uncontested ADR number is 0023** (0019 claimed-unwritten by 18.3; 0020–0022 exist), and the golden fingerprint has moved four times in two days to `f4a7cbac…` at `SiteGeneratorAdapterTests.cs:1242` — read it, never quote it. Two items inherited from 23.5 and named rather than patched by it: **`DashboardSurface.vue` hard-throws on any project with no Hierarchy Explorer** (the one thing that broke in the two-IR run) and **the ADR 0005 CSP amendment is still this story's** — ADR 0022 deliberately does not touch CSP. |
 | 2026-07-27 | Story 23.4 created (baseline `32fd282`), seeded **`blocked`** on Story 23.5. Four owner decisions locked: (D1) seed now but blocked; (D2) "retire the `HtmlRenderAdapter`" means C# stops **writing** `.html` while keeping a **region-composition** path that feeds the IR and the webview/SPA; (D3) **full componentization** of the remaining 857 pages with `ir-content.css` retired to empty per ADR 0018; (D4) **Story 22.3 is retired** and 23.4 is the answer to "who renders static HTML from the IR." ACs 3–8 extend the epic's two. Three structural findings drove the shape: the IR for 82 % of the site is **produced by the code this story retires** (`ExtractContentRegion` slices the C# renderer's own full-page output), so the region path must be stood up and proven byte-equal **before** any deletion; D2 and D3 are in apparent tension and are reconciled on **provenance** (after C# stops writing pages, `specscribe.css` serves only the webview/SPA, so `web/` owning authored styles completes rather than reverses 23.2's decision); and the owed **ADR 0005 CSP amendment is probably now documentation-only**, because 23.3's `noScripts: true` removed the hydration that 23.1's `'strict-dynamic'` finding was about. `GoldenContentFingerprint` **inverts** here — 23.3 asserted it stationary; this story must move or retire it, by design. |

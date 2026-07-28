@@ -27,4 +27,22 @@ public sealed record AssetManifest
     /// <para>Optional with a <c>false</c> default rather than <c>required</c>: every page that does not host a
     /// hierarchy chart must stay byte-identical, and 1.2 MB is not a rounding error.</para></summary>
     public bool HierarchyEngineNeeded { get; init; }
+
+    /// <summary>Whether <see cref="HierarchyExplorer.BootScript"/> is emitted INLINE, between the wayfinding band
+    /// and the body. Split from <see cref="HierarchyEngineNeeded"/> by Story 23.4 because the two placements are
+    /// genuinely independent and BOTH ship today: the dashboard/epics families emit the boot marker inline (its
+    /// anti-flash handshake has to run while the body is still parsing), while the Impact Map — the newer Story
+    /// 21.3 convention — puts the SAME marker in <see cref="ExtraHead"/>, and the Code Map emits no boot marker at
+    /// all and only pulls the engine. One flag could not express three shapes, and collapsing them would have
+    /// moved bytes on pages this story must leave untouched.
+    /// <para>Either placement is chrome-level and therefore OUTSIDE the IR content region
+    /// (<see cref="JsonSpaRenderAdapter.RenderContent"/> composes nav + wayfinding + body only) — which is why
+    /// <c>IrSurface.vue</c> re-emits it from the head. [Story 23.4 AC #3; Trap 3]</para></summary>
+    public bool HierarchyBootInline { get; init; }
+
+    /// <summary>Page-specific <c>&lt;head&gt;</c> additions, emitted verbatim as
+    /// <see cref="PathUtil.RenderHeadOpen"/>'s <c>extraHead</c>. The producer owns the exact tags. Two real users:
+    /// a code page's Prism stylesheet + highlighter, and the Impact Map's head-placed hierarchy boot marker.
+    /// Null on every other page, which is why it is optional rather than required. [Story 23.4 AC #3]</summary>
+    public string? ExtraHead { get; init; }
 }

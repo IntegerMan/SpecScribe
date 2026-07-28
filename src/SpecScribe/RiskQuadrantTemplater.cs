@@ -19,21 +19,21 @@ public static class RiskQuadrantTemplater
     /// <paramref name="fileHref"/> is the guarded in-portal code-page resolver (Story 7.2 seam): a non-null
     /// return routes a file/point to its code page, a null return (or a null resolver) leaves it plain — never a
     /// broken link.</summary>
-    public static string RenderPage(CodeMap map, SiteNav nav, Func<string, string?>? fileHref = null)
+    public static string RenderPage(CodeMap map, SiteNav nav, Func<string, string?>? fileHref = null) =>
+        HtmlRenderAdapter.Shared.Render(BuildPage(map, nav, fileHref)).Content;
+
+    /// <summary>Builds this page's host-neutral <see cref="PageView"/> — the AD-2 delivery contract. Story 23.4
+    /// moved every standalone templater onto it so the IR's content region can be COMPOSED
+    /// (<see cref="JsonSpaRenderAdapter.RenderContent"/>: nav markup + wayfinding + <c>&lt;main&gt;</c>) instead of
+    /// sliced back out of a rendered full page. <see cref="RenderPage"/> is the unchanged HTML projection of this
+    /// same model, so the bytes are identical. [Story 23.4 AC #3]</summary>
+    public static PageView BuildPage(CodeMap map, SiteNav nav, Func<string, string?>? fileHref = null)
     {
         var outputPath = SiteNav.RiskQuadrantOutputPath;
         var prefix = PathUtil.RelativePrefix(outputPath); // "" — risk-quadrant.html is at the output root.
         var files = map.Files();
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen(
-            $"Risk Quadrant — {nav.SiteTitle}",
-            prefix + ForgeOptions.StylesheetName,
-            prefix + ForgeOptions.ScriptName,
-            $"Refactor-target risk quadrant for {nav.SiteTitle} — files plotted by size and change frequency, with the high-churn, high-size quadrant flagged and ranked as a text-equivalent list."));
-        sb.Append(nav.RenderNavBar(outputPath, nav.BuildInsightsLocalContext(outputPath)));
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[] { ("Home", "index.html"), ("Risk Quadrant", null) }));
-
         sb.Append("<main id=\"main-content\" class=\"dashboard\">\n\n");
         sb.Append("<h1>Refactor-Target Risk Quadrant</h1>\n");
         sb.Append($"<p class=\"doc-subtitle\">{PathUtil.Html(nav.SiteTitle)} &middot; files plotted by size and change frequency</p>\n\n");
@@ -52,9 +52,24 @@ public static class RiskQuadrantTemplater
         AppendElevatedGrid(sb, Charts.RiskQuadrantElevatedFiles(files), fileHref);
 
         sb.Append("</main>\n\n");
-        sb.Append(PathUtil.RenderFooter());
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+
+        return new PageView
+        {
+            Kind = PageKind.Structure,
+            OutputRelativePath = outputPath,
+            Title = $"Risk Quadrant — {nav.SiteTitle}",
+            MetaDescription = $"Refactor-target risk quadrant for {nav.SiteTitle} — files plotted by size and change frequency, with the high-churn, high-size quadrant flagged and ranked as a text-equivalent list.",
+            Nav = nav.ToNavigationView(outputPath, nav.BuildInsightsLocalContext(outputPath)),
+            Breadcrumb = BreadcrumbTrail.From(new (string, string?)[] { ("Home", "index.html"), ("Risk Quadrant", null) }),
+            Assets = new AssetManifest
+            {
+                StylesheetHref = prefix + ForgeOptions.StylesheetName,
+                ScriptHref = prefix + ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+            },
+            Interaction = InteractionState.None,
+            BodyHtml = sb.ToString(),
+        };
     }
 
     /// <summary>The mandatory text equivalent of the chart's shaded quadrant (this project pairs every chart with

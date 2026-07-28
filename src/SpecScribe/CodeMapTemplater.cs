@@ -29,7 +29,14 @@ public static class CodeMapTemplater
     /// — the checkboxes are a view onto one codebase, not a different one. <paramref name="fileHref"/> is the guarded
     /// in-portal code-page resolver (Story 7.1): a non-null return routes a file to its code page, a null return (or a
     /// null resolver) leaves it a plain, focusable rect — never a broken link.</summary>
-    public static string RenderPage(IReadOnlyList<CodeMapVariant> variants, SiteNav nav, Func<string, string?>? fileHref = null)
+    public static string RenderPage(IReadOnlyList<CodeMapVariant> variants, SiteNav nav, Func<string, string?>? fileHref = null) =>
+        HtmlRenderAdapter.Shared.Render(BuildPage(variants, nav, fileHref)).Content;
+
+    /// <summary>Builds this page's host-neutral <see cref="PageView"/> — see
+    /// <see cref="RiskQuadrantTemplater.BuildPage"/> for why every standalone templater grew one. This page emits
+    /// NO boot marker at all (neither head nor inline) and only pulls the engine, which is the third of the three
+    /// hierarchy shapes <see cref="AssetManifest.HierarchyBootInline"/> documents. [Story 23.4 AC #3]</summary>
+    public static PageView BuildPage(IReadOnlyList<CodeMapVariant> variants, SiteNav nav, Func<string, string?>? fileHref = null)
     {
         var outputPath = SiteNav.CodeMapOutputPath;
         var prefix = PathUtil.RelativePrefix(outputPath); // "" — code-map.html is at the output root.
@@ -43,14 +50,6 @@ public static class CodeMapTemplater
         var headline = $"{map.FileCount:N0} {fileWord} across {map.DirectoryCount:N0} {dirWord} · {map.TotalLines:N0} {lineWord} of code";
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen(
-            $"Code Map — {nav.SiteTitle}",
-            prefix + ForgeOptions.StylesheetName,
-            prefix + ForgeOptions.ScriptName,
-            $"Source-code treemap for {nav.SiteTitle} — every file sized by its lines of code and colorable by git-derived change activity, with a full text-equivalent listing."));
-        sb.Append(nav.RenderNavBar(outputPath, nav.BuildInsightsLocalContext(outputPath)));
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[] { ("Home", "index.html"), ("Code Map", null) }));
-
         sb.Append("<main id=\"main-content\" class=\"dashboard\">\n\n");
         sb.Append("<h1>Code Map</h1>\n");
         sb.Append($"<p class=\"doc-subtitle\">{PathUtil.Html(nav.SiteTitle)} &middot; {PathUtil.Html(headline)}</p>\n\n");
@@ -73,19 +72,30 @@ public static class CodeMapTemplater
         }
 
         sb.Append("</main>\n\n");
-        sb.Append(PathUtil.RenderFooter());
-        // The vendored plotly.js hierarchy engine. This page builds its own document rather than going through
-        // PageView/AssetManifest, so the flag-driven emission in HtmlRenderAdapter never reaches it — the engine is
-        // appended here on the same terms the Impact Map uses: AFTER the body, a local file reference, never a CDN
-        // (NFR-3). Conditional on a host actually being present, so an empty repo ships no 1.2 MB bundle it cannot
-        // use. This is the exact miss Story 20.7 made on four surfaces at once — every layer below the browser was
-        // green while nothing mounted — which is why `SiteGeneratorSpaTests` asserts the "no fewer" half.
-        if (HierarchyExplorer.ContainsHost(sb.ToString()))
+
+        return new PageView
         {
-            sb.Append($"<script src=\"{prefix}{ForgeOptions.HierarchyEngineScriptName}\"></script>\n");
-        }
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+            Kind = PageKind.Structure,
+            OutputRelativePath = outputPath,
+            Title = $"Code Map — {nav.SiteTitle}",
+            MetaDescription = $"Source-code treemap for {nav.SiteTitle} — every file sized by its lines of code and colorable by git-derived change activity, with a full text-equivalent listing.",
+            Nav = nav.ToNavigationView(outputPath, nav.BuildInsightsLocalContext(outputPath)),
+            Breadcrumb = BreadcrumbTrail.From(new (string, string?)[] { ("Home", "index.html"), ("Code Map", null) }),
+            Assets = new AssetManifest
+            {
+                StylesheetHref = prefix + ForgeOptions.StylesheetName,
+                ScriptHref = prefix + ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+                // The vendored plotly.js hierarchy engine: AFTER the body, a local file reference, never a CDN
+                // (NFR-3). Conditional on a host actually being present, so an empty repo ships no 1.2 MB bundle
+                // it cannot use — the exact miss Story 20.7 made on four surfaces at once, every layer below the
+                // browser green while nothing mounted, which is why `SiteGeneratorSpaTests` asserts the "no
+                // fewer" half. This page emits NO boot marker, so HierarchyBootInline stays false. [Story 23.4]
+                HierarchyEngineNeeded = HierarchyExplorer.ContainsHost(sb.ToString()),
+            },
+            Interaction = InteractionState.None,
+            BodyHtml = sb.ToString(),
+        };
     }
 
     /// <summary>The pure-CSS panel toggle — the ONE filter on this page that works with JavaScript off, and owner

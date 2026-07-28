@@ -17,6 +17,23 @@ public static class ActionItemsTemplater
         ProjectCounts? counts = null,
         EpicsModel? epicsModel = null,
         IReadOnlyDictionary<string, string>? hrefMap = null,
+        IReadOnlyList<SprintActionItem>? allActionItemsForSlugs = null) =>
+        HtmlRenderAdapter.Shared.Render(BuildPage(
+            openItems, epicRetroMap, commands, nav, deferredWorkHref, counts, epicsModel, hrefMap,
+            allActionItemsForSlugs)).Content;
+
+    /// <summary>Builds this page's host-neutral <see cref="PageView"/> — see
+    /// <see cref="HowToReadTemplater.BuildPage"/> for why the body starts at the doc-header, not the landmark.
+    /// [Story 23.4 AC #3]</summary>
+    public static PageView BuildPage(
+        IReadOnlyList<SprintActionItem> openItems,
+        IReadOnlyDictionary<int, string>? epicRetroMap,
+        CommandCatalog commands,
+        SiteNav nav,
+        string? deferredWorkHref = null,
+        ProjectCounts? counts = null,
+        EpicsModel? epicsModel = null,
+        IReadOnlyDictionary<string, string>? hrefMap = null,
         IReadOnlyList<SprintActionItem>? allActionItemsForSlugs = null)
     {
         var outputPath = SiteNav.ActionItemsOutputPath;
@@ -34,18 +51,6 @@ public static class ActionItemsTemplater
         var detailSlugs = FollowUpSlug.AssignActionSlugs(allActionItemsForSlugs ?? openItems);
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen(
-            $"Open Action Items — {nav.SiteTitle}",
-            ForgeOptions.StylesheetName, ForgeOptions.ScriptName,
-            $"Open retrospective action items for {nav.SiteTitle}."));
-        sb.Append(nav.RenderNavBar(outputPath));
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
-        {
-            ("Home", "index.html"),
-            ("Sprint Status", "sprint.html"),
-            ("Open Action Items", null),
-        }));
-
         sb.Append("<header class=\"doc-header\">\n");
         sb.Append("  <h1>Open Action Items");
         sb.Append(StatusStyles.LegendKey());
@@ -68,9 +73,29 @@ public static class ActionItemsTemplater
         }
 
         sb.Append("</section>\n</main>\n\n");
-        sb.Append(PathUtil.RenderFooter());
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+
+        return new PageView
+        {
+            Kind = PageKind.Sprint,
+            OutputRelativePath = outputPath,
+            Title = $"Open Action Items — {nav.SiteTitle}",
+            MetaDescription = $"Open retrospective action items for {nav.SiteTitle}.",
+            Nav = nav.ToNavigationView(outputPath),
+            Breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
+            {
+                ("Home", "index.html"),
+                ("Sprint Status", "sprint.html"),
+                ("Open Action Items", null),
+            }),
+            Assets = new AssetManifest
+            {
+                StylesheetHref = ForgeOptions.StylesheetName,
+                ScriptHref = ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+            },
+            Interaction = InteractionState.None,
+            BodyHtml = sb.ToString(),
+        };
     }
 
     /// <summary>Projects the whole-site open action-items list into the list-batch Address/Close pane —

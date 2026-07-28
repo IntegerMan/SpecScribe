@@ -14,23 +14,22 @@ public static class HowToReadTemplater
     /// since Story 18.2 the glossary and command-legend sections need the module's identity state and label,
     /// not just its term list, and threading two more positional parameters through would have made the
     /// signature a list of facts that must be kept mutually consistent by every caller. [Story 18.2]</param>
-    public static string RenderPage(SiteNav nav, ModuleContext module)
+    public static string RenderPage(SiteNav nav, ModuleContext module) =>
+        HtmlRenderAdapter.Shared.Render(BuildPage(nav, module)).Content;
+
+    /// <summary>Builds this page's host-neutral <see cref="PageView"/> — see
+    /// <see cref="RiskQuadrantTemplater.BuildPage"/> for why every standalone templater grew one.
+    /// <para>⚠️ <b>The body starts at <c>&lt;header class="doc-header"&gt;</c>, not at <c>&lt;main&gt;</c>.</b>
+    /// This page emits a doc-header BEFORE the landmark, and the slice this composition replaces began at the
+    /// breadcrumb — so a body that started at <c>&lt;main&gt;</c> would silently drop the page's own title block
+    /// from the IR while the static page still showed it. <see cref="PageView.BodyHtml"/> is everything between
+    /// the wayfinding band and the footer.</para> [Story 23.4 AC #3]</summary>
+    public static PageView BuildPage(SiteNav nav, ModuleContext module)
     {
         var moduleDocs = module.Docs;
         var outputPath = SiteNav.HowToReadOutputPath;
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen(
-            $"How to use SpecScribe — {nav.SiteTitle}",
-            ForgeOptions.StylesheetName, ForgeOptions.ScriptName,
-            $"Orientation for a first visit to {nav.SiteTitle}'s documentation portal: a suggested reading order, how to generate and refresh the site from the command line, and a glossary of the terms used throughout."));
-        sb.Append(nav.RenderNavBar(outputPath));
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
-        {
-            ("Home", SiteNav.HomeOutputPath),
-            ("How to use SpecScribe", null),
-        }));
-
         sb.Append("<header class=\"doc-header\">\n");
         sb.Append("  <h1>How to use SpecScribe</h1>\n");
 
@@ -105,9 +104,27 @@ public static class HowToReadTemplater
         sb.Append("</section>\n");
         sb.Append("</main>\n\n");
 
-        sb.Append(PathUtil.RenderFooter());
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+        return new PageView
+        {
+            Kind = PageKind.About,
+            OutputRelativePath = outputPath,
+            Title = $"How to use SpecScribe — {nav.SiteTitle}",
+            MetaDescription = $"Orientation for a first visit to {nav.SiteTitle}'s documentation portal: a suggested reading order, how to generate and refresh the site from the command line, and a glossary of the terms used throughout.",
+            Nav = nav.ToNavigationView(outputPath),
+            Breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
+            {
+                ("Home", SiteNav.HomeOutputPath),
+                ("How to use SpecScribe", null),
+            }),
+            Assets = new AssetManifest
+            {
+                StylesheetHref = ForgeOptions.StylesheetName,
+                ScriptHref = ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+            },
+            Interaction = InteractionState.None,
+            BodyHtml = sb.ToString(),
+        };
     }
 
     /// <summary>Journey 5's canonical path (Readme → module docs in their own declared order → ADRs →

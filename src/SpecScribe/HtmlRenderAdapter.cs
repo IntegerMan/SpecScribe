@@ -27,14 +27,14 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
     public RenderedArtifact Render(PageView page)
     {
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen(page.Title, page.Assets.StylesheetHref, page.Assets.ScriptHref, page.MetaDescription));
+        sb.Append(PathUtil.RenderHeadOpen(page.Title, page.Assets.StylesheetHref, page.Assets.ScriptHref, page.MetaDescription, page.Assets.ExtraHead));
         sb.Append(RenderNav(page.Nav));
         sb.Append(RenderWayfinding(page.OutputRelativePath, page.Breadcrumb, page.Pager));
         // The Hierarchy Explorer's anti-flash handshake (Story 20.5 owner round) — emitted BEFORE the body so it
         // runs while the body is still parsing, which is the only moment the server SVG can be suppressed without
         // the reader watching it paint and then be replaced. Chrome-level for the same reason the plotly bundle is:
         // the webview and SPA use page.BodyHtml directly and must carry no script.
-        if (page.Assets.HierarchyEngineNeeded)
+        if (page.Assets.HierarchyBootInline)
         {
             sb.Append(HierarchyExplorer.BootScript);
         }

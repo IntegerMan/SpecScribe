@@ -202,6 +202,8 @@ public static class HtmlTemplater
                 // Same discipline as MermaidNeeded: derived from the rendered body, so the flag cannot claim a
                 // 1.2 MB engine a page does not host (nor omit one it does). [Story 20.5]
                 HierarchyEngineNeeded = HierarchyExplorer.ContainsHost(body),
+                // Both: this family emits the boot marker INLINE (pre-body) and pulls the engine. [Story 23.4]
+                HierarchyBootInline = HierarchyExplorer.ContainsHost(body),
             },
             Interaction = new InteractionState
             {

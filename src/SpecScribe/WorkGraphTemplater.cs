@@ -11,20 +11,17 @@ namespace SpecScribe;
 /// query results are static HTML, so the page is fully usable with JS off. [Story 19.2]</summary>
 public static class WorkGraphTemplater
 {
-    public static string RenderPage(WorkGraphModel model, SiteNav nav)
+    public static string RenderPage(WorkGraphModel model, SiteNav nav) =>
+        HtmlRenderAdapter.Shared.Render(BuildPage(model, nav)).Content;
+
+    /// <summary>Builds this page's host-neutral <see cref="PageView"/> — see
+    /// <see cref="RiskQuadrantTemplater.BuildPage"/> for why every standalone templater grew one. [Story 23.4 AC #3]</summary>
+    public static PageView BuildPage(WorkGraphModel model, SiteNav nav)
     {
         var outputPath = SiteNav.WorkGraphOutputPath;
         var prefix = PathUtil.RelativePrefix(outputPath); // "" — work-graph.html is at the output root.
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen(
-            $"Work Graph — {nav.SiteTitle}",
-            prefix + ForgeOptions.StylesheetName,
-            prefix + ForgeOptions.ScriptName,
-            $"Directed work graph for {nav.SiteTitle} — where each epic's deferred and action items came from, and any circular provenance."));
-        sb.Append(nav.RenderNavBar(outputPath, nav.BuildInsightsLocalContext(outputPath)));
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[] { ("Home", "index.html"), ("Work Graph", null) }));
-
         sb.Append("<main id=\"main-content\" class=\"dashboard\">\n\n");
         sb.Append("<h1>Work Graph</h1>\n");
         sb.Append($"<p class=\"doc-subtitle\">{PathUtil.Html(nav.SiteTitle)} &middot; where each epic's follow-up work came from</p>\n\n");
@@ -48,9 +45,24 @@ public static class WorkGraphTemplater
             sb.Append(RenderEpicSection(epic));
 
         sb.Append("</main>\n\n");
-        sb.Append(PathUtil.RenderFooter());
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+
+        return new PageView
+        {
+            Kind = PageKind.Structure,
+            OutputRelativePath = outputPath,
+            Title = $"Work Graph — {nav.SiteTitle}",
+            MetaDescription = $"Directed work graph for {nav.SiteTitle} — where each epic's deferred and action items came from, and any circular provenance.",
+            Nav = nav.ToNavigationView(outputPath, nav.BuildInsightsLocalContext(outputPath)),
+            Breadcrumb = BreadcrumbTrail.From(new (string, string?)[] { ("Home", "index.html"), ("Work Graph", null) }),
+            Assets = new AssetManifest
+            {
+                StylesheetHref = prefix + ForgeOptions.StylesheetName,
+                ScriptHref = prefix + ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+            },
+            Interaction = InteractionState.None,
+            BodyHtml = sb.ToString(),
+        };
     }
 
     private static string RenderLegend()

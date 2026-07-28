@@ -254,12 +254,18 @@ public static class TestArtifactsTemplater
         sb.Append("    <caption>Module test coverage by requirement</caption>\n");
         sb.Append("    <thead><tr><th scope=\"col\">Requirement or story</th><th scope=\"col\">Reported as</th><th scope=\"col\">Tests</th><th scope=\"col\">Priority</th></tr></thead>\n");
         sb.Append("    <tbody>\n");
-        foreach (var row in model.Join.Rows)
+        // Grouped by TargetId: the story-id-prefix join form (e.g. two criteria both resolving to "18.4" via
+        // "18.4-AC-1"/"18.4-AC-2") deliberately allows more than one criterion to resolve to the same id, and a
+        // second `<tr>` with an IDENTICAL row header reads as a duplicate/error rather than two distinct oracle
+        // items under one story. One row header per unique target; every criterion still gets its own line
+        // inside the cell. [Review][Patch]
+        foreach (var group in model.Join.Rows.GroupBy(r => r.TargetId, StringComparer.Ordinal))
         {
-            sb.Append($"      <tr><th scope=\"row\">{PathUtil.Html(row.TargetId)}</th>");
-            sb.Append($"<td>{CoverageBadge(row.Criterion.CoverageStatus)}</td>");
-            sb.Append($"<td>{row.Criterion.TestCount}</td>");
-            sb.Append($"<td>{PathUtil.Html(row.Criterion.Priority ?? "&mdash;")}</td></tr>\n");
+            var criteria = group.Select(r => r.Criterion).ToList();
+            sb.Append($"      <tr><th scope=\"row\">{PathUtil.Html(group.Key)}</th>");
+            sb.Append("<td>").Append(string.Join("<br>", criteria.Select(c => CoverageBadge(c.CoverageStatus)))).Append("</td>");
+            sb.Append("<td>").Append(string.Join("<br>", criteria.Select(c => c.TestCount.ToString(CultureInfo.InvariantCulture)))).Append("</td>");
+            sb.Append("<td>").Append(string.Join("<br>", criteria.Select(c => PathUtil.Html(c.Priority ?? "&mdash;")))).Append("</td></tr>\n");
         }
         sb.Append("    </tbody>\n  </table>\n  </div>\n");
         sb.Append("</section>\n\n");

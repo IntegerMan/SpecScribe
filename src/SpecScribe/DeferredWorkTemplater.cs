@@ -13,23 +13,25 @@ public static class DeferredWorkTemplater
         string title = "Deferred Work",
         CommandCatalog? commands = null,
         EpicsModel? epicsModel = null,
+        IReadOnlyDictionary<string, string>? hrefMap = null) =>
+        HtmlRenderAdapter.Shared.Render(
+            BuildPage(model, nav, outputRelativePath, title, commands, epicsModel, hrefMap)).Content;
+
+    /// <summary>Builds this page's host-neutral <see cref="PageView"/> — see
+    /// <see cref="HowToReadTemplater.BuildPage"/> for why the body starts at the doc-header, not the landmark.
+    /// [Story 23.4 AC #3]</summary>
+    public static PageView BuildPage(
+        DeferredWorkModel model,
+        SiteNav nav,
+        string outputRelativePath,
+        string title = "Deferred Work",
+        CommandCatalog? commands = null,
+        EpicsModel? epicsModel = null,
         IReadOnlyDictionary<string, string>? hrefMap = null)
     {
         var catalog = commands ?? CommandCatalog.Empty;
         var prefix = PathUtil.RelativePrefix(outputRelativePath);
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen(
-            $"{title} — {nav.SiteTitle}",
-            prefix + ForgeOptions.StylesheetName,
-            prefix + ForgeOptions.ScriptName,
-            $"Deferred work for {nav.SiteTitle}."));
-        sb.Append(nav.RenderNavBar(outputRelativePath));
-        sb.Append(SiteNav.RenderBreadcrumb(outputRelativePath, new (string, string?)[]
-        {
-            ("Home", prefix + "index.html"),
-            (title, null),
-        }));
-
         sb.Append("<header class=\"doc-header\">\n");
         sb.Append($"  <h1>{PathUtil.Html(title)}");
         sb.Append(StatusStyles.LegendKey());
@@ -94,9 +96,28 @@ public static class DeferredWorkTemplater
         }
 
         sb.Append("</main>\n\n");
-        sb.Append(PathUtil.RenderFooter(prefix));
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+
+        return new PageView
+        {
+            Kind = PageKind.Structure,
+            OutputRelativePath = outputRelativePath,
+            Title = $"{title} — {nav.SiteTitle}",
+            MetaDescription = $"Deferred work for {nav.SiteTitle}.",
+            Nav = nav.ToNavigationView(outputRelativePath),
+            Breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
+            {
+                ("Home", prefix + "index.html"),
+                (title, null),
+            }),
+            Assets = new AssetManifest
+            {
+                StylesheetHref = prefix + ForgeOptions.StylesheetName,
+                ScriptHref = prefix + ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+            },
+            Interaction = InteractionState.None,
+            BodyHtml = sb.ToString(),
+        };
     }
 
     /// <summary>Projects one open deferred item for the list-batch Address/Close pane — raw summary text

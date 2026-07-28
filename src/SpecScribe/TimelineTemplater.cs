@@ -18,24 +18,24 @@ public static class TimelineTemplater
         IReadOnlyDictionary<DateOnly, IReadOnlyList<CommitInfo>> commitsByDay,
         IReadOnlyDictionary<DateOnly, IReadOnlyList<(string Label, string Href)>> artifactsByDay,
         SiteNav nav,
+        DateOnly? today = null) =>
+        HtmlRenderAdapter.Shared.Render(
+            BuildPage(git, daysNewestFirst, commitsByDay, artifactsByDay, nav, today)).Content;
+
+    /// <summary>Builds this page's host-neutral <see cref="PageView"/> — see
+    /// <see cref="RiskQuadrantTemplater.BuildPage"/> for why every standalone templater grew one. [Story 23.4 AC #3]</summary>
+    public static PageView BuildPage(
+        GitPulse? git,
+        IReadOnlyList<DateOnly> daysNewestFirst,
+        IReadOnlyDictionary<DateOnly, IReadOnlyList<CommitInfo>> commitsByDay,
+        IReadOnlyDictionary<DateOnly, IReadOnlyList<(string Label, string Href)>> artifactsByDay,
+        SiteNav nav,
         DateOnly? today = null)
     {
         var outputPath = SiteNav.TimelineOutputPath;
         var prefix = PathUtil.RelativePrefix(outputPath);
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen(
-            $"Activity Timeline — {nav.SiteTitle}",
-            prefix + ForgeOptions.StylesheetName,
-            prefix + ForgeOptions.ScriptName,
-            $"Activity timeline for {nav.SiteTitle}: commits and artifact changes over time, with a page for each active date."));
-        sb.Append(nav.RenderNavBar(outputPath));
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[]
-        {
-            ("Home", "index.html"),
-            ("Timeline", null),
-        }));
-
         // Single <main id="main-content"> landmark / skip-link target. [Story 1.4 AC #1]
         sb.Append("<main id=\"main-content\">\n");
         sb.Append("<header class=\"doc-header\">\n");
@@ -96,8 +96,27 @@ public static class TimelineTemplater
 
         sb.Append("</article>\n\n");
         sb.Append("</main>\n\n");
-        sb.Append(PathUtil.RenderFooter(prefix));
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+
+        return new PageView
+        {
+            Kind = PageKind.Structure,
+            OutputRelativePath = outputPath,
+            Title = $"Activity Timeline — {nav.SiteTitle}",
+            MetaDescription = $"Activity timeline for {nav.SiteTitle}: commits and artifact changes over time, with a page for each active date.",
+            Nav = nav.ToNavigationView(outputPath),
+            Breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
+            {
+                ("Home", "index.html"),
+                ("Timeline", null),
+            }),
+            Assets = new AssetManifest
+            {
+                StylesheetHref = prefix + ForgeOptions.StylesheetName,
+                ScriptHref = prefix + ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+            },
+            Interaction = InteractionState.None,
+            BodyHtml = sb.ToString(),
+        };
     }
 }

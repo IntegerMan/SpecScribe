@@ -2,6 +2,18 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of 20-8-dashboard-details-pane (2026-07-28)
+
+- source_spec: `20-8-dashboard-details-pane.md`
+  summary: Two files on this story's own declared File List — `src/SpecScribe/assets/specscribe.css` (a ~120-line
+  "FORGED IDEAS (Story 18.4)" block) and `.claude/launch.json` (the `ideas-18-4` / `ideas-18-4-jsoff` entries, one
+  pointing at another session's now-gone scratch path) — carry substantial Story 18.4 content, even though the
+  File List states sibling-story content was "excluded here."
+  evidence: Blind Hunter + Acceptance Auditor. Not a defect in this story's own implementation — an artifact of
+  landing several concurrent sessions' work in one commit (`c1a6ee5`, per CLAUDE.md § Concurrent work). Revisit
+  next time either file is reviewed: don't assume this story's File List fully describes their diffs.
+  [`src/SpecScribe/assets/specscribe.css`, `.claude/launch.json`]
+
 ## Deferred from: code review of 5-7-fixed-as-of-date-page-cutoff-policy (2026-07-28)
 
 - source_spec: `5-7-fixed-as-of-date-page-cutoff-policy.md`

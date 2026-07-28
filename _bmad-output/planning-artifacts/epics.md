@@ -1948,6 +1948,43 @@ So that I can spot recent movement without diffing pages.
 **Then** the affected surface shows no recency marker rather than a wrong one
 **And** generation remains non-fatal.
 
+<!-- 2026-07-28: Epic 8 REOPENED (was `done` since its 2026-07-15 retrospective) to seat Story 8.9, per owner
+     decision D4 at create-story. Story 22.3 was retired on 2026-07-27 and its `Status: retired` line renders as
+     "Unrecognized" — Story 8.2 promoted `retired` to a first-class stage in the sprint-ledger classifier but never
+     in the artifact-status classifier, so the word is canonical in one half of its own seam and unmapped in the
+     other. `sprint-status.yaml` carries `epic-8: in-progress` + the `8-9-…` key in this same change. -->
+
+### Story 8.9: `retired` Is a First-Class Story Status
+
+As a maintainer reading the portal after retiring a story,
+I want a retired story to read as **Retired** everywhere — badge, counts, epic roll-up, charts and diagnostics — instead of as an unrecognized status word,
+So that a deliberate, documented planning decision stops being reported as a defect, and an epic that retires a story can still reach "done".
+
+**Acceptance Criteria:**
+
+1.
+**Given** `StatusStyles.ForSprint` maps `retired` to a first-class stage while `StatusStyles.ForStatus` — the classifier that reads a story artifact's `Status:` line — has no arm for it
+**When** a story artifact carries a retirement word
+**Then** it classifies as `retired`, not `unrecognized`
+**And** the retirement vocabulary (`retired`, `superseded`, `deprecated`, `cancelled`, `obsolete`, `wontfix`) lives in exactly one authored place, shared with `EpicsParser.RetirementKeyword`
+**And** generation emits no "unrecognized status" diagnostic for it, while a genuinely unmapped word still gets one (Story 8.2 AC #3 is narrowed, not removed).
+
+2.
+**Given** Story 8.3's requirement that every count derive from one source
+**When** the same retired story is tallied
+**Then** the defined-story ledger and the sprint-tracked ledger name the same stage
+**And** `retired` is a bucket in the story-stage partition every consumer iterates, with its own word and glyph — never colour alone (UX-DR17).
+
+3.
+**Given** an epic containing a retired story
+**When** its status is rolled up
+**Then** `retired` counts as a terminal stage: all-done-or-retired reads `done`, and an all-retired epic reads `retired`
+**And** a retired story is never offered as the next unit of work.
+
+<!-- Full context, the five measured consequences, six traps and the four owner decisions (D1 terminal stage ·
+     D2 inline demoted card, no 7th --status token · D3 six-word shared vocabulary · D4 reopen Epic 8) are in
+     `8-9-retired-is-a-first-class-story-status.md`. The golden fingerprint is EXPECTED to move. ADR 0025 owed. -->
+
 ## Epic 9: Traceability and Review Follow-Through
 
 Complete the requirement → epic → story chain so a Stakeholder can click from any requirement to its delivering stories, a Reviewer can judge a "done" claim in one glance, and follow-up items carry provenance and resolution paths — including visibility in the primary remaining-work geometry (sunburst) and coherent Driver/Stakeholder workflows for authoring and satisfaction status. Serves the daily Driver journeys (1–2), the review journey (3), the traceability differentiator (4), and debt follow-through (7) defined in docs/UserJourneys.md.

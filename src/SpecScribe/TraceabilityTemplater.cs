@@ -11,21 +11,18 @@ namespace SpecScribe;
 /// freshest precedent) rather than <see cref="HtmlTemplater.RenderPage"/>. [Story 21.1]</summary>
 public static class TraceabilityTemplater
 {
-    public static string RenderPage(RequirementsModel requirements, EpicsModel epics, SiteNav nav, ProjectCounts counts)
+    public static string RenderPage(RequirementsModel requirements, EpicsModel epics, SiteNav nav, ProjectCounts counts) =>
+        HtmlRenderAdapter.Shared.Render(BuildPage(requirements, epics, nav, counts)).Content;
+
+    /// <summary>Builds this page's host-neutral <see cref="PageView"/> — see
+    /// <see cref="RiskQuadrantTemplater.BuildPage"/> for why every standalone templater grew one. [Story 23.4 AC #3]</summary>
+    public static PageView BuildPage(RequirementsModel requirements, EpicsModel epics, SiteNav nav, ProjectCounts counts)
     {
         var outputPath = SiteNav.TraceabilityOutputPath;
         var prefix = PathUtil.RelativePrefix(outputPath); // "" — traceability.html is at the output root.
         var sat = counts.RequirementsOverall;
 
         var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen(
-            $"Traceability — {nav.SiteTitle}",
-            prefix + ForgeOptions.StylesheetName,
-            prefix + ForgeOptions.ScriptName,
-            $"Requirement-to-epic traceability matrix for {nav.SiteTitle} — every FR, NFR, and UX design requirement plotted against the epics that cover it."));
-        sb.Append(nav.RenderNavBar(outputPath, nav.BuildDeliveryLocalContext(outputPath)));
-        sb.Append(SiteNav.RenderBreadcrumb(outputPath, new (string, string?)[] { ("Home", "index.html"), ("Traceability", null) }));
-
         sb.Append("<main id=\"main-content\" class=\"dashboard\">\n\n");
         sb.Append("<h1>Requirement Traceability</h1>\n");
         sb.Append($"<p class=\"doc-subtitle\">{PathUtil.Html(nav.SiteTitle)} &middot; every requirement plotted against its covering epics</p>\n\n");
@@ -45,8 +42,23 @@ public static class TraceabilityTemplater
             body));
 
         sb.Append("</main>\n\n");
-        sb.Append(PathUtil.RenderFooter());
-        sb.Append("</body>\n</html>\n");
-        return sb.ToString();
+
+        return new PageView
+        {
+            Kind = PageKind.Requirements,
+            OutputRelativePath = outputPath,
+            Title = $"Traceability — {nav.SiteTitle}",
+            MetaDescription = $"Requirement-to-epic traceability matrix for {nav.SiteTitle} — every FR, NFR, and UX design requirement plotted against the epics that cover it.",
+            Nav = nav.ToNavigationView(outputPath, nav.BuildDeliveryLocalContext(outputPath)),
+            Breadcrumb = BreadcrumbTrail.From(new (string, string?)[] { ("Home", "index.html"), ("Traceability", null) }),
+            Assets = new AssetManifest
+            {
+                StylesheetHref = prefix + ForgeOptions.StylesheetName,
+                ScriptHref = prefix + ForgeOptions.ScriptName,
+                MermaidNeeded = false,
+            },
+            Interaction = InteractionState.None,
+            BodyHtml = sb.ToString(),
+        };
     }
 }

@@ -128,14 +128,20 @@ public static class RelatedWorkCards
             // A story sitting inside its epic's card restates "Part of -> Epic N" as the heading above it. Drop
             // it with the SHARED test rather than a second rule. [Story 20.3]
             var meaningful = node.Groups.Where(g => !RelatedWork.IsRestatedContainsGroup(g)).ToList();
-            if (meaningful.Count == 0) continue;
+            // A wedged story can itself already carry upstream-folded Subjects (RelatedWork.Build's own separate
+            // ancestor fold, when this story was the nearest wedged ancestor of an unwedged deferred/action/spec
+            // item). Those must ride along when the story's own section collapses into its epic here — dropping
+            // them would silently discard real relationship data that would otherwise have nowhere left to live.
+            if (meaningful.Count == 0 && node.Subjects.Count == 0) continue;
             if (!subjectsByEpic.TryGetValue(host, out var list))
             {
                 subjectsByEpic[host] = list = new List<RelatedWorkSubject>();
                 epicFoldOrder.Add(host);
             }
-            list.Add(new RelatedWorkSubject(
-                StoryTitle(node.IslandId, storiesById) ?? node.Label, node.Kind, node.Href, meaningful));
+            if (meaningful.Count > 0)
+                list.Add(new RelatedWorkSubject(
+                    StoryTitle(node.IslandId, storiesById) ?? node.Label, node.Kind, node.Href, meaningful));
+            list.AddRange(node.Subjects);
         }
 
         // ---- D3: canonicalize the selectable set before any card is built ---------------------------------
@@ -196,7 +202,10 @@ public static class RelatedWorkCards
             var card = BuildCard(
                 node.IslandId, payload: null, byIslandId, subjectsByEpic,
                 epicsByNumber, storiesById, commands, geometry);
-            if (card is not null) cards.Add(card);
+            if (card is null) continue;
+            cards.Add(aliasesByCanonical.TryGetValue(node.IslandId, out var aliases)
+                ? card with { Aliases = aliases }
+                : card);
         }
 
         // The fallback pass D1 requires: an epic that hosts folded story subjects but has no card of its own —
@@ -210,7 +219,10 @@ public static class RelatedWorkCards
             var card = BuildCard(
                 host, payload: null, byIslandId, subjectsByEpic,
                 epicsByNumber, storiesById, commands, geometry);
-            if (card is not null) cards.Add(card);
+            if (card is null) continue;
+            cards.Add(aliasesByCanonical.TryGetValue(host, out var aliases)
+                ? card with { Aliases = aliases }
+                : card);
         }
 
         return new RelatedWorkPaneModel(project, cards, workGraphHref, relationships.Overflow);
@@ -240,6 +252,11 @@ public static class RelatedWorkCards
         var dot = islandId.IndexOf('.');
         return dot > 0 ? $"epic-{islandId[..dot]}" : null;
     }
+
+    /// <summary>A readable label for a fold host id that resolved to no <see cref="EpicInfo"/> — the same shape
+    /// <c>RelatedWork.HostLabel</c> uses for its own orphaned-host fallback.</summary>
+    private static string HostLabelFor(string islandId) =>
+        islandId.StartsWith("epic-", StringComparison.Ordinal) ? "Epic " + islandId[5..] : islandId;
 
     private static string? StoryTitle(string islandId, IReadOnlyDictionary<string, StoryInfo> storiesById) =>
         storiesById.TryGetValue(islandId, out var story)
@@ -318,14 +335,33 @@ public static class RelatedWorkCards
         // ---- A scope the work graph knows but no domain object does: the Unattributed root. Unchanged. ----
         if (known is not null)
         {
-            var items = known.EntryCount;
             var rel = known;
             if (subjectsByEpic.TryGetValue(islandId, out var folded))
                 rel = rel with { Subjects = rel.Subjects.Concat(folded).ToList() };
+            // Count AFTER folding — a phantom "epic-N" whose number matches no current EpicInfo but still carries
+            // a work-graph node lands here too, and its folded story subjects must be reflected in the count the
+            // reader sees, not just in the rendered block underneath it.
+            var items = rel.EntryCount;
             return new RelatedCard(
                 islandId, known.Label, "Follow-ups",
                 $"{items} related {Charts.Plural(items, "item", "items")} with no epic",
                 null, known.Href, rel);
+        }
+
+        // ---- A fold host with no EpicInfo AND no work-graph node of its own: an epic number that no longer
+        // matches any current epic, but still has story subjects folded onto it (D1). Materialize a minimal card
+        // — the same "don't drop content with nowhere else to live" reasoning RelatedWork.Build already applies
+        // via its own HostLabel fallback — rather than falling through to `payload is null` and discarding the
+        // whole fold silently. ----
+        if (subjectsByEpic.TryGetValue(islandId, out var orphanFolded))
+        {
+            var rel = EmptyRelationships(islandId, HostLabelFor(islandId), WorkNodeKind.Epic)
+                with { Subjects = orphanFolded };
+            var items = rel.EntryCount;
+            return new RelatedCard(
+                islandId, HostLabelFor(islandId), "Follow-ups",
+                $"{items} related {Charts.Plural(items, "item", "items")} with no matching epic",
+                null, null, rel);
         }
 
         // ---- D3: the follow-up AGGREGATES and the `unplanned` root. ----
