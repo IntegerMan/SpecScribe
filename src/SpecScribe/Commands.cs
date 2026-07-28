@@ -620,7 +620,14 @@ public sealed class InteractiveCommand : Command<SiteSettings>
             // this prompt exists to give — say so, the same way the settings-save failure below does. [Review][Patch]
             AnsiConsole.MarkupLine($"[yellow]![/] [yellow]Saved today-policy '{Markup.Escape(unrecognized)}' is not recognized[/] [grey](defaulting to machine-local below)[/]");
         }
-        var currentCutoff = todayPolicyParsed ? parsed : default;
+        // --as-of takes the SAME precedence here as SiteSettings.ResolveDateCutoff()/SettingsStore.ResolveCutoffOrNull:
+        // it implies the fixed policy on its own, without needing --today-policy too. A launch driven only by
+        // --as-of (settings.TodayPolicy still empty) must still be recognized as the CURRENT cutoff here, or
+        // re-opening this menu would pre-select machine-local and silently discard the pin the run is actually
+        // using — exactly the flip the surrounding comment says this prompt exists to prevent. [Review][Patch]
+        var currentCutoff = settings.AsOf is { Length: > 0 } && DatePolicies.TryParseAsOfDate(settings.AsOf, out var pinnedAsOf)
+            ? new DateCutoff(DatePolicy.AsOf, pinnedAsOf)
+            : todayPolicyParsed ? parsed : default;
         var policyChoices = new[] { currentCutoff.Policy }
             .Concat(Enum.GetValues<DatePolicy>().Where(p => p != currentCutoff.Policy))
             .ToArray();
@@ -649,7 +656,14 @@ public sealed class InteractiveCommand : Command<SiteSettings>
                 datePrompt = datePrompt.DefaultValue(PortalDates.IsoDay(pinned));
             }
 
-            DatePolicies.TryParseAsOfDate(AnsiConsole.Prompt(datePrompt), out var chosenDate);
+            // The prompt's own .Validate() delegate above already guarantees AnsiConsole.Prompt cannot return
+            // something TryParseAsOfDate rejects — but that is two call sites independently re-implementing the
+            // same check. Assert it here too rather than discarding the bool, so a future drift between them fails
+            // loudly instead of silently persisting an as-of:0001-01-01 token (NFR8). [Review][Patch]
+            if (!DatePolicies.TryParseAsOfDate(AnsiConsole.Prompt(datePrompt), out var chosenDate))
+            {
+                throw new InvalidOperationException("Prompted date failed to parse after passing its own validator.");
+            }
             settings.TodayPolicy = DatePolicies.Token(new DateCutoff(DatePolicy.AsOf, chosenDate));
         }
         else

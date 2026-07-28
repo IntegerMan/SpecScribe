@@ -2844,6 +2844,184 @@ public sealed class SiteGenerator
     /// <see cref="ForgeOptions.RepoRoot"/> never changes after construction. [6-10-deferred-debt-cleanup]</summary>
     private string? _realRepoRoot;
 
+    // ===== Story 22.4: ONE region seam, two filtered projections ============================================
+    //
+    // Until 22.4 the SPA bundle (BuildSpaBundle) and the webview bundle (RenderWebviewSurfaces) were two ~200-line
+    // builders that each rebuilt the SAME prelude, iterated the epics family with the SAME rules, and sliced the
+    // SAME captured regions — and had to be edited in lockstep forever. Story 22.2's codeItemHref fix had to be
+    // applied twice, in both files, and both carried apology comments saying so.
+    //
+    // The three members below are that seam, singular. Both surfaces are now FILTERED PROJECTIONS of it:
+    //   · BuildSurfacePrelude  — docs → work → counts → followUps → unplanned → dashboard PageView
+    //   · BuildFamilySurfaces  — the dashboard + epics-family PageView sequence, in order, with the linkify skip
+    //                            keys and the identity the webview's outline tree needs
+    //   · CapturedRegions      — one (path, title, region, breadcrumb, description, degraded) per captured page
+    //
+    // What stays surface-specific is ONLY what genuinely differs — see RenderWebviewSurfaces' filter. This is
+    // ADR 0008 §Decision 2's "co-equal projections" made true: the webview stopped being a rival builder.
+
+    /// <summary>The shared state every dashboard/epics surface is composed from, built ONCE per bundle so the SPA
+    /// and the webview cannot disagree by construction. [Story 22.4 AC #1]</summary>
+    private sealed record SurfacePrelude(
+        List<DocModel> Docs,
+        WorkInventory Work,
+        ProjectCounts Counts,
+        FollowUpGeometry? FollowUps,
+        UnplannedWorkGeometry? Unplanned,
+        PageView DashboardPage);
+
+    /// <summary>Builds <see cref="SurfacePrelude"/>. This is the ONE place the dashboard's inputs are assembled.
+    /// <para>⚠️ <c>CodeItemHref</c> is passed EXPLICITLY and positionally-correctly to
+    /// <see cref="HtmlTemplater.BuildIndexPage"/>. The named arguments start at <c>counts:</c>, so an omission
+    /// silently skips the positional <c>codeItemHref</c> and leaves it null — which makes
+    /// <c>Charts.CodeItemLink</c> degrade the Git Pulse top-changed-file bar labels from links to plain text and
+    /// drops 5 anchors, the ENTIRE 277-byte parity delta Story 23.1 measured. Both former call sites carried a
+    /// comment about it because both had made the mistake; unifying them is exactly the moment it could have been
+    /// lost, so it is stated once, here, at the only call site left. [Story 22.2 AC #4; Story 22.4 Task 4]</para>
+    /// </summary>
+    private SurfacePrelude BuildSurfacePrelude(SiteNav nav)
+    {
+        var docs = _docs.Values.ToList();
+        var work = WorkInventory.Build(docs);
+        var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work, _epicsModel, _requirements);
+        var followUps = BuildFollowUpGeometry(work, counts);
+        var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel, retros: _retros);
+        var dashboardPage = HtmlTemplater.BuildIndexPage(
+            docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
+            work, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts: counts, followUps: followUps, unplanned: unplanned, cadence: _cadence, workGraph: _workGraph, dateCutoff: _today, testArtifacts: _testArtifacts);
+        return new SurfacePrelude(docs, work, counts, followUps, unplanned, dashboardPage);
+    }
+
+    /// <summary>One dashboard/epics family surface: the <see cref="PageView"/> both consumers render, plus the
+    /// reference-linkify skip keys and the identity only the webview's outline tree needs. Carrying the identity
+    /// here (rather than rebuilding the tree in a second loop) is what guarantees an outline node's
+    /// <c>SurfacePath</c> comes from the SAME PageView the surface was rendered from — Story 6.9 fact #5.
+    /// [Story 22.4 AC #1]</summary>
+    private sealed record FamilySurface(
+        PageView Page,
+        string? SkipStoryId = null,
+        int? SkipEpicNumber = null,
+        /// <summary>The webview's reveal-source target for the SURFACE (falls back to the epics file).</summary>
+        string? SurfaceSourcePath = null,
+        /// <summary>The story's own artifact path, or null for a placeholder — the OUTLINE's stricter rule,
+        /// which omits "Open Source" entirely rather than falling back to the epics file.</summary>
+        string? ArtifactSourcePath = null,
+        EpicInfo? Epic = null,
+        StoryInfo? Story = null);
+
+    /// <summary>The dashboard + epics family <see cref="PageView"/> sequence, in emission order. Formerly
+    /// duplicated verbatim in <see cref="BuildSpaBundle"/> and <see cref="RenderWebviewSurfaces"/> — same models,
+    /// same retro map, same pagers, same placeholder rule, same fragment pipeline.
+    /// <para><b>Trap 4, resolved deliberately.</b> The two former loops were NOT identical: the webview wrapped its
+    /// <see cref="BuildStoryPageFragments"/> call in a <c>catch (IOException or UnauthorizedAccessException)</c>
+    /// that degrades ONE story to a placeholder, and the SPA had no catch at all. The unified loop KEEPS the
+    /// catch, so the SPA gains resilience it did not have. That direction was chosen because the alternative is
+    /// strictly worse: without it, an artifact deleted or ACL-denied mid-render aborts the ENTIRE SPA emit, where
+    /// the HTML path (<see cref="RenderEpicsPages"/>) already degrades gracefully. It can only change behaviour in
+    /// a case that previously threw. [Story 22.4 AC #1/#2]</para></summary>
+    private List<FamilySurface> BuildFamilySurfaces(SiteNav nav, SurfacePrelude prelude)
+    {
+        var families = new List<FamilySurface> { new(prelude.DashboardPage) };
+        if (_epicsModel is not { } model || _progress is not { } progress) return families;
+
+        var progressByEpic = progress.PerEpic.ToDictionary(p => p.Number);
+        families.Add(new FamilySurface(
+            EpicsTemplater.BuildIndexPage(model, progress, nav, _module.Commands, prelude.Counts, prelude.FollowUps, prelude.Unplanned),
+            SurfaceSourcePath: _epicsSourcePath));
+
+        foreach (var epic in model.Epics)
+        {
+            var epicRetroPath = EpicRetroMap.TryGetValue(epic.Number, out var erp) ? erp : null;
+            families.Add(new FamilySurface(
+                EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic), prelude.FollowUps, prelude.Unplanned, _planningImpact, EpicSubgraph(epic.Number)),
+                SkipEpicNumber: epic.Number,
+                SurfaceSourcePath: _epicsSourcePath,
+                Epic: epic));
+
+            foreach (var story in epic.Stories)
+            {
+                PageView storyPage;
+                string? artifactSourcePath = null;
+                if (story.ArtifactOutputPath is null || !_storyArtifactsById.TryGetValue(story.Id, out var artifactFullPath))
+                {
+                    storyPage = EpicsTemplater.BuildStoryPlaceholderPage(epic, story, nav, _module.Commands, epicRetroPath, StoryPager(model, story));
+                }
+                else
+                {
+                    try
+                    {
+                        artifactSourcePath = RepoRelative(artifactFullPath);
+                        var f = BuildStoryPageFragments(story, artifactFullPath, _referenceMap);
+                        storyPage = EpicsTemplater.BuildStoryPage(
+                            epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria,
+                            f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav,
+                            _module.Commands, epicRetroPath, StoryPager(model, story), prelude.FollowUps, _planningImpact, StorySubgraph(epic, story, prelude.FollowUps));
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        // The artifact was deleted, ACL-denied, or otherwise became unreadable between
+                        // GenerateAll() and this bundle build — degrade this ONE story to a placeholder rather
+                        // than aborting the whole bundle, mirroring RenderEpicsPages' resilience on the HTML path.
+                        // [Deferred item, Story 6.4 review; widened to the SPA by Story 22.4 — see Trap 4 above]
+                        artifactSourcePath = null;
+                        storyPage = EpicsTemplater.BuildStoryPlaceholderPage(epic, story, nav, _module.Commands, epicRetroPath, StoryPager(model, story));
+                    }
+                }
+
+                families.Add(new FamilySurface(
+                    storyPage,
+                    SkipStoryId: story.Id,
+                    SurfaceSourcePath: artifactSourcePath ?? _epicsSourcePath,
+                    ArtifactSourcePath: artifactSourcePath,
+                    Epic: epic,
+                    Story: story));
+            }
+        }
+
+        return families;
+    }
+
+    /// <summary>One captured page's sliced content region and everything either consumer projects from it.
+    /// <para>⚠️ <b>Trap 3.</b> <see cref="SpaDelivery.ExtractContentRegion"/> signals "this page carries no
+    /// landmark" by returning the nav-markup INSTANCE it was handed, and the webview detects that with a
+    /// REFERENCE comparison. <see cref="Degraded"/> is computed at the point of slicing, inside the one loop,
+    /// precisely so no consumer has to re-derive it — a caller that recomputed, copied or re-concatenated the nav
+    /// markup would silently break the detection with no test failing, and ship a content-empty surface into the
+    /// webview. Read this flag; never re-compare.</para></summary>
+    private readonly record struct CapturedRegion(
+        string Path,
+        string Title,
+        string Region,
+        IReadOnlyList<BreadcrumbCrumb> Breadcrumb,
+        string? MetaDescription,
+        bool Degraded);
+
+    /// <summary>Slices every captured page that is not already a family surface — the ONE captured-region
+    /// producer, consumed unfiltered by the SPA and filtered by the webview.
+    /// <para>Nothing here is deleted by this story: <see cref="_spaCapture"/>, <see cref="CapturedNavMarkup"/> and
+    /// the <c>SpaDelivery.Extract*</c> family remain the IR's producer for the ~1,200 non-family pages until
+    /// Story 23.4 replaces them (23.4 AC #3 deliberately keeps one C# region-composition path). This method is
+    /// where that path now lives, once. [Story 22.4 AC #1/#3]</para></summary>
+    private IEnumerable<CapturedRegion> CapturedRegions(SiteNav nav, HashSet<string> familyPaths)
+    {
+        if (_spaCapture is not { } capture) yield break;
+
+        foreach (var (path, fullHtml) in capture)
+        {
+            var normalized = PathUtil.NormalizeSlashes(path);
+            if (familyPaths.Contains(normalized)) continue;
+            var navMarkup = CapturedNavMarkup(fullHtml, nav, normalized);
+            var region = SpaDelivery.ExtractContentRegion(fullHtml, navMarkup);
+            yield return new CapturedRegion(
+                normalized,
+                SpaDelivery.ExtractTitle(fullHtml),
+                region,
+                SpaDelivery.ExtractBreadcrumb(fullHtml, normalized),
+                SpaDelivery.ExtractMetaDescription(fullHtml),
+                Degraded: ReferenceEquals(region, navMarkup));
+        }
+    }
+
     /// <summary>Renders the webview's navigable surface set — dashboard, epics index, every epic page, and every
     /// story page/placeholder (the five Story 6.2 surface families) — through the
     /// <see cref="WebviewRenderAdapter"/>, from the SAME cached models, builders, and fragment pipeline the HTML
@@ -2859,108 +3037,21 @@ public sealed class SiteGenerator
             var nav = _nav ?? throw new InvalidOperationException(
                 "RenderWebviewSurfaces requires a completed GenerateAll() pass on this generator.");
 
-            var surfaces = new List<WebviewSurface>();
-            // Built in lock-step with the surfaces below so every outline SurfacePath is captured from the SAME
-            // PageView the surface is rendered from — never re-derived — guaranteeing it matches a surfaces[...]
-            // key a tree click can push() to (Story 6.9 fact #5). Data only; no HTML, no re-parse.
-            var outlineEpics = new List<OutlineEpic>();
-
-            // Dashboard — the same inputs WriteIndex hands the templater, so the webview dashboard can never
-            // disagree with the generated index.html.
-            var docs = _docs.Values.ToList();
-            var work = WorkInventory.Build(docs);
-            var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work, _epicsModel, _requirements);
-            var followUps = BuildFollowUpGeometry(work, counts);
-            var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel, retros: _retros);
-            // CodeItemHref is passed EXPLICITLY here (Story 22.2 AC #4). The named arguments below start at
-            // `counts:`, which used to silently skip the positional codeItemHref and leave it null — and a null
-            // resolver makes Charts.CodeItemLink degrade the Git Pulse top-changed-file bar labels from links to
-            // plain text, dropping 5 anchors this surface should carry. Story 23.1 measured the identical defect on
-            // the SPA capture; both are fixed together because both are the same omission.
-            var dashboardPage = HtmlTemplater.BuildIndexPage(
-                docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
-                work, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts: counts, followUps: followUps, unplanned: unplanned, cadence: _cadence, workGraph: _workGraph, dateCutoff: _today, testArtifacts: _testArtifacts);
-            surfaces.Add(WebviewSurfaceFor(dashboardPage));
-
-            // Epics family — mirrors RenderEpicsPages' iteration exactly (same retro map, same per-epic
-            // progress, same placeholder rule, same fragment pipeline), rendered to webview content instead of
-            // written to disk.
-            if (_epicsModel is { } model && _progress is { } progress)
+            // ONE shared prelude + ONE family sequence, identical to the SPA bundle's (Story 22.4 AC #1). The
+            // webview's dashboard can never disagree with the generated index.html, and — new in 22.4 — it can
+            // never disagree with the IR either, because there is no second builder left to drift.
+            var prelude = BuildSurfacePrelude(nav);
+            var families = BuildFamilySurfaces(nav, prelude);
+            var surfaces = new List<WebviewSurface>(families.Count);
+            foreach (var f in families)
             {
-                var progressByEpic = progress.PerEpic.ToDictionary(p => p.Number);
-                surfaces.Add(WebviewSurfaceFor(EpicsTemplater.BuildIndexPage(model, progress, nav, _module.Commands, counts, followUps, unplanned), _epicsSourcePath));
-
-                foreach (var epic in model.Epics)
-                {
-                    var epicRetroPath = EpicRetroMap.TryGetValue(epic.Number, out var erp) ? erp : null;
-                    var epicPage = EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic), followUps, unplanned, _planningImpact, EpicSubgraph(epic.Number));
-                    surfaces.Add(WebviewSurfaceFor(epicPage, _epicsSourcePath, skipEpicNumber: epic.Number));
-
-                    var outlineStories = new List<OutlineStory>();
-                    foreach (var story in epic.Stories)
-                    {
-                        PageView storyPage;
-                        // A drafted story's REPO-relative `.md` — the reveal-source target (Story 6.10) AND the
-                        // harmonized 6.9 tree "Open Source" path (one convention, host-joined to the workspace
-                        // folder). Null for a placeholder (no artifact yet); its surface still reveals the epics
-                        // file (the placeholder's source IS the epic), but the outline node omits "Open Source".
-                        string? storySourcePath = null;
-                        if (story.ArtifactOutputPath is null || !_storyArtifactsById.TryGetValue(story.Id, out var artifactFullPath))
-                        {
-                            storyPage = EpicsTemplater.BuildStoryPlaceholderPage(epic, story, nav, _module.Commands, epicRetroPath, StoryPager(model, story));
-                        }
-                        else
-                        {
-                            try
-                            {
-                                storySourcePath = RepoRelative(artifactFullPath);
-                                var f = BuildStoryPageFragments(story, artifactFullPath, _referenceMap);
-                                storyPage = EpicsTemplater.BuildStoryPage(
-                                    epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria,
-                                    f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav,
-                                    _module.Commands, epicRetroPath, StoryPager(model, story), followUps, _planningImpact, StorySubgraph(epic, story, followUps));
-                            }
-                            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                            {
-                                // The artifact was deleted, ACL-denied, or otherwise became unreadable in the
-                                // sub-second window between GenerateAll() and RenderWebviewSurfaces() — degrade
-                                // this ONE story to a placeholder rather than aborting the entire webview bundle,
-                                // mirroring RenderEpicsPages' resilience on the HTML path. [Deferred item, Story
-                                // 6.4 review]
-                                storySourcePath = null;
-                                storyPage = EpicsTemplater.BuildStoryPlaceholderPage(epic, story, nav, _module.Commands, epicRetroPath, StoryPager(model, story));
-                            }
-                        }
-                        surfaces.Add(WebviewSurfaceFor(storyPage, storySourcePath ?? _epicsSourcePath, skipStoryId: story.Id));
-
-                        var storyStage = StatusStyles.ForStory(story);
-                        // `commands` = full Next Steps set (incl. done's muted correct-course hatch when exposed);
-                        // `helperCommand` = PrimaryStoryCommand (null for done unless Address deferred is primary —
-                        // hatch is never a primary). [spec-vscode-sidebar-shortcuts-…-quickpick; Story 8.5;
-                        // spec-address-deferred-next-steps]
-                        var storyOpenDeferred = followUps?.DeferredForSource(story.Id)
-                            ?.Where(s => !s.Item.Resolved).ToList();
-                        var storyCommands = BmadCommands.StoryCommands(story, _module.Commands, storyOpenDeferred);
-                        outlineStories.Add(new OutlineStory(
-                            story.Id, story.Title, storyStage, StatusStyles.StoryLabel(storyStage),
-                            PathUtil.NormalizeSlashes(storyPage.OutputRelativePath),
-                            storySourcePath,
-                            story.TasksDone, story.TasksTotal,
-                            BmadCommands.PrimaryStoryCommand(story, _module.Commands, storyOpenDeferred),
-                            storyCommands));
-                    }
-
-                    var epicStage = StatusStyles.ForEpicWithRetrospective(epic);
-                    outlineEpics.Add(new OutlineEpic(
-                        epic.Number, epic.Title, epicStage, StatusStyles.EpicLabel(epicStage),
-                        PathUtil.NormalizeSlashes(epicPage.OutputRelativePath),
-                        StoriesTotal: epic.Stories.Count,
-                        StoriesDone: epic.Stories.Count(s => StatusStyles.ForStory(s) == "done"),
-                        outlineStories));
-                }
+                surfaces.Add(WebviewSurfaceFor(f.Page, f.SurfaceSourcePath, f.SkipStoryId, f.SkipEpicNumber));
             }
 
-            var outline = new ProjectOutline(outlineEpics, BuildOutlineSummary(outlineEpics));
+            // The outline tree is projected from the SAME FamilySurface list the surfaces were rendered from, so
+            // every node's SurfacePath is the PageView's own path and always matches a surfaces[...] key a tree
+            // click can push() to (Story 6.9 fact #5). Data only; no HTML, no re-parse.
+            var outline = BuildOutline(families, prelude.FollowUps);
 
             // Long-tail pages (docs, ADRs, requirements, sprint, retros, about, diagnostics…) captured at the
             // WriteOutput seam during this run's GenerateAll (CapturePages — the webview command turns it on):
@@ -2981,7 +3072,7 @@ public sealed class SiteGenerator
                 throw new InvalidOperationException(
                     "CapturePages was set after GenerateAll(); set it before generating so the write seam captures pages.");
             }
-            if (_spaCapture is { } capture)
+            if (_spaCapture is not null)
             {
                 var familyPaths = new HashSet<string>(
                     surfaces.Select(s => PathUtil.NormalizeSlashes(s.OutputRelativePath)),
@@ -2992,36 +3083,36 @@ public sealed class SiteGenerator
                     excluded.Add(PathUtil.NormalizeSlashes(day.OutputRelativePath));
                 }
                 var sourceByOutput = BuildCapturedSourceMap();
-                foreach (var (path, fullHtml) in capture)
+
+                // THE WEBVIEW'S FILTER over the shared region producer — this, and only this, is what makes the
+                // webview a different projection from the SPA (Story 22.4 AC #1/#2):
+                //   1. the exclusion set above (code pages, commit-day pages, the commit/ prefix)
+                //   2. the degrade skip
+                //   3. the JSON-island strip
+                //   4. the SourcePath join
+                // The SPA consumes the same sequence unfiltered.
+                foreach (var captured in CapturedRegions(nav, familyPaths))
                 {
-                    var normalized = PathUtil.NormalizeSlashes(path);
-                    if (familyPaths.Contains(normalized)) continue;
-                    if (excluded.Contains(normalized)) continue;
-                    if (normalized.StartsWith("commit/", StringComparison.OrdinalIgnoreCase)) continue;
-                    var navMarkup = CapturedNavMarkup(fullHtml, nav, normalized);
-                    var region = SpaDelivery.ExtractContentRegion(fullHtml, navMarkup);
-                    if (ReferenceEquals(region, navMarkup))
+                    if (excluded.Contains(captured.Path)) continue;
+                    if (captured.Path.StartsWith("commit/", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (captured.Degraded)
                     {
                         // No <main> landmark → the slice degraded to nav-only. A silently BLANK surface is
                         // worse than the shim's honest toast, so skip it (the SPA keeps its nav-only degrade:
                         // a browser tab is escapable; a status panel claiming "links work" is not).
+                        //
+                        // The flag is computed at the slice, inside CapturedRegions, against the nav-markup
+                        // REFERENCE — so the strip below can no longer defeat it by ordering, which is how this
+                        // check used to be fragile (Trap 3).
                         continue;
                     }
                     // Same rule the PageView path applies in WebviewRenderAdapter.RenderContent, which this path
                     // never ran: this surface ships no specscribe.js, so an inline JSON island is dead weight it
                     // can never read — and after Story 20.9 that is 4.5 MB of it on code-map.html alone. The
                     // `data-island` host exception already described the webview as carrying none.
-                    //
-                    // AFTER the degrade check, deliberately: that check is a REFERENCE comparison against the
-                    // nav markup, and stripping first would hand it a fresh string every time, so a genuinely
-                    // landmark-less page would stop being detected and would ship as a blank surface.
-                    region = WebviewRenderAdapter.StripDataIslands(region);
-                    sourceByOutput.TryGetValue(normalized, out var capturedSource);
-                    surfaces.Add(new WebviewSurface(
-                        normalized,
-                        SpaDelivery.ExtractTitle(fullHtml),
-                        region,
-                        capturedSource));
+                    var region = WebviewRenderAdapter.StripDataIslands(captured.Region);
+                    sourceByOutput.TryGetValue(captured.Path, out var capturedSource);
+                    surfaces.Add(new WebviewSurface(captured.Path, captured.Title, region, capturedSource));
                 }
             }
 
@@ -3030,7 +3121,7 @@ public sealed class SiteGenerator
             // SourcePath is null (it aggregates many artifacts), so the reveal button paints hidden — the bridge
             // shows it only once an update swaps in a surface that carries a source (Story 6.10).
             var entry = surfaces[0];
-            var entryDocument = WebviewRenderAdapter.Shared.WrapDocument(dashboardPage, entry.ContentHtml, entry.SourcePath);
+            var entryDocument = WebviewRenderAdapter.Shared.WrapDocument(prelude.DashboardPage, entry.ContentHtml, entry.SourcePath);
             return new WebviewBundle(_options.SiteTitle, entry.OutputRelativePath, entryDocument, surfaces, outline);
         }
     }
@@ -3074,6 +3165,67 @@ public sealed class SiteGenerator
             Add(SiteNav.ReadmeOutputPath, ReadmeSourcePath);
         }
         return map;
+    }
+
+    /// <summary>Projects the webview's outline tree from the SAME <see cref="FamilySurface"/> sequence the
+    /// surfaces were rendered from — so a node's <c>SurfacePath</c> is always the PageView's own path and always
+    /// matches a <c>surfaces[...]</c> key a tree click can <c>push()</c> to (Story 6.9 fact #5). Formerly built
+    /// inline, interleaved with the surface loop; extracting it is what let that loop become shared.
+    /// <para>Note the deliberate asymmetry the <see cref="FamilySurface"/> record preserves: a placeholder
+    /// story's SURFACE still reveals the epics file, but its outline node omits "Open Source" entirely — so this
+    /// reads <see cref="FamilySurface.ArtifactSourcePath"/>, never <c>SurfaceSourcePath</c>. [Story 22.4]</para>
+    /// </summary>
+    private ProjectOutline BuildOutline(IReadOnlyList<FamilySurface> families, FollowUpGeometry? followUps)
+    {
+        var outlineEpics = new List<OutlineEpic>();
+        List<OutlineStory>? stories = null;
+        EpicInfo? currentEpic = null;
+        PageView? currentEpicPage = null;
+
+        void FlushEpic()
+        {
+            if (currentEpic is not { } epic || currentEpicPage is not { } epicPage) return;
+            var epicStage = StatusStyles.ForEpicWithRetrospective(epic);
+            outlineEpics.Add(new OutlineEpic(
+                epic.Number, epic.Title, epicStage, StatusStyles.EpicLabel(epicStage),
+                PathUtil.NormalizeSlashes(epicPage.OutputRelativePath),
+                StoriesTotal: epic.Stories.Count,
+                StoriesDone: epic.Stories.Count(s => StatusStyles.ForStory(s) == "done"),
+                stories ?? new List<OutlineStory>()));
+        }
+
+        foreach (var f in families)
+        {
+            if (f.Story is { } story && f.Epic is not null)
+            {
+                var storyStage = StatusStyles.ForStory(story);
+                // `commands` = full Next Steps set (incl. done's muted correct-course hatch when exposed);
+                // `helperCommand` = PrimaryStoryCommand (null for done unless Address deferred is primary —
+                // hatch is never a primary). [spec-vscode-sidebar-shortcuts-…-quickpick; Story 8.5;
+                // spec-address-deferred-next-steps]
+                var storyOpenDeferred = followUps?.DeferredForSource(story.Id)
+                    ?.Where(s => !s.Item.Resolved).ToList();
+                stories?.Add(new OutlineStory(
+                    story.Id, story.Title, storyStage, StatusStyles.StoryLabel(storyStage),
+                    PathUtil.NormalizeSlashes(f.Page.OutputRelativePath),
+                    f.ArtifactSourcePath,
+                    story.TasksDone, story.TasksTotal,
+                    BmadCommands.PrimaryStoryCommand(story, _module.Commands, storyOpenDeferred),
+                    BmadCommands.StoryCommands(story, _module.Commands, storyOpenDeferred)));
+                continue;
+            }
+
+            if (f.Epic is { } newEpic)
+            {
+                FlushEpic();
+                currentEpic = newEpic;
+                currentEpicPage = f.Page;
+                stories = new List<OutlineStory>();
+            }
+        }
+        FlushEpic();
+
+        return new ProjectOutline(outlineEpics, BuildOutlineSummary(outlineEpics));
     }
 
     /// <summary>Tallies the status-bar summary from the assembled outline — stories by stage across all epics,
@@ -3153,72 +3305,28 @@ public sealed class SiteGenerator
         var familyPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // 1) Dashboard + epics families via their view models — true view-model renders, so section-fact parity is
-        // airtight (AC #4). Mirrors RenderWebviewSurfaces' iteration exactly (same models, retro map, placeholder
-        // rule, fragment pipeline).
-        var docs = _docs.Values.ToList();
-        var work = WorkInventory.Build(docs);
-        var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work, _epicsModel, _requirements);
-        var followUps = BuildFollowUpGeometry(work, counts);
-        var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel, retros: _retros);
-        // CodeItemHref passed explicitly — see the identical note on RenderWebviewSurfaces' dashboard call.
-        // Without it the IR's dashboard region carries 548 anchors where the static page carries 553, which is
-        // the ENTIRE 277-byte parity delta Story 23.1 measured. [Story 22.2 AC #4]
-        var dashboardPage = HtmlTemplater.BuildIndexPage(
-            docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands,
-            work, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts: counts, followUps: followUps, unplanned: unplanned, cadence: _cadence, workGraph: _workGraph, dateCutoff: _today, testArtifacts: _testArtifacts);
-        AddSpaSurface(pages, familyPaths, dashboardPage);
-
-        if (_epicsModel is { } model && _progress is { } progress)
+        // airtight (AC #4). The prelude and the family sequence are the SAME ones RenderWebviewSurfaces consumes
+        // (Story 22.4 AC #1): there is no second builder to keep in step any more.
+        var prelude = BuildSurfacePrelude(nav);
+        foreach (var f in BuildFamilySurfaces(nav, prelude))
         {
-            var progressByEpic = progress.PerEpic.ToDictionary(p => p.Number);
-            AddSpaSurface(pages, familyPaths, EpicsTemplater.BuildIndexPage(model, progress, nav, _module.Commands, counts, followUps, unplanned));
-
-            foreach (var epic in model.Epics)
-            {
-                var epicRetroPath = EpicRetroMap.TryGetValue(epic.Number, out var erp) ? erp : null;
-                AddSpaSurface(pages, familyPaths,
-                    EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic), followUps, unplanned, _planningImpact, EpicSubgraph(epic.Number)),
-                    skipEpicNumber: epic.Number);
-
-                foreach (var story in epic.Stories)
-                {
-                    if (story.ArtifactOutputPath is null || !_storyArtifactsById.TryGetValue(story.Id, out var artifactFullPath))
-                    {
-                        AddSpaSurface(pages, familyPaths,
-                            EpicsTemplater.BuildStoryPlaceholderPage(epic, story, nav, _module.Commands, epicRetroPath, StoryPager(model, story)),
-                            skipStoryId: story.Id);
-                        continue;
-                    }
-
-                    var f = BuildStoryPageFragments(story, artifactFullPath, _referenceMap);
-                    AddSpaSurface(pages, familyPaths,
-                        EpicsTemplater.BuildStoryPage(
-                            epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria,
-                            f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav,
-                            _module.Commands, epicRetroPath, StoryPager(model, story), followUps, _planningImpact, StorySubgraph(epic, story, followUps)),
-                        skipStoryId: story.Id);
-                }
-            }
+            AddSpaSurface(pages, familyPaths, f.Page, f.SkipStoryId, f.SkipEpicNumber);
         }
 
         // 2) Every OTHER captured page: slice its content region via the landmark. Families are already covered
         // above (skipped here). The nav is re-rendered fresh (byte-identical to the page's own, minus the inline
-        // toggle script the client owns); the breadcrumb + <main> come from the page's own captured output. The
-        // breadcrumb is ALSO recovered structurally (from that same captured string — never re-read from disk)
-        // so the manifest's drill parent/child data covers the whole site, not just the 5 view-model families.
-        if (_spaCapture is { } capture)
+        // toggle script the client owns); the wayfinding band + <main> come from the page's own captured output.
+        // The breadcrumb is ALSO recovered structurally (from that same captured string — never re-read from
+        // disk) so the manifest's drill parent/child data covers the whole site, not just the 5 view-model
+        // families.
+        //
+        // The SPA consumes the shared producer UNFILTERED — including a page whose region degraded to nav-only,
+        // which the webview drops. That asymmetry is deliberate and preserved: a browser tab is escapable, a
+        // status panel claiming "links work" is not.
+        foreach (var captured in CapturedRegions(nav, familyPaths))
         {
-            foreach (var (path, fullHtml) in capture)
-            {
-                var normalized = PathUtil.NormalizeSlashes(path);
-                if (familyPaths.Contains(normalized)) continue;
-                var navMarkup = CapturedNavMarkup(fullHtml, nav, normalized);
-                var region = SpaDelivery.ExtractContentRegion(fullHtml, navMarkup);
-                var breadcrumb = SpaDelivery.ExtractBreadcrumb(fullHtml, normalized);
-                pages.Add(new SpaPage(
-                    normalized, SpaDelivery.ExtractTitle(fullHtml), region, breadcrumb,
-                    SpaDelivery.ExtractMetaDescription(fullHtml)));
-            }
+            pages.Add(new SpaPage(
+                captured.Path, captured.Title, captured.Region, captured.Breadcrumb, captured.MetaDescription));
         }
 
         return new SpaBundle(_options.SiteTitle, "index.html", nav.Items, pages);
@@ -3797,22 +3905,16 @@ public sealed class SiteGenerator
                 ForgedIdeaHtml = i.ForgedIdeaHtml is { Length: > 0 } handoff
                     ? RewriteHandoffLinks(handoff, i.WorkspaceSourceRelative)
                     : i.ForgedIdeaHtml,
-            }).ToList());
+            }).ToList())
+        { WorkspaceSourceRelatives = _ideas.WorkspaceSourceRelatives };
         _ideas = resolved;
         events.AddRange(MapDiagnostics(linkDiagnostics));
 
-        var sw = Stopwatch.StartNew();
-        try
-        {
-            WriteOutput(SiteNav.IdeasOutputPath,
-                ApplyReferenceLinks(IdeasTemplater.RenderListPage(resolved, nav), SiteNav.IdeasOutputPath));
-            events.Add(new GenerationEvent(GenerationOutcome.Generated, SiteNav.IdeasOutputPath, sw.Elapsed));
-        }
-        catch (Exception ex)
-        {
-            events.Add(new GenerationEvent(GenerationOutcome.Error, SiteNav.IdeasOutputPath, sw.Elapsed, ex.Message));
-        }
-
+        // [Story 18.4 review] Detail pages (+ carried reports) write FIRST, and only the ideas that actually made
+        // it to disk are handed to the list page below — so a mid-loop write failure can never leave ideas.html
+        // linking to a detail page that was never written. Same discipline the report-before-detail ordering
+        // already applied one level down.
+        var writtenIdeas = new List<IdeaEntry>();
         foreach (var idea in resolved.Ideas)
         {
             var detailSw = Stopwatch.StartNew();
@@ -3829,11 +3931,28 @@ public sealed class SiteGenerator
                 WriteOutput(idea.DetailOutputPath,
                     ApplyReferenceLinks(IdeasTemplater.RenderDetailPage(idea, nav), idea.DetailOutputPath));
                 events.Add(new GenerationEvent(GenerationOutcome.Generated, idea.DetailOutputPath, detailSw.Elapsed));
+                writtenIdeas.Add(idea);
             }
             catch (Exception ex)
             {
                 events.Add(new GenerationEvent(GenerationOutcome.Error, idea.DetailOutputPath, detailSw.Elapsed, ex.Message));
             }
+        }
+
+        var listModel = writtenIdeas.Count == resolved.Ideas.Count
+            ? resolved
+            : new IdeasModel(writtenIdeas) { WorkspaceSourceRelatives = resolved.WorkspaceSourceRelatives };
+
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            WriteOutput(SiteNav.IdeasOutputPath,
+                ApplyReferenceLinks(IdeasTemplater.RenderListPage(listModel, nav), SiteNav.IdeasOutputPath));
+            events.Add(new GenerationEvent(GenerationOutcome.Generated, SiteNav.IdeasOutputPath, sw.Elapsed));
+        }
+        catch (Exception ex)
+        {
+            events.Add(new GenerationEvent(GenerationOutcome.Error, SiteNav.IdeasOutputPath, sw.Elapsed, ex.Message));
         }
 
         return events;
@@ -3971,6 +4090,19 @@ public sealed class SiteGenerator
         if (BmadArtifactAdapter.IsEpicsFile(normalized))
         {
             return _epicsModel is not null ? SiteNav.EpicsOutputPath : null;
+        }
+
+        // [Story 18.4 review] Retros are consumed out of _docs (like epics.md) but DO each get their own page —
+        // a link into one fell through to the final _docs check and was always treated as dead. (ADRs are NOT
+        // checked here: they live outside SourceRoot, in docs/adrs/, and the only two callers of this method
+        // resolve hrefs through IdeaDiscovery.TryResolveWorkspaceHref, which refuses to resolve anything that
+        // escapes SourceRoot — so a real ADR reference can never reach this method in the first place.)
+        foreach (var retro in _retros)
+        {
+            if (string.Equals(PathUtil.NormalizeSlashes(retro.SourceRelativePath), normalized, StringComparison.OrdinalIgnoreCase))
+            {
+                return PathUtil.NormalizeSlashes(retro.OutputRelativePath);
+            }
         }
 
         // A link INTO another idea's workspace routes to that idea's detail page — its workspace markdown was
@@ -4562,6 +4694,37 @@ public sealed class SiteGenerator
         };
     }
 
+    /// <summary>The <c>(sourceRelative, outputRelative)</c> pairs the follow-up href map's doc half needs —
+    /// from the populated <see cref="_docs"/> when it exists, and otherwise derived straight from the source file
+    /// list. <see cref="PathUtil.ToOutputRelative"/> is a pure function of the source-relative path, so the
+    /// derived pairs are the SAME pairs <see cref="_docs"/> yields once the pages loop has filled it — which is
+    /// what makes the pre-loop and post-loop maps agree instead of silently differing.
+    /// <para>Deliberately NOT a <see cref="_docs"/> pre-population (Story 22.4 Trap 2): filling <c>_docs</c>
+    /// early would flip <see cref="GenerateOneInternal"/>'s <c>alreadyExisted</c> and turn every
+    /// <c>Generated</c> diagnostic into <c>Updated</c>, moving the golden fingerprint for a reason that has
+    /// nothing to do with the work inventory. This reads paths only — no conversion, no cache mutation.</para>
+    /// <para><see cref="IsIgnored"/> is applied for the same reason the pages loop applies it: an ignored file
+    /// never becomes a page, so mapping a resolver onto its would-be href would manufacture a dangling
+    /// link.</para>
+    /// [Story 22.4 AC #5]</summary>
+    private IEnumerable<(string SourceRelativePath, string OutputRelativePath)> ResolveFollowUpDocPairs(
+        IReadOnlyList<string> files)
+    {
+        if (_docs.Count > 0)
+        {
+            return _docs.Values.Select(d => (d.SourceRelativePath, d.OutputRelativePath)).ToList();
+        }
+
+        var pairs = new List<(string, string)>();
+        foreach (var file in files)
+        {
+            if (IsIgnored(file)) continue;
+            var relative = ToSourceRelative(file);
+            pairs.Add((relative, PathUtil.ToOutputRelative(relative)));
+        }
+        return pairs;
+    }
+
     /// <summary>Read-only conversion of <c>spec-*.md</c> one-shots when <see cref="_docs"/> is not yet
     /// populated — keeps epics.html Unplanned wedges aligned with index.html. [Story 9.12]</summary>
     private IReadOnlyList<QuickDevEntry> ConvertQuickDevFromSource(IReadOnlyList<string> files)
@@ -4602,7 +4765,11 @@ public sealed class SiteGenerator
         if (work.Deferred is null || TryConvertDeferredDoc(files) is not { } doc) return null;
 
         var prefix = PathUtil.RelativePrefix(PathUtil.NormalizeSlashes(work.Deferred.OutputPath));
-        var hrefMap = FollowUpRefs.BuildHrefMap(_epicsModel, _docs.Values);
+        // Story 22.4 AC #5: this used to pass `_docs.Values`, which is EMPTY on the RenderEpicsPages route (the
+        // pages loop has not run yet) — so every spec resolver's href came back null and WorkGraph.BuildStory
+        // dropped the resolver node and its edge from 46 static story pages while the IR, built after the loop,
+        // drew them. Resolving the map through the source-derived route makes both sides see the same one.
+        var hrefMap = FollowUpRefs.BuildHrefMap(_epicsModel, ResolveFollowUpDocPairs(files));
         return DeferredWorkParser.Parse(doc.Markdown, hrefMap, prefix, doc.BodyHtml);
     }
 
@@ -5121,8 +5288,11 @@ public sealed class SiteGenerator
         var result = new Dictionary<string, DateOnly>(StringComparer.OrdinalIgnoreCase);
         if (!Directory.Exists(_options.SourceRoot)) return result;
 
+        // [Story 18.4 review] Keyed off WorkspaceSourceRelatives (every proven forge workspace), NOT Ideas — a
+        // slug-collision loser never becomes an IdeaEntry, but its memlog is still on disk and must still be
+        // excluded here, or it keeps flipping hasScopedMemlog for the rest of the portal.
         var ideaWorkspaces = new HashSet<string>(
-            _ideas.Ideas.Select(i => i.WorkspaceSourceRelative), StringComparer.OrdinalIgnoreCase);
+            _ideas.WorkspaceSourceRelatives, StringComparer.OrdinalIgnoreCase);
 
         var memlogs = new List<(string Dir, DateOnly Updated)>();
         foreach (var full in Directory.EnumerateFiles(_options.SourceRoot, Memlog.FileName, SearchOption.AllDirectories))

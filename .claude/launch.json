@@ -298,6 +298,26 @@
       "port": 8110
     },
     {
+      "name": "static-jsoff-22-4",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "C:/Users/MattE/AppData/Local/Temp/claude/C--Dev-SpecScribe/2315f98d-8db5-4d03-89e6-2269fa58eef8/scratchpad/jsoff_server.py",
+        "8117",
+        "C:/Dev/SpecScribe/SpecScribeOutput"
+      ],
+      "port": 8117
+    },
+    {
+      "name": "nuxt-jsoff-22-4",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "C:/Users/MattE/AppData/Local/Temp/claude/C--Dev-SpecScribe/2315f98d-8db5-4d03-89e6-2269fa58eef8/scratchpad/jsoff_server.py",
+        "8118",
+        "C:/Dev/SpecScribe/web/.output/public"
+      ],
+      "port": 8118
+    },
+    {
       "name": "codemap-20-9",
       "runtimeExecutable": "python",
       "runtimeArgs": [

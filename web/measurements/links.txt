@@ -3,18 +3,18 @@ Story 23.3 AC #4 — internal link resolution, Nuxt output vs the golden site
 
                         nuxt          golden
 ----------------------------------------------------
-  pages walked          1063          1057
-  files emitted         1100          1119
-  <a href> total        102588        106455
-  external/anchor       11720         12992
-  internal              90868         93463
-  resolved              89816         92393
-  dangling              1052          1070
+  pages walked          1414          1408
+  files emitted         1451          1497
+  <a href> total        220118        224811
+  external/anchor       10569         12202
+  internal              209549        212609
+  resolved              208419        211461
+  dangling              1130          1148
 
 Link-for-link against the golden site:
 
   REGRESSIONS (resolve in golden, dangle here)   0  (0 distinct hrefs)
-  inherited   (dangle in both — not this story)  534  (223 distinct hrefs)
+  inherited   (dangle in both — not this story)  592  (240 distinct hrefs)
   repaired    (dangle in golden, resolve here)   0
   nuxt-only   (link has no golden counterpart)   0
 
@@ -22,19 +22,19 @@ No regressions: every link that resolves on the golden site also resolves in the
 
 Inherited dangling targets (present in the golden site, reproduced faithfully here):
 
-  31    ../planning-artifacts/epics.md
-  28    ../specs/spec-specscribe/ARCHITECTURE-SPINE.md
+  33    ../planning-artifacts/epics.md
+  31    ../specs/spec-specscribe/ARCHITECTURE-SPINE.md
   17    ../specs/spec-specscribe/rendering-architecture.md
+  15    ../../docs/adrs/0013-text-twin-is-the-no-js-contract.md
   15    ../../<a href=
-  14    ../../docs/adrs/0013-text-twin-is-the-no-js-contract.md
-  13    ../../docs/adrs/0005-vs-code-webview-runtime-and-packaging.md
+  14    ../../docs/adrs/0005-vs-code-webview-runtime-and-packaging.md
   11    ../../docs/adrs/0012-plotly-hierarchy-chart-engine-and-standardized-explorer-component.md
   11    ../../docs/adrs/0009-frontend-framework-for-projection-layer.md
   11    ../../docs/adrs/0006-delivery-architecture-and-distribution.md
-  8     6-4-read-only-vs-code-webview-runtime-for-dashboard-and-epics.md
-  7     ../../docs/adrs/0008-json-ir-canonical-and-incremental-generation.md
-  7     ../../CLAUDE.md
-  … and 211 more distinct targets.
+  9     ../../docs/adrs/0008-json-ir-canonical-and-incremental-generation.md
+  9     ../../CLAUDE.md
+  8     deferred-work.md
+  … and 228 more distinct targets.
 
   Two known causes, both in shipped C# and both worth their own follow-up:
     · links to SOURCE files (`…/epics.md`) that the portal never rewrites to their `.html` page;

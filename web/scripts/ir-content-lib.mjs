@@ -12,8 +12,10 @@
 //   2. GENERATED — never hand-authored, and gated in both directions by `check:ir-content`;
 //   3. SCOPED   — every rule is emitted under `.ir-content`, so it cannot reach a template-authored
 //                 component even by accident;
-//   4. ENUMERATED — `assets/ir-content.manifest.json` names every source rule carried, with its line span.
-//                 That list is the surface Story 23.4 has to retire. Implied debt is debt nobody pays.
+//   4. ENUMERATED — `assets/ir-content.manifest.json` names every source rule carried, by SELECTOR (plus
+//                 the at-rule it sits within). That list is the surface Story 23.4 has to retire; implied
+//                 debt is debt nobody pays. It records no line spans on purpose — see the committed-fields
+//                 rule in `ir-content-build.mjs`, and grep the selector instead.
 //
 // ⚠️ Never write the `*` + `/` sequence inside a CSS comment in a generated or hand-authored sheet here.
 // That exact mistake silently closed a comment in `specscribe.css` and took ~1,000 rules with it, invisible

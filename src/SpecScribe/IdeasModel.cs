@@ -103,6 +103,14 @@ public sealed record IdeasModel(IReadOnlyList<IdeaEntry> Ideas)
 {
     public static IdeasModel Empty { get; } = new(Array.Empty<IdeaEntry>());
 
+    /// <summary>Every workspace-relative path <see cref="IdeaDiscovery"/> proved was a real forge workspace (rules
+    /// 1-3), before slug de-duplication — a superset of <see cref="Ideas"/>' workspaces, since a slug-collision
+    /// LOSER never becomes an <see cref="IdeaEntry"/> but its memlog is still on disk.
+    /// <c>SiteGenerator.BuildMemlogMap</c> keys its forge-exclusion off THIS set rather than <see cref="Ideas"/>
+    /// alone, so a collision loser's memlog can't still flip <c>hasScopedMemlog</c> for the rest of the portal.
+    /// [Story 18.4 review]</summary>
+    public IReadOnlyList<string> WorkspaceSourceRelatives { get; init; } = Array.Empty<string>();
+
     /// <summary>True when no forge workspace was discovered — no <c>ideas.html</c> is written and no nav entry or
     /// quick link is emitted (AC #3 / NFR8: absent artifacts → absent surfaces, never an empty page).</summary>
     public bool IsEmpty => Ideas.Count == 0;
@@ -268,11 +276,7 @@ public static class IdeaDerivation
         _ => "In progress",
     };
 
-    /// <summary>Section heading for a verdict group on <c>ideas.html</c>.</summary>
-    public static string SectionHeading(IdeaVerdict verdict) => verdict switch
-    {
-        IdeaVerdict.Hardened => "Hardened",
-        IdeaVerdict.Killed => "Killed",
-        _ => "In progress",
-    };
+    /// <summary>Section heading for a verdict group on <c>ideas.html</c> — the same word as <see cref="VerdictWord"/>
+    /// (one classifier, one seam; [Story 18.4 review]).</summary>
+    public static string SectionHeading(IdeaVerdict verdict) => VerdictWord(verdict);
 }

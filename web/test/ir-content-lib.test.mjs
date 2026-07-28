@@ -11,6 +11,7 @@
  * written inside a CSS comment, once terminated that comment early and silently broke roughly a thousand
  * rules across the portal. (Writing that sequence literally in this docblock would end it here, too.)
  */
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   isMigrated,
@@ -124,5 +125,61 @@ describe('selectorAttributes', () => {
 
   it('returns an empty list when there are no attribute selectors', () => {
     expect(selectorAttributes('.a .b')).toEqual([])
+  })
+})
+
+// ── The committed manifest must describe the CARRIED LAYER, never the whole source ──────────────────────
+//
+// `ir-content.manifest.json` is committed and `check:ir-content` compares it byte-for-byte. The rule that
+// keeps that honest: a field belongs in the manifest only if changing it implies the emitted
+// `ir-content.css` changed too. A field that can move on its own turns the gate red on a commit that could
+// not possibly have affected the layer, and a gate that cannot stay green teaches people to re-run the
+// extractor on reflex — which is exactly how a real drift gets committed unnoticed.
+//
+// Both classes of offender got in and were removed after they had already cost a red build:
+//
+//   1. WHOLE-CORPUS  [Story 23.5] — `migratedPages`, `totalPages`, `passThroughUncoveredClasses` moved
+//      whenever anybody added a document anywhere in the ~1,100-page corpus.
+//   2. WHOLE-SOURCE  — `sourceRules`, `droppedUnused`, `sourceBytes` and the per-rule `lines` span count or
+//      locate rules the layer does NOT carry. Deleting 38 unused rules from `specscribe.css` shifted every
+//      line span in the file and reddened CI with an 865-line diff while `ir-content.css` stayed
+//      byte-identical.
+//
+// These assertions need no IR and no portal, so they run in the ordinary `npm test` loop rather than only
+// in the expensive CI gate. They read the COMMITTED artifact, which is the thing the gate actually compares.
+describe('ir-content.manifest.json committed fields', () => {
+  const manifest = JSON.parse(readFileSync(new URL('../assets/ir-content.manifest.json', import.meta.url), 'utf8'))
+
+  it('records no source line span on any rule', () => {
+    const withLines = manifest.rules.filter((r) => 'lines' in r)
+    expect(withLines).toEqual([])
+  })
+
+  it('carries only stats that move when the emitted layer moves', () => {
+    // Whitelist, not a blocklist: a new source-wide counter should fail this the day it is added, and a
+    // blocklist would silently wave it through.
+    expect(Object.keys(manifest.stats).sort()).toEqual(
+      ['carriedKeyframes', 'carriedRules', 'carriedSelectors', 'droppedRoot', 'generatedBytes'].sort(),
+    )
+  })
+
+  it('identifies every rule by selector, the anchor that does not go stale', () => {
+    expect(manifest.rules.length).toBeGreaterThan(0)
+    for (const rule of manifest.rules) {
+      expect(typeof rule.selector).toBe('string')
+      expect(rule.selector.length).toBeGreaterThan(0)
+      expect(typeof rule.carried).toBe('boolean')
+    }
+  })
+
+  it('enumerates exactly the rules its own stats claim', () => {
+    // Ties the two halves together: if a future change writes one and not the other, the manifest is
+    // internally inconsistent and this fails without needing the C# stylesheet at all.
+    const carried = manifest.rules.filter((r) => r.carried)
+    const droppedRoot = manifest.rules.filter((r) => !r.carried)
+    const keyframes = carried.filter((r) => r.selector.startsWith('@keyframes '))
+    expect(droppedRoot).toHaveLength(manifest.stats.droppedRoot)
+    expect(keyframes).toHaveLength(manifest.stats.carriedKeyframes)
+    expect(carried.length - keyframes.length).toBe(manifest.stats.carriedRules)
   })
 })

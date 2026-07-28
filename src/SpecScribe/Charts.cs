@@ -834,7 +834,10 @@ public static partial class Charts
         // Everything the summary text claims is derived from the days the grid ACTUALLY renders (<= the cutoff), not
         // from the whole series — otherwise the aria-label and the headline name commits the cells don't show, which
         // ADR 0013 forbids and which a past --as-of (or plain clock skew) makes routine rather than exotic. The
-        // already-migrated twin is DeliveryCadenceHeatmap; this is the same shape. [Story 5.7 D2 / AC #1a]
+        // already-migrated twin is DeliveryCadenceHeatmap, which bounds its own summary figures to `visible` the
+        // same way — though its empty state stays generic ("No completed stories to chart yet.") rather than
+        // naming the cutoff the way the guard below does; that gap is DeliveryCadenceHeatmap's, not this story's
+        // to fix. [Story 5.7 D2 / AC #1a] [Review][Patch]
         var visible = series.Where(s => s.Day <= todayValue).ToList();
         // The crash guard, not merely an empty state: firstCommit/lastCommit below are Min/Max over this set and
         // firstCommit also drives start/isYoungRepo, so an --as-of date before every commit would throw

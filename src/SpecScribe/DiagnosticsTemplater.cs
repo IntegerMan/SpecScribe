@@ -298,6 +298,13 @@ public static class DiagnosticsTemplater
         {
             { Policy: DatePolicy.AsOf, AsOf: { } pinned } =>
                 $"{DatePolicies.Label(config.DateCutoff)} (--as-of {PortalDates.IsoDay(pinned)})",
+            // A dateless AsOf is unreachable through the validated CLI path (Charts.ResolveToday degrades it to
+            // MachineLocal), but ForgeOptions.Resolve is also an NFR8 library entry point a caller can construct
+            // directly. Render the row for what the run ACTUALLY does — the MachineLocal row — rather than
+            // Label's menu-only "fixed date" phrasing paired with Token's own machine-local degrade, which
+            // otherwise disagree and print a self-contradicting "fixed date (--today-policy machine-local)".
+            // [Review][Patch]
+            { Policy: DatePolicy.AsOf } => $"{DatePolicies.Label(default)} (default)",
             { Policy: DatePolicy.MachineLocal } => $"{DatePolicies.Label(config.DateCutoff)} (default)",
             _ => $"{DatePolicies.Label(config.DateCutoff)} (--today-policy {DatePolicies.Token(config.DateCutoff)})",
         });

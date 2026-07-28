@@ -4,6 +4,7 @@
 **Date:** 2026-07-20
 **Deciders:** Matthew-Hope Eland
 **Extends:** [ADR 0002 — Shared Rendering Core & Host-Neutral View Models](0002-shared-rendering-core-and-host-neutral-view-models.md), [ADR 0006 — Delivery Architecture & Distribution](0006-delivery-architecture-and-distribution.md) (extends; does **not** supersede either)
+**Refined by:** [ADR 0024 — The SPA and the Webview Are Filtered Projections of ONE Region Seam](0024-spa-and-webview-are-filtered-projections-of-one-region-seam.md) — **§Decision 2's "co-equal projections" was aspirational**: the webview was a second independent builder, not a projection. Story 22.4 collapsed the two builders onto one region seam so the clause describes the code.
 **Source:** `_bmad-output/planning-artifacts/sprint-change-proposal-2026-07-20.md` (Correct-Course)
 
 ## Context

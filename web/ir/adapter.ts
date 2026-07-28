@@ -2,7 +2,8 @@
  * The ONE file in `web/` that knows the shipped IR's field names. [Story 23.3 AC #3]
  *
  * ADR 0008 seated `spa/manifest.json` + `spa/pages-*.json` as SpecScribe's canonical intermediate
- * representation and Story 22.2 promoted that file set in place and stamped it `schemaVersion: 1`. This
+ * representation and Story 22.2 promoted that file set in place and stamped it `schemaVersion` (1 then; 2
+ * since Story 22.4 moved the content region's start marker — see `EXPECTED_SCHEMA_VERSION`). This
  * module reads it and hands the rest of the app the neutral shape below. Nothing downstream of here may
  * mention `outputRelativePath`, `chunk`, `siteTitle`, or any other emitter-side name — so when the schema
  * next moves, exactly one file changes.
@@ -15,7 +16,7 @@
  *   IrHead   { title, description }
  *   IrPage   { path, title, head, breadcrumb: IrCrumb[], parent, children: string[],
  *              region: IrRegion, hasDataIsland, hasExecutableIsland }
- *   IrRegion { navHtml, wayfindingHtml, mainAttributes, mainInnerHtml, wayfindingRepaired }
+ *   IrRegion { navHtml, wayfindingHtml, mainAttributes, mainAttrs, mainInnerHtml }
  *
  * ── Server-only by construction ────────────────────────────────────────────────────────────────────────
  *
@@ -55,8 +56,14 @@ import type { IrPage, IrRegion, IrSite } from './types'
  */
 export const IR_DIR = resolve(process.env.SPECSCRIBE_IR_DIR ?? resolve(process.cwd(), '..', 'SpecScribeOutput'))
 
-/** The schema version this adapter was written against. A mismatch is reported, never silently tolerated. */
-export const EXPECTED_SCHEMA_VERSION = 1
+/**
+ * The schema version this adapter was written against. A mismatch is reported, never silently tolerated.
+ *
+ * ⚠️ Bumped to 2 by Story 22.4, which moved the content region's start marker to the wayfinding band's
+ * OUTERMOST tag. Keep this in lockstep with `SpaDelivery.SchemaVersion` **and** with the twin constant in
+ * `adapter.client.ts` — the check below only `console.warn`s, so a missed consumer is silent.
+ */
+export const EXPECTED_SCHEMA_VERSION = 2
 
 // ── Raw manifest shape (emitter names live HERE and nowhere else) ────────────────────────────────────────
 
@@ -176,31 +183,32 @@ const MAIN_MARKER = '<main id="main-content"'
 const MAIN_CLOSER = '</main>'
 const CRUMB_MARKER = '<div class="breadcrumb"'
 
-const WAYFINDING_MARKER = '<div class="page-wayfinding"'
-
 /**
  * The wrapper the static renderer opens around the breadcrumb + sibling pager.
  *
- * ⚠️ THE IR CARRIES TWO DIFFERENT REGION SHAPES, and treating them as one produces broken markup that no
- * `<main>` comparison can see. Measured across all 1,042 pages:
+ * ⚠️ THE IR USED TO CARRY TWO DIFFERENT REGION SHAPES, and treating them as one produced broken markup that
+ * no `<main>` comparison could see. Story 23.3 measured it: 187 re-rendered family pages carried the whole
+ * band (balanced), while every CAPTURED page whose pager rendered non-empty was sliced by
+ * `SpaDelivery.ExtractContentRegion` from `<div class="breadcrumb"` — INSIDE the wrapper — and so carried the
+ * wrapper's closing `</div>` without its opener. On the real repo that was 594 of 1,400 pages. This adapter
+ * detected that shape and prepended the missing opener, and threw on anything it still could not balance.
  *
- *   · 187 pages (the dashboard/epics FAMILIES) are re-rendered from their view models for the IR, so the
- *     region carries the whole wayfinding band, wrapper and all. Balanced.
- *   · 853 CAPTURED pages go through `SpaDelivery.ExtractContentRegion`, which starts its slice at
- *     `<div class="breadcrumb"` — INSIDE the wrapper. Those regions carry the wrapper's closing `</div>`
- *     without its opener and are unbalanced by one element.
+ * **Story 22.4 fixed it at the emitter**: `ExtractContentRegion` now prefers the wrapper as its slice start,
+ * so every emitted region is element-balanced and there is ONE shape. The repair and the throw are deleted —
+ * a repair that can no longer fire is worse than no repair, because it is a second, drifting truth about a
+ * boundary the emitter already owns.
  *
- * So the split point is the wrapper when the region has one, and the breadcrumb otherwise; the repair below
- * fires only for the second shape. Getting this wrong is not a cosmetic error: prepending a second opener
- * to an already-balanced region nested `<main>` and `<footer>` INSIDE the wayfinding band on all 187
- * migrated pages — with the `<main>` region still byte-identical, so parity, links and a11y all passed. It
- * was caught by looking at real DOM geometry in a browser, which is the whole reason CLAUDE.md requires it.
+ * Getting this wrong is not a cosmetic error: prepending a second opener to an already-balanced region nested
+ * `<main>` and `<footer>` INSIDE the wayfinding band on all 187 migrated pages — with the `<main>` region
+ * still byte-identical, so parity, links and a11y all passed. It was caught by looking at real DOM geometry
+ * in a browser, which is the whole reason CLAUDE.md requires it.
  *
- * `npm run check:a11y` now asserts the structure over the emitted HTML so it cannot come back quietly.
- *
- * The unbalanced captured shape stays a named gap for Epic 22: the emitter should slice from the wrapper.
+ * The invariant now lives in two places that CANNOT drift from the emitter: `npm run check:a11y` asserts
+ * `one-main` / `wayfinding-single` / `wayfinding-closed` over the emitted HTML, and
+ * `SiteGeneratorSpaTests.EveryIrRegion_HasOneBalancedWayfindingBand_AndExactlyOneMainLandmark` asserts
+ * balance over the WHOLE emitted IR on the C# side.
  */
-const WAYFINDING_OPEN = '<div class="page-wayfinding">\n'
+const WAYFINDING_MARKER = '<div class="page-wayfinding"'
 
 /**
  * Inverts `SpaDelivery.ExtractContentRegion` using the SAME markers it concatenated with.
@@ -224,8 +232,9 @@ export function splitContentRegion(contentHtml: string, path: string): IrRegion 
     throw new Error(`IR page "${path}" has an unterminated <main> element.`)
   }
 
-  // Prefer the wrapper as the split point; fall back to the breadcrumb for the captured shape that has no
-  // wrapper opener. Taking the EARLIEST of the two that precedes <main> means neither shape is assumed.
+  // The emitter slices from the band's OUTERMOST marker (Story 22.4), so the wrapper is present whenever the
+  // page has one and the breadcrumb is the whole band otherwise. Taking the EARLIEST of the two that precedes
+  // <main> keeps this an inversion of the emitter's own rule rather than an assumption about which shape won.
   const wrapOpen = contentHtml.indexOf(WAYFINDING_MARKER)
   const crumbOpen = contentHtml.indexOf(CRUMB_MARKER)
   const candidates = [wrapOpen, crumbOpen].filter((i) => i >= 0 && i < mainOpen)
@@ -233,26 +242,7 @@ export function splitContentRegion(contentHtml: string, path: string): IrRegion 
   const bodyStart = hasWayfinding ? Math.min(...candidates) : mainOpen
 
   const navHtml = contentHtml.slice(0, bodyStart)
-  let wayfindingHtml = hasWayfinding ? contentHtml.slice(bodyStart, mainOpen) : ''
-
-  // Repair only when the slice is genuinely unbalanced, so the two shapes are handled by the same code and
-  // a future emitter fix makes this stop firing on its own rather than double-wrapping.
-  const opens = (wayfindingHtml.match(/<div\b/g) ?? []).length
-  const closes = (wayfindingHtml.match(/<\/div>/g) ?? []).length
-  const wayfindingRepaired = wayfindingHtml.length > 0 && closes === opens + 1
-  if (wayfindingRepaired) {
-    wayfindingHtml = WAYFINDING_OPEN + wayfindingHtml
-  }
-  const stillUnbalanced =
-    wayfindingHtml.length > 0 &&
-    (wayfindingHtml.match(/<div\b/g) ?? []).length !== (wayfindingHtml.match(/<\/div>/g) ?? []).length
-  if (stillUnbalanced) {
-    throw new Error(
-      `IR page "${path}" has a wayfinding band this adapter cannot balance. Injecting it would nest ` +
-        `<main> inside it — a DOM defect no <main> comparison can see. Region head: ` +
-        `${JSON.stringify(wayfindingHtml.slice(0, 200))}`,
-    )
-  }
+  const wayfindingHtml = hasWayfinding ? contentHtml.slice(bodyStart, mainOpen) : ''
 
   const mainAttributes = contentHtml.slice(mainOpen + MAIN_MARKER.length, openTagEnd)
   return {
@@ -261,7 +251,6 @@ export function splitContentRegion(contentHtml: string, path: string): IrRegion 
     mainAttributes,
     mainAttrs: parseAttributes(mainAttributes, path),
     mainInnerHtml: contentHtml.slice(openTagEnd + 1, mainClose),
-    wayfindingRepaired,
   }
 }
 

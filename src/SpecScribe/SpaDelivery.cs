@@ -43,8 +43,21 @@ public static class SpaDelivery
     /// <para>Version <b>1</b> is the first stamped shape. The pre-22.2 unversioned manifest is version <b>0</b>
     /// by implication: it carried no <c>schemaVersion</c> key at all, so a consumer reading a manifest without
     /// one is looking at version 0. No migration shim exists, and none is needed — the SPA client ships in this
-    /// repo alongside the emitter, and there is no shipped consumer outside it.</para></summary>
-    public const int SchemaVersion = 1;
+    /// repo alongside the emitter, and there is no shipped consumer outside it.</para>
+    /// <para>Version <b>2</b> (Story 22.4 AC #4/#6) moved the content region's START marker. Before it,
+    /// <see cref="ExtractContentRegion"/> sliced a captured page from the inner <c>&lt;div class="breadcrumb"&gt;</c>
+    /// even when the page's pager had put that breadcrumb inside a <c>&lt;div class="page-wayfinding"&gt;</c>
+    /// wrapper — so those regions carried the wrapper's closing tag without its opener. It now slices from the
+    /// band's outermost marker, and the IR has ONE region shape.</para>
+    /// <para><b>The measurement that decided the bump</b> (this repo, <c>--spa --deep-git</c>, 1,400 IR pages):
+    /// 594 pages' <c>contentHash</c> moved, every one of them by exactly <b>+30 bytes</b> — the length of the
+    /// literal <c>&lt;div class="page-wayfinding"&gt;\n</c> opener. Regions carrying an unbalanced band went from
+    /// 594 to 0; pages carrying the wrapper went from 189 to 783; no page was added, removed, or lost its
+    /// landmark. That is squarely "a change to how a page's content region is delimited", so this is a bump and
+    /// not an additive change. Consumers move in the same change: <c>EXPECTED_SCHEMA_VERSION</c> in BOTH
+    /// <c>web/ir/adapter.ts</c> and <c>web/ir/adapter.client.ts</c> (the adapter only warns on a mismatch, so a
+    /// missed one is silent).</para></summary>
+    public const int SchemaVersion = 2;
 
     /// <summary>The per-chunk page cap. Chunking groups pages by their top-level output segment (so a navigation
     /// typically pulls one small, category-scoped chunk), then splits any group past this cap into numbered files —
@@ -103,9 +116,11 @@ public static class SpaDelivery
     /// string the generator already holds before it writes the file (NOT a read-back of a generated <c>.html</c>,
     /// which would be scraping and an AD-1/AD-2 violation — see the Story 6.7 Dev Notes boundary). The region is the
     /// freshly-rendered nav markup (byte-identical to the page's own nav, minus the inline toggle script the client
-    /// owns) plus the page's contiguous breadcrumb + <c>&lt;main id="main-content"&gt;…&lt;/main&gt;</c> block — the
-    /// universal Story 1.4 landmark every templater emits. A page missing the landmark degrades to nav-only rather
-    /// than aborting the whole SPA emit. [Story 6.7]</summary>
+    /// owns) plus the page's contiguous wayfinding band + <c>&lt;main id="main-content"&gt;…&lt;/main&gt;</c> block —
+    /// the universal Story 1.4 landmark every templater emits. A page missing the landmark degrades to nav-only
+    /// rather than aborting the whole SPA emit.
+    /// <para>The band is sliced from its OUTERMOST marker so every emitted region has ONE shape and is
+    /// element-balanced — see the two-marker note below. [Story 6.7; Story 22.4 AC #4]</para></summary>
     public static string ExtractContentRegion(string fullPageHtml, string navMarkup)
     {
         const string mainMarker = "<main id=\"main-content\"";
@@ -123,11 +138,28 @@ public static class SpaDelivery
         }
         mainClose += mainCloser.Length;
 
-        // The breadcrumb (when present) immediately precedes <main> and carries no script, so nav + [breadcrumb +
-        // main] is contiguous and script-free — exactly the RenderContent shape (nav markup + breadcrumb + body).
+        // The wayfinding band (when present) immediately precedes <main> and carries no script, so nav + [band +
+        // main] is contiguous and script-free — exactly the RenderContent shape (nav markup + wayfinding + body).
+        //
+        // TWO markers, because the band has two shapes (Story 22.4 AC #4). A page whose pager renders non-empty
+        // gets HtmlRenderAdapter.RenderWayfinding's <div class="page-wayfinding"> WRAPPER around the breadcrumb;
+        // every other page gets the bare breadcrumb, byte-identically to RenderBreadcrumb. Slicing from the inner
+        // breadcrumb on a wrapped page carried the wrapper's closing </div> WITHOUT its opener — an IR region
+        // unbalanced by one element on 594 of this repo's 1,400 pages, which the TS adapter then had to detect
+        // and repair. Preferring the wrapper emits ONE region shape for the whole IR, and the repair is deleted.
+        //
+        // Take the EARLIEST candidate that precedes mainOpen (the wrapper always encloses the breadcrumb, so it
+        // is the earlier of the two when both are present). Anchoring on "precedes <main>" is what keeps a
+        // breadcrumb-shaped string inside the page BODY — a doc's raw-HTML code sample — from splitting the
+        // region; region-split.test.ts pins that case. Only the slice's START moves: the end is still </main>,
+        // which HtmlTemplater's section-nav script placement depends on. [Story 22.4 AC #4]
+        const string wrapMarker = "<div class=\"page-wayfinding\"";
         const string crumbMarker = "<div class=\"breadcrumb\"";
+        var wrapOpen = fullPageHtml.IndexOf(wrapMarker, StringComparison.Ordinal);
         var crumbOpen = fullPageHtml.IndexOf(crumbMarker, StringComparison.Ordinal);
-        var bodyStart = crumbOpen >= 0 && crumbOpen < mainOpen ? crumbOpen : mainOpen;
+        var bodyStart = mainOpen;
+        if (wrapOpen >= 0 && wrapOpen < bodyStart) bodyStart = wrapOpen;
+        if (crumbOpen >= 0 && crumbOpen < bodyStart) bodyStart = crumbOpen;
         return navMarkup + fullPageHtml[bodyStart..mainClose];
     }
 

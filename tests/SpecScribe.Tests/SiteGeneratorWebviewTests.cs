@@ -597,6 +597,45 @@ public class SiteGeneratorWebviewTests : IDisposable
         Assert.DoesNotContain("<script", codeMap.ContentHtml);
     }
 
+    /// <summary>Story 22.4 AC #2. <b>EVERY</b> surface in the bundle — family AND captured — carries no
+    /// <c>&lt;script&gt;</c> of any kind.
+    /// <para>Why a whole-set assertion and not another per-page one: the JSON-island divergence was invisible for
+    /// exactly this reason. <c>EverySurface_CarriesTheChromeAndNoScript</c> runs on a generator with NO capture,
+    /// so it only ever saw the five view-model families; the captured path never applied
+    /// <c>WebviewRenderAdapter</c>'s strip, and <c>impact-map.html</c> — reachable only under
+    /// <c>--deep-git</c> — shipped a <c>HierarchyExplorer</c> island the registered <c>data-island</c> host
+    /// exception already claimed the webview did not carry. Individually-named pages (ADR, code-map,
+    /// traceability) close the cases someone thought to name; this closes the ones nobody did.</para>
+    /// <para>The direction is deliberate and recorded: <b>strip on both</b>. The webview ships no
+    /// <c>specscribe.js</c>, so an inline island is dead weight it can never read — inert data, so removing it is
+    /// dead-weight removal rather than a behaviour change a reader can see. [Story 22.4 AC #2, Trap 1]</para>
+    /// </summary>
+    [Fact]
+    public void EveryWebviewSurface_IncludingCapturedOnes_CarriesNoScript()
+    {
+        Directory.CreateDirectory(Path.Combine(_root, "src", "Lib"));
+        File.WriteAllText(Path.Combine(_root, "src", "Lib", "Widget.cs"), "namespace Lib;\npublic class Widget { }\n");
+        File.WriteAllText(Path.Combine(Adrs, "0002-another-decision.md"),
+            "# ADR 0002: Another Decision\n\n**Status:** Accepted\n\nBody.\n");
+
+        var bundle = GeneratedSiteWithCapture().RenderWebviewSurfaces();
+
+        // Guard against a vacuous green: the captured half must genuinely be present and substantial.
+        Assert.True(bundle.Surfaces.Count > 10, $"expected a populated bundle, saw {bundle.Surfaces.Count}");
+        Assert.Contains(bundle.Surfaces, s => s.OutputRelativePath == "code-map.html");
+        Assert.Contains(bundle.Surfaces, s => s.OutputRelativePath.StartsWith("adrs/", StringComparison.Ordinal));
+
+        var offenders = bundle.Surfaces
+            .Where(s => s.ContentHtml.Contains("<script", StringComparison.OrdinalIgnoreCase))
+            .Select(s => s.OutputRelativePath)
+            .ToList();
+        Assert.Empty(offenders);
+
+        // The entry document is the one place a script IS expected (the host bridge), so the assertion above
+        // deliberately covers surfaces only — stated here so a reader does not "fix" the omission.
+        Assert.Contains("<script", bundle.EntryDocument);
+    }
+
     [Fact]
     public void CapturePages_IncludesTraceabilityAsACapturedSurface()
     {

@@ -90,7 +90,6 @@ export async function buildIrContentCss() {
       stats.droppedRoot += 1
       manifestRules.push({
         selector: keep.join(', '),
-        lines: `${block.startLine}-${block.endLine}`,
         carried: false,
         reason: 'root-level rule — no descendant to scope under .ir-content; see web/assets/base.css',
       })
@@ -100,7 +99,6 @@ export async function buildIrContentCss() {
     stats.carriedSelectors += keep.length
     manifestRules.push({
       selector: keep.join(', '),
-      lines: `${block.startLine}-${block.endLine}`,
       carried: true,
       ...(insideAt ? { within: insideAt } : {}),
       ...(keep.length < selectors.length
@@ -119,15 +117,13 @@ export async function buildIrContentCss() {
    * `animation:` declarations all name nothing — every entrance silently dead, and nothing in a markup
    * comparison able to notice.
    */
-  function walk(level, at, lineOffset) {
+  function walk(level, at) {
     const out = []
     for (const block of level) {
       if (block.kind === 'statement') continue
-      const startLine = block.startLine + lineOffset
-      const endLine = block.endLine + lineOffset
 
       if (block.kind === 'rule') {
-        const text = takeRule({ ...block, startLine, endLine }, at)
+        const text = takeRule(block, at)
         if (text) out.push(text)
         continue
       }
@@ -140,22 +136,22 @@ export async function buildIrContentCss() {
         // identifier or media condition, so the two halves can never be ambiguous — written as the six-character
         // backslash-u escape below, NEVER as a raw NUL byte: a literal NUL makes Git sniff this whole file
         // as binary, costing it diffs in review and exempting it from the .gitattributes text normalization.
-        keyframeBlocks.set(`${at ?? ''}\u0000${name}`, { name, at, block, startLine, endLine })
+        keyframeBlocks.set(`${at ?? ''}\u0000${name}`, { name, at, block })
         continue
       }
       if (/^@(media|supports|layer|container)\b/i.test(prelude)) {
-        const inner = walk(readBlocks(block.body), prelude, startLine - 1)
+        const inner = walk(readBlocks(block.body), prelude)
         if (inner.length) out.push(`${prelude} {\n${inner.join('\n\n')}\n}`)
         continue
       }
       // @font-face and friends: carried whole — they declare a resource, not a selector match.
       out.push(`${prelude} {${block.body}}`)
-      manifestRules.push({ selector: prelude, lines: `${startLine}-${endLine}`, carried: true })
+      manifestRules.push({ selector: prelude, carried: true })
     }
     return out
   }
 
-  carried.push(...walk(blocks, null, 0))
+  carried.push(...walk(blocks, null))
 
   // ── 3. Keyframes, only those the carried rules animate ─────────────────────────────────────────────────
   const body = carried.join('\n')
@@ -165,14 +161,13 @@ export async function buildIrContentCss() {
   }
   const keyframes = []
   const byCondition = new Map()
-  for (const { name, at, block, startLine, endLine } of keyframeBlocks.values()) {
+  for (const { name, at, block } of keyframeBlocks.values()) {
     if (!animated.has(name)) continue
     const text = `@keyframes ${name} {${block.body}}`
     if (at) byCondition.set(at, [...(byCondition.get(at) ?? []), text])
     else keyframes.push(text)
     manifestRules.push({
       selector: `@keyframes ${name}`,
-      lines: `${startLine}-${endLine}`,
       carried: true,
       ...(at ? { within: at } : {}),
     })
@@ -213,22 +208,35 @@ export async function buildIrContentCss() {
   const outBytes = Buffer.byteLength(css)
 
   /**
-   * ⚠️ WHOLE-CORPUS statistics are deliberately NOT committed here. [Story 23.5 AC #8]
+   * ⚠️ Only fields that describe the CARRIED LAYER are committed here. Anything that describes the SOURCE
+   * stylesheet as a whole, or the corpus as a whole, is computed and reported but deliberately not written.
    *
    * This manifest is a COMMITTED artifact that `npm run check:ir-content` compares byte-for-byte, and
-   * Story 23.5 put that comparison into CI. Three of the fields it used to carry — `migratedPages`,
-   * `totalPages`, and `passThroughUncoveredClasses` — are functions of the ENTIRE 1,056-page corpus, so
-   * they changed whenever anybody added a document. Committed, that made the gate red on ordinary docs
-   * commits that could not possibly have touched the stylesheet: a gate that cannot stay green teaches
-   * people to re-run the extractor on reflex, which is exactly how a real drift gets committed unnoticed.
+   * Story 23.5 put that comparison into CI. The rule that keeps it honest: a field belongs here only if
+   * changing it implies the emitted `ir-content.css` changed too. A field that can move on its own turns
+   * the gate red on a commit that could not possibly have affected the layer — and a gate that cannot stay
+   * green teaches people to re-run the extractor on reflex, which is exactly how a real drift gets
+   * committed unnoticed.
    *
-   * They are still COMPUTED and still reported by `npm run extract:ir-content`'s console summary, which is
-   * where they are actually useful (at extraction time, to a human). Regenerate to see them.
+   * Two rounds of fields have failed that rule and been removed:
+   *
+   *   1. WHOLE-CORPUS [Story 23.5 AC #8] — `migratedPages`, `totalPages`, `passThroughUncoveredClasses`
+   *      are functions of the ENTIRE ~1,100-page corpus, so they moved whenever anybody added a document.
+   *
+   *   2. WHOLE-SOURCE — `sourceRules`, `droppedUnused`, `sourceBytes`, and the per-rule `lines` span.
+   *      These count or locate rules the layer does NOT carry, so ANY edit to `specscribe.css` moved them:
+   *      deleting 38 unused rules in commit 06b300c shifted every line span in the file and reddened CI
+   *      with an 865-line diff while `ir-content.css` stayed byte-identical. Line spans are the worse
+   *      offender of the two — they are also the anchor this project already learned not to cite by, and
+   *      `selector` (plus `within`) identifies a rule without going stale.
+   *
+   * All of them are still COMPUTED and still reported by `npm run extract:ir-content`'s console summary,
+   * which is where they are actually useful (at extraction time, to a human). Regenerate to see them.
    *
    * Be honest about what this does NOT fix: `rules` and the emitted CSS still depend on which classes the
    * FOUR MIGRATED FAMILIES use, so a dashboard/epics markup change can still legitimately move this file.
    * That dependence is inherent to how Story 23.3 derives the layer and is the gate working as designed —
-   * it is narrow (4 families) where the removed fields were broad (every page).
+   * it is narrow (4 families) where the removed fields were broad (every page, or every source rule).
    */
   const manifest = {
     generatedBy: 'web/scripts/extract-ir-content.mjs',
@@ -237,8 +245,10 @@ export async function buildIrContentCss() {
     transitional: 'Story 23.4 retires this layer. Every entry below is a rule it has to account for.',
     migratedFamilies: ['index.html', 'epics.html', 'epics/epic-{N}.html', 'epics/story-{id}.html'],
     stats: {
-      ...stats,
-      sourceBytes,
+      carriedRules: stats.carriedRules,
+      carriedSelectors: stats.carriedSelectors,
+      carriedKeyframes: stats.carriedKeyframes,
+      droppedRoot: stats.droppedRoot,
       generatedBytes: outBytes,
     },
     rules: manifestRules,

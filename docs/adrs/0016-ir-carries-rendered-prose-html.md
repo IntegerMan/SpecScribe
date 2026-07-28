@@ -3,7 +3,7 @@
 **Status:** Proposed (authored 2026-07-26 by Story 22.2; ratification is the owner's)
 **Date:** 2026-07-26
 **Deciders:** Matthew-Hope Eland
-**Relates to:** [ADR 0008 — JSON IR Canonical and Incremental Generation](0008-json-ir-canonical-and-incremental-generation.md) (**amends §Decision 1 and §Decision 4**); [ADR 0013](0013-text-twin-is-the-no-js-contract.md) §5 (already amended the *chart* half of the same clause — this ADR amends the *prose* half); [ADR 0009](0009-frontend-framework-for-projection-layer.md) (the Epic 23 consumer that depends on the outcome); [ADR 0002](0002-shared-rendering-core-and-host-neutral-view-models.md) (the view-model contract this does **not** replace); Epic 22 (Stories 22.2–22.6), Epic 23 (Stories 23.1, 23.3, 23.4)
+**Relates to:** [ADR 0008 — JSON IR Canonical and Incremental Generation](0008-json-ir-canonical-and-incremental-generation.md) (**amends §Decision 1 and §Decision 4**); [ADR 0013](0013-text-twin-is-the-no-js-contract.md) §5 (already amended the *chart* half of the same clause — this ADR amends the *prose* half); [ADR 0009](0009-frontend-framework-for-projection-layer.md) (the Epic 23 consumer that depends on the outcome); [ADR 0002](0002-shared-rendering-core-and-host-neutral-view-models.md) (the view-model contract this does **not** replace); [ADR 0024 — The SPA and the Webview Are Filtered Projections of ONE Region Seam](0024-spa-and-webview-are-filtered-projections-of-one-region-seam.md) (**exercises §Decision 4's grant** — Story 22.4 retired the duplicate builder, NOT the slicers; and its one-region-shape fix triggers **§Decision 5**'s `schemaVersion` bump, 1 → 2); Epic 22 (Stories 22.2–22.6), Epic 23 (Stories 23.1, 23.3, 23.4)
 
 ## Context
 

@@ -12,8 +12,9 @@
  * brace inside a comment truncates the copy, the generated file looks plausible, and tokens vanish from
  * every page. So the scanner tracks comment state, and that is asserted here directly.
  */
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { declaredTokenNames, renderTokensCss, sliceRootBlock } from '../scripts/tokens-lib.mjs'
+import { declaredTokenNames, renderTokensCss, sliceRootBlock, SOURCE_CSS } from '../scripts/tokens-lib.mjs'
 
 describe('sliceRootBlock', () => {
   it('returns the block body exclusive of its braces', () => {
@@ -85,5 +86,28 @@ describe('renderTokensCss', () => {
 
   it('names the source line span in the failure, so the wrong rule can be identified', () => {
     expect(() => renderTokensCss(':root {\n  --nope: 1;\n}\n')).toThrow(/specscribe\.css:1-3/)
+  })
+
+  // ── The committed output must not encode WHERE it came from, only WHAT it carries ──────────────────────
+  //
+  // `tokens.css` is committed and `check:tokens` compares it byte-for-byte. Anything baked into it that can
+  // move without a token moving turns the gate red on a commit that could not have affected the bridge —
+  // and a gate that cannot stay green teaches people to re-run the extractor on reflex, which is how a real
+  // drift gets committed unnoticed. The sibling ir-content manifest reddened CI exactly that way (an
+  // unrelated `specscribe.css` edit shifted every line span it recorded), so this is a proven failure mode,
+  // not a hypothetical one. The banner used to carry `(lines {start}-{end})`; these pin that it does not
+  // come back.
+  describe('is invariant to where the :root block sits in the source', () => {
+    const source = readFileSync(SOURCE_CSS, 'utf8').replace(/\r\n/g, '\n')
+
+    it('renders identical bytes when unrelated rules are inserted above :root', () => {
+      const shifted = `.zzz-unrelated {\n  color: red;\n}\n\n${source}`
+      expect(sliceRootBlock(shifted).startLine).not.toBe(sliceRootBlock(source).startLine)
+      expect(renderTokensCss(shifted)).toBe(renderTokensCss(source))
+    })
+
+    it('records no source line span in the generated banner', () => {
+      expect(renderTokensCss(source)).not.toMatch(/lines \d+-\d+/)
+    })
   })
 })

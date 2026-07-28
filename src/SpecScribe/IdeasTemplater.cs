@@ -172,10 +172,15 @@ public static class IdeasTemplater
     /// the portal makes, and for clarified sessions it would be wrong.</summary>
     private static string RenderOutcomeStatement(IdeaEntry idea)
     {
+        // [Story 18.4 review] `Hardened` is derived from forged-idea.md's mere PRESENCE, but rendering that file
+        // can still fail (ForgedIdeaHtml ends up null) — in which case the page must not claim a hand-off exists
+        // right above a page that shows none.
         var text = idea.ExitWord switch
         {
-            "Hardened" =>
+            "Hardened" when idea.ForgedIdeaHtml is { Length: > 0 } =>
                 "This session <strong>hardened</strong>: the idea held up and was distilled into a hand-off the planning workflows can pick up.",
+            "Hardened" =>
+                "This session <strong>hardened</strong>: the idea held up, but its distilled hand-off could not be rendered (see the diagnostics for why).",
             "Killed" =>
                 "This session <strong>killed</strong> the idea: it did not hold up under pressure. Finding that out early is a valid outcome, and the reasoning is kept here rather than discarded.",
             "Clarified" =>

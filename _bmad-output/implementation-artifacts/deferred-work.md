@@ -2,6 +2,24 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of 5-7-fixed-as-of-date-page-cutoff-policy (2026-07-28)
+
+- source_spec: `5-7-fixed-as-of-date-page-cutoff-policy.md`
+  summary: `DateCutoffJsonConverter.Read` calls `reader.GetString()` unconditionally on any non-null JSON token; a hand-edited `.specscribe/config.json` with `"TodayPolicy": 123` (or `true`/an object) throws `InvalidOperationException`, which `TryReadCandidate`'s `catch (IOException or JsonException)` does not catch — crashing settings load instead of the intended per-field graceful degrade this converter's own doc comment promises.
+  evidence: Edge Case Hunter. Pre-existing and unchanged from the Story 5.5 `DatePolicyJsonConverter` this story retyped; not introduced by 5.7. Revisit next time `.specscribe` deserialization is touched — add a `reader.TokenType != JsonTokenType.String` guard alongside the existing null check. [`src/SpecScribe/SettingsStore.cs:92`]
+- source_spec: `5-7-fixed-as-of-date-page-cutoff-policy.md`
+  summary: `DatePolicyTests.OneResolvedToday_MakesEveryConsumerAgree` asserts `linked == generated` where both sides call `Charts.LinkedCommitDays` with identical arguments — the assertion cannot fail regardless of whether `_today` threading is correct, so it proves nothing about AC #1's single-resolution guarantee.
+  evidence: Acceptance Auditor. Pre-existing from Story 5.5; this story extended the test's policy array to include the new `AsOf` case without fixing the underlying tautology, despite the story's own Dev Notes warning against exactly this anti-pattern. Real AC #1 coverage comes from the separate `SiteGeneratorCommitDetailsTests` production-wiring test, so not blocking. Revisit next time `DatePolicyTests` is touched — replace the second `LinkedCommitDays` call with an independent assertion against a second consumer (e.g. the heatmap's linked-day set) or delete it as non-load-bearing. [`tests/SpecScribe.Tests/DatePolicyTests.cs`]
+
+## Deferred from: code review of 18-4-forged-ideas-list-page (2026-07-28)
+
+- source_spec: `18-4-forged-ideas-list-page.md`
+  summary: `.claude/launch.json`'s two story-added entries (`ideas-18-4`, `ideas-18-4-jsoff`) point at an ephemeral per-Claude-session scratch path under `AppData/Local/Temp`, which will not exist for anyone else who checks out the repo.
+  evidence: Blind Hunter. Dev-tooling only — not shipped or executed automatically, so it breaks nothing at build/test time. Revisit next time someone opens `launch.json` for Ideas work: repoint at a checked-in fixture or remove the entries now that Task 8's live verification is done. [`.claude/launch.json`]
+- source_spec: `18-4-forged-ideas-list-page.md`
+  summary: `RewriteHandoffLinks`' anchor regex (`HandoffAnchorPattern`) only matches double-quoted `href` attributes, so a hand-authored raw `<a href='...'>` (single-quoted or unquoted) embedded directly in `forged-idea.md`'s markdown source would pass through unrewritten.
+  evidence: Edge Case Hunter. Low probability — the tested and primary path (standard markdown link syntax) always renders double-quoted via Markdig — and degrades safely to an unrewritten link rather than a broken page. Revisit if a real hardened idea's hand-off ever ships a raw-HTML anchor. [`src/SpecScribe/SiteGenerator.cs:3931-3933`]
+
 ## Deferred from: code review of 18-3-bmad-index-docs-contract-spike (2026-07-28)
 
 - source_spec: `18-3-bmad-index-docs-contract-spike.md`

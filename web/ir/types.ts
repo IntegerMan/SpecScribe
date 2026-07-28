@@ -49,8 +49,6 @@ export interface IrRegion {
   mainAttrs: Record<string, string>
   /** Everything BETWEEN `<main …>` and `</main>`. This is what gets injected. */
   mainInnerHtml: string
-  /** True when the `page-wayfinding` wrapper was re-opened to repair the IR's unbalanced slice — see below. */
-  wayfindingRepaired: boolean
 }
 
 export interface IrPage {

@@ -3,19 +3,27 @@
  *
  * ── Why this function is worth pinning ─────────────────────────────────────────────────────────────────
  *
- * THE IR CARRIES TWO DIFFERENT REGION SHAPES, and Story 23.3 recorded what happens when they are treated as
- * one: `<main>` ends up NESTED inside the wayfinding band on 187 pages, producing broken markup that no
- * `<main>`-region comparison can detect — every harness passed while the DOM was corrupt. The two shapes:
+ * THE IR USED TO CARRY TWO DIFFERENT REGION SHAPES, and Story 23.3 recorded what happens when they are
+ * treated as one: `<main>` ends up NESTED inside the wayfinding band on 187 pages, producing broken markup
+ * that no `<main>`-region comparison can detect — every harness passed while the DOM was corrupt. The two
+ * shapes were:
  *
- *   · RE-RENDERED pages (the dashboard/epics families) carry the whole wayfinding band, wrapper and all.
+ *   · RE-RENDERED pages (the dashboard/epics families) carried the whole wayfinding band, wrapper and all.
  *     Balanced.
- *   · CAPTURED pages go through `ExtractContentRegion`, which begins its slice INSIDE the wrapper at
- *     `<div class="breadcrumb"`. Those regions carry the wrapper's closing `</div>` without its opener and
- *     are unbalanced by exactly one element.
+ *   · CAPTURED pages went through `ExtractContentRegion`, which began its slice INSIDE the wrapper at
+ *     `<div class="breadcrumb"`. Those regions carried the wrapper's closing `</div>` without its opener
+ *     and were unbalanced by exactly one element — 594 of this repo's 1,400 pages.
  *
- * The repair is deliberately conditional — it fires only when the slice is genuinely unbalanced — so that a
- * future emitter fix makes it stop firing on its own instead of double-wrapping. That conditionality is the
- * behaviour most at risk from a well-meaning edit, so it is asserted in both directions here.
+ * **Story 22.4 collapsed them to ONE shape at the emitter**: `ExtractContentRegion` now slices from the
+ * band's outermost marker, so a captured page with a pager carries the wrapper exactly like a re-rendered
+ * one. The conditional repair and the "cannot balance" throw this file used to pin are DELETED — a repair
+ * that can no longer fire is a second, drifting truth about a boundary the emitter owns.
+ *
+ * What is pinned now is that the split is a faithful INVERSION of the emitter's rule: outermost marker that
+ * precedes `<main>`, band verbatim, `<main>` open tag reproduced byte-for-byte. The balance invariant itself
+ * is asserted where it is now enforced — `SiteGeneratorSpaTests
+ * .EveryIrRegion_HasOneBalancedWayfindingBand_AndExactlyOneMainLandmark` over the whole emitted IR, and
+ * `npm run check:a11y`'s `one-main` / `wayfinding-single` / `wayfinding-closed` over the emitted HTML.
  *
  * These fixtures are hand-built rather than read from a generated portal, because `vitest.config.ts` runs
  * with `SPECSCRIBE_PACKAGE_BUILD=1` and there is deliberately no IR on disk during a unit run.
@@ -32,8 +40,15 @@ const BODY = '<h1>Epic 3</h1><p>Body copy.</p>'
 /** The RE-RENDERED shape: the wayfinding wrapper is present and balanced. */
 const reRendered = `${NAV}<div class="page-wayfinding">\n${CRUMB}${PAGER}</div>${MAIN_OPEN}${BODY}</main>`
 
-/** The CAPTURED shape: the slice starts at the breadcrumb, so the wrapper's `</div>` has no opener. */
-const captured = `${NAV}${CRUMB}${PAGER}</div>${MAIN_OPEN}${BODY}</main>`
+/**
+ * The CAPTURED shape, post-22.4: the emitter slices from the wrapper, so this is now the SAME shape the
+ * re-rendered path produces. Kept as a distinct fixture (different path, different describe) because the two
+ * still travel through different producers in C# and this is what pins them to one shape here.
+ */
+const captured = `${NAV}<div class="page-wayfinding">\n${CRUMB}${PAGER}</div>${MAIN_OPEN}${BODY}</main>`
+
+/** A page with no pager: the band is the bare breadcrumb, and it is balanced on its own. */
+const bareCrumb = `${NAV}${CRUMB}${MAIN_OPEN}${BODY}</main>`
 
 describe('splitContentRegion — the re-rendered shape', () => {
   const region = splitContentRegion(reRendered, 'epics/epic-3.html')
@@ -42,8 +57,7 @@ describe('splitContentRegion — the re-rendered shape', () => {
     expect(region.navHtml).toBe(NAV)
   })
 
-  it('captures the whole balanced band without repairing it', () => {
-    expect(region.wayfindingRepaired).toBe(false)
+  it('captures the whole balanced band verbatim', () => {
     expect(region.wayfindingHtml).toBe(`<div class="page-wayfinding">\n${CRUMB}${PAGER}</div>`)
   })
 
@@ -61,12 +75,9 @@ describe('splitContentRegion — the re-rendered shape', () => {
 describe('splitContentRegion — the captured shape', () => {
   const region = splitContentRegion(captured, 'adrs/0006-delivery.html')
 
-  it('repairs the missing wrapper opener rather than nesting <main> inside the band', () => {
-    expect(region.wayfindingRepaired).toBe(true)
-    expect(region.wayfindingHtml.startsWith('<div class="page-wayfinding">\n')).toBe(true)
-  })
-
-  it('leaves the band balanced after the repair', () => {
+  it('is the SAME shape the re-rendered path produces — no repair needed', () => {
+    // The whole point of the 22.4 emitter fix: a captured page with a pager now arrives already balanced.
+    expect(region.wayfindingHtml).toBe(`<div class="page-wayfinding">\n${CRUMB}${PAGER}</div>`)
     const opens = (region.wayfindingHtml.match(/<div\b/g) ?? []).length
     const closes = (region.wayfindingHtml.match(/<\/div>/g) ?? []).length
     expect(closes).toBe(opens)
@@ -78,22 +89,40 @@ describe('splitContentRegion — the captured shape', () => {
   })
 })
 
+describe('splitContentRegion — a band with no pager', () => {
+  const region = splitContentRegion(bareCrumb, 'about.html')
+
+  it('takes the bare breadcrumb as the whole band', () => {
+    expect(region.wayfindingHtml).toBe(CRUMB)
+    expect(region.navHtml).toBe(NAV)
+    expect(region.mainInnerHtml).toBe(BODY)
+  })
+})
+
 describe('splitContentRegion — pages with no wayfinding band', () => {
   it('treats the whole prefix as nav and leaves the band empty', () => {
     const region = splitContentRegion(`${NAV}${MAIN_OPEN}${BODY}</main>`, 'index.html')
     expect(region.wayfindingHtml).toBe('')
-    expect(region.wayfindingRepaired).toBe(false)
     expect(region.navHtml).toBe(NAV)
     expect(region.mainInnerHtml).toBe(BODY)
   })
 
   it('ignores a breadcrumb that appears AFTER <main> rather than splitting on it', () => {
     // A breadcrumb inside the body is content, not wayfinding. Splitting on it would move part of the
-    // page into the band and change what `<main>` contains.
+    // page into the band and change what `<main>` contains. The emitter applies the same "precedes <main>"
+    // rule, so this is an inversion of its behaviour, not an independent guess.
     const html = `${NAV}${MAIN_OPEN}${BODY}<div class="breadcrumb">inside</div></main>`
     const region = splitContentRegion(html, 'about.html')
     expect(region.wayfindingHtml).toBe('')
     expect(region.mainInnerHtml).toBe(`${BODY}<div class="breadcrumb">inside</div>`)
+  })
+
+  it('ignores a page-wayfinding wrapper that appears AFTER <main>', () => {
+    // Same rule, the other marker — a design-system page documenting the wrapper is content, not wayfinding.
+    const html = `${NAV}${MAIN_OPEN}${BODY}<div class="page-wayfinding">sample</div></main>`
+    const region = splitContentRegion(html, 'design-system.html')
+    expect(region.wayfindingHtml).toBe('')
+    expect(region.mainInnerHtml).toBe(`${BODY}<div class="page-wayfinding">sample</div>`)
   })
 })
 
@@ -106,13 +135,6 @@ describe('splitContentRegion — refusals', () => {
 
   it('refuses an unterminated <main>', () => {
     expect(() => splitContentRegion(`${NAV}${MAIN_OPEN}${BODY}`, 'broken.html')).toThrow(/unterminated <main>/)
-  })
-
-  it('refuses a band it cannot balance instead of nesting <main> inside it', () => {
-    // Two unmatched closers: the conditional repair adds exactly one opener, so this stays unbalanced and
-    // must fail loudly rather than emit a corrupt DOM.
-    const html = `${NAV}${CRUMB}${PAGER}</div></div>${MAIN_OPEN}${BODY}</main>`
-    expect(() => splitContentRegion(html, 'bad.html')).toThrow(/cannot balance/)
   })
 
   it('refuses <main> attributes it cannot reproduce exactly', () => {

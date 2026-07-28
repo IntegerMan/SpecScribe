@@ -32,7 +32,8 @@ function unavailable(what: string): never {
 }
 
 export const IR_DIR = ''
-export const EXPECTED_SCHEMA_VERSION = 1
+/** Twin of `adapter.ts`'s constant — must move in the SAME change. Bumped to 2 by Story 22.4. */
+export const EXPECTED_SCHEMA_VERSION = 2
 
 export const site: IrSite = new Proxy({} as IrSite, {
   get: (_t, prop) => unavailable(`site.${String(prop)}`),

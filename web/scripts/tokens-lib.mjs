@@ -137,9 +137,14 @@ export function renderTokensCss(cssText = readFileSync(SOURCE_CSS, 'utf8')) {
     )
   }
 
+  // ⚠️ No source LINE SPAN in this banner, deliberately. This file is committed and `check:tokens` compares
+  // it byte-for-byte, so anything baked in here that can move without a token moving turns the gate red on
+  // an unrelated commit — inserting one rule above `:root` in the C# stylesheet would have done it. (The
+  // sibling ir-content manifest reddened CI exactly that way; see the committed-fields rule in
+  // `ir-content-build.mjs`.) The span is still reported in the thrown error above, which is not committed.
   const banner = [
     '/* GENERATED FILE — DO NOT EDIT.',
-    ` * Extracted verbatim from the \`:root\` block of ${SOURCE_LABEL} (lines ${startLine}-${endLine})`,
+    ` * Extracted verbatim from the \`:root\` block of ${SOURCE_LABEL}`,
     ' * by `npm run extract:tokens`. That C# stylesheet is the single source of truth for SpecScribe\'s',
     ' * presentation tokens (AD-7); this file is a copy, never a second definition.',
     ' *',

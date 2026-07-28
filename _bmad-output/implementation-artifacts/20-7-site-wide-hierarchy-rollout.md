@@ -4,7 +4,7 @@ baseline_commit: 1116e134e1708a34a902d59c18f06fbf7c118e9c
 
 # Story 20.7: Site-Wide Rollout — Every Sunburst and Treemap Through the Component
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

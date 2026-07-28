@@ -273,11 +273,16 @@ public class IdeasTests : IDisposable
     }
 
     [Fact]
-    public void Discover_MalformedMemlog_StillListsTheIdeaAndReportsMalformed()
+    public void Discover_MalformedMemlogProvenByReport_StillListsTheIdeaAndReportsMalformed()
     {
+        // [Story 18.4 review] A malformed memlog is only listed when something ELSE proves the workspace is a
+        // real forge session — here, the sibling report (rule 2). Without a report this same fixture is now
+        // rejected instead (see Discover_UnparseableMemlogWithNoReport_IsSkippedRatherThanListed, an owner
+        // decision made during the code review, 2026-07-28).
         var dir = Path.Combine(Source, "forge", "half-written");
         Directory.CreateDirectory(dir);
         File.WriteAllText(Path.Combine(dir, ".memlog.md"), "---\nidea: interrupted mid-write\n");
+        Report(dir, SafeReport("CLARIFIED"));
 
         var diagnostics = new List<AdapterDiagnostic>();
         var idea = Assert.Single(IdeaDiscovery.Discover(Source, diagnostics).Ideas);
@@ -308,6 +313,48 @@ public class IdeasTests : IDisposable
         Assert.Contains("1 other(s) skipped", d.Message);
     }
 
+    [Fact]
+    public void Discover_UnparseableMemlogWithNoReport_IsSkippedRatherThanListed()
+    {
+        // [Story 18.4 review, owner decision 2026-07-28] Rule 1 alone (path only) proved nothing here, and an
+        // unparseable memlog can't corroborate via rule 3 either — so unlike Discover_MalformedMemlog... above
+        // (which DOES have a report and is proven by rule 2), this unproven, unparseable, report-less folder must
+        // be skipped rather than listed as an in-progress idea.
+        var dir = Path.Combine(Source, "forge", "junk-folder");
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, ".memlog.md"), "not frontmatter at all, just text");
+
+        var diagnostics = new List<AdapterDiagnostic>();
+        var model = IdeaDiscovery.Discover(Source, diagnostics);
+
+        Assert.True(model.IsEmpty);
+        var d = Assert.Single(diagnostics);
+        Assert.Equal(AdapterDiagnosticCategory.Malformed, d.Category);
+        Assert.Contains("skipped rather than listed", d.Message);
+    }
+
+    [Fact]
+    public void Discover_SlugCollidesWithAnotherIdeasReportPath_SkipsTheCollidingWorkspace()
+    {
+        // [Story 18.4 review] DetailOutputPath is "ideas/{slug}.html" and ReportOutputPath is
+        // "ideas/{slug}-report.html" — so slug "foo-report" aliases onto slug "foo"'s carried-report path even
+        // though the two raw slugs are never equal. The plain slug-equality check alone would miss this.
+        // (Ordinal order over the full OS path — where '-' (0x2D) sorts below both '/' and '\' — decides which
+        // of the two actually wins; the point under test is that exactly one survives either way, never both
+        // with colliding output paths.)
+        var withReport = Path.Combine(Source, "forge", "foo");
+        WriteMemlog(withReport, "idea: has a report", "updated: 2026-07-20T09:00", "status: complete");
+        Report(withReport, SafeReport("HARDENED"));
+        WriteMemlog(Path.Combine(Source, "forge", "foo-report"), "idea: collides with foo's report path", "updated: 2026-07-21T09:00");
+
+        var diagnostics = new List<AdapterDiagnostic>();
+        var idea = Assert.Single(IdeaDiscovery.Discover(Source, diagnostics).Ideas);
+
+        Assert.Contains(idea.Slug, new[] { "foo", "foo-report" });
+        Assert.Contains(diagnostics, d => d.Category == AdapterDiagnosticCategory.Skipped
+            && d.Message.Contains("collide", StringComparison.OrdinalIgnoreCase));
+    }
+
     // ---- AC #6: the carry safety gate ---------------------------------------------------------------------
 
     [Fact]
@@ -331,6 +378,12 @@ public class IdeasTests : IDisposable
     [InlineData("<iframe srcdoc=\"<b>hi</b>\"></iframe>")]
     [InlineData("<link rel=\"stylesheet\" href=\"https://cdn.example.com/r.css\">")]
     [InlineData("<img src=\"//cdn.example.com/seal.png\">")]
+    // [Story 18.4 review] Three bypasses the gate originally missed: an UNQUOTED handler (no quote right after
+    // `=`), an external image via `srcset=` rather than `src=`, and a CSS `url(...)` reference (inline style
+    // attribute) rather than an HTML attribute.
+    [InlineData("<div onerror=alert(1)>x</div>")]
+    [InlineData("<img srcset=\"https://cdn.example.com/seal.png 1x\">")]
+    [InlineData("<div style=\"background:url(https://cdn.example.com/bg.png)\"></div>")]
     public void Discover_ReportThatIsNotSelfContained_IsNotCarriedAndReportsSkipped(string offendingMarkup)
     {
         var dir = Path.Combine(Source, "forge", "unsafe");
@@ -499,6 +552,8 @@ public class IdeasTests : IDisposable
         Assert.False(Directory.Exists(Path.Combine(site, "ideas")));
         Assert.DoesNotContain(events, e => e.RelativePath.Contains("ideas", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain("ideas.html", File.ReadAllText(Path.Combine(site, "index.html")));
+        // [Story 18.4 review] The test's own name promised this and never asserted it.
+        Assert.DoesNotContain(events, e => e.Message != null && e.Message.Contains("unrecognized top-level folder"));
     }
 
     [Fact]
@@ -510,7 +565,7 @@ public class IdeasTests : IDisposable
         File.WriteAllText(Path.Combine(hardened, "forged-idea.md"), "# Write-through cache\n\nLocked.\n");
         Report(hardened, SafeReport("HARDENED"));
 
-        var site = Generate(out _);
+        var site = Generate(out var events);
 
         Assert.True(File.Exists(Path.Combine(site, "ideas.html")));
         Assert.True(File.Exists(Path.Combine(site, "ideas", "cache-layer.html")));
@@ -524,6 +579,9 @@ public class IdeasTests : IDisposable
         Assert.DoesNotContain("site-nav", carried);
         // And the nav entry the gate promised actually exists.
         Assert.Contains("ideas.html", File.ReadAllText(Path.Combine(site, "index.html")));
+        // [Story 18.4 review] The KnownIndexGroups("Ideas", "forge") registration must actually suppress the
+        // generic notice for a REAL forge/ folder with a discovered idea — not just an absent one.
+        Assert.DoesNotContain(events, e => e.Message != null && e.Message.Contains("unrecognized top-level folder"));
     }
 
     [Fact]
@@ -551,6 +609,28 @@ public class IdeasTests : IDisposable
         // The idea's own composed pages ARE routes — only the foreign leaf is held out.
         Assert.Contains(bundle.Pages, p => p.OutputRelativePath == SiteNav.IdeasOutputPath);
         Assert.Contains(bundle.Pages, p => p.OutputRelativePath == "ideas/cache-layer.html");
+    }
+
+    [Fact]
+    public void GenerateAll_ForwardLink_ReverseDirectionEvidence_ResolvesFromADownstreamDocsSources()
+    {
+        // [Story 18.4 review] AC #2 / §9 names TWO admissible evidence sources; only the first (a markdown link
+        // inside forged-idea.md) had a test. This pins the second: a downstream doc whose OWN frontmatter
+        // `sources:` names the forge workspace.
+        SeedEpics();
+        var dir = Path.Combine(Source, "forge", "cache-layer");
+        WriteMemlog(dir, "idea: A write-through cache", "updated: 2026-07-21T11:02", "status: complete");
+
+        var briefDir = Path.Combine(Source, "planning-artifacts", "briefs");
+        Directory.CreateDirectory(briefDir);
+        File.WriteAllText(Path.Combine(briefDir, "brief-cache.md"),
+            "---\nsources:\n  - forge/cache-layer/forged-idea.md\n---\n\n# A downstream brief\n\nBody.\n");
+
+        var site = Generate(out _);
+        var detail = File.ReadAllText(Path.Combine(site, "ideas", "cache-layer.html"));
+
+        Assert.Contains("A downstream brief", detail);
+        Assert.Contains("Declared in this document&#39;s sources", detail);
     }
 
     [Fact]
@@ -593,6 +673,25 @@ public class IdeasTests : IDisposable
         var after = File.ReadAllText(Path.Combine(Generate(out _), "index.html"));
 
         // The coverage panel's journal-derived freshness is unchanged by the forge run.
+        Assert.Equal(CoverageFreshnessSignature(before), CoverageFreshnessSignature(after));
+    }
+
+    [Fact]
+    public void GenerateAll_SlugCollisionLoser_IsStillExcludedFromCoverageJournalFallback()
+    {
+        // [Story 18.4 review] §7(a)'s fix originally keyed the forge-exclusion set off `_ideas.Ideas` — but a
+        // slug-collision LOSER never reaches `Ideas`, so its memlog stayed in BuildMemlogMap's scan and could
+        // still flip hasScopedMemlog even though the workspace IS a proven forge session. Two workspaces that
+        // slugify to the same name reproduce that gap directly.
+        SeedEpics();
+        File.WriteAllText(Path.Combine(Source, ".memlog.md"),
+            "---\ntopic: the project journal\nupdated: 2026-07-19T10:00\n---\n\n- (note) seeded\n");
+        var before = File.ReadAllText(Path.Combine(Generate(out _), "index.html"));
+
+        WriteMemlog(Path.Combine(Source, "forge", "a-idea"), "idea: first", "updated: 2026-07-20T09:00");
+        WriteMemlog(Path.Combine(Source, "forge", "A Idea"), "idea: second (slug collision loser)", "updated: 2026-07-21T09:00");
+        var after = File.ReadAllText(Path.Combine(Generate(out _), "index.html"));
+
         Assert.Equal(CoverageFreshnessSignature(before), CoverageFreshnessSignature(after));
     }
 

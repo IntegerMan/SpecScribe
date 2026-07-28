@@ -809,6 +809,96 @@ public class SiteGeneratorSpaTests : IDisposable
         Assert.Throws<InvalidOperationException>(() => gen.RenderSpaBundle());
     }
 
+    // ===== Story 22.4: ONE region shape across the whole IR ==================================================
+
+    /// <summary>Story 22.4 AC #4. Before this story the IR carried TWO region shapes: a re-rendered family page
+    /// carried <c>HtmlRenderAdapter.RenderWayfinding</c>'s <c>&lt;div class="page-wayfinding"&gt;</c> wrapper, while a
+    /// CAPTURED page whose pager rendered non-empty was sliced from the inner <c>&lt;div class="breadcrumb"&gt;</c> —
+    /// carrying the wrapper's closing <c>&lt;/div&gt;</c> without its opener, unbalanced by exactly one element. On
+    /// the real repo that was 594 of 1,400 pages. The TS adapter detected the shape and prepended the missing
+    /// opener; that repair (and the throw behind it) is deleted by this story, so the invariant has to hold HERE,
+    /// at the emitter.
+    /// <para>Asserted over EVERY page in the bundle, not a sample, because the defect class this replaces —
+    /// Story 23.3's double-opened wrapper — nested <c>&lt;main&gt;</c> and <c>&lt;footer&gt;</c> inside the
+    /// wayfinding band on 187 pages while <c>&lt;main&gt;</c> stayed byte-identical, so parity, link resolution and
+    /// every a11y assertion passed green. A sampled assertion is exactly what that defect walks through.</para></summary>
+    [Fact]
+    public void EveryIrRegion_HasOneBalancedWayfindingBand_AndExactlyOneMainLandmark()
+    {
+        // A second ADR gives the ADR pages a non-empty prev/next pager, which is the ONLY thing that makes
+        // RenderWayfinding emit its wrapper — so this fixture genuinely exercises a CAPTURED wrapped page and not
+        // just the re-rendered family shape. Without it the test would be vacuously green on the old emitter.
+        File.WriteAllText(Path.Combine(Adrs, "0002-another-decision.md"),
+            "# ADR 0002: Another Decision\n\n**Status:** Accepted\n\nBody.\n");
+        var gen = GeneratedSite();
+        var bundle = gen.RenderSpaBundle();
+
+        const string mainMarker = "<main id=\"main-content\"";
+        const string wrapMarker = "<div class=\"page-wayfinding\"";
+        const string crumbMarker = "<div class=\"breadcrumb\"";
+
+        var wrapped = 0;
+        var bare = 0;
+        foreach (var page in bundle.Pages)
+        {
+            var html = page.ContentHtml;
+            var mainOpen = html.IndexOf(mainMarker, StringComparison.Ordinal);
+            if (mainOpen < 0)
+            {
+                // The documented degrade: a page carrying no landmark slices to nav-only. It has no band to
+                // balance, and the webview drops it outright (ReferenceEquals check). Nothing to assert.
+                continue;
+            }
+
+            // Exactly ONE landmark — a second <main> is the shape 23.3's defect produced.
+            Assert.Equal(1, CountOccurrences(html, mainMarker));
+            Assert.Equal(1, CountOccurrences(html, "<main"));
+
+            var wrapOpen = html.IndexOf(wrapMarker, StringComparison.Ordinal);
+            var crumbOpen = html.IndexOf(crumbMarker, StringComparison.Ordinal);
+            var bodyStart = mainOpen;
+            if (wrapOpen >= 0 && wrapOpen < bodyStart) bodyStart = wrapOpen;
+            if (crumbOpen >= 0 && crumbOpen < bodyStart) bodyStart = crumbOpen;
+            if (bodyStart == mainOpen) continue; // no wayfinding band at all — legitimate on some surfaces
+
+            var band = html[bodyStart..mainOpen];
+            // Element-balanced: the band opens and closes every <div> it contains, so injecting it can never
+            // swallow the <main> that follows it.
+            Assert.Equal(CountOccurrences(band, "<div"), CountOccurrences(band, "</div>"));
+
+            // The band opens and closes on the SAME side of <main> — i.e. entirely before it. A wrapper opener
+            // that survives past the landmark is the nesting defect restated.
+            if (wrapOpen >= 0 && wrapOpen < mainOpen)
+            {
+                wrapped++;
+                Assert.StartsWith(wrapMarker, band, StringComparison.Ordinal);
+                Assert.EndsWith("</div>\n\n", band, StringComparison.Ordinal);
+            }
+            else
+            {
+                bare++;
+            }
+        }
+
+        // Guard against a vacuous green: BOTH shapes must actually be present in what was measured, and the
+        // wrapped set must include a CAPTURED page (an ADR record), not only the re-rendered epics family.
+        Assert.True(wrapped > 0, "fixture emitted no wrapped wayfinding band — the invariant was not exercised");
+        Assert.True(bare > 0, "fixture emitted no bare breadcrumb band — the invariant was not exercised");
+        var adr = bundle.Pages.Single(p => p.OutputRelativePath == "adrs/0001-a-decision.html").ContentHtml;
+        Assert.Contains(wrapMarker, adr, StringComparison.Ordinal);
+    }
+
+    private static int CountOccurrences(string haystack, string needle)
+    {
+        var n = 0;
+        for (var i = haystack.IndexOf(needle, StringComparison.Ordinal); i >= 0;
+             i = haystack.IndexOf(needle, i + needle.Length, StringComparison.Ordinal))
+        {
+            n++;
+        }
+        return n;
+    }
+
     /// <summary>The <c>&lt;main id="main-content"&gt;…&lt;/main&gt;</c> block of a full page — the landmark the SPA
     /// slices, recovered here to prove the region carries it byte-for-byte.</summary>
     private static string MainBlock(string fullHtml)

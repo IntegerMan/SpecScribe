@@ -36,10 +36,29 @@ public static class FollowUpRefs
 
     /// <summary>Builds a filename-stem → output-href map for docs under implementation-artifacts
     /// (spec pages) plus every story's generated page path. Keys are bare stems and <c>.md</c> forms.</summary>
-    public static IReadOnlyDictionary<string, string> BuildHrefMap(EpicsModel? epics, IEnumerable<DocModel>? docs)
+    public static IReadOnlyDictionary<string, string> BuildHrefMap(EpicsModel? epics, IEnumerable<DocModel>? docs) =>
+        BuildHrefMap(epics, docs?.Select(d => (d.SourceRelativePath, d.OutputRelativePath)));
+
+    /// <summary>The same map, built from bare <c>(sourceRelative, outputRelative)</c> pairs instead of converted
+    /// <see cref="DocModel"/>s.
+    /// <para>Why this overload exists (Story 22.4 AC #5): the doc half of this map only ever reads those two
+    /// paths, and a doc's output path is derived purely from its source path
+    /// (<see cref="PathUtil.ToOutputRelative"/>) — so the map can be built BEFORE the pages loop has converted
+    /// anything. Without it, <see cref="SiteGenerator.RenderEpicsPages"/> ran against an empty <c>_docs</c>, every
+    /// spec resolver's href came back null, and <c>WorkGraph.BuildStory</c> silently dropped the resolver node
+    /// AND its edge — the static story page drew "4 work items and 3 provenance links" where the IR, built after
+    /// the loop, drew "5 work items and 5 provenance links". Story 23.3 measured that divergence across 46
+    /// surfaces. The map is the whole of the difference; nothing else about the geometry needed the doc bodies.
+    /// </para></summary>
+    public static IReadOnlyDictionary<string, string> BuildHrefMap(
+        EpicsModel? epics,
+        IEnumerable<(string SourceRelativePath, string OutputRelativePath)>? docs)
     {
         var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
+        // The epics half is added FIRST and Add() is TryAdd, so a story artifact's own filename key always
+        // resolves to its STORY page, never to a doc page — which is what keeps the two overloads agreeing even
+        // when the pair source enumerates story artifacts the doc set never contains.
         if (epics is not null)
         {
             foreach (var epic in epics.Epics)
@@ -62,13 +81,13 @@ public static class FollowUpRefs
 
         if (docs is not null)
         {
-            foreach (var doc in docs)
+            foreach (var (sourceRelative, outputRelative) in docs)
             {
-                var norm = PathUtil.NormalizeSlashes(doc.SourceRelativePath);
+                var norm = PathUtil.NormalizeSlashes(sourceRelative);
                 if (!BmadArtifactAdapter.IsUnderImplementationArtifacts(norm)) continue;
                 var slash = norm.LastIndexOf('/');
                 var file = slash >= 0 ? norm[(slash + 1)..] : norm;
-                var href = PathUtil.NormalizeSlashes(doc.OutputRelativePath);
+                var href = PathUtil.NormalizeSlashes(outputRelative);
                 Add(map, file, href);
                 Add(map, Path.GetFileNameWithoutExtension(file), href);
             }

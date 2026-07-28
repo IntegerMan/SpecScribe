@@ -4,6 +4,7 @@
 **Date:** 2026-07-10
 **Deciders:** Matt Eland
 **Amended by:** [ADR 0006 — Delivery Architecture & Distribution](0006-delivery-architecture-and-distribution.md) (re-affirms this ADR's C#-render + self-contained-binary core; adds npx distribution + an optional JSON+SPA delivery form)
+**Refined by:** [ADR 0024 — The SPA and the Webview Are Filtered Projections of ONE Region Seam](0024-spa-and-webview-are-filtered-projections-of-one-region-seam.md) — the webview bundle is now a **filter over one shared region seam** rather than its own builder. This ADR's runtime contract is **unchanged**, and 0024 §Decision 4 states explicitly that the webview is **not** a Nuxt consumer: it keeps consuming C#-composed regions directly, so no Node runtime or Epic 23 build output enters the extension's critical path.
 
 ## Context
 

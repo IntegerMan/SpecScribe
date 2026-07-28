@@ -89,14 +89,21 @@ public static class ConsoleUi
         // misparse is immediately visible rather than silently shifting which date pages exist. Conditional, and
         // shaped like the ADR line above rather than a grid row — a permanent row would change every ordinary run's
         // output for a setting almost nobody sets. [Story 5.7 D3 / AC #2a]
-        if (options.DateCutoff is { Policy: DatePolicy.AsOf, AsOf: { } pinned })
+        if (FormatPinnedCutoffLine(options.DateCutoff) is { } pinnedCutoffLine)
         {
-            AnsiConsole.MarkupLine(
-                $"[grey]i[/] [grey]Date-page cutoff pinned to[/] [cyan]{PortalDates.IsoDay(pinned)}[/] [grey](--as-of)[/]");
+            AnsiConsole.MarkupLine(pinnedCutoffLine);
         }
 
         AnsiConsole.WriteLine();
     }
+
+    /// <summary>The AC #2a pinned-cutoff line's content, or null when the cutoff isn't a dated fixed policy — split
+    /// out as a pure, Spectre-free function (same discipline as <see cref="GenerationSummary.FormatLine"/>) so this
+    /// story's echo requirement is unit-testable without driving a live <c>AnsiConsole</c>, which would test
+    /// Spectre, not us (see <c>CliFeedbackTests</c>). [Review][Patch]</summary>
+    internal static string? FormatPinnedCutoffLine(DateCutoff cutoff) => cutoff is { Policy: DatePolicy.AsOf, AsOf: { } pinned }
+        ? $"[grey]i[/] [grey]Date-page cutoff pinned to[/] [cyan]{PortalDates.IsoDay(pinned)}[/] [grey](--as-of)[/]"
+        : null;
 
     /// <summary>The standard "what am I about to build, and from where" preamble for a resolved run: what the
     /// settings file restored (when one contributed) followed by the provenance-annotated paths block. One helper so

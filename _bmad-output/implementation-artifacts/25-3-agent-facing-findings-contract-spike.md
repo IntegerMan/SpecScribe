@@ -23,7 +23,7 @@ deliverables:
 
 # Story 25.3: SPIKE — A Framework-Neutral Findings Contract for AI Agents in SDD Workflows
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -318,75 +318,95 @@ Binding clarifications:
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Re-read the ground truth before designing anything (AC: #1, #2)**
-  - [ ] Re-run the live facet query in § Re-measure first. The count moved **1,360 → 1,420 in one day**; every
+- [x] **Task 1 — Re-read the ground truth before designing anything (AC: #1, #2)**
+  - [x] Re-run the live facet query in § Re-measure first. The count moved **1,360 → 1,420 in one day**; every
         number in this file is from 2026-07-27. If a figure here is wrong, say so in the report — do not quietly
-        re-baseline.
-  - [ ] Read `AdapterDiagnostic.cs`, `DiagnosticsTemplater.cs:1-80`, and `Commands.cs:240-290` **in full** before
-        proposing any severity enum (R1). Do not infer their shape from this story's table.
-  - [ ] Read `PlanningCodeImpact.cs:40-60` XML docs for the join's own stated approximations (R6).
-  - [ ] Confirm `SiteGenerator.cs:357` and `:739` still gate `PlanningCodeImpact.Build` on `DeepGit.Commits` —
-        a concurrent session may have moved them. Grep, do not assume (CLAUDE.md § Concurrent work).
+        re-baseline. → **1,466 on 2026-07-28**; all figures restated in the report, none silently re-baselined.
+  - [x] Read `AdapterDiagnostic.cs`, `DiagnosticsTemplater.cs:1-80`, and `Commands.cs:240-290` **in full** before
+        proposing any severity enum (R1). Do not infer their shape from this story's table. → Found **F5**: the
+        stderr channel is **2-level**, not 3 (`Info` → `"warning"`), which R1's table does not record.
+  - [x] Read `PlanningCodeImpact.cs:40-60` XML docs for the join's own stated approximations (R6).
+  - [x] Confirm `SiteGenerator.cs:357` and `:739` still gate `PlanningCodeImpact.Build` on `DeepGit.Commits` —
+        a concurrent session may have moved them. Grep, do not assume (CLAUDE.md § Concurrent work). → **They
+        moved: now `:388` and `:774`.** Gate condition unchanged.
 
-- [ ] **Task 2 — Produce raw analyzer output that never touched Sonar (AC: #1)**
-  - [ ] Emit SARIF 2.1 from a real build (R3). Escape the comma; build **one project at a time** or use a
-        per-project path token (`dotnet/roslyn#24319`).
-  - [ ] Record the result count and sanity-check it against the ~755 `external_roslyn:*` issues Sonar imported.
-        A wildly smaller number means the multi-project trap bit you, not that the code is clean.
-  - [ ] Put the artifacts under `spike/findings/` — quarantined per `spike/README.md`, referenced by no `.slnx`,
-        contributing nothing to the shipped tool.
+- [x] **Task 2 — Produce raw analyzer output that never touched Sonar (AC: #1)**
+  - [x] Emit SARIF 2.1 from a real build (R3). Escape the comma; build **one project at a time** or use a
+        per-project path token (`dotnet/roslyn#24319`). → **A third trap found: an up-to-date build writes no
+        SARIF at all** (`0 Warning(s)`, no file). `-t:Rebuild` required.
+  - [x] Record the result count and sanity-check it against the ~755 `external_roslyn:*` issues Sonar imported.
+        A wildly smaller number means the multi-project trap bit you, not that the code is clean. → src alone gave
+        **261** (the trap); + tests gave **834**, reconciling with Sonar's **819** (CA1861 339 vs 338).
+  - [x] Put the artifacts under `spike/findings/` — quarantined per `spike/README.md`, referenced by no `.slnx`,
+        contributing nothing to the shipped tool. → Inertness **tested**, not assumed (report § 13.3).
 
-- [ ] **Task 3 — Price SARIF before designing a schema (AC: #1, #4)**
-  - [ ] Map a real Sonar issue **and** a real Roslyn SARIF result into your candidate model. Record what each
-        direction loses.
-  - [ ] Answer R4's three-way question — **is** SARIF / **profile of** SARIF / **deliberate divergence** — with
-        reasons, in the ADR's options table.
-  - [ ] Settle the severity axis (R5): legacy vs `impacts[]`, the array, and the collapse cost.
-  - [ ] Settle multi-location (`flows[]` / SARIF `relatedLocations`).
-  - [ ] Settle naming (R2) and reuse-vs-parallel (R1).
+- [x] **Task 3 — Price SARIF before designing a schema (AC: #1, #4)**
+  - [x] Map a real Sonar issue **and** a real Roslyn SARIF result into your candidate model. Record what each
+        direction loses. → Executed on **1,466 + 834 real records** by `spike/findings/map_to_model.py`.
+  - [x] Answer R4's three-way question — **is** SARIF / **profile of** SARIF / **deliberate divergence** — with
+        reasons, in the ADR's options table. → **Profile of SARIF 2.1.0** (ADR Decision 3).
+  - [x] Settle the severity axis (R5): legacy vs `impacts[]`, the array, and the collapse cost. → **`impacts[]`**;
+        **54.6 % of issues differ by axis**; **14 issues carry two impacts today** and the facet cannot reveal it.
+  - [x] Settle multi-location (`flows[]` / SARIF `relatedLocations`). → Carried, flattened, capped with an explicit
+        truncation count. Measured **source-class dependent**: 15.5 % vs 0.1 %, max **52**.
+  - [x] Settle naming (R2) and reuse-vs-parallel (R1). → **`AnalysisObservation`**; **parallel**, not merged.
 
-- [ ] **Task 4 — Define attachment, gates and all (AC: #2)**
-  - [ ] Specify `finding → file → {directory, story, epic, requirement}` with the hop count and approximation
-        stated per edge.
-  - [ ] State the `--deep-git`-off behavior explicitly, and how the payload advertises that attachment was
-        unavailable rather than empty.
-  - [ ] Evaluate the work graph and say plainly if it cannot be the join (it carries no file nodes).
-  - [ ] Define the unattached route and name Story 26.6's hub as its destination.
+- [x] **Task 4 — Define attachment, gates and all (AC: #2)**
+  - [x] Specify `finding → file → {directory, story, epic, requirement}` with the hop count and approximation
+        stated per edge. → Report § 7; **`requirement` is NOT a key** (two hops, epic-granular).
+  - [x] State the `--deep-git`-off behavior explicitly, and how the payload advertises that attachment was
+        unavailable rather than empty. → **100 % unattached** by default; mandatory non-nullable `attachment.basis`.
+  - [x] Evaluate the work graph and say plainly if it cannot be the join (it carries no file nodes). → Confirmed,
+        **and it has no requirement nodes either** — contrary to this story's description.
+  - [x] Define the unattached route and name Story 26.6's hub as its destination. → **728 (31.7 %)** deep-git on,
+        **2,300 (100 %)** off.
 
-- [ ] **Task 5 — Compare channels and recommend (AC: #3)**
-  - [ ] Build the comparison table. **Four rows minimum**: digest artifact, Epic 22 IR field, Sonar's official
-        MCP server, a SpecScribe-emitted MCP surface.
-  - [ ] Per row: framework-neutrality, offline behavior, new-runtime cost, **fingerprint impact**, staleness
-        honesty, and whether an agent can consume a *subset* (the 25.4 use case).
-  - [ ] Recommend **for Story 25.4** and **for Epic 26** separately if the answers differ. Say so if they do.
-  - [ ] State what 25.4 defers.
+- [x] **Task 5 — Compare channels and recommend (AC: #3)**
+  - [x] Build the comparison table. **Four rows minimum**: digest artifact, Epic 22 IR field, Sonar's official
+        MCP server, a SpecScribe-emitted MCP surface. → **Five rows** (the shipped stderr channel added as baseline).
+  - [x] Per row: framework-neutrality, offline behavior, new-runtime cost, **fingerprint impact**, staleness
+        honesty, and whether an agent can consume a *subset* (the 25.4 use case). → Report § 10, plus a
+        BMad-neutrality row and a credential row.
+  - [x] Recommend **for Story 25.4** and **for Epic 26** separately if the answers differ. Say so if they do. →
+        **They differ.** 25.4 → sharded digest; Epic 26 → IR field.
+  - [x] State what 25.4 defers. → Report § 10.4.
 
-- [ ] **Task 6 — Write the report (AC: #1–#4)**
-  - [ ] `_bmad-output/implementation-artifacts/25-3-spike-report.md`. Follow the structure of
+- [x] **Task 6 — Write the report (AC: #1–#4)**
+  - [x] `_bmad-output/implementation-artifacts/25-3-spike-report.md`. Follow the structure of
         [24-6](24-6-graph-engine-spike.md)'s and [23-1](23-1-spike-report.md)'s reports: findings numbered and
-        citable, negatives reported as loudly as positives, unmeasured axes named as unmeasured.
-  - [ ] Include a **§ Handoff** naming, per story: 25.4, 26.2, 26.3, 26.4, 26.5, 26.6 — and what each receives.
-  - [ ] Add a note to **26.1** (visual ideation): the severity vocabulary and text labels it must render, so it
+        citable, negatives reported as loudly as positives, unmeasured axes named as unmeasured. → **F1–F7**
+        numbered; **§ 14 names seven unmeasured axes.**
+  - [x] Include a **§ Handoff** naming, per story: 25.4, 26.2, 26.3, 26.4, 26.5, 26.6 — and what each receives.
+  - [x] Add a note to **26.1** (visual ideation): the severity vocabulary and text labels it must render, so it
         does not invent a second one. Add a note to **26.7**: whether the contract generalizes to a pluggable
-        provider seam or is bespoke per service.
-  - [ ] Add a note to **Epic 27** (FR42, coverage): coverage is a per-file *metric*, not a finding — say whether
+        provider seam or is bespoke per service. → Both written; 26.7 gets "proven on two, not proven general".
+  - [x] Add a note to **Epic 27** (FR42, coverage): coverage is a per-file *metric*, not a finding — say whether
         it rides this contract or is deliberately outside it. Epic 27 was kept separate for a reason; confirm or
-        challenge that reason on evidence.
+        challenge that reason on evidence. → **Separation upheld**, with the *uncovered-lines range* named as the
+        one genuine edge for Epic 27 to decide rather than inherit.
 
-- [ ] **Task 7 — Author and ratify the ADR (AC: #4)**
-  - [ ] Verify the next free number (0019 is claimed by 18.3, unwritten). Author `docs/adrs/00NN-*.md` in the
-        house format: Status line, Context, Decision(s), Options considered, Consequences.
-  - [ ] Add the one-line entry to `docs/adrs/README.md`.
-  - [ ] **Get owner ratification.** Status `Accepted`, not `Proposed`, before this story goes to review.
+- [x] **Task 7 — Author and ratify the ADR (AC: #4)**
+  - [x] Verify the next free number (0019 is claimed by 18.3, unwritten). Author `docs/adrs/00NN-*.md` in the
+        house format: Status line, Context, Decision(s), Options considered, Consequences. → **The story's guess
+        of 0021 was stale**: 0020/0021/0022 all landed since authoring. `0019` still claimed-but-unwritten by
+        **both** 18.3 **and** 22.3. **ADR 0023** authored.
+  - [x] Add the one-line entry to `docs/adrs/README.md`. → Added; index now lists 22 records.
+  - [x] **Get owner ratification.** Status `Accepted`, not `Proposed`, before this story goes to review.
+        → ✅ **Ratified by the owner during this dev pass, 2026-07-28.** ADR 0023 and its `README.md` index entry
+        both read **Accepted**. This makes 0023 the **first Accepted ADR since 0015** — 0016–0018 and 0020–0022 all
+        remain Proposed.
 
-- [ ] **Task 8 — Prove the spike shipped nothing (AC: all)**
-  - [ ] `git status` — no `src/`, `tests/`, `web/`, `extension/` edits attributable to this story. If a
+- [x] **Task 8 — Prove the spike shipped nothing (AC: all)**
+  - [x] `git status` — no `src/`, `tests/`, `web/`, `extension/` edits attributable to this story. If a
         concurrent session's edits are in the tree, say so and leave them (CLAUDE.md: never `git reset --hard`,
-        `git checkout --`, or `git clean`).
-  - [ ] Full suite green and `GoldenContentFingerprint` **unmoved**. If it moved, either you edited `src/` or a
-        sibling session did — determine which and record it.
-  - [ ] Confirm `spike/findings/` is referenced by no project file and the generated site is byte-identical with
-        and without it (the `spike/README.md` guarantee).
+        `git checkout --`, or `git clean`). → **A concurrent session's Story 22.4 work is in the tree and was
+        left untouched.** `Commands.cs` entered the diff *mid-pass*.
+  - [x] Full suite green and `GoldenContentFingerprint` **unmoved**. If it moved, either you edited `src/` or a
+        sibling session did — determine which and record it. → **2,658 passed / 0 failed / 3 skipped**;
+        fingerprint test green standalone and in-suite.
+  - [x] Confirm `spike/findings/` is referenced by no project file and the generated site is byte-identical with
+        and without it (the `spike/README.md` guarantee). → **Tested, 0 differences** (report § 13.3). Required
+        normalizing the per-run footer stamp first, and surfaced **F7** (the deep-git silent loss) along the way.
 
 ## Dev Notes
 
@@ -542,9 +562,85 @@ There is no unit test for a contract decision. The evidence for this story is:
 
 ### Agent Model Used
 
+claude-opus-5 (dev-story, 2026-07-28)
+
 ### Debug Log References
 
+- Live Sonar re-measure: `api/issues/search?componentKeys=IntegerMan_SpecScribe&resolved=false` — **1,466**
+  unresolved (1,360 → 1,420 → 1,466 over three days).
+- Raw SARIF: `dotnet build <proj> -t:Rebuild -p:ErrorLog=<abs>%2cversion=2.1`, **one project at a time**.
+  `src` 261 + `tests` 573 = **834** results.
+- Two-way mapping: `python spike/findings/map_to_model.py <scratch>` — 1,466 Sonar + 834 SARIF → one model.
+- Channel sizing: `python spike/findings/measure_channels.py <scratch>`.
+- Attachment: `specscribe generate --deep-git`, then parsed `impact-map.html`'s embedded hierarchy JSON
+  (1,166 nodes) and all 162 generated story pages.
+- Suite: `dotnet test` → **2,658 passed / 0 failed / 3 skipped**.
+- Inertness: two identical `generate` runs → 0 diff after normalizing the footer stamp; `spike/findings/` parked →
+  0 diff.
+
 ### Completion Notes List
+
+All nine required items are discharged; the one open item is owner ratification.
+
+1. **The findings model, named deliberately, reuse-vs-parallel recorded (AC #1, R1, R2).** The record is
+   **`AnalysisObservation`** — "finding" is taken by the *parsed* `## Review Findings` story section
+   (`EpicsParser.cs:253` → `EpicsView.cs:303` → `<h3>` at `HtmlRenderAdapter.Epics.cs:609`), exactly where Story
+   26.5 wants to put analysis results. **Parallel, not merged**, split on subject. The losing argument is recorded
+   in both report § 2 and ADR Decision 2. *New finding beyond R1's table:* `Commands.SerializeDiagnostics` is
+   **2-level** — `DiagnosticSeverity.Info` silently becomes `"warning"` — so "reuse the existing serialization" is
+   cheaper on paper than in fact.
+2. **SARIF answered three ways (AC #1, R4).** **A named profile of SARIF 2.1.0.** Not *is* (no planning
+   vocabulary; **2.6×** the bytes at 1,793 B/result vs 678; results carry only a `ruleIndex` into an out-of-line
+   rule catalogue, so one result is not self-describing); not *diverges* (forfeits Roslyn/GitHub/Sonar interop).
+   Confirmed live: OASIS Standard + Errata 01, 28 Aug 2023, `level` 4-valued defaulting to `warning`. *Also found:*
+   SARIF's `result.kind` is a **separate** axis — pinned to `fail` rather than left undefined.
+3. **Severity axis settled (AC #1, R5).** Read **`impacts[]`**; carry every provider value verbatim; normalize to
+   SARIF's `level` enum so the raw-SARIF direction is lossless. **54.6 % (800/1,466) of issues land on a different
+   normalized level depending on the axis.** ⚠ **The story's own R5 inference is wrong**: the `impactSeverities`
+   facet **counts issues, not impact pairs**, so it can never reveal the array — and **14 issues carry two impacts
+   today**. A scalar severity is lossy on live data now. Collapse cost stated: BLOCKER (1) and HIGH (120) merge,
+   so the **single BLOCKER is invisible** at normalized granularity.
+4. **Second source class proven on RAW Roslyn SARIF, both losses listed (AC #1, R3).** 834 results that never
+   touched Sonar, reconciling to Sonar's 819 imports. Independence is honest: the *acquisition path* is fully
+   independent, the *rule content* overlaps — but **2 rules appear only in raw SARIF** and **37 `csharpsquid`
+   rules only in Sonar**. Losses tabulated both directions (report § 8.2–8.3). *New finding:* SARIF's
+   `artifactLocation.uri` is an **absolute `file://` URI carrying the build machine's path** — normalization is a
+   correctness requirement, not tidiness.
+5. **Attachment specified with the gate and its silent-loss mode (AC #2, R6, R7).** ⚠ **The gate sites moved** —
+   `SiteGenerator.cs:388`/`:774`, not `:357`/`:739`. **The headline is F3:** the join amplifies — observation-weighted
+   fan-out **7.33 epics / 10.02 stories**, 1,572 attached observations → **15,758 story edges**, `specscribe.css` →
+   **64 stories**, `SiteGenerator.cs` → **18 of 19 epics**, 67 % of attached observations landing on ≥5 epics.
+   Story 26.5's "use the existing miner" is correct **and insufficient**. `requirement` is **not** a key.
+6. **Unattached route named with the expected count (AC #2).** Story 26.6's hub. **728 (31.7 %)** with `--deep-git`
+   on; **2,300 (100 %)** with it off — the default.
+7. **Channel table, five rows, separate recommendations (AC #3, R8, R9).** 25.4 → **sharded gitignored digest**
+   (8.9 KB index + median 3.7 KB shards vs 1.49 MB whole), fingerprint-safe. Epic 26 → **IR field**, which moves
+   the fingerprint 25.4 forbids and 26.4 expects. Sonar's official MCP server **confirmed live** (supports Cloud,
+   documents Claude Code, needs a token) — **adopt as a complement, never as the contract**. SpecScribe-emitted MCP
+   **deferred to its own ADR**.
+8. **ADR authored and indexed (AC #4).** ⚠ **Numbering: the story's guess of 0021 was stale** — 0020/0021/0022 all
+   landed between authoring and this pass, while **`0019` remains claimed-but-unwritten by BOTH 18.3 and 22.3**.
+   **[ADR 0023](../../docs/adrs/0023-agent-facing-analysis-observation-contract.md)**, listed in `docs/adrs/README.md`.
+   ADRs cited by symbol/section, never line number.
+9. **Handoffs written (AC #4).** 25.4 and 26.2–26.6, plus notes to 26.1 (severity vocabulary and labels only — no
+   layout), 26.7 ("proven on two, not proven general"), and Epic 27 (separation **upheld on evidence**, with the
+   *uncovered-lines range* named as the one real edge).
+
+**✅ Ratified.** AC #4 requires the ADR **Accepted, not Proposed**, before this story goes to review, because six
+downstream stories bind to it. **The owner ratified ADR 0023 during this dev pass (2026-07-28)**; the record and
+its `docs/adrs/README.md` index entry both read **Accepted**. Worth noting for the epic retrospective: **0023 is
+the first Accepted ADR since 0015** — 0016, 0017, 0018, 0020, 0021, and 0022 all still sit at Proposed, several of
+them also load-bearing for in-flight epics.
+
+**Bonus finding, F7 — the deep-git silent loss reproduced live.** `generate --deep-git` was run 8× and returned
+**739 pages on some runs and 436 on others** — the no-deep-git page set, all ~304 `commit/*.html` gone — at
+**`errors=0` every time**. Cited from project memory in § 7.4, now first-hand. It makes `attachment.basis`
+load-bearing rather than defensive: without it, a consumer sees "attaches to no story" on 100 % of observations on
+a run that reported success. **Corollary for 25.4/26.5: never cache attachment across runs without its `basis`.**
+
+**Shared-`main` conditions.** A concurrent session's Story 22.4 work (`SpaDelivery.cs`, `SiteGeneratorSpaTests.cs`,
+`Commands.cs`, `web/ir/*`) was in the tree throughout and was **left untouched**; `Commands.cs` entered the diff
+mid-pass. No destructive git commands were run. The full suite is green **with** those changes present.
 
 <!-- Required by the ACs — do not mark this story done without all nine:
      1. The findings model, named deliberately, with the reuse-vs-parallel decision against the shipped
@@ -564,8 +660,33 @@ There is no unit test for a contract decision. The evidence for this story is:
 
 ### File List
 
+**Added (durable):**
+
+- `_bmad-output/implementation-artifacts/25-3-spike-report.md`
+- `docs/adrs/0023-agent-facing-analysis-observation-contract.md`
+
+**Added (disposable — `spike/findings/`, quarantined per `spike/README.md`, inertness tested):**
+
+- `spike/findings/roslyn-specscribe.sarif` (572,435 B, 261 results)
+- `spike/findings/roslyn-tests.sarif` (922,781 B, 573 results)
+- `spike/findings/map_to_model.py` (the two-way mapping — AC #1's demonstration)
+- `spike/findings/measure_channels.py` (digest sizing — AC #3's numbers)
+
+**Modified:**
+
+- `docs/adrs/README.md` (one appended index entry for ADR 0023)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (status + notes)
+- `_bmad-output/implementation-artifacts/25-3-agent-facing-findings-contract-spike.md` (this file)
+
+**Untouched, as required:** everything under `src/`, `tests/`, `extension/`, `web/`, and `SpecScribe.slnx`.
+Modifications present in those paths belong to a **concurrent session's Story 22.4** work and were left alone.
+
+**Not committed:** `SpecScribeOutput/` (gitignored, verified `git check-ignore` → `.gitignore:490`),
+`spike/findings/__pycache__/`.
+
 ### Change Log
 
 | Date | Change |
 |---|---|
 | 2026-07-27 | Story created by `create-story` at baseline `40c7ee9`. Nine reconciliations recorded against shipped code and live Sonar data. |
+| 2026-07-28 | `dev-story` pass at session HEAD `06b300c`. Tasks 1–8 complete except owner ratification of ADR 0023. Contract decided: **`AnalysisObservation`**, a named profile of SARIF 2.1.0, parallel to `DiagnosticNotice`, severity read from `impacts[]` and normalized to SARIF's `level` enum. Evidence: 1,466 live Sonar issues + 834 raw Roslyn SARIF results mapped both ways. Seven numbered findings (F1–F7), seven axes named unmeasured. Four of this story's own facts corrected: the gate sites moved (`:388`/`:774`), the `impactSeverities` facet cannot reveal the impacts array (and 14 issues carry two), the work graph has no requirement nodes either, and the ADR number is 0023 not 0021. Suite 2,658 passed / 0 failed / 3 skipped; `GoldenContentFingerprint` unmoved; `spike/findings/` proved byte-inert. |

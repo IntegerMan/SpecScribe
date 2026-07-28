@@ -10,7 +10,7 @@ owner_decisions: 2026-07-27 # D1 one region seam + both defects; D2 22.4 runs BE
 
 # Story 22.4: SPA + Webview as IR Consumers
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -127,50 +127,50 @@ The retired [Story 22.3 file](22-3-static-html-rendered-from-the-ir.md) is kept 
 
 **Sequence matters.** Task 1 is measurement — without a captured "before" bundle, AC #2's byte-identity claim is unfalsifiable. Tasks 2 and 3 are the two defect fixes and are *independent of each other*; do them before the unification so the refactor lands on a fixed baseline rather than carrying a defect into a new shape.
 
-- [ ] **Task 0 — Re-verify every line number in this file.** They were measured at `6017c2c`. `SiteGenerator.cs` is 5,359 lines and moves under concurrent sessions; 22.3's numbers were already ~40 lines stale within one day. Grep for the symbol, never trust the number.
+- [x] **Task 0 — Re-verify every line number in this file.** They were measured at `6017c2c`. `SiteGenerator.cs` is 5,359 lines and moves under concurrent sessions; 22.3's numbers were already ~40 lines stale within one day. Grep for the symbol, never trust the number.
 
-- [ ] **Task 1 — Capture the "before" oracle (AC: #1, #2).**
-  - [ ] `dotnet run --project src/SpecScribe -- generate --spa --deep-git` into `SpecScribeOutput/` (the default — **never** `--output docs/live`).
-  - [ ] ⚠️ **Verify `git-insights.html`, `deep-analytics.html`, `impact-map.html` and `commit/*.html` are actually present** before trusting the page count. Memory `gitmetrics-3s-timeout-silent-deep-git-loss`: `GitMetrics`' hard-coded 3,000 ms budget silently drops all of them at `errors=0` (6,496 ms measured cold), costing 3 surfaces and ~300 pages. A default generate emits **1,046** IR pages and is missing them entirely.
-  - [ ] Serialize the pre-story `WebviewBundle` (all surfaces, `EntryDocument`, `ProjectOutline`) and the pre-story `spa/` file set to a scratch location. **This is the AC #2 oracle** — a byte-identity claim with no captured baseline is a claim, not a measurement.
+- [x] **Task 1 — Capture the "before" oracle (AC: #1, #2).**
+  - [x] `dotnet run --project src/SpecScribe -- generate --spa --deep-git` into `SpecScribeOutput/` (the default — **never** `--output docs/live`).
+  - [x] ⚠️ **Verify `git-insights.html`, `deep-analytics.html`, `impact-map.html` and `commit/*.html` are actually present** before trusting the page count. Memory `gitmetrics-3s-timeout-silent-deep-git-loss`: `GitMetrics`' hard-coded 3,000 ms budget silently drops all of them at `errors=0` (6,496 ms measured cold), costing 3 surfaces and ~300 pages. A default generate emits **1,046** IR pages and is missing them entirely.
+  - [x] Serialize the pre-story `WebviewBundle` (all surfaces, `EntryDocument`, `ProjectOutline`) and the pre-story `spa/` file set to a scratch location. **This is the AC #2 oracle** — a byte-identity claim with no captured baseline is a claim, not a measurement.
 
-- [ ] **Task 2 — Fix the two-region-shapes defect at the emitter (AC: #4, #6).**
-  - [ ] In [`SpaDelivery.ExtractContentRegion`](../../src/SpecScribe/SpaDelivery.cs), prefer `<div class="page-wayfinding"` as `bodyStart`, falling back to `<div class="breadcrumb"`, then to `mainOpen`. Take the **earliest candidate that precedes `mainOpen`** — the same rule `web/ir/adapter.ts` uses today — so a breadcrumb appearing *after* `<main>` never splits the region (`region-split.test.ts` already pins that case).
-  - [ ] The wrapper appears only where a pager renders. Affected captured templaters — the 5 `SiteNav.RenderWayfinding` callers: [`CodeFileTemplater.cs:740`](../../src/SpecScribe/CodeFileTemplater.cs) (`RenderPage` + `RenderPlaceholder`, ~hundreds), [`HtmlTemplater.cs:31`](../../src/SpecScribe/HtmlTemplater.cs) (ADR records), [`CommitDayTemplater.cs:44`](../../src/SpecScribe/CommitDayTemplater.cs), [`CommitDetailTemplater.cs:49`](../../src/SpecScribe/CommitDetailTemplater.cs), [`RetroTemplater.cs:72`](../../src/SpecScribe/RetroTemplater.cs). Every other templater calls `SiteNav.RenderBreadcrumb`, which is byte-identical to `RenderWayfinding` with an empty pager and emits **no wrapper** — those pages are unaffected.
-  - [ ] Add the whole-IR invariant test (AC #4). Assert over every emitted region, not a sample.
-  - [ ] Delete `WAYFINDING_OPEN` / `wayfindingRepaired` / `stillUnbalanced` from [`web/ir/adapter.ts`](../../web/ir/adapter.ts) and update `IrRegion` + its `types.ts` declaration; update `web/test/region-split.test.ts`'s `captured` fixture to the single shape.
-  - [ ] Measure the `contentHash` delta (AC #6) and decide the `schemaVersion` bump. **`SiteGeneratorSpaTests.cs:517`** (`ManifestAndChunks_AreByteIdentical_AcrossTwoConsecutiveRunsOfUnchangedInput`) names the page whose hash moved — use it as the measuring instrument, not just as a gate.
+- [x] **Task 2 — Fix the two-region-shapes defect at the emitter (AC: #4, #6).**
+  - [x] In [`SpaDelivery.ExtractContentRegion`](../../src/SpecScribe/SpaDelivery.cs), prefer `<div class="page-wayfinding"` as `bodyStart`, falling back to `<div class="breadcrumb"`, then to `mainOpen`. Take the **earliest candidate that precedes `mainOpen`** — the same rule `web/ir/adapter.ts` uses today — so a breadcrumb appearing *after* `<main>` never splits the region (`region-split.test.ts` already pins that case).
+  - [x] The wrapper appears only where a pager renders. Affected captured templaters — the 5 `SiteNav.RenderWayfinding` callers: [`CodeFileTemplater.cs:740`](../../src/SpecScribe/CodeFileTemplater.cs) (`RenderPage` + `RenderPlaceholder`, ~hundreds), [`HtmlTemplater.cs:31`](../../src/SpecScribe/HtmlTemplater.cs) (ADR records), [`CommitDayTemplater.cs:44`](../../src/SpecScribe/CommitDayTemplater.cs), [`CommitDetailTemplater.cs:49`](../../src/SpecScribe/CommitDetailTemplater.cs), [`RetroTemplater.cs:72`](../../src/SpecScribe/RetroTemplater.cs). Every other templater calls `SiteNav.RenderBreadcrumb`, which is byte-identical to `RenderWayfinding` with an empty pager and emits **no wrapper** — those pages are unaffected.
+  - [x] Add the whole-IR invariant test (AC #4). Assert over every emitted region, not a sample.
+  - [x] Delete `WAYFINDING_OPEN` / `wayfindingRepaired` / `stillUnbalanced` from [`web/ir/adapter.ts`](../../web/ir/adapter.ts) and update `IrRegion` + its `types.ts` declaration; update `web/test/region-split.test.ts`'s `captured` fixture to the single shape.
+  - [x] Measure the `contentHash` delta (AC #6) and decide the `schemaVersion` bump. **`SiteGeneratorSpaTests.cs:517`** (`ManifestAndChunks_AreByteIdentical_AcrossTwoConsecutiveRunsOfUnchangedInput`) names the page whose hash moved — use it as the measuring instrument, not just as a gate.
 
-- [ ] **Task 3 — Fix the 46-delta pipeline-ordering defect (AC: #5, #7).**
-  - [ ] Make `RenderEpicsPages` see the same fully-populated work inventory the IR sees. The blocker is structural: `_docs` is filled inside `GenerateOneInternal` ([:3289](../../src/SpecScribe/SiteGenerator.cs)) **after** it writes the page, and `RenderEpicsPages` runs before that loop — which is exactly why [`:2617`](../../src/SpecScribe/SiteGenerator.cs) reaches for `ResolveFollowUpWork(files)` instead.
-  - [ ] ⚠️ **Trap 2 (the `alreadyExisted` flip) applies to any pre-population approach — read it before choosing one.**
-  - [ ] Share **one** `WorkInventory` / `FollowUpGeometry` instance between `RenderEpicsPages`, `BuildSpaBundle` and `RenderWebviewSurfaces`. One instance, not three equal ones — an equal-but-separate build is the same defect waiting to drift again.
-  - [ ] Add the agreement test (AC #5): per-story work-graph node/edge counts equal across static and IR.
-  - [ ] Enumerate the static byte delta page-by-page. **It may be zero on the golden fixture** (whether `StorySubgraph` differs there depends on the fixture carrying deferred work) — measure the *real* `SpecScribeOutput/` too, since the fixture proves nothing about pages it does not contain.
-  - [ ] ⚠️ `RenderEpicsPages` is **also** called from the watch route ([:741](../../src/SpecScribe/SiteGenerator.cs)). Confirm the change does not alter watch-mode behaviour; `RegenerateEpics`' known non-oracle-faithfulness is **22.5's**, not this story's (Scope guard #1).
+- [x] **Task 3 — Fix the 46-delta pipeline-ordering defect (AC: #5, #7).**
+  - [x] Make `RenderEpicsPages` see the same fully-populated work inventory the IR sees. The blocker is structural: `_docs` is filled inside `GenerateOneInternal` ([:3289](../../src/SpecScribe/SiteGenerator.cs)) **after** it writes the page, and `RenderEpicsPages` runs before that loop — which is exactly why [`:2617`](../../src/SpecScribe/SiteGenerator.cs) reaches for `ResolveFollowUpWork(files)` instead.
+  - [x] ⚠️ **Trap 2 (the `alreadyExisted` flip) applies to any pre-population approach — read it before choosing one.**
+  - [x] Share **one** `WorkInventory` / `FollowUpGeometry` instance between `RenderEpicsPages`, `BuildSpaBundle` and `RenderWebviewSurfaces`. One instance, not three equal ones — an equal-but-separate build is the same defect waiting to drift again.
+  - [x] Add the agreement test (AC #5): per-story work-graph node/edge counts equal across static and IR.
+  - [x] Enumerate the static byte delta page-by-page. **It may be zero on the golden fixture** (whether `StorySubgraph` differs there depends on the fixture carrying deferred work) — measure the *real* `SpecScribeOutput/` too, since the fixture proves nothing about pages it does not contain.
+  - [x] ⚠️ `RenderEpicsPages` is **also** called from the watch route ([:741](../../src/SpecScribe/SiteGenerator.cs)). Confirm the change does not alter watch-mode behaviour; `RegenerateEpics`' known non-oracle-faithfulness is **22.5's**, not this story's (Scope guard #1).
 
-- [ ] **Task 4 — Extract the shared prelude (AC: #1).**
-  - [ ] Lift `docs` → `work` → `counts` → `followUps` → `unplanned` → `dashboardPage` into one private builder returning the shared state, consumed by `BuildSpaBundle`, `RenderWebviewSurfaces` **and** (for AC #5) `RenderEpicsPages`' geometry.
-  - [ ] ⚠️ Keep `CodeItemHref` **explicit** at the `HtmlTemplater.BuildIndexPage` call. Both current call sites carry a comment about it because the named arguments start at `counts:` and a positional omission silently nulls the resolver, degrading Git Pulse bar labels from links to text and dropping **5 anchors** — the entire 277-byte parity delta Story 23.1 measured. Unifying the call is the moment to lose it.
+- [x] **Task 4 — Extract the shared prelude (AC: #1).**
+  - [x] Lift `docs` → `work` → `counts` → `followUps` → `unplanned` → `dashboardPage` into one private builder returning the shared state, consumed by `BuildSpaBundle`, `RenderWebviewSurfaces` **and** (for AC #5) `RenderEpicsPages`' geometry.
+  - [x] ⚠️ Keep `CodeItemHref` **explicit** at the `HtmlTemplater.BuildIndexPage` call. Both current call sites carry a comment about it because the named arguments start at `counts:` and a positional omission silently nulls the resolver, degrading Git Pulse bar labels from links to text and dropping **5 anchors** — the entire 277-byte parity delta Story 23.1 measured. Unifying the call is the moment to lose it.
 
-- [ ] **Task 5 — Extract the shared captured-region loop and express the webview as a filter (AC: #1, #2, #3).**
-  - [ ] One loop produces `(path, title, region, breadcrumb, metaDescription, degraded)` per captured page.
-  - [ ] The webview consumes it with its own filter: exclusions, `degraded → skip`, `SourcePath` join via `BuildCapturedSourceMap`, island strip. The SPA consumes it unfiltered.
-  - [ ] Resolve Trap 1 (the island divergence) here, in the direction chosen under AC #2.
-  - [ ] Diff the emitted `WebviewBundle` and `spa/` file set against Task 1's oracle. **Byte-identical except the AC #4 region change and the AC #5 inventory change**, each attributed.
+- [x] **Task 5 — Extract the shared captured-region loop and express the webview as a filter (AC: #1, #2, #3).**
+  - [x] One loop produces `(path, title, region, breadcrumb, metaDescription, degraded)` per captured page.
+  - [x] The webview consumes it with its own filter: exclusions, `degraded → skip`, `SourcePath` join via `BuildCapturedSourceMap`, island strip. The SPA consumes it unfiltered.
+  - [x] Resolve Trap 1 (the island divergence) here, in the direction chosen under AC #2.
+  - [x] Diff the emitted `WebviewBundle` and `spa/` file set against Task 1's oracle. **Byte-identical except the AC #4 region change and the AC #5 inventory change**, each attributed.
 
-- [ ] **Task 6 — Enumerate deleted vs. deliberately-kept symbols (AC: #3).** Kept list must state *why* — "still the IR's producer for ~853 pages until 23.4" — so the next agent does not read it as dead code.
+- [x] **Task 6 — Enumerate deleted vs. deliberately-kept symbols (AC: #3).** Kept list must state *why* — "still the IR's producer for ~853 pages until 23.4" — so the next agent does not read it as dead code.
 
-- [ ] **Task 7 — Verify (AC: #2, #4, #5, #7).**
-  - [ ] `dotnet test SpecScribe.slnx` — golden fingerprint per AC #7; registry ceiling holds (see Test gates row 5).
-  - [ ] Under `web/`: `npm run test` (region-split), `npm run check:a11y`, `npm run check:links`, `npm run measure:parity`, `npm run check:ir-content`.
-  - [ ] ⚠️ Verify the git-derived surfaces **separately**: `git-insights.html`, `impact-map.html`, `timeline.html` and `commits/` are **absent from the golden fixture** (honest-scope-limit comment at [`HierarchyExplorerTests.cs:671-679`](../../tests/SpecScribe.Tests/HierarchyExplorerTests.cs) — note `code-map.html` and `risk-quadrant.html` **do** render there; only the deep-git surfaces are absent). A green fingerprint is **not** evidence they survived — and `impact-map.html` is the one captured surface carrying a JSON island (Trap 1).
+- [x] **Task 7 — Verify (AC: #2, #4, #5, #7).**
+  - [x] `dotnet test SpecScribe.slnx` — golden fingerprint per AC #7; registry ceiling holds (see Test gates row 5).
+  - [x] Under `web/`: `npm run test` (region-split), `npm run check:a11y`, `npm run check:links`, `npm run measure:parity`, `npm run check:ir-content`.
+  - [x] ⚠️ Verify the git-derived surfaces **separately**: `git-insights.html`, `impact-map.html`, `timeline.html` and `commits/` are **absent from the golden fixture** (honest-scope-limit comment at [`HierarchyExplorerTests.cs:671-679`](../../tests/SpecScribe.Tests/HierarchyExplorerTests.cs) — note `code-map.html` and `risk-quadrant.html` **do** render there; only the deep-git surfaces are absent). A green fingerprint is **not** evidence they survived — and `impact-map.html` is the one captured surface carrying a JSON island (Trap 1).
 
-- [ ] **Task 8 — Live-browser JS-off verification (AC: #8).** Real DOM geometry, not a test assertion.
+- [x] **Task 8 — Live-browser JS-off verification (AC: #8).** Real DOM geometry, not a test assertion.
 
-- [ ] **Task 9 — Propose the ADR and cross-reference it (AC: #9).**
+- [x] **Task 9 — Propose the ADR and cross-reference it (AC: #9).**
 
-- [ ] **Task 10 — Record the AC drift in `epics.md` AND `sprint-status.yaml` in the same change** (CLAUDE.md § Decision records). Include that `22-3`'s "kept as reference" status is unchanged and that 23.4's Task 8 restatement obligation is **discharged by this story running first** (D2) — 23.4 should be updated to point at the seam this story built.
+- [x] **Task 10 — Record the AC drift in `epics.md` AND `sprint-status.yaml` in the same change** (CLAUDE.md § Decision records). Include that `22-3`'s "kept as reference" status is unchanged and that 23.4's Task 8 restatement obligation is **discharged by this story running first** (D2) — 23.4 should be updated to point at the seam this story built.
 
 ## Dev Notes
 
@@ -328,14 +328,136 @@ The section-nav script is appended *after* `</main>` **because `ExtractContentRe
 
 ### Agent Model Used
 
+claude-opus-5 (Claude Code, dev-story workflow), 2026-07-28. Baseline `6017c2c`; run against working tree at `06b300c`.
+
 ### Debug Log References
+
+**The measurement harness is the load-bearing part of this story — record it before the results.**
+
+- **A baseline BINARY, not a baseline snapshot.** The first before/after pair (oracle captured 10:19, after-state 10:46) straddled a concurrent session's work and was unusable: 6 surfaces appeared, the outline summary shifted a story from review→done, and `epics/story-18-4.html` moved by +25 KB with *no code change at all* (proven by a control run: two identical-code generations 10 minutes apart differed on exactly that one page). The usable method was to build a **pre-story binary from the live tree**: copy `src/` to scratch, restore only this story's three files (`SiteGenerator.cs`, `SpaDelivery.cs`, `FollowUpRefs.cs`) from `HEAD`, compile, and run both binaries against the *same* `_bmad-output` + `docs/adrs`. Every delta is then attributable to this story alone. The concurrent session touched 7 different files, so the separation was clean.
+- ⚠️ **A diff that reports "identical" can be reporting nothing.** The first webview diff claimed a perfect `822/822 contentHtml` match. The webview payload's surface field is **`content`**, not `contentHtml` — it was comparing `undefined` to `undefined`. Caught only because `contentWrapperOnly: 0` contradicted the independently-measured 594-page region change. **Assert the field exists before trusting a bundle diff.**
+- Region shapes measured by walking `spa/manifest.json` + chunks directly (`measure-regions.js`); static-vs-IR `<main>` parity by comparing each page's on-disk `.html` against its IR chunk entry (`measure-46delta.js`); static byte delta with golden-style volatile normalization (footer clock, `?v=`, output root, build stamp).
+- Full suite run 4×. A **rotating** 1–5 tests fail per run — a different set each time (`SiteGeneratorCodeInsightsTests`, `SiteGeneratorChangeLogDateLinkTests` ×2, `SiteGeneratorGitInsightsTests`), all green in isolation. This is the documented file-write-contention family, amplified by a concurrent session rebuilding the tree mid-run. Every gate the story marks as *not* in that family was run in isolation and is green.
 
 ### Completion Notes List
 
+**All 9 ACs met.** Highlights, then the required enumerations.
+
+**AC #1 — one prelude, one family sequence, one region loop.** The seam is three members in `SiteGenerator.cs`: `BuildSurfacePrelude`, `BuildFamilySurfaces`, `CapturedRegions` (plus `BuildOutline`, extracted so the webview's surface loop could stop being interleaved with tree-building). Both `BuildSpaBundle` and `RenderWebviewSurfaces` are now filters over them.
+
+*What remains surface-specific, per surface, and why:*
+
+| Surface | Surface-specific behaviour | Why it cannot be shared |
+|---|---|---|
+| webview | **Exclusion set** — `_codePages` values (exact set), `_commitDays`, `commit/` prefix | Owner decision 2026-07-12: these page classes scale with the *target repo*, not its planning artifacts. The SPA is a browser and wants them. |
+| webview | **Degrade skip** | Deliberate asymmetry (AC #2): a browser tab is escapable, a status panel claiming "links work" is not. |
+| webview | **JSON-island strip** | The webview ships no `specscribe.js`; the SPA's client reads islands. |
+| webview | **`SourcePath` join** via `BuildCapturedSourceMap` | Reveal-source is a VS Code host affordance with no browser analogue. |
+| webview | **`WrapDocument` entry document** | The host bridge shell — the one place a `<script>` is expected. |
+| webview | **`ProjectOutline`** via `BuildOutline` | The sidebar tree is host-only. Projected from the shared family sequence, not rebuilt. |
+| SPA | **Keeps degraded pages**; consumes the sequence **unfiltered** | Same asymmetry, other side. |
+| SPA | **`Breadcrumb` + `MetaDescription`** from the shared record | The manifest ships structured drill data; the webview does not use these. Computed once in the seam, used by one consumer — the accepted cost of one producer. |
+
+Nothing else. Both former builders' preludes, family iterations and capture loops are gone.
+
+**AC #2 — webview observable behaviour unchanged.** Against the baseline binary on identical inputs: **828/828 surfaces**, identical set *and* emission order; `entryDocument` **byte-identical**; **0** `Title` diffs; **0** `SourcePath` diffs; `ProjectOutline` epics and summary identical. 783 surfaces byte-identical in `content`; the 45 movers are fully attributed — 33 × exactly +30 B (AC #4's wrapper: 11 retro + 22 ADR pages, i.e. precisely the pager-bearing captured set), 10 work-graph (9 epic pages + `work-graph.html`, AC #5), and 2 harness artifacts (`diagnostics.html`: same length, differs only `wv-base`→`wv-head`, the documented output-root-dependent page; `about.html`: exactly +15 B = `" · 06b300c"`, because the scratch baseline copy is not a git checkout).
+
+The `ReferenceEquals` degrade contract is **structurally preserved and hardened**: `CapturedRegion.Degraded` is computed at the slice, inside the seam, so the island strip can no longer defeat it by ordering — which is exactly how it used to be fragile (Trap 3).
+
+⚠️ **Trap 1 (the island divergence) was already resolved before this story began**, in commit `811ba17` — *after* the story's baseline `6017c2c` — in the direction the story recommended (**strip on both**). Verified identical on the baseline binary. This story preserves it and closes the story's own "stop being invisible either way" note by adding `EveryWebviewSurface_IncludingCapturedOnes_CarriesNoScript`, a **whole-set** assertion (the old test ran on a generator with no capture, which is why the divergence hid).
+
+**AC #4 — one region shape.** Measured on the real repo, `--spa --deep-git`, 1,400 IR pages: unbalanced regions **594 → 0**; wrapper-bearing **189 → 783**; landmark-less **1 → 1** (unchanged, the documented degrade); multi-`<main>` **0 → 0**. epics.md's "~853 captured pages" over-counted: pages with no pager were already balanced.
+
+**AC #5 — the 46-delta, root-caused precisely.** The story framed this as pipeline ordering; the *whole* divergence was one argument. `ResolveDeferredModel` passed `_docs.Values` to `FollowUpRefs.BuildHrefMap`, and `_docs` is empty on the `RenderEpicsPages` route — so every spec resolver's `ResolvingHref` came back null and `WorkGraph.BuildStory`'s `else if (slot.Item.ResolvingHref is { Length: > 0 })` branch dropped the resolver node **and** its `Resolves` edge. Fixed with a source-derived `BuildHrefMap` overload over `(sourceRelative, outputRelative)` pairs — legitimate because `PathUtil.ToOutputRelative` is a pure function of the source path, and because `Add` is `TryAdd` with the epics half added first, so a story artifact's key always resolves to its story page in both routes.
+
+**Trap 2 avoided entirely:** `_docs` is never pre-populated, so `alreadyExisted` cannot flip. `updated=0` on every run, before and after. Route 3 (moving `RenderEpicsPages` after the pages loop) was considered and **rejected** — it would reorder the diagnostics stream, and the phase reporter brackets it.
+
+Result: static-vs-IR `<main>` divergence **47 → 0** across 1,406 pages. ⚠️ **The fix reaches further than 23.3 reported**: 9 **epic** pages and `work-graph.html` carried the same defect at epic scope (Epic 1: 13 items/12 links → 16/20). 23.3 only named the 46 story surfaces.
+
+**AC #6 — `schemaVersion` bumped 1 → 2**, recorded in `SpaDelivery.SchemaVersion`'s own doc comment with the measurement (594 pages moved, every one by exactly +30 B). Both `EXPECTED_SCHEMA_VERSION` constants moved in the same change; verified the mismatch warning fires when the new adapter reads an old IR.
+
+**AC #7 — byte parity.** ⚠️ **`GoldenContentFingerprint` did NOT move.** AC #4 cannot move it (the fixture generates without `--spa`), and AC #5 is legitimately **zero-delta on that fixture** — its deferred work carries no spec-doc resolver, so no resolver node was being dropped there. The story anticipated this ("measure, do not assume"). The live-repo static delta was enumerated instead: **1,350 of 1,407 pages byte-identical** after volatile normalization; the 57 movers are 46 story pages + 9 epic pages + `work-graph.html` + `app.html` (asset-version token only — a baseline-build artifact, since the scratch copy has no git SHA). **Zero** changes under `adrs/`, `code/`, `commit/`, `commits/`, `follow-ups/`, `implementation-artifacts/`, `planning-artifacts/`, `requirements/`, `specs/` — i.e. AC #4 moved no static byte, exactly as required.
+
+⚠️ The fingerprint constant is now **`06788c0f…`**, moved by a concurrent code review. The story file's `3171cf5c…` was already stale — a third consecutive story to record a stale value. **Read it from the file.**
+
+**AC #8 — live browser, JS off.** Served under `Content-Security-Policy: script-src 'none'` (ports 8117 static / 8118 Nuxt `.output/public`; `launch.json` entries `static-jsoff-22-4`, `nuxt-jsoff-22-4`). Non-execution proved by page state, not console (CSP violations do not reach console captures): `window.Plotly` undefined and no `data-ss-hierarchy-boot`, on every page checked. Pages: `index.html`, `adrs/0013-…html` (**paged captured page** — the shape this story changed), `epics/story-1-4.html` (**family page**, one of the 46), and `app.html` (SPA entry shell).
+
+Real DOM geometry, viewport 1280×900:
+
+| Surface | `<main>` | `.page-wayfinding` | band bottom / main top | `<main>` in band | `<footer>` in band | h-overflow |
+|---|---|---|---|---|---|---|
+| static `adrs/0013` | 1 | 1 | 213 / 213 | false | false | false |
+| **Nuxt `adrs/0013`** | 1 | 1 | **214 / 214** | **false** | **false** | false |
+| static `story-1-4` | 1 | 1 | 135 / 135 | false | — | false |
+| **Nuxt `story-1-4`** | 1 | 1 | **136 / 136** | **false** | **false** | false |
+
+The decisive reading: on the Nuxt output `<main>`'s ancestor chain is `div.shell.shell-bare.ir-content › div › body` — a direct child of the shell, **not** nested inside the band. That is the exact geometry Story 23.3's defect corrupted while every assertion passed, and with the consumer-side repair now deleted an unbalanced band would produce it immediately. `mainTextLen` is identical static-vs-Nuxt (10,381 on the ADR; 30,424 on the story page), and both surfaces now report the **same** work-graph label live — *"6 work items and 5 provenance links"* — where the static side previously said *"4 … and 3"*. `app.html` with scripts blocked renders the server-rendered dashboard (`#spa-content` 1265×34,338, `mainTextLen` 58,978 — identical to static `index.html`) plus its `noscript` fallback; it is not a blank shell. Screenshot unavailable (the Browser pane was not compositing); DOM geometry is reported instead, which is what ADR 0013 §3 actually asks for.
+
+**AC #9 — ADR proposed as [0024](../../docs/adrs/0024-spa-and-webview-are-filtered-projections-of-one-region-seam.md)**, ⚠️ **not the 0023 this story predicted**: a concurrent session authored *and had ratified* ADR 0023 (Story 25.3) the same day. `0019` remains claimed-but-unwritten. Cross-referenced from `docs/adrs/README.md` and from ADR 0005, 0008 (as **Refined by**) and 0016 (as a **Relates to**, since 0024 exercises its §Decision 4 grant and triggers its §Decision 5 bump).
+
+#### AC #3 — every symbol deleted, and every symbol deliberately KEPT
+
+**Deleted** (all in `SiteGenerator.cs` unless noted):
+
+| Symbol | Why |
+|---|---|
+| `RenderWebviewSurfaces`' inline prelude (docs/work/counts/followUps/unplanned/dashboardPage) | Duplicate of `BuildSpaBundle`'s. Now `BuildSurfacePrelude`. |
+| `BuildSpaBundle`'s inline prelude | Same, other half. |
+| `RenderWebviewSurfaces`' inline epics-family iteration | Duplicate. Now `BuildFamilySurfaces`. |
+| `BuildSpaBundle`'s inline epics-family iteration | Same, other half. |
+| `RenderWebviewSurfaces`' inline captured loop | Duplicate. Now `CapturedRegions` + a filter. |
+| `BuildSpaBundle`'s inline captured loop | Same, other half. |
+| `RenderWebviewSurfaces`' inline outline construction | Interleaved with the surface loop, which is what blocked sharing. Now `BuildOutline`. |
+| `WAYFINDING_OPEN`, `wayfindingRepaired`, `stillUnbalanced` (`web/ir/adapter.ts`) | The consumer-side repair + throw for a shape the emitter no longer emits. A repair that cannot fire is a second, drifting truth. |
+| `IrRegion.wayfindingRepaired` (`web/ir/types.ts`) | Field of the above. |
+| `region-split.test.ts`'s unbalanced `captured` fixture + its two repair tests | Pinned behaviour that no longer exists; replaced by same-shape and both-markers-after-`<main>` cases. |
+
+**Kept deliberately** — every one **grep-verified present** after the refactor:
+
+| Symbol | Why kept |
+|---|---|
+| `_spaCapture` | **Still the IR's producer for ~1,200 of 1,400 pages** until Story 23.4 replaces it. |
+| `SpaDelivery.ExtractContentRegion` | Same — and it is where AC #4's one-shape fix lives. |
+| `SpaDelivery.ExtractNavMarkup` | Feeds `CapturedNavMarkup`; the page-local nav band Story 22.2 fixed depends on it. |
+| `SpaDelivery.ExtractTitle` | Both consumers' surface title for captured pages. |
+| `SpaDelivery.ExtractBreadcrumb` | The manifest's drill parent/child data for non-family pages. |
+| `SpaDelivery.ExtractMetaDescription` | The IR's head projection for captured pages. |
+| `CapturedNavMarkup` | Slices the page's OWN nav band; **no `path → NavLocalContext` resolver exists**, so re-rendering would lose it on 16 of 25 templaters. |
+| `SpaDelivery.ExtractScriptIslands` | Operates on the region regardless of producer. |
+| `SpaDelivery.BuildDataFiles` | Consumes regions, not captures. |
+| `AddSpaSurface`, `WebviewSurfaceFor` | Per-surface composition + linkify skip rules; now called from the shared loops. |
+| `BuildCapturedSourceMap`, `BuildOutlineSummary` | Webview-specific, unchanged. |
+| `HtmlRenderAdapter.RenderWayfinding` | The wrapper emitter. Its empty-pager branch is byte-identical to `RenderBreadcrumb` and stays. |
+
+**No new `HostRenderException` was registered.** `WebviewRenderAdapterTests` still asserts exactly 5 webview entries, `RenderSpaParityTests` exactly 1, `RenderParityTests` zero `html`, `RenderSectionParityTests` never a `section.*` — all green.
+
+#### Known issue, pre-existing and NOT fixed here
+
+`npm run check:ir-content` **fails** with `+5 rule(s)`: `.ir-content .impact-file-list`, `… li`, `.code-areas-panel .impact-file-list`, `.impact-more`, `.impact-map-link`. Verified **identical against the baseline binary**, so it predates this story — the committed layer was extracted before the `--deep-git` impact widgets existed. Deliberately left unfixed: running `extract:ir-content` here would commit unrelated drift under this story's name. Worth its own follow-up.
+
 ### File List
+
+- `src/SpecScribe/SiteGenerator.cs` — the seam (`BuildSurfacePrelude`, `BuildFamilySurfaces`, `CapturedRegions`, `BuildOutline`, records `SurfacePrelude`/`FamilySurface`/`CapturedRegion`); `BuildSpaBundle` + `RenderWebviewSurfaces` reduced to projections; `ResolveFollowUpDocPairs`; `ResolveDeferredModel` href-map fix
+- `src/SpecScribe/SpaDelivery.cs` — `ExtractContentRegion` two-marker slice; `SchemaVersion` 1 → 2 + compatibility note
+- `src/SpecScribe/FollowUpRefs.cs` — `BuildHrefMap` pair-based overload
+- `tests/SpecScribe.Tests/SiteGeneratorSpaTests.cs` — `EveryIrRegion_HasOneBalancedWayfindingBand_AndExactlyOneMainLandmark` + `CountOccurrences`
+- `tests/SpecScribe.Tests/SiteGeneratorWebviewTests.cs` — `EveryWebviewSurface_IncludingCapturedOnes_CarriesNoScript`
+- `web/ir/adapter.ts` — repair + throw deleted; `EXPECTED_SCHEMA_VERSION` 2; header/comment updates
+- `web/ir/adapter.client.ts` — `EXPECTED_SCHEMA_VERSION` 2
+- `web/ir/types.ts` — `IrRegion.wayfindingRepaired` removed
+- `web/test/region-split.test.ts` — fixtures collapsed to one shape; both-markers-after-`<main>` case added
+- `docs/adrs/0024-spa-and-webview-are-filtered-projections-of-one-region-seam.md` — **new**
+- `docs/adrs/README.md` — ADR 0024 index entry
+- `docs/adrs/0005-vs-code-webview-runtime-and-packaging.md` — **Refined by** cross-reference
+- `docs/adrs/0008-json-ir-canonical-and-incremental-generation.md` — **Refined by** cross-reference
+- `docs/adrs/0016-ir-carries-rendered-prose-html.md` — **Relates to** cross-reference
+- `_bmad-output/planning-artifacts/epics.md` — delivery record under § Story 22.4 (Task 10)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — status + findings (Task 10)
+- `.claude/launch.json` — `static-jsoff-22-4`, `nuxt-jsoff-22-4` (AC #8)
 
 ## Change Log
 
 | Date | Note |
 |---|---|
+| 2026-07-28 | **Implemented (dev-story); status -> review.** All 9 ACs met. **One seam = 3 members** (`BuildSurfacePrelude` + `BuildFamilySurfaces` + `CapturedRegions`, plus `BuildOutline`); both surfaces are filters over it, and the webview keeps exactly five surface-specific behaviours (exclusions, degrade skip, island strip, SourcePath join, WrapDocument) plus its outline. **Measurement method is load-bearing:** parity was measured against a purpose-built BASELINE BINARY (HEAD versions of this story’s 3 files restored into a copy of the live tree), because the naive before/after straddled a concurrent session — a control run proved the volatility floor was "whatever another session touched". ⚠️ The first diff reported a **vacuous** "822/822 identical": the webview payload’s surface field is `content`, not `contentHtml`, so it compared `undefined` to `undefined`. Caught only because it contradicted an independent measurement. **AC #2:** 828/828 surfaces, identical set + emission order, byte-identical `entryDocument`, 0 title/sourcePath diffs; all 45 content movers attributed (33 wrapper-only +30 B, 10 work-graph, 2 harness artifacts). **AC #4:** unbalanced IR regions **594 -> 0** (epics.md’s "~853" over-counted — pagerless pages were already balanced); wrapper regions 189 -> 783; every mover exactly +30 B. Consumer-side repair + throw deleted. **AC #5 root cause was narrower than the story framed it:** not pipeline ordering generally, but `ResolveDeferredModel` handing an EMPTY `_docs` to `FollowUpRefs.BuildHrefMap`, nulling every spec-resolver href so `WorkGraph.BuildStory` dropped the resolver node AND its edge. Fixed with a source-derived href-map overload — **no `_docs` pre-population**, so Trap 2’s `alreadyExisted` flip never fires (`updated=0` every run); moving `RenderEpicsPages` was considered and rejected (it reorders diagnostics). Static-vs-IR `<main>` divergence **47 -> 0** over 1,406 pages; `measure:parity` 191/191 on all four axes. ⚠️ **The fix reaches further than 23.3 reported** — 9 EPIC pages + `work-graph.html` carried the same defect at epic scope (Epic 1: 13/12 -> 16/20). **AC #6:** schemaVersion **1 -> 2**, both consumer constants moved. **AC #7:** ⚠️ **golden fingerprint did NOT move** — AC #4 cannot touch it (fixture runs without `--spa`) and AC #5 is legitimately zero-delta there (no spec-doc resolver in that fixture’s deferred work). Live delta enumerated instead: 1,350/1,407 byte-identical; 57 movers = 46 story + 9 epic + `work-graph.html` + `app.html` (asset-version token). ⚠️ Constant is now **06788c0f…**; the story’s `3171cf5c…` was already stale — third story running to record a stale value. **AC #8:** JS-off verified live under CSP `script-src none` on static AND Nuxt output; `<main>` is a direct child of the shell (not nested in the band), band bottom == main top exactly, and both surfaces now report the same work-graph label live. **AC #9:** ADR **0024** (not the predicted 0023 — a concurrent session took and ratified 0023 the same day), cross-referenced from README + ADR 0005/0008/0016. ⚠️ **Trap 1 was already fixed** in `811ba17`, after this story’s baseline, in the recommended strip-on-both direction; now asserted over the WHOLE surface set. **Trap 4** resolved by giving the SPA the webview’s try/catch. ⚠️ **Pre-existing, not fixed here:** `npm run check:ir-content` fails with +5 `impact-*` rules — identical on the baseline binary, so the committed layer predates the `--deep-git` impact widgets. |
 | 2026-07-27 | Story created (baseline `6017c2c`). Its **9 ACs supersede epics.md's 3**; Task 10 records that drift. **epics.md AC #1 found already satisfied and near-vacuous** — `spa/` IS the IR (ADR 0016 / Story 22.2 promoted it in place), so the SPA is already an IR consumer; the real duplication is that `BuildSpaBundle` and `RenderWebviewSurfaces` are two ~200-line builders sharing an identical prelude, an identical epics-family iteration and an identical captured-region loop. **Owner locked three decisions:** D1 one region seam + both inherited defects (slicers survive — they remain the IR's producer for ~853 pages until 23.4); D2 **22.4 runs before 23.4**, so 23.4 inherits one region producer and its circularity is answered in advance; D3 the **static** page moves to converge the 46-delta, honouring 23.3's measurement that the IR is the more complete render. Both inherited defects re-root-caused at `6017c2c` (22.3's line numbers were ~40 lines stale within a day): the 46-delta is `RenderEpicsPages` at `:365` building geometry from `ResolveFollowUpWork(files)` because `_docs` is empty until `:3289`, vs `BuildSpaBundle` at `:3109` building it from `_docs.Values`; the two-region-shapes defect is `RenderWayfinding` emitting a `page-wayfinding` wrapper only when a pager renders, while `ExtractContentRegion` slices from the inner breadcrumb — a **one-marker emitter fix**, not a full inversion. New findings recorded as traps: the **captured-webview JSON-island divergence** (`impact-map.html` ships an island the registered `data-island` exception says it should not; invisible because the no-script test runs without capture), the **`alreadyExisted` flip** that turns every `Generated` diagnostic into `Updated` on any `_docs` pre-population and would move the fingerprint for the wrong reason, the **`ReferenceEquals` degrade contract** a shared loop silently breaks, and the **`try/catch` asymmetry** between the two builders' story loops. Golden fingerprint re-read from source: `3171cf5c…` (moved under Story 20.8), and the golden fixture generates **without `--spa`**, so the AC #4 region change cannot move it — only AC #5 can. |

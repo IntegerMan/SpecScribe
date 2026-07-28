@@ -6,56 +6,13 @@ family                    pages   golden=IR   IR=Nuxt     golden=Nuxt   verbatim
 index.html                1       1/1         1/1         1/1           1/1
 epics.html                1       1/1         1/1         1/1           1/1
 epics/epic-{N}.html       27      27/27       27/27       27/27         27/27
-epics/story-{id}.html     161     115/161     161/161     115/161       161/161
+epics/story-{id}.html     162     162/162     162/162     162/162       162/162
 ------------------------------------------------------------------------------------
-TOTAL                     190     144/190     190/190     144/190       190/190
+TOTAL                     191     191/191     191/191     191/191       191/191
 
 MIGRATION: no deltas. Every migrated surface renders the IR byte-for-byte, and every one of them
            contains the IR's `<main>` body verbatim.
 
-CAPTURE:   46 surface(s) where the IR already differs from the static golden page,
-           reproduced faithfully here. INHERITED — owned by Epic 22, enumerated below with its cause.
-
-  Root cause, verified in `SiteGenerator.cs`: the dashboard/epics families are RE-RENDERED for the
-  IR (`BuildSpaBundle`, :3044) rather than captured from the static pass's own output. The two
-  passes run at different points in the pipeline and therefore see different work inventories:
-
-    · static  — `RenderEpicsPages` :2566 runs BEFORE the pages loop fills `_docs`, so it builds its
-                follow-up inventory straight from source (`ResolveFollowUpWork(files)`) and passes
-                an explicitly parsed deferred model.
-    · IR      — `BuildSpaBundle` :3053 runs AFTER, so `WorkInventory.Build(_docs)` sees MORE items,
-                and the 2-arg `BuildFollowUpGeometry` re-derives the deferred model itself.
-
-  The visible symptom is the per-story work graph: same story, different node and edge counts. Note
-  which side is stale — the IR is the MORE complete render, so this is a latent defect in the static
-  page rather than a loss in the capture.
-
-  epics/story-1-2.html  @65201
-    golden: "wBox=\"0 0 865 150\" width=\"865\" height=\"150\" role=\"img\" aria-label=\"Work graph for Epic 1: 4 work items and 3 provenance links, no circular provenance. The list below enumerates eve"
-    ir/nuxt:"wBox=\"0 0 865 150\" width=\"865\" height=\"150\" role=\"img\" aria-label=\"Work graph for Epic 1: 5 work items and 5 provenance links, no circular provenance. The list below enumerates eve"
-  epics/story-1-3.html  @106719
-    golden: "wBox=\"0 0 865 150\" width=\"865\" height=\"150\" role=\"img\" aria-label=\"Work graph for Epic 1: 4 work items and 3 provenance links, no circular provenance. The list below enumerates eve"
-    ir/nuxt:"wBox=\"0 0 865 150\" width=\"865\" height=\"150\" role=\"img\" aria-label=\"Work graph for Epic 1: 5 work items and 5 provenance links, no circular provenance. The list below enumerates eve"
-  epics/story-1-4.html  @107867
-    golden: "wBox=\"0 0 865 150\" width=\"865\" height=\"150\" role=\"img\" aria-label=\"Work graph for Epic 1: 4 work items and 3 provenance links, no circular provenance. The list below enumerates eve"
-    ir/nuxt:"wBox=\"0 0 865 150\" width=\"865\" height=\"150\" role=\"img\" aria-label=\"Work graph for Epic 1: 6 work items and 5 provenance links, no circular provenance. The list below enumerates eve"
-  epics/story-1-5.html  @124952
-    golden: "wBox=\"0 0 865 150\" width=\"865\" height=\"150\" role=\"img\" aria-label=\"Work graph for Epic 1: 4 work items and 3 provenance links, no circular provenance. The list below enumerates eve"
-    ir/nuxt:"wBox=\"0 0 865 150\" width=\"865\" height=\"150\" role=\"img\" aria-label=\"Work graph for Epic 1: 6 work items and 5 provenance links, no circular provenance. The list below enumerates eve"
-  epics/story-10-10.html  @104388
-    golden: "Box=\"0 0 865 150\" width=\"865\" height=\"150\" role=\"img\" aria-label=\"Work graph for Epic 10: 4 work items and 3 provenance links, no circular provenance. The list below enumerates eve"
-    ir/nuxt:"Box=\"0 0 865 150\" width=\"865\" height=\"150\" role=\"img\" aria-label=\"Work graph for Epic 10: 5 work items and 5 provenance links, no circular provenance. The list below enumerates eve"
-  epics/story-10-11.html  @93541
-    golden: "hor=\"middle\" font-size=\"12\">KeyViewGroupOrder…</text></a>\n  <a class=\"work-node\" href=\"../epics/story-10-11.html\" aria-label=\"Source: spec-epic-10-deferred-work-cleanup\"><title>Sou"
-    ir/nuxt:"hor=\"middle\" font-size=\"12\">KeyViewGroupOrder…</text></a>\n  <a class=\"work-node\" href=\"../implementation-artifacts/spec-epic-10-deferred-work-cleanup.html\" aria-label=\"Source: spec"
-  epics/story-10-3.html  @108209
-    golden: "hor=\"middle\" font-size=\"12\">AbbreviationExpan…</text></a>\n  <a class=\"work-node\" href=\"../epics/story-10-3.html\" aria-label=\"Source: spec-abbreviation-expander-skip-numbered-refs\">"
-    ir/nuxt:"hor=\"middle\" font-size=\"12\">AbbreviationExpan…</text></a>\n  <a class=\"work-node\" href=\"../implementation-artifacts/spec-abbreviation-expander-skip-numbered-refs.html\" aria-label=\"S"
-  epics/story-10-4.html  @120578
-    golden: "hor=\"middle\" font-size=\"12\">Linked treemap ce…</text></a>\n  <a class=\"work-node\" href=\"../epics/story-10-4.html\" aria-label=\"Source: spec-10-4-deferred-debt-cleanup\"><title>Source:"
-    ir/nuxt:"hor=\"middle\" font-size=\"12\">Linked treemap ce…</text></a>\n  <a class=\"work-node\" href=\"../implementation-artifacts/spec-10-4-deferred-debt-cleanup.html\" aria-label=\"Source: spec-10"
-  … and 38 more (all in measurements/parity.json).
-
-Surfaces measured: 190 of 190 migrated pages in the IR (no sampling).
-Golden root: C:\Users\MattE\AppData\Local\Temp\claude\C--Dev-SpecScribe\16516aa4-3768-45e4-8485-782346ac442f\scratchpad\ir-A
+Surfaces measured: 191 of 191 migrated pages in the IR (no sampling).
+Golden root: C:\Dev\SpecScribe\SpecScribeOutput
 

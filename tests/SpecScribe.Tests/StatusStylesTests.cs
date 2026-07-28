@@ -224,6 +224,14 @@ public class StatusStylesTests
     [InlineData("retired", "Retired")]
     // forward-compat value still reads as a real word (title-cased), never a raw token.
     [InlineData("blocked", "Blocked")]
+    // [Story 18.4 review] Spaced aliases of a KNOWN value now kebab-normalize onto the same canonical label
+    // ForSprint already uses — before this story, a spaced "in progress" fell through to the TitleCase fallback
+    // and rendered "In Progress" (capital P), disagreeing with ForSprint's colour for the same value.
+    [InlineData("in progress", "In progress")]
+    [InlineData("ready for dev", "Ready for dev")]
+    // An UNMAPPED spaced value still falls through to the TitleCase fallback untouched — only known kebab forms
+    // are affected by the normalization.
+    [InlineData("code review", "Code Review")]
     public void SprintLabel_MapsEachLifecycleValueToAWord(string status, string expected)
         => Assert.Equal(expected, StatusStyles.SprintLabel(status));
 

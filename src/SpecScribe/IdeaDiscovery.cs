@@ -64,12 +64,16 @@ public static class IdeaDiscovery
     //
     // Rejecting also keeps the site inside ADR 0013 / NFR-5's JS-optional posture: a carried page that only works
     // with JS would be a portal surface with no text twin.
+    // [Story 18.4 review] Widened: the handler branch no longer requires a quote immediately after `=`, so an
+    // UNQUOTED handler (`onerror=alert(1)`) is caught too — the quote-required form let exactly that through.
     private static readonly Regex UnsafeReportPattern = new(
-        @"<\s*(?:script|iframe|object|embed)\b|\son[a-z]+\s*=\s*[""']|javascript\s*:",
+        @"<\s*(?:script|iframe|object|embed)\b|\son[a-z]+\s*=|javascript\s*:",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    // [Story 18.4 review] Widened: `srcset=` and CSS `url(...)` (inline `<style>`/`@import`/`style="...url(...)"`)
+    // are both real ways to reach an external origin that `src=`/`href=` alone missed.
     private static readonly Regex ExternalSubresourcePattern = new(
-        @"\b(?:src|href)\s*=\s*[""']?\s*(?:https?:)?//",
+        @"\b(?:src|href|srcset)\s*=\s*[""']?\s*(?:https?:)?//|url\s*\(\s*[""']?\s*(?:https?:)?//",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly Regex MarkdownLinkPattern = new(
@@ -95,6 +99,17 @@ public static class IdeaDiscovery
             var entries = new List<IdeaEntry>();
             var slugOwners = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             var slugCollisions = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            // Every workspace-relative path proven to be a real forge workspace (rules 1-3), regardless of whether
+            // it later wins or loses a slug collision. A collision LOSER never reaches `entries`/`Ideas`, but its
+            // memlog is still on disk and must still be excluded from BuildMemlogMap's coverage-freshness scan —
+            // keying that exclusion off `Ideas` alone missed exactly this case. [Story 18.4 review]
+            var allWorkspacePaths = new List<string>();
+            // Reserves BOTH a workspace's own `{slug}` and, when it carries a report, its `{slug}-report` name in
+            // one shared namespace (mapped to the owning workspace) — so slug "foo-report" can never alias onto
+            // slug "foo"'s carried-report output path (`ideas/foo-report.html`) even though the two raw slugs are
+            // not equal. A SEPARATE map from `slugOwners`, since a cross-namespace collision's colliding name is
+            // never itself a key in `slugOwners` (only actual slug-equality collisions are). [Story 18.4 review]
+            var reservedOutputNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var memlogFullPath in memlogs)
             {
@@ -131,28 +146,58 @@ public static class IdeaDiscovery
                 var parsed = Memlog.TrySplit(raw, out var frontmatter, out var bodyLines);
                 if (!parsed)
                 {
+                    if (!hasReport)
+                    {
+                        // Owner decision (2026-07-28, code review): rule 1 alone proves nothing, and an unparseable
+                        // memlog cannot corroborate via rule 3 either — so unlike a parseable-but-uncorroborated
+                        // memlog (silent skip below), an UNPARSEABLE one with no report is unproven and is skipped
+                        // with its own diagnostic rather than listed as an idea.
+                        diagnostics?.Add(new AdapterDiagnostic(
+                            AdapterDiagnosticCategory.Malformed,
+                            $"{workspaceRelative}/{Memlog.FileName}",
+                            "Forge session memlog could not be parsed and carries no report to corroborate it; the folder is skipped rather than listed as an idea."));
+                        continue;
+                    }
+
                     diagnostics?.Add(new AdapterDiagnostic(
                         AdapterDiagnosticCategory.Malformed,
                         $"{workspaceRelative}/{Memlog.FileName}",
                         "Forge session memlog could not be parsed; the idea is listed with its folder name and no summary."));
                 }
-
-                // Rule 3, reject-only. A rule-2 workspace is already proven by its report, so corroboration applies
-                // solely to the path rule; and an unparseable memlog cannot corroborate either way, so the path rule
-                // stays authoritative there rather than silently dropping a real session.
-                if (underForgeRoot && !hasReport && parsed && !frontmatter.ContainsKey(IdeaDerivation.IdeaKey))
+                else if (underForgeRoot && !hasReport && !frontmatter.ContainsKey(IdeaDerivation.IdeaKey))
                 {
+                    // Rule 3, reject-only. A rule-2 workspace is already proven by its report, so corroboration
+                    // applies solely to the path rule.
                     continue;
                 }
 
+                allWorkspacePaths.Add(workspaceRelative);
+
                 var workspaceDirName = LastSegment(workspaceRelative);
                 var slug = IdeaDerivation.Slugify(workspaceDirName);
+                var reportSlugName = $"{slug}-report";
+
                 if (slugOwners.TryGetValue(slug, out _))
                 {
                     slugCollisions[slug] = slugCollisions.GetValueOrDefault(slug) + 1;
                     continue; // first wins, in ordinal path order; the aggregated Skipped notice is emitted below
                 }
+
+                if (reservedOutputNames.TryGetValue(slug, out var crossOwner)
+                    || (hasReport && reservedOutputNames.TryGetValue(reportSlugName, out crossOwner)))
+                {
+                    // A DIFFERENT collision class from the one above: this workspace's own slug (or its own
+                    // prospective report path) aliases onto another idea's already-reserved output path, even
+                    // though the two raw slugs are not equal (e.g. slug "foo-report" vs slug "foo" + a report).
+                    diagnostics?.Add(new AdapterDiagnostic(
+                        AdapterDiagnosticCategory.Skipped, workspaceRelative,
+                        $"Idea slug '{slug}' would collide with idea '{LastSegment(crossOwner)}''s output path; '{slug}' is skipped."));
+                    continue;
+                }
+
                 slugOwners[slug] = workspaceRelative;
+                reservedOutputNames[slug] = workspaceRelative;
+                if (hasReport) reservedOutputNames[reportSlugName] = workspaceRelative;
 
                 var memlogEntries = Memlog.ParseEntries(bodyLines);
                 var forgedIdeaFullPath = Path.Combine(workspaceFullPath, ForgedIdeaFileName);
@@ -173,8 +218,13 @@ public static class IdeaDiscovery
                     catch (Exception)
                     {
                         // A hardened session whose hand-off cannot be rendered still IS hardened — the file's
-                        // presence is what the verdict reads. The detail page simply omits that block.
+                        // presence is what the verdict reads. The detail page simply omits that block, and this
+                        // Skipped diagnostic says why rather than leaving the omission unexplained. [Story 18.4 review]
                         forgedIdeaHtml = null;
+                        diagnostics?.Add(new AdapterDiagnostic(
+                            AdapterDiagnosticCategory.Skipped,
+                            $"{workspaceRelative}/{ForgedIdeaFileName}",
+                            $"The hand-off for '{slug}' could not be rendered; the idea is still listed as hardened, but its detail page omits the hand-off section."));
                     }
                 }
 
@@ -222,7 +272,7 @@ public static class IdeaDiscovery
                 .ThenBy(e => e.Slug, StringComparer.Ordinal)
                 .ToList();
 
-            return new IdeasModel(ordered);
+            return new IdeasModel(ordered) { WorkspaceSourceRelatives = allWorkspacePaths };
         }
         catch (Exception)
         {
@@ -278,7 +328,9 @@ public static class IdeaDiscovery
         {
             diagnostics?.Add(new AdapterDiagnostic(
                 AdapterDiagnosticCategory.Error, reportRelative,
-                $"Forge session '{slug}' could not be read; it is omitted from the Ideas page."));
+                // [Story 18.4 review] Was "...it is omitted from the Ideas page" — wrong: only the report link is
+                // dropped here; the idea and its detail page still render.
+                $"Forge report for '{slug}' could not be read; the report link is omitted from its detail page."));
             return null;
         }
     }

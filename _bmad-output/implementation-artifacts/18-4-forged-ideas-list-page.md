@@ -4,7 +4,7 @@ baseline_commit: 32fd28237d42f9a558b716d46bb2ffd7b5dbf6a4
 
 # Story 18.4: Forged Ideas List Page
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -467,6 +467,34 @@ Story 10.9's client sort/filter enhances, and it is inert with JS off.
   - [x] Decide whether *"a foreign, externally-generated HTML artifact may be carried verbatim into the portal output"* is a cross-cutting architectural decision. Arguments in favour: every page in the site is C#-composed today; this adds a second, un-composed class of output; it interacts with AD-1/AD-2 (one shared rendering core, host-neutral view models) and with ADR 0013's text-twin contract. Argument against: AD-4 may already cover it as one more optional, additive provider.
   - [x] If it is a fork, **propose the ADR** rather than burying the decision here or in `sprint-status.yaml` prose ([[adr-creation-trigger-gap-epic-10-retro]]). If not, say so in one sentence and move on.
   - [x] Read `docs/adrs/` first — do not declare a rule-crossing without checking whether a ratified ADR already permits it ([[adr-consultation-gap-three-arc-renderers]]).
+
+### Review Findings
+
+Scoped to this story's own File List (`baseline_commit` `32fd282`..HEAD), never a commit range — the shared-`main`
+convention this repo runs under (CLAUDE.md). The diff still visibly bundles sibling-story hunks in shared files
+(`DashboardViewBuilder.cs`, `specscribe.css`, `epics.md`, `.claude/launch.json` — Stories 18.5/20.5/20.7/20.8/20.9);
+those were read but not attributed here. Three review layers ran: Blind Hunter (adversarial), Edge Case Hunter,
+Acceptance Auditor (against this story's ACs, extensions, and owner decisions — **zero AC violations found**).
+
+- [x] [Review][Patch] Malformed memlog under `forge/` with no report and no `idea:` key must be rejected, not listed [src/SpecScribe/IdeaDiscovery.cs:131-146] — owner decision (2026-07-28): reject rather than accept-as-is. Fixed: an unparseable memlog under `forge/` with no sibling report is now skipped with its own `Malformed` diagnostic ("...skipped rather than listed as an idea"), distinct from the pre-existing "could not be parsed" notice (which still applies when the memlog DOES carry a report). Pinned by `Discover_UnparseableMemlogWithNoReport_IsSkippedRatherThanListed`; the pre-existing `Discover_MalformedMemlog...` test was updated to add a report so it stays in the "proven, still listed" scenario.
+- [x] [Review][Patch] hasScopedMemlog fix doesn't cover slug-collision losers [src/SpecScribe/IdeaDiscovery.cs; src/SpecScribe/SiteGenerator.cs] — fixed by adding `IdeasModel.WorkspaceSourceRelatives` (every proven forge workspace, including collision losers) and keying `BuildMemlogMap`'s exclusion off it instead of `_ideas.Ideas`. Pinned by `GenerateAll_SlugCollisionLoser_IsStillExcludedFromCoverageJournalFallback`.
+- [x] [Review][Patch] AC #6 safety gate has untested bypasses [src/SpecScribe/IdeaDiscovery.cs:67-73] — fixed: `ExternalSubresourcePattern` now also matches `srcset=` and CSS `url(...)`; `UnsafeReportPattern`'s handler branch no longer requires a quote after `=`. Pinned by three new `[InlineData]` rows on `Discover_ReportThatIsNotSelfContained_IsNotCarriedAndReportsSkipped`.
+- [x] [Review][Patch] Slug collision can alias one idea's detail page onto another idea's report path [src/SpecScribe/IdeaDiscovery.cs] — fixed with a `reservedOutputNames` map (slug → owning workspace) checked separately from the existing same-slug `slugOwners` map, so a colliding cross-namespace name is skipped with its own diagnostic without breaking the existing same-slug collision path. Pinned by `Discover_SlugCollidesWithAnotherIdeasReportPath_SkipsTheCollidingWorkspace`.
+- [x] [Review][Patch] `forged-idea.md` render failures are swallowed with no diagnostic, and the detail page then contradicts itself [src/SpecScribe/IdeaDiscovery.cs:161-179; src/SpecScribe/IdeasTemplater.cs:173-186] — fixed: the catch now adds a `Skipped` diagnostic, and `RenderOutcomeStatement` only claims a hand-off was distilled when `ForgedIdeaHtml` is actually present, with a distinct sentence for the render-failed case. (No dedicated test added — Markdig doesn't throw on any markdown-shaped input in this codebase's other tests, so the exception path isn't practically triggerable via a file fixture; verified by code inspection instead.)
+- [x] [Review][Patch] Misleading diagnostic wording on a report-carry IO failure [src/SpecScribe/IdeaDiscovery.cs:277-283] — fixed: now says "the report link is omitted from its detail page" rather than implying the whole idea vanishes.
+- [x] [Review][Patch] Forward/handoff links into retro pages always resolved as dead [src/SpecScribe/SiteGenerator.cs:3968-3989] — `ResolveSourceRelativeToPage` only checked `IsEpicsFile`, idea workspaces, and `_docs`; retros are consumed out of `_docs` (like `epics.md`) but each still gets its own page, so a real link into one fell through to null. Fixed by also probing `_retros`. (Investigated the ADR half of the original finding and found it structurally unreachable: ADRs live outside `SourceRoot`, and this method's only two callers resolve hrefs through `IdeaDiscovery.TryResolveWorkspaceHref`, which refuses anything escaping `SourceRoot` — so a real ADR reference can never reach this method. No fix needed there.)
+- [x] [Review][Patch] `ideas.html` is written before the per-idea detail pages, so a mid-loop write failure leaves a dangling link [src/SpecScribe/SiteGenerator.cs — `WriteIdeas`] — fixed: detail pages (+ carried reports) now write first, and the list page renders only the ideas that actually made it to disk.
+- [x] [Review][Patch] `StatusStyles.SprintLabel` behavior change has no regression test [src/SpecScribe/StatusStyles.cs:304] — fixed: added spaced-input cases (`"in progress"`, `"ready for dev"`) and an unmapped-spaced-value case to `SprintLabel_MapsEachLifecycleValueToAWord`, pinning both the changed and unchanged behavior.
+- [x] [Review][Patch] `IdeaDerivation.VerdictWord` and `SectionHeading` are byte-identical duplicate switches [src/SpecScribe/IdeasModel.cs:264-277] — fixed: `SectionHeading` now delegates to `VerdictWord`.
+- [x] [Review][Patch] Test name promises an assertion it doesn't make [tests/SpecScribe.Tests/IdeasTests.cs:491] — fixed: added the missing "no unrecognized top-level folder notice" assertion to both the no-workspace test and the real-workspace generation test.
+- [x] [Review][Patch] `ResolveForwardLinks`' reverse-direction evidence source is untested [tests/SpecScribe.Tests/IdeasTests.cs] — fixed: added `GenerateAll_ForwardLink_ReverseDirectionEvidence_ResolvesFromADownstreamDocsSources`.
+- [x] [Review][Defer] `.claude/launch.json`'s two story-added entries point at an ephemeral per-session scratch path [.claude/launch.json — `ideas-18-4`, `ideas-18-4-jsoff`] — deferred, pre-existing dev-tooling debt, not shipped/executed automatically.
+- [x] [Review][Defer] `RewriteHandoffLinks`' anchor regex only matches double-quoted `href` [src/SpecScribe/SiteGenerator.cs:3931-3933] — deferred, pre-existing; standard markdown links (the tested path) always render double-quoted via Markdig, only a raw hand-authored `<a href='...'>` in source markdown would slip past, degrading safely to an unrewritten link rather than a broken one.
+
+**Dismissed as noise (3):** directory-enumeration exceptions in `IdeaDiscovery.Discover` degrade silently to `Empty`,
+consistent with this codebase's established AD-4 pattern used by every other optional provider · a zero-depth
+memlog at exactly `forge/.memlog.md` has no realistic trigger given the forge's own `{slug}/`-subdirectory contract ·
+the diff's sibling-story bundling (see above) is the project's known shared-`main` condition, not a defect.
 
 ## Dev Notes
 
