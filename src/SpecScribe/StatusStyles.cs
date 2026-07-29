@@ -231,6 +231,11 @@ public static class StatusStyles
         // the two states differ by icon + word (and, in the requirements-flow Sankey, a distinct bucket), never
         // by color. Deferred keeps its own dedicated grey --status-deferred. [Story 9.3 Task 2]
         RequirementStatus.Unmapped => "pending",
+        // Retired shares Deferred's grey (same Story 8.9/D2 pattern: no 7th token) but MUST have its own arm —
+        // the `_ =>` fallback below is "deferred" too, so this line is not load-bearing for color, only for
+        // making the mapping explicit rather than accidental (the exact Trap 1 hazard Story 8.9 warns about
+        // for StoryLabel/EpicLabel). Distinguished from a genuine Deferred by word only. [Story 8.9 review]
+        RequirementStatus.Retired => "deferred",
         _ => "deferred",                        // grey
     };
 
@@ -241,6 +246,10 @@ public static class StatusStyles
         RequirementStatus.Ready => "Ready for dev",
         RequirementStatus.Planned => "Planned",
         RequirementStatus.Unmapped => "Not yet mapped",
+        // MUST have its own arm: the `_ =>` fallback is "Deferred", so a Retired requirement without this line
+        // would silently print "Deferred" — conflating "shelved on purpose, may resume" with "the covering plan
+        // was abandoned". [Story 8.9 review]
+        RequirementStatus.Retired => "Retired",
         _ => "Deferred",
     };
 

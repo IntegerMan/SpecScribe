@@ -9,7 +9,7 @@ owner_decisions: 2026-07-25 # (1) promote spa/ in place, (2) per-page hash + ove
 
 # Story 22.2: Canonical IR Schema + Versioning
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -156,6 +156,26 @@ Three things changed:
   - [x] Confirm on the dashboard: the git-pulse bar labels are **links** in the SPA, and they navigate.
   - [x] Confirm on an ADR page in the SPA: the page-local context band renders with the right label, not the generic key-views nav.
   - [x] Confirm no console errors after a client-side navigation (the region swap fires `specscribe:content-swapped`; new markup must not break the explorer re-init seam).
+
+### Review Findings
+
+**Scope note.** Reviewed via Blind Hunter + Edge Case Hunter + Acceptance Auditor, scoped to this story's own File List/symbols per CLAUDE.md. `src/SpecScribe/SiteGenerator.cs`'s raw diff (1,402 lines) is almost entirely sibling-story rework (18.4/18.5/18.6, 20.7/20.8/20.9, and especially 22.4's `BuildSpaBundle`/`RenderWebviewSurfaces` unification) — reviewed by current-state symbol read instead. The initial package also mis-labeled `SpaDelivery.cs`, `SiteGeneratorSpaTests.cs`, and `SiteGeneratorWebviewTests.cs` diffs as "clean" when they too carry sibling-story content (Story 22.4's `SchemaVersion` 1→2 bump and two-marker `ExtractContentRegion` rewrite; Story 20.7/20.9/22.4/23.2/23.3-tagged tests) — excluded from the findings below once caught by both review layers and confirmed directly against the source's own `[Story ...]` attribution comments.
+
+- [x] [Review][Decision] Manifest per-page `bytes` field used raw UTF-8 content bytes, the same approximation Task 7 closed for the chunk ceiling — owner chose to switch it to exact JSON-encoded bytes for consistency. **Fixed**: `BuildDataFiles` now reuses the pre-encoded `EncodedPage.ValueJson` token; `ManifestOversizedPage.ChunkBytes`'s doc comment updated to state both fields are exact-encoded now, differing only in scope (whole chunk vs one page's content value); both dependent test assertions (`CanonicalIrSerializationTests.ManifestAndChunks_AgreeOnEveryPage_...`, `SiteGeneratorSpaTests.Manifest_CarriesSchemaVersion_..._AndPerPageHashAndBytes`) updated to assert against `JsonSerializer.Serialize(region)` byte count. 79/79 affected tests green. [src/SpecScribe/SpaDelivery.cs:676]
+
+- [x] [Review][Patch] `ManifestHead` description fallback treats a whitespace-only `MetaDescription` as present (`{ Length: > 0 }` is true for `" "`), shipping blank instead of falling back to title. **Fixed**: added `!string.IsNullOrWhiteSpace(d)` to the fallback condition. [src/SpecScribe/SpaDelivery.cs:684]
+- [x] [Review][Patch] `ExtractNavMarkup`'s `NavBlockRegex` matches the first literal `<nav class="site-nav">...</nav>` anywhere in the captured page with no positional anchor, unlike `ExtractContentRegion`'s deliberate anchor-before-`<main>` precedent. **Fixed**: hoisted the shared `<main id="main-content"` landmark into a new `MainLandmarkMarker` constant used by both extractors; `ExtractNavMarkup` now rejects a match that doesn't precede it. [src/SpecScribe/SpaDelivery.cs:258-292]
+- [x] [Review][Patch] `CanonicalIrSerializationTests`'s "whole document, no enumerated exceptions" round-trip never exercises a populated `OversizedPages` entry — the fixture is too small to produce one, so a shape regression in that record would pass silently. **Fixed**: added `Manifest_RoundTrips_WhenAPageIsDeclaredOversized`, forcing one ADR past `MaxChunkBytes` and asserting `OversizedPages` is non-empty before the byte-identical round-trip check. [tests/SpecScribe.Tests/CanonicalIrSerializationTests.cs]
+- [x] [Review][Patch] `SpaDeliveryTests` calls obsolete `string.Copy` (SYSLIB0050) to force a non-interned reference for the hash-determinism test. **Fixed**: swapped for `string.Concat(region)`. [tests/SpecScribe.Tests/SpaDeliveryTests.cs:641]
+- [x] [Review][Patch] `ManifestOversizedPage.ChunkBytes` is `long` while the structurally parallel `ManifestEntry.Bytes` is `int` — same "byte count of an HTML region" concept, inconsistent width with no stated reason. **Fixed**: `ChunkBytes` changed to `int` (the value already originates from `Encoding.GetByteCount`, which returns `int` — pure widening cleanup, no functional change); the mirrored `IrOversizedPage` test model updated to match. [src/SpecScribe/SpaDelivery.cs:819]
+
+All 5 patches + the decision-item fix verified together: 111/112 relevant tests green (1 pre-existing symlink-privilege skip), and the full suite re-run clean at 2,812 passed / 0 failed / 3 skipped (all 3 pre-existing symlink-privilege gated skips) with `GoldenContentFingerprint` unaffected.
+
+- [x] [Review][Defer] Manifest metadata growth (`head`/`scriptIslands`/`contentHash`/`bytes` on every page, no size ceiling on `manifest.json` itself unlike the content chunks) reintroduces a smaller-scale byte-blind-payload risk; the SPA client fetches all of it while reading only `title`+`chunk` — AC #6 explicitly authorizes this addressing metadata and the scope guard stops at "addressing, no transport," so not a violation, flagged for 22.5/22.6 awareness [src/SpecScribe/SpaDelivery.cs] — deferred, pre-existing scope trade-off
+- [x] [Review][Defer] Three independent hand-rolled "SHA-256 → lowercase hex → truncate" idioms now exist (`Commands.cs`, `FollowUpSlug.cs`, this story's `ContentHash`) with no shared helper [src/SpecScribe/SpaDelivery.cs:351-354] — deferred, pre-existing pattern this story added a third instance of
+- [x] [Review][Defer] `ExtractMetaDescription`'s regex hardcodes meta-tag attribute order (`name="description" content="..."`), matching this file's own established `ExtractTitle`/`ExtractBreadcrumb` idiom [src/SpecScribe/SpaDelivery.cs:222-223] — deferred, shared brittleness class, not a new risk
+- [x] [Review][Defer] `ExtractScriptIslands`'s attribute regexes assume double-quoted, case-matched attributes and no embedded `>` in an attribute value; verified the failure direction is always safe (defaults to the conservative "executable" classification) and the only content flowing through this path is SpecScribe's own self-generated `<script>` tags, never arbitrary markup [src/SpecScribe/SpaDelivery.cs:278-285] — deferred, narrow/negligible exposure today
+- [x] [Review][Defer] Oversized-chunk declaration would report the same `ChunkBytes` once per member if the one-page-per-over-cap-chunk invariant is ever loosened — not a live bug today, a note for whoever touches that invariant next [src/SpecScribe/SpaDelivery.cs:624-638] — deferred, hypothetical on future code change
 
 ## Dev Notes
 

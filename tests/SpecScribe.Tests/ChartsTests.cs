@@ -2517,6 +2517,64 @@ public class ChartsTests
     }
 
     [Fact]
+    public void RequirementFlowConservation_RetiredIsItsOwnBucket_SeparateFromDeferred()
+    {
+        // Story 8.9 review: a requirement covered solely by an all-retired epic must land in its own "retired"
+        // Sankey bucket, not silently merge into "deferred" (same reasoning as Unmapped vs Planned, Story 9.3).
+        var dir = Directory.CreateTempSubdirectory("ss-flow-retired-").FullName;
+        try
+        {
+            var md = """
+                # Epics
+
+                ## Requirements Inventory
+
+                ### Functional Requirements
+
+                **Core**
+                FR1: Covered by a retired epic
+                FR2: Deferred requirement
+
+                ### FR Coverage Map
+
+                FR1: Epic 1
+                FR2: Deferred - later
+
+                ## Epic List
+
+                ### Epic 1: Abandoned
+
+                Goal.
+
+                ## Epic 1: Abandoned
+
+                ### Story 1.1: Retired story
+
+                As a dev, I want a, so that b.
+                """;
+            var artifact = Path.Combine(dir, "1-1.md");
+            File.WriteAllText(artifact, "# Story 1.1\nStatus: retired\n\n## Tasks / Subtasks\n\n- [ ] a\n");
+            var epics = EpicsParser.Parse(md);
+            var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string> { ["1.1"] = artifact }, git: null);
+            var reqs = RequirementsParser.Parse(md, epics, progress);
+            Assert.Equal(RequirementStatus.Retired, reqs.ById["FR1"].Status);
+
+            var (entering, byState) = Charts.RequirementFlowConservation(reqs.All.ToList());
+
+            Assert.True(byState.ContainsKey("retired"));
+            Assert.True(byState.ContainsKey("deferred"));
+            Assert.Equal(1, byState["retired"]);
+            Assert.Equal(1, byState["deferred"]);
+            Assert.Equal(entering, byState.Values.Sum());
+
+            var svg = Charts.RequirementFlow(reqs, epics);
+            Assert.Contains("req-flow-state retired", svg);
+            Assert.Contains(">Retired (1)</text>", svg);
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Fact]
     public void RequirementFlow_RendersUnmappedAndDeferredAsTwoDistinctStateNodes()
     {
         var (reqs, epics) = FlowFixture();

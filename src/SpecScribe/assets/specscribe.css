@@ -1923,8 +1923,10 @@ a.ref-file-node:focus-visible {
 
 /* Reference graph: "Group by epic" + "Show relationships" toggles (epic grouping + cross-relationship edges).
    PURE CSS, no script required — mirrors CodeMap.BuildVariants' two-checkbox idiom (specscribe.css's
-   .codemap-filter-checkbox / .codemap-view rules above). Plain, unwrapped <input>+<label> siblings so the
-   sibling-combinator toggle below sees them at the same nesting level as the .ref-graph-view panels they control. */
+   .codemap-filter-checkbox rules; the sibling-combinator panel toggle itself moved to the row/lead-text rules
+   near .codemap-table-section once Story 20.10 collapsed Code Map's four panels into one). Plain, unwrapped
+   <input>+<label> siblings so the sibling-combinator toggle below sees them at the same nesting level as the
+   .ref-graph-view panels they control. */
 /* No top margin here: the preceding .code-relationships-note already carries margin-bottom for row spacing —
    a top margin on this inline checkbox would shift its border-box down within the line, throwing its
    vertical-align:middle out of alignment with its own label (the actual cause of a prior visual misalignment). */
@@ -4069,12 +4071,16 @@ a.work-node:focus-visible {
    separate Sankey bucket + labelled distinctly ("not yet mapped") so the split reads without a new color. */
 .req-flow-state.unmapped { fill: var(--status-pending); }
 .req-flow-state.deferred { fill: var(--status-deferred); }
+/* Retired reuses the deferred/grey token for FILL (Story 8.9/D2: no 7th --status-* token) — kept a separate
+   Sankey bucket + labelled distinctly ("retired") so it never reads as a plain deferred requirement. */
+.req-flow-state.retired { fill: var(--status-deferred); }
 .req-flow-ribbon.done { fill: var(--status-done); opacity: 0.5; }
 .req-flow-ribbon.active { fill: var(--status-active); opacity: 0.5; }
 .req-flow-ribbon.ready { fill: var(--status-ready); opacity: 0.5; }
 .req-flow-ribbon.pending { fill: var(--status-pending); opacity: 0.5; }
 .req-flow-ribbon.unmapped { fill: var(--status-pending); opacity: 0.5; }
 .req-flow-ribbon.deferred { fill: var(--status-deferred); opacity: 0.5; }
+.req-flow-ribbon.retired { fill: var(--status-deferred); opacity: 0.5; }
 .req-flow-hint { font-size: 0.72rem; color: var(--ink-light); text-align: center; font-style: italic; }
 
 /* ====================== PROGRESS BARS ====================== */
@@ -4340,17 +4346,31 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
   cursor: pointer;
 }
 
-/* Four precomputed filter-combination panels (round 2): exactly one is visible at a time, picked by the two
-   checkboxes' :checked state via plain CSS sibling combinators — no JavaScript is needed for filtering to work,
-   and each panel is independently, correctly re-tiled server-side (never a leftover blank gap where an excluded
-   file's rectangle used to be). */
-.codemap-view { display: none; }
-#cm-exclude-spec:not(:checked) ~ #cm-exclude-tests:not(:checked) ~ .codemap-view[data-view="full"],
-#cm-exclude-spec:checked ~ #cm-exclude-tests:not(:checked) ~ .codemap-view[data-view="no-spec"],
-#cm-exclude-spec:not(:checked) ~ #cm-exclude-tests:checked ~ .codemap-view[data-view="no-tests"],
-#cm-exclude-spec:checked ~ #cm-exclude-tests:checked ~ .codemap-view[data-view="no-spec-no-tests"] {
+/* Story 20.10 D2/D3: the four independently-serialized `.codemap-view` filter-combination panels are retired —
+   ONE chart instance (view-switched by specscribe.js) and ONE file table now sit where four used to. Two pure-CSS
+   mechanisms replace the old single four-combination panel toggle:
+
+   1. Per-view LEAD TEXT in the (now shared) file table section — still exactly one of four blocks shown at a
+      time, so it keeps the same four-combination sibling-combinator selector the retired panel toggle used, just
+      scoped to `.codemap-table-section` (a plain sibling of the checkboxes, same as the four panels were) and
+      matching the generic `[data-codemap-view]` marker instead of the retired `.codemap-view[data-view]`. */
+.codemap-table-section [data-codemap-view] { display: none; }
+#cm-exclude-spec:not(:checked) ~ #cm-exclude-tests:not(:checked) ~ .codemap-table-section [data-codemap-view="full"],
+#cm-exclude-spec:checked ~ #cm-exclude-tests:not(:checked) ~ .codemap-table-section [data-codemap-view="no-spec"],
+#cm-exclude-spec:not(:checked) ~ #cm-exclude-tests:checked ~ .codemap-table-section [data-codemap-view="no-tests"],
+#cm-exclude-spec:checked ~ #cm-exclude-tests:checked ~ .codemap-table-section [data-codemap-view="no-spec-no-tests"] {
   display: block;
 }
+
+/* 2. Per-ROW hiding (Task 4.3): the SAME `#cm-exclude-*:checked ~ …` idiom, but as two INDEPENDENT rules rather
+      than four combinatorial ones — a row's own is-spec/is-test marker classes are simple booleans, so hiding it
+      under EITHER active exclude checkbox composes correctly for all four combinations without enumerating them.
+      This is the D2/D3 no-JS filter guarantee, preserved by construction: still pure CSS, still zero script. */
+#cm-exclude-spec:checked ~ .codemap-table-section .codemap-table-row.is-spec,
+#cm-exclude-tests:checked ~ .codemap-table-section .codemap-table-row.is-test {
+  display: none;
+}
+
 /* Legend — always visible (it explains the baked-in default colors). Same ramp tokens as the cells + heatmap. */
 .codemap-legend {
   display: flex;
@@ -5344,6 +5364,9 @@ abbr[title] {
 .satisfaction-bracket .seg.deferred { background: var(--status-deferred); }
 /* Unmapped reuses pending/tan (no 7th token) — kept distinct by its chip icon+word, not by bar color. */
 .satisfaction-bracket .seg.unmapped { background: var(--status-pending); }
+/* Retired reuses deferred/grey (Story 8.9/D2: no 7th token) — kept distinct by its chip icon+word, not by bar
+   color, same pattern as Unmapped above. */
+.satisfaction-bracket .seg.retired { background: var(--status-deferred); }
 .satisfaction-note {
   font-size: 0.78rem;
   color: var(--ink-light);
@@ -7630,3 +7653,22 @@ a.deferred-item-resolving:hover { color: var(--rust); }
    live-browser pass at 375 px: the page reached 422 px (374 px of table min-content + main's 48 px padding)
    while every sibling standalone page stayed at 375. A first attempt with a bare `overflow-x: auto` wrapper did
    NOT fix it — `contain: inline-size` is the load-bearing half, and `.table-scroll` already had it. */
+
+/* ── Story 22.6: the "Quiet Stamp" ──────────────────────────────────────────────────────────────────────────
+   The live delta channel's state, as a small line of page chrome on the SPA entry shell and the webview chrome
+   (never a static page — those have no live channel, and their bytes are pinned by the golden fingerprint).
+
+   State is carried by the TEXT, never by color and never by motion: the stamp reads "Live updates: unavailable"
+   or "Live updates: connected · updated 14:32", so it says the same thing to a screen reader, a monochrome
+   display and a colorblind reader. Deliberately no --motion-* usage and no prefers-reduced-motion block — a
+   stamp that never animates needs no reduced-motion variant, and adding one would imply motion exists.
+
+   Sized off the existing small-type/--ink-light convention .coverage-freshness already uses rather than
+   inventing a token. min-height + the client updating textContent ONLY (no element insert/remove) is what keeps
+   an update from shifting layout: the longest and shortest states occupy the same box. */
+.spa-live-stamp {
+  margin: 0 0 0.5rem;
+  font-size: 0.84rem;
+  color: var(--ink-light);
+  min-height: 1.2em;
+}

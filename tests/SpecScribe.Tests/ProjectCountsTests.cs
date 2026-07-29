@@ -414,6 +414,43 @@ public class ProjectCountsTests
     }
 
     [Fact]
+    public void Build_RequirementSatisfaction_IncludesRetiredInTotalAndTiers()
+    {
+        // Story 8.9 review: Retired is the 7th canonical tier — Total, Tiers, and Readings must all carry it
+        // rather than silently under-counting (the exact Story 8.3 "every count agrees" invariant this codebase
+        // enforces throughout).
+        var requirements = new RequirementsModel
+        {
+            Functional = new[]
+            {
+                Req(RequirementKind.Functional, 1, RequirementStatus.Done),
+                Req(RequirementKind.Functional, 2, RequirementStatus.Retired),
+                Req(RequirementKind.Functional, 3, RequirementStatus.Retired),
+            },
+            NonFunctional = Array.Empty<RequirementInfo>(),
+            Design = Array.Empty<RequirementInfo>(),
+        };
+
+        var counts = ProjectCounts.Build(
+            ProgressModel.Empty, sprint: null, WorkInventory.Empty, epics: null, requirements);
+
+        var o = counts.RequirementsOverall;
+        Assert.Equal(3, o.Total);
+        Assert.Equal(2, o.Retired);
+        Assert.Equal(o.Done + o.Active + o.Ready + o.Planned + o.Unmapped + o.Deferred + o.Retired, o.Total);
+
+        var retiredTier = o.Tiers.Single(t => t.Label == "Retired");
+        Assert.Equal(2, retiredTier.Count);
+        // Retired shares Deferred's css class (Story 8.9/D2: no 7th --status-* token) but is its OWN tier —
+        // never silently merged into "Deferred"'s count.
+        Assert.Equal("deferred", retiredTier.CssClass);
+        Assert.Equal(0, o.Tiers.Single(t => t.Label == "Deferred").Count);
+
+        var retiredReading = o.Readings.Single(r => r.Label == "Retired");
+        Assert.Equal(2, retiredReading.Count);
+    }
+
+    [Fact]
     public void Build_RequirementSatisfaction_IsDeterministic()
     {
         var requirements = new RequirementsModel

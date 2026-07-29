@@ -749,7 +749,8 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Story 10.10 / icon: Story 7.12 review) — all content changes, plus matching specscribe.css rules.
         // Verified stable across 2 repeated runs before locking in. [golden-diff-normalization-gotchas]
         // Regenerated for the Story 7.12 review pass's second round: owner correction — "Tree" now means the
-        // squarified TREEMAP (Charts.CodeFreshnessTreemap, reusing CodeMapVariant.Layout colored by recency), not
+        // squarified TREEMAP (then Charts.CodeFreshnessTreemap, reusing CodeMapVariant.Layout colored by recency —
+        // both retired by Story 20.9/20.10, which moved layout client-side and dropped the unread Layout field), not
         // a folder-list view; the file table gained client-side pagination (CodeMapTemplater/specscribe.js/.css:
         // .codemap-table-row/.codemap-table-pager, mirroring the risk-grid pager). This non-git fixture renders
         // code-map.html, so both changes shift the hash (all-neutral wedges/cells, no pager reveal below the
@@ -1435,7 +1436,72 @@ public class SiteGeneratorAdapterTests : IDisposable
         //
         // VERIFICATION: `a649bd17…` confirmed byte-identical across two consecutive runs, both after an
         // explicit `dotnet build --no-incremental`.
-        const string expected = "a649bd1776366a49b2149dceb337545c658b8ffde1f9f740e09e2565a09cfb45";
+        //
+        // Regenerated for Story 20.10 (shared Code Map payload across filter variants): this fixture's own
+        // repo-root walk finds its own markdown files (confirmed at line ~703's provenance comment, Story 7.12),
+        // so `code-map.html` DOES render here despite not being a git repo — the story file's own "code-map.html
+        // does not render in this fixture" note (citing Story 20.6 Task 4.1 / confirmed by 20.9) does not hold for
+        // THIS fixture and was investigated rather than trusted, per CLAUDE.md. The four independently-serialized
+        // `.codemap-view` panels collapsed into ONE chart instance + ONE deduplicated file table over a shared,
+        // server-declared-views payload (`HierarchyExplorer.ProjectCodeMapViews`) — new markup (`data-codemap-
+        // view`, `data-hierarchy-view-toggle`, `data-hierarchy-legend-view`, `is-spec`/`is-test` row classes) and
+        // the retired `data-view`/`data-hierarchy-reveal-when`/`.codemap-view` wrapper shift this fixture's
+        // `code-map.html` bytes; no other page is affected (specscribe.css/.js untouched by this pass so far).
+        // `b41c3315…` confirmed byte-identical across two consecutive runs, the second after an explicit
+        // `dotnet build --no-incremental`.
+        //
+        // Regenerated AGAIN within the same story once the client-side view switch (specscribe.js) and the
+        // pure-CSS row/lead-text toggle (specscribe.css) landed — CSS/JS now legitimately shift this fixture's
+        // `code-map.html` too (the retired `.codemap-view` display rule, the new `[data-codemap-view]`/row-class
+        // selectors, `data-hierarchy-view-toggle`). `52b3a8e3…` confirmed byte-identical across two consecutive
+        // runs.
+        //
+        // PROVENANCE (shared main): at regeneration time the working tree ALSO carried uncommitted, unrelated
+        // changes from a concurrent session — by this second regeneration it had progressed from an Epic 18
+        // retrospective pass to what looks like Epic 22 "delta transport" work (`FileWatcherService.cs`,
+        // `SiteGenerator.cs`, `SpaDelivery.cs` newly modified; untracked `spike/delta-transport/` replaced by
+        // untracked `_bmad-output/implementation-artifacts/22-6-delta-measurement-report.md`), on top of the
+        // still-present `Charts.cs`, `StatusStyles.cs`, `RequirementsModel.cs`, `RequirementsParser.cs`,
+        // `RequirementsTemplater.cs`, `DashboardViewBuilder.cs`, `EpicsViewBuilder.cs`,
+        // `HtmlRenderAdapter.Dashboard.cs`, `ProjectCounts.cs`, `TraceabilityTemplater.cs`, `CLAUDE.md`,
+        // `docs/adrs/0020…`/`0021…`/`README.md` and several test files. Per CLAUDE.md § Concurrent work, none of
+        // it was reset, reverted or touched; this hash may therefore include some of THEIR rendering effect as
+        // well as this story's, and is expected to move again if their pass lands separately. A FINAL regeneration
+        // is expected at this story's Task 9.9 live-verification pass if anything further changes CSS/JS/markup.
+        //
+        // Regenerated for Story 22.6 (client-server delta channel), and the drift was ISOLATED rather than
+        // assumed — which matters, because two independent things had moved it:
+        //
+        //   52b3a8e3… (the committed constant, from Story 20.10)
+        //   078ef476… = the tree WITHOUT this story's only stylesheet change → a CONCURRENT SESSION's drift,
+        //               nothing to do with Story 22.6. Measured by temporarily removing this story's own
+        //               appended CSS block and re-running; nothing of the other session's was touched.
+        //   501ee958… = with it → this story's contribution is EXACTLY one additive rule.
+        //
+        // Story 22.6's own contribution is the `.spa-live-stamp` rule (AC #5's "Quiet Stamp"), which its Task 6
+        // explicitly directs to specscribe.css so the stamp reuses the existing --ink-light/small-type
+        // convention instead of inventing a token. specscribe.css is copied verbatim into the output and this
+        // fingerprint embeds it, so a stylesheet rule necessarily moves the hash.
+        //
+        // THIS IS THE ONE PLACE AC #4 NEEDS READING CAREFULLY. AC #4 says a plain `generate` must leave "every
+        // output byte unchanged". That holds for every PAGE: no static page's markup moved, which is pinned
+        // directly by SiteGeneratorSpaTests.NoStaticPage_CarriesTheQuietStamp — the stamp is emitted only in the
+        // SPA entry shell and the webview chrome, never in the shared PathUtil.RenderHeadOpen. What moved is the
+        // stylesheet, additively, by one rule that no static page has a selector match for. Recorded rather than
+        // waved through: the constant moving here is expected and explained, not drift.
+        //
+        // PROVENANCE (shared main): regenerated on top of a working tree carrying a concurrent session's
+        // uncommitted work — the `retired`-status pass across Charts.cs / StatusStyles.cs / RequirementsModel.cs
+        // / RequirementsParser.cs / RequirementsTemplater.cs / ProjectCounts.cs / DashboardViewBuilder.cs /
+        // HtmlRenderAdapter.Dashboard.cs / TraceabilityTemplater.cs / HierarchyExplorer*.cs and their tests,
+        // which is what 078ef476… measures. Per CLAUDE.md § Concurrent work none of it was reset, reverted or
+        // cleaned; that session's src/ build was mid-write and broken at one point during this story and was
+        // WAITED OUT rather than worked around. If their pass lands separately this constant is expected to move
+        // again — the shared-main condition, not a defect.
+        //
+        // VERIFICATION: 501ee958… confirmed byte-identical across two consecutive runs, both after an explicit
+        // `dotnet build --no-incremental`.
+        const string expected = "501ee958271a56096003bdbea806b42d233a08192202cd849e516dddd2f57b4e";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

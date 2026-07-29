@@ -365,8 +365,10 @@ public class CodeMapTests
         Assert.Equal(1, noBoth.Map.FileCount); // only src/SpecScribe/GitMetrics.cs survives both filters
         Assert.Equal("src/SpecScribe/GitMetrics.cs", noBoth.Map.Files().Single().RepoRelativePath);
 
-        // Each variant's own layout tiles its OWN (smaller) file set — never leftover rects for excluded files.
-        Assert.Equal(noBoth.Map.FileCount, noBoth.Layout.Count(r => !r.Node.IsDirectory));
+        // Each variant's own map tiles its OWN (smaller) file set — never leftover rects for excluded files.
+        // Story 20.10 F6: CodeMapVariant no longer carries a precomputed Layout (nothing in production read it);
+        // CodeMap.Layout() the method is unchanged and still exercised directly here.
+        Assert.Equal(noBoth.Map.FileCount, noBoth.Map.Layout().Count(r => !r.Node.IsDirectory));
     }
 
     [Fact]
@@ -378,7 +380,7 @@ public class CodeMapTests
 
         var noTests = variants.Single(v => v.Key == "no-tests");
         Assert.True(noTests.Map.IsEmpty);
-        Assert.Empty(noTests.Layout);
+        Assert.Empty(noTests.Map.Layout());
     }
 
     [Fact]

@@ -520,7 +520,14 @@ public static class EpicsViewBuilder
 
         if (target is null)
         {
-            sb.Append("  <p class=\"all-done-note\">Every story in this epic is done.</p>\n");
+            // Story 8.9 review: an all-retired epic also has no active/ready/undrafted story, so it hits this
+            // same "nothing left to pick" path — but it is abandoned, not finished, and the epic badge/donut
+            // elsewhere on this same page now correctly reads "Retired" (AC #4). Naming the case here keeps
+            // this card from contradicting that badge.
+            var note = StatusStyles.ForEpic(epic) == "retired"
+                ? "Every story in this epic was retired."
+                : "Every story in this epic is done.";
+            sb.Append($"  <p class=\"all-done-note\">{PathUtil.Html(note)}</p>\n");
             return;
         }
 

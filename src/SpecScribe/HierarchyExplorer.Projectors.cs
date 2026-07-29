@@ -483,6 +483,134 @@ public static partial class HierarchyExplorer
         new(node.RepoRelativePath, parentId, node.RepoRelativePath, node.Label, 0,
             string.Empty, string.Empty, "Directory", null, "directory", CodeMapDirColorClass);
 
+    /// <summary>Story 20.10's shared-payload projector: builds ONE <see cref="HierarchyExplorerModel"/> across ALL
+    /// four Code Map filter variants instead of one per variant (<see cref="ProjectCodeMap"/>, kept for any other
+    /// single-variant caller). Every distinct file's metric bag, hover card, label, detail and href is built
+    /// exactly once — from the <c>full</c> variant, which is the superset every other variant filters from — and
+    /// each variant becomes a <see cref="HierarchyView"/> naming its own directory scaffold and which of those
+    /// shared files it contains (owner decision D1; F2's directory-collapse divergence is why the scaffold cannot
+    /// be shared too). The detail cap (<see cref="Charts.SelectDetailedCodeMapFiles"/>) is applied ONCE, against
+    /// the distinct file set and its true count (F7) — so the chart and every view's table agree on which files
+    /// are "detailed" no matter how many views a file appears in.</summary>
+    public static HierarchyExplorerModel ProjectCodeMapViews(
+        IReadOnlyList<CodeMapVariant> variants,
+        HierarchyExplorerConfig config,
+        Func<string, string?>? fileHref = null,
+        string prefix = "")
+    {
+        var full = variants.FirstOrDefault(v => v.Key == "full") ?? variants[0];
+        if (full.Map.IsEmpty) return new HierarchyExplorerModel(config, Array.Empty<HierarchyNode>());
+
+        // The shared, deduplicated file bag — built ONCE, from the superset variant. Order is the walk's own
+        // parent-before-child, directories-then-files order (Charts.OrderBySignificance re-orders PER VIEW below;
+        // this index order only has to be stable, not significant, since every view addresses it by index).
+        var allFiles = full.Map.Files();
+        var detailed = Charts.SelectDetailedCodeMapFiles(allFiles, full.Map.FileCount);
+        var sharedNodes = new List<HierarchyNode>(allFiles.Count);
+        var fileIndexByPath = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var f in allFiles)
+        {
+            fileIndexByPath[f.RepoRelativePath] = sharedNodes.Count;
+            // ParentId is meaningless on the shared copy (parent is a property of (file, view) — F2); left null
+            // rather than any one view's answer, so nothing accidentally reads it as authoritative.
+            sharedNodes.Add(CodeMapFileNode(f, parentId: string.Empty, fileHref, prefix, detailed) with { ParentId = null });
+        }
+
+        var views = new List<HierarchyView>(variants.Count);
+        foreach (var variant in variants)
+        {
+            views.Add(BuildCodeMapView(variant, fileIndexByPath));
+        }
+
+        return new HierarchyExplorerModel(config, sharedNodes, views);
+    }
+
+    /// <summary>Builds one variant's <see cref="HierarchyView"/>: its own directory scaffold (never shared, F2)
+    /// plus which shared file indices it contains and where each hangs in THIS view. Ordered by
+    /// <see cref="Charts.OrderBySignificance"/> over this view's own file subset, matching
+    /// <see cref="CodeMapTemplater"/>'s table ordering exactly (Task 4.1 — a subset of one ordering is the same
+    /// relative order, so a view's chart and its table never disagree on reading order).
+    ///
+    /// <para>Walks <see cref="CodeMap.BuildDir"/>'s already-collapsed tree directly rather than through
+    /// <see cref="WalkCodeMap"/>'s <c>file</c> builder — the whole point of sharing is to build each file's
+    /// (expensive, hover-card-bearing) <see cref="HierarchyNode"/> exactly once, so a per-view walk must record
+    /// only an INDEX for a file, never rebuild it.</para></summary>
+    private static HierarchyView BuildCodeMapView(CodeMapVariant variant, IReadOnlyDictionary<string, int> fileIndexByPath)
+    {
+        var title = CodeMapViewTitle(variant);
+        var window = $"{variant.Map.FileCount:N0} {Charts.Plural(variant.Map.FileCount, "file", "files")} · {variant.Map.TotalLines:N0} {Charts.Plural((int)Math.Min(variant.Map.TotalLines, int.MaxValue), "line", "lines")}";
+        var when = $"cm-exclude-spec={(variant.ExcludesSpecDev ? "1" : "0")};cm-exclude-tests={(variant.ExcludesTests ? "1" : "0")}";
+
+        if (variant.Map.IsEmpty)
+            return new HierarchyView(variant.Key, title, window, Array.Empty<HierarchyNode>(), Array.Empty<int>(), Array.Empty<int>(), when);
+
+        var scaffold = new List<HierarchyNode>
+        {
+            new(ProjectRootId, null, "All files", "All files", 0,
+                $"{variant.Map.FileCount:N0} {Charts.Plural(variant.Map.FileCount, "file", "files")}",
+                string.Empty, "All files", null, ProjectRootKind, CodeMapDirColorClass),
+        };
+        var scaffoldIndexById = new Dictionary<string, int>(StringComparer.Ordinal) { [ProjectRootId] = 0 };
+
+        // Ordered file list for THIS view — the same significance order the file table renders (Task 4.1) — with
+        // its (path -> scaffold parent id) worked out from the SAME collapsed tree the table's own files() flatten
+        // ignores, since the scaffold parent depends on tree position, not flattening order.
+        var parentPathOf = new Dictionary<string, string>(StringComparer.Ordinal);
+        WalkForScaffold(variant.Map.Roots, ProjectRootId, scaffold, scaffoldIndexById, parentPathOf);
+
+        var orderedFiles = Charts.OrderBySignificance(variant.Map.Files()).ToList();
+        var files = new List<int>(orderedFiles.Count);
+        var parentIdx = new List<int>(orderedFiles.Count);
+        foreach (var f in orderedFiles)
+        {
+            if (!fileIndexByPath.TryGetValue(f.RepoRelativePath, out var idx)) continue; // defensive; cannot occur (full is the superset)
+            var parentPath = parentPathOf.TryGetValue(f.RepoRelativePath, out var pp) ? pp : ProjectRootId;
+            if (!scaffoldIndexById.TryGetValue(parentPath, out var sIdx)) sIdx = 0;
+            files.Add(idx);
+            parentIdx.Add(sIdx);
+        }
+
+        return new HierarchyView(variant.Key, title, window, scaffold, files, parentIdx, when);
+    }
+
+    /// <summary>Each view's own framed title (F4) — the SAME vocabulary <c>CodeMapTemplater.VariantTitle</c> used
+    /// per-panel before Story 20.10 collapsed four panels to one instance. Lives here (not in the templater)
+    /// because it is now payload DATA the client swaps on a view change, not a one-time server string.</summary>
+    internal static string CodeMapViewTitle(CodeMapVariant variant) =>
+        (variant.ExcludesSpecDev, variant.ExcludesTests) switch
+        {
+            (true, true) => "Source Code Map — excluding spec-driven development directories and tests",
+            (true, false) => "Source Code Map — excluding spec-driven development directories",
+            (false, true) => "Source Code Map — excluding tests",
+            _ => "Source Code Map — every file",
+        };
+
+    /// <summary>Walks a variant's already-collapsed directory tree, emitting ONLY directory nodes into
+    /// <paramref name="scaffold"/> (never rebuilding a file's expensive <see cref="HierarchyNode"/> — that is the
+    /// whole point of the shared-payload split) and recording each file's enclosing directory path in
+    /// <paramref name="parentPathOf"/> so <see cref="BuildCodeMapView"/> can resolve it to a scaffold index after
+    /// re-ordering the files by significance. Mirrors <see cref="WalkCodeMap"/>'s own traversal order
+    /// (directories before files, depth-first) without needing its two-builder-function shape.</summary>
+    private static void WalkForScaffold(
+        IReadOnlyList<CodeMapNode> level, string parentId,
+        List<HierarchyNode> scaffold, Dictionary<string, int> scaffoldIndexById,
+        Dictionary<string, string> parentPathOf)
+    {
+        foreach (var node in level)
+        {
+            if (node.IsDirectory)
+            {
+                scaffoldIndexById[node.RepoRelativePath] = scaffold.Count;
+                scaffold.Add(CodeMapDirNode(node, parentId));
+                WalkForScaffold(node.Children, node.RepoRelativePath, scaffold, scaffoldIndexById, parentPathOf);
+            }
+            else
+            {
+                parentPathOf[node.RepoRelativePath] = parentId;
+            }
+        }
+    }
+
     private static HierarchyNode CodeMapFileNode(
         CodeMapNode node, string parentId, Func<string, string?>? fileHref, string prefix, HashSet<string>? detailed)
     {

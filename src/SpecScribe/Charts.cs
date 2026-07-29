@@ -3222,7 +3222,7 @@ public static partial class Charts
             $"Requirement satisfaction across {sat.Total} requirements: " +
             $"{sat.Satisfied} satisfied, " +
             $"{sat.InFlight} in flight ({sat.Active} partially implemented, {sat.Ready} ready for dev, {sat.Planned} planned), " +
-            $"{sat.Deferred} deferred on purpose, {sat.Unmapped} not yet mapped");
+            $"{sat.Deferred} deferred on purpose, {sat.Unmapped} not yet mapped, {sat.Retired} retired");
 
         var sb = new StringBuilder();
         sb.Append($"<div class=\"satisfaction-bar\" role=\"img\" aria-label=\"{aria}\">\n");
@@ -3248,6 +3248,13 @@ public static partial class Charts
         {
             ("pending unmapped", sat.Unmapped, "Not yet mapped"),
         });
+        // Retired shares the deferred grey token (Story 8.9/D2: no 7th token) but is its own bracket/segment so
+        // it is never silently folded into "deferred on purpose" — the two mean different things (shelved vs.
+        // the covering plan was abandoned). [Story 8.9 review]
+        AppendSatisfactionBracket(sb, "retired", sat.Retired, new[]
+        {
+            ("deferred retired", sat.Retired, "Retired"),
+        });
 
         sb.Append("</div>\n");
         return sb.ToString();
@@ -3269,15 +3276,16 @@ public static partial class Charts
         sb.Append("  </span>\n");
     }
 
-    /// <summary>Four-reading satisfaction chips (Satisfied · In flight · Deferred on purpose · Unmapped).
-    /// Each chip pairs color + icon + word (never color-only). Optional hrefs deep-link to on-page detail.
-    /// In-flight tooltip expands Active/Ready/Planned. [Story 9.9]</summary>
+    /// <summary>Five-reading satisfaction chips (Satisfied · In flight · Deferred on purpose · Unmapped ·
+    /// Retired). Each chip pairs color + icon + word (never color-only). Optional hrefs deep-link to on-page
+    /// detail. In-flight tooltip expands Active/Ready/Planned. [Story 9.9; Retired added Story 8.9 review]</summary>
     public static string RequirementSatisfactionChips(
         ProjectCounts.RequirementSatisfaction sat,
         string? satisfiedHref = null,
         string? inFlightHref = null,
         string? deferredHref = null,
         string? unmappedHref = null,
+        string? retiredHref = null,
         string? linkPrefix = null)
     {
         if (sat.Total <= 0) return string.Empty;
@@ -3297,6 +3305,9 @@ public static partial class Charts
         AppendSatisfactionChip(sb, "Unmapped", sat.Unmapped, "pending", "unmapped",
             StatusStyles.StageMeaning("unmapped"), Href(unmappedHref),
             displayWord: StatusStyles.RequirementLabel(RequirementStatus.Unmapped));
+        AppendSatisfactionChip(sb, "Retired", sat.Retired, "deferred", "deferred",
+            StatusStyles.StageMeaning("retired"), Href(retiredHref),
+            displayWord: StatusStyles.RequirementLabel(RequirementStatus.Retired));
         sb.Append("</div>\n");
         return sb.ToString();
     }
@@ -3496,7 +3507,12 @@ public static partial class Charts
     /// Covered) since the matrix is literal 3-state by owner decision.</summary>
     private static string TraceabilityChips(ProjectCounts.RequirementSatisfaction sat)
     {
-        var covered = sat.Satisfied + sat.InFlight;
+        // Retired folds into Covered here, not into Deferred: the matrix's "Covered" state means "a delivering
+        // epic is named" (a real cell/link exists), which is still true for a retired-epic-covered requirement —
+        // only the requirement's own DELIVERY progress (Satisfied/In flight) is what Retired says nothing
+        // happened on. Keeping the traceability page's owner-locked 3-state shape (Story 21.1) rather than
+        // adding a 4th chip. [Story 8.9 review]
+        var covered = sat.Satisfied + sat.InFlight + sat.Retired;
         var sb = new StringBuilder();
         sb.Append("  <div class=\"satisfaction-chips trace-strip-chips\">\n");
         AppendSatisfactionChip(sb, "Covered", covered, "done", "done",
@@ -3543,17 +3559,24 @@ public static partial class Charts
     {
         ("done", "done"), ("active", "partially implemented"), ("ready", "ready for dev"),
         ("pending", "planned"), ("unmapped", "not yet mapped"), ("deferred", "deferred"),
+        ("retired", "retired"),
     };
 
     /// <summary>The requirements-flow's own terminal-state bucket key. Identical to
     /// <see cref="StatusStyles.ForRequirement"/> everywhere except it routes <see cref="RequirementStatus.Unmapped"/>
-    /// to its own <c>unmapped</c> bucket instead of the shared tan <c>pending</c> class the badge/card/grid/donut
-    /// deliberately reuse for it. This is the ONE documented place the flow needs a bucket distinct from
-    /// <see cref="StatusStyles.ForRequirement"/> — AC #2 requires the deferred/unmapped/planned split visible in
-    /// the diagram (and its aria twin) even though the badge color does not get a 7th token. Do not let this
-    /// exception leak into any other consumer. [Story 9.3 Task 3]</summary>
-    private static string FlowStateKey(RequirementInfo req) =>
-        req.Status == RequirementStatus.Unmapped ? "unmapped" : StatusStyles.ForRequirement(req);
+    /// to its own <c>unmapped</c> bucket instead of the shared tan <c>pending</c> class, and
+    /// <see cref="RequirementStatus.Retired"/> to its own <c>retired</c> bucket instead of the shared grey
+    /// <c>deferred</c> class — both the badge/card/grid/donut deliberately reuse those shared classes for. This is
+    /// the ONE documented place the flow needs buckets distinct from <see cref="StatusStyles.ForRequirement"/> —
+    /// AC #2 (Story 9.3) requires the deferred/unmapped/planned split visible in the diagram (and its aria twin)
+    /// even though the badge color does not get a 7th token; Retired needs the identical treatment for the same
+    /// reason (Story 8.9 review). Do not let this exception leak into any other consumer. [Story 9.3 Task 3]</summary>
+    private static string FlowStateKey(RequirementInfo req) => req.Status switch
+    {
+        RequirementStatus.Unmapped => "unmapped",
+        RequirementStatus.Retired => "retired",
+        _ => StatusStyles.ForRequirement(req),
+    };
 
     /// <summary>The requirements-flow's "No coverage" epic-coverage-key sentinel. Single source for
     /// <see cref="RequirementFlow"/> and <see cref="RequirementFlowTextEquivalent"/> so a future change to

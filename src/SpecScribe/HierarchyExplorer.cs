@@ -277,10 +277,59 @@ public sealed record HierarchyExplorerConfig(
 
 /// <summary>The whole payload: component configuration + the node hierarchy. One datasource, both shapes — the
 /// selector re-types the trace, it never re-derives geometry, re-counts against <see cref="ProjectCounts"/>, or
-/// fetches (AC #1; <c>file://</c>-safe). [Story 20.5]</summary>
+/// fetches (AC #1; <c>file://</c>-safe). [Story 20.5]
+/// <para><see cref="Views"/> is Story 20.10's addition: an optional server-declared set of alternate VIEWS over
+/// this same <see cref="Nodes"/> bag (Code Map's four filter combinations are the first consumer). Null on every
+/// surface that has exactly one view of its data — which is every surface except Code Map today — so nothing
+/// about the six already-shipped islands moves. When present, <see cref="Nodes"/> holds each FILE exactly once
+/// (the shared, deduplicated bag) and each <see cref="HierarchyView"/> supplies its own directory scaffold plus
+/// which files it contains and where each hangs, because a file's parent is a property of (file, view) rather
+/// than of the file alone (F2 — a single-child directory chain's collapse depends on which files survived the
+/// filter). The client selects one view, reparents its files under that view's own scaffold, and rolls up through
+/// the SAME children-win rule every other instance uses — nothing here mints a second projection.</para></summary>
 public sealed record HierarchyExplorerModel(
     HierarchyExplorerConfig Config,
-    IReadOnlyList<HierarchyNode> Nodes);
+    IReadOnlyList<HierarchyNode> Nodes,
+    IReadOnlyList<HierarchyView>? Views = null);
+
+/// <summary>One server-declared VIEW over a shared <see cref="HierarchyExplorerModel"/> payload — the "one
+/// payload, N server-declared views" contract Story 20.10 adds (a candidate ADR 0012 §2 amendment, Task 5).
+///
+/// <para><b>Why directories are not shared across views (owner decision D1, finding F2).</b>
+/// <see cref="CodeMap.BuildDir"/> collapses a single-child directory chain only while the directory has no files
+/// of its own — filtering files changes that condition, so the SAME directory can collapse to a different id,
+/// label AND parent depending on which files a view kept. A file's parent is therefore a property of (file, view),
+/// never of the file alone. Rather than port that collapse rule into JavaScript (a second copy of a structural
+/// rule — exactly the drift ADR 0012 exists to end) or accept a filtered view rendering chains the server would
+/// have collapsed (a visible fidelity regression), each view keeps its own directory <see cref="Scaffold"/>
+/// verbatim from the server; the client only ever selects a view and rolls up.</para>
+///
+/// <para><see cref="Files"/> and <see cref="ParentScaffoldIndex"/> are parallel, INTEGER-indexed (Task 1.4):
+/// <c>Files[i]</c> is an index into the model's shared <see cref="HierarchyExplorerModel.Nodes"/>, and that file's
+/// parent in this view is <c>Scaffold[ParentScaffoldIndex[i]]</c>. Indices, not repeated path strings, because
+/// ~2,970 file instances' worth of repeated paths is exactly the duplication this story removes.</para></summary>
+/// <param name="Key">The CSS class/id suffix distinguishing this view — carries over from
+/// <see cref="CodeMapVariant.Key"/> for Code Map.</param>
+/// <param name="Title">This view's own framed title (F4) — swapped into the panel's heading on a view switch.</param>
+/// <param name="Window">This view's own analysis-window string (F4) — e.g. "1,220 files · 322,227 lines".</param>
+/// <param name="Scaffold">This view's directory nodes, INCLUDING its own synthesized root at index 0 (verbatim
+/// per-view structural nodes; never shared across views, per D1/F2 above).</param>
+/// <param name="Files">Indices into the shared <see cref="HierarchyExplorerModel.Nodes"/> for the files this view
+/// contains, already in this view's own significance order.</param>
+/// <param name="ParentScaffoldIndex">Parallel to <see cref="Files"/>: <c>ParentScaffoldIndex[i]</c> is the index
+/// into <see cref="Scaffold"/> that is <c>Files[i]</c>'s parent in this view.</param>
+/// <param name="When">A declarative checkbox-state predicate this view activates under, in the SAME
+/// <c>id=0|1;id=0|1</c> vocabulary <c>data-hierarchy-reveal-when</c> already uses (Story 20.9 F1) — generic by
+/// construction, so the shared component matches a state string without ever learning what the checkboxes mean.
+/// Empty when the surface has no such toggle (a future non-Code-Map view consumer).</param>
+public sealed record HierarchyView(
+    string Key,
+    string Title,
+    string Window,
+    IReadOnlyList<HierarchyNode> Scaffold,
+    IReadOnlyList<int> Files,
+    IReadOnlyList<int> ParentScaffoldIndex,
+    string When = "");
 
 /// <summary>The ONE standardized hierarchy surface (ADR 0012 §2): a sunburst and a treemap over the same
 /// datasource, behind one selector, with an explicit activation mode. Every hierarchy call site routes through
@@ -723,6 +772,27 @@ public static partial class HierarchyExplorer
         json.Replace("</", "<\\/", StringComparison.Ordinal)
             .Replace("<!", "\\u003C!", StringComparison.Ordinal);
 
+    /// <summary>The one node-serialization shape shared by the top-level shared node bag AND every view's own
+    /// directory scaffold (Story 20.10) — a scaffold directory simply carries null metrics/tip, which
+    /// <see cref="CompactIslandJson"/>'s null-skipping already drops for free. One shape, so a view's scaffold
+    /// node can never accidentally diverge from a shared file node's own field set.</summary>
+    private static object DimNodeJson(HierarchyNode n) => new
+    {
+        id = n.Id,
+        parentId = n.ParentId,
+        label = n.Label,
+        shortLabel = NullIfEmpty(n.ShortLabel),
+        value = n.Value,
+        detail = NullIfEmpty(n.Detail),
+        statusClass = NullIfEmpty(n.StatusClass),
+        statusLabel = NullIfEmpty(n.StatusLabel),
+        colorClass = NullIfEmpty(n.ColorClass),
+        href = n.Href,
+        kind = n.Kind,
+        metrics = n.Metrics,
+        tip = n.TipHtml,
+    };
+
     public static string IslandHtml(HierarchyExplorerModel model)
     {
         if (model.Nodes.Count == 0) return string.Empty;
@@ -807,21 +877,20 @@ public static partial class HierarchyExplorer
                         rosterConstant = NullIfEmpty(d.RosterConstant),
                     }),
                 },
-                nodes = model.Nodes.Select(n => new
+                nodes = model.Nodes.Select(DimNodeJson),
+                // Story 20.10: the server-declared views over this same shared node bag (null on every surface
+                // with exactly one view — the six already-shipped islands do not move a byte). `files`/`parent`
+                // are the integer-indexed membership encoding (Task 1.4): `files[i]` indexes `nodes` above,
+                // `parent[i]` indexes this view's own `scaffold`.
+                views = model.Views?.Select(v => new
                 {
-                    id = n.Id,
-                    parentId = n.ParentId,
-                    label = n.Label,
-                    shortLabel = NullIfEmpty(n.ShortLabel),
-                    value = n.Value,
-                    detail = NullIfEmpty(n.Detail),
-                    statusClass = NullIfEmpty(n.StatusClass),
-                    statusLabel = NullIfEmpty(n.StatusLabel),
-                    colorClass = NullIfEmpty(n.ColorClass),
-                    href = n.Href,
-                    kind = n.Kind,
-                    metrics = n.Metrics,
-                    tip = n.TipHtml,
+                    key = v.Key,
+                    title = v.Title,
+                    window = v.Window,
+                    when = NullIfEmpty(v.When),
+                    scaffold = v.Scaffold.Select(DimNodeJson),
+                    files = v.Files,
+                    parent = v.ParentScaffoldIndex,
                 }),
             }, CompactIslandJson));
         return $"<script type=\"application/json\" class=\"ss-hierarchy-data\" id=\"{PathUtil.Html(model.Config.DomId)}-data\">{json}</script>\n";

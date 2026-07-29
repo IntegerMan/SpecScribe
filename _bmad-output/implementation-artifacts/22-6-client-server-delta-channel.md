@@ -10,7 +10,7 @@ owner_decisions: 2026-07-28 # D1 run now on 22.2's hashes; D2 delta-ify `--serve
 
 # Story 22.6: Client-Server Delta Channel
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -163,55 +163,55 @@ The document's shape is a **contract**, not an implementation detail — Story 2
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — THE GATE. Measure before building. (AC: #1)**
-  - [ ] Build the measurement harness under `spike/` (quarantined, as 22.1 did) — do **not** touch `src/` in this task.
-  - [ ] Drive real regenerations against a mutable copy of this repo's artifacts, one per watch route: `GenerateOne`, `RegenerateEpics`, `RegenerateAdrs`, `RegenerateFromDataSource`. Route selection logic lives at [`FileWatcherService.RunDebouncedPass`](../../src/SpecScribe/FileWatcherService.cs:381) — mirror it, don't guess.
-  - [ ] For each: diff manifest before/after by `contentHash`; sum the `bytes` of changed pages; compare against full-IR bytes and against the full `SerializePayload` webview payload bytes.
-  - [ ] Write `22-6-delta-measurement-report.md` with a per-route table. **Report the `RegenerateEpics` number even though it is inflated by the known no-op over-count** ([22.1 headline](22-1-spike-report.md)) — and say so, so the number is not read as this story's fault.
-  - [ ] **STOP HERE if the `GenerateOne` gate fails.** Set `sprint-status.yaml` back to `backlog` with the numbers inline, and report to the owner. Do not proceed to Task 2.
+- [x] **Task 1 — THE GATE. Measure before building. (AC: #1)**
+  - [x] Build the measurement harness under `spike/` (quarantined, as 22.1 did) — do **not** touch `src/` in this task.
+  - [x] Drive real regenerations against a mutable copy of this repo's artifacts, one per watch route: `GenerateOne`, `RegenerateEpics`, `RegenerateAdrs`, `RegenerateFromDataSource`. Route selection logic lives at [`FileWatcherService.RunDebouncedPass`](../../src/SpecScribe/FileWatcherService.cs:381) — mirror it, don't guess.
+  - [x] For each: diff manifest before/after by `contentHash`; sum the `bytes` of changed pages; compare against full-IR bytes and against the full `SerializePayload` webview payload bytes.
+  - [x] Write `22-6-delta-measurement-report.md` with a per-route table. **Report the `RegenerateEpics` number even though it is inflated by the known no-op over-count** ([22.1 headline](22-1-spike-report.md)) — and say so, so the number is not read as this story's fault.
+  - [x] **STOP HERE if the `GenerateOne` gate fails.** Set `sprint-status.yaml` back to `backlog` with the numbers inline, and report to the owner. Do not proceed to Task 2.
 
-- [ ] **Task 2 — The delta document, as a pure function (AC: #2, #7)**
-  - [ ] Add `SpaDelivery.BuildDelta(previousManifestJson, currentManifestJson, …)` returning a delta record. **Pure and side-effect-free**, matching every other method in that file (its class doc comment: *"Every method here is side-effect-free string work"*).
-  - [ ] Add `DeltaSchemaVersion` as its **own** constant with the same monotonically-increasing-integer compatibility rule `SchemaVersion`'s doc comment states. Do **not** bump `SchemaVersion` (AC #4).
-  - [ ] Encode the degrade-to-full path (AC #7) inside `BuildDelta` so no caller can forget it.
-  - [ ] Unit-test `BuildDelta` directly in `SpaDeliveryTests.cs`: unchanged site → empty delta; one page edited → exactly that page; page added; page removed; absent prior → `full`; schema-version mismatch → `full`.
+- [x] **Task 2 — The delta document, as a pure function (AC: #2, #7)**
+  - [x] Add `SpaDelivery.BuildDelta(previousManifestJson, currentManifestJson, …)` returning a delta record. **Pure and side-effect-free**, matching every other method in that file (its class doc comment: *"Every method here is side-effect-free string work"*).
+  - [x] Add `DeltaSchemaVersion` as its **own** constant with the same monotonically-increasing-integer compatibility rule `SchemaVersion`'s doc comment states. Do **not** bump `SchemaVersion` (AC #4).
+  - [x] Encode the degrade-to-full path (AC #7) inside `BuildDelta` so no caller can forget it.
+  - [x] Unit-test `BuildDelta` directly in `SpaDeliveryTests.cs`: unchanged site → empty delta; one page edited → exactly that page; page added; page removed; absent prior → `full`; schema-version mismatch → `full`.
 
-- [ ] **Task 3 — Emit the sidecar in watch mode only (AC: #2, #4)**
-  - [ ] Hold the previous emit's manifest on `SiteGenerator` and update it inside `EmitSpaSite`, where `SpaDelivery.BuildDataFiles(bundle)` already produces the new one — one place, six callers.
-  - [ ] Gate emission on watch/serve, **not** on `--spa` alone, so a one-shot `generate --spa` writes no `delta.json` (AC #2, NFR9).
-  - [ ] Write atomically: temp file under the output root, then `File.Move(temp, target, overwrite: true)`. `WriteSpaFile` uses a plain `File.WriteAllText` ([SiteGenerator.cs:3306](../../src/SpecScribe/SiteGenerator.cs:3306)) and is **not** safe for a concurrently-polling reader — add a sibling writer rather than changing that one.
-  - [ ] Assert in `SiteGeneratorSpaTests.cs` that a one-shot `generate --spa` produces **no** `spa/delta.json`, and that two consecutive watch regens produce one whose contents match `BuildDelta`'s.
+- [x] **Task 3 — Emit the sidecar in watch mode only (AC: #2, #4)**
+  - [x] Hold the previous emit's manifest on `SiteGenerator` and update it inside `EmitSpaSite`, where `SpaDelivery.BuildDataFiles(bundle)` already produces the new one — one place, six callers.
+  - [x] Gate emission on watch/serve, **not** on `--spa` alone, so a one-shot `generate --spa` writes no `delta.json` (AC #2, NFR9).
+  - [x] Write atomically: temp file under the output root, then `File.Move(temp, target, overwrite: true)`. `WriteSpaFile` uses a plain `File.WriteAllText` ([SiteGenerator.cs:3306](../../src/SpecScribe/SiteGenerator.cs:3306)) and is **not** safe for a concurrently-polling reader — add a sibling writer rather than changing that one.
+  - [x] Assert in `SiteGeneratorSpaTests.cs` that a one-shot `generate --spa` produces **no** `spa/delta.json`, and that two consecutive watch regens produce one whose contents match `BuildDelta`'s.
 
-- [ ] **Task 4 — Delta frames on the NDJSON channel (AC: #3)**
-  - [ ] Add a `--serve-delta` switch to `SiteSettings` alongside `--serve`.
-  - [ ] Add `WebviewCommand.SerializeDeltaPayload(previousBundle, currentBundle, sequence, …)` as a **`public static` pure method**, exactly like the existing `SerializePayload` / `SerializeDiagnostics` / `ResolveConfiguredOutputRoot` pair-testable seams. **This is not optional style**: `RunServeLoop` is `private static`, blocks on a `ManualResetEventSlim`, spawns a real `FileWatcherService` and writes to `Console` — it has **zero** test coverage today (`WebviewCommandTests.cs` covers only the pure helpers), and any delta logic written *inside* it is untestable by construction.
-  - [ ] Reuse `SpaDelivery.ContentHash` for the webview surfaces' change detection — do not introduce a second hash function.
-  - [ ] Wire `RunServeLoop` to call the pure method; keep the first frame full.
-  - [ ] Extend `WebviewCommandTests.cs` with the frame-shape contract: first frame full; second frame delta with only changed surfaces; `--serve-delta` off ⇒ byte-identical to `SerializePayload`.
+- [x] **Task 4 — Delta frames on the NDJSON channel (AC: #3)**
+  - [x] Add a `--serve-delta` switch to `SiteSettings` alongside `--serve`.
+  - [x] Add `WebviewCommand.SerializeDeltaPayload(previousBundle, currentBundle, sequence, …)` as a **`public static` pure method**, exactly like the existing `SerializePayload` / `SerializeDiagnostics` / `ResolveConfiguredOutputRoot` pair-testable seams. **This is not optional style**: `RunServeLoop` is `private static`, blocks on a `ManualResetEventSlim`, spawns a real `FileWatcherService` and writes to `Console` — it has **zero** test coverage today (`WebviewCommandTests.cs` covers only the pure helpers), and any delta logic written *inside* it is untestable by construction.
+  - [x] Reuse `SpaDelivery.ContentHash` for the webview surfaces' change detection — do not introduce a second hash function.
+  - [x] Wire `RunServeLoop` to call the pure method; keep the first frame full.
+  - [x] Extend `WebviewCommandTests.cs` with the frame-shape contract: first frame full; second frame delta with only changed surfaces; `--serve-delta` off ⇒ byte-identical to `SerializePayload`.
 
-- [ ] **Task 5 — Consume the delta in the extension (AC: #3, #6)**
-  - [ ] Extend `PersistentRenderer` ([extension.ts:1395](../../extension/src/extension.ts:1395)) to merge a delta frame into its cached payload instead of replacing it.
-  - [ ] Pass `--serve-delta` on spawn. The existing `persistentUnavailable` fallback ([extension.ts:580](../../extension/src/extension.ts:580)) already handles an older core that rejects an unknown flag — verify that path still degrades to `loadViaSpawn` rather than hanging.
-  - [ ] Preserve the documented invariant that *"a live-pushed `--serve` payload and a one-shot spawn payload are indistinguishable"* ([extension.ts:612](../../extension/src/extension.ts:612)) — the merge must produce the same object shape the one-shot path yields.
+- [x] **Task 5 — Consume the delta in the extension (AC: #3, #6)**
+  - [x] Extend `PersistentRenderer` ([extension.ts:1395](../../extension/src/extension.ts:1395)) to merge a delta frame into its cached payload instead of replacing it.
+  - [x] Pass `--serve-delta` on spawn. The existing `persistentUnavailable` fallback ([extension.ts:580](../../extension/src/extension.ts:580)) already handles an older core that rejects an unknown flag — verify that path still degrades to `loadViaSpawn` rather than hanging.
+  - [x] Preserve the documented invariant that *"a live-pushed `--serve` payload and a one-shot spawn payload are indistinguishable"* ([extension.ts:612](../../extension/src/extension.ts:612)) — the merge must produce the same object shape the one-shot path yields.
 
-- [ ] **Task 6 — The Quiet Stamp (AC: #5)**
-  - [ ] Emit the stamp in [`SpaDelivery.BuildEntryShell`](../../src/SpecScribe/SpaDelivery.cs) and in the webview chrome. **Not** in `PathUtil.RenderHeadOpen` — that is shared with every static page and would move the golden fingerprint (AC #4).
-  - [ ] Style it off the existing `--ink-light` / small-type conventions the `.coverage-freshness` rule already uses (`specscribe.css:4243`) rather than inventing a token. No `--motion-*` usage — the direction is deliberately motionless.
-  - [ ] Client updates `textContent` in place. No element insertion/removal, no height change.
-  - [ ] Test: the stamp's text conveys state without color; it is absent from every static page; a reduced-motion media query is unnecessary and none is added.
+- [x] **Task 6 — The Quiet Stamp (AC: #5)**
+  - [x] Emit the stamp in [`SpaDelivery.BuildEntryShell`](../../src/SpecScribe/SpaDelivery.cs) and in the webview chrome. **Not** in `PathUtil.RenderHeadOpen` — that is shared with every static page and would move the golden fingerprint (AC #4).
+  - [x] Style it off the existing `--ink-light` / small-type conventions the `.coverage-freshness` rule already uses (`specscribe.css:4243`) rather than inventing a token. No `--motion-*` usage — the direction is deliberately motionless.
+  - [x] Client updates `textContent` in place. No element insertion/removal, no height change.
+  - [x] Test: the stamp's text conveys state without color; it is absent from every static page; a reduced-motion media query is unnecessary and none is added.
 
-- [ ] **Task 7 — The oracle test (AC: #6)**
-  - [ ] Drive a real generator: emit N−1, apply a source edit, emit N, apply the delta to an N−1 page set, assert byte-identity against the N page set.
-  - [ ] Cover at minimum: content-only edit (`GenerateOne`), epics edit (`RegenerateEpics`), a file delete (`RemoveFor`), and a directory rename (`RegenerateTopology` → must degrade to `full`).
+- [x] **Task 7 — The oracle test (AC: #6)**
+  - [x] Drive a real generator: emit N−1, apply a source edit, emit N, apply the delta to an N−1 page set, assert byte-identity against the N page set.
+  - [x] Cover at minimum: content-only edit (`GenerateOne`), epics edit (`RegenerateEpics`), a file delete (`RemoveFor`), and a directory rename (`RegenerateTopology` → must degrade to `full`).
 
-- [ ] **Task 8 — Live browser verification (CLAUDE.md § Verification)**
-  - [ ] Generate with `--spa` to `SpecScribeOutput/` (**never** `--output docs/live`), serve it, run a watch session, edit a source file, and **look at the page**: confirm the region swaps, the stamp updates, no console error, and no layout shift.
-  - [ ] The test suite structurally cannot see layout collapse or DOM corruption from markup splicing — all three of those shipped before and were caught only by looking.
+- [x] **Task 8 — Live browser verification (CLAUDE.md § Verification)**
+  - [x] Generate with `--spa` to `SpecScribeOutput/` (**never** `--output docs/live`), serve it, run a watch session, edit a source file, and **look at the page**: confirm the region swaps, the stamp updates, no console error, and no layout shift.
+  - [x] The test suite structurally cannot see layout collapse or DOM corruption from markup splicing — all three of those shipped before and were caught only by looking.
 
-- [ ] **Task 9 — Record the contracts (AC: #8)**
-  - [ ] Write the ADR. **Read `docs/adrs/` for the next free number at dev time** — `0019` is claimed-but-unwritten (Story 18.3), `0023` is pre-claimed (Story 22.4), so `0024` is the first uncontested slot *as of this writing*; verify, don't assume.
-  - [ ] Cross-reference it from `docs/adrs/README.md` and from ADR 0008 §Decision 3.
-  - [ ] Update `epics.md` § Story 22.6 **and** `sprint-status.yaml` in the **same** change.
+- [x] **Task 9 — Record the contracts (AC: #8)**
+  - [x] Write the ADR. **Read `docs/adrs/` for the next free number at dev time** — `0019` is claimed-but-unwritten (Story 18.3), `0023` is pre-claimed (Story 22.4), so `0024` is the first uncontested slot *as of this writing*; verify, don't assume.
+  - [x] Cross-reference it from `docs/adrs/README.md` and from ADR 0008 §Decision 3.
+  - [x] Update `epics.md` § Story 22.6 **and** `sprint-status.yaml` in the **same** change.
 
 ## Dev Notes
 
@@ -288,8 +288,145 @@ New files: `spike/` measurement harness (Task 1, quarantined), `_bmad-output/imp
 
 ### Agent Model Used
 
+claude-opus-5 (Claude Code / bmad-dev-story)
+
 ### Debug Log References
+
+- Gate harness: `spike/delta-transport/` — `dotnet run --project spike/delta-transport/SpecScribe.DeltaTransportSpike.csproj -c Release -- --repo . --out ./scratch` (exit 0 = pass, 1 = fail)
+- Gate report: [22-6-delta-measurement-report.md](22-6-delta-measurement-report.md)
+- Live verification: `generate --spa` → `SpecScribeOutput/`, served on :8125, `watch --spa` session, real edits observed in-browser
 
 ### Completion Notes List
 
+**All 8 ACs met. Full suite 2811 passed / 0 failed / 3 skipped** (the 3 pre-existing symlink-privilege skips).
+
+#### The gate (AC #1) — passed, after being made honest
+
+`GenerateOne` single-file content edit: **2.72 % of the full IR**, **4.09 % of the full webview payload**, against
+a 5 % threshold, stable across two runs to <0.03 pp. Story 22.1's comparable figure was 25.3–39.9 % at *chunk*
+granularity; the difference is Story 22.2's page-level addressing, not an accounting change. Per-route numbers, the
+no-op control (zero churn on all four routes), and the caveats are in the report.
+
+⚠️ **The harness's first run reported a false PASS at 0.000 %.** It selected `.memlog.md` — an *ignored* source
+file, which still classifies `Narrow` and still reaches `GenerateOne`, which then returns `Skipped` and renders
+nothing: a delta of nothing measured against everything. Liveness (dispatched as expected, not `Skipped`, >0 pages
+changed) is now **part of the gate**, not a precondition to it.
+
+#### Three of the story's own premises were disproved by measurement
+
+1. **⚠️ Trap 2's premise is FALSE for one route.** `RegenerateFromDataSource` calls `GenerateAll()` on its **first
+   line** — a complete rebuild including `EmitSpaSite` — and only *afterwards* inspects the events to decide what
+   to report. An unparseable `sprint-status.yaml` (which this repo's own file is) therefore returns `Skipped`
+   **having already rewritten the entire IR**; the harness observed `code-map.html`'s hash moving on exactly that
+   path. A basis gated on the reported outcome would emit a false *unchanged* — the failure AC #7 names as worse
+   than a false *changed*. **The delta basis is therefore captured at the EMIT seam**, which is what Task 3
+   prescribed anyway; only its stated *reason* was wrong. The NDJSON channel keeps the opposite rule for the
+   opposite reason (it genuinely does not re-render on `Skipped`) — two channels, two bases, two correct answers.
+2. **⚠️ The golden fingerprint DID move, and AC #4 needs reading precisely.** Every **page** is byte-identical —
+   pinned directly by `NoStaticPage_CarriesTheQuietStamp` — but Task 6's own instruction puts the Quiet Stamp's
+   rule in `specscribe.css`, which the fingerprint embeds. The drift was **isolated rather than assumed**:
+   `078ef476…` without this story's rule (a **concurrent session's** drift) vs `501ee958…` with it. Confirmed
+   stable across two runs after `dotnet build --no-incremental`; provenance recorded at the constant.
+3. **The next free ADR slot is 0028, not 0024.** The story said to verify rather than assume; four ADRs
+   (0024–0027) landed in between.
+
+#### ⚠️ Live verification caught a defect the test suite structurally could not
+
+Exactly the class CLAUDE.md § Verification predicts. The topology degrade-to-full was first derived from the
+`trigger` **label**. During Task 8 a concurrent session's save overwrote that label between
+`RegenerateTopology` setting it and the emit reading it, and the sidecar written in that same second read
+`"full": false` while the watch log printed `<directory change> full rebuild`. `FileWatcherService` fires one
+debounce `Timer` per changed path on its own thread-pool thread, so the label is **racy by construction** — and my
+own doc comment claimed it was "never a correctness input", which deriving `forceFull` from it had made false.
+
+Fixed by having `RegenerateTopology` set a flag on itself (`_nextEmitIsFullDelta`), set and consumed under
+`_gate` on one call stack. **Re-verified live under the identical race** (label again overwritten by a concurrent
+save; `full: true` held), plus two regression tests including one that the flag is consumed exactly once.
+
+#### AC #5 verified in a live browser, by measurement
+
+Stamp text updated 15:15 → 15:19 → "full refresh" with **height shift 0.000 and content-top shift 0.000**, a single
+text node throughout (no element insert/remove), `docScrollW` 1265 ≤ `innerW` 1280 (no horizontal overflow), and
+the stamp survived a content-region swap unchanged. No console errors at any point.
+
+*(An initial measurement showed a collapsed 0-width / 133px-tall stamp — that was an unsized headless viewport
+(`window.innerWidth === 0`), not a layout defect. Re-measured at 1280×900.)*
+
+#### Accepted floor, recorded so it is not rediscovered
+
+`code-map.html` carries a whole-repo lines-of-code total and therefore changes on **every** content edit — ~807 KB
+encoded, the dominant term in every delta measured, and 100 % of the data-source route's. **No content edit will
+produce a delta below ~1.2 % of the IR until that page changes.** That is a page-design problem, not a transport
+one, and must not be "fixed" by normalizing the hash (a delta omitting it would ship a false *unchanged*).
+
+#### Notes on scope and the shared tree
+
+- `22.4` had **landed** (done) when this ran, so there was one region seam to hook, not two.
+- `22.5` had also landed (review) despite `runs_before` — no conflict; the two are orthogonal as owner decision D1
+  said, and `ClassifyRebuildScope` (22.5's) is mirrored by the gate harness rather than guessed.
+- Per CLAUDE.md § Concurrent work, **nothing of another session's was reset, reverted or cleaned.** Their in-flight
+  `retired`-status pass broke `src/` mid-session (`RequirementsTemplater.cs` deconstructing 6 elements into 7);
+  it was **waited out**, not worked around.
+- `web/` was not touched (it is a prerender-time consumer; ADR 0022).
+- One self-inflicted issue worth noting: the first write of `SurfaceHash` embedded **literal NUL bytes** as a field
+  separator, which made `Commands.cs` read as binary to `grep`. Replaced with length-prefixing — unambiguous using
+  only printable ASCII.
+
 ### File List
+
+**New**
+
+- `spike/delta-transport/SpecScribe.DeltaTransportSpike.csproj` — quarantined gate harness (Task 1)
+- `spike/delta-transport/Program.cs`
+- `spike/delta-transport/README.md`
+- `_bmad-output/implementation-artifacts/22-6-delta-measurement-report.md` — the gate's durable output
+- `tests/SpecScribe.Tests/DeltaOracleTests.cs` — AC #6 oracle (5 tests)
+- `docs/adrs/0028-delta-transport-is-a-sidecar-and-a-stream-never-a-server.md`
+
+**Modified — production**
+
+- `src/SpecScribe/SpaDelivery.cs` — `DeltaPath`, `DeltaSchemaVersion`, `BuildDelta`, `TryReadPageIndex`,
+  `DeltaPage`, `DeltaDocument`, `LiveStampId`, `LiveStampMarkup`; stamp emitted in `BuildEntryShell`
+- `src/SpecScribe/SiteGenerator.cs` — `EmitDeltaSidecar`, `_previousManifestJson`, `_deltaSequence`,
+  `_watchTrigger`, `SetWatchTrigger`, `_nextEmitIsFullDelta`, `EmitDelta`, `WriteSpaFileAtomic`;
+  `RegenerateTopology` arms the full-delta flag
+- `src/SpecScribe/Commands.cs` — `DeltaFrameDiscriminator`, `SerializeDeltaPayload`, `SurfaceHash`;
+  `RunServeLoop` takes `serveDelta`/`initialBundle`; `WatchCommand.RunWatchLoop` enables the sidecar
+- `src/SpecScribe/SiteSettings.cs` — `--serve-delta`
+- `src/SpecScribe/FileWatcherService.cs` — sets the trigger label; `RunTopology` local relabels to the shared constant
+- `src/SpecScribe/WebviewRenderAdapter.cs` — Quiet Stamp in the toolbar + `liveStatus` message handler
+- `src/SpecScribe/assets/specscribe.css` — `.spa-live-stamp` (the one rule that moves the golden fingerprint)
+- `src/SpecScribe/assets/specscribe-spa.js` — `startLiveStamp` sidecar polling
+- `extension/src/extension.ts` — `DeltaFrame`, `isDeltaFrame`, `applyDeltaFrame`, `DELTA_FRAME`;
+  `PersistentRenderer.lastPayload`/`lastSequence` + merge; `--serve-delta` on spawn;
+  `SpecScribeStore.hasLiveChannel`; `pushLiveStamp`
+
+**Modified — tests**
+
+- `tests/SpecScribe.Tests/SpaDeliveryTests.cs` — 16 `BuildDelta` tests
+- `tests/SpecScribe.Tests/SiteGeneratorSpaTests.cs` — sidecar + Quiet Stamp + the two race regression guards
+- `tests/SpecScribe.Tests/WebviewCommandTests.cs` — 8 delta-frame contract tests
+- `tests/SpecScribe.Tests/FileWatcherServiceTests.cs` — Trap 1 concurrency test
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — `GoldenContentFingerprint` → `501ee958…` with isolation + provenance
+
+**Modified — records**
+
+- `docs/adrs/README.md` — ADR 0028 entry
+- `docs/adrs/0008-json-ir-canonical-and-incremental-generation.md` — §Decision 3 forward reference
+- `_bmad-output/planning-artifacts/epics.md` — § Story 22.6 outcome (same change as sprint-status)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `.claude/launch.json` — `delta-22-6` preview config for Task 8
+
+### Change Log
+
+| Date | Change |
+|---|---|
+| 2026-07-29 | Task 1 gate harness built and run twice; **gate PASSED** (2.72 % / 4.09 %). First run's false PASS (ignored dotfile ⇒ `Skipped`) found and closed by making liveness part of the gate. |
+| 2026-07-29 | `SpaDelivery.BuildDelta` + `DeltaSchemaVersion` with degrade-to-full enforced internally (16 tests). |
+| 2026-07-29 | `spa/delta.json` emitted in watch mode only, written atomically; basis captured at the emit seam after Trap 2's premise was disproved for `RegenerateFromDataSource`. |
+| 2026-07-29 | `--serve-delta` + `WebviewCommand.SerializeDeltaPayload` as a pure static seam (8 tests); `RunServeLoop` kept thin. |
+| 2026-07-29 | Extension merges delta frames into its cached payload, preserving the one-shot/live indistinguishability invariant. |
+| 2026-07-29 | Quiet Stamp (AC #5) on the SPA shell + webview chrome; `GoldenContentFingerprint` regenerated to `501ee958…`, drift isolated from a concurrent session's. |
+| 2026-07-29 | `DeltaOracleTests` (AC #6); the separately-generated-site oracle was tried, failed on `diagnostics.html`/`code-map.html`, and rejected as conflating transport with recompute. |
+| 2026-07-29 | **Live verification caught the topology degrade being derived from a racy label**; moved to a route-owned flag, re-verified live, 2 regression tests added. |
+| 2026-07-29 | ADR 0028 written and cross-referenced; `epics.md` + `sprint-status.yaml` updated in the same change. |

@@ -74,15 +74,15 @@ public class SiteGeneratorCodeMapTests : IDisposable
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
     }
 
-    /// <summary>The unfiltered panel's island JSON. Story 20.9 moved every per-file fact these tests assert out
-    /// of two SVGs' markup and into one payload per panel.</summary>
+    /// <summary>The ONE shared code-map island JSON (Story 20.10 D1/D2 — one payload, four server-declared views,
+    /// replacing the four independent per-panel islands Story 20.9 shipped).</summary>
     private static string FullIsland(string html)
     {
         var m = Regex.Match(
             html,
-            "<script type=\"application/json\" class=\"ss-hierarchy-data\" id=\"codemap-full-data\">(?<j>.*?)</script>",
+            "<script type=\"application/json\" class=\"ss-hierarchy-data\" id=\"codemap-data\">(?<j>.*?)</script>",
             RegexOptions.Singleline);
-        Assert.True(m.Success, "expected an island for the unfiltered Code Map panel");
+        Assert.True(m.Success, "expected the shared Code Map island");
         return m.Groups["j"].Value;
     }
 
@@ -115,10 +115,12 @@ public class SiteGeneratorCodeMapTests : IDisposable
             "the hierarchy engine must be on disk for a source-only repo, not only when a dashboard chart copied it");
         // Non-git temp repo → no deep-git metrics → sized-by-LOC with the graceful-degradation notice.
         Assert.Contains("codemap-notice", html);
-        // Round 2: the two pure-CSS exclude-filter checkboxes and their four precomputed panels are always present.
+        // Round 2: the two pure-CSS exclude-filter checkboxes are always present. Story 20.10 D2 collapsed the
+        // four precomputed panels into ONE instance whose views (still keyed "full"/"no-spec"/"no-tests"/
+        // "no-spec-no-tests") live in the shared island's own `views` array.
         Assert.Contains("id=\"cm-exclude-spec\"", html);
         Assert.Contains("id=\"cm-exclude-tests\"", html);
-        Assert.Contains("data-view=\"full\"", html);
+        Assert.Contains("\"key\":\"full\"", FullIsland(html));
 
         // Code Map is reachable from the global journey nav menu (the Codebase group), pointing at the page.
         var index = File.ReadAllText(IndexPage);
@@ -202,7 +204,8 @@ public class SiteGeneratorCodeMapTests : IDisposable
         var html = File.ReadAllText(CodeMapPage);
         Assert.Contains("value=\"filetype\" selected", html);
         Assert.Contains("codemap-legend-discrete", html);
-        Assert.Contains("data-hierarchy-legend=\"" + HierarchyExplorer.CodeMapDiscreteLegend + "\">", html); // visible
+        // The default ("full") view's discrete legend ships visible; Story 20.10 adds data-hierarchy-legend-view.
+        Assert.Contains("data-hierarchy-legend=\"" + HierarchyExplorer.CodeMapDiscreteLegend + "\" data-hierarchy-legend-view=\"full\">", html);
         // File type is the ONLY dimension declared - there is nothing for the six git-derived ramps to quantize,
         // which is the same rule the dropdown has always followed, now stated once in the contract.
         var island = FullIsland(html);
@@ -261,8 +264,9 @@ public class SiteGeneratorCodeMapTests : IDisposable
         var html = File.ReadAllText(CodeMapPage);
         Assert.Contains("value=\"changes\" selected", html);   // unchanged sequential default (AC #3)
         Assert.Contains("value=\"filetype\">File type</option>", html); // 7th option, not selected
-        Assert.Contains("data-hierarchy-legend=\"" + HierarchyExplorer.CodeMapRampLegend + "\">", html);
-        Assert.Contains("data-hierarchy-legend=\"" + HierarchyExplorer.CodeMapDiscreteLegend + "\" hidden>", html);
+        // The default ("full") view's ramp legend ships visible; its discrete legend ships hidden.
+        Assert.Contains("data-hierarchy-legend=\"" + HierarchyExplorer.CodeMapRampLegend + "\" data-hierarchy-legend-view=\"full\">", html);
+        Assert.Contains("data-hierarchy-legend=\"" + HierarchyExplorer.CodeMapDiscreteLegend + "\" data-hierarchy-legend-view=\"full\" hidden>", html);
 
         // Story 20.9: the dropdown's seven options are now backed by seven DECLARED dimensions, in the same
         // order, with change frequency first - so the control and the contract cannot drift apart.

@@ -55,6 +55,10 @@ public class SiteSettings : CommandSettings
     [Description("`webview` only: stay resident and stream one JSON payload per line (NDJSON) on stdout after every incremental regen, instead of rendering once and exiting. Reuses the same debounced file-watch/incremental-regen path as `specscribe watch`, so a live-push no longer reruns a full generation from scratch. Default: off (render once and exit).")]
     public bool Serve { get; set; }
 
+    [CommandOption("--serve-delta")]
+    [Description("`webview --serve` only: after the first (full) payload, stream DELTA frames carrying only the surfaces that changed, instead of re-shipping the whole site on every save. Opt-in so an older extension against a newer core is unaffected. Default: off (every push is a full payload).")]
+    public bool ServeDelta { get; set; }
+
     /// <summary>Spectre's parse-time validation gate — the earliest, cleanest place to reject a typo'd
     /// <c>--today-policy</c> or <c>--as-of</c>: it fails before any path resolution or generation work, and the
     /// message is rendered as a plain CLI error rather than an exception. <see cref="ResolveDateCutoff"/> keeps the

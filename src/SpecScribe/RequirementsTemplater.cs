@@ -179,10 +179,12 @@ public static class RequirementsTemplater
             satisfiedHref: detailHref,
             inFlightHref: detailHref,
             deferredHref: detailHref,
-            unmappedHref: detailHref));
-        // Names the rollup so the four readings read as a grouping of the six canonical tiers (which the bar's
-        // In-flight bracket and the Overall donut below both show in full), not a parallel vocabulary. [Story 9.9]
-        sb.Append("<p class=\"satisfaction-note\">A rollup of the six status tiers over all "
+            unmappedHref: detailHref,
+            retiredHref: detailHref));
+        // Names the rollup so the five readings read as a grouping of the seven canonical tiers (which the bar's
+        // In-flight bracket and the Overall donut below both show in full), not a parallel vocabulary. [Story 9.9;
+        // Retired added Story 8.9 review]
+        sb.Append("<p class=\"satisfaction-note\">A rollup of the seven status tiers over all "
             + $"{sat.Total} requirements — <strong>In flight</strong> groups partially implemented, ready for dev, and planned. "
             + "The donuts and flow below break the same requirements down tier by tier.</p>\n");
         sb.Append("</section>\n\n");
@@ -601,12 +603,12 @@ public static class RequirementsTemplater
 
     private static void AppendStatusDonut(StringBuilder sb, string label, IReadOnlyList<RequirementInfo> reqs)
     {
-        var (done, active, ready, planned, unmapped, deferred) = StatusCounts(reqs);
+        var (done, active, ready, planned, unmapped, deferred, retired) = StatusCounts(reqs);
 
         sb.Append("<div class=\"chart-panel\">\n");
         sb.Append($"<h3>{PathUtil.Html(label)} ({reqs.Count})</h3>\n<div class=\"donut-and-legend\">\n");
         var statusSegments = StatusSegments(reqs);
-        sb.Append(Charts.Donut(statusSegments, ariaLabel: $"{label} requirements: {done} done, {active} partially implemented, {ready} ready for dev, {planned} planned, {unmapped} not yet mapped, {deferred} deferred"));
+        sb.Append(Charts.Donut(statusSegments, ariaLabel: $"{label} requirements: {done} done, {active} partially implemented, {ready} ready for dev, {planned} planned, {unmapped} not yet mapped, {deferred} deferred, {retired} retired"));
         sb.Append(Charts.DonutLegend(statusSegments));
         sb.Append("</div>\n</div>\n\n");
     }
@@ -621,7 +623,7 @@ public static class RequirementsTemplater
         sb.Append($"<h3>{PathUtil.Html(label)} ({sat.Total})</h3>\n<div class=\"donut-and-legend\">\n");
         sb.Append(Charts.Donut(statusSegments, ariaLabel:
             $"{label} requirements: {sat.Done} done, {sat.Active} partially implemented, {sat.Ready} ready for dev, "
-            + $"{sat.Planned} planned, {sat.Unmapped} not yet mapped, {sat.Deferred} deferred"));
+            + $"{sat.Planned} planned, {sat.Unmapped} not yet mapped, {sat.Deferred} deferred, {sat.Retired} retired"));
         sb.Append(Charts.DonutLegend(statusSegments));
         sb.Append("</div>\n</div>\n\n");
     }
@@ -634,6 +636,7 @@ public static class RequirementsTemplater
         ("Planned", sat.Planned, "pending"),
         ("Not yet mapped", sat.Unmapped, "pending"),
         ("Deferred", sat.Deferred, "deferred"),
+        ("Retired", sat.Retired, "deferred"),
     ];
 
     /// <summary>A clickable navigator card for one group: a compact status pie chart, the group name, and
@@ -650,7 +653,7 @@ public static class RequirementsTemplater
         sb.Append("    </div>\n  </a>\n");
     }
 
-    private static (int Done, int Active, int Ready, int Planned, int Unmapped, int Deferred) StatusCounts(IReadOnlyList<RequirementInfo> reqs) => (
+    private static (int Done, int Active, int Ready, int Planned, int Unmapped, int Deferred, int Retired) StatusCounts(IReadOnlyList<RequirementInfo> reqs) => (
         // Per-kind / group-card donuts keep a local count (scoped to the list they render). The Overall
         // donut and satisfaction band read the ProjectCounts ledger. [Story 9.9]
         reqs.Count(r => r.Status == RequirementStatus.Done),
@@ -658,11 +661,12 @@ public static class RequirementsTemplater
         reqs.Count(r => r.Status == RequirementStatus.Ready),
         reqs.Count(r => r.Status == RequirementStatus.Planned),
         reqs.Count(r => r.Status == RequirementStatus.Unmapped),
-        reqs.Count(r => r.Status == RequirementStatus.Deferred));
+        reqs.Count(r => r.Status == RequirementStatus.Deferred),
+        reqs.Count(r => r.Status == RequirementStatus.Retired));
 
     private static (string, int, string)[] StatusSegments(IReadOnlyList<RequirementInfo> reqs)
     {
-        var (done, active, ready, planned, unmapped, deferred) = StatusCounts(reqs);
+        var (done, active, ready, planned, unmapped, deferred, retired) = StatusCounts(reqs);
         return new (string, int, string)[]
         {
             ("Done", done, "done"),
@@ -673,6 +677,9 @@ public static class RequirementsTemplater
             // legend segment so "no plan exists yet" never hides inside "Planned". [Story 9.3 Task 4]
             ("Not yet mapped", unmapped, "pending"),
             ("Deferred", deferred, "deferred"),
+            // Retired reuses the deferred/grey swatch (Story 8.9/D2: no 7th token) but is its own separately-
+            // counted segment so an abandoned covering epic never hides inside "Deferred". [Story 8.9 review]
+            ("Retired", retired, "deferred"),
         };
     }
 

@@ -591,6 +591,45 @@ public class StatusStylesTests
         Assert.DoesNotContain(Icons.ForStatus("unmapped"), planned);
     }
 
+    // ---- Story 8.9 review: Retired requirement tier ----
+
+    [Fact]
+    public void ForRequirement_RetiredSharesDeferredColor_ButLabelStaysDistinct()
+    {
+        // Same no-7th-token pattern as Unmapped/Planned, but Retired shares DEFERRED's grey (not pending's tan):
+        // both mean "not progressing", Retired specifically because the covering epic was abandoned.
+        Assert.Equal("deferred", StatusStyles.ForRequirement(Requirement(RequirementStatus.Retired)));
+        Assert.Equal(
+            StatusStyles.ForRequirement(Requirement(RequirementStatus.Deferred, deferred: true)),
+            StatusStyles.ForRequirement(Requirement(RequirementStatus.Retired)));
+    }
+
+    [Fact]
+    public void RequirementLabel_RetiredReadsRetired_NotTheGenericDeferredFallback()
+    {
+        // The `_ => "Deferred"` fallback arm is exactly Trap 1's hazard (StoryLabel/EpicLabel) applied to
+        // requirements: without its own arm, a Retired requirement would silently print "Deferred".
+        Assert.Equal("Retired", StatusStyles.RequirementLabel(RequirementStatus.Retired));
+        Assert.NotEqual(
+            StatusStyles.RequirementLabel(RequirementStatus.Retired),
+            StatusStyles.RequirementLabel(RequirementStatus.Deferred));
+    }
+
+    [Fact]
+    public void RequirementBadge_Retired_SharesDeferredGlyphByDesign_ButWordDiffers()
+    {
+        // Mirrors the story/epic-level Trap 6 precedent: retired and deferred are byte-identical glyphs on
+        // purpose (Icons.ForStatus("retired") == ("deferred")) — class + WORD keep them distinct, never the icon.
+        var retired = StatusStyles.RequirementBadge(Requirement(RequirementStatus.Retired));
+        var deferred = StatusStyles.RequirementBadge(Requirement(RequirementStatus.Deferred, deferred: true));
+
+        Assert.Contains("class=\"status-badge deferred js-tip\"", retired);
+        Assert.Contains("Retired", retired);
+        Assert.DoesNotContain("Deferred", retired);
+        Assert.Contains(Icons.ForStatus("deferred"), retired);
+        Assert.Contains(Icons.ForStatus("deferred"), deferred);
+    }
+
     [Fact]
     public void Icon_UnmappedHasItsOwnGlyph()
         => Assert.False(string.IsNullOrEmpty(StatusStyles.Icon("unmapped")));

@@ -2401,6 +2401,8 @@
 
 .ir-content .req-flow-state.deferred { fill: var(--status-deferred); }
 
+.ir-content .req-flow-state.retired { fill: var(--status-deferred); }
+
 .ir-content .req-flow-ribbon.done { fill: var(--status-done); opacity: 0.5; }
 
 .ir-content .req-flow-ribbon.active { fill: var(--status-active); opacity: 0.5; }
@@ -2412,6 +2414,8 @@
 .ir-content .req-flow-ribbon.unmapped { fill: var(--status-pending); opacity: 0.5; }
 
 .ir-content .req-flow-ribbon.deferred { fill: var(--status-deferred); opacity: 0.5; }
+
+.ir-content .req-flow-ribbon.retired { fill: var(--status-deferred); opacity: 0.5; }
 
 .ir-content .req-flow-hint { font-size: 0.72rem; color: var(--ink-light); text-align: center; font-style: italic; }
 
@@ -2975,6 +2979,8 @@ body:has(#wm-review:checked) .ir-content .dashboard-tile-band {
 .ir-content .satisfaction-bracket .seg.deferred { background: var(--status-deferred); }
 
 .ir-content .satisfaction-bracket .seg.unmapped { background: var(--status-pending); }
+
+.ir-content .satisfaction-bracket .seg.retired { background: var(--status-deferred); }
 
 .ir-content .satisfaction-chips {
   display: flex;

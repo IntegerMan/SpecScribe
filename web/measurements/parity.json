@@ -3,9 +3,9 @@
   "totals": {
     "n": 191,
     "gi": 191,
-    "irn": 65,
-    "gn": 65,
-    "verb": 65
+    "irn": 61,
+    "gn": 61,
+    "verb": 61
   },
   "migrationDeltas": [
     {
@@ -13,7 +13,7 @@
       "stage": "migration (IR -> Nuxt)",
       "verbatim": false,
       "at": 347,
-      "golden": "\" wm-show-requirements wm-show-track\\\" href=\\\"requirements.html\\\" data-tip=\\\"Functional reqs: 24 done of 38. Open the requirements view to refine coverage and follow the epic → story ch\"",
+      "golden": "\" wm-show-requirements wm-show-track\\\" href=\\\"requirements.html\\\" data-tip=\\\"Functional reqs: 25 done of 38. Open the requirements view to refine coverage and follow the epic → story ch\"",
       "nuxt": "\" wm-show-requirements wm-show-track\\\" href=\\\"requirements.html\\\" data-tip=\\\"Functional reqs: 28 done of 38. Open the requirements view to refine coverage and follow the epic → story ch\""
     },
     {
@@ -21,7 +21,7 @@
       "stage": "migration (IR -> Nuxt)",
       "verbatim": false,
       "at": 350,
-      "golden": "\"s=\\\"stat-label\\\">Epics drafted</div></div><div class=\\\"stat-card\\\"><div class=\\\"stat-number\\\">163</div><div class=\\\"stat-label\\\">Stories defined</div><div class=\\\"stat-sub\\\">127 with a task \"",
+      "golden": "\"s=\\\"stat-label\\\">Epics drafted</div></div><div class=\\\"stat-card\\\"><div class=\\\"stat-number\\\">164</div><div class=\\\"stat-label\\\">Stories defined</div><div class=\\\"stat-sub\\\">130 with a task \"",
       "nuxt": "\"s=\\\"stat-label\\\">Epics drafted</div></div><div class=\\\"stat-card\\\"><div class=\\\"stat-number\\\">162</div><div class=\\\"stat-label\\\">Stories defined</div><div class=\\\"stat-sub\\\">124 with a task \""
     },
     {
@@ -52,9 +52,9 @@
       "path": "epics/epic-18.html",
       "stage": "migration (IR -> Nuxt)",
       "verbatim": false,
-      "at": 9046,
-      "golden": "\"progress-label\\\">Tasks</div>\\n  <div class=\\\"progress-bar\\\" role=\\\"progressbar\\\" aria-valuenow=\\\"98\\\" aria-valuemin=\\\"0\\\" aria-valuemax=\\\"100\\\" aria-label=\\\"Tasks: 122 / 124\\\"><div class=\\\"progre\"",
-      "nuxt": "\"progress-label\\\">Tasks</div>\\n  <div class=\\\"progress-bar\\\" role=\\\"progressbar\\\" aria-valuenow=\\\"100\\\" aria-valuemin=\\\"0\\\" aria-valuemax=\\\"100\\\" aria-label=\\\"Tasks: 113 / 113\\\"><div class=\\\"progr\""
+      "at": 205,
+      "golden": "\"\\\"kicker-row\\\">\\n    <span class=\\\"story-kicker\\\">Epic 18</span>\\n    <span class=\\\"status-badge done js-tip\\\" data-tip=\\\"Finished and closed\\\" title=\\\"Finished and closed\\\"><svg class=\\\"ss-ico\"",
+      "nuxt": "\"\\\"kicker-row\\\">\\n    <span class=\\\"story-kicker\\\">Epic 18</span>\\n    <span class=\\\"status-badge active js-tip\\\" data-tip=\\\"Actively being developed\\\" title=\\\"Actively being developed\\\"><svg c\""
     },
     {
       "path": "epics/epic-19.html",
@@ -76,9 +76,9 @@
       "path": "epics/epic-20.html",
       "stage": "migration (IR -> Nuxt)",
       "verbatim": false,
-      "at": 15822,
-      "golden": "\"progress-label\\\">Tasks</div>\\n  <div class=\\\"progress-bar\\\" role=\\\"progressbar\\\" aria-valuenow=\\\"98\\\" aria-valuemin=\\\"0\\\" aria-valuemax=\\\"100\\\" aria-label=\\\"Tasks: 391 / 397\\\"><div class=\\\"progre\"",
-      "nuxt": "\"progress-label\\\">Tasks</div>\\n  <div class=\\\"progress-bar\\\" role=\\\"progressbar\\\" aria-valuenow=\\\"100\\\" aria-valuemin=\\\"0\\\" aria-valuemax=\\\"100\\\" aria-label=\\\"Tasks: 383 / 383\\\"><div class=\\\"progr\""
+      "at": 15571,
+      "golden": "\"\\\" aria-valuenow=\\\"100\\\" aria-valuemin=\\\"0\\\" aria-valuemax=\\\"100\\\" aria-label=\\\"Stories detailed: 10 / 10\\\"><div class=\\\"progress-fill done\\\" style=\\\"width:100%\\\"></div></div>\\n  <div class=\\\"pro\"",
+      "nuxt": "\"\\\" aria-valuenow=\\\"100\\\" aria-valuemin=\\\"0\\\" aria-valuemax=\\\"100\\\" aria-label=\\\"Stories detailed: 9 / 9\\\"><div class=\\\"progress-fill done\\\" style=\\\"width:100%\\\"></div></div>\\n  <div class=\\\"progr\""
     },
     {
       "path": "epics/epic-21.html",
@@ -93,7 +93,7 @@
       "stage": "migration (IR -> Nuxt)",
       "verbatim": false,
       "at": 14402,
-      "golden": "\"progress-label\\\">Tasks</div>\\n  <div class=\\\"progress-bar\\\" role=\\\"progressbar\\\" aria-valuenow=\\\"44\\\" aria-valuemin=\\\"0\\\" aria-valuemax=\\\"100\\\" aria-label=\\\"Tasks: 28 / 63\\\"><div class=\\\"progress\"",
+      "golden": "\"progress-label\\\">Tasks</div>\\n  <div class=\\\"progress-bar\\\" role=\\\"progressbar\\\" aria-valuenow=\\\"79\\\" aria-valuemin=\\\"0\\\" aria-valuemax=\\\"100\\\" aria-label=\\\"Tasks: 70 / 89\\\"><div class=\\\"progress\"",
       "nuxt": "\"progress-label\\\">Tasks</div>\\n  <div class=\\\"progress-bar\\\" role=\\\"progressbar\\\" aria-valuenow=\\\"27\\\" aria-valuemin=\\\"0\\\" aria-valuemax=\\\"100\\\" aria-label=\\\"Tasks: 17 / 63\\\"><div class=\\\"progress\""
     },
     {
@@ -101,24 +101,32 @@
       "stage": "migration (IR -> Nuxt)",
       "verbatim": false,
       "at": 15077,
-      "golden": "\"progress-label\\\">Tasks</div>\\n  <div class=\\\"progress-bar\\\" role=\\\"progressbar\\\" aria-valuenow=\\\"70\\\" aria-valuemin=\\\"0\\\" aria-valuemax=\\\"100\\\" aria-label=\\\"Tasks: 65 / 93\\\"><div class=\\\"progress\"",
+      "golden": "\"progress-label\\\">Tasks</div>\\n  <div class=\\\"progress-bar\\\" role=\\\"progressbar\\\" aria-valuenow=\\\"77\\\" aria-valuemin=\\\"0\\\" aria-valuemax=\\\"100\\\" aria-label=\\\"Tasks: 98 / 127\\\"><div class=\\\"progres\"",
       "nuxt": "\"progress-label\\\">Tasks</div>\\n  <div class=\\\"progress-bar\\\" role=\\\"progressbar\\\" aria-valuenow=\\\"68\\\" aria-valuemin=\\\"0\\\" aria-valuemax=\\\"100\\\" aria-label=\\\"Tasks: 63 / 93\\\"><div class=\\\"progress\""
     },
     {
       "path": "epics/epic-24.html",
       "stage": "migration (IR -> Nuxt)",
       "verbatim": false,
-      "at": 26422,
-      "golden": "\"true\\\"> · </span><span class=\\\"status-badge task-badge none-done\\\">0/7 tasks</span></span>\\n  </div>\\n  <div class=\\\"user-story\\\">As a maintainer inspecting a file's relationships, I want\"",
-      "nuxt": "\"true\\\"> · </span><span class=\\\"status-badge task-badge none-done\\\">0/7 tasks</span></span>\\n    <span class=\\\"story-card-updated\\\">Updated Jul 23, 2026</span>\\n  </div>\\n  <div class=\\\"user\""
+      "at": 205,
+      "golden": "\"\\\"kicker-row\\\">\\n    <span class=\\\"story-kicker\\\">Epic 24</span>\\n    <span class=\\\"status-badge active js-tip\\\" data-tip=\\\"Actively being developed\\\" title=\\\"Actively being developed\\\"><svg c\"",
+      "nuxt": "\"\\\"kicker-row\\\">\\n    <span class=\\\"story-kicker\\\">Epic 24</span>\\n    <span class=\\\"status-badge ready js-tip\\\" data-tip=\\\"Task plan exists and dependencies met\\\" title=\\\"Task plan exists and\""
     },
     {
       "path": "epics/epic-25.html",
       "stage": "migration (IR -> Nuxt)",
       "verbatim": false,
       "at": 10512,
-      "golden": "\"bel\\\">Stories detailed</div>\\n  <div class=\\\"progress-bar\\\" role=\\\"progressbar\\\" aria-valuenow=\\\"83\\\" aria-valuemin=\\\"0\\\" aria-valuemax=\\\"100\\\" aria-label=\\\"Stories detailed: 5 / 6\\\"><div class=\"",
+      "golden": "\"bel\\\">Stories detailed</div>\\n  <div class=\\\"progress-bar\\\" role=\\\"progressbar\\\" aria-valuenow=\\\"100\\\" aria-valuemin=\\\"0\\\" aria-valuemax=\\\"100\\\" aria-label=\\\"Stories detailed: 6 / 6\\\"><div class\"",
       "nuxt": "\"bel\\\">Stories detailed</div>\\n  <div class=\\\"progress-bar\\\" role=\\\"progressbar\\\" aria-valuenow=\\\"50\\\" aria-valuemin=\\\"0\\\" aria-valuemax=\\\"100\\\" aria-label=\\\"Stories detailed: 3 / 6\\\"><div class=\""
+    },
+    {
+      "path": "epics/epic-26.html",
+      "stage": "migration (IR -> Nuxt)",
+      "verbatim": false,
+      "at": 205,
+      "golden": "\"\\\"kicker-row\\\">\\n    <span class=\\\"story-kicker\\\">Epic 26</span>\\n    <span class=\\\"status-badge ready js-tip\\\" data-tip=\\\"Task plan exists and dependencies met\\\" title=\\\"Task plan exists and\"",
+      "nuxt": "\"\\\"kicker-row\\\">\\n    <span class=\\\"story-kicker\\\">Epic 26</span>\\n    <span class=\\\"status-badge drafted js-tip\\\" data-tip=\\\"Stories or a plan exist; work has not started\\\" title=\\\"Stories or\""
     },
     {
       "path": "epics/epic-3.html",
@@ -140,9 +148,9 @@
       "path": "epics/epic-5.html",
       "stage": "migration (IR -> Nuxt)",
       "verbatim": false,
-      "at": 35095,
-      "golden": "\"mplete\\\">&#10003; 15 tasks</span></span>\\n    <span class=\\\"story-card-updated\\\">Updated Jul 23, 2026</span>\\n  </div>\\n  <div class=\\\"user-story\\\">As a maintainer, I want one-shot generat\"",
-      "nuxt": "\"mplete\\\">&#10003; 15 tasks</span></span>\\n    <span class=\\\"story-card-updated\\\">Updated Jul 25, 2026</span>\\n  </div>\\n  <div class=\\\"user-story\\\">As a maintainer, I want one-shot generat\""
+      "at": 21866,
+      "golden": "\"-item\\\" tabindex=\\\"0\\\"><span class=\\\"swatch sb-followup-open-sw\\\"></span>Open follow-up</span>\\n  <span class=\\\"sb-legend-item sb-followup-done-item\\\" tabindex=\\\"0\\\"><span class=\\\"swatch sb-f\"",
+      "nuxt": "\"-item\\\" tabindex=\\\"0\\\"><span class=\\\"swatch sb-followup-open-sw\\\"></span>Open follow-up</span>\\n</div>\\n<p class=\\\"ss-hierarchy-legend-note\\\">Hatched sectors are work outside the normal sto\""
     },
     {
       "path": "epics/epic-6.html",
@@ -276,33 +284,33 @@
       "path": "epics/story-18-1.html",
       "stage": "migration (IR -> Nuxt)",
       "verbatim": false,
-      "at": 176119,
-      "golden": "\"</a> from <code>backlog</code> to <code>in-progress</code>.</li>\\n</ul>\\n</div>\\n</section>\\n\\n\\n  </div>\\n  <div class=\\\"ss-tabpanel ss-tabpanel--graph\\\">\\n<p class=\\\"work-graph-intro\\\">Defer\"",
-      "nuxt": "\"</a> from <code>backlog</code> to <code>in-progress</code>.</li>\\n</ul>\\n</div>\\n</section>\\n\\n<section class=\\\"chart-panel code-areas-panel\\\" id=\\\"sec-code-areas\\\">\\n  <h3>Code Areas Touche\""
+      "at": 6359,
+      "golden": "\"ve status word has no canonical mapping</span>\\n      </li>\\n    </ul>\\n  </div>\\n</details>    <a class=\\\"pill pill-link\\\" href=\\\"../implementation-artifacts/epic-18-retro-2026-07-29.htm\"",
+      "nuxt": "\"ve status word has no canonical mapping</span>\\n      </li>\\n    </ul>\\n  </div>\\n</details>  </div>\\n  <div class=\\\"evidence-block\\\">\\n  <div class=\\\"evidence-strip\\\"><span class=\\\"status-ba\""
     },
     {
       "path": "epics/story-18-2.html",
       "stage": "migration (IR -> Nuxt)",
       "verbatim": false,
-      "at": 176401,
-      "golden": "\"yaml</code> reading, and command\\nvocabulary generalization.</li>\\n</ul>\\n</div>\\n</section>\\n\\n\\n  </div>\\n  <div class=\\\"ss-tabpanel ss-tabpanel--graph\\\">\\n<p class=\\\"work-graph-intro\\\">Defer\"",
-      "nuxt": "\"yaml</code> reading, and command\\nvocabulary generalization.</li>\\n</ul>\\n</div>\\n</section>\\n\\n<section class=\\\"chart-panel code-areas-panel\\\" id=\\\"sec-code-areas\\\">\\n  <h3>Code Areas Touche\""
+      "at": 6359,
+      "golden": "\"ve status word has no canonical mapping</span>\\n      </li>\\n    </ul>\\n  </div>\\n</details>    <a class=\\\"pill pill-link\\\" href=\\\"../implementation-artifacts/epic-18-retro-2026-07-29.htm\"",
+      "nuxt": "\"ve status word has no canonical mapping</span>\\n      </li>\\n    </ul>\\n  </div>\\n</details>  </div>\\n  <div class=\\\"evidence-block\\\">\\n  <div class=\\\"evidence-strip\\\"><span class=\\\"status-ba\""
     },
     {
       "path": "epics/story-18-3.html",
       "stage": "migration (IR -> Nuxt)",
       "verbatim": false,
-      "at": 129415,
-      "golden": "\"e>deferred-work.md</code>. Status → done.</td>\\n</tr>\\n</tbody>\\n</table>\\n</div>\\n</section>\\n\\n\\n  </div>\\n  <div class=\\\"ss-tabpanel ss-tabpanel--graph\\\">\\n<p class=\\\"work-graph-intro\\\">Defer\"",
-      "nuxt": "\"e>deferred-work.md</code>. Status → done.</td>\\n</tr>\\n</tbody>\\n</table>\\n</div>\\n</section>\\n\\n<section class=\\\"chart-panel code-areas-panel\\\" id=\\\"sec-code-areas\\\">\\n  <h3>Code Areas Touche\""
+      "at": 6359,
+      "golden": "\"ve status word has no canonical mapping</span>\\n      </li>\\n    </ul>\\n  </div>\\n</details>    <a class=\\\"pill pill-link\\\" href=\\\"../implementation-artifacts/epic-18-retro-2026-07-29.htm\"",
+      "nuxt": "\"ve status word has no canonical mapping</span>\\n      </li>\\n    </ul>\\n  </div>\\n</details>  </div>\\n  <div class=\\\"evidence-block\\\">\\n  <div class=\\\"evidence-strip\\\"><span class=\\\"status-ba\""
     },
     {
       "path": "epics/story-18-4.html",
       "stage": "migration (IR -> Nuxt)",
       "verbatim": false,
-      "at": 175270,
-      "golden": "\"arried verbatim as gated dead-end leaves.</td>\\n</tr>\\n</tbody>\\n</table>\\n</div>\\n</section>\\n\\n\\n  </div>\\n  <div class=\\\"ss-tabpanel ss-tabpanel--graph\\\">\\n<p class=\\\"work-graph-intro\\\">Defer\"",
-      "nuxt": "\"arried verbatim as gated dead-end leaves.</td>\\n</tr>\\n</tbody>\\n</table>\\n</div>\\n</section>\\n\\n<section class=\\\"chart-panel code-areas-panel\\\" id=\\\"sec-code-areas\\\">\\n  <h3>Code Areas Touche\""
+      "at": 6359,
+      "golden": "\"ve status word has no canonical mapping</span>\\n      </li>\\n    </ul>\\n  </div>\\n</details>    <a class=\\\"pill pill-link\\\" href=\\\"../implementation-artifacts/epic-18-retro-2026-07-29.htm\"",
+      "nuxt": "\"ve status word has no canonical mapping</span>\\n      </li>\\n    </ul>\\n  </div>\\n</details>  </div>\\n  <div class=\\\"evidence-block\\\">\\n  <div class=\\\"evidence-strip\\\"><span class=\\\"status-ba\""
     },
     {
       "path": "epics/story-18-5.html",
@@ -316,9 +324,9 @@
       "path": "epics/story-18-6.html",
       "stage": "migration (IR -> Nuxt)",
       "verbatim": false,
-      "at": 6572,
-      "golden": "\"class=\\\"evidence-block\\\">\\n  <div class=\\\"evidence-strip\\\"><span class=\\\"status-badge task-badge\\\"><svg class=\\\"mini-donut\\\" viewBox=\\\"0 0 22 22\\\" width=\\\"22\\\" height=\\\"22\\\" aria-hidden=\\\"true\\\"><c\"",
-      "nuxt": "\"class=\\\"evidence-block\\\">\\n  <div class=\\\"evidence-strip\\\"><span class=\\\"status-badge task-badge complete\\\">&#10003; 8 tasks</span><span class=\\\"status-badge evidence-pill empty\\\"><svg clas\""
+      "at": 208,
+      "golden": "\"cker-row\\\">\\n    <span class=\\\"story-kicker\\\">Story 18.6</span>\\n    <span class=\\\"status-badge done js-tip\\\" data-tip=\\\"Finished and closed\\\" title=\\\"Finished and closed\\\"><svg class=\\\"ss-ico\"",
+      "nuxt": "\"cker-row\\\">\\n    <span class=\\\"story-kicker\\\">Story 18.6</span>\\n    <span class=\\\"status-badge review js-tip\\\" data-tip=\\\"Implementation complete; awaiting review or retrospective\\\" title=\""
     },
     {
       "path": "epics/story-19-1.html",
@@ -356,9 +364,9 @@
       "path": "epics/story-20-1.html",
       "stage": "migration (IR -> Nuxt)",
       "verbatim": false,
-      "at": 178216,
-      "golden": "\"pics/epic-20.html\\\">Epic 20</a> → in-progress (first story).</li>\\n</ul>\\n</div>\\n</section>\\n\\n\\n  </div>\\n  <div class=\\\"ss-tabpanel ss-tabpanel--graph\\\">\\n<p class=\\\"work-graph-intro\\\">Defer\"",
-      "nuxt": "\"pics/epic-20.html\\\">Epic 20</a> → in-progress (first story).</li>\\n</ul>\\n</div>\\n</section>\\n\\n<section class=\\\"chart-panel code-areas-panel\\\" id=\\\"sec-code-areas\\\">\\n  <h3>Code Areas Touche\""
+      "at": 10411,
+      "golden": "\"-item\\\" tabindex=\\\"0\\\"><span class=\\\"swatch sb-followup-open-sw\\\"></span>Open follow-up</span>\\n  <span class=\\\"sb-legend-item sb-followup-done-item\\\" tabindex=\\\"0\\\"><span class=\\\"swatch sb-f\"",
+      "nuxt": "\"-item\\\" tabindex=\\\"0\\\"><span class=\\\"swatch sb-followup-open-sw\\\"></span>Open follow-up</span>\\n</div>\\n<p class=\\\"ss-hierarchy-legend-note\\\">Hatched sectors are work outside the normal sto\""
     },
     {
       "path": "epics/story-20-2.html",
@@ -420,9 +428,9 @@
       "path": "epics/story-20-9.html",
       "stage": "migration (IR -> Nuxt)",
       "verbatim": false,
-      "at": 6572,
-      "golden": "\"class=\\\"evidence-block\\\">\\n  <div class=\\\"evidence-strip\\\"><span class=\\\"status-badge task-badge\\\"><svg class=\\\"mini-donut\\\" viewBox=\\\"0 0 22 22\\\" width=\\\"22\\\" height=\\\"22\\\" aria-hidden=\\\"true\\\"><c\"",
-      "nuxt": "\"class=\\\"evidence-block\\\">\\n  <div class=\\\"evidence-strip\\\"><span class=\\\"status-badge task-badge complete\\\">&#10003; 59 tasks</span><span class=\\\"status-badge evidence-pill empty\\\"><svg cla\""
+      "at": 208,
+      "golden": "\"cker-row\\\">\\n    <span class=\\\"story-kicker\\\">Story 20.9</span>\\n    <span class=\\\"status-badge done js-tip\\\" data-tip=\\\"Finished and closed\\\" title=\\\"Finished and closed\\\"><svg class=\\\"ss-ico\"",
+      "nuxt": "\"cker-row\\\">\\n    <span class=\\\"story-kicker\\\">Story 20.9</span>\\n    <span class=\\\"status-badge review js-tip\\\" data-tip=\\\"Implementation complete; awaiting review or retrospective\\\" title=\""
     },
     {
       "path": "epics/story-21-1.html",
@@ -452,9 +460,9 @@
       "path": "epics/story-22-2.html",
       "stage": "migration (IR -> Nuxt)",
       "verbatim": false,
-      "at": 146920,
-      "golden": "\"oldenContentFingerprint</code> unchanged.</td>\\n</tr>\\n</tbody>\\n</table>\\n</div>\\n</section>\\n\\n\\n  </div>\\n  <div class=\\\"ss-tabpanel ss-tabpanel--graph\\\">\\n<p class=\\\"work-graph-empty\\\">No pr\"",
-      "nuxt": "\"oldenContentFingerprint</code> unchanged.</td>\\n</tr>\\n</tbody>\\n</table>\\n</div>\\n</section>\\n\\n<section class=\\\"chart-panel code-areas-panel\\\" id=\\\"sec-code-areas\\\">\\n  <h3>Code Areas Touche\""
+      "at": 6572,
+      "golden": "\"class=\\\"evidence-block\\\">\\n  <div class=\\\"evidence-strip\\\"><span class=\\\"status-badge task-badge\\\"><svg class=\\\"mini-donut\\\" viewBox=\\\"0 0 22 22\\\" width=\\\"22\\\" height=\\\"22\\\" aria-hidden=\\\"true\\\"><c\"",
+      "nuxt": "\"class=\\\"evidence-block\\\">\\n  <div class=\\\"evidence-strip\\\"><span class=\\\"status-badge task-badge complete\\\">&#10003; 11 tasks</span><span class=\\\"status-badge evidence-pill empty\\\"><svg cla\""
     },
     {
       "path": "epics/story-22-3.html",
@@ -469,16 +477,24 @@
       "stage": "migration (IR -> Nuxt)",
       "verbatim": false,
       "at": 208,
-      "golden": "\"cker-row\\\">\\n    <span class=\\\"story-kicker\\\">Story 22.4</span>\\n    <span class=\\\"status-badge review js-tip\\\" data-tip=\\\"Implementation complete; awaiting review or retrospective\\\" title=\"",
+      "golden": "\"cker-row\\\">\\n    <span class=\\\"story-kicker\\\">Story 22.4</span>\\n    <span class=\\\"status-badge done js-tip\\\" data-tip=\\\"Finished and closed\\\" title=\\\"Finished and closed\\\"><svg class=\\\"ss-ico\"",
       "nuxt": "\"cker-row\\\">\\n    <span class=\\\"story-kicker\\\">Story 22.4</span>\\n    <span class=\\\"status-badge active js-tip\\\" data-tip=\\\"Actively being developed\\\" title=\\\"Actively being developed\\\"><svg c\""
+    },
+    {
+      "path": "epics/story-22-5.html",
+      "stage": "migration (IR -> Nuxt)",
+      "verbatim": false,
+      "at": 210,
+      "golden": "\"er-row\\\">\\n    <span class=\\\"story-kicker\\\">Story 22.5</span>\\n    <span class=\\\"status-badge review js-tip\\\" data-tip=\\\"Implementation complete; awaiting review or retrospective\\\" title=\\\"I\"",
+      "nuxt": "\"er-row\\\">\\n    <span class=\\\"story-kicker\\\">Story 22.5</span>\\n    <span class=\\\"status-badge ready js-tip\\\" data-tip=\\\"Task plan exists and dependencies met\\\" title=\\\"Task plan exists and d\""
     },
     {
       "path": "epics/story-22-6.html",
       "stage": "migration (IR -> Nuxt)",
       "verbatim": false,
-      "at": 44959,
-      "golden": "\" it as one NDJSON line to stdout and flushes.</li>\\n</ol>\\n<p>The extension consumes it in <code>PersistentRenderer</code>, whose own guard comment measures the cost: <em>&quot;a gen\"",
-      "nuxt": "\" it as one NDJSON line to stdout and flushes.</li>\\n</ol>\\n<p>The extension consumes it in <a href=\\\"../code/extension/src/extension.ts.html#L1395\\\"><code>PersistentRenderer</code></a>\""
+      "at": 210,
+      "golden": "\"er-row\\\">\\n    <span class=\\\"story-kicker\\\">Story 22.6</span>\\n    <span class=\\\"status-badge review js-tip\\\" data-tip=\\\"Implementation complete; awaiting review or retrospective\\\" title=\\\"I\"",
+      "nuxt": "\"er-row\\\">\\n    <span class=\\\"story-kicker\\\">Story 22.6</span>\\n    <span class=\\\"status-badge ready js-tip\\\" data-tip=\\\"Task plan exists and dependencies met\\\" title=\\\"Task plan exists and d\""
     },
     {
       "path": "epics/story-23-1.html",
@@ -492,9 +508,9 @@
       "path": "epics/story-23-2.html",
       "stage": "migration (IR -> Nuxt)",
       "verbatim": false,
-      "at": 148348,
-      "golden": "\"nt session's uncommitted Story 20.x work.</td>\\n</tr>\\n</tbody>\\n</table>\\n</div>\\n</section>\\n\\n\\n  </div>\\n  <div class=\\\"ss-tabpanel ss-tabpanel--graph\\\">\\n<p class=\\\"work-graph-intro\\\">Defer\"",
-      "nuxt": "\"nt session's uncommitted Story 20.x work.</td>\\n</tr>\\n</tbody>\\n</table>\\n</div>\\n</section>\\n\\n<section class=\\\"chart-panel code-areas-panel\\\" id=\\\"sec-code-areas\\\">\\n  <h3>Code Areas Touche\""
+      "at": 208,
+      "golden": "\"cker-row\\\">\\n    <span class=\\\"story-kicker\\\">Story 23.2</span>\\n    <span class=\\\"status-badge active js-tip\\\" data-tip=\\\"Actively being developed\\\" title=\\\"Actively being developed\\\"><svg c\"",
+      "nuxt": "\"cker-row\\\">\\n    <span class=\\\"story-kicker\\\">Story 23.2</span>\\n    <span class=\\\"status-badge review js-tip\\\" data-tip=\\\"Implementation complete; awaiting review or retrospective\\\" title=\""
     },
     {
       "path": "epics/story-23-3.html",
@@ -524,9 +540,9 @@
       "path": "epics/story-24-1.html",
       "stage": "migration (IR -> Nuxt)",
       "verbatim": false,
-      "at": 80776,
-      "golden": "\"sc then ordinal; surface lift in the tooltip. Confirm.</li>\\n</ul>\\n</details>\\n\\n</article>\\n\\n\\n  </div>\\n  <div class=\\\"ss-tabpanel ss-tabpanel--graph\\\">\\n<p class=\\\"work-graph-empty\\\">No pr\"",
-      "nuxt": "\"sc then ordinal; surface lift in the tooltip. Confirm.</li>\\n</ul>\\n</details>\\n\\n</article>\\n\\n<section class=\\\"chart-panel code-areas-panel\\\" id=\\\"sec-code-areas\\\">\\n  <h3>Code Areas Touche\""
+      "at": 210,
+      "golden": "\"er-row\\\">\\n    <span class=\\\"story-kicker\\\">Story 24.1</span>\\n    <span class=\\\"status-badge review js-tip\\\" data-tip=\\\"Implementation complete; awaiting review or retrospective\\\" title=\\\"I\"",
+      "nuxt": "\"er-row\\\">\\n    <span class=\\\"story-kicker\\\">Story 24.1</span>\\n    <span class=\\\"status-badge ready js-tip\\\" data-tip=\\\"Task plan exists and dependencies met\\\" title=\\\"Task plan exists and d\""
     },
     {
       "path": "epics/story-24-6.html",
@@ -570,6 +586,22 @@
     },
     {
       "path": "epics/story-25-5.html",
+      "stage": "migration (IR -> Nuxt)",
+      "verbatim": false,
+      "at": 26,
+      "golden": "\"<main id=\\\"main-content\\\">\\n<div class=\\\"page-shell\\\">\\n<div class=\\\"page-main\\\">\\n<header class=\\\"doc-header\\\">\\n  <div class=\\\"\"",
+      "nuxt": "\"<main id=\\\"main-content\\\">\\n<header class=\\\"doc-header\\\">\\n  <div class=\\\"kicker-row\\\">\\n    <span class=\\\"story-kicker\\\">Story\""
+    },
+    {
+      "path": "epics/story-25-6.html",
+      "stage": "migration (IR -> Nuxt)",
+      "verbatim": false,
+      "at": 26,
+      "golden": "\"<main id=\\\"main-content\\\">\\n<div class=\\\"page-shell\\\">\\n<div class=\\\"page-main\\\">\\n<header class=\\\"doc-header\\\">\\n  <div class=\\\"\"",
+      "nuxt": "\"<main id=\\\"main-content\\\">\\n<header class=\\\"doc-header\\\">\\n  <div class=\\\"kicker-row\\\">\\n    <span class=\\\"story-kicker\\\">Story\""
+    },
+    {
+      "path": "epics/story-26-1.html",
       "stage": "migration (IR -> Nuxt)",
       "verbatim": false,
       "at": 26,
@@ -1022,8 +1054,8 @@
     {
       "path": "index.html",
       "family": "dashboard",
-      "goldenBytes": 1111075,
-      "irBytes": 1111075,
+      "goldenBytes": 1166175,
+      "irBytes": 1166175,
       "nuxtBytes": 1093082,
       "goldenVsIr": true,
       "irVsNuxt": false,
@@ -1034,8 +1066,8 @@
     {
       "path": "epics.html",
       "family": "epicsIndex",
-      "goldenBytes": 262601,
-      "irBytes": 262601,
+      "goldenBytes": 264207,
+      "irBytes": 264207,
       "nuxtBytes": 261710,
       "goldenVsIr": true,
       "irVsNuxt": false,
@@ -1154,8 +1186,8 @@
     {
       "path": "epics/epic-18.html",
       "family": "epicDetail",
-      "goldenBytes": 75240,
-      "irBytes": 75240,
+      "goldenBytes": 82718,
+      "irBytes": 82718,
       "nuxtBytes": 76561,
       "goldenVsIr": true,
       "irVsNuxt": false,
@@ -1190,8 +1222,8 @@
     {
       "path": "epics/epic-20.html",
       "family": "epicDetail",
-      "goldenBytes": 141004,
-      "irBytes": 141004,
+      "goldenBytes": 149683,
+      "irBytes": 149683,
       "nuxtBytes": 128418,
       "goldenVsIr": true,
       "irVsNuxt": false,
@@ -1214,8 +1246,8 @@
     {
       "path": "epics/epic-22.html",
       "family": "epicDetail",
-      "goldenBytes": 92145,
-      "irBytes": 92145,
+      "goldenBytes": 139150,
+      "irBytes": 139150,
       "nuxtBytes": 89539,
       "goldenVsIr": true,
       "irVsNuxt": false,
@@ -1226,8 +1258,8 @@
     {
       "path": "epics/epic-23.html",
       "family": "epicDetail",
-      "goldenBytes": 66745,
-      "irBytes": 66745,
+      "goldenBytes": 66694,
+      "irBytes": 66694,
       "nuxtBytes": 67904,
       "goldenVsIr": true,
       "irVsNuxt": false,
@@ -1238,8 +1270,8 @@
     {
       "path": "epics/epic-24.html",
       "family": "epicDetail",
-      "goldenBytes": 51047,
-      "irBytes": 51047,
+      "goldenBytes": 51291,
+      "irBytes": 51291,
       "nuxtBytes": 52624,
       "goldenVsIr": true,
       "irVsNuxt": false,
@@ -1250,8 +1282,8 @@
     {
       "path": "epics/epic-25.html",
       "family": "epicDetail",
-      "goldenBytes": 97332,
-      "irBytes": 97332,
+      "goldenBytes": 95614,
+      "irBytes": 95614,
       "nuxtBytes": 97605,
       "goldenVsIr": true,
       "irVsNuxt": false,
@@ -1262,13 +1294,13 @@
     {
       "path": "epics/epic-26.html",
       "family": "epicDetail",
-      "goldenBytes": 49961,
-      "irBytes": 49961,
+      "goldenBytes": 51032,
+      "irBytes": 51032,
       "nuxtBytes": 49961,
       "goldenVsIr": true,
-      "irVsNuxt": true,
-      "goldenVsNuxt": true,
-      "verbatim": true,
+      "irVsNuxt": false,
+      "goldenVsNuxt": false,
+      "verbatim": false,
       "status": "ok"
     },
     {
@@ -1310,8 +1342,8 @@
     {
       "path": "epics/epic-5.html",
       "family": "epicDetail",
-      "goldenBytes": 76250,
-      "irBytes": 76250,
+      "goldenBytes": 74962,
+      "irBytes": 74962,
       "nuxtBytes": 77711,
       "goldenVsIr": true,
       "irVsNuxt": false,
@@ -1346,8 +1378,8 @@
     {
       "path": "epics/epic-8.html",
       "family": "epicDetail",
-      "goldenBytes": 73971,
-      "irBytes": 73971,
+      "goldenBytes": 91876,
+      "irBytes": 91876,
       "nuxtBytes": 67448,
       "goldenVsIr": true,
       "irVsNuxt": false,
@@ -1838,8 +1870,8 @@
     {
       "path": "epics/story-18-1.html",
       "family": "storyDetail",
-      "goldenBytes": 181816,
-      "irBytes": 181816,
+      "goldenBytes": 181936,
+      "irBytes": 181936,
       "nuxtBytes": 183254,
       "goldenVsIr": true,
       "irVsNuxt": false,
@@ -1850,8 +1882,8 @@
     {
       "path": "epics/story-18-2.html",
       "family": "storyDetail",
-      "goldenBytes": 182713,
-      "irBytes": 182713,
+      "goldenBytes": 182833,
+      "irBytes": 182833,
       "nuxtBytes": 184151,
       "goldenVsIr": true,
       "irVsNuxt": false,
@@ -1862,8 +1894,8 @@
     {
       "path": "epics/story-18-3.html",
       "family": "storyDetail",
-      "goldenBytes": 137398,
-      "irBytes": 137398,
+      "goldenBytes": 137518,
+      "irBytes": 137518,
       "nuxtBytes": 138176,
       "goldenVsIr": true,
       "irVsNuxt": false,
@@ -1874,8 +1906,8 @@
     {
       "path": "epics/story-18-4.html",
       "family": "storyDetail",
-      "goldenBytes": 183193,
-      "irBytes": 183193,
+      "goldenBytes": 183313,
+      "irBytes": 183313,
       "nuxtBytes": 184577,
       "goldenVsIr": true,
       "irVsNuxt": false,
@@ -1886,8 +1918,8 @@
     {
       "path": "epics/story-18-5.html",
       "family": "storyDetail",
-      "goldenBytes": 135021,
-      "irBytes": 135021,
+      "goldenBytes": 135141,
+      "irBytes": 135141,
       "nuxtBytes": 122601,
       "goldenVsIr": true,
       "irVsNuxt": false,
@@ -1898,8 +1930,8 @@
     {
       "path": "epics/story-18-6.html",
       "family": "storyDetail",
-      "goldenBytes": 95162,
-      "irBytes": 95162,
+      "goldenBytes": 94164,
+      "irBytes": 94164,
       "nuxtBytes": 91397,
       "goldenVsIr": true,
       "irVsNuxt": false,
@@ -2006,14 +2038,19 @@
     {
       "path": "epics/story-20-1.html",
       "family": "storyDetail",
-      "goldenBytes": 189696,
-      "irBytes": 189696,
+      "goldenBytes": 189440,
+      "irBytes": 189440,
       "nuxtBytes": 190984,
       "goldenVsIr": true,
       "irVsNuxt": false,
       "goldenVsNuxt": false,
       "verbatim": false,
       "status": "ok"
+    },
+    {
+      "path": "epics/story-20-10.html",
+      "family": "storyDetail",
+      "status": "NOT PRERENDERED"
     },
     {
       "path": "epics/story-20-2.html",
@@ -2102,8 +2139,8 @@
     {
       "path": "epics/story-20-9.html",
       "family": "storyDetail",
-      "goldenBytes": 253833,
-      "irBytes": 253833,
+      "goldenBytes": 254424,
+      "irBytes": 254424,
       "nuxtBytes": 211705,
       "goldenVsIr": true,
       "irVsNuxt": false,
@@ -2162,8 +2199,8 @@
     {
       "path": "epics/story-22-2.html",
       "family": "storyDetail",
-      "goldenBytes": 147934,
-      "irBytes": 147934,
+      "goldenBytes": 192491,
+      "irBytes": 192491,
       "nuxtBytes": 149186,
       "goldenVsIr": true,
       "irVsNuxt": false,
@@ -2186,8 +2223,8 @@
     {
       "path": "epics/story-22-4.html",
       "family": "storyDetail",
-      "goldenBytes": 179835,
-      "irBytes": 179835,
+      "goldenBytes": 243257,
+      "irBytes": 243257,
       "nuxtBytes": 154648,
       "goldenVsIr": true,
       "irVsNuxt": false,
@@ -2198,20 +2235,20 @@
     {
       "path": "epics/story-22-5.html",
       "family": "storyDetail",
-      "goldenBytes": 146064,
-      "irBytes": 146064,
+      "goldenBytes": 187820,
+      "irBytes": 187820,
       "nuxtBytes": 146064,
       "goldenVsIr": true,
-      "irVsNuxt": true,
-      "goldenVsNuxt": true,
-      "verbatim": true,
+      "irVsNuxt": false,
+      "goldenVsNuxt": false,
+      "verbatim": false,
       "status": "ok"
     },
     {
       "path": "epics/story-22-6.html",
       "family": "storyDetail",
-      "goldenBytes": 73236,
-      "irBytes": 73236,
+      "goldenBytes": 91560,
+      "irBytes": 91560,
       "nuxtBytes": 73473,
       "goldenVsIr": true,
       "irVsNuxt": false,
@@ -2234,8 +2271,8 @@
     {
       "path": "epics/story-23-2.html",
       "family": "storyDetail",
-      "goldenBytes": 152695,
-      "irBytes": 152695,
+      "goldenBytes": 277451,
+      "irBytes": 277451,
       "nuxtBytes": 153957,
       "goldenVsIr": true,
       "irVsNuxt": false,
@@ -2258,8 +2295,8 @@
     {
       "path": "epics/story-23-4.html",
       "family": "storyDetail",
-      "goldenBytes": 168486,
-      "irBytes": 168486,
+      "goldenBytes": 187259,
+      "irBytes": 187259,
       "nuxtBytes": 143595,
       "goldenVsIr": true,
       "irVsNuxt": false,
@@ -2282,8 +2319,8 @@
     {
       "path": "epics/story-24-1.html",
       "family": "storyDetail",
-      "goldenBytes": 81582,
-      "irBytes": 81582,
+      "goldenBytes": 93082,
+      "irBytes": 93082,
       "nuxtBytes": 82953,
       "goldenVsIr": true,
       "irVsNuxt": false,
@@ -2390,8 +2427,8 @@
     {
       "path": "epics/story-25-4.html",
       "family": "storyDetail",
-      "goldenBytes": 75501,
-      "irBytes": 75501,
+      "goldenBytes": 96199,
+      "irBytes": 96199,
       "nuxtBytes": 10185,
       "goldenVsIr": true,
       "irVsNuxt": false,
@@ -2402,8 +2439,8 @@
     {
       "path": "epics/story-25-5.html",
       "family": "storyDetail",
-      "goldenBytes": 71443,
-      "irBytes": 71443,
+      "goldenBytes": 98591,
+      "irBytes": 98591,
       "nuxtBytes": 10588,
       "goldenVsIr": true,
       "irVsNuxt": false,
@@ -2414,25 +2451,25 @@
     {
       "path": "epics/story-25-6.html",
       "family": "storyDetail",
-      "goldenBytes": 10405,
-      "irBytes": 10405,
+      "goldenBytes": 68873,
+      "irBytes": 68873,
       "nuxtBytes": 10405,
       "goldenVsIr": true,
-      "irVsNuxt": true,
-      "goldenVsNuxt": true,
-      "verbatim": true,
+      "irVsNuxt": false,
+      "goldenVsNuxt": false,
+      "verbatim": false,
       "status": "ok"
     },
     {
       "path": "epics/story-26-1.html",
       "family": "storyDetail",
-      "goldenBytes": 11238,
-      "irBytes": 11238,
+      "goldenBytes": 96275,
+      "irBytes": 96275,
       "nuxtBytes": 11238,
       "goldenVsIr": true,
-      "irVsNuxt": true,
-      "goldenVsNuxt": true,
-      "verbatim": true,
+      "irVsNuxt": false,
+      "goldenVsNuxt": false,
+      "verbatim": false,
       "status": "ok"
     },
     {

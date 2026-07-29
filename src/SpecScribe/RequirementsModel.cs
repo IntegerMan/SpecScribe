@@ -6,12 +6,20 @@ public enum RequirementKind { Functional, NonFunctional, Design }
 /// least→most complete: Deferred (shelved on purpose); Unmapped (no covering epic at all — no plan exists yet);
 /// Planned (covered by an epic that simply hasn't started); Ready (a covering epic's stories have task plans but
 /// none started); Active = "partially implemented" (a covering epic has a story in dev/review/done, but not every
-/// covering epic is fully done); Done (every covering epic is complete).
+/// covering epic is fully done); Done (every covering epic is complete); Retired (every covering epic is itself
+/// retired — <see cref="StatusStyles.ForEpic"/>'s all-retired terminal tier, Story 8.9/ADR 0025 — so the plan
+/// that would have delivered this requirement was abandoned, not merely not-yet-started).
 /// <para><see cref="Unmapped"/> and <see cref="Planned"/> are deliberately split: both mean "not started," but
 /// Planned has a real covering epic behind it while Unmapped has none, so surfacing them identically (the old
 /// single "Planned" bucket) let a genuine coverage gap read as an intentional, planned state — the
 /// false-oversight-vs-intentional-scope confusion Story 9.3 removes. Deferred and Unmapped are also distinct:
 /// Deferred is a deliberate decision to shelve, Unmapped is an unaddressed gap. [Story 9.3]</para>
+/// <para><see cref="Retired"/> is distinct from <see cref="Deferred"/> for the same reason: Deferred is a
+/// requirement-level decision to shelve (<see cref="RequirementInfo.Deferred"/>), independent of what any
+/// covering epic does; Retired is an epic-level outcome — the covering epic(s) were abandoned — surfaced only
+/// once <em>every</em> covering epic resolves to "retired". A requirement covered by one retired epic and one
+/// still-progressing epic reads Active/Ready/Done as appropriate, never Retired: this tier fires only when no
+/// covering epic offers any other signal. [Story 8.9 review]</para>
 /// <para>Honesty caveat: the FR→Epic map is epic-level, and "Active / Partially implemented" is an
 /// <em>epic-level</em> approximation — <see cref="StatusStyles.ForEpic"/> rolls up over the covering epic's
 /// entire story list, not just the stories <see cref="RequirementsParser.StoriesFor"/> resolves for this
@@ -19,7 +27,7 @@ public enum RequirementKind { Functional, NonFunctional, Design }
 /// deliberately supersedes the earlier stance (Story 3.7) that refused any mid-development state, but it is
 /// not the finer-grained, per-requirement claim the name might suggest — it is the same epic-level signal as
 /// every other requirement-status tier, just with a new label for a real epic-level state.</para></summary>
-public enum RequirementStatus { Deferred, Unmapped, Planned, Ready, Active, Done }
+public enum RequirementStatus { Deferred, Unmapped, Planned, Ready, Active, Done, Retired }
 
 /// <summary>One Functional, Non-Functional, or UX Design requirement parsed from epics.md's
 /// "## Requirements Inventory". Its <see cref="Status"/> is rolled up from the epic(s) that cover it.</summary>

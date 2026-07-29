@@ -202,6 +202,65 @@ public sealed class SiteGenerator
     /// written bytes are identical either way (the golden gate). [spec-webview-doc-page-surfaces]</summary>
     public bool CapturePages { get; set; }
 
+    /// <summary>Opt-in WATCH-MODE delta sidecar: when true, every <c>--spa</c> emit also writes
+    /// <see cref="SpaDelivery.DeltaPath"/> naming what changed since the previous emit — AD-8's "sidecar polling"
+    /// transport clause. Set BEFORE the watch loop starts (<see cref="WatchCommand.RunWatchLoop"/> and
+    /// <c>webview --serve</c> do). [Story 22.6 AC #2]
+    /// <para><b>Why this is a separate switch and not implied by <c>--spa</c></b>: a one-shot
+    /// <c>generate --spa</c> must emit NO delta at all. The document carries a wall-clock <c>generatedAt</c> by
+    /// nature, and a cold build has to stay byte-reproducible (NFR9) — letting <c>--spa</c> alone turn this on is
+    /// exactly how a timestamp gets into a CI artifact.</para></summary>
+    public bool EmitDeltaSidecar { get; set; }
+
+    /// <summary>The PREVIOUS emit's manifest JSON — the basis <see cref="SpaDelivery.BuildDelta"/> diffs against.
+    /// Null until the first emit of a session (⇒ that emit's delta is a <c>full</c> marker).
+    /// <para><b>Captured at the EMIT seam, deliberately, and NOT gated on a route's reported outcome.</b> Story
+    /// 22.6's Dev Notes said not to advance the basis on <see cref="GenerationOutcome.Skipped"/> "because the
+    /// generator's in-memory state is unchanged". Task 1's measurement falsified that premise for one route:
+    /// <see cref="RegenerateFromDataSource"/> calls <see cref="GenerateAll"/> on its FIRST line — a complete
+    /// rebuild including this emit — and only afterwards inspects the event list to decide what to report, so an
+    /// unparseable <c>sprint-status.yaml</c> returns <c>Skipped</c> having already rewritten the whole IR (the
+    /// harness observed <c>code-map.html</c>'s hash moving on exactly that path). A basis gated on the outcome
+    /// would refuse to advance there and the next genuine push would diff against a stale manifest, emitting a
+    /// false "unchanged" — the failure AC #7 names as worse than a false "changed". Capturing here makes the
+    /// basis track what was EMITTED rather than what was REPORTED, and the route stops being a special case.</para>
+    /// <para><b>Thread safety</b>: read and replaced only inside <see cref="EmitSpaSite"/>, which every one of its
+    /// six call sites reaches while holding <see cref="_gate"/> — so the two concurrent debounce timers
+    /// <see cref="FileWatcherService"/> can fire (one per distinct changed path, each on its own thread-pool
+    /// thread) are already serialized against each other here. No second lock is added; a second lock around
+    /// state the gate already covers would be the deadlock risk, not the protection.</para></summary>
+    private string? _previousManifestJson;
+
+    /// <summary>Monotonic delta sequence within one watch session, starting at 1. Lets a polling consumer detect a
+    /// MISSED delta — a gap in the sequence means refetch — without comparing clocks. Same
+    /// <see cref="_gate"/> serialization as <see cref="_previousManifestJson"/>; never persisted, so it resets at
+    /// session start exactly as the contract says.</summary>
+    private long _deltaSequence;
+
+    /// <summary>The path whose change triggered the current pass, used ONLY as the delta's <c>trigger</c> LABEL.
+    /// Set by <see cref="FileWatcherService.RunDebouncedPass"/> immediately before it dispatches a route.
+    /// <para><b>This is a label, never a correctness input.</b> The changed/added/removed lists are computed
+    /// entirely from the two manifests under <see cref="_gate"/> and do not consult this field at all. That
+    /// matters because the field IS racy in one narrow case: two files saved inside the same debounce window
+    /// dispatch on two threads, and the second setter can win before the first acquires the gate — so a delta may
+    /// name the sibling path. The lists stay correct either way. Making the label exact would mean threading a
+    /// trigger argument through five public route signatures (<see cref="RegenerateEpics"/> and
+    /// <see cref="RegenerateAdrs"/> take no path today); that surface change was judged out of proportion to a
+    /// diagnostic string, and is recorded here rather than left to be rediscovered.</para></summary>
+    private string? _watchTrigger;
+
+    /// <summary>Set by <see cref="RegenerateTopology"/> so the delta it emits is a <c>full</c> marker, and cleared
+    /// by <see cref="EmitDelta"/> the moment it is consumed. Separate from <see cref="_watchTrigger"/> ON PURPOSE:
+    /// the trigger is a racy diagnostic label, and Story 22.6's live verification caught a topology pass emitting
+    /// <c>full: false</c> because a concurrent save had overwritten the label between the route setting it and the
+    /// emit reading it. Set and consumed on one call stack under <see cref="_gate"/>, so no other thread can
+    /// overwrite it. [Story 22.6 AC #7]</summary>
+    private bool _nextEmitIsFullDelta;
+
+    /// <summary>Sets the <c>trigger</c> label for the next emit's delta document — see <see cref="_watchTrigger"/>
+    /// for why this is a label only. Internal: <see cref="FileWatcherService"/> is the only caller.</summary>
+    internal void SetWatchTrigger(string? trigger) => _watchTrigger = trigger;
+
     public SiteGenerator(ForgeOptions options)
     {
         _options = options;
@@ -1211,6 +1270,17 @@ public sealed class SiteGenerator
     public GenerationEvent RegenerateTopology()
     {
         var sw = Stopwatch.StartNew();
+        // The delta sidecar this pass emits must be a `full` marker (AC #7 / Trap 5): a literal page diff over a
+        // whole-site rebuild produces a thousand-entry `changed` list, larger and slower than the full payload it
+        // was meant to replace. Flagged HERE rather than inferred from the trigger LABEL, and that distinction was
+        // forced by live evidence, not theory — during Story 22.6's Task 8 verification a concurrent session's
+        // save re-set the label between this route's own SetWatchTrigger and its emit, and the topology pass
+        // emitted `full: false` with that sibling's path as its trigger. The label is racy by construction (one
+        // debounce Timer per changed path, each on its own thread) and is documented as a diagnostic; deriving a
+        // correctness decision from it contradicted that and was defeated exactly as the race predicts. This flag
+        // is set and consumed under `_gate` on one call stack, so it cannot be overwritten by another thread.
+        // [Story 22.6]
+        _nextEmitIsFullDelta = true;
         // GenerateAll takes _gate itself, so no outer lock here — a full rebuild is the whole point of this route.
         var events = GenerateAll();
 
@@ -3721,6 +3791,80 @@ public sealed class SiteGenerator
         // The entry shell inlines the dashboard region for instant first paint AND the no-JS fallback (AC #2).
         var entryRegion = bundle.Pages.First(p => p.OutputRelativePath == bundle.EntryPath).ContentHtml;
         WriteSpaFile(SpaDelivery.EntryFileName, SpaDelivery.BuildEntryShell(bundle.SiteTitle, entryRegion));
+
+        EmitDelta(dataFiles);
+    }
+
+    /// <summary>Writes the watch-mode delta sidecar (<see cref="SpaDelivery.DeltaPath"/>) and advances the basis —
+    /// AD-8's "sidecar polling" clause. Called from <see cref="EmitSpaSite"/> and nowhere else, so the basis can
+    /// only ever advance when the IR was actually re-emitted. [Story 22.6 AC #2/#7]
+    /// <para><b>The basis advances even when the sidecar is off.</b> Otherwise a run that toggled the switch
+    /// mid-session would diff against a manifest from an arbitrary earlier point. Cheap — it is one string
+    /// reference.</para></summary>
+    private void EmitDelta(IReadOnlyList<SpaDelivery.OutputFile> dataFiles)
+    {
+        var manifestJson = dataFiles.First(f => f.OutputRelativePath == SpaDelivery.ManifestPath).Content;
+        var previous = _previousManifestJson;
+        _previousManifestJson = manifestJson;
+        // Consumed exactly once, and cleared even when the sidecar is off — otherwise a topology rebuild with the
+        // switch off would leave the flag armed and make some LATER, unrelated emit a spurious full marker.
+        var forceFull = _nextEmitIsFullDelta;
+        _nextEmitIsFullDelta = false;
+
+        // A one-shot `generate --spa` writes NO delta at all: the document carries a wall clock, and a cold build
+        // must stay byte-reproducible (NFR9). Gated on watch/serve, never on --spa. [AC #2/#4]
+        if (!EmitDeltaSidecar) return;
+
+        var delta = SpaDelivery.BuildDelta(
+            previous,
+            manifestJson,
+            ++_deltaSequence,
+            // No trigger set means no watcher event drove this pass — the session's own initial build, or a
+            // programmatic caller. <directory change> is the established constant for "a whole-site rebuild not
+            // attributable to one file", which is exactly that; reusing it adds no fourth spelling.
+            _watchTrigger ?? FileWatcherService.TopologyEventLabel,
+            DateTimeOffset.UtcNow,
+            // A topology pass is a whole-site rebuild: a literal diff would produce a thousand-entry `changed`
+            // list, larger and slower than the full payload it replaces. The signal is the FLAG the route itself
+            // set, never the trigger label — see _nextEmitIsFullDelta for the live-caught race that decided this.
+            //
+            // A missing or unrecognized trigger deliberately does NOT force full. AC #7 enumerates the degrade
+            // conditions and an unknown label is not among them: the basis's trustworthiness does not depend on
+            // whether we can name what moved, and conflating a diagnostic gap with a correctness gap would make
+            // every programmatic regen re-ship the whole IR for nothing. The genuinely basis-less case (a
+            // session's first emit) is already covered inside BuildDelta by `previous is null`.
+            forceFull);
+
+        WriteSpaFileAtomic(SpaDelivery.DeltaPath, delta);
+    }
+
+    /// <summary>Writes one SPA output file so a CONCURRENT reader never observes a torn or partial document:
+    /// content lands in a temp file beside the target, which is then atomically moved over it.
+    /// <para>A sibling of <see cref="WriteSpaFile"/> rather than a change to it. That one uses a plain
+    /// <see cref="File.WriteAllText(string,string)"/> — fine for the manifest and chunks, which no consumer polls
+    /// while they are being written, and changing it would put a rename in the hot path of every one of this
+    /// repo's ~1,400 IR pages for no benefit. The delta sidecar is the one file explicitly designed to be POLLED,
+    /// so it is the one file that needs this.</para>
+    /// <para>The temp file is created under the SAME directory as the target — a cross-volume
+    /// <see cref="File.Move(string,string,bool)"/> degrades to copy+delete and stops being atomic — and is cleaned
+    /// up on a failed move so a crashed write cannot litter the output root. NFR5's "never take a write lock on
+    /// the watched tree" is untouched: this writes under the OUTPUT root, which is not watched.</para></summary>
+    private void WriteSpaFileAtomic(string outputRelativePath, string content)
+    {
+        var full = Path.Combine(_options.OutputRoot, outputRelativePath.Replace('/', Path.DirectorySeparatorChar));
+        var dir = Path.GetDirectoryName(full);
+        if (dir is { Length: > 0 }) Directory.CreateDirectory(dir);
+        var temp = full + ".tmp";
+        try
+        {
+            File.WriteAllText(temp, content);
+            File.Move(temp, full, overwrite: true);
+        }
+        catch
+        {
+            try { if (File.Exists(temp)) File.Delete(temp); } catch { /* best-effort cleanup */ }
+            throw;
+        }
     }
 
     /// <summary>Writes one SPA output file under the output root (creating parent dirs). Unlike

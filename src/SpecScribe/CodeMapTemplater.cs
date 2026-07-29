@@ -56,19 +56,21 @@ public static class CodeMapTemplater
 
         // Shown once, shared across all four filter combinations (not one of the four panels themselves) —
         // deliberately NOT wrapped in a .chart-panel card: the two filter checkboxes right below need to be plain,
-        // unwrapped siblings of the four .codemap-view panels (the CSS sibling-combinator toggle needs them at the
-        // same nesting level as their targets), so nothing here can be a common ancestor of both.
+        // unwrapped siblings of the ONE chart panel and the file table section (the CSS sibling-combinator toggle
+        // needs them at the same nesting level as their targets), so nothing here can be a common ancestor of both.
         sb.Append("<h3>Source Code Map</h3>\n");
         sb.Append("<p class=\"chart-lead\">Every file, sized by its lines of code and nested inside its directory. ");
-        sb.Append("Use \"Sunburst / Treemap\" to switch shape, and \"Colorize by\" to switch what the color encodes — a git-derived change signal when available, or file type. Select a directory to zoom in. Filter what's shown with the checkboxes below; the full text listing under each map works with JavaScript off.</p>\n\n");
+        sb.Append("Use \"Sunburst / Treemap\" to switch shape, and \"Colorize by\" to switch what the color encodes — a git-derived change signal when available, or file type. Select a directory to zoom in. Filter what's shown with the checkboxes below; the full text listing under the map works with JavaScript off.</p>\n\n");
 
-        // Pure CSS: no JavaScript is needed for filtering to work (round 2).
+        // Pure CSS: no JavaScript is needed for the file table's filtering to work (round 2). `data-hierarchy-view-toggle`
+        // additionally lets the ONE chart instance below pick a matching view (Story 20.10 Task 2.3) — declarative,
+        // like `data-hierarchy-reveal-when` before it, so the shared component never learns these ids mean anything.
         AppendFilterCheckbox(sb, "cm-exclude-spec", "Exclude spec-driven development directories");
         AppendFilterCheckbox(sb, "cm-exclude-tests", "Exclude tests");
 
-        foreach (var variant in variants)
+        if (!full.Map.IsEmpty)
         {
-            AppendVariantPanel(sb, variant, fileHref, prefix);
+            AppendCodeMapPanel(sb, variants, fileHref, prefix);
         }
 
         sb.Append("</main>\n\n");
@@ -98,19 +100,21 @@ public static class CodeMapTemplater
         };
     }
 
-    /// <summary>The pure-CSS panel toggle — the ONE filter on this page that works with JavaScript off, and owner
-    /// decision D2 of Story 20.9 keeps it that way deliberately: trading it for a byte win would take information
-    /// away from a no-JS visitor to make a chart cheaper.
+    /// <summary>The pure-CSS filter checkboxes (Story 20.9 owner decision D2, kept unchanged by Story 20.10 D3):
+    /// the ONE filter on this page that works with JavaScript off. Trading it for a byte win would take
+    /// information away from a no-JS visitor to make a chart cheaper.
     ///
-    /// <para><c>data-hierarchy-reveal</c> is the only thing this story adds. Exactly one <c>.codemap-view</c> panel
-    /// is visible at a time and the other three are <c>display:none</c>, i.e. ZERO-WIDTH — and Plotly cannot lay
-    /// out in a zero-width container while <c>responsive: true</c>'s resize listener never fires on a CSS-only
-    /// reveal. The marker tells the component "a mount may become possible when this changes"; it does not tell it
-    /// anything about this page. These are real <c>&lt;input&gt;</c> elements — the toggle is pure CSS for
-    /// STYLING, but the elements still fire <c>change</c>. [Story 20.9 F1]</para></summary>
+    /// <para><c>data-hierarchy-view-toggle</c> is Story 20.10's addition, replacing the retired
+    /// <c>data-hierarchy-reveal-when</c> (F5 — its only consumer, the four-panel reveal-by-hash path, is gone now
+    /// that there is one always-visible chart instance). It declares these checkboxes as inputs to the component's
+    /// VIEW switch (Task 2.3): the component reads each toggle's own id and checked state and matches the result
+    /// against a view's own <c>when</c> string (e.g. <c>"cm-exclude-spec=1;cm-exclude-tests=0"</c>) — the same
+    /// declarative idiom <c>data-hierarchy-reveal-when</c> used, so the shared component still never learns what
+    /// these two checkboxes mean. <c>data-hierarchy-reveal</c> stays too: it is the general zero-width deferred-
+    /// mount guard's trigger (Story 20.9 F1), a different and still-live capability.</para></summary>
     private static void AppendFilterCheckbox(StringBuilder sb, string id, string label)
     {
-        sb.Append($"  <input type=\"checkbox\" id=\"{id}\" class=\"codemap-filter-checkbox\" data-hierarchy-reveal>");
+        sb.Append($"  <input type=\"checkbox\" id=\"{id}\" class=\"codemap-filter-checkbox\" data-hierarchy-reveal data-hierarchy-view-toggle>");
         sb.Append($"<label for=\"{id}\" class=\"codemap-filter-label\">{PathUtil.Html(label)}</label>\n");
     }
 
@@ -121,47 +125,26 @@ public static class CodeMapTemplater
     /// (Story 20.9 F5).</summary>
     private const int CodeMapExplorerSize = 640;
 
-    /// <summary>Renders one precomputed filter combination as a self-contained panel: a "View as" shape toggle
-    /// (Treemap/Sunburst) crossed with a shared "Colorize by" dimension dropdown, the drill breadcrumb (Treemap
-    /// zoom only), the shared legend/notice, both chart shapes, and the text-equivalent table. Owner feedback,
-    /// Story 7.12 review round 2: this used to be TWO separate panels — a general multi-dimension Treemap and a
-    /// recency-only Sunburst — which felt like "what to view" and "how to view it" were artificially split across
-    /// different surfaces. They're now ONE panel: <see cref="AppendColorizeControls"/>/<see cref="AppendLegend"/>/
-    /// <see cref="AppendDiscreteLegend"/> govern BOTH shapes (the client-side <c>recolor()</c> enhancement in
-    /// <c>specscribe.js</c> now queries <c>.codemap-cell</c> across the whole panel, not just the treemap's own
-    /// <c>&lt;svg&gt;</c>, so a dimension switch recolors whichever shape is showing — and the other, off-screen
-    /// one, so neither can drift stale). The treemap card and the table card are SIBLING <c>.chart-panel</c>s
-    /// inside the (unstyled) <c>.codemap-view</c> wrapper — never one nested inside the other, matching how every
-    /// other chart on this site pairs a visual + its text-equivalent table as two top-level cards. Nothing here
-    /// carries an <c>id</c> except the per-shape toggle radios (suffixed with <paramref name="variant"/>'s key so
-    /// all four filter-combination panels' toggles can coexist without collision): every other lookup is scoped
-    /// with class selectors (not <c>getElementById</c>). Exactly one panel is visible at a time via the pure-CSS
-    /// checkbox toggle; the others are <c>display:none</c> (and therefore out of the accessibility tree) until
-    /// selected.</summary>
-    private static void AppendVariantPanel(StringBuilder sb, CodeMapVariant variant, Func<string, string?>? fileHref, string prefix)
+    /// <summary>Renders the ONE Code Map chart instance (Story 20.10 owner decision D2), replacing the four
+    /// independently-serialized <c>.codemap-view</c> panels: a "View as" shape toggle (Treemap/Sunburst) crossed
+    /// with a shared "Colorize by" dimension dropdown, the drill breadcrumb (Treemap zoom only), all four variants'
+    /// legend pairs (pre-rendered, the active view × active dimension pair shown), and one shape. The framed title
+    /// and analysis window are the DEFAULT ("full") view's own strings server-side (F4) — the checkboxes drive a
+    /// client-side swap once mounted (D2's accepted consequence: the chart is JavaScript-driven regardless of how
+    /// many payloads back it). <paramref name="variants"/> must be non-empty and its "full" entry non-empty; the
+    /// call site (<see cref="BuildPage"/>) already gates on that.</summary>
+    private static void AppendCodeMapPanel(StringBuilder sb, IReadOnlyList<CodeMapVariant> variants, Func<string, string?>? fileHref, string prefix)
     {
-        // [Review][Patch] Declares which of the two pure-CSS filter checkboxes need which checked state to reveal
-        // THIS panel — read by specscribe.js's boot-time hash reveal so a deep link into a non-default panel (e.g.
-        // "no-tests") auto-checks the right box instead of silently doing nothing, since only the default-visible
-        // panel's own init runs `scopeFromHash()` at load. Declarative, not a surface name in the shared component.
-        var revealWhen = $"cm-exclude-spec={(variant.ExcludesSpecDev ? "1" : "0")};cm-exclude-tests={(variant.ExcludesTests ? "1" : "0")}";
-        sb.Append($"<div class=\"codemap-view\" data-view=\"{PathUtil.Html(variant.Key)}\" data-hierarchy-reveal-when=\"{PathUtil.Html(revealWhen)}\">\n");
+        var full = variants.FirstOrDefault(v => v.Key == "full") ?? variants[0];
 
-        if (variant.Map.IsEmpty)
-        {
-            sb.Append("  <p class=\"codemap-notice\" role=\"note\">No files match this filter.</p>\n");
-            sb.Append("</div>\n\n");
-            return;
-        }
+        // hasMetrics is now a WHOLE-PAGE property (Task 3.5): computed once over the DISTINCT file set (the
+        // superset "full" variant already carries every file), not per-variant. A file's metrics either exist
+        // (git ran) or they don't — that fact cannot disagree across views of the same repository.
+        var distinctFiles = full.Map.Files();
+        var hasMetrics = distinctFiles.Any(f => f.Metrics is not null);
 
-        var files = variant.Map.Files();
-        var hasMetrics = files.Any(f => f.Metrics is not null);
-        var maxChanges = Charts.ComputeMaxChanges(variant.Map.Roots);
-
-        // "What to view" — the colorize dimension picker, kept exactly as Story 7.12's owner-directed merge left
-        // it and now wired to the component's dimension contract instead of a per-panel recolour loop. It rides
-        // inside the component's own hidden control bar, so it inherits the reveal handshake rather than
-        // re-inventing one, and the "how to view it" axis is the component's shape selector.
+        // "What to view" — the colorize dimension picker, unchanged in shape from Story 7.9/7.12; now global
+        // rather than per-panel because there is only one panel and hasMetrics no longer varies by view.
         var controls = new StringBuilder();
         AppendColorizeControls(controls, hasMetrics);
 
@@ -172,55 +155,43 @@ public static class CodeMapTemplater
             // stands whether or not the chart ever mounts.
             legend.Append("    <p class=\"codemap-notice codemap-notice-secondary\" role=\"note\">Git change data is unavailable (run with <code>--deep-git</code> in a git repository to colorize by the six git-derived dimensions). The map is colorized by file type instead.</p>\n");
         }
-        // Both legend shapes ship pre-rendered; the component shows exactly the one the active dimension owns, so
-        // the visible legend can never disagree with what is coloured. The bar itself is hidden until a successful
-        // mount — a legend for a chart that never renders is chrome for nothing.
+        // Both legend shapes ship pre-rendered PER VIEW now (F4/D4): a view's ramp normalizes against its own file
+        // subset, so its legend's real change-count ranges are that view's own. The component shows exactly the
+        // pair belonging to the active view × active dimension, so the visible legend can never disagree with
+        // what is coloured. The bar itself is hidden until a successful mount.
         legend.Append("    <div class=\"ss-hierarchy-legends\" hidden>\n");
-        AppendLegend(legend, hasMetrics, maxChanges);
-        AppendDiscreteLegend(legend, files, hasMetrics);
+        foreach (var variant in variants)
+        {
+            if (variant.Map.IsEmpty) continue;
+            var vFiles = variant.Map.Files();
+            var vMaxChanges = Charts.ComputeMaxChanges(variant.Map.Roots);
+            AppendLegend(legend, hasMetrics, vMaxChanges, variant.Key);
+            AppendDiscreteLegend(legend, vFiles, hasMetrics, variant.Key);
+        }
         legend.Append("    </div>\n");
 
-        // Four instances, four DomIds, four HashKeys — keyed off the variant so their deep links cannot collide
-        // (Story 20.9 F4). `#dir=` is deliberately NOT preserved: it was never a documented stable scheme and
-        // contorting `hashKey` to keep it would fork the deep-link vocabulary across surfaces.
+        // ONE instance, one DomId, one HashKey (Task 2.7 — the four `#cm-{key}=` deep links retire, same call
+        // Story 20.9 made for `#dir=`; a shared link now encodes the view alongside the drilled scope).
         var config = new HierarchyExplorerConfig(
-            DomId: $"codemap-{variant.Key}",
-            // Story 20.7 D2: selector ordering is fixed site-wide, the DEFAULT shape stays per-instance. This
-            // surface's shipped default was the treemap.
+            DomId: "codemap",
             Shape: "treemap",
             Mode: HierarchyMode.Navigate,
-            HashKey: $"cm-{variant.Key}",
+            HashKey: "cm",
             Size: CodeMapExplorerSize,
             Labels: true,
             Meta: new Charts.ChartMeta(
-                VariantTitle(variant),
-                Window: $"{variant.Map.FileCount:N0} {Charts.Plural(variant.Map.FileCount, "file", "files")} · {variant.Map.TotalLines:N0} {Charts.Plural((int)Math.Min(variant.Map.TotalLines, int.MaxValue), "line", "lines")}"),
-            // Story 20.6 D1: the per-variant file table below IS this surface's twin, and it is richer than the
-            // generic nested listing — it carries every file's six git metrics as real table cells.
+                HierarchyExplorer.CodeMapViewTitle(full),
+                Window: $"{full.Map.FileCount:N0} {Charts.Plural(full.Map.FileCount, "file", "files")} · {full.Map.TotalLines:N0} {Charts.Plural((int)Math.Min(full.Map.TotalLines, int.MaxValue), "line", "lines")}"),
+            // Story 20.6 D1: the (now deduplicated) file table below IS this surface's twin.
             TwinDisplay: HierarchyTwinDisplay.External,
             Dimensions: HierarchyExplorer.CodeMapDimensions(hasMetrics));
 
-        var model = HierarchyExplorer.ProjectCodeMap(variant, config, fileHref, prefix);
+        var model = HierarchyExplorer.ProjectCodeMapViews(variants, config, fileHref, prefix);
         sb.Append(HierarchyExplorer.Render(
             model, "chart-panel codemap-panel", " data-explorer", controls.ToString(), legend.ToString()));
 
-        AppendFileTable(sb, files, hasMetrics, fileHref, prefix);
-
-        sb.Append("</div>\n\n");
+        AppendFileTable(sb, variants, distinctFiles, hasMetrics, fileHref, prefix);
     }
-
-    /// <summary>Each panel's own framed title. The page heading above the checkboxes describes the surface; a
-    /// panel's title has to say WHICH filter combination it is, or four identically-titled panels sit in one
-    /// document with nothing but a checkbox state telling them apart. This absorbs the old
-    /// <c>.codemap-view-note</c> — same fact, in the frame's own slot rather than a bespoke paragraph.</summary>
-    private static string VariantTitle(CodeMapVariant variant) =>
-        (variant.ExcludesSpecDev, variant.ExcludesTests) switch
-        {
-            (true, true) => "Source Code Map — excluding spec-driven development directories and tests",
-            (true, false) => "Source Code Map — excluding spec-driven development directories",
-            (false, true) => "Source Code Map — excluding tests",
-            _ => "Source Code Map — every file",
-        };
 
     /// <summary>The dimension-switch control — a dropdown, keyboard-operable, present whenever the variant has
     /// files (Story 7.9 loosened this from "only when git metrics exist" — file type needs no git data). Emitted
@@ -263,20 +234,23 @@ public static class CodeMapTemplater
     }
 
     /// <summary>The sequential-ramp legend for the change-frequency dimension — reuses the commit-heatmap ramp
-    /// levels (a non-<c>--status-*</c> scale). Server-baked visible only when it explains the baked-in default
-    /// (git metrics present); otherwise pre-rendered <c>hidden</c> so the client-side dimension switch can reveal
-    /// it without a DOM rewrite when the user picks a numeric dimension from the dropdown. Each swatch carries a
-    /// real change-count range from <see cref="Charts.CodeMapChangeLevelRange"/> — never the literal "Less … More"
-    /// placeholder, per AC #1 of Story 7.12 (which this ramp's sunburst sibling also shares). [Subtask 4.3;
-    /// Story 7.9; Review 2026-07-22]</summary>
-    private static void AppendLegend(StringBuilder sb, bool hasMetrics, double maxChanges)
+    /// levels (a non-<c>--status-*</c> scale). Server-baked visible only for the DEFAULT ("full") view when it
+    /// explains the baked-in default (git metrics present); otherwise pre-rendered <c>hidden</c> so the
+    /// client-side dimension AND view switches can reveal it without a DOM rewrite. Each swatch carries a real
+    /// change-count range from <see cref="Charts.CodeMapChangeLevelRange"/> — never the literal "Less … More"
+    /// placeholder, per AC #1 of Story 7.12. Story 20.10 D4: <paramref name="maxChanges"/> is THIS VIEW's own
+    /// scale (<see cref="Charts.ComputeMaxChanges"/> over the variant's own file subset), so the swatch ranges
+    /// never silently disagree with what the chart actually paints once this view is active.
+    /// [Subtask 4.3; Story 7.9; Review 2026-07-22]</summary>
+    private static void AppendLegend(StringBuilder sb, bool hasMetrics, double maxChanges, string viewKey)
     {
-        // `data-hierarchy-legend` names which dimensions own this block (the six numeric ramps share it); the
-        // caption is a TEMPLATE the component substitutes the active dimension's own label into, so the words
-        // stay this surface's and the component never learns them. Initial `hidden` is only the pre-mount state —
-        // the component sets it explicitly for every block on the first dimension apply.
+        // `data-hierarchy-legend` names which DIMENSION owns this block; `data-hierarchy-legend-view` names which
+        // VIEW it belongs to (Story 20.10) — the component shows the pair matching BOTH. The caption is a TEMPLATE
+        // the component substitutes the active dimension's own label into, so the words stay this surface's.
+        var visible = hasMetrics && viewKey == "full";
         sb.Append("    <div class=\"codemap-legend codemap-legend-ramp\" data-hierarchy-legend=\"")
-          .Append(HierarchyExplorer.CodeMapRampLegend).Append('"').Append(hasMetrics ? "" : " hidden").Append(">");
+          .Append(HierarchyExplorer.CodeMapRampLegend).Append("\" data-hierarchy-legend-view=\"").Append(PathUtil.Html(viewKey))
+          .Append('"').Append(visible ? "" : " hidden").Append(">");
         sb.Append("<span class=\"codemap-legend-dim\" data-hierarchy-legend-caption=\"Colorized by {label}\">Colorized by change frequency</span> ");
         for (var l = 0; l <= 4; l++)
         {
@@ -289,18 +263,18 @@ public static class CodeMapTemplater
     }
 
     /// <summary>The discrete (categorical) legend for the "File type" dimension — a swatch + human label per
-    /// category actually present in this variant's file set (never every possible category, so a repo with no
-    /// config files doesn't show an unused "Config &amp; Data" swatch). Pre-rendered alongside
-    /// <see cref="AppendLegend"/>: whichever legend explains the currently-baked default ships visible, the other
-    /// <c>hidden</c>, and the client-side dimension switch simply toggles which one is shown rather than rewriting
-    /// either one's content (both are static once rendered — this variant's category set never changes at
-    /// runtime). [Story 7.9]</summary>
-    private static void AppendDiscreteLegend(StringBuilder sb, IReadOnlyList<CodeMapNode> files, bool hasMetrics)
+    /// category actually present in THIS VIEW's own file set (never every possible category, so a repo with no
+    /// config files doesn't show an unused "Config &amp; Data" swatch, and a filtered view can legitimately show
+    /// FEWER swatches than "full"). Pre-rendered alongside <see cref="AppendLegend"/> for the same view: whichever
+    /// legend explains the currently-baked default ships visible, the rest <c>hidden</c>. [Story 7.9; Story 20.10]</summary>
+    private static void AppendDiscreteLegend(StringBuilder sb, IReadOnlyList<CodeMapNode> files, bool hasMetrics, string viewKey)
     {
         var present = CodeFileType.AllCategories.Where(cat => files.Any(f => f.Category == cat)).ToList();
+        var visible = !hasMetrics && viewKey == "full";
 
         sb.Append("    <div class=\"codemap-legend codemap-legend-discrete\" data-hierarchy-legend=\"")
-          .Append(HierarchyExplorer.CodeMapDiscreteLegend).Append('"').Append(hasMetrics ? " hidden" : "").Append(">");
+          .Append(HierarchyExplorer.CodeMapDiscreteLegend).Append("\" data-hierarchy-legend-view=\"").Append(PathUtil.Html(viewKey))
+          .Append('"').Append(visible ? "" : " hidden").Append(">");
         sb.Append("<span class=\"codemap-legend-dim\" data-hierarchy-legend-caption=\"Colorized by {label}\">Colorized by file type</span> ");
         foreach (var cat in present)
         {
@@ -311,35 +285,57 @@ public static class CodeMapTemplater
     }
 
     /// <summary>The text-equivalent table — the no-JS truth of the visualization and the screen-reader listing:
-    /// every file with its path, line count, and (when present) git metrics as TEXT, so color is never the sole
-    /// signal (AC #4). Ordered by the default dimension (change frequency) descending, then lines, so the reading
-    /// order is meaningful. Each path links to its in-portal code page when the guarded resolver supplies one.
-    /// [Subtask 4.6]
+    /// every DISTINCT file with its path, line count, and (when present) git metrics as TEXT, so color is never
+    /// the sole signal (AC #4). Story 20.10 D3: ONE table now, over the shared distinct-file set, instead of one
+    /// per variant — each row carries <c>is-spec</c>/<c>is-test</c> marker classes from the SAME
+    /// <see cref="CodeMap.IsSpecDevPath"/>/<see cref="CodeMap.IsTestPath"/> predicates <see cref="CodeMap.BuildVariants"/>
+    /// itself filters by, and the stylesheet hides a row under exactly the checkbox combination that would have
+    /// excluded it — the no-JS filter guarantee (owner decision D2 of Story 20.9) preserved BY CONSTRUCTION,
+    /// because it is still pure CSS and still zero script. Ordered by <see cref="Charts.OrderBySignificance"/>, the
+    /// SAME ordering the treemap's detail cap uses, so the two text-equivalents of the visualization can never
+    /// silently disagree on which files count as "most significant." Each path links to its in-portal code page
+    /// when the guarded resolver supplies one. [Subtask 4.6]
+    /// <para>The per-view LEAD sentence and the truncation row's applicability differ by view (a view with fewer
+    /// files may not hit the cap even when "full" does), so <paramref name="variants"/> drives one <c>&lt;p&gt;</c>
+    /// per view, toggled by the SAME 4-combination checkbox selector the panel switch used to use (Task 4.4) — a
+    /// no-JS visitor still reads the correct sentence for whichever combination is checked.</para>
     /// <para><b>Story 10.8 scope:</b> stays a genuine <c>&lt;table&gt;</c> (Design Direction #5) — its multi-column
     /// numeric header row is load-bearing for the accessible/no-JS reading of the treemap, and files carry no
     /// lifecycle status, so there is no badge to route through the shared row primitive. Only a badge-bearing
     /// row family gets rewired onto <see cref="ListRow"/>.</para></summary>
-    private static void AppendFileTable(StringBuilder sb, IReadOnlyList<CodeMapNode> files, bool hasMetrics, Func<string, string?>? fileHref, string prefix)
+    private static void AppendFileTable(
+        StringBuilder sb, IReadOnlyList<CodeMapVariant> variants, IReadOnlyList<CodeMapNode> distinctFiles,
+        bool hasMetrics, Func<string, string?>? fileHref, string prefix)
     {
-        // Ordering is the SAME Charts.OrderBySignificance the treemap's detail cap uses — shared, not a second
-        // hand-rolled copy, so the two text-equivalents of the visualization can never silently disagree on which
-        // files count as "most significant." [Review][Patch: DRY]
-        var ordered = Charts.OrderBySignificance(files).ToList();
+        var ordered = Charts.OrderBySignificance(distinctFiles).ToList();
 
-        // Deferred item (at-scale SPA perf pass): capped at very large scale, the SAME cap+ordering the treemap's
-        // rich tooltips use, so a file with a table row also has a tooltip and vice versa. Below the cap (every
-        // real project so far — Epic-7 scale is ~1,060 files) this is a no-op: `shown` == `ordered`,
-        // byte-identical to before.
+        // The cap applies ONCE now, against the distinct set (F7) — so the chart and the table agree on which
+        // files are "detailed" no matter how many views a file appears in.
         var cap = Charts.MaxDetailedCodeMapFiles;
         var shown = ordered.Count > cap ? ordered.Take(cap).ToList() : ordered;
         var omittedCount = ordered.Count - shown.Count;
 
-        sb.Append("    <section class=\"chart-panel\">\n");
+        sb.Append("    <section class=\"chart-panel codemap-table-section\">\n");
         sb.Append("      <h3>All files</h3>\n");
-        var leadScope = omittedCount > 0
-            ? $"The {cap.ToString("N0", CultureInfo.InvariantCulture)} most significant files in the treemap"
-            : "Every file in the treemap";
-        sb.Append($"      <p class=\"chart-lead\">{leadScope}, listed as text{(hasMetrics ? ", ordered by change frequency" : ", ordered by size")}.</p>\n");
+
+        foreach (var variant in variants)
+        {
+            string leadText;
+            if (variant.Map.IsEmpty)
+            {
+                leadText = "No files match this filter.";
+            }
+            else
+            {
+                var vOmitted = Math.Max(0, variant.Map.FileCount - cap);
+                var leadScope = vOmitted > 0
+                    ? $"The {cap.ToString("N0", CultureInfo.InvariantCulture)} most significant files in the treemap"
+                    : "Every file in the treemap";
+                leadText = $"{leadScope}, listed as text{(hasMetrics ? ", ordered by change frequency" : ", ordered by size")}.";
+            }
+            sb.Append($"      <p class=\"chart-lead\" data-codemap-view=\"{PathUtil.Html(variant.Key)}\">{PathUtil.Html(leadText)}</p>\n");
+        }
+
         sb.Append($"      <table class=\"codemap-table\" data-page-size=\"{CodeMapTablePageSize.ToString(CultureInfo.InvariantCulture)}\">\n");
         sb.Append("        <thead><tr><th scope=\"col\">File</th><th scope=\"col\" class=\"num\">Lines</th><th scope=\"col\">Type</th>");
         if (hasMetrics)
@@ -355,7 +351,11 @@ public static class CodeMapTemplater
                 ? $"<a href=\"{PathUtil.Html(prefix + target)}\">{PathUtil.Html(file.RepoRelativePath)}</a>"
                 : PathUtil.Html(file.RepoRelativePath);
 
-            sb.Append("          <tr class=\"codemap-table-row\"><th scope=\"row\">").Append(pathCell).Append("</th>");
+            var rowClass = "codemap-table-row";
+            if (CodeMap.IsSpecDevPath(file.RepoRelativePath)) rowClass += " is-spec";
+            if (CodeMap.IsTestPath(file.RepoRelativePath)) rowClass += " is-test";
+
+            sb.Append("          <tr class=\"").Append(rowClass).Append("\"><th scope=\"row\">").Append(pathCell).Append("</th>");
             sb.Append($"<td class=\"num\">{file.Lines.ToString("N0", CultureInfo.InvariantCulture)}</td>");
             // Always present, independent of hasMetrics — the categorical dimension's text equivalent. [Story 7.9]
             sb.Append($"<td>{PathUtil.Html((file.Category ?? CodeFileType.Other).Label)}</td>");

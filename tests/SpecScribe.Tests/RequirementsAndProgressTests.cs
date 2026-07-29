@@ -320,6 +320,37 @@ public class RequirementsParserTests
     }
 
     [Fact]
+    public void DeriveStatus_AllCoveringEpicsRetired_IsRetired_NotPlanned()
+    {
+        // Story 8.9 review: StatusStyles.ForEpic can now return "retired" (all-retired terminal tier). Before
+        // that existed, this exact combination fell through DeriveStatus's final `return Planned` — misreporting
+        // an abandoned covering epic as merely "not started yet". Guards the new branch fires ONLY when every
+        // covering epic is uniformly retired.
+        var dir = Directory.CreateTempSubdirectory("ss-req-retired-").FullName;
+        try
+        {
+            var artifact = Path.Combine(dir, "1-1.md");
+            File.WriteAllText(artifact, "# Story 1.1\nStatus: retired\n\n## Tasks / Subtasks\n\n- [ ] a\n");
+            var epics = EpicsParser.Parse(MultiEpicEpicsMd);
+            var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string> { ["1.1"] = artifact }, git: null);
+            Assert.Equal("retired", StatusStyles.ForEpic(epics.Epics.Single(e => e.Number == 1)));
+
+            var reqs = RequirementsParser.Parse(MultiEpicEpicsMd, epics, progress);
+
+            // FR1 and NFR1 are covered solely by Epic 1 (now all-retired) → Retired, not Planned.
+            Assert.Equal(RequirementStatus.Retired, reqs.ById["FR1"].Status);
+            Assert.Equal(RequirementStatus.Retired, reqs.ById["NFR1"].Status);
+            // FR2 spans Epic 1 (retired) AND Epic 2 (drafted, still live) — a mixed covering set must NOT read
+            // Retired just because one covering epic was abandoned; it stays Planned exactly as before this story.
+            Assert.Equal(RequirementStatus.Planned, reqs.ById["FR2"].Status);
+            // Deferred/Unmapped are unaffected by the new tier.
+            Assert.Equal(RequirementStatus.Deferred, reqs.ById["FR3"].Status);
+            Assert.Equal(RequirementStatus.Unmapped, reqs.ById["FR4"].Status);
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Fact]
     public void RenderIndex_SatisfactionBand_ShowsFourReadingsOverEverything()
     {
         var (reqs, epics) = ParseMultiEpic();

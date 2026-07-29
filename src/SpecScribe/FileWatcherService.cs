@@ -380,10 +380,28 @@ public sealed class FileWatcherService : IDisposable
     /// same reason. [Story 5.3 follow-up]</para></summary>
     internal void RunDebouncedPass(string fullPath)
     {
+        // A topology escalation rebuilds the WHOLE site, so attributing its delta to the one path that happened to
+        // fire would be a lie. Relabel to the SHARED constant RegenerateTopology and the watch log already report,
+        // rather than inventing a third spelling.
+        // <para>LABEL ONLY. The sidecar's degrade-to-full for this pass is decided by a flag RegenerateTopology
+        // sets on itself, NOT by this string — Story 22.6's live verification caught a concurrent save overwriting
+        // this label between the set and the emit, which would have silently defeated the guard had correctness
+        // depended on it. [Story 22.6 AC #7, Trap 5]</para>
+        GenerationEvent RunTopology()
+        {
+            _generator.SetWatchTrigger(TopologyEventLabel);
+            return _generator.RegenerateTopology();
+        }
+
         GenerationEvent ev;
         try
         {
             var relative = Path.GetRelativePath(_options.RepoRoot, fullPath).Replace('\\', '/');
+            // The delta sidecar's `trigger` LABEL for whatever this pass emits — set here because this is the one
+            // place that knows which path fired, and cleared by the topology branch below to the shared
+            // <directory change> constant. Label only: the delta's page lists are computed from the manifests, not
+            // from this. See SiteGenerator._watchTrigger for the narrow race this accepts and why. [Story 22.6]
+            _generator.SetWatchTrigger(relative);
             ev = RunGuarded(() => _generator.IsDataSource(fullPath)
                 ? _generator.RegenerateFromDataSource(fullPath)
                 // Story 22.5 AC #3: the SCOPE question is answered once, by one named classifier, BEFORE the family
@@ -395,7 +413,7 @@ public sealed class FileWatcherService : IDisposable
                 // wrap it in one either. IsDataSource stays FIRST and unchanged — sprint-status.yaml already
                 // escalates through its own route, and its precedence over IsEpicsRelated is load-bearing.
                 : _generator.ClassifyRebuildScope(fullPath) == RebuildScope.Full
-                ? _generator.RegenerateTopology()
+                ? RunTopology()
                 : _generator.IsAdr(fullPath)
                 ? _generator.RegenerateAdrs()
                 : _generator.IsEpicsRelated(fullPath)

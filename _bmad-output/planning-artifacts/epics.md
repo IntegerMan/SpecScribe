@@ -4222,6 +4222,41 @@ So that AD-5's changed-scope principle is fully operationalized rather than part
 >    [Story 22.5](#story-225-incremental-event-driven-regeneration-engine).** The delta is manifest *N* vs
 >    manifest *N−1*, so no incremental engine is required underneath. 22.5 makes *recompute* cheap; 22.6 makes
 >    *transport* cheap. They are orthogonal, and 22.1's gate named **22.2**, not 22.5, as 22.6's blocker.
+>
+> **⚠ DEV-STORY OUTCOME (2026-07-29) — Story 22.6 is implemented; the contract now lives in an ADR.**
+> Recorded here in the same change as `sprint-status.yaml`, per CLAUDE.md § Decision records.
+>
+> - **THE GATE PASSED, and it was re-run until it was honest.** A `GenerateOne` single-file content edit costs
+>   **2.72 % of the full IR** and **4.09 % of the full webview payload** (threshold 5 %), stable across two runs
+>   to <0.03 pp. Against Story 22.1's **25.3–39.9 %** at chunk granularity — the difference is Story 22.2's
+>   page-level addressing, not an accounting change. Full numbers, per route, in
+>   [22-6-delta-measurement-report.md](../implementation-artifacts/22-6-delta-measurement-report.md).
+>   ⚠ The harness's FIRST run reported a false PASS at 0.000 % because it edited an *ignored* dotfile, so the
+>   route returned `Skipped` and rendered nothing — a delta of nothing measured against everything. Liveness
+>   (dispatched as expected, not `Skipped`, >0 pages changed) is now part of the gate, not a precondition to it.
+> - **The contract is [ADR 0028](../../docs/adrs/0028-delta-transport-is-a-sidecar-and-a-stream-never-a-server.md)**
+>   (Accepted 2026-07-29), which also resolves ADR 0008 §Consequences' deferred long-lived-process question as a
+>   **no**. The story file guessed `0024` as the next free slot; four ADRs landed in between, so it is **0028**.
+> - **Two of the story's own Dev Notes were disproved by measurement and must not be inherited:**
+>   1. **Trap 2's premise is false for one route.** `RegenerateFromDataSource` calls `GenerateAll()` on its FIRST
+>      line and only afterwards inspects the events to decide what to report, so an unparseable
+>      `sprint-status.yaml` returns `Skipped` **having already rewritten the entire IR**. A delta basis gated on
+>      the reported outcome would emit a false *unchanged*. The basis is therefore captured at the **emit seam**,
+>      never on the outcome. The NDJSON channel keeps the opposite rule for the opposite reason — two channels,
+>      two bases, two different correct answers.
+>   2. **The golden fingerprint DID move, and AC #4 needs reading precisely.** Every page's markup is unchanged
+>      (pinned by a test asserting no static page carries the stamp), but Task 6's own instruction puts the
+>      Quiet Stamp's rule in `specscribe.css`, which the fingerprint embeds. The drift was isolated: `078ef476…`
+>      without this story's rule (a **concurrent session's** drift), `501ee958…` with it.
+> - **⚠ A defect the test suite structurally could not see was caught by live browser verification**, exactly as
+>   CLAUDE.md § Verification predicts. The topology degrade-to-full was first derived from the `trigger` LABEL; a
+>   concurrent session's save overwrote that label between `RegenerateTopology` setting it and the emit reading
+>   it, and the sidecar read `"full": false` while the watch log printed `<directory change> full rebuild`. The
+>   signal is now a flag the route sets on itself. Re-verified live under the identical race.
+> - **Accepted floor, recorded so it is not rediscovered:** `code-map.html` carries a whole-repo lines-of-code
+>   total and therefore changes on EVERY content edit — ~807 KB encoded, the dominant term in every delta. No
+>   content edit will produce a delta below ~1.2 % of the IR until that page changes. A page-design problem, not
+>   a transport one.
 
 As a maintainer wanting live-updating consumers of SpecScribe output,
 I want an optional watch server that pushes IR deltas to connected consumers,

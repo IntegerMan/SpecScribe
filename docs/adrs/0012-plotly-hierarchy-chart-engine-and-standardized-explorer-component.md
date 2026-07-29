@@ -204,3 +204,63 @@ accessible name).
 - **§5's ADR 0005 amendment was not authored here** (it lands once, jointly with Story 23.4). The evidence it will
   cite is that **no relaxation of the policy string is required**.
 - **§4's Epic 24 graph engine remains open.** Plotly has no force-directed trace; nothing here settles Story 24.2.
+
+---
+
+## Addendum — Story 20.10: one payload, N server-declared views over it (2026-07-29)
+
+**Status stays `Accepted`.** §2's contract text above is unchanged; this addendum ADDS a capability the
+component did not have — a single instance may present several server-declared **views** over one shared
+payload — rather than rewriting §2's wording. Authored by Story 20.10 (Code Map's four independently-serialized
+filter-variant panels — `full` / `no-spec` / `no-tests` / `no-spec-no-tests` — collapsed into one chart instance
+and one file table).
+
+**The problem the addendum closes.** Story 20.9 converted Code Map to the component but measured the result at
+only 57% of the Story 20.4 spike's projected saving: `code-map.html` serialized **3,512 chart nodes and 2,970
+table rows against 1,421 distinct nodes and 1,189 distinct files** — a 2.47× duplication factor, because each of
+the four filter panels independently re-serialized its own subset of the same codebase. §2's "one datasource per
+instance" clause was correct for a surface with one view of its data; Code Map has four, and nothing in §2 said
+what a *second* view of the *same* data costs.
+
+**Decision.** `HierarchyExplorerModel` gains an optional `Views` list, trailing and defaulted so every existing
+single-view call site is unaffected (six already-shipped islands do not move a byte). When present:
+
+1. **Every file (or other leaf) is serialized EXACTLY ONCE**, in the model's shared `Nodes` bag — its metric bag,
+   its hover card, its label/detail/href are each built once regardless of how many views contain it.
+2. **A view's own structural (non-leaf) scaffold is NEVER shared across views.** Each `HierarchyView` carries its
+   own directory nodes (or equivalent structural nodes) verbatim from the server, plus which shared leaves it
+   contains and where each hangs *in that view* (`Files`/`ParentScaffoldIndex`, parallel integer-indexed arrays —
+   not repeated path strings).
+3. **The client selects one view and reparents its leaves under that view's own scaffold**, then rolls up through
+   the SAME children-win rule (`HierarchyExplorer.RollUp`) every other instance already uses — extending
+   `specscribe.js`'s existing `visibleNodes()` seam, not minting a second projection path.
+4. **Per-view normalization stays per-view.** A ramp dimension's `[min,max]` scale re-resolves against the active
+   view's own file subset on every view switch, and that view's own legend re-scales with it — preserving each
+   view's shipped colours exactly rather than recolouring three of four panels as a side effect of deduplication.
+
+**Why structural nodes are NOT deduplicated too (the one place D1's cost is paid, and it is small).** A directory
+(or other grouping) node's identity is not stable across views when membership can change WHICH nodes collapse
+into which — Code Map's proof: `CodeMap.BuildDir` collapses a single-child directory chain only while that
+directory has no files of its own, so filtering files changes the condition. On this repository's own tree,
+`.github` has two children (`agents`, `workflows`) in the `full` view; once `no-spec` drops every
+`.github/agents/*` file, `.github` has one child directory and no files of its own and DOES collapse — to a
+DIFFERENT id, label AND parent (`.github/workflows`, `".github / workflows"`). A file's structural parent is
+therefore a property of **(file, view)**, never of the file alone. The alternative to keeping per-view scaffolds
+was porting the collapse rule into JavaScript — a second copy of a structural rule, precisely the drift this ADR's
+§2 exists to end — or accepting a filtered view rendering chains the server would have collapsed, a visible
+fidelity regression. Keeping scaffolds server-emitted and per-view dissolves the problem at a measured, small
+cost: on this repository, structural nodes across all four views (542 instances) are under a fifth the count of
+distinct files (1,189), and a structural node carries no metrics, no hover card, and no href.
+
+**Consequence for §2's "one datasource per instance" reading.** That clause is now read as "one PAYLOAD per
+instance", not "one node list" — a views-bearing instance's data is still one thing the emitter builds once and
+the client never fetches, re-derives, or re-counts; it is simply addressed through an extra one-of-N selector
+(the active view) the same way the existing shape selector (sunburst/treemap) already is one-of-two.
+
+**Non-goal, stated deliberately.** This is built for Code Map, its one consumer. No other surface is changed to
+use `Views` speculatively — the same discipline that let Story 20.7's two-consumer node-filter resolver hold up
+cleanly when Story 20.9 arrived as its second real consumer. A second `Views` consumer should prove the shape
+generalizes rather than have it asserted here.
+
+### Ratified addition to Ratified decisions (2026-07-29)
+8. **A Hierarchy Explorer instance may present N server-declared VIEWS over one shared payload** (`HierarchyExplorerModel.Views`, optional, defaulted). Leaves are serialized once, in the shared payload; a view's own structural scaffold and its leaf membership/parentage are declared per view, never shared, because structural identity is a property of (leaf, view) when a grouping rule can collapse differently per view. The client selects a view, reparents, and rolls up through the SAME children-win rule every instance already uses. Per-view colour normalization (ramps, legends) stays per-view. First and, for now, only consumer: Code Map's four filter combinations (Story 20.10).

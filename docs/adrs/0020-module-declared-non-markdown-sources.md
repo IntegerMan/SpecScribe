@@ -1,6 +1,6 @@
 # ADR 0020: A Module May Declare Non-Markdown Sources, Read by Exact Filename and Gated on a Schema Version
 
-**Status:** Proposed (authored 2026-07-27 by Story 18.5; ratification is the owner's)
+**Status:** **Accepted** — ratified 2026-07-29 at the Epic 18 retrospective (authored 2026-07-27 by Story 18.5). The owner resolved the one open question in the **opposite** direction to the shipped code — a higher schema major is now to be accepted with a warning, not skipped — so this ADR leads its implementation; see § Resolved question.
 **Date:** 2026-07-27
 **Deciders:** Matthew-Hope Eland
 **Relates to:** [ADR 0015 — BMad Module Identity Is Open-World and Multi-Valued](0015-bmad-module-identity-open-world-and-multi-valued.md) (the module-code identity this ingest is gated on); [ADR 0021 — Foreign Artifacts May Be Carried Verbatim Into the Portal](0021-carrying-foreign-artifacts-verbatim-into-the-portal.md) (the sibling answer for foreign *pages*, where this is the answer for foreign *data*); [ADR 0002 — Shared Rendering Core and Host-Neutral View Models](0002-shared-rendering-core-and-host-neutral-view-models.md) (AD-2's source → normalized-records boundary, which this widens by one input format and no more); [ADR 0016 — The Canonical IR Carries Rendered Prose HTML](0016-ir-carries-rendered-prose-html.md); Epic 18 (Story 18.5)
@@ -83,6 +83,12 @@ Concretely, in Story 18.5: the module's traceability matrix may contribute rows 
 - **A minor-version bump inside the accepted major is trusted.** If upstream removes a field in `0.2.0`, the reader sees a null and degrades rather than skipping. Accepted deliberately: gating on the full version would skip every harmless additive change, which trades a rare wrong-shaped read for a common needless blindness.
 - **The generic-pages pass and this path can both see the same markdown file.** Story 18.5 resolves that by having the module surface *link* the generic page rather than re-render it, and pins the invariant with a test; a future story that instead re-renders must add the path to `ArtifactBundle.ConsumedSourceRelatives` or it will emit the document twice.
 
-## Open question for the owner
+## Resolved question (ratified 2026-07-29, Epic 18 retrospective)
 
-Should the version gate accept a **higher** major with a warning rather than skipping outright? Skipping is chosen here because a wrong verdict on a quality gate is worse than an absent one. The counter-argument is that upstream's `0.1.0` is manifestly an early version, and a `1.0.0` may well be shape-compatible — in which case skipping costs users the signal for no benefit. This is left open rather than assumed; the current behaviour is the conservative one and is cheap to relax.
+> **Previously open:** should the version gate accept a **higher** major with a warning rather than skipping outright?
+
+**Decided: accept a higher major and warn.** Upstream's `0.1.0` is manifestly an early version and a `1.0.0` is likely to be shape-compatible, so skipping outright costs the user the signal for no benefit in the case most likely to actually occur. The reader parses, degrades field-by-field on anything it does not recognize (the same tolerance a minor bump already gets, § Consequences), and emits one non-fatal diagnostic naming the version it read and the version it was built against.
+
+The conservative argument — *a wrong verdict on a quality gate is worse than an absent one* — is not discarded; it is bounded. It applies to a **lower-or-unparseable** major, which remains a hard skip with no parse attempted. It does not apply to a higher major, because the failure mode there is a missing field (which degrades to null, visibly) rather than a field that means something different.
+
+**⚠️ This ratification runs AHEAD of the implementation.** `TestArtifactDerivation.IsSchemaSupported` currently tests `major == SupportedSchemaMajor` — exact equality — so a higher major is skipped today, before any field is touched. That is the pre-ratification behaviour and it now diverges from this ADR. Aligning it is seated as an action item at the Epic 18 retrospective; until that lands, the shipped behaviour is the conservative one and this section is the authority on where it is going. Do not "fix" the ADR to match the code.

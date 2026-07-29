@@ -59,6 +59,27 @@ public static class SpaDelivery
     /// missed one is silent).</para></summary>
     public const int SchemaVersion = 2;
 
+    /// <summary>The delta sidecar (<c>spa/delta.json</c>) written beside the manifest on each WATCH-MODE regen —
+    /// AD-8's "sidecar polling" transport clause, operationalized (Story 22.6 AC #2). Never written by a one-shot
+    /// <c>generate</c>: it carries a wall-clock <c>generatedAt</c> by nature, and a cold build must stay
+    /// byte-reproducible (NFR9).</summary>
+    public const string DeltaPath = "spa/delta.json";
+
+    /// <summary>The DELTA document's own schema version — deliberately SEPARATE from <see cref="SchemaVersion"/>,
+    /// and governed by the same monotonically-increasing-integer compatibility rule that constant's doc comment
+    /// states (bump on a removed/renamed field, a changed type, a changed meaning; do NOT bump for a purely
+    /// additive field).
+    /// <para><b>Why a second constant rather than a bump.</b> A new sidecar file is strictly ADDITIVE to the IR —
+    /// every existing consumer that reads <c>manifest.json</c> and the chunks is bit-for-bit unaffected by a file
+    /// it never opens, which is exactly the case <see cref="SchemaVersion"/>'s own doc comment says NOT to bump
+    /// for. Versioning the delta independently also lets the delta contract move (it is young; the IR's is not)
+    /// without forcing every IR consumer through a compatibility check it does not need.</para>
+    /// <para>The delta ALSO carries the <see cref="SchemaVersion"/> it was computed against, as a separate
+    /// <c>schemaVersion</c> field: a consumer holding state from a different IR schema cannot safely apply a page
+    /// delta to it, so a mismatch means refetch. <see cref="BuildDelta"/> enforces that itself — see its
+    /// degrade-to-full rules.</para></summary>
+    public const int DeltaSchemaVersion = 1;
+
     /// <summary>The per-chunk page cap. Chunking groups pages by their top-level output segment (so a navigation
     /// typically pulls one small, category-scoped chunk), then splits any group past this cap into numbered files —
     /// the invariant ADR 0006 axis A demands: FEW files, never one-per-page (no file-count win) and never a single
@@ -101,6 +122,12 @@ public static class SpaDelivery
     /// change detector for delta addressing, never a security or integrity claim.</summary>
     private const int ContentHashHexLength = 16;
 
+    /// <summary>The universal Story 1.4 landmark every templater emits, shared by <see cref="ExtractContentRegion"/>
+    /// (as its region's end-anchor) and <see cref="ExtractNavMarkup"/> (as the boundary a nav match must precede) —
+    /// one literal so the two extractors can never anchor against different ideas of "where the chrome ends"
+    /// (code review).</summary>
+    private const string MainLandmarkMarker = "<main id=\"main-content\"";
+
     // JSON is fetched and JSON.parse'd by the client (never inlined into a <script>), so default (HTML-safe)
     // escaping is used — <, >, & become \uXXXX in the payload and decode back to the exact HTML on parse. Compact
     // (no indentation) because this is a delivery payload, not a hand-edited file.
@@ -123,9 +150,8 @@ public static class SpaDelivery
     /// element-balanced — see the two-marker note below. [Story 6.7; Story 22.4 AC #4]</para></summary>
     public static string ExtractContentRegion(string fullPageHtml, string navMarkup)
     {
-        const string mainMarker = "<main id=\"main-content\"";
         const string mainCloser = "</main>";
-        var mainOpen = fullPageHtml.IndexOf(mainMarker, StringComparison.Ordinal);
+        var mainOpen = fullPageHtml.IndexOf(MainLandmarkMarker, StringComparison.Ordinal);
         // Search for the closer starting AT the opener, not from index 0 — a page whose body legitimately
         // contains an earlier literal "</main>" (e.g. a doc's raw-HTML code sample) must never be allowed to
         // put mainClose before mainOpen, which would make the slice below throw. [Story 6.7 review]
@@ -251,12 +277,18 @@ public static class SpaDelivery
     /// bridge each own the toggle through delegation; an injected script would never execute anyway).</para>
     /// <para>Byte-faithful and plumbing-free: it consumes the same captured string
     /// <see cref="ExtractContentRegion"/> slices, never a disk read-back, so the AD-1/AD-2 boundary holds.
-    /// Returns null when the page carries no site nav, leaving the caller on its re-rendered fallback.
-    /// [Story 22.2]</para></summary>
+    /// Returns null when the page carries no site nav, leaving the caller on its re-rendered fallback.</para>
+    /// <para>⚠️ <b>Anchored the same way <see cref="ExtractContentRegion"/> anchors its own markers</b> (code
+    /// review): a match is accepted only when it precedes the page's <see cref="MainLandmarkMarker"/>. Without
+    /// this, a doc page whose own PROSE quotes this exact nav markup (this file's own doc comments do, for
+    /// instance) could be mistaken for the page's real chrome nav — the same self-reference class
+    /// <see cref="ExtractContentRegion"/>'s own comment names.</para>
+    /// [Story 22.2]</summary>
     public static string? ExtractNavMarkup(string fullPageHtml)
     {
+        var mainOpen = fullPageHtml.IndexOf(MainLandmarkMarker, StringComparison.Ordinal);
         var m = NavBlockRegex.Match(fullPageHtml);
-        return m.Success ? m.Value : null;
+        return m.Success && (mainOpen < 0 || m.Index < mainOpen) ? m.Value : null;
     }
 
     /// <summary>One embedded <c>&lt;script&gt;</c> a consumer of a page's content region must deal with — the
@@ -332,6 +364,176 @@ public static class SpaDelivery
         var digest = SHA256.HashData(Encoding.UTF8.GetBytes(contentHtml));
         return Convert.ToHexStringLower(digest)[..ContentHashHexLength];
     }
+
+    /// <summary>Diffs two IR manifests into the watch-mode delta document (<see cref="DeltaPath"/>) — AD-8's
+    /// "sidecar polling" half, addressed by the per-page <see cref="ContentHash"/> Story 22.2 emits. Pure and
+    /// side-effect-free like every other method in this file: it takes two manifest STRINGS and the caller's
+    /// session facts, and returns the JSON to write. <see cref="SiteGenerator"/> owns where the bytes land and
+    /// when this is called at all. [Story 22.6 AC #2/#7]
+    ///
+    /// <para><b>The document is a CONTRACT, not an implementation detail.</b> Story 22.5 and any future consumer
+    /// bind to these field names. Changing one is a <see cref="DeltaSchemaVersion"/> bump.</para>
+    ///
+    /// <para><b>Degrade to FULL, loudly, rather than emit a wrong delta</b> (AC #7). Every condition under which
+    /// the previous state is absent or untrustworthy resolves to <c>"full": true</c> with empty page lists,
+    /// meaning "refetch the manifest". Those conditions are enforced HERE rather than at the call site precisely
+    /// so no caller can forget one:</para>
+    /// <list type="bullet">
+    /// <item>no previous manifest — the first emit of a watch session;</item>
+    /// <item><paramref name="forceFull"/> — the caller knows the basis is untrustworthy, which is how a
+    /// <see cref="SiteGenerator.RegenerateTopology"/> escalation reports itself. A literal diff there would produce
+    /// a thousand-entry <c>changed</c> list, larger and slower than the full payload it was meant to replace;</item>
+    /// <item>either manifest is unparseable or structurally unrecognizable;</item>
+    /// <item>the two manifests carry DIFFERENT <see cref="SchemaVersion"/>s — page content means something
+    /// different across a schema bump (version 2 moved the content region's start marker and moved 594 pages'
+    /// hashes by +30 bytes each), so a page-level diff across that boundary is meaningless.</item>
+    /// </list>
+    ///
+    /// <para><b>⚠ THE TRUST BOUNDARY, stated in code because AC #7 requires it to be.</b> This delta is only ever
+    /// as accurate as the manifest it is handed, and that manifest is only as accurate as
+    /// <see cref="SiteGenerator"/>'s <c>_spaCapture</c> — which has a DOCUMENTED watch-mode drift class (four
+    /// eviction/repopulation sites carry a <c>[deferred-work: story-6-7 watch-mode _spaCapture drift]</c> marker).
+    /// A stale capture yields a stale <see cref="ContentHash"/>, which yields a false <i>unchanged</i> — a page
+    /// omitted from <c>changed</c> that really did change. That is strictly worse than a false <i>changed</i>: a
+    /// spurious entry costs bytes, a missing one costs correctness, and the consumer has no way to detect it.
+    /// This function cannot close that gap (it never sees a page's content, only its hash); it can only refuse to
+    /// widen it, which is why every uncertain case above degrades to full instead of guessing.</para></summary>
+    /// <param name="previousManifestJson">The manifest emitted by the PREVIOUS regen of this watch session, or
+    /// <c>null</c> for the session's first emit (⇒ full).</param>
+    /// <param name="currentManifestJson">The manifest just emitted. Required.</param>
+    /// <param name="sequence">Monotonic within one watch session, reset at session start. Lets a polling consumer
+    /// detect a missed delta (a gap ⇒ refetch) without a clock comparison.</param>
+    /// <param name="trigger">The changed path, or <see cref="FileWatcherService.TopologyEventLabel"/> for an
+    /// escalated topology pass — reused verbatim rather than re-spelled, so the sidecar, the watch log and
+    /// <see cref="SiteGenerator.RegenerateTopology"/> can never drift apart.</param>
+    /// <param name="generatedAt">Watch-only wall clock. Never reaches a one-shot <c>generate</c> artifact: the
+    /// caller does not write this file at all in that mode (NFR9).</param>
+    /// <param name="forceFull">Caller-known untrustworthy basis — see the degrade list above.</param>
+    public static string BuildDelta(
+        string? previousManifestJson,
+        string currentManifestJson,
+        long sequence,
+        string trigger,
+        DateTimeOffset generatedAt,
+        bool forceFull = false)
+    {
+        var current = TryReadPageIndex(currentManifestJson, out var currentSchema);
+        var previous = TryReadPageIndex(previousManifestJson, out var previousSchema);
+        // A caller-declared untrustworthy basis and a cross-schema basis are the same answer as no basis at all.
+        if (forceFull || previousSchema != currentSchema) previous = null;
+
+        // `full` is the honest answer whenever the basis is missing OR the current manifest itself could not be
+        // read: a delta computed from an unreadable "current" would report every page as removed.
+        var full = current is null || previous is null;
+
+        var changed = new List<string>();
+        var added = new List<string>();
+        var removed = new List<string>();
+        var chunks = new SortedSet<string>(StringComparer.Ordinal);
+
+        if (!full)
+        {
+            // Ordinal ordering throughout so two runs over the same change emit byte-identical documents — the
+            // same determinism discipline BuildDataFiles applies to chunk membership.
+            foreach (var (path, entry) in current!.OrderBy(kv => kv.Key, StringComparer.Ordinal))
+            {
+                if (!previous!.TryGetValue(path, out var before))
+                {
+                    added.Add(path);
+                }
+                else if (string.Equals(before.ContentHash, entry.ContentHash, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+                else
+                {
+                    changed.Add(path);
+                }
+                // Only changed + added carry chunks: a REMOVED page's chunk may not exist any more, and a
+                // consumer applying a removal needs no bytes to do it.
+                chunks.Add(entry.Chunk);
+            }
+            foreach (var path in previous!.Keys.Where(k => !current!.ContainsKey(k)).OrderBy(k => k, StringComparer.Ordinal))
+            {
+                removed.Add(path);
+            }
+        }
+
+        var doc = new DeltaDocument(
+            DeltaSchemaVersion,
+            currentSchema,
+            sequence,
+            // Round-trip "O" against UTC so the stamp is unambiguous and machine-parseable. Serialized as a
+            // STRING rather than left to the serializer's DateTimeOffset handling, which would emit a numeric
+            // offset (+00:00) instead of the Z the contract specifies.
+            generatedAt.UtcDateTime.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
+            trigger,
+            full,
+            changed,
+            added,
+            removed,
+            chunks.ToList());
+        return JsonSerializer.Serialize(doc, JsonOptions);
+    }
+
+    /// <summary>Reads just the two things <see cref="BuildDelta"/> diffs on — each page's
+    /// <see cref="ContentHash"/> and its chunk — plus the manifest's own <see cref="SchemaVersion"/>. Returns
+    /// <c>null</c> for ANY unusable input (absent, malformed, or structurally unrecognizable) rather than
+    /// throwing: a delta computation is a best-effort optimization sitting on a watch loop, and NFR2 says degrade,
+    /// never amplify. Every null here becomes a <c>"full": true</c> document, which is always correct — merely
+    /// expensive.</summary>
+    private static Dictionary<string, DeltaPage>? TryReadPageIndex(string? manifestJson, out int schemaVersion)
+    {
+        schemaVersion = 0;
+        if (manifestJson is not { Length: > 0 }) return null;
+        try
+        {
+            using var doc = JsonDocument.Parse(manifestJson);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object) return null;
+            schemaVersion = doc.RootElement.TryGetProperty("schemaVersion", out var sv) && sv.TryGetInt32(out var v)
+                ? v
+                // A manifest with no schemaVersion key at all is the pre-22.2 shape — version 0 by implication,
+                // exactly as SchemaVersion's own doc comment defines it.
+                : 0;
+            if (!doc.RootElement.TryGetProperty("pages", out var pages) || pages.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            var index = new Dictionary<string, DeltaPage>(StringComparer.Ordinal);
+            foreach (var page in pages.EnumerateObject())
+            {
+                if (page.Value.ValueKind != JsonValueKind.Object) return null;
+                if (!page.Value.TryGetProperty("contentHash", out var h) || h.ValueKind != JsonValueKind.String) return null;
+                if (!page.Value.TryGetProperty("chunk", out var c) || c.ValueKind != JsonValueKind.String) return null;
+                index[page.Name] = new DeltaPage(h.GetString()!, c.GetString()!);
+            }
+            return index;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private readonly record struct DeltaPage(string ContentHash, string Chunk);
+
+    /// <summary>The on-the-wire shape of <see cref="DeltaPath"/>. Property ORDER is the emitted field order and
+    /// is part of the readable contract; property NAMES are camelCased by <see cref="JsonOptions"/>.</summary>
+    /// <param name="SchemaVersion">The IR <see cref="SpaDelivery.SchemaVersion"/> this delta was computed against.
+    /// A consumer holding state from a different IR schema must refetch rather than apply.</param>
+    /// <param name="Full"><c>true</c> ⇒ every list below is empty and the consumer must refetch the manifest.</param>
+    private sealed record DeltaDocument(
+        int DeltaSchemaVersion,
+        int SchemaVersion,
+        long Sequence,
+        string GeneratedAt,
+        string Trigger,
+        bool Full,
+        IReadOnlyList<string> Changed,
+        IReadOnlyList<string> Added,
+        IReadOnlyList<string> Removed,
+        IReadOnlyList<string> Chunks);
 
     /// <summary>One serialized SPA output file: its output-relative path and its content bytes (UTF-8 text).</summary>
     public sealed record OutputFile(string OutputRelativePath, string Content);
@@ -479,10 +681,18 @@ public static class SpaDelivery
                 // a constant data URI. The ?v= asset cache-bust is deliberately NOT carried: it is a build token
                 // (already exposed as PathUtil.CurrentAssetVersion and the shell's data-asset-version), and putting
                 // it in per-page data would churn every page's bytes on every build.
-                new ManifestHead(page.Title, page.MetaDescription is { Length: > 0 } d ? d : page.Title),
+                // Whitespace-only counts as absent (code review): { Length: > 0 } alone let a blank
+                // "content=\" \"" ship instead of falling back to the title, same fallback PathUtil.RenderHeadOpen
+                // applies when it builds the tag.
+                new ManifestHead(page.Title, page.MetaDescription is { Length: > 0 } d && !string.IsNullOrWhiteSpace(d) ? d : page.Title),
                 ExtractScriptIslands(page.ContentHtml),
                 ContentHash(page.ContentHtml),
-                Encoding.UTF8.GetByteCount(page.ContentHtml));
+                // The page's own JSON-ENCODED byte count — the same exact measurement (not raw UTF-8 content
+                // bytes) the chunk ceiling above budgets against, reusing the token already produced for it so
+                // this costs no extra serialization. Raw content bytes under-report by up to 6x on escape-heavy
+                // regions (</>/& each balloon to 6 bytes), which is exactly the imprecision Story 22.2 closed for
+                // the chunk ceiling; `bytes` shipped that same imprecision until this fix (code review).
+                Encoding.UTF8.GetByteCount(encoded[page.OutputRelativePath].ValueJson));
         }
         var navGraph = bundle.Nav.Select(n => new ManifestNavItem(n.Label, n.OutputRelativePath)).ToList();
         var manifest = new Manifest(SchemaVersion, bundle.SiteTitle, bundle.EntryPath, navGraph, oversized, pages);
@@ -529,6 +739,36 @@ public static class SpaDelivery
     /// fallback link to the static site, the dashboard region inlined for instant first paint, and the client
     /// renderer script. The inlined region's own nav links are ordinary relative links to the static <c>.html</c>
     /// files, so navigation works with JS disabled too (AC #2 / NFR6). [Story 6.7]</summary>
+    /// <summary>The Quiet Stamp's id — the single hook the client updates and the one selector a test asserts on.</summary>
+    public const string LiveStampId = "spa-live-stamp";
+
+    /// <summary>The "Quiet Stamp" (Story 22.6 AC #5): a small, motionless line of page chrome that reports the live
+    /// delta channel's state as WORDS. Present in the initial server-rendered markup so it is not a JS-only
+    /// artifact, and updated in place by the client (<c>textContent</c> only — no element insertion or removal, so
+    /// there is no layout shift on update).
+    ///
+    /// <para><b>State is never signalled by color or motion</b> (CLAUDE.md § Verification: no state by color alone).
+    /// The text itself carries the state — "Live updates: unavailable" vs "Live updates: connected · updated
+    /// 14:32" — so it reads identically to a screen reader, a monochrome display, and a colorblind reader. There is
+    /// deliberately no <c>--motion-*</c> token here and no <c>prefers-reduced-motion</c> block: a stamp that never
+    /// animates needs no reduced-motion variant, and adding one would imply motion exists.</para>
+    ///
+    /// <para><b>Server-rendered as "unavailable", not "connecting".</b> With JS off — or with a stale cached
+    /// script — the stamp is never updated, and "unavailable" is then TRUE while "connecting…" would be a
+    /// permanent lie. Honest at rest is worth more than optimistic on arrival.</para>
+    ///
+    /// <para><b>Why it lives here and NOT in <see cref="PathUtil.RenderHeadOpen"/></b>: that helper is shared with
+    /// every static page, and a static page has no live channel — putting the stamp there would both claim a
+    /// capability those pages do not have and move every page's bytes, breaking AC #4's byte-identity and the
+    /// <c>GoldenContentFingerprint</c> gate. The SPA entry shell and the webview chrome are the only two surfaces
+    /// that ever have a delta channel, so they are the only two that carry it.</para>
+    ///
+    /// <para><c>aria-live="polite"</c> announces an update without stealing focus; <c>role="status"</c> gives it
+    /// the right semantics for assistive tech reading a state line rather than a heading.</para></summary>
+    public const string LiveStampMarkup =
+        "<p class=\"spa-live-stamp\" id=\"" + LiveStampId + "\" role=\"status\" aria-live=\"polite\">"
+        + "Live updates: unavailable</p>\n";
+
     public static string BuildEntryShell(string siteTitle, string dashboardRegion)
     {
         var description =
@@ -539,6 +779,7 @@ public static class SpaDelivery
         // Reuse the canonical head (title, meta/OG, favicon, versioned specscribe.css + specscribe.js, skip link,
         // <body>) so the SPA shell can never drift from the static pages' chrome.
         sb.Append(PathUtil.RenderHeadOpen(siteTitle, ForgeOptions.StylesheetName, ForgeOptions.ScriptName, description));
+        sb.Append(LiveStampMarkup);
         sb.Append("<noscript>\n");
         sb.Append("  <div class=\"spa-noscript\">JavaScript is disabled — ");
         sb.Append("<a href=\"index.html\">open the full static site</a>.</div>\n");
@@ -572,9 +813,10 @@ public static class SpaDelivery
     /// it is necessarily above the ceiling (its content region is atomic and cannot be split). Declared, never
     /// silent — Story 22.2 AC #2.</summary>
     /// <param name="ChunkBytes">The size of the chunk FILE this page produces, in JSON-encoded UTF-8 bytes —
-    /// which is the number that exceeds the ceiling, not the raw content size the page entry's own
-    /// <c>bytes</c> field carries.</param>
-    private sealed record ManifestOversizedPage(string Path, long ChunkBytes);
+    /// the number that exceeds the ceiling. This is the whole assembled chunk (key + value + envelope), whereas
+    /// the page entry's own <c>bytes</c> field measures just that page's JSON-encoded content VALUE — both are
+    /// exact-encoded now (code review), so they agree on unit, just not on scope.</param>
+    private sealed record ManifestOversizedPage(string Path, int ChunkBytes);
 
     private sealed record ManifestEntry(
         string Title,

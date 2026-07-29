@@ -873,28 +873,54 @@
     try { initRiskGridPager(grid); } catch (err) { /* degrade silently — the full server-ordered grid stands */ }
   });
 
-  // ---- Code Map file table: client-side pagination [Story 7.12 review] -----------------------
+  // ---- Code Map file table: client-side pagination [Story 7.12 review; Story 20.10 Task 4.5] --
   // Progressive enhancement ONLY, mirroring initRiskGridPager above (same shape, its own class family so the
-  // two pagers can never cross-wire). The server ships every file as a plain <tr> inside ".codemap-table",
-  // already in significance order — the complete, correct, no-JS truth. Up to four independent tables can exist
-  // on one page (one per exclude-filter combination), so each is paginated independently by its own state.
+  // two pagers can never cross-wire). The server ships every DISTINCT file as a plain <tr> inside
+  // ".codemap-table", already in significance order — the complete, correct, no-JS truth.
+  //
+  // Story 20.10 D3 shares ONE table across all four filter combinations, with the pure-CSS
+  // `#cm-exclude-*:checked ~ … .is-spec/.is-test` rule (specscribe.css) hiding whichever rows the active exclude
+  // checkboxes remove — a DIFFERENT hiding mechanism than this pager's own `hidden` attribute. Paging must count
+  // only what the reader can actually SEE: over the raw row count, a filtered-down view would report "page 1 of
+  // 12" while most of those pages are invisible rows nobody can reach with Next.
   function initCodemapTablePager(table) {
     var pager = table.nextElementSibling;
     if (!pager || !pager.classList.contains("codemap-table-pager")) return;
-    var rows = Array.prototype.slice.call(table.querySelectorAll(".codemap-table-row"));
+    var allRows = Array.prototype.slice.call(table.querySelectorAll(".codemap-table-row"));
     var pageSize = parseInt(table.getAttribute("data-page-size"), 10) || 30;
-    if (rows.length <= pageSize) return; // everything already fits on one screen — leave the pager hidden
 
     var prevBtn = pager.querySelector(".codemap-table-pager-prev");
     var nextBtn = pager.querySelector(".codemap-table-pager-next");
     var status = pager.querySelector(".codemap-table-pager-status");
-    var totalPages = Math.ceil(rows.length / pageSize);
     var page = 0;
 
+    // Mirrors the CSS rule exactly (same two checkbox ids, same is-spec/is-test predicate) rather than reading
+    // computed style back — cheap, and correct even before the stylesheet has painted a first frame.
+    var excludeSpec = document.getElementById("cm-exclude-spec");
+    var excludeTests = document.getElementById("cm-exclude-tests");
+    function isRowFiltered(row) {
+      return (!!excludeSpec && excludeSpec.checked && row.classList.contains("is-spec"))
+        || (!!excludeTests && excludeTests.checked && row.classList.contains("is-test"));
+    }
+    function visibleRows() {
+      return allRows.filter(function (row) { return !isRowFiltered(row); });
+    }
+
     function render() {
-      rows.forEach(function (row, i) {
-        row.hidden = Math.floor(i / pageSize) !== page;
-      });
+      var rows = visibleRows();
+      var totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+      if (page >= totalPages) page = totalPages - 1;
+      if (page < 0) page = 0;
+
+      rows.forEach(function (row, i) { row.hidden = Math.floor(i / pageSize) !== page; });
+      // A filtered-out row's OWN hidden state is irrelevant — the CSS is-spec/is-test rule hides it regardless —
+      // but clearing it here means toggling the filter back off never leaves a stale hidden="" behind from a
+      // page boundary that no longer applies.
+      allRows.forEach(function (row) { if (isRowFiltered(row)) row.hidden = false; });
+
+      var showPager = rows.length > pageSize;
+      pager.hidden = !showPager;
+      if (!showPager) return;
       status.textContent = "Page " + (page + 1) + " of " + totalPages;
       prevBtn.disabled = page === 0;
       nextBtn.disabled = page === totalPages - 1;
@@ -907,13 +933,17 @@
       table.scrollIntoView({ block: "nearest" });
     });
     nextBtn.addEventListener("click", function () {
-      if (page === totalPages - 1) return;
       page++;
       render();
       table.scrollIntoView({ block: "nearest" });
     });
+    // The visible row set changes size when the reader flips an exclude checkbox — reset to page 1 and re-page
+    // rather than stranding them on a page index that may no longer exist.
+    [excludeSpec, excludeTests].forEach(function (box) {
+      if (!box) return;
+      box.addEventListener("change", function () { page = 0; render(); });
+    });
 
-    pager.hidden = false;
     render();
   }
 
@@ -1098,44 +1128,16 @@
     if (t && t.getAttribute && t.getAttribute("data-hierarchy-reveal") !== null) flushHierarchyReveals();
   });
 
-  /* --- Reveal-by-hash: a fragment naming a scope inside a not-yet-mounted panel must get a chance to apply too
-     [Story 20.9 code review] ---------------------------------------------------------------------------------
-     Only the default-visible panel's own `initHierarchyExplorer` runs at load, so `scopeFromHash()` never sees a
-     hash naming a scope inside one of the OTHER panels until the reader manually reveals it. Each instance's
-     `hashKey` lives in its own data island, readable without mounting it, so this runs once at boot — cheap, and
-     before the deferred-mount pass below gets to them.
-     Never forces `display` directly: the checkbox state IS the reader-visible "which filter is active" affordance,
-     so revealing a panel any other way would desync it from what the page's own controls show. A panel declares
-     which `[data-hierarchy-reveal]` controls need which checked state on the nearest ancestor carrying
-     `data-hierarchy-reveal-when="id=0|1;id=0|1"` — generic by construction, no surface name reaches this file. */
-  function revealPanelsNamedByHash() {
-    if (!location.hash) return;
-    var parts = location.hash.replace(/^#/, "").split("&");
-    var matched = false;
-    Array.prototype.forEach.call(document.querySelectorAll("[data-hierarchy]"), function (root) {
-      if (hierarchyPanelOf(root).clientWidth) return; // already visible — its own init reads the hash directly
-      var dataEl = document.getElementById(root.id + "-data");
-      if (!dataEl) return;
-      var cfg;
-      try { cfg = (JSON.parse(dataEl.textContent) || {}).config; } catch (e) { return; }
-      if (!cfg) return;
-      var key = (cfg.hashKey || "sb") + "=";
-      var named = false;
-      for (var i = 0; i < parts.length; i++) { if (parts[i].indexOf(key) === 0) { named = true; break; } }
-      if (!named) return;
-      var revealer = root.closest("[data-hierarchy-reveal-when]");
-      if (!revealer) return;
-      revealer.getAttribute("data-hierarchy-reveal-when").split(";").forEach(function (pair) {
-        var eq = pair.indexOf("=");
-        if (eq < 1) return;
-        var el = document.getElementById(pair.slice(0, eq));
-        if (el) { el.checked = pair.slice(eq + 1) === "1"; matched = true; }
-      });
-    });
-    // One flush covers every panel this hash named — flushHierarchyReveals() scans every deferred host itself,
-    // it does not need to be told which ones just became visible.
-    if (matched) flushHierarchyReveals();
-  }
+  // --- Reveal-by-hash [Story 20.9] -> RETIRED by Story 20.10 F5 --------------------------------------------
+  // `revealPanelsNamedByHash()` and `data-hierarchy-reveal-when` existed because Code Map's four filter panels
+  // were each `display:none` except the default one, so a deep link naming a scope inside a NON-default panel
+  // needed to check the right boxes before that panel's own `initHierarchyExplorer` could ever run. Story 20.10
+  // collapsed those four panels into ONE always-visible instance (D2) with a client-side view switch instead, so
+  // the hash-driven CHECKBOX-CHECKING this function did is now handled by `initHierarchyExplorer`'s own
+  // `viewKeyFromHash()` + view-toggle wiring, scoped to the one instance that exists. `data-hierarchy-reveal` and
+  // the zero-width deferred-mount guard (`deferHierarchyMount`/`flushHierarchyReveals`, below) are a DIFFERENT,
+  // still-live capability — the component's general answer to "I may be mounted inside a hidden container" — and
+  // are unaffected.
 
   // The two runtime-argument kinds a dimension may take (HierarchyDimensionArg). Named once so the marker
   // attribute and the emitted declaration cannot drift on a typo.
@@ -1153,6 +1155,9 @@
     var cfg = payload && payload.config;
     var NODES = (payload && payload.nodes) || [];
     if (!cfg || !NODES.length) return false;
+    // Story 20.10: an optional set of server-declared VIEWS over this same shared NODES bag (Code Map's four
+    // filter combinations are the first consumer). Null on every other surface, so nothing below changes for them.
+    var VIEWS = (payload && payload.views && payload.views.length) ? payload.views : null;
 
     var panel = root.closest("[data-explorer]") || root.parentNode;
     var live = panel.querySelector(".ss-hierarchy-live");
@@ -1161,14 +1166,49 @@
     var controls = panel.querySelector(".ss-hierarchy-controls");
     var selectMode = cfg.mode === "select";
 
+    /* --- Views (Story 20.10) --------------------------------------------------------------------------------
+       A view names its own directory SCAFFOLD (never shared across views — F2: a single-child directory chain's
+       collapse depends on which files survived the filter, so the same directory can carry a different id, label
+       AND parent per view) plus which of the shared NODES it contains and where each hangs in THIS view
+       (`files`/`parent`, parallel integer-indexed arrays — Task 1.4). `activeView()` and `activeViewRawNodes()`
+       are the ONLY place that reads them; everything else below keeps working over whatever `reindex()` last
+       built, exactly as it did before views existed. */
+    var viewIndex = 0;
+    function activeView() { return VIEWS ? (VIEWS[viewIndex] || VIEWS[0]) : null; }
+    function activeViewKey() { var v = activeView(); return v ? v.key : null; }
+    function activeViewRawNodes() {
+      var v = activeView();
+      if (!v) return NODES;
+      var out = v.scaffold.slice();
+      for (var i = 0; i < v.files.length; i++) {
+        var n = NODES[v.files[i]];
+        if (!n) continue;
+        var parentNode = v.scaffold[v.parent[i]];
+        var copy = {};
+        for (var k in n) { if (Object.prototype.hasOwnProperty.call(n, k)) copy[k] = n[k]; }
+        copy.parentId = parentNode ? parentNode.id : null;
+        out.push(copy);
+      }
+      return out;
+    }
+
     // Prototype-less maps: node ids come from author-controlled markdown (`### Story N.M:` headings, which nothing
     // dedupes), so an id of "constructor" or "__proto__" would otherwise resolve to an inherited Object member and
     // blow up every lookup below — reachable from a crafted hash. Same hardening the Story 20.2 block carries.
-    var byId = Object.create(null), childrenOf = Object.create(null), indexOf = Object.create(null), depthOf = Object.create(null);
-    NODES.forEach(function (n, i) {
-      if (byId[n.id] === undefined) { byId[n.id] = n; indexOf[n.id] = i; }
-      if (n.parentId) { (childrenOf[n.parentId] = childrenOf[n.parentId] || []).push(n); }
-    });
+    // Story 20.10: these are now REASSIGNED (not just built once) by `reindex()` on every view switch — every
+    // function below closes over the SAME `var` bindings, so a reassignment is visible everywhere without having
+    // to thread a view parameter through the whole file.
+    var byId, childrenOf, indexOf, depthOf, ROOT_ID, currentRawNodes;
+    function reindex(list) {
+      currentRawNodes = list;
+      byId = Object.create(null); childrenOf = Object.create(null); indexOf = Object.create(null); depthOf = Object.create(null);
+      list.forEach(function (n, i) {
+        if (byId[n.id] === undefined) { byId[n.id] = n; indexOf[n.id] = i; }
+        if (n.parentId) { (childrenOf[n.parentId] = childrenOf[n.parentId] || []).push(n); }
+      });
+      ROOT_ID = list[0] && !list[0].parentId ? list[0].id : null;
+    }
+    reindex(VIEWS ? activeViewRawNodes() : NODES);
     function depth(id) {
       if (depthOf[id] !== undefined) return depthOf[id];
       var d = 0, cur = byId[id], guard = 0;
@@ -1177,7 +1217,6 @@
       return d;
     }
     function hasChildren(id) { return !!(childrenOf[id] && childrenOf[id].length); }
-    var ROOT_ID = NODES[0] && !NODES[0].parentId ? NODES[0].id : null;
 
     /* --- Tokens: resolved from the SHIPPED cascade, never re-typed ------------------------------------------
        NOTHING about a colour family is written here any more. The server emits each node's resolvable CLASS LIST
@@ -1413,12 +1452,15 @@
       var d = activeDim();
       if (!d) return;
 
-      // The scan spans the WHOLE payload, not the drilled or filtered view — the renderer this replaces scanned
-      // every cell in the panel regardless of zoom, so a level means the same thing before and after a drill.
+      // The scan spans the WHOLE payload, not the drilled scope — the renderer this replaces scanned every cell in
+      // the panel regardless of zoom, so a level means the same thing before and after a drill. Story 20.10 F3:
+      // with views, "whole payload" means the ACTIVE VIEW's own nodes (`currentRawNodes`, kept in step by
+      // `reindex()` on every view switch) — scanning the full shared NODES bag here would silently become the
+      // rejected "one scale across all views" design and recolour views whose ramp should normalize on their own.
       var scale = null;
       if (d.kind === "ramp" || d.kind === "ramp-window") {
         var min = Infinity, max = 0;
-        NODES.forEach(function (n) {
+        currentRawNodes.forEach(function (n) {
           if (!n.metrics) return;
           var v = dimValue(n, d);
           if (v === null) return;
@@ -1428,7 +1470,7 @@
         scale = { min: isFinite(min) ? min : 0, max: max, window: d.kind === "ramp-window" };
       }
 
-      NODES.forEach(function (n) {
+      currentRawNodes.forEach(function (n) {
         // Structural nodes — directories and the synthesized root — carry no metric bag and never participate in
         // a dimension. The SVG never recoloured a directory rect either; a directory has no dominant author.
         if (!n.metrics) return;
@@ -1557,7 +1599,31 @@
        `branchvalues: "total"` Plotly renders that wrong rather than complaining. [Story 20.7 Task 1.3] */
     var filterState = null;   // null = unfiltered; otherwise a map of kept root-child id -> true
 
+    // Story 20.10 Task 2.1: the children-win roll-up, extracted so the EXISTING root-child filter below and the
+    // NEW view switch both end on the SAME rule — a second implementation is exactly how two views (or a view and
+    // a filter) would start disagreeing about a parent's value. `list` must already be parent-before-child.
+    function rollUpChildrenWin(list) {
+      var present = Object.create(null);
+      for (var p = 0; p < list.length; p++) present[list[p].id] = true;
+      var sum = Object.create(null), hasKids = Object.create(null);
+      for (var i = list.length - 1; i >= 0; i--) {
+        var n = list[i];
+        var own = hasKids[n.id] ? sum[n.id] : n.value;
+        if (n.parentId && present[n.parentId]) {
+          sum[n.parentId] = (sum[n.parentId] || 0) + own;
+          hasKids[n.parentId] = true;
+        }
+      }
+      return list.map(function (n) {
+        return hasKids[n.id] ? shallowWithValue(n, sum[n.id]) : n;
+      });
+    }
+
     function visibleNodes() {
+      // Story 20.10: a view-bearing instance rolls up its OWN scaffold+files set — `currentRawNodes`, kept in
+      // step by `reindex()` on every view switch (Task 2.1 — extending this seam, not minting a second one).
+      if (VIEWS) return rollUpChildrenWin(currentRawNodes);
+
       if (!cfg.filterable || !filterState) return NODES;
 
       var keep = Object.create(null);
@@ -1577,20 +1643,7 @@
       // Plotly renders as an empty frame with a stale-looking centre label. The live region says what happened.
       if (kept.length <= 1) return [];
 
-      // Roll up bottom-up over the KEPT set. Iterate children-before-parents by walking the kept list backwards,
-      // which is valid because the emitted order is parent-before-child at every level.
-      var sum = Object.create(null), hasKids = Object.create(null);
-      for (var i = kept.length - 1; i >= 0; i--) {
-        var n = kept[i];
-        var own = hasKids[n.id] ? sum[n.id] : n.value;
-        if (n.parentId && keep[n.parentId]) {
-          sum[n.parentId] = (sum[n.parentId] || 0) + own;
-          hasKids[n.parentId] = true;
-        }
-      }
-      return kept.map(function (n) {
-        return hasKids[n.id] ? shallowWithValue(n, sum[n.id]) : n;
-      });
+      return rollUpChildrenWin(kept);
     }
     function shallowWithValue(n, value) {
       var out = {};
@@ -1991,14 +2044,35 @@
        and tears the chart down mid-interaction. Extracted to component scope so 20.7's deletion of the 20.2 block
        does not take them with it. */
     var HASH_KEY = (cfg.hashKey || "sb") + "=";
+    // Story 20.10 Task 2.7: a second fragment key for the active VIEW, alongside the drilled scope — retiring the
+    // four per-variant `#cm-{key}=` HashKeys Story 20.9 shipped (never a documented stable scheme) in favour of
+    // ONE HashKey plus this sibling, so a shared link lands on the right filter AND the right scope together.
+    var VIEW_HASH_KEY = VIEWS ? (cfg.hashKey || "sb") + "-view=" : null;
     var spaHost = document.getElementById("spa-content");
     function hashWith(id) {
       var raw = location.hash.replace(/^#/, "");
       var parts = raw ? raw.split("&") : [];
       var kept = [];
-      for (var i = 0; i < parts.length; i++) { if (parts[i].indexOf(HASH_KEY) !== 0 && parts[i]) kept.push(parts[i]); }
+      for (var i = 0; i < parts.length; i++) {
+        if (parts[i].indexOf(HASH_KEY) !== 0 && (!VIEW_HASH_KEY || parts[i].indexOf(VIEW_HASH_KEY) !== 0) && parts[i]) kept.push(parts[i]);
+      }
+      if (VIEW_HASH_KEY) {
+        var vk = activeViewKey();
+        if (vk) kept.unshift(VIEW_HASH_KEY + encodeURIComponent(vk));
+      }
       if (id) kept.unshift(HASH_KEY + encodeURIComponent(id));
       return kept.length ? "#" + kept.join("&") : location.pathname + location.search;
+    }
+    function viewKeyFromHash() {
+      if (!VIEW_HASH_KEY) return null;
+      var raw = location.hash.replace(/^#/, "");
+      var parts = raw ? raw.split("&") : [];
+      for (var i = 0; i < parts.length; i++) {
+        if (parts[i].indexOf(VIEW_HASH_KEY) === 0) {
+          try { return decodeURIComponent(parts[i].slice(VIEW_HASH_KEY.length)); } catch (e) { return null; }
+        }
+      }
+      return null;
     }
     function scopeFromHash() {
       var raw = location.hash.replace(/^#/, "");
@@ -2138,12 +2212,17 @@
       Array.prototype.forEach.call(panel.querySelectorAll("[data-hierarchy-arg-wrap]"), function (wrap) {
         wrap.hidden = wrap.getAttribute("data-hierarchy-arg-wrap") !== (d.arg || "");
       });
-      // Exactly one legend block visible per active dimension, so the legend can never disagree with what is
-      // coloured. The caption is a TEMPLATE the surface wrote — the words are the surface's, not this file's.
+      // Exactly one legend block visible per active dimension (AND, Story 20.10, per active VIEW), so the legend
+      // can never disagree with what is coloured. The caption is a TEMPLATE the surface wrote — the words are the
+      // surface's, not this file's.
+      var vKey = activeViewKey();
       Array.prototype.forEach.call(panel.querySelectorAll("[data-hierarchy-legend]"), function (block) {
-        block.hidden = block.getAttribute("data-hierarchy-legend") !== (d.legendKey || "");
+        var matchesDim = block.getAttribute("data-hierarchy-legend") === (d.legendKey || "");
+        var matchesView = !VIEWS || block.getAttribute("data-hierarchy-legend-view") === vKey;
+        block.hidden = !(matchesDim && matchesView);
       });
-      var caption = panel.querySelector("[data-hierarchy-legend=\"" + (d.legendKey || "") + "\"] [data-hierarchy-legend-caption]");
+      var legendSelector = "[data-hierarchy-legend=\"" + (d.legendKey || "") + "\"]" + (VIEWS ? "[data-hierarchy-legend-view=\"" + vKey + "\"]" : "");
+      var caption = panel.querySelector(legendSelector + " [data-hierarchy-legend-caption]");
       var captionText = caption ? tmpl(caption.getAttribute("data-hierarchy-legend-caption"), { label: d.label }) : "";
       if (caption) caption.textContent = captionText;
       resolveDimension();
@@ -2216,6 +2295,78 @@
         // the visible control disagrees with. [Review 2026-07-22, preserved]
         if (dimSelect && dimSelect.value) dimState.key = dimSelect.value;
         applyDimension(false);
+      }
+
+      // --- View switch (Story 20.10 Task 2.3). Declarative, exactly like `data-hierarchy-filter` below: the
+      // checkboxes now live OUTSIDE this panel (D2 collapsed four panels into one), so this reads them from the
+      // WHOLE DOCUMENT via a generic marker rather than a surface-specific id, matching each checkbox's own id +
+      // checked state against a view's `when` string. Nothing here learns what "cm-exclude-spec" means.
+      if (VIEWS) {
+        var viewToggles = Array.prototype.slice.call(document.querySelectorAll("[data-hierarchy-view-toggle]"));
+        var titleEl = panel.querySelector(".chart-frame-head h3");
+        var windowEl = panel.querySelector(".chart-frame-window");
+
+        function viewToggleState() {
+          return viewToggles.map(function (box) { return box.id + "=" + (box.checked ? "1" : "0"); }).join(";");
+        }
+        function viewIndexForState(want) {
+          for (var i = 0; i < VIEWS.length; i++) { if (VIEWS[i].when === want) return i; }
+          return -1;
+        }
+
+        // The framed title and analysis window track the active view (F4) — the ONLY two visible facts a JS-off
+        // reader would have gotten from a per-panel heading; everything else the view switch changes is inside
+        // the chart itself. Task 2.4: a drilled scope the new view does not contain is reset to the top rather
+        // than left pointing at a level that no longer exists — the same precedent `applyFilter` sets below.
+        function applyView(pushHash, announceIt) {
+          var v = activeView();
+          if (titleEl && v.title) titleEl.textContent = v.title;
+          if (windowEl) windowEl.textContent = v.window || "";
+          reindex(activeViewRawNodes());
+          if (state.level && !byId[state.level]) state.level = null;
+          state.selected = null;
+          // Task 2.5: re-run dimension resolution (the ramp re-scales to the ACTIVE view, F3) on every view
+          // change, not only a dimension change — nothing was both dimension-bearing and filterable before Code
+          // Map's shared payload existed.
+          if (DIMS) { applyDimension(false); } else { redraw(); }
+          applyState(pushHash);
+          if (announceIt && v.title) announce("Showing " + v.title);
+        }
+
+        if (viewToggles.length) {
+          // Task 2.7 / F4: a deep link naming a view (`{hashKey}-view=`) checks the boxes that view declares it
+          // needs BEFORE reading their state back — the checkbox state IS the reader-visible "which filter is
+          // active" affordance, so the chart's view and what the page visibly shows must agree, never diverge.
+          var hashView = viewKeyFromHash();
+          if (hashView) {
+            var named = null;
+            for (var hv = 0; hv < VIEWS.length; hv++) { if (VIEWS[hv].key === hashView) { named = VIEWS[hv]; break; } }
+            if (named && named.when) {
+              named.when.split(";").forEach(function (pair) {
+                var eq = pair.indexOf("=");
+                if (eq < 1) return;
+                var wantId = pair.slice(0, eq), wantOn = pair.slice(eq + 1) === "1";
+                for (var vb = 0; vb < viewToggles.length; vb++) {
+                  if (viewToggles[vb].id === wantId) { viewToggles[vb].checked = wantOn; break; }
+                }
+              });
+            }
+          }
+
+          viewToggles.forEach(function (box) {
+            box.addEventListener("change", function () {
+              var idx = viewIndexForState(viewToggleState());
+              if (idx < 0 || idx === viewIndex) return;
+              viewIndex = idx;
+              applyView(true, true);
+            });
+          });
+          // Sync once at init — same precedent as the dimension select above: a bfcache/back-navigation restore
+          // or a hash-driven check above must not leave the chart on the default view while the visible checkboxes
+          // (or the shared link) disagree.
+          var initialIdx = viewIndexForState(viewToggleState());
+          if (initialIdx >= 0 && initialIdx !== viewIndex) { viewIndex = initialIdx; applyView(false, false); }
+        }
       }
 
       // --- Root-subtree filter (config-gated). Same reveal, same bar: a surface's own controls inherit the
@@ -2316,7 +2467,6 @@
     return true;
   }
 
-  revealPanelsNamedByHash();
   initHierarchyExplorers(document);
   document.addEventListener("specscribe:content-swapped", function (e) {
     initHierarchyExplorers(e && e.detail ? e.detail.root : document);

@@ -74,6 +74,221 @@ public class SpaDeliveryTests
     private static Dictionary<string, string> ChunkContent(IReadOnlyList<SpaDelivery.OutputFile> files, string chunkFile) =>
         JsonSerializer.Deserialize<Dictionary<string, string>>(files.Single(f => f.OutputRelativePath == chunkFile).Content)!;
 
+    // ===== Story 22.6: the watch-mode delta document ========================================================
+
+    /// <summary>Builds a manifest through the REAL <see cref="SpaDelivery.BuildDataFiles"/> rather than
+    /// hand-writing one, so these tests exercise the shape the emitter actually produces — a hand-rolled fixture
+    /// would keep passing after a manifest change that broke the delta.</summary>
+    private static string Manifest(params (string Path, string Body)[] pages)
+    {
+        var bundle = new SpaBundle(
+            "Test Site", "index.html", Array.Empty<(string, string)>(),
+            pages.Select(p => new SpaPage(
+                p.Path, p.Path, $"<main id=\"main-content\">{p.Body}</main>", Array.Empty<BreadcrumbCrumb>())).ToList());
+        return SpaDelivery.BuildDataFiles(bundle).Single(f => f.OutputRelativePath == SpaDelivery.ManifestPath).Content;
+    }
+
+    private static JsonElement Delta(
+        string? previous, string current, long sequence = 1, string trigger = "docs/a.md", bool forceFull = false) =>
+        JsonDocument.Parse(SpaDelivery.BuildDelta(
+            previous, current, sequence, trigger, DateTimeOffset.UnixEpoch, forceFull)).RootElement;
+
+    private static string[] Arr(JsonElement delta, string name) =>
+        delta.GetProperty(name).EnumerateArray().Select(e => e.GetString()!).ToArray();
+
+    /// <summary>The baseline every other delta case is measured against: a regen that changed nothing must emit an
+    /// EMPTY delta, not a full one. If this degraded to <c>full</c> the sidecar would be worthless — a watch
+    /// session's debounce fires on saves that frequently change no rendered output at all (Task 1's no-op control
+    /// measured exactly zero churn on all four routes), and every one of them would tell the consumer to refetch
+    /// the whole IR.</summary>
+    [Fact]
+    public void BuildDelta_EmitsAnEmptyDelta_WhenNothingChanged()
+    {
+        var manifest = Manifest(("index.html", "home"), ("docs/a.html", "alpha"));
+
+        var delta = Delta(manifest, manifest);
+
+        Assert.False(delta.GetProperty("full").GetBoolean());
+        Assert.Empty(Arr(delta, "changed"));
+        Assert.Empty(Arr(delta, "added"));
+        Assert.Empty(Arr(delta, "removed"));
+        Assert.Empty(Arr(delta, "chunks"));
+    }
+
+    /// <summary>The whole point of Story 22.2's per-page <c>contentHash</c>: one page edited names EXACTLY that
+    /// page, not its neighbours and not its whole chunk. Task 1 measured this route re-shipping 39.9 % of the IR
+    /// at chunk granularity before page addressing existed.</summary>
+    [Fact]
+    public void BuildDelta_NamesOnlyTheEditedPage_AndTheChunkCarryingIt()
+    {
+        var before = Manifest(("index.html", "home"), ("docs/a.html", "alpha"), ("docs/b.html", "beta"));
+        var after = Manifest(("index.html", "home"), ("docs/a.html", "ALPHA EDITED"), ("docs/b.html", "beta"));
+
+        var delta = Delta(before, after);
+
+        Assert.False(delta.GetProperty("full").GetBoolean());
+        Assert.Equal(new[] { "docs/a.html" }, Arr(delta, "changed"));
+        Assert.Empty(Arr(delta, "added"));
+        Assert.Empty(Arr(delta, "removed"));
+        Assert.Equal(new[] { "spa/pages-docs.json" }, Arr(delta, "chunks"));
+    }
+
+    [Fact]
+    public void BuildDelta_ReportsAnAddedPage_AndItsChunk()
+    {
+        var before = Manifest(("index.html", "home"));
+        var after = Manifest(("index.html", "home"), ("docs/new.html", "fresh"));
+
+        var delta = Delta(before, after);
+
+        Assert.Equal(new[] { "docs/new.html" }, Arr(delta, "added"));
+        Assert.Empty(Arr(delta, "changed"));
+        Assert.Equal(new[] { "spa/pages-docs.json" }, Arr(delta, "chunks"));
+    }
+
+    /// <summary>A removed page carries NO chunk: the chunk that held it may not exist any more, and a consumer
+    /// applying a removal needs no bytes to do it. Pinning this stops a future "symmetry" refactor from telling
+    /// consumers to fetch a file that was just deleted.</summary>
+    [Fact]
+    public void BuildDelta_ReportsARemovedPage_AndAsksForNoChunkToApplyIt()
+    {
+        var before = Manifest(("index.html", "home"), ("docs/gone.html", "bye"));
+        var after = Manifest(("index.html", "home"));
+
+        var delta = Delta(before, after);
+
+        Assert.Equal(new[] { "docs/gone.html" }, Arr(delta, "removed"));
+        Assert.Empty(Arr(delta, "changed"));
+        Assert.Empty(Arr(delta, "added"));
+        Assert.Empty(Arr(delta, "chunks"));
+    }
+
+    /// <summary>AC #7, first degrade condition: the first emit of a watch session has no basis to diff against.</summary>
+    [Fact]
+    public void BuildDelta_DegradesToFull_WhenThereIsNoPreviousManifest()
+    {
+        var delta = Delta(previous: null, current: Manifest(("index.html", "home")));
+
+        AssertIsFullMarker(delta);
+    }
+
+    /// <summary>AC #7: a <see cref="SpaDelivery.SchemaVersion"/> change between emits makes a page-level diff
+    /// meaningless — version 2 moved the content region's start marker and moved 594 pages' hashes by +30 bytes
+    /// each, none of which was a content change. Simulated by rewriting the version on an otherwise IDENTICAL
+    /// manifest, so the ONLY difference is the schema: without the guard this would report zero changes, which is
+    /// the false-unchanged failure AC #7 exists to prevent.</summary>
+    [Fact]
+    public void BuildDelta_DegradesToFull_WhenTheIrSchemaVersionMovedBetweenEmits()
+    {
+        var current = Manifest(("index.html", "home"), ("docs/a.html", "alpha"));
+        var previous = current.Replace(
+            $"\"schemaVersion\":{SpaDelivery.SchemaVersion}",
+            $"\"schemaVersion\":{SpaDelivery.SchemaVersion - 1}",
+            StringComparison.Ordinal);
+        Assert.NotEqual(previous, current); // the rewrite must actually have bitten
+
+        AssertIsFullMarker(Delta(previous, current));
+    }
+
+    /// <summary>AC #7: the caller-declared untrustworthy basis — how a <c>RegenerateTopology</c> escalation
+    /// reports itself. A literal diff there would produce a thousand-entry <c>changed</c> list, larger and slower
+    /// than the full payload it was meant to replace.</summary>
+    [Fact]
+    public void BuildDelta_DegradesToFull_WhenTheCallerForcesIt_EvenWithAPerfectlyGoodBasis()
+    {
+        var manifest = Manifest(("index.html", "home"));
+
+        AssertIsFullMarker(Delta(manifest, manifest, forceFull: true));
+    }
+
+    /// <summary>AC #7 / NFR2: an unparseable or structurally alien basis degrades rather than throwing. This runs
+    /// on a watch loop; an exception here would take down the session over a best-effort optimization.</summary>
+    [Theory]
+    [InlineData("{ not json at all")]
+    [InlineData("[]")]
+    [InlineData("{\"schemaVersion\":2}")]                       // no pages object
+    [InlineData("{\"schemaVersion\":2,\"pages\":[]}")]           // pages is the wrong kind
+    [InlineData("{\"schemaVersion\":2,\"pages\":{\"a.html\":{}}}")] // page entry missing contentHash/chunk
+    public void BuildDelta_DegradesToFull_RatherThanThrowing_OnAnUnusableBasis(string previous)
+    {
+        AssertIsFullMarker(Delta(previous, Manifest(("index.html", "home"))));
+    }
+
+    /// <summary>The mirror case: an unreadable CURRENT manifest must not be diffed into "every page removed".</summary>
+    [Fact]
+    public void BuildDelta_DegradesToFull_WhenTheCurrentManifestIsUnreadable()
+    {
+        var delta = Delta(Manifest(("index.html", "home")), "{ truncated");
+
+        AssertIsFullMarker(delta);
+    }
+
+    /// <summary>The document is a CONTRACT (AC #2) — Story 22.5 and any future consumer bind to these names. This
+    /// pins the envelope: every field present, correctly named, correctly typed, with the version constants
+    /// SEPARATE (AC #4 forbids bumping <see cref="SpaDelivery.SchemaVersion"/> for this feature).</summary>
+    [Fact]
+    public void BuildDelta_EmitsTheContractedEnvelope_WithBothVersionsCarriedSeparately()
+    {
+        var manifest = Manifest(("index.html", "home"));
+
+        var delta = Delta(manifest, manifest, sequence: 7, trigger: "_bmad-output/planning-artifacts/epics.md");
+
+        Assert.Equal(SpaDelivery.DeltaSchemaVersion, delta.GetProperty("deltaSchemaVersion").GetInt32());
+        Assert.Equal(SpaDelivery.SchemaVersion, delta.GetProperty("schemaVersion").GetInt32());
+        Assert.Equal(7, delta.GetProperty("sequence").GetInt64());
+        Assert.Equal("_bmad-output/planning-artifacts/epics.md", delta.GetProperty("trigger").GetString());
+        Assert.Equal("1970-01-01T00:00:00.0000000Z", delta.GetProperty("generatedAt").GetString());
+        Assert.Equal(JsonValueKind.False, delta.GetProperty("full").ValueKind);
+        foreach (var list in new[] { "changed", "added", "removed", "chunks" })
+        {
+            Assert.Equal(JsonValueKind.Array, delta.GetProperty(list).ValueKind);
+        }
+    }
+
+    /// <summary>The escalated topology pass reuses <see cref="FileWatcherService.TopologyEventLabel"/> VERBATIM
+    /// rather than introducing a third spelling — that constant is already shared between the watcher and
+    /// <c>SiteGenerator.RegenerateTopology</c> "so the two can never drift", and the sidecar joins that pact.</summary>
+    [Fact]
+    public void BuildDelta_CarriesTheSharedTopologyLabel_AsItsTrigger()
+    {
+        var manifest = Manifest(("index.html", "home"));
+
+        var delta = Delta(manifest, manifest, trigger: FileWatcherService.TopologyEventLabel, forceFull: true);
+
+        Assert.Equal("<directory change>", delta.GetProperty("trigger").GetString());
+        Assert.Equal(FileWatcherService.TopologyEventLabel, delta.GetProperty("trigger").GetString());
+    }
+
+    /// <summary>NFR9-adjacent determinism: the same two manifests must produce a BYTE-identical document, and page
+    /// order must not leak input enumeration order. <see cref="SpaDelivery.BuildDataFiles"/> holds this same
+    /// discipline for chunk membership; the delta is written to disk on every watch regen, so a nondeterministic
+    /// ordering would churn the sidecar's bytes for no reason.</summary>
+    [Fact]
+    public void BuildDelta_IsDeterministic_AndOrdersPathsOrdinally()
+    {
+        var before = Manifest(("index.html", "h"), ("docs/b.html", "b"), ("docs/a.html", "a"), ("docs/c.html", "c"));
+        var after = Manifest(("index.html", "h"), ("docs/c.html", "C!"), ("docs/a.html", "A!"), ("docs/b.html", "B!"));
+
+        var first = SpaDelivery.BuildDelta(before, after, 3, "docs/a.md", DateTimeOffset.UnixEpoch);
+        var second = SpaDelivery.BuildDelta(before, after, 3, "docs/a.md", DateTimeOffset.UnixEpoch);
+
+        Assert.Equal(first, second);
+        Assert.Equal(
+            new[] { "docs/a.html", "docs/b.html", "docs/c.html" },
+            Arr(JsonDocument.Parse(first).RootElement, "changed"));
+    }
+
+    /// <summary>A full marker is not merely <c>full: true</c> — AC #7 requires the page lists be EMPTY, so a
+    /// consumer can never half-apply a delta it was told to distrust.</summary>
+    private static void AssertIsFullMarker(JsonElement delta)
+    {
+        Assert.True(delta.GetProperty("full").GetBoolean());
+        Assert.Empty(Arr(delta, "changed"));
+        Assert.Empty(Arr(delta, "added"));
+        Assert.Empty(Arr(delta, "removed"));
+        Assert.Empty(Arr(delta, "chunks"));
+    }
+
     /// <summary>Deferred item (Story 6.7 review): the "split oversized groups into numbered files" branch of
     /// <see cref="SpaDelivery.BuildDataFiles"/> had zero test coverage at the <see cref="SpaDelivery.MaxPagesPerChunk"/>
     /// (75) boundary — an off-by-one in the batch arithmetic (<c>count / MaxPagesPerChunk + 1</c>) would go
@@ -423,7 +638,9 @@ public class SpaDeliveryTests
         const string region = "<main id=\"main-content\"><p>Stable</p></main>";
 
         Assert.Equal(SpaDelivery.ContentHash(region), SpaDelivery.ContentHash(region));
-        Assert.Equal(SpaDelivery.ContentHash(region), SpaDelivery.ContentHash(string.Copy(region)));
+        // string.Copy is obsolete (SYSLIB0050, code review) — string.Concat forces the same distinct,
+        // non-interned reference without a deprecated API call.
+        Assert.Equal(SpaDelivery.ContentHash(region), SpaDelivery.ContentHash(string.Concat(region)));
         Assert.NotEqual(SpaDelivery.ContentHash(region), SpaDelivery.ContentHash(region + " "));
         Assert.Matches("^[0-9a-f]{16}$", SpaDelivery.ContentHash(region));
     }

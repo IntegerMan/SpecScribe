@@ -148,6 +148,7 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
         <span class="ss-webview-toolbar-label">SpecScribe</span>
         <button type="button" class="ss-reveal-src-btn" title="Open the markdown file this view was rendered from (read-only)" hidden>Open source</button>
         <button type="button" class="ss-helper-btn" data-ss-label="a code-review prompt" data-ss-prompt="__HELPER_PROMPT__">Copy code-review prompt</button>
+        <span class="spa-live-stamp" id="spa-live-stamp" role="status" aria-live="polite">Live updates: unavailable</span>
         </div>
         <div id="specscribe-surface" data-path="__PATH__" data-source="__SOURCE__">
         __CONTENT__
@@ -286,8 +287,18 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
 
           // Host push (AD-8): both in-webview navigation and live refresh arrive as one message shape and are
           // swapped IN PLACE — the panel document (and its one nonce) is set exactly once, never re-created.
+          // Story 22.6 AC #5 — the "Quiet Stamp", webview half. State as WORDS, never by color and never by
+          // motion; the element is already in the server-rendered toolbar reading "Live updates: unavailable", so
+          // this only ever rewrites textContent — nothing is inserted or removed, so an update shifts no layout.
+          // The host posts this whenever it applies a payload, because the host — not this script — is the side
+          // that owns the `--serve --serve-delta` connection and knows whether it is alive.
+          var liveStamp = document.getElementById('spa-live-stamp');
           window.addEventListener('message', function (e) {
             var m = e.data || {};
+            if (m.type === 'liveStatus') {
+              if (liveStamp && typeof m.text === 'string') liveStamp.textContent = m.text;
+              return;
+            }
             if (m.type !== 'update' || typeof m.html !== 'string' || !surface) return;
             surface.innerHTML = m.html;
             if (m.path) surface.setAttribute('data-path', m.path);

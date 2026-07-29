@@ -10,11 +10,11 @@
     "epics/story-{id}.html"
   ],
   "stats": {
-    "carriedRules": 873,
-    "carriedSelectors": 995,
+    "carriedRules": 876,
+    "carriedSelectors": 998,
     "carriedKeyframes": 4,
     "droppedRoot": 4,
-    "generatedBytes": 110745
+    "generatedBytes": 110990
   },
   "rules": [
     {
@@ -2172,6 +2172,10 @@
       "carried": true
     },
     {
+      "selector": ".req-flow-state.retired",
+      "carried": true
+    },
+    {
       "selector": ".req-flow-ribbon.done",
       "carried": true
     },
@@ -2193,6 +2197,10 @@
     },
     {
       "selector": ".req-flow-ribbon.deferred",
+      "carried": true
+    },
+    {
+      "selector": ".req-flow-ribbon.retired",
       "carried": true
     },
     {
@@ -2755,6 +2763,10 @@
     },
     {
       "selector": ".satisfaction-bracket .seg.unmapped",
+      "carried": true
+    },
+    {
+      "selector": ".satisfaction-bracket .seg.retired",
       "carried": true
     },
     {

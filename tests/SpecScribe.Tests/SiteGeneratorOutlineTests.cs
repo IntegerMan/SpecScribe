@@ -45,6 +45,10 @@ public class SiteGeneratorOutlineTests : IDisposable
 
         Harden the portal.
 
+        ### Epic 4: Abandoned
+
+        Was going to widen the portal further.
+
         ## Epic 1: Foundation
 
         ### Story 1.1: Foundation Story
@@ -74,6 +78,12 @@ public class SiteGeneratorOutlineTests : IDisposable
         ### Story 3.2: Hardening Story Two
 
         As a maintainer, I want hardening two.
+
+        ## Epic 4: Abandoned
+
+        ### Story 4.1: Widening Story
+
+        As a maintainer, I want to widen the portal (retired before it started).
         """;
 
     // 1.1 is in-progress → stage "active"; two tasks, one done → 1/2.
@@ -161,6 +171,10 @@ public class SiteGeneratorOutlineTests : IDisposable
         // Epic 3's stories are all done but there is NO retro → retro-gated stage "review".
         File.WriteAllText(Path.Combine(impl, "epic-2-retro-2026-01-01.md"),
             "# Epic 2 Retrospective\n\n**Date:** 2026-01-01\n\nWent well.\n");
+        // Epic 4's sole story is retired → the epic is all-retired (Story 8.9 review): the retro-gated
+        // classifier must pass this straight through as "retired", never treat it as awaiting a retrospective.
+        File.WriteAllText(Path.Combine(impl, "4-1-widening.md"),
+            "# Story 4.1: Widening Story\n\nStatus: retired\n\n## Story\n\nAs a maintainer, I want to widen the portal.\n\n## Acceptance Criteria\n\n1. n/a.\n\n## Tasks / Subtasks\n\n- [ ] Task 1: n/a\n");
 
         // Seed a bmm module so BmadCommands.PrimaryStoryCommand resolves to /bmad-* strings.
         var configDir = Path.Combine(_root, "_bmad", "_config");
@@ -197,10 +211,11 @@ public class SiteGeneratorOutlineTests : IDisposable
     {
         var outline = Outline();
 
-        Assert.Equal(new[] { 1, 2, 3 }, outline.Epics.Select(e => e.Number).ToArray());
+        Assert.Equal(new[] { 1, 2, 3, 4 }, outline.Epics.Select(e => e.Number).ToArray());
         Assert.Equal(new[] { "1.1", "1.2", "1.3" }, outline.Epics[0].Stories.Select(s => s.Id).ToArray());
         Assert.Equal(new[] { "2.1" }, outline.Epics[1].Stories.Select(s => s.Id).ToArray());
         Assert.Equal(new[] { "3.1", "3.2" }, outline.Epics[2].Stories.Select(s => s.Id).ToArray());
+        Assert.Equal(new[] { "4.1" }, outline.Epics[3].Stories.Select(s => s.Id).ToArray());
         Assert.Equal("Foundation", outline.Epics[0].Title);
     }
 
@@ -221,6 +236,9 @@ public class SiteGeneratorOutlineTests : IDisposable
         Assert.Equal("active", outline.Epics[0].Stage);          // has an active story
         Assert.Equal("done", outline.Epics[1].Stage);            // all done AND a retro exists
         Assert.Equal("review", outline.Epics[2].Stage);          // all done but NO retro → retro-gated review
+        // Story 8.9 review: all-retired must pass straight through as "retired" — the retro gate (Done-only)
+        // must never turn an abandoned epic into "review", as if it were awaiting a retrospective.
+        Assert.Equal("retired", outline.Epics[3].Stage);
     }
 
     [Fact]
@@ -284,7 +302,9 @@ public class SiteGeneratorOutlineTests : IDisposable
         Assert.Equal(1, s.Active);   // 1.1
         Assert.Equal(1, s.Review);   // 1.3
         Assert.Equal(3, s.Done);     // 2.1, 3.1, 3.2
-        Assert.Equal(6, s.Total);    // 1.1, 1.2, 1.3, 2.1, 3.1, 3.2
+        // Total counts every story regardless of stage (Story 8.9 review: 4.1 retired joins the tally, same as
+        // every other stage — Active/Review/Done stay unaffected since retired matches none of them).
+        Assert.Equal(7, s.Total);    // 1.1, 1.2, 1.3, 2.1, 3.1, 3.2, 4.1
     }
 
     [Fact]

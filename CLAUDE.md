@@ -22,6 +22,18 @@ Consequences you must plan for:
   shift because of a concurrent session's changes, not yours. Confirm a regenerated
   hash is stable across two repeated runs before locking it in, and say in the story
   record whose changes the regeneration sat on top of.
+- **Never regenerate the golden constant reflexively — establish causality first.**
+  If the fingerprint moved and you did **not** touch rendering, audit the normalizer
+  (`GoldenNormalization.NormalizeVolatile` / `FoldToday`) *before* touching the
+  constant: a broken normalizer leaks a volatile token, and regenerating hides the
+  defect behind a green test. Epic 5 found exactly that — the harness itself was
+  leaking the commit SHA. Prove whose change moved it by bisecting into a throwaway
+  tree (`git archive HEAD` into the scratchpad, then overwrite only your own files) —
+  never by resetting the shared tree. Stories 18.2, 18.4 and 18.6 each did this and
+  each proved the move was somebody else's.
+- **Rebuild non-incrementally before trusting a fingerprint that involves an asset.**
+  `specscribe.css`/`.js` are embedded resources; an incremental build reuses the cached
+  assembly and never re-embeds a changed asset, so the hash you measure is stale.
 - **Expect commits to bundle sibling stories.** Because code review runs at epic end
   (see below), a single commit routinely carries several stories' work.
 
@@ -45,6 +57,21 @@ Because reviews run at epic end over bundled commits, **scope by the story's own
 `File List` and its declared symbols — never by a commit range.** State the exclusion
 explicitly in the review record ("sibling stories X/Y excluded from the same commit
 range"). Verify a story's claimed symbols actually exist before trusting its File List.
+
+**When siblings share the same files, File-List scoping is not enough — fall back to
+attribution by hunk.** Scoping by file assumes one story owns each file. Once several
+stories land in the same file, a symbol a *sibling* added is invisible to **both**
+reviews: yours skips it as not-your-file-region, theirs skips it as not-in-their-File-List.
+Story 18.2's review found `IsModulePresent` and `ForCode` sitting in 18.2's primary file
+while their own doc comments self-attributed them to Story 18.5 — neither review would
+have covered them if that one had not recorded the handoff. So:
+
+- Attribute by **hunk**, not by file, whenever a file appears in more than one in-flight
+  story's File List.
+- A symbol whose doc comment attributes it to another story is that story's to review —
+  **record the handoff explicitly** in your review record so it cannot fall between them.
+- Say in the record which hunks you excluded and to whom, the same way you already state
+  excluded sibling stories.
 
 ## Decision records
 

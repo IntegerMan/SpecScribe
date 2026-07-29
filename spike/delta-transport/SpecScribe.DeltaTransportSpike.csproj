@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Story 22.6 DELTA-TRANSPORT MEASUREMENT HARNESS — THROWAWAY, and it is Task 1's GATE, not a feature.
+       Quarantined under spike/ exactly like Story 22.1's spike: the repo's solution (SpecScribe.slnx) lists ONLY
+       src/SpecScribe + tests/SpecScribe.Tests and never references this project, `dotnet build src/SpecScribe`
+       never sees it, and the generated site is byte-identical with or without this folder.
+
+       WHY IT EXISTS. Story 22.1 measured IR-delta size ONLY through RegenerateEpics (25.3 %–39.9 % of a 48 MB IR)
+       and said so: "Both delta events were driven through RegenerateEpics, and its own no-op over-count inflates
+       the number… the byte-perfect GenerateOne route was NEVER delta-measured." Story 22.6's AC #1 turns that
+       caveat into a binding gate — a single-file content edit via GenerateOne must produce a delta under 5 % of
+       BOTH the full IR and the full webview payload, or 22.6 ships nothing.
+
+       WHAT CHANGED SINCE 22.1. Story 22.2 delivered PAGE-level addressing (manifest contentHash + bytes), so this
+       harness diffs at page granularity rather than 22.1's chunk granularity. That is the whole point: 22.1
+       measured what a chunk-granular transport would re-ship; this measures what a page-granular one would.
+
+       It drives the REAL shipped SiteGenerator and the REAL shipped SpaDelivery/WebviewCommand serializers against
+       a mutable copy of this repo's own artifacts. It never re-parses .md and never scrapes .html (AD-1/AD-2).
+       Delete with the story; the durable output is 22-6-delta-measurement-report.md. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>specscribe-delta-transport-spike</AssemblyName>
+    <RootNamespace>SpecScribe.DeltaTransportSpike</RootNamespace>
+    <!-- The referenced SpecScribe project is PackAsTool; suppress the transitive pack-tool warning for the spike. -->
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SpecScribe\SpecScribe.csproj" />
+  </ItemGroup>
+
+</Project>

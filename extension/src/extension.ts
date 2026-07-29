@@ -113,6 +113,68 @@ interface WebviewPayload {
   outline?: ProjectOutline;
 }
 
+/** The literal `frame` value a Story 22.6 DELTA frame carries. A full payload deliberately carries no `frame`
+ * field at all, so every payload every already-shipped VSIX has ever received still reads as full — the
+ * discriminator is on the NEW shape, never the old one. Mirrors `WebviewCommand.DeltaFrameDiscriminator`. */
+const DELTA_FRAME = 'delta';
+
+/** One incremental push from `specscribe webview --serve --serve-delta`: only the surfaces that moved, the paths
+ * that disappeared, and the (small) outline — instead of re-shipping the whole site on every save. Before this,
+ * a one-character edit to one story file re-shipped this repo's ~8 MB whole-site payload (see the
+ * MAX_RENDERER_STDOUT_BYTES guard's own note).
+ *
+ * <p>{@link PersistentRenderer} MERGES a frame into its cached payload and hands downstream a complete
+ * {@link WebviewPayload}, so the documented invariant that "a live-pushed `--serve` payload and a one-shot spawn
+ * payload are indistinguishable" is preserved — no consumer below the renderer learns that deltas exist.</p>
+ * [Story 22.6 AC #3] */
+interface DeltaFrame {
+  frame: typeof DELTA_FRAME;
+  /** Monotonic within one serve session. A GAP means a frame was missed, so the cached payload can no longer be
+   * trusted — the connection is torn down rather than rendering a half-applied state. */
+  sequence: number;
+  siteTitle: string;
+  entry: string;
+  /** Present only when the dashboard document itself moved. `null`/absent means KEEP WHAT YOU HAVE — never
+   * "the dashboard is now empty". */
+  document?: string | null;
+  configuredOutputRoot?: string;
+  sourceRoot?: string;
+  adrRoot?: string;
+  repoRoot?: string;
+  /** Deliberately NOT named `surfaces`: a consumer that missed the discriminator and merged a partial `surfaces`
+   * map as the whole site would silently drop every unchanged page. Different meaning, different name — the same
+   * mistake now degrades to a missing key instead of data loss. */
+  changedSurfaces: Record<string, SurfaceContent>;
+  removedSurfaces: string[];
+  outline?: ProjectOutline;
+}
+
+function isDeltaFrame(value: WebviewPayload | DeltaFrame): value is DeltaFrame {
+  return (value as DeltaFrame).frame === DELTA_FRAME;
+}
+
+/** Folds one delta frame onto the payload the consumer currently holds, producing a payload of exactly the shape
+ * a one-shot spawn would have returned. Pure: it builds a new object rather than mutating `base`, so a downstream
+ * consumer holding the previous payload never observes it change underneath. [Story 22.6 AC #3/#6] */
+function applyDeltaFrame(base: WebviewPayload, frame: DeltaFrame): WebviewPayload {
+  const surfaces: Record<string, SurfaceContent> = { ...base.surfaces, ...frame.changedSurfaces };
+  for (const removed of frame.removedSurfaces ?? []) delete surfaces[removed];
+  return {
+    ...base,
+    siteTitle: frame.siteTitle,
+    entry: frame.entry,
+    // `?? base.document` is the load-bearing half: an absent/null document means unchanged, and coercing it to
+    // '' would blank the dashboard on every unrelated edit.
+    document: frame.document ?? base.document,
+    configuredOutputRoot: frame.configuredOutputRoot ?? base.configuredOutputRoot,
+    sourceRoot: frame.sourceRoot ?? base.sourceRoot,
+    adrRoot: frame.adrRoot ?? base.adrRoot,
+    repoRoot: frame.repoRoot ?? base.repoRoot,
+    surfaces,
+    outline: frame.outline ?? base.outline,
+  };
+}
+
 /** One core-emitted generation notice, parsed from a JSON line on the `webview` command's stderr. The core owns
  * WHAT the notice says and WHICH file; the shim only decides that VS Code shows the file-anchored ones in the
  * Problems panel (constraint #1). Unknown fields are ignored and a record missing a string `path`/`message` or
@@ -418,6 +480,25 @@ function createController(
     // `source` carries the swapped-in surface's repo-relative artifact (Story 6.10) so the bridge can refresh
     // #specscribe-surface's data-source and show/hide the "Open source" button; '' when the surface has none.
     p.webview.postMessage({ type: 'update', html: surface.content, path: current, source: surface.sourcePath ?? '', reason, fragment });
+    pushLiveStamp();
+  }
+
+  /** Story 22.6 AC #5 — the "Quiet Stamp", host half. Reports the live `--serve` channel's state as WORDS
+   * ("Live updates: connected · updated 14:32" / "Live updates: unavailable"), never by color and never by
+   * motion, and the webview rewrites the existing element's textContent so nothing shifts.
+   *
+   * <p>The HOST owns this because the host owns the connection: `persistentUnavailable` is the one place that
+   * knows whether a live channel exists at all, and the webview script cannot see it. A panel fed by the
+   * one-shot spawn path correctly reads "unavailable" — it is not receiving live updates, and saying otherwise
+   * would be a lie the user would only discover by noticing stale content.</p> */
+  function pushLiveStamp(): void {
+    const live = currentStore().hasLiveChannel;
+    const when = new Date();
+    const time = `${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')}`;
+    p.webview.postMessage({
+      type: 'liveStatus',
+      text: live ? `Live updates: connected · updated ${time}` : 'Live updates: unavailable',
+    });
   }
 
   p.webview.onDidReceiveMessage(async (msg: { type?: string; target?: string; fragment?: string; href?: string; text?: string; label?: string; path?: string; line?: number }) => {
@@ -581,6 +662,14 @@ class SpecScribeStore {
    * crash) — every subsequent {@link load} falls back to the one-shot spawn-per-call path instead of retrying
    * `--serve` on every call. */
   private persistentUnavailable = false;
+
+  /** True when a live `--serve` connection is actually up — the datum the Quiet Stamp reports (Story 22.6 AC #5).
+   * Deliberately BOTH conditions: `persistent` alone would read true for a connection that has spawned but never
+   * produced a payload, and `!persistentUnavailable` alone would read true before the first attempt was even
+   * made. The stamp must claim "connected" only when a payload has genuinely arrived over the live channel. */
+  get hasLiveChannel(): boolean {
+    return this.persistent !== undefined && !this.persistentUnavailable && this.cache !== undefined;
+  }
 
   /** Spawn (or join an in-flight spawn) and update the shared cache. Fires the fan-out on every settle: on success
    * the cache + configured-output-root refresh and the error clears; on failure the LAST-GOOD cache is retained
@@ -1405,6 +1494,12 @@ class PersistentRenderer implements vscode.Disposable {
   private errText = '';
   private gotFirstPayload = false;
   private torndown = false;
+  /** The last COMPLETE payload handed downstream — the basis each delta frame is merged onto. Undefined until the
+   * session's first (full) push. [Story 22.6] */
+  private lastPayload: WebviewPayload | undefined;
+  /** The last applied delta sequence, reset to 0 by every full payload (which re-bases the session). Used only to
+   * detect a GAP; the merge itself never consults it. */
+  private lastSequence = 0;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -1420,7 +1515,12 @@ class PersistentRenderer implements vscode.Disposable {
 
   start(): void {
     const tool = resolveTool(this.context);
-    const args = [...tool.prefixArgs, 'webview', '--serve'];
+    // `--serve-delta` (Story 22.6 AC #3) asks the core to push only what changed after the first full payload.
+    // Safe against an OLDER core that does not know the flag: Spectre rejects the unknown option and the process
+    // exits before ever writing a payload, which is exactly the `persistentUnavailable` condition — `teardown`
+    // fires with hadPayload=false and the store falls back to `loadViaSpawn` permanently. That is the same path
+    // an older core without `--serve` at all already takes, so no new failure mode is introduced.
+    const args = [...tool.prefixArgs, 'webview', '--serve', '--serve-delta'];
     const proc = spawn(tool.command, args, { cwd: this.cwd });
     this.proc = proc;
     proc.stdout.setEncoding('utf8');
@@ -1455,15 +1555,47 @@ class PersistentRenderer implements vscode.Disposable {
       const line = this.buffer.slice(0, newlineIndex);
       this.buffer = this.buffer.slice(newlineIndex + 1);
       if (line.trim().length === 0) continue;
-      let payload: WebviewPayload;
+      let parsed: WebviewPayload | DeltaFrame;
       try {
-        payload = JSON.parse(line) as WebviewPayload;
+        parsed = JSON.parse(line) as WebviewPayload | DeltaFrame;
       } catch {
         continue; // a stray non-JSON line on stdout — ignore rather than tear down the connection
       }
+
+      let payload: WebviewPayload;
+      if (isDeltaFrame(parsed)) {
+        // A delta with nothing to merge onto cannot be applied. The core never does this (the first push of a
+        // session is always full), so reaching here means the stream is not what we think it is — fall back
+        // rather than render a payload assembled from a guess.
+        if (!this.lastPayload) {
+          this.teardown(new Error('specscribe webview --serve sent a delta frame before any full payload'));
+          return;
+        }
+        // A sequence GAP means a frame was missed, so the cached payload is no longer a trustworthy basis.
+        // Tearing down is the honest response: `onUnavailable(err, hadPayload=true)` makes the store run a fresh
+        // recovery load, where silently applying the frame would leave the panel showing a half-applied state
+        // that nothing downstream could detect. [Story 22.6 AC #3]
+        const expected = this.lastSequence + 1;
+        if (parsed.sequence !== expected) {
+          this.teardown(new Error(
+            `specscribe webview --serve delta sequence gap: expected ${expected}, got ${parsed.sequence}`));
+          return;
+        }
+        this.lastSequence = parsed.sequence;
+        payload = applyDeltaFrame(this.lastPayload, parsed);
+      } else {
+        payload = parsed;
+        // A full payload RE-BASES the session: the core restarts its own sequence at 1 for the frames that
+        // follow, so the consumer must too or the very next frame reads as a gap.
+        this.lastSequence = 0;
+      }
+
+      this.lastPayload = payload;
       this.gotFirstPayload = true;
       const diagnostics = parseDiagnostics(this.errText);
       this.errText = '';
+      // Downstream always receives a COMPLETE payload — the merge happens here and nowhere else, which is what
+      // preserves the invariant that a live-pushed payload and a one-shot spawn payload are indistinguishable.
       this.onPayload(payload, diagnostics);
     }
   }

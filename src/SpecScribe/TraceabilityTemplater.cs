@@ -29,7 +29,10 @@ public static class TraceabilityTemplater
 
         var body = Charts.TraceabilityLegend(sat) + Charts.TraceabilityMatrix(requirements, epics, prefix);
 
-        var covered = sat.Satisfied + sat.InFlight;
+        // Retired folds into "delivering epic" here, same reasoning as Charts.TraceabilityChips: a retired-
+        // epic-covered requirement still has a real epic named/linked, it's the covering epic's own progress
+        // that stopped. [Story 8.9 review]
+        var covered = sat.Satisfied + sat.InFlight + sat.Retired;
         var ranking = sat.Total > 0
             ? $"{covered.ToString("N0", CultureInfo.InvariantCulture)} of {sat.Total.ToString("N0", CultureInfo.InvariantCulture)} requirements have a delivering epic &middot; {sat.Deferred.ToString("N0", CultureInfo.InvariantCulture)} deferred &middot; {sat.Unmapped.ToString("N0", CultureInfo.InvariantCulture)} unmapped"
             : null;

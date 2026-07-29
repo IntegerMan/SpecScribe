@@ -13,6 +13,7 @@ public class IconsTests
     [InlineData("drafted")]
     [InlineData("pending")]
     [InlineData("deferred")]
+    [InlineData("retired")]
     public void ForStatus_EveryKnownCssClassReturnsAGlyph(string cssClass)
         => AssertWellFormedIcon(Icons.ForStatus(cssClass));
 

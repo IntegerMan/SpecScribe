@@ -350,6 +350,13 @@ public static class RequirementsParser
         if (classes.Count == 0) return RequirementStatus.Planned;
 
         if (classes.All(c => c == "done")) return RequirementStatus.Done;
+        // Every covering epic is itself all-retired (Story 8.9's all-retired terminal tier) — the plan that would
+        // have delivered this requirement was abandoned, not merely unstarted. Checked before the done-or-active
+        // branches below can't fire on their own here (retired is never "active"/"done"), so this only catches
+        // the uniform case; a requirement covered by a mix of retired + still-live epics falls through to
+        // Active/Ready/Planned as appropriate — one retired covering epic must never mask real progress
+        // elsewhere. [Story 8.9 review]
+        if (classes.All(c => c == "retired")) return RequirementStatus.Retired;
         // A covering epic that is itself fully done, or has any story in dev/review/done, rolls up to
         // "active" — surfaced as partially implemented since the whole set of covering epics isn't done yet.
         // "done" must count here too: a requirement covered by one finished epic and one merely-ready epic

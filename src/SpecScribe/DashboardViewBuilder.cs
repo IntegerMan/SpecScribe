@@ -298,8 +298,8 @@ public static class DashboardViewBuilder
 
     /// <summary>One clickable requirements-kind tile: done/total with an in-progress sub-line, drilling to
     /// requirements.html. Counts come from the portal-wide ledger (no local recount). Sub-line prefers Active,
-    /// then enumerates non-zero Ready/Planned/Unmapped/Deferred so unmapped coverage is never mislabelled as
-    /// "planned". [Story 9.2 UX; Story 9.9]</summary>
+    /// then enumerates non-zero Ready/Planned/Unmapped/Deferred/Retired so unmapped coverage is never mislabelled
+    /// as "planned". [Story 9.2 UX; Story 9.9; Retired added Story 8.9 review]</summary>
     private static StatTile RequirementStatTile(string label, ProjectCounts.RequirementSatisfaction sat, string href)
     {
         var sub = sat.Active > 0
@@ -317,6 +317,7 @@ public static class DashboardViewBuilder
         if (sat.Planned > 0) parts.Add($"{sat.Planned} planned");
         if (sat.Unmapped > 0) parts.Add($"{sat.Unmapped} not yet mapped");
         if (sat.Deferred > 0) parts.Add($"{sat.Deferred} deferred");
+        if (sat.Retired > 0) parts.Add($"{sat.Retired} retired");
         if (parts.Count > 0) return string.Join(" · ", parts);
         return sat.Done == sat.Total && sat.Total > 0 ? "all done" : "0 ready · 0 planned";
     }

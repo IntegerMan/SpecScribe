@@ -17,10 +17,10 @@ public sealed record ProjectCounts
     /// (<see cref="SprintTemplater.StoryStageCounts"/>). Label + count + status css class.</summary>
     public readonly record struct StageCount(string Label, int Count, string CssClass);
 
-    /// <summary>Requirement-satisfaction tallies over one requirement set — six canonical
-    /// <see cref="RequirementStatus"/> tiers plus the four-reading rollups (Satisfied / In flight /
-    /// Deferred on purpose / Unmapped). Colors/words route through <see cref="StatusStyles"/>; the four
-    /// readings are labels on brackets, not a parallel vocabulary. [Story 9.9]</summary>
+    /// <summary>Requirement-satisfaction tallies over one requirement set — seven canonical
+    /// <see cref="RequirementStatus"/> tiers plus the five-reading rollups (Satisfied / In flight /
+    /// Deferred on purpose / Unmapped / Retired). Colors/words route through <see cref="StatusStyles"/>; the
+    /// readings are labels on brackets, not a parallel vocabulary. [Story 9.9; Retired added Story 8.9 review]</summary>
     public sealed record RequirementSatisfaction
     {
         public required int Done { get; init; }
@@ -29,13 +29,14 @@ public sealed record ProjectCounts
         public required int Planned { get; init; }
         public required int Unmapped { get; init; }
         public required int Deferred { get; init; }
+        public required int Retired { get; init; }
 
-        public int Total => Done + Active + Ready + Planned + Unmapped + Deferred;
+        public int Total => Done + Active + Ready + Planned + Unmapped + Deferred + Retired;
         public int Satisfied => Done;
         public int InFlight => Active + Ready + Planned;
 
-        /// <summary>Six canonical tiers in Done→…→Deferred order — stacked-bar segments. CssClass from
-        /// <see cref="StatusStyles.ForRequirement"/> (Unmapped→pending); Label from
+        /// <summary>Seven canonical tiers in Done→…→Retired order — stacked-bar segments. CssClass from
+        /// <see cref="StatusStyles.ForRequirement"/> (Unmapped→pending, Retired→deferred); Label from
         /// <see cref="StatusStyles.RequirementLabel"/>.</summary>
         public IReadOnlyList<StageCount> Tiers => new[]
         {
@@ -45,21 +46,24 @@ public sealed record ProjectCounts
             new StageCount(StatusStyles.RequirementLabel(RequirementStatus.Planned), Planned, "pending"),
             new StageCount(StatusStyles.RequirementLabel(RequirementStatus.Unmapped), Unmapped, "pending"),
             new StageCount(StatusStyles.RequirementLabel(RequirementStatus.Deferred), Deferred, "deferred"),
+            new StageCount(StatusStyles.RequirementLabel(RequirementStatus.Retired), Retired, "deferred"),
         };
 
-        /// <summary>Four-reading chip rollups. In-flight CssClass is <c>active</c> (honest lifecycle expands
-        /// in the chip tooltip); Unmapped keeps pending color + distinct word. [Story 9.9]</summary>
+        /// <summary>Five-reading chip rollups. In-flight CssClass is <c>active</c> (honest lifecycle expands
+        /// in the chip tooltip); Unmapped keeps pending color + distinct word; Retired keeps deferred color +
+        /// distinct word (same no-7th-token pattern). [Story 9.9; Retired added Story 8.9 review]</summary>
         public IReadOnlyList<StageCount> Readings => new[]
         {
             new StageCount("Satisfied", Satisfied, "done"),
             new StageCount("In flight", InFlight, "active"),
             new StageCount("Deferred on purpose", Deferred, "deferred"),
             new StageCount("Unmapped", Unmapped, "pending"),
+            new StageCount("Retired", Retired, "deferred"),
         };
 
         public static readonly RequirementSatisfaction Empty = new()
         {
-            Done = 0, Active = 0, Ready = 0, Planned = 0, Unmapped = 0, Deferred = 0,
+            Done = 0, Active = 0, Ready = 0, Planned = 0, Unmapped = 0, Deferred = 0, Retired = 0,
         };
 
         public static RequirementSatisfaction From(IEnumerable<RequirementInfo>? reqs)
@@ -75,6 +79,7 @@ public sealed record ProjectCounts
                 Planned = list.Count(r => r.Status == RequirementStatus.Planned),
                 Unmapped = list.Count(r => r.Status == RequirementStatus.Unmapped),
                 Deferred = list.Count(r => r.Status == RequirementStatus.Deferred),
+                Retired = list.Count(r => r.Status == RequirementStatus.Retired),
             };
         }
     }

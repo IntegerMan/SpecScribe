@@ -1,6 +1,6 @@
 # ADR 0021: Foreign Artifacts May Be Carried Verbatim Into the Portal, as Gated Dead-End Leaves
 
-**Status:** Proposed (authored 2026-07-27 by Story 18.4; ratification is the owner's)
+**Status:** **Accepted** — ratified 2026-07-29 at the Epic 18 retrospective (authored 2026-07-27 by Story 18.4). The one open question is resolved in favour of the shipped behaviour, so ratification requires **no code change**; see § Resolved question.
 **Date:** 2026-07-27
 **Deciders:** Matthew-Hope Eland
 **Relates to:** [ADR 0002 — Shared Rendering Core and Host-Neutral View Models](0002-shared-rendering-core-and-host-neutral-view-models.md) (AD-1/AD-2, which this scopes rather than breaks); [ADR 0013 — The Text Twin Is the No-JS Contract](0013-text-twin-is-the-no-js-contract.md) (the JS-off posture the safety gate protects); [ADR 0016 — The Canonical IR Carries Rendered Prose HTML](0016-ir-carries-rendered-prose-html.md) (the IR's transport shape, which a carried leaf deliberately stays out of); [ADR 0012](0012-plotly-hierarchy-chart-engine-and-standardized-explorer-component.md) (the vendored-asset precedent); Epic 18 (Story 18.4)
@@ -57,6 +57,10 @@ A failure at any gate means the artifact is **not written**, the linking page re
 - **Sanitizing a failing artifact** (stripping the script, inlining the remote stylesheet) — that produces a document the author did not write while still presenting it as "the original report". Verbatim-or-nothing is the only honest carry.
 - **A general "copy any file into the output" seam.** This decision authorizes carrying a *named, contracted* artifact a known producer always emits, discovered by an explicit rule. It is not a static-asset mirror.
 
-## Open question for the owner
+## Resolved question (ratified 2026-07-29, Epic 18 retrospective)
 
-Should the gate's diagnostics be `Skipped` (today's choice — the artifact was deliberately not ingested) or `Unsupported`? `Skipped` reads correctly for the size cap and for a deliberate refusal; a scripted report is arguably an artifact "whose shape isn't one the adapter can interpret". Story 18.4 chose `Skipped` for all four conditions so one gate reports one way. No behaviour depends on the answer.
+> **Previously open:** should the gate's diagnostics be `Skipped` or `Unsupported`?
+
+**Decided: `Skipped`, for all four refusal conditions** — script content, external origin, embedded frame, and the size cap. This confirms Story 18.4's shipped choice, so nothing changes in code.
+
+The reasoning is that **one gate should report one way**. Every one of the four conditions is the same act: SpecScribe looked at the artifact, decided not to ingest it, and said so. Splitting the vocabulary by *why* it refused (`Unsupported` for shape, `Skipped` for size) would make the diagnostics page imply two different mechanisms where there is one, and a reader chasing a missing report would have to know which category their failure fell into before they could search for it. `Unsupported` is reserved for its existing meaning: an artifact whose shape the adapter cannot interpret at all — not one it deliberately declined to copy.

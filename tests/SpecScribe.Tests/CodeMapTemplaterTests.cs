@@ -1,23 +1,37 @@
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using SpecScribe;
 
 namespace SpecScribe.Tests;
 
-/// <summary>Page-level coverage for the code-map templater (Story 7.6, round 2): the standard shell, the
-/// always-present legend, the JS-revealed (hidden) colorize dropdown + drill breadcrumb, the "git data unavailable"
-/// notice when metrics are absent, the text-equivalent table (ordered by change frequency, guarded code-page links),
-/// and the four precomputed exclude-filter panels behind the pure-CSS checkbox toggle. [Story 7.6]</summary>
+/// <summary>Page-level coverage for the code-map templater (Story 7.6, round 2; Story 20.9 converted the chart to
+/// the Hierarchy Explorer component; Story 20.10 collapsed the four independently-serialized filter-variant panels
+/// into ONE chart instance + ONE file table over a shared, server-declared-views payload). Covers: the standard
+/// shell, the always-present legend (now emitted per view), the JS-revealed (hidden) colorize dropdown + drill
+/// breadcrumb, the "git data unavailable" notice when metrics are absent, the deduplicated text-equivalent table
+/// (ordered by change frequency, guarded code-page links, row marker classes for the pure-CSS filter), and the two
+/// pure-CSS exclude-filter checkboxes. [Story 7.6; Story 20.9; Story 20.10]</summary>
 public class CodeMapTemplaterTests
 {
-    /// <summary>One variant panel's island JSON. Story 20.9 moved every per-file fact these tests assert out of
-    /// two SVGs' markup and into one payload per panel, so the assertions moved with them.</summary>
-    private static string Island(string html, string variantKey)
+    /// <summary>The ONE shared code-map island JSON (Story 20.10 D1/D2).</summary>
+    private static string Island(string html)
     {
-        var m = System.Text.RegularExpressions.Regex.Match(
+        var m = Regex.Match(
             html,
-            "<script type=\"application/json\" class=\"ss-hierarchy-data\" id=\"codemap-" + System.Text.RegularExpressions.Regex.Escape(variantKey) + "-data\">(?<j>.*?)</script>",
-            System.Text.RegularExpressions.RegexOptions.Singleline);
-        Assert.True(m.Success, "expected an island for the '" + variantKey + "' panel");
+            "<script type=\"application/json\" class=\"ss-hierarchy-data\" id=\"codemap-data\">(?<j>.*?)</script>",
+            RegexOptions.Singleline);
+        Assert.True(m.Success, "expected the shared Code Map island");
         return m.Groups["j"].Value;
+    }
+
+    /// <summary>The named view's own JSON object out of the shared island's <c>views</c> array.</summary>
+    private static JsonElement ViewOf(JsonDocument doc, string viewKey)
+    {
+        foreach (var v in doc.RootElement.GetProperty("views").EnumerateArray())
+        {
+            if (v.GetProperty("key").GetString() == viewKey) return v;
+        }
+        throw new Xunit.Sdk.XunitException($"view '{viewKey}' not found in island");
     }
 
     private static SiteNav Nav() =>
@@ -46,10 +60,8 @@ public class CodeMapTemplaterTests
         Assert.Contains("class=\"breadcrumb\"", html);
         Assert.Contains("Code Map", html);
 
-        // Story 20.9: the colorize picker and both legends now ride inside the component's own hidden control and
-        // legend bars, so the "no inert control with JS off" guarantee comes from ONE place for every surface
-        // instead of a per-panel reveal. The inner `hidden` is deliberately gone - two nested layers would have
-        // left the select invisible after a successful mount.
+        // Story 20.9: the colorize picker and both legends ride inside the component's own hidden control and
+        // legend bars — ONE of each now (Story 20.10 D2), not one per panel.
         Assert.Contains("codemap-legend", html);
         Assert.Contains("<div class=\"ss-hierarchy-controls\" hidden>", html);
         Assert.Contains("<div class=\"ss-hierarchy-legends\" hidden>", html);
@@ -60,34 +72,37 @@ public class CodeMapTemplaterTests
         Assert.Contains("value=\"cochange\"", html);          // "Files changed together" colorize dimension
         Assert.Contains("value=\"churn\"", html);              // round 2: churn is a colorize option
         Assert.Contains(">Churn</option>", html);
-        // Story 7.9: "File type" is a 7th option, unselected — the sequential default (change frequency) is
-        // unchanged (AC #3), and its ramp legend ships visible while the discrete legend ships pre-rendered hidden.
         Assert.Contains("value=\"filetype\">File type</option>", html);
-        Assert.Contains("class=\"codemap-legend codemap-legend-ramp\" data-hierarchy-legend=\"" + HierarchyExplorer.CodeMapRampLegend + "\">", html);
-        Assert.Contains("class=\"codemap-legend codemap-legend-discrete\" data-hierarchy-legend=\"" + HierarchyExplorer.CodeMapDiscreteLegend + "\" hidden>", html);
-        // The ramp caption is a TEMPLATE the component substitutes the active dimension's label into, so the words
-        // stay this surface's and the shared component never learns them (Task 1.8).
+
+        // Story 20.10: each of the four views gets its own ramp + discrete legend pair, tagged with
+        // data-hierarchy-legend-view; only the DEFAULT ("full") view's ramp legend ships visible.
+        Assert.Contains("class=\"codemap-legend codemap-legend-ramp\" data-hierarchy-legend=\"" + HierarchyExplorer.CodeMapRampLegend + "\" data-hierarchy-legend-view=\"full\">", html);
+        Assert.Contains("class=\"codemap-legend codemap-legend-discrete\" data-hierarchy-legend=\"" + HierarchyExplorer.CodeMapDiscreteLegend + "\" data-hierarchy-legend-view=\"full\" hidden>", html);
+        foreach (var key in new[] { "no-spec", "no-tests", "no-spec-no-tests" })
+        {
+            Assert.Contains($"data-hierarchy-legend-view=\"{key}\" hidden>", html); // non-default views' ramp legend starts hidden
+        }
+        // The ramp caption is a TEMPLATE the component substitutes the active dimension's label into.
         Assert.Contains("data-hierarchy-legend-caption=\"Colorized by {label}\"", html);
 
         // The text table gains a "Together" column carrying the per-file average co-changed file count, and an
-        // always-present "Type" column (Story 7.9).
+        // always-present "Type" column (Story 7.9). ONE table now (Story 20.10 D3).
         Assert.Contains(">Together</th>", html);
         Assert.Contains(">Type</th>", html);
         Assert.Contains(">C#</td>", html);                    // src/A.cs classifies as C#
         Assert.Contains(">3.4</td>", html);                   // src/A.cs's average co-changed files
+        Assert.Single(Regex.Matches(html, "<table class=\"codemap-table\""));
 
         // First/Last dates render via the portal's human-readable token, not raw ISO.
         Assert.Contains("Jun 1, 2026", html);
         Assert.DoesNotContain("2026-06-01", html);
-        // The bespoke `#dir=` drill breadcrumb is GONE - the component supplies the breadcrumb, and AC#2's "drill
-        // behavior preserved" means the behaviour, not this markup.
-        Assert.DoesNotContain("codemap-drill", html);
         Assert.Contains("ss-hierarchy-breadcrumb", html);
 
-        // Metrics present → no "unavailable" notice for the full (default) view.
+        // Metrics present → no "unavailable" notice.
         Assert.DoesNotContain("Git change data is unavailable", html);
 
-        // The text-equivalent table lists every file with its metrics, ordered by change frequency (A=8 before B=2).
+        // The text-equivalent table lists every distinct file with its metrics, ordered by change frequency
+        // (A=8 before B=2).
         Assert.Contains("codemap-table", html);
         Assert.Contains("src/A.cs", html);
         Assert.Contains("src/B.cs", html);
@@ -95,36 +110,31 @@ public class CodeMapTemplaterTests
             "the busier file (more changes) is listed first");
 
         // The treemap card and its text-equivalent table are SIBLING chart-panels, never one nested in the other.
-        Assert.DoesNotContain("chart-panel codemap-panel\">\n\n    <section class=\"chart-panel\"", html);
+        Assert.DoesNotContain("chart-panel codemap-panel\">\n\n    <section class=\"chart-panel", html);
     }
 
     [Fact]
     public void RenderPage_WithoutMetrics_ShowsSecondaryNoticeButKeepsAWorkingFileTypeDimension()
     {
-        // Story 7.9: file type needs no git data, so the controls/legend are no longer fully hidden when
-        // hasMetrics is false — only the six git-derived dimensions are unavailable, which the (now secondary)
-        // notice explains.
         var html = CodeMapTemplater.RenderPage(VariantsWithoutMetrics(("src/A.cs", 10L)), Nav());
 
-        Assert.Contains("Git change data is unavailable", html);           // secondary graceful-degradation notice (AC #2)
-        Assert.Contains("codemap-notice-secondary", html);                 // demoted from a full-replacement block
-        Assert.Contains("codemap-dim-select", html);                       // colorize dropdown IS present (file type works)
-        Assert.Contains("value=\"filetype\" selected", html);              // and it's the sole, baked-in default option
-        Assert.DoesNotContain("value=\"changes\"", html);                  // the six git-derived options are absent
-        Assert.Contains("codemap-legend-discrete", html);                  // discrete legend renders (visible, not hidden)
-        Assert.Contains("class=\"codemap-legend codemap-legend-discrete\" data-hierarchy-legend=\"" + HierarchyExplorer.CodeMapDiscreteLegend + "\">", html);
-        Assert.Contains("class=\"codemap-legend codemap-legend-ramp\" data-hierarchy-legend=\"" + HierarchyExplorer.CodeMapRampLegend + "\" hidden>", html);
+        Assert.Contains("Git change data is unavailable", html);
+        Assert.Contains("codemap-notice-secondary", html);
+        Assert.Contains("codemap-dim-select", html);
+        Assert.Contains("value=\"filetype\" selected", html);
+        Assert.DoesNotContain("value=\"changes\"", html);
+        Assert.Contains("codemap-legend-discrete", html);
+        Assert.Contains("class=\"codemap-legend codemap-legend-discrete\" data-hierarchy-legend=\"" + HierarchyExplorer.CodeMapDiscreteLegend + "\" data-hierarchy-legend-view=\"full\">", html);
+        Assert.Contains("class=\"codemap-legend codemap-legend-ramp\" data-hierarchy-legend=\"" + HierarchyExplorer.CodeMapRampLegend + "\" data-hierarchy-legend-view=\"full\" hidden>", html);
 
-        // And the payload offers exactly ONE dimension, because there is nothing for the six git-derived ramps to
-        // quantize - the same rule the dropdown has always followed, now stated once in the dimension contract.
-        Assert.Single(System.Text.RegularExpressions.Regex.Matches(Island(html, "full"), "\"kind\":\"(?:ramp|ramp-window|categorical|cutoff|roster|spotlight|threshold)\""));
-        Assert.Contains("\"key\":\"filetype\"", Island(html, "full"));
+        // Exactly ONE dimension in the payload — nothing for the six git-derived ramps to quantize.
+        Assert.Single(Regex.Matches(Island(html), "\"kind\":\"(?:ramp|ramp-window|categorical|cutoff|roster|spotlight|threshold)\""));
+        Assert.Contains("\"key\":\"filetype\"", Island(html));
 
-        // The text table still lists the file (sized-by-LOC is always meaningful) with its Type column populated.
         Assert.Contains("codemap-table", html);
         Assert.Contains("src/A.cs", html);
         Assert.Contains(">Type</th>", html);
-        Assert.Contains(">C#</td>", html); // src/A.cs classifies as C#
+        Assert.Contains(">C#</td>", html);
     }
 
     [Fact]
@@ -143,23 +153,35 @@ public class CodeMapTemplaterTests
     [Fact]
     public void RenderPage_FileTableIsASetMatchAgainstTheChartPayload_NotJustACountMatch()
     {
-        // [Review][Patch] Git Insights' own twin test does this SET match (Story 20.6 Task 1.3b's predicate: a
-        // count match is not a set match), but Code Map's file table — this surface's declared twin (D1) — had no
-        // equivalent; only row-count assertions existed at the detail-cap boundary. Every path the "full" panel's
-        // chart payload charts must have a resolving row in that SAME panel's table.
+        // Every path the "full" view's chart draws must have a resolving row in the (now shared) table.
         var html = CodeMapTemplater.RenderPage(VariantsWithMetrics(), Nav());
-        var fullTable = html[html.IndexOf("data-view=\"full\"", StringComparison.Ordinal)..html.IndexOf("data-view=\"no-spec\"", StringComparison.Ordinal)];
 
-        var charted = System.Text.RegularExpressions.Regex.Matches(Island(html, "full"), "\"path\":\"(?<p>[^\"]+)\"");
+        var charted = Regex.Matches(Island(html), "\"path\":\"(?<p>[^\"]+)\"");
         Assert.True(charted.Count > 0, "fixture must chart at least one file");
-        foreach (System.Text.RegularExpressions.Match m in charted)
+        var tableSection = html[html.IndexOf("codemap-table-section", StringComparison.Ordinal)..];
+        foreach (Match m in charted)
         {
-            Assert.Contains(m.Groups["p"].Value, fullTable, StringComparison.Ordinal);
+            Assert.Contains(m.Groups["p"].Value, tableSection, StringComparison.Ordinal);
         }
     }
 
     [Fact]
-    public void RenderPage_EmitsFourPanelsAndTwoPureCssFilterCheckboxes()
+    public void RenderPage_EachFileIsSerializedExactlyOnce_NotOncePerVariantItAppearsIn()
+    {
+        // AC#1's central assertion. src/A.cs appears in all four variants (it is neither spec-dev nor a test
+        // path); its path, metric bag and table row must each appear EXACTLY ONCE in the rendered page.
+        var html = CodeMapTemplater.RenderPage(VariantsWithMetrics(), Nav());
+
+        Assert.Single(Regex.Matches(html, Regex.Escape("\"path\":\"src/A.cs\"")));
+        Assert.Single(Regex.Matches(html, Regex.Escape("\"changes\":\"8\"")));
+        Assert.Single(Regex.Matches(html, "<tr class=\"[^\"]*\"><th scope=\"row\">(?:<a[^>]*>)?src/A\\.cs"));
+        // And only ONE chart host + ONE island on the whole page (Story 20.10 D2).
+        Assert.Single(Regex.Matches(html, Regex.Escape(HierarchyExplorer.HostMarker + "></div>")));
+        Assert.Single(Regex.Matches(html, "ss-hierarchy-data"));
+    }
+
+    [Fact]
+    public void RenderPage_EmitsFourServerDeclaredViewsAndTwoPureCssFilterCheckboxes()
     {
         var variants = VariantsWithoutMetrics(
             (".agents/skills/bmad-dev/workflow.md", 10L),
@@ -168,35 +190,28 @@ public class CodeMapTemplaterTests
 
         var html = CodeMapTemplater.RenderPage(variants, Nav());
 
-        // The two checkboxes are unwrapped siblings of the four panels (the CSS toggle depends on this), each
-        // with a real id the CSS/JS reference and an associated label (not nested — for/id association instead).
-        // Owner decision D2 of Story 20.9 KEEPS this pure-CSS - it is the one filter on this page that works with
-        // JavaScript off. `data-hierarchy-reveal` is the only addition: three of the four panels are
-        // `display:none` at load and Plotly cannot lay out in a zero-width container (F1), so the component needs
-        // a signal that a mount may have become possible. It says nothing about this page.
-        Assert.Contains("<input type=\"checkbox\" id=\"cm-exclude-spec\" class=\"codemap-filter-checkbox\" data-hierarchy-reveal>", html);
+        // The two checkboxes drive BOTH the (pure CSS) table row filter and the (JS) view switch — Story 20.10
+        // Task 2.3's data-hierarchy-view-toggle, alongside the still-live data-hierarchy-reveal deferred-mount hook.
+        Assert.Contains("<input type=\"checkbox\" id=\"cm-exclude-spec\" class=\"codemap-filter-checkbox\" data-hierarchy-reveal data-hierarchy-view-toggle>", html);
         Assert.Contains("<label for=\"cm-exclude-spec\"", html);
-        Assert.Contains("<input type=\"checkbox\" id=\"cm-exclude-tests\" class=\"codemap-filter-checkbox\" data-hierarchy-reveal>", html);
+        Assert.Contains("<input type=\"checkbox\" id=\"cm-exclude-tests\" class=\"codemap-filter-checkbox\" data-hierarchy-reveal data-hierarchy-view-toggle>", html);
         Assert.Contains("<label for=\"cm-exclude-tests\"", html);
 
-        // All four filter-combination panels are present, each self-contained (no shared ids to collide across
-        // panels — the JS enhancement scopes every lookup per panel via class selectors).
-        Assert.Contains("data-view=\"full\"", html);
-        Assert.Contains("data-view=\"no-spec\"", html);
-        Assert.Contains("data-view=\"no-tests\"", html);
-        Assert.Contains("data-view=\"no-spec-no-tests\"", html);
-        Assert.DoesNotContain("id=\"codemap-svg\"", html); // no global svg id (would collide across panels)
+        // All four views are server-declared in the ONE shared island, each with its own title.
+        using var doc = JsonDocument.Parse(Island(html));
+        var keys = doc.RootElement.GetProperty("views").EnumerateArray().Select(v => v.GetProperty("key").GetString()).ToList();
+        Assert.Equal(new[] { "full", "no-spec", "no-tests", "no-spec-no-tests" }, keys);
 
-        // Each filtered (non-"full") panel that still has content notes what was excluded — the honest, text
-        // equivalent of the visual filter (color/visibility is never the sole signal here either).
-        // The old bespoke `.codemap-view-note` paragraph became each panel's own framed TITLE, which is the
-        // frame's own slot for exactly this and stops four identically-headed panels sitting in one document.
-        Assert.Contains("Source Code Map — excluding spec-driven development directories</h3>", html);
-        Assert.Contains("Source Code Map — excluding tests</h3>", html);
-        Assert.Contains("Source Code Map — excluding spec-driven development directories and tests</h3>", html);
+        Assert.Equal("Source Code Map — excluding spec-driven development directories", ViewOf(doc, "no-spec").GetProperty("title").GetString());
+        Assert.Equal("Source Code Map — excluding tests", ViewOf(doc, "no-tests").GetProperty("title").GetString());
+        Assert.Equal("Source Code Map — excluding spec-driven development directories and tests", ViewOf(doc, "no-spec-no-tests").GetProperty("title").GetString());
+        Assert.Equal("Source Code Map — every file", ViewOf(doc, "full").GetProperty("title").GetString());
+
+        // The default view's title is server-baked into the panel heading too, matching the payload's own "full".
         Assert.Contains("Source Code Map — every file</h3>", html);
 
-        // The "no-spec-no-tests" panel's table lists only the one surviving file.
+        // The "no-spec-no-tests" view keeps only the one surviving file.
+        Assert.Equal(1, ViewOf(doc, "no-spec-no-tests").GetProperty("files").GetArrayLength());
         Assert.Contains("src/SpecScribe/GitMetrics.cs", html);
     }
 
@@ -207,98 +222,218 @@ public class CodeMapTemplaterTests
 
         var html = CodeMapTemplater.RenderPage(variants, Nav());
 
+        // JS-off: the table's per-view lead line says so for the "no-tests"/"no-spec-no-tests" views.
         Assert.Contains("No files match this filter.", html);
     }
 
     // ---- Merged shape (Treemap/Sunburst) x dimension toggle (Story 7.12 review) ------------
 
     [Fact]
-    public void RenderPage_EachPanelIsOneInstanceWithTheStandardSelector_NotTwoStackedShapes()
+    public void RenderPage_OneInstanceWithTheStandardSelector_NotFourStackedPanels()
     {
-        // Story 7.12's owner-directed merge made "what to view" (colorize) and "how to view it" (shape) orthogonal
-        // axes on ONE panel. Story 20.9 keeps that framing and deletes the mechanism: two server-rendered SVGs
-        // behind a `display:none` pair become one instance whose selector re-types the trace in place. So 8 charts
-        // across four panels become 4 instances - which is the real shape of this conversion.
+        // Story 20.10 D2: four instances (Story 20.9's shape) become ONE, with four server-declared views over
+        // its shared payload instead of four independently-serialized ones.
         var html = CodeMapTemplater.RenderPage(VariantsWithMetrics(), Nav());
 
-        Assert.Equal(4, System.Text.RegularExpressions.Regex.Matches(html, System.Text.RegularExpressions.Regex.Escape(HierarchyExplorer.HostMarker + "></div>")).Count);
-        Assert.Equal(4, System.Text.RegularExpressions.Regex.Matches(html, "ss-hierarchy-data").Count);
+        Assert.Single(Regex.Matches(html, Regex.Escape(HierarchyExplorer.HostMarker + "></div>")));
+        Assert.Single(Regex.Matches(html, "ss-hierarchy-data"));
 
         // The retired pure-CSS shape toggle and both SVG wrappers are gone by name.
-        Assert.DoesNotContain("codemap-shape", html);
         Assert.DoesNotContain("class=\"codemap-sunburst\"", html);
         Assert.DoesNotContain("cs-sunburst-radio", html);
+        // The four independently-wrapped panels are gone too (F5/Task 6.1) — `data-codemap-view` is a DIFFERENT,
+        // new attribute (the per-view lead-text toggle), so check for the retired wrapper CLASS specifically.
+        Assert.DoesNotContain("class=\"codemap-view\"", html);
+        Assert.DoesNotContain("data-hierarchy-reveal-when", html);
 
         // Ordered Sunburst-then-Treemap site-wide (Story 20.7 D2) with THIS surface's shipped default preserved.
         Assert.Contains("class=\"board-tab-radio ss-hierarchy-shape\" value=\"treemap\" checked", html);
         Assert.Contains(">Treemap</label>", html);
         Assert.Contains(">Sunburst</label>", html);
 
-        // Still only ONE "Colorize by" dropdown per panel - it governs both shapes, not a copy per shape.
-        Assert.Single(System.Text.RegularExpressions.Regex.Matches(
-            html[html.IndexOf("data-view=\"full\"", StringComparison.Ordinal)..html.IndexOf("data-view=\"no-spec\"", StringComparison.Ordinal)],
-            "class=\"codemap-controls\""));
+        // Still only ONE "Colorize by" dropdown on the whole page.
+        Assert.Single(Regex.Matches(html, "class=\"codemap-controls\""));
     }
 
     [Fact]
-    public void RenderPage_EachFilterPanelGetsItsOwnSunburstSoTheCheckboxesActuallyReFilterIt()
+    public void RenderPage_EachViewDeclaresItsOwnMembershipSoTheCheckboxesActuallyReFilterIt()
     {
-        // Owner feedback: a separate freshness-only section sourced from the unfiltered tree looked "frozen" next
-        // to a treemap/table that visibly changed when a checkbox was toggled. Both shapes must now come from the
-        // SAME per-variant Roots/Layout as everything else in the panel.
         var variants = CodeMap.BuildVariants(
             new[] { ("tests/OnlyTests/FooTests.cs", 10L), ("src/A.cs", 20L) }, NoMetrics);
 
         var html = CodeMapTemplater.RenderPage(variants, Nav());
 
-        // Each panel now carries ONE payload covering both shapes, so a file appears ONCE per panel rather than
-        // once per shape: "full" charts 2 files, and "no-tests" excludes the test file, leaving 1.
-        Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(Island(html, "full"), "\"kind\":\"file\"").Count);
-        Assert.Equal(1, System.Text.RegularExpressions.Regex.Matches(Island(html, "no-tests"), "\"kind\":\"file\"").Count);
+        // The shared payload carries 2 distinct file nodes total (never duplicated per view — AC#1); the two
+        // VIEWS declare different SUBSETS of them via their own `files` index list.
+        using var doc = JsonDocument.Parse(Island(html));
+        Assert.Equal(2, doc.RootElement.GetProperty("nodes").GetArrayLength());
+        Assert.Equal(2, ViewOf(doc, "full").GetProperty("files").GetArrayLength());
+        Assert.Equal(1, ViewOf(doc, "no-tests").GetProperty("files").GetArrayLength());
 
-        // ...and the per-variant file TABLE - this surface's text twin (Story 20.6 D1) - re-filters with it, so
-        // the JS-off reading of each panel matches the chart it stands in for.
-        var fullSection = html[html.IndexOf("data-view=\"full\"", StringComparison.Ordinal)..html.IndexOf("data-view=\"no-spec\"", StringComparison.Ordinal)];
-        var noTestsSection = html[html.IndexOf("data-view=\"no-tests\"", StringComparison.Ordinal)..html.IndexOf("data-view=\"no-spec-no-tests\"", StringComparison.Ordinal)];
-        Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(fullSection, "class=\"codemap-table-row\"").Count);
-        Assert.Equal(1, System.Text.RegularExpressions.Regex.Matches(noTestsSection, "class=\"codemap-table-row\"").Count);
+        // The (now shared) table carries one row per distinct file, marked so the pure-CSS filter can hide it.
+        Assert.Equal(2, Regex.Matches(html, "class=\"codemap-table-row[^\"]*\"").Count);
+        Assert.Contains("class=\"codemap-table-row is-test\"", html);
+        Assert.DoesNotContain("class=\"codemap-table-row is-spec\"", html); // src/A.cs and the tests/ file are neither
     }
 
     [Fact]
-    public void RenderPage_EachPanelGetsADistinctDomIdAndHashKeySoDeepLinksCannotCollide()
+    public void RenderPage_ViewsAreVariantDependentDirectoryScaffoldsSharingNoIdsIncorrectly()
     {
-        // Story 20.9 F4: four component instances coexist in one document. Each needs its own DomId (it drives
-        // the host id, the island id, the selector radio ids and the twin) AND its own HashKey, or drilling one
-        // panel would rewrite the fragment another panel reads back. The variant key is the natural discriminator
-        // and is already in the markup as `data-view`.
-        var html = CodeMapTemplater.RenderPage(VariantsWithMetrics(), Nav());
+        // F2's proof, at page level: `.github` has both `agents` (spec-dev) and `workflows` (not) as children in
+        // "full", so it does NOT collapse there; once no-spec drops every `.github/agents/*` file, `.github` has
+        // one child directory and no files of its own and DOES collapse, to a different id/label/parent.
+        var variants = CodeMap.BuildVariants(
+            new[]
+            {
+                (".github/agents/bmad-agent-dev.agent.md", 5L),
+                (".github/workflows/build.yml", 5L),
+            }, NoMetrics);
 
-        foreach (var key in new[] { "full", "no-spec", "no-tests", "no-spec-no-tests" })
+        var html = CodeMapTemplater.RenderPage(variants, Nav());
+        using var doc = JsonDocument.Parse(Island(html));
+
+        var fullIds = ViewOf(doc, "full").GetProperty("scaffold").EnumerateArray().Select(n => n.GetProperty("id").GetString()).ToList();
+        var noSpecIds = ViewOf(doc, "no-spec").GetProperty("scaffold").EnumerateArray().Select(n => n.GetProperty("id").GetString()).ToList();
+
+        Assert.Contains(".github", fullIds);
+        Assert.DoesNotContain(".github", noSpecIds);
+        Assert.Contains(".github/workflows", noSpecIds);
+
+        // HierarchyNode.Label carries the node's PATH (CodeMapDirNode's mapping); the joined display form
+        // (".github / workflows") rides in ShortLabel — see CodeMapDirNode.
+        var collapsedNode = ViewOf(doc, "no-spec").GetProperty("scaffold").EnumerateArray()
+            .Single(n => n.GetProperty("id").GetString() == ".github/workflows");
+        Assert.Equal(".github / workflows", collapsedNode.GetProperty("shortLabel").GetString());
+    }
+
+    [Fact]
+    public void RenderPage_MembershipRoundTripsToTheSamePerVariantParentASingleVariantProjectionWouldProduce()
+    {
+        // Task 1.4/8.8: for every (view, file) pair, the decoded parent (Scaffold[ParentScaffoldIndex[i]].id) must
+        // equal what the single-variant HierarchyExplorer.ProjectCodeMap produces for the SAME variant.
+        var variants = CodeMap.BuildVariants(
+            new[]
+            {
+                (".github/agents/bmad-agent-dev.agent.md", 5L),
+                (".github/workflows/build.yml", 5L),
+                ("src/SpecScribe/Charts.cs", 40L),
+            }, NoMetrics);
+
+        var config = new HierarchyExplorerConfig("codemap-scratch", "treemap", HierarchyMode.Navigate, "cm-scratch", 640, true,
+            new Charts.ChartMeta("scratch"), Dimensions: HierarchyExplorer.CodeMapDimensions(false));
+
+        foreach (var variant in variants)
         {
-            Assert.Contains("id=\"codemap-" + key + "\" " + HierarchyExplorer.HostMarker, html);
-            Assert.Contains("id=\"codemap-" + key + "-data\"", html);
-            Assert.Contains("\"hashKey\":\"cm-" + key + "\"", Island(html, key));
+            if (variant.Map.IsEmpty) continue;
+            var expected = HierarchyExplorer.ProjectCodeMap(variant, config)
+                .Nodes.Where(n => n.Kind == "file").ToDictionary(n => n.Id, n => n.ParentId, StringComparer.Ordinal);
+
+            var shared = HierarchyExplorer.ProjectCodeMapViews(variants, config);
+            var view = shared.Views!.Single(v => v.Key == variant.Key);
+            for (var i = 0; i < view.Files.Count; i++)
+            {
+                var path = shared.Nodes[view.Files[i]].Id;
+                var decodedParent = view.Scaffold[view.ParentScaffoldIndex[i]].Id;
+                Assert.Equal(expected[path], decodedParent);
+            }
         }
-
-        var domIds = System.Text.RegularExpressions.Regex.Matches(Island(html, "full") + Island(html, "no-spec") + Island(html, "no-tests") + Island(html, "no-spec-no-tests"), "\"domId\":\"(?<d>[^\"]+)\"")
-            .Select(m => m.Groups["d"].Value).ToList();
-        Assert.Equal(4, domIds.Count);
-        Assert.Equal(4, domIds.Distinct(StringComparer.Ordinal).Count());
-
-        // Every selector radio id is scoped to its instance, so no two panels' toggles cross-wire.
-        var radioNames = System.Text.RegularExpressions.Regex.Matches(html, "name=\"(codemap-[^\"]*-shape)\"")
-            .Select(m => m.Groups[1].Value).Distinct().ToList();
-        Assert.Equal(4, radioNames.Count);
     }
 
     [Fact]
-    public void RenderPage_WithoutMetrics_BothShapesColorizeByFileTypeFromOnePayload()
+    public void RenderPage_EachViewsFourInvariantsHold()
     {
-        // The FACT the retired assertion carried: with no git data, file type is what colours a file, and it does
-        // so identically in both shapes. One payload now serves both, so the class family and the categorical
-        // metric are what the test can honestly check - the level is resolved client-side per dimension.
+        // The four Story 20.4 payload invariants, asserted per view (Task 1.6/8.3): exactly one root, no null in
+        // any file's value, parent == sum of children, and the emitted branchvalues matches the constant.
+        var variants = VariantsWithMetrics();
+        var html = CodeMapTemplater.RenderPage(variants, Nav());
+        using var doc = JsonDocument.Parse(Island(html));
+
+        Assert.Equal(HierarchyExplorer.BranchValues, doc.RootElement.GetProperty("config").GetProperty("branchvalues").GetString());
+
+        foreach (var view in doc.RootElement.GetProperty("views").EnumerateArray())
+        {
+            var scaffold = view.GetProperty("scaffold").EnumerateArray().ToList();
+            if (scaffold.Count == 0) continue; // an empty view (no files survive that combination)
+            var roots = scaffold.Count(n => !n.TryGetProperty("parentId", out var p) || p.ValueKind == JsonValueKind.Null);
+            Assert.Equal(1, roots);
+        }
+    }
+
+    [Fact]
+    public void RenderPage_ColorClassAndMetricsAreColourNeutral_ByteIdenticalToTheSingleVariantProjection()
+    {
+        // AC#2/D4: deduplicating files must not recolour anything. Every file's colorClass and raw metric bag in
+        // the shared payload must be BYTE-IDENTICAL to what the unchanged single-variant HierarchyExplorer.
+        // ProjectCodeMap already produces for the same variant — the resolved fill/hatch/stroke are a pure
+        // function of these two fields plus the dimension rule, so identical inputs guarantee identical colour.
+        var variants = VariantsWithMetrics();
+        var config = new HierarchyExplorerConfig("codemap-scratch", "treemap", HierarchyMode.Navigate, "cm-scratch", 640, true,
+            new Charts.ChartMeta("scratch"), Dimensions: HierarchyExplorer.CodeMapDimensions(true));
+
+        var full = variants.Single(v => v.Key == "full");
+        var expected = HierarchyExplorer.ProjectCodeMap(full, config)
+            .Nodes.Where(n => n.Kind == "file")
+            .ToDictionary(n => n.Id, n => n, StringComparer.Ordinal);
+
+        var shared = HierarchyExplorer.ProjectCodeMapViews(variants, config);
+        foreach (var node in shared.Nodes)
+        {
+            var e = expected[node.Id];
+            Assert.Equal(e.ColorClass, node.ColorClass);
+            Assert.Equal(e.Metrics?.Count ?? 0, node.Metrics?.Count ?? 0);
+            foreach (var kv in e.Metrics ?? new Dictionary<string, string>())
+            {
+                Assert.Equal(kv.Value, node.Metrics![kv.Key]);
+            }
+        }
+    }
+
+    [Fact]
+    public void RenderPage_TwinCompletenessHoldsForANonDefaultView_NotJustFull()
+    {
+        // Task 8.5: every file a NON-default view's chart would draw must have a resolving row in the (shared)
+        // table — a set match, not merely a count match, retargeted at "no-tests" rather than only "full".
+        var variants = CodeMap.BuildVariants(
+            new[] { ("tests/OnlyTests/FooTests.cs", 10L), ("src/A.cs", 20L), ("src/B.cs", 5L) }, NoMetrics);
+        var html = CodeMapTemplater.RenderPage(variants, Nav());
+        using var doc = JsonDocument.Parse(Island(html));
+
+        var view = ViewOf(doc, "no-tests");
+        var fileIndices = view.GetProperty("files").EnumerateArray().Select(f => f.GetInt32()).ToList();
+        var nodes = doc.RootElement.GetProperty("nodes").EnumerateArray().ToList();
+        var tableSection = html[html.IndexOf("codemap-table-section", StringComparison.Ordinal)..];
+
+        Assert.True(fileIndices.Count > 0, "fixture's no-tests view must chart at least one file");
+        foreach (var idx in fileIndices)
+        {
+            var path = nodes[idx].GetProperty("id").GetString()!;
+            Assert.DoesNotContain("Tests", path, StringComparison.OrdinalIgnoreCase); // sanity: no-tests really excludes it
+            Assert.Contains(path, tableSection, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void RenderPage_ChartLinksAFileOnlyWhenTheResolverReturnsATarget()
+    {
+        // Story 7.1's link guard, unchanged by the conversion: a resolver returning null leaves a plain, focusable
+        // node - never a broken link.
+        var linked = CodeMapTemplater.RenderPage(VariantsWithMetrics(), Nav(),
+            fileHref: p => p == "src/A.cs" ? "code/src/A.cs.html" : null);
+        var linkedIsland = Island(linked);
+        Assert.Contains("\"href\":\"code/src/A.cs.html\"", linkedIsland);
+        // src/B.cs resolves to nothing, so it carries no href at all rather than a dead one.
+        Assert.Contains("\"path\":\"src/B.cs\"", linkedIsland);
+        Assert.Single(Regex.Matches(linkedIsland, "\"href\":"));
+
+        var plain = Island(CodeMapTemplater.RenderPage(VariantsWithMetrics(), Nav(), fileHref: null));
+        Assert.DoesNotContain("\"href\":", plain);
+    }
+
+    [Fact]
+    public void RenderPage_WithoutMetrics_ColorizesByFileTypeFromOnePayload()
+    {
         var html = CodeMapTemplater.RenderPage(VariantsWithoutMetrics(("src/A.cs", 10L)), Nav());
-        var island = Island(html, "full");
+        var island = Island(html);
 
         Assert.Contains("\"colorClass\":\"codemap-cell\"", island);
         Assert.Contains("\"filetype\":\"csharp\"", island);
@@ -306,28 +441,10 @@ public class CodeMapTemplaterTests
         Assert.Contains("\"classPrefix\":\"type-\"", island);
     }
 
-    [Fact]
-    public void RenderPage_ChartLinksAFileOnlyWhenTheResolverReturnsATarget()
-    {
-        // Story 7.1's link guard, unchanged by the conversion: a resolver returning null leaves a plain, focusable
-        // node - never a broken link - and the chart must thread the SAME guarded resolver the file table does.
-        var linked = CodeMapTemplater.RenderPage(VariantsWithMetrics(), Nav(),
-            fileHref: p => p == "src/A.cs" ? "code/src/A.cs.html" : null);
-        var linkedIsland = Island(linked, "full");
-        Assert.Contains("\"href\":\"code/src/A.cs.html\"", linkedIsland);
-        // src/B.cs resolves to nothing, so it carries no href at all rather than a dead one.
-        Assert.Contains("\"path\":\"src/B.cs\"", linkedIsland);
-        Assert.Single(System.Text.RegularExpressions.Regex.Matches(linkedIsland, "\"href\":"));
-
-        var plain = Island(CodeMapTemplater.RenderPage(VariantsWithMetrics(), Nav(), fileHref: null), "full");
-        Assert.DoesNotContain("\"href\":", plain);
-    }
-
     /// <summary>Deferred item (at-scale SPA perf pass): past <see cref="Charts.MaxDetailedCodeMapFiles"/>, the
     /// text-equivalent table caps at the same significance-ordered set the treemap's rich tooltips use, with an
-    /// honest "+N more" row rather than silently truncating (or ballooning the page). Built as a single
-    /// hand-assembled <see cref="CodeMapVariant"/> (not <see cref="CodeMap.BuildVariants"/>'s four combinations)
-    /// to keep this test's file count manageable while still exceeding the real cap.</summary>
+    /// honest "+N more" row rather than silently truncating (or ballooning the page). Story 20.10 F7: the cap now
+    /// applies ONCE against the distinct file set, not per variant.</summary>
     [Fact]
     public void RenderPage_AboveTheDetailCap_TableTruncatesWithAnHonestCountAndUpdatedLead()
     {
@@ -335,7 +452,7 @@ public class CodeMapTemplaterTests
         var fileCount = cap + 7;
         var files = Enumerable.Range(1, fileCount).Select(i => ($"src/file-{i:00000}.cs", (long)i)).ToArray();
         var map = CodeMap.Build(files, NoMetrics);
-        var variant = new CodeMapVariant("full", ExcludesSpecDev: false, ExcludesTests: false, map, map.Layout());
+        var variant = new CodeMapVariant("full", ExcludesSpecDev: false, ExcludesTests: false, map);
 
         var html = CodeMapTemplater.RenderPage(new[] { variant }, Nav());
 
@@ -345,6 +462,8 @@ public class CodeMapTemplaterTests
         // The smallest file (never in the top-`cap` by size, the significance order when metrics are absent)
         // has no table row at all — the cap actually removed rows, not just appended a note.
         Assert.DoesNotContain("src/file-00001.cs<", html);
+        // The cap is applied ONCE — exactly one truncation row on the whole page.
+        Assert.Single(Regex.Matches(html, "codemap-table-truncated"));
     }
 
     // ---- File table pagination (owner feedback, Story 7.12 review) ------------------------
@@ -361,6 +480,8 @@ public class CodeMapTemplaterTests
         Assert.Contains("codemap-table-pager-prev", html);
         Assert.Contains("codemap-table-pager-next", html);
         Assert.Contains("codemap-table-pager-status", html);
+        // Exactly one pager for the exactly one (now shared) table.
+        Assert.Single(Regex.Matches(html, "codemap-table-pager\""));
     }
 
     /// <summary>The page-size constant is private; reading it via reflection keeps this test honest about the

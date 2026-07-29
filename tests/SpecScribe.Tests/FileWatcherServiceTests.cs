@@ -370,4 +370,67 @@ public class FileWatcherServiceTests : IDisposable
         Assert.True(stableRun >= requiredStableSamples,
             $"'<directory change>' event count never stabilized (still climbing at {lastCount} — a self-triggered rebuild loop)");
     }
+
+    // ===== Story 22.6: the delta sidecar under the watcher's real concurrency ===============================
+
+    /// <summary>Story 22.6 Trap 1, driven rather than reasoned about. <see cref="FileWatcherService"/> fires one
+    /// debounce <see cref="Timer"/> PER distinct changed path, each on its own thread-pool thread, so two files
+    /// saved inside the same window invoke the delta computation CONCURRENTLY. If the previous-manifest basis were
+    /// read and replaced outside a lock, a delta would be emitted against the wrong basis — a page that changed
+    /// reported unchanged, or vice versa, with no test failing.
+    /// <para>The protection is that every <c>EmitSpaSite</c> call site already holds the generator's <c>_gate</c>,
+    /// so the basis is serialized by construction and no second lock was added. This pins that: after N concurrent
+    /// passes the sidecar is a complete, parseable document whose sequence equals the number of emits — a torn
+    /// write or a lost update shows up as a parse failure or a sequence gap.</para></summary>
+    [Fact]
+    public void ConcurrentDebouncedPasses_LeaveTheDeltaSidecarCoherent()
+    {
+        var options = ForgeOptions.Resolve(
+            source: Source, adrs: Adrs, output: Site, projectName: "SpecScribe", includeReadme: false, emitSpa: true);
+        var gen = new SiteGenerator(options) { EmitDeltaSidecar = true };
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+
+        using var watcher = new FileWatcherService(options, gen, _ => { });
+
+        // Eight distinct paths, dispatched from eight threads at once — the exact shape the per-path timers
+        // produce. RunDebouncedPass is the internal synchronous seam (see its own doc comment: driving the body
+        // directly is what turns a crash into an ordinary test failure instead of a lost suite run).
+        const int Passes = 8;
+        var docs = Enumerable.Range(1, Passes)
+            .Select(i => Path.Combine(Source, "notes", $"concurrent-{i}.md")).ToList();
+        foreach (var (doc, i) in docs.Select((d, i) => (d, i)))
+        {
+            File.WriteAllText(doc, $"# Concurrent {i}\n\nBody {i}.\n");
+        }
+
+        using var start = new ManualResetEventSlim(false);
+        var threads = docs.Select(doc => new Thread(() =>
+        {
+            start.Wait();
+            watcher.RunDebouncedPass(doc);
+        })).ToList();
+        foreach (var t in threads) t.Start();
+        start.Set();
+        foreach (var t in threads) Assert.True(t.Join(TimeSpan.FromMinutes(2)), "a debounced pass never completed");
+
+        // Complete and parseable — never observed torn, and no temp file survived.
+        var deltaPath = Path.Combine(Site, SpaDelivery.DeltaPath.Replace('/', Path.DirectorySeparatorChar));
+        var delta = System.Text.Json.JsonDocument.Parse(File.ReadAllText(deltaPath)).RootElement;
+        Assert.Empty(Directory.EnumerateFiles(Path.Combine(Site, SpaDelivery.ChunkDir), "*.tmp"));
+
+        // One emit per pass on top of the session's first — no lost update, no double-increment.
+        Assert.Equal(1 + Passes, delta.GetProperty("sequence").GetInt64());
+
+        // Every page really did land in the IR: the concurrency must not have dropped one, which is the failure a
+        // sequence check alone would miss.
+        var manifest = System.Text.Json.JsonDocument
+            .Parse(File.ReadAllText(Path.Combine(Site, SpaDelivery.ManifestPath.Replace('/', Path.DirectorySeparatorChar))))
+            .RootElement.GetProperty("pages");
+        foreach (var i in Enumerable.Range(1, Passes))
+        {
+            Assert.True(
+                manifest.TryGetProperty($"notes/concurrent-{i}.html", out _),
+                $"notes/concurrent-{i}.html is missing from the IR after concurrent passes");
+        }
+    }
 }

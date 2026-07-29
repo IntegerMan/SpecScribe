@@ -87,7 +87,7 @@ public class CanonicalIrSerializationTests : IDisposable
     private sealed record IrNavItem(string Label, string OutputRelativePath);
     private sealed record IrHead(string Title, string Description);
     private sealed record IrIsland(string? Id, string Kind);
-    private sealed record IrOversizedPage(string Path, long ChunkBytes);
+    private sealed record IrOversizedPage(string Path, int ChunkBytes);
     private sealed record IrEntry(
         string Title,
         string Chunk,
@@ -169,7 +169,10 @@ public class CanonicalIrSerializationTests : IDisposable
             var region = Assert.Contains(path, byChunk[entry.Chunk]);
             // The addressing fields DESCRIBE the region that actually shipped — they are not a parallel truth.
             Assert.Equal(SpaDelivery.ContentHash(region), entry.ContentHash);
-            Assert.Equal(System.Text.Encoding.UTF8.GetByteCount(region), entry.Bytes);
+            // JSON-ENCODED bytes (code review fix), not raw UTF-8 content bytes — the same exact measurement
+            // the chunk ceiling budgets against, so `bytes` can't under-report escape-heavy regions.
+            Assert.Equal(
+                System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(region)), entry.Bytes);
             Assert.Equal(SpaDelivery.ExtractScriptIslands(region).Count, entry.ScriptIslands.Count);
         }
 
@@ -181,5 +184,27 @@ public class CanonicalIrSerializationTests : IDisposable
                 Assert.True(manifest.Pages.ContainsKey(path), $"{chunkPath} carries unindexed page {path}");
             }
         }
+    }
+
+    [Fact]
+    public void Manifest_RoundTrips_WhenAPageIsDeclaredOversized()
+    {
+        // AC #3's "whole document, no enumerated exceptions" claim was unproven for the one field this story
+        // invented specifically to declare an exception (code review): every ADR/story in the shared fixture
+        // is comfortably under MaxChunkBytes, so OversizedPages round-tripped only in its EMPTY form elsewhere
+        // in this suite. A shape regression in ManifestOversizedPage (a renamed or retyped property) would have
+        // passed silently through this test's siblings. Force a real oversized page so it can't.
+        File.WriteAllText(Path.Combine(Adrs, "0003-a-huge-decision.md"),
+            "# ADR 0003: A Huge Decision\n\n**Status:** Accepted\n\n" + new string('h', SpaDelivery.MaxChunkBytes + 1));
+
+        var manifestJson = IrFiles().Single(f => f.OutputRelativePath == SpaDelivery.ManifestPath).Content;
+        var model = JsonSerializer.Deserialize<IrManifest>(manifestJson, IrJson);
+        Assert.NotNull(model);
+
+        // Sanity that the fixture actually exercised the corner this test exists for, so a green here is not vacuous.
+        Assert.NotEmpty(model.OversizedPages);
+
+        var reserialized = JsonSerializer.Serialize(model, IrJson);
+        Assert.Equal(manifestJson, reserialized);
     }
 }

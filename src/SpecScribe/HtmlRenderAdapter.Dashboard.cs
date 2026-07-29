@@ -492,7 +492,8 @@ public sealed partial class HtmlRenderAdapter
             satisfiedHref: "requirements.html#satisfaction",
             inFlightHref: "requirements.html#satisfaction",
             deferredHref: "requirements.html#satisfaction",
-            unmappedHref: "requirements.html#satisfaction"));
+            unmappedHref: "requirements.html#satisfaction",
+            retiredHref: "requirements.html#satisfaction"));
         sb.Append("</div>\n");
     }
 

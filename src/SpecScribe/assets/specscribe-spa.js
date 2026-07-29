@@ -175,7 +175,49 @@
   fetchJson(basePrefix + "spa/manifest.json").then(function (m) {
     manifest = m;
     history.replaceState({ path: currentPath, fragment: "" }, "", location.href);
+    startLiveStamp();
   }).catch(function (err) {
     if (window.console) console.warn("[specscribe-spa] data layer unavailable; using static navigation", err);
   });
+
+  // ── Story 22.6 AC #5: the "Quiet Stamp" ──────────────────────────────────────────────────────────────────
+  // Reports the delta channel's state as WORDS, never by color and never by motion. The element is already in
+  // the server-rendered shell reading "Live updates: unavailable", so this only ever rewrites its textContent —
+  // no element is inserted or removed, which is what makes an update produce no layout shift.
+  //
+  // The channel here is the watch-mode SIDECAR (spa/delta.json), polled — AD-8's "static HTML may hydrate via
+  // URL hash plus sidecar polling" clause. There is no socket and no server: a one-shot `generate` writes no
+  // sidecar at all, so the 404 below is the NORMAL steady state for a statically-served site and the stamp
+  // correctly stays "unavailable" rather than claiming a channel that does not exist.
+  function startLiveStamp() {
+    var stamp = document.getElementById("spa-live-stamp");
+    if (!stamp) return;
+
+    var lastSequence = -1;
+    function poll() {
+      // Deliberately NOT versioned(): the sidecar changes WITHIN a build, so the build's cache-bust token would
+      // pin it to the first response forever. cache:"no-store" is the correct freshness control here.
+      fetch(basePrefix + "spa/delta.json", { cache: "no-store" }).then(function (r) {
+        if (!r.ok) throw new Error("no delta channel");
+        return r.json();
+      }).then(function (d) {
+        if (d.sequence === lastSequence) return;   // nothing new since the last poll; leave the stamp alone
+        lastSequence = d.sequence;
+        var when = new Date(d.generatedAt);
+        var time = isNaN(when.getTime())
+          ? ""
+          : " · updated " + String(when.getHours()).padStart(2, "0") + ":" + String(when.getMinutes()).padStart(2, "0");
+        // The full marker is reported honestly rather than dressed up as an ordinary update: it means the
+        // consumer must refetch, and a reader watching the stamp should see that a full reload happened.
+        stamp.textContent = "Live updates: connected" + time + (d.full ? " · full refresh" : "");
+      }).catch(function () {
+        // Any failure — no sidecar, a torn read, a parse error — is reported as the one honest state. Never
+        // silently leave a stale "connected" up: a stamp that lies about being live is worse than no stamp.
+        stamp.textContent = "Live updates: unavailable";
+      });
+    }
+
+    poll();
+    setInterval(poll, 2000);
+  }
 })();

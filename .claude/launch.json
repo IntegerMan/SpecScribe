@@ -340,6 +340,40 @@
         "SpecScribeOutput"
       ],
       "port": 8119
+    },
+    {
+      "name": "codemap-20-10",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8123",
+        "--directory",
+        "SpecScribeOutput"
+      ],
+      "port": 8123
+    },
+    {
+      "name": "codemap-20-10-jsoff",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "C:/Users/MattE/AppData/Local/Temp/claude/C--Dev-SpecScribe/df3b3f2b-d4c2-4ccf-9abb-80460080ca6a/scratchpad/jsoff_server.py",
+        "8124",
+        "C:/Dev/SpecScribe/SpecScribeOutput"
+      ],
+      "port": 8124
+    },
+    {
+      "name": "delta-22-6",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8125",
+        "--directory",
+        "SpecScribeOutput"
+      ],
+      "port": 8125
     }
   ]
 }

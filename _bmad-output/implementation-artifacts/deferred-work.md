@@ -2,7 +2,7 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
-## Deferred from: code review of 8-9-retired-is-a-first-class-story-status (2026-07-28)
+## Deferred from: code review of 8-9-retired-is-a-first-class-story-status (2026-07-29)
 
 - source_spec: `8-9-retired-is-a-first-class-story-status.md`
   summary: `BmadCommands.cs`'s private `ForStory` (:478-533) and `ForEpic` (:535-610) next-step pickers fall through to their default branches and suggest `create-story`/`sprint-planning` on a retired story's own "Next Steps" panel and an all-retired epic's next-step panel — i.e. recommending someone re-draft or re-plan work that was deliberately retired/abandoned.
@@ -1223,3 +1223,25 @@ Baseline SonarCloud triage of the whole codebase, performed rule-first against a
 - source_spec: `22-4-spa-and-webview-as-ir-consumers.md`
   summary: Story 22.4's Completion Notes record the golden fingerprint as `06788c0f...`; it is now `9bf8ac05862372b929eccc17c1f034487698b727333449690b422b4fb2233f25` (`SiteGeneratorAdapterTests.cs:1318`), moved by concurrent Stories 8.9 and 24.1. This is the FOURTH consecutive story to record a value that was stale on arrival — 22.2 recorded `91c3aeb4`, 22.3 `7adbdb01`, 22.4's own story file predicted `3171cf5c`, and 22.5 currently carries `f4a7cbac`. The load-bearing claim ("22.4 did not move it") remains correct and is consistent with the constant's own audit-trail block, which credits no 22.4 contribution. Recording an absolute hash in a story file is structurally unreliable under shared `main`; the durable guidance is the instruction these stories already carry — read it from the file.
   evidence: Confirmed during Story 22.4's code review, 2026-07-28; the value moved twice within that single session. Pattern-level finding, not a defect in 22.4's work. [`tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs:1318`]
+
+## Deferred from: code review of story-22.2 (2026-07-29)
+
+- source_spec: `22-2-canonical-ir-schema-and-versioning.md`
+  summary: Manifest metadata growth (`head`/`scriptIslands`/`contentHash`/`bytes` on every page entry) has no size ceiling on `manifest.json` itself, unlike the content chunks which Task 7 bounds exactly. The SPA client fetches the whole enlarged manifest today while its own comment admits it reads only `title`+`chunk` per page. AC #6 explicitly authorizes this addressing metadata and the story's scope guard stops at "addressing, no transport, no client consumption" — not a violation, but a known cost Stories 22.5/22.6 should size before they start consuming these fields at scale.
+  evidence: Confirmed during code review, 2026-07-29 (Blind Hunter layer), by reading `SpaDelivery.BuildDataFiles`'s manifest-entry loop and `specscribe-spa.js`'s own "reads only title + chunk" comment. [`src/SpecScribe/SpaDelivery.cs`, `src/SpecScribe/assets/specscribe-spa.js`]
+
+- source_spec: `22-2-canonical-ir-schema-and-versioning.md`
+  summary: Three independent hand-rolled "SHA-256 → lowercase hex → truncate" idioms now exist with no shared helper: `Commands.cs:351` (`Convert.ToHexString(...)[..16].ToLowerInvariant()`), `FollowUpSlug.cs:75` (`Convert.ToHexString(...).ToLowerInvariant()[..6]`), and this story's `SpaDelivery.ContentHash` (`Convert.ToHexStringLower(digest)[..16]`). Free to silently diverge (e.g. one site switching to uppercase or a different truncation length) with nothing to catch it.
+  evidence: Confirmed during code review, 2026-07-29 (Blind Hunter layer), by grepping the repo for the hex-truncate pattern. Pre-existing pattern this story added a third instance of, not a regression it introduced alone. [`src/SpecScribe/SpaDelivery.cs:351-354`, `src/SpecScribe/Commands.cs:351`, `src/SpecScribe/FollowUpSlug.cs:75`]
+
+- source_spec: `22-2-canonical-ir-schema-and-versioning.md`
+  summary: `ExtractMetaDescription`'s regex hardcodes the meta tag's attribute order (`name="description" content="..."`) with no tolerance for reordering. Matches the file's own established `ExtractTitle`/`ExtractBreadcrumb` idiom (the story's own stated precedent), so this is shared brittleness across all three extractors, not a new risk class this story introduced alone. Reachability today is low: the source is SpecScribe's own `PathUtil.RenderHeadOpen` emitter, which controls attribute order deterministically.
+  evidence: Confirmed during code review, 2026-07-29 (Blind Hunter layer), by reading `MetaDescriptionRegex` and comparing to `ExtractTitle`/`ExtractBreadcrumb`. [`src/SpecScribe/SpaDelivery.cs:222-223`]
+
+- source_spec: `22-2-canonical-ir-schema-and-versioning.md`
+  summary: `ExtractScriptIslands`'s attribute regexes (`ScriptTypeAttrRegex`, `ScriptIdAttrRegex`, `ScriptTagRegex`) assume double-quoted, case-matched attributes and no embedded `>` inside an attribute value. Verified the failure direction is always safe: an unmatched/misread `type` attribute defaults to `type.Length == 0` -> classified `executable` (the conservative direction), never the reverse (an executable script silently classified as inert data). The only content flowing through this path is SpecScribe's own self-generated `<script>` tags (fixed `id`/`type` shapes from `HierarchyExplorer`), never arbitrary or attacker-controlled markup, so practical exposure today is negligible.
+  evidence: Confirmed during code review, 2026-07-29 (Edge Case Hunter layer, verified by direct read), by tracing both the regex definitions and every real caller of `ExtractScriptIslands`. [`src/SpecScribe/SpaDelivery.cs:278-296`]
+
+- source_spec: `22-2-canonical-ir-schema-and-versioning.md`
+  summary: The oversized-chunk declaration (`oversizedPages`) would report the identical `ChunkBytes` value once per member if the "exactly one page per over-cap chunk" invariant is ever loosened by a future change to the batching rule in `BuildDataFiles`. Every member is named anyway (rather than assuming the invariant), per the code's own comment — but a consumer naively summing `chunkBytes` across entries would multiply-count the same bytes if that invariant ever stopped holding. Not a live bug: today the batching loop guarantees exactly one page per over-cap chunk.
+  evidence: Confirmed during code review, 2026-07-29 (Blind Hunter layer), by reading the oversized-page declaration loop and its own defensive comment. [`src/SpecScribe/SpaDelivery.cs:624-638`]

@@ -5,26 +5,26 @@ family                    pages   golden=IR   IR=Nuxt     golden=Nuxt   verbatim
 ------------------------------------------------------------------------------------
 index.html                1       1/1         0/1         0/1           0/1
 epics.html                1       1/1         0/1         0/1           0/1
-epics/epic-{N}.html       27      27/27       8/27        8/27          8/27
-epics/story-{id}.html     162     162/162     57/162      57/162        57/162
+epics/epic-{N}.html       27      27/27       7/27        7/27          7/27
+epics/story-{id}.html     162     162/162     54/162      54/162        54/162
 ------------------------------------------------------------------------------------
-TOTAL                     191     191/191     65/191      65/191        65/191
+TOTAL                     191     191/191     61/191      61/191        61/191
 
-⚠ 1 migrated surface(s) were not found in .output/public — run `npm run generate`.
+⚠ 2 migrated surface(s) were not found in .output/public — run `npm run generate`.
 
-MIGRATION: 126 surface(s) where the emitted page differs from the IR. These are
+MIGRATION: 130 surface(s) where the emitted page differs from the IR. These are
            this story's to fix.
 
   index.html
     verbatim: false
     at byte:  347
-    golden:   " wm-show-requirements wm-show-track\" href=\"requirements.html\" data-tip=\"Functional reqs: 24 done of 38. Open the requirements view to refine coverage and follow the epic → story ch"
+    golden:   " wm-show-requirements wm-show-track\" href=\"requirements.html\" data-tip=\"Functional reqs: 25 done of 38. Open the requirements view to refine coverage and follow the epic → story ch"
     nuxt:     " wm-show-requirements wm-show-track\" href=\"requirements.html\" data-tip=\"Functional reqs: 28 done of 38. Open the requirements view to refine coverage and follow the epic → story ch"
 
   epics.html
     verbatim: false
     at byte:  350
-    golden:   "s=\"stat-label\">Epics drafted</div></div><div class=\"stat-card\"><div class=\"stat-number\">163</div><div class=\"stat-label\">Stories defined</div><div class=\"stat-sub\">127 with a task "
+    golden:   "s=\"stat-label\">Epics drafted</div></div><div class=\"stat-card\"><div class=\"stat-number\">164</div><div class=\"stat-label\">Stories defined</div><div class=\"stat-sub\">130 with a task "
     nuxt:     "s=\"stat-label\">Epics drafted</div></div><div class=\"stat-card\"><div class=\"stat-number\">162</div><div class=\"stat-label\">Stories defined</div><div class=\"stat-sub\">124 with a task "
 
   epics/epic-1.html
@@ -47,9 +47,9 @@ MIGRATION: 126 surface(s) where the emitted page differs from the IR. These are
 
   epics/epic-18.html
     verbatim: false
-    at byte:  9046
-    golden:   "progress-label\">Tasks</div>\n  <div class=\"progress-bar\" role=\"progressbar\" aria-valuenow=\"98\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"Tasks: 122 / 124\"><div class=\"progre"
-    nuxt:     "progress-label\">Tasks</div>\n  <div class=\"progress-bar\" role=\"progressbar\" aria-valuenow=\"100\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"Tasks: 113 / 113\"><div class=\"progr"
+    at byte:  205
+    golden:   "\"kicker-row\">\n    <span class=\"story-kicker\">Epic 18</span>\n    <span class=\"status-badge done js-tip\" data-tip=\"Finished and closed\" title=\"Finished and closed\"><svg class=\"ss-ico"
+    nuxt:     "\"kicker-row\">\n    <span class=\"story-kicker\">Epic 18</span>\n    <span class=\"status-badge active js-tip\" data-tip=\"Actively being developed\" title=\"Actively being developed\"><svg c"
 
   epics/epic-19.html
     verbatim: false
@@ -65,9 +65,9 @@ MIGRATION: 126 surface(s) where the emitted page differs from the IR. These are
 
   epics/epic-20.html
     verbatim: false
-    at byte:  15822
-    golden:   "progress-label\">Tasks</div>\n  <div class=\"progress-bar\" role=\"progressbar\" aria-valuenow=\"98\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"Tasks: 391 / 397\"><div class=\"progre"
-    nuxt:     "progress-label\">Tasks</div>\n  <div class=\"progress-bar\" role=\"progressbar\" aria-valuenow=\"100\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"Tasks: 383 / 383\"><div class=\"progr"
+    at byte:  15571
+    golden:   "\" aria-valuenow=\"100\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"Stories detailed: 10 / 10\"><div class=\"progress-fill done\" style=\"width:100%\"></div></div>\n  <div class=\"pro"
+    nuxt:     "\" aria-valuenow=\"100\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"Stories detailed: 9 / 9\"><div class=\"progress-fill done\" style=\"width:100%\"></div></div>\n  <div class=\"progr"
 
   epics/epic-21.html
     verbatim: false
@@ -78,26 +78,32 @@ MIGRATION: 126 surface(s) where the emitted page differs from the IR. These are
   epics/epic-22.html
     verbatim: false
     at byte:  14402
-    golden:   "progress-label\">Tasks</div>\n  <div class=\"progress-bar\" role=\"progressbar\" aria-valuenow=\"44\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"Tasks: 28 / 63\"><div class=\"progress"
+    golden:   "progress-label\">Tasks</div>\n  <div class=\"progress-bar\" role=\"progressbar\" aria-valuenow=\"79\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"Tasks: 70 / 89\"><div class=\"progress"
     nuxt:     "progress-label\">Tasks</div>\n  <div class=\"progress-bar\" role=\"progressbar\" aria-valuenow=\"27\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"Tasks: 17 / 63\"><div class=\"progress"
 
   epics/epic-23.html
     verbatim: false
     at byte:  15077
-    golden:   "progress-label\">Tasks</div>\n  <div class=\"progress-bar\" role=\"progressbar\" aria-valuenow=\"70\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"Tasks: 65 / 93\"><div class=\"progress"
+    golden:   "progress-label\">Tasks</div>\n  <div class=\"progress-bar\" role=\"progressbar\" aria-valuenow=\"77\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"Tasks: 98 / 127\"><div class=\"progres"
     nuxt:     "progress-label\">Tasks</div>\n  <div class=\"progress-bar\" role=\"progressbar\" aria-valuenow=\"68\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"Tasks: 63 / 93\"><div class=\"progress"
 
   epics/epic-24.html
     verbatim: false
-    at byte:  26422
-    golden:   "true\"> · </span><span class=\"status-badge task-badge none-done\">0/7 tasks</span></span>\n  </div>\n  <div class=\"user-story\">As a maintainer inspecting a file's relationships, I want"
-    nuxt:     "true\"> · </span><span class=\"status-badge task-badge none-done\">0/7 tasks</span></span>\n    <span class=\"story-card-updated\">Updated Jul 23, 2026</span>\n  </div>\n  <div class=\"user"
+    at byte:  205
+    golden:   "\"kicker-row\">\n    <span class=\"story-kicker\">Epic 24</span>\n    <span class=\"status-badge active js-tip\" data-tip=\"Actively being developed\" title=\"Actively being developed\"><svg c"
+    nuxt:     "\"kicker-row\">\n    <span class=\"story-kicker\">Epic 24</span>\n    <span class=\"status-badge ready js-tip\" data-tip=\"Task plan exists and dependencies met\" title=\"Task plan exists and"
 
   epics/epic-25.html
     verbatim: false
     at byte:  10512
-    golden:   "bel\">Stories detailed</div>\n  <div class=\"progress-bar\" role=\"progressbar\" aria-valuenow=\"83\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"Stories detailed: 5 / 6\"><div class="
+    golden:   "bel\">Stories detailed</div>\n  <div class=\"progress-bar\" role=\"progressbar\" aria-valuenow=\"100\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"Stories detailed: 6 / 6\"><div class"
     nuxt:     "bel\">Stories detailed</div>\n  <div class=\"progress-bar\" role=\"progressbar\" aria-valuenow=\"50\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"Stories detailed: 3 / 6\"><div class="
+
+  epics/epic-26.html
+    verbatim: false
+    at byte:  205
+    golden:   "\"kicker-row\">\n    <span class=\"story-kicker\">Epic 26</span>\n    <span class=\"status-badge ready js-tip\" data-tip=\"Task plan exists and dependencies met\" title=\"Task plan exists and"
+    nuxt:     "\"kicker-row\">\n    <span class=\"story-kicker\">Epic 26</span>\n    <span class=\"status-badge drafted js-tip\" data-tip=\"Stories or a plan exist; work has not started\" title=\"Stories or"
 
   epics/epic-3.html
     verbatim: false
@@ -113,9 +119,9 @@ MIGRATION: 126 surface(s) where the emitted page differs from the IR. These are
 
   epics/epic-5.html
     verbatim: false
-    at byte:  35095
-    golden:   "mplete\">&#10003; 15 tasks</span></span>\n    <span class=\"story-card-updated\">Updated Jul 23, 2026</span>\n  </div>\n  <div class=\"user-story\">As a maintainer, I want one-shot generat"
-    nuxt:     "mplete\">&#10003; 15 tasks</span></span>\n    <span class=\"story-card-updated\">Updated Jul 25, 2026</span>\n  </div>\n  <div class=\"user-story\">As a maintainer, I want one-shot generat"
+    at byte:  21866
+    golden:   "-item\" tabindex=\"0\"><span class=\"swatch sb-followup-open-sw\"></span>Open follow-up</span>\n  <span class=\"sb-legend-item sb-followup-done-item\" tabindex=\"0\"><span class=\"swatch sb-f"
+    nuxt:     "-item\" tabindex=\"0\"><span class=\"swatch sb-followup-open-sw\"></span>Open follow-up</span>\n</div>\n<p class=\"ss-hierarchy-legend-note\">Hatched sectors are work outside the normal sto"
 
   epics/epic-6.html
     verbatim: false
@@ -129,13 +135,7 @@ MIGRATION: 126 surface(s) where the emitted page differs from the IR. These are
     golden:   "mplete\">&#10003; 23 tasks</span></span>\n    <span class=\"story-card-updated\">Updated Jul 12, 2026</span>\n  </div>\n  <aside class=\"md-comment\">2026-07-11 (SCP 2026-07-11, correct-co"
     nuxt:     "mplete\">&#10003; 23 tasks</span></span>\n    <span class=\"story-card-updated\">Updated Jul 13, 2026</span>\n  </div>\n  <aside class=\"md-comment\">2026-07-11 (SCP 2026-07-11, correct-co"
 
-  epics/epic-8.html
-    verbatim: false
-    at byte:  204
-    golden:   "=\"kicker-row\">\n    <span class=\"story-kicker\">Epic 8</span>\n    <span class=\"status-badge active js-tip\" data-tip=\"Actively being developed\" title=\"Actively being developed\"><svg c"
-    nuxt:     "=\"kicker-row\">\n    <span class=\"story-kicker\">Epic 8</span>\n    <span class=\"status-badge done js-tip\" data-tip=\"Finished and closed\" title=\"Finished and closed\"><svg class=\"ss-ico"
 
-
-Surfaces measured: 191 of 192 migrated pages in the IR (no sampling).
+Surfaces measured: 191 of 193 migrated pages in the IR (no sampling).
 Golden root: C:\Dev\SpecScribe\SpecScribeOutput
 

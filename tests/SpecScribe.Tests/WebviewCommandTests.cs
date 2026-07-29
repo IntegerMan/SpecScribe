@@ -1,3 +1,4 @@
+using System.Text.Json;
 using SpecScribe;
 
 namespace SpecScribe.Tests;
@@ -180,5 +181,148 @@ public class WebviewCommandTests
             catch (IOException) { /* best effort */ }
             catch (UnauthorizedAccessException) { /* best effort */ }
         }
+    }
+
+    // ===== Story 22.6: delta frames on the NDJSON channel ===================================================
+
+    private static readonly ProjectOutline EmptyOutline =
+        new(Array.Empty<OutlineEpic>(), new OutlineSummary(0, 0, 0, 0));
+
+    private static WebviewBundle Bundle(string entryDocument, params WebviewSurface[] surfaces) =>
+        new("Test Site", "index.html", entryDocument, surfaces, EmptyOutline);
+
+    private static WebviewSurface Surface(string path, string content, string? title = null, string? source = null) =>
+        new(path, title ?? path, content, source);
+
+    private static JsonElement Frame(WebviewBundle? previous, WebviewBundle current, long sequence = 1) =>
+        JsonDocument.Parse(
+            WebviewCommand.SerializeDeltaPayload(previous, current, sequence, "SpecScribeOutput")).RootElement;
+
+    /// <summary>AC #3, and the compatibility guarantee the whole opt-in rests on: with no basis, the delta
+    /// serializer returns a payload BYTE-IDENTICAL to <see cref="WebviewCommand.SerializePayload"/>'s. A cold
+    /// consumer therefore needs no special case, and the first frame of a session is indistinguishable from what
+    /// every already-shipped VSIX has always received.</summary>
+    [Fact]
+    public void SerializeDeltaPayload_WithNoBasis_IsByteIdenticalToAFullPayload()
+    {
+        var bundle = Bundle("<html>dash</html>", Surface("index.html", "<p>A</p>"), Surface("docs/a.html", "<p>B</p>"));
+
+        var delta = WebviewCommand.SerializeDeltaPayload(previous: null, bundle, 1, "SpecScribeOutput");
+        var full = WebviewCommand.SerializePayload(bundle, "SpecScribeOutput");
+
+        Assert.Equal(full, delta);
+        // And it carries NO discriminator — that is what makes it indistinguishable rather than merely similar.
+        Assert.False(JsonDocument.Parse(delta).RootElement.TryGetProperty("frame", out _));
+    }
+
+    /// <summary>The defect this story closes, stated as a test: a one-surface change must ship ONE surface, not
+    /// the whole site. The extension's own guard comment measures today's cost as a ~8 MB whole-site payload per
+    /// push.</summary>
+    [Fact]
+    public void SerializeDeltaPayload_ShipsOnlyTheChangedSurface()
+    {
+        var before = Bundle("<html>dash</html>",
+            Surface("index.html", "<p>A</p>"), Surface("docs/a.html", "<p>B</p>"), Surface("docs/b.html", "<p>C</p>"));
+        var after = Bundle("<html>dash</html>",
+            Surface("index.html", "<p>A</p>"), Surface("docs/a.html", "<p>B EDITED</p>"), Surface("docs/b.html", "<p>C</p>"));
+
+        var frame = Frame(before, after, sequence: 2);
+
+        Assert.Equal(WebviewCommand.DeltaFrameDiscriminator, frame.GetProperty("frame").GetString());
+        Assert.Equal(2, frame.GetProperty("sequence").GetInt64());
+
+        var changed = frame.GetProperty("changedSurfaces");
+        Assert.Equal(1, changed.EnumerateObject().Count());
+        Assert.Equal("<p>B EDITED</p>", changed.GetProperty("docs/a.html").GetProperty("content").GetString());
+        Assert.Empty(frame.GetProperty("removedSurfaces").EnumerateArray());
+    }
+
+    /// <summary>Hashing CONTENT alone would report a retitled or re-sourced surface as unchanged — the panel title
+    /// and the "Open source" affordance both read off these fields, so a stale one is a visible defect.</summary>
+    [Theory]
+    [InlineData("New Title", null)]
+    [InlineData(null, "docs/new-source.md")]
+    public void SerializeDeltaPayload_DetectsATitleOrSourcePathChange_NotJustContent(string? title, string? source)
+    {
+        var before = Bundle("<html>d</html>", Surface("docs/a.html", "<p>same</p>", "Old Title", "docs/old.md"));
+        var after = Bundle("<html>d</html>",
+            Surface("docs/a.html", "<p>same</p>", title ?? "Old Title", source ?? "docs/old.md"));
+
+        var changed = Frame(before, after).GetProperty("changedSurfaces");
+
+        Assert.True(changed.TryGetProperty("docs/a.html", out _), "a title/sourcePath change must reach the wire");
+    }
+
+    /// <summary>An unchanged site produces an EMPTY delta frame — the panel does not flicker and no bytes ride.</summary>
+    [Fact]
+    public void SerializeDeltaPayload_IsEmpty_WhenNothingChanged()
+    {
+        var bundle = Bundle("<html>dash</html>", Surface("index.html", "<p>A</p>"), Surface("docs/a.html", "<p>B</p>"));
+
+        var frame = Frame(bundle, bundle);
+
+        Assert.Empty(frame.GetProperty("changedSurfaces").EnumerateObject());
+        Assert.Empty(frame.GetProperty("removedSurfaces").EnumerateArray());
+        // `document` null means "keep what you have" — never "the dashboard is now empty".
+        Assert.Equal(JsonValueKind.Null, frame.GetProperty("document").ValueKind);
+    }
+
+    [Fact]
+    public void SerializeDeltaPayload_ReportsRemovedAndAddedSurfaces()
+    {
+        var before = Bundle("<html>d</html>", Surface("index.html", "<p>A</p>"), Surface("docs/gone.html", "<p>X</p>"));
+        var after = Bundle("<html>d</html>", Surface("index.html", "<p>A</p>"), Surface("docs/new.html", "<p>Y</p>"));
+
+        var frame = Frame(before, after);
+
+        Assert.Equal(new[] { "docs/gone.html" },
+            frame.GetProperty("removedSurfaces").EnumerateArray().Select(e => e.GetString()).ToArray());
+        // An ADDED surface rides in changedSurfaces — it is content the consumer does not have.
+        Assert.True(frame.GetProperty("changedSurfaces").TryGetProperty("docs/new.html", out _));
+    }
+
+    /// <summary>The entry document is the single biggest string on the wire, so it rides only when it moved.
+    /// Absent/null must mean "keep what you have"; a consumer treating it as an empty document would blank the
+    /// dashboard on every unrelated edit.</summary>
+    [Fact]
+    public void SerializeDeltaPayload_ShipsTheEntryDocument_OnlyWhenItChanged()
+    {
+        var before = Bundle("<html>OLD</html>", Surface("index.html", "<p>A</p>"));
+
+        var unchanged = Frame(before, Bundle("<html>OLD</html>", Surface("index.html", "<p>A EDITED</p>")));
+        Assert.Equal(JsonValueKind.Null, unchanged.GetProperty("document").ValueKind);
+
+        var moved = Frame(before, Bundle("<html>NEW</html>", Surface("index.html", "<p>A</p>")));
+        Assert.Equal("<html>NEW</html>", moved.GetProperty("document").GetString());
+    }
+
+    /// <summary>The partial map is deliberately NOT called <c>surfaces</c>. A consumer that missed the
+    /// discriminator and merged a partial <c>surfaces</c> map as the whole site would silently drop every
+    /// unchanged page; with a different name, the same mistake degrades to a missing key instead of data loss.</summary>
+    [Fact]
+    public void DeltaFrame_DoesNotReuseTheFullPayloadsSurfacesKey()
+    {
+        var before = Bundle("<html>d</html>", Surface("index.html", "<p>A</p>"), Surface("docs/a.html", "<p>B</p>"));
+        var after = Bundle("<html>d</html>", Surface("index.html", "<p>A</p>"), Surface("docs/a.html", "<p>B!</p>"));
+
+        var frame = Frame(before, after);
+
+        Assert.False(frame.TryGetProperty("surfaces", out _));
+        Assert.True(frame.TryGetProperty("changedSurfaces", out _));
+    }
+
+    /// <summary>The outline is the navigation spine (activity-bar tree + status bar) and rides whole on every
+    /// frame — small relative to the surface set, and diffing it would trade real complexity for negligible bytes.
+    /// Pinned so a future "optimization" does not quietly strip it and leave the tree stale.</summary>
+    [Fact]
+    public void DeltaFrame_AlwaysCarriesTheOutline()
+    {
+        var bundle = Bundle("<html>d</html>", Surface("index.html", "<p>A</p>"));
+
+        var frame = Frame(bundle, bundle);
+
+        Assert.True(frame.TryGetProperty("outline", out var outline));
+        Assert.True(outline.TryGetProperty("epics", out _));
+        Assert.True(outline.TryGetProperty("summary", out _));
     }
 }

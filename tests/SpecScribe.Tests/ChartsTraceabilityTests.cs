@@ -301,7 +301,7 @@ public class ChartsTraceabilityTests
 
     // ---- Legend + strip (Task 2 legend; Task 4 strip) ----
 
-    private static ProjectCounts.RequirementSatisfaction Sat(int done, int active, int ready, int planned, int unmapped, int deferred) => new()
+    private static ProjectCounts.RequirementSatisfaction Sat(int done, int active, int ready, int planned, int unmapped, int deferred, int retired = 0) => new()
     {
         Done = done,
         Active = active,
@@ -309,6 +309,7 @@ public class ChartsTraceabilityTests
         Planned = planned,
         Unmapped = unmapped,
         Deferred = deferred,
+        Retired = retired,
     };
 
     [Fact]
@@ -359,6 +360,21 @@ public class ChartsTraceabilityTests
         Assert.Contains("<span class=\"satisfaction-chip-count\">5</span>", legend); // Deferred
         Assert.Contains("<span class=\"satisfaction-chip-count\">5</span>", strip);
         Assert.Contains("<span class=\"satisfaction-chip-count\">4</span>", legend); // Unmapped
+    }
+
+    [Fact]
+    public void TraceabilityLegend_RetiredFoldsIntoCovered_NotDeferred()
+    {
+        // Story 8.9 review: the traceability page's 3-state shape is owner-locked (Story 21.1) — Retired isn't
+        // a 4th chip. It folds into "Covered" because a retired-epic-covered requirement still names a real
+        // delivering epic (the matrix still draws a cell/link for it); only the epic's own progress stopped.
+        var sat = Sat(done: 1, active: 0, ready: 0, planned: 0, unmapped: 0, deferred: 0, retired: 2);
+
+        var html = Charts.TraceabilityLegend(sat);
+
+        // Covered = Satisfied(1) + InFlight(0) + Retired(2) = 3.
+        Assert.Contains("<span class=\"satisfaction-chip-count\">3</span>", html);
+        Assert.DoesNotContain("Retired", html);
     }
 
     [Fact]

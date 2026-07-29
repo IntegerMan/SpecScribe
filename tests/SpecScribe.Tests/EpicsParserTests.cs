@@ -429,6 +429,51 @@ public class EpicsParserTests
     }
 
     [Fact]
+    public void Parse_RetirementKeyword_DoesNotMatchTheSpacedWontFixForm_UnlikeForStatus()
+    {
+        // Story 8.9 review: RetirementKeyword's own doc comment (and ADR 0025) describe this asymmetry in prose —
+        // "wontfix" matches here, but the spaced/apostrophe'd "won't fix" ForStatus tolerates does NOT, because
+        // this seam reads authored PROSE (canonical spelling expected) while ForStatus reads a punctuation-free
+        // Status: value. Pin it so a future "alignment" pass can't silently regress the deliberate asymmetry.
+        var md = """
+            # Epics
+
+            ## Epic List
+
+            ### Epic 1: Foundation
+
+            Goal.
+
+            ## Epic 1: Foundation
+
+            ### Story 1.1: Kept story
+
+            As a developer, I want the first story, so that work starts.
+
+            **Acceptance Criteria:**
+
+            **Given** nothing
+            **When** it builds
+            **Then** it succeeds
+
+            ### Story 1.2: Successor story
+
+            <!-- Story 3.4 is won't fix as of 2026-07-08. -->
+
+            As a developer, I want the successor, so that work continues.
+
+            **Acceptance Criteria:**
+
+            **Given** nothing
+            **When** it builds
+            **Then** it succeeds
+            """;
+
+        var epic = EpicsParser.Parse(md).Epics[0];
+        Assert.Empty(epic.RetiredNoticesHtml);
+    }
+
+    [Fact]
     public void Parse_RetirementKeyword_ReadsTheSharedVocabulary_NotASecondCopy()
     {
         // Story 8.9 AC #1: one authored list, two consumers. If a word is ever added to

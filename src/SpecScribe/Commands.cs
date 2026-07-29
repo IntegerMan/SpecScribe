@@ -131,21 +131,39 @@ public sealed class WebviewCommand : Command<SiteSettings>
         // spawning a fresh `specscribe webview` process — and therefore a fresh full GenerateAll() — on every save.
         Console.Out.WriteLine(payload);
         Console.Out.Flush();
-        return RunServeLoop(options, resolved, generator);
+        return RunServeLoop(options, resolved, generator, settings.ServeDelta, bundle);
     }
 
     /// <summary>The persistent-mode loop: rewrites and re-streams the webview payload after every debounced
     /// incremental regen, then blocks until the process is torn down (Ctrl+C in an interactive shell, or the host
     /// simply killing the process — the same lifecycle <see cref="WatchCommand.RunWatchLoop"/> uses). One JSON
     /// object per line on stdout, same shape as the one-shot path's <see cref="SerializePayload"/> output, so the
-    /// extension's parser needs no branch on which mode produced it. [Deferred item, Story 6.4 review]</summary>
-    private static int RunServeLoop(ForgeOptions options, ForgeOptions resolved, SiteGenerator generator)
+    /// extension's parser needs no branch on which mode produced it. [Deferred item, Story 6.4 review]
+    /// <para>With <paramref name="serveDelta"/> on (Story 22.6 AC #3) every push AFTER the first carries only the
+    /// surfaces that changed. The first payload — already written by the caller before this loop starts — stays a
+    /// full one, so a cold consumer still needs no special case, and an older VSIX that never passes the flag sees
+    /// byte-identical behavior to before.</para></summary>
+    /// <param name="serveDelta">Opt-in delta framing. Off ⇒ every push is a full payload, exactly as today.</param>
+    /// <param name="initialBundle">The bundle the caller already streamed as the first full payload — the basis
+    /// the first DELTA frame is computed against. Passing it in (rather than starting from null) is what makes the
+    /// second push a real delta instead of a redundant second full payload.</param>
+    private static int RunServeLoop(
+        ForgeOptions options,
+        ForgeOptions resolved,
+        SiteGenerator generator,
+        bool serveDelta = false,
+        WebviewBundle? initialBundle = null)
     {
         // FileWatcherService fires one debounce Timer PER distinct changed path, each on its own thread-pool
         // thread — two files touched inside the same debounce window can invoke this callback concurrently.
         // `_pushLock` serializes the whole read-render-write sequence so two regens can never interleave their
         // writes into the single NDJSON stdout stream. [Review][Patch]
         var pushLock = new object();
+        // The delta basis and sequence live under the SAME `pushLock` as the stdout write, so the two concurrent
+        // debounce timers above can never compute a frame against a basis the other has already replaced — the
+        // failure mode where a surface that changed is reported unchanged, with no test failing. [Story 22.6 Trap 1]
+        var previousBundle = initialBundle;
+        var sequence = 0L;
         using var watcher = new FileWatcherService(options, generator, ev =>
         {
             lock (pushLock)
@@ -159,15 +177,31 @@ public sealed class WebviewCommand : Command<SiteSettings>
                     // watcher noise) produced no site delta — re-rendering would just waste the exact per-push
                     // cost this mode exists to eliminate and flicker the panel with an unchanged payload.
                     // [Review][Patch]
+                    //
+                    // The delta basis is untouched on this path, and that is correct HERE precisely because no
+                    // re-render happened: `previousBundle` still describes what the consumer holds. (Note this is
+                    // NOT the same rule the spa/delta.json sidecar follows — RegenerateFromDataSource reports
+                    // Skipped after a full GenerateAll, so the sidecar's basis has to advance at the emit seam
+                    // instead. Two channels, two bases, two different correct answers. [Story 22.6 Task 1])
                     return;
                 }
                 var bundle = generator.RenderWebviewSurfaces();
-                var payload = SerializePayload(
-                    bundle,
-                    ResolveConfiguredOutputRoot(resolved),
-                    ResolveSourceRoot(resolved),
-                    ResolveAdrRoot(resolved),
-                    ResolveRepoRootOffset(resolved));
+                var payload = serveDelta
+                    ? SerializeDeltaPayload(
+                        previousBundle,
+                        bundle,
+                        ++sequence,
+                        ResolveConfiguredOutputRoot(resolved),
+                        ResolveSourceRoot(resolved),
+                        ResolveAdrRoot(resolved),
+                        ResolveRepoRootOffset(resolved))
+                    : SerializePayload(
+                        bundle,
+                        ResolveConfiguredOutputRoot(resolved),
+                        ResolveSourceRoot(resolved),
+                        ResolveAdrRoot(resolved),
+                        ResolveRepoRootOffset(resolved));
+                previousBundle = bundle;
                 Console.Out.WriteLine(payload);
                 Console.Out.Flush();
             }
@@ -231,6 +265,112 @@ public sealed class WebviewCommand : Command<SiteSettings>
         // output-relative paths, governed by DictionaryKeyPolicy, which stays default/none). [Story 6.9]
         return JsonSerializer.Serialize(payload, CamelCase);
     }
+
+    /// <summary>The discriminator field a DELTA frame carries and a full payload deliberately does NOT. AC #3
+    /// requires the first frame be byte-identical in shape to today's <see cref="SerializePayload"/> output so a
+    /// cold consumer needs no special case — which means the full frame stays exactly as it is and the NEW shape
+    /// is the one that announces itself. A consumer reads <c>frame === "delta"</c>; anything without it is a full
+    /// payload, including every payload every already-shipped VSIX has ever received. [Story 22.6 AC #3]</summary>
+    public const string DeltaFrameDiscriminator = "delta";
+
+    /// <summary>Serializes a DELTA frame for the persistent <c>--serve --serve-delta</c> channel: only the surfaces
+    /// whose rendered content actually moved, the paths that disappeared, and the (small) outline — instead of
+    /// re-shipping every surface on every save. The defect this closes is measurable and live: the extension's own
+    /// guard comment records a <b>~8 MB whole-site webview payload</b>, and today a one-character edit to one story
+    /// file re-ships all of it. [Story 22.6 AC #3]
+    ///
+    /// <para><b>Pure and <c>public static</c>, and that is not a style preference.</b> It follows the
+    /// <see cref="SerializePayload"/>/<see cref="SerializeDiagnostics"/>/<see cref="ResolveConfiguredOutputRoot"/>
+    /// precedent because <see cref="RunServeLoop"/> is <c>private static</c>, blocks on a
+    /// <see cref="ManualResetEventSlim"/>, spawns a real <see cref="FileWatcherService"/> and writes to
+    /// <see cref="Console"/> — it has ZERO test coverage today, and any delta logic written inside it would be
+    /// untestable by construction.</para>
+    ///
+    /// <para><b>Change detection reuses <see cref="SpaDelivery.ContentHash"/></b> rather than introducing a second
+    /// hash function — that method is <c>public static</c> and its own doc comment names 22.5/22.6 as its
+    /// consumers. It hashes the surface's title, source path and content TOGETHER: a retitled surface or one whose
+    /// <c>sourcePath</c> moved has changed as far as the panel is concerned, and hashing content alone would
+    /// report it unchanged.</para>
+    ///
+    /// <para><b>Returns a FULL payload, not a delta, whenever <paramref name="previous"/> is null</b> — the first
+    /// push of a session, or any point at which the caller cannot vouch for its basis. Same degrade-to-full
+    /// discipline as <see cref="SpaDelivery.BuildDelta"/>, and enforced here so no caller can forget it.</para></summary>
+    /// <param name="previous">The bundle the consumer is believed to be holding, or <c>null</c> ⇒ emit a full
+    /// payload instead.</param>
+    /// <param name="sequence">Monotonic within one serve session. A consumer seeing a gap knows it missed a frame
+    /// and can ask for a full reload rather than silently rendering a half-applied state.</param>
+    public static string SerializeDeltaPayload(
+        WebviewBundle? previous,
+        WebviewBundle current,
+        long sequence,
+        string configuredOutputRoot,
+        string sourceRoot = SourceDirDefault,
+        string adrRoot = AdrDirDefault,
+        string repoRoot = ".")
+    {
+        if (previous is null)
+        {
+            return SerializePayload(current, configuredOutputRoot, sourceRoot, adrRoot, repoRoot);
+        }
+
+        var before = previous.Surfaces.ToDictionary(s => s.OutputRelativePath, SurfaceHash, StringComparer.Ordinal);
+        var changed = current.Surfaces
+            .Where(s => !before.TryGetValue(s.OutputRelativePath, out var hash)
+                     || !string.Equals(hash, SurfaceHash(s), StringComparison.Ordinal))
+            .ToDictionary(
+                s => s.OutputRelativePath,
+                s => new { title = s.Title, content = s.ContentHtml, sourcePath = s.SourcePath },
+                StringComparer.Ordinal);
+
+        var live = new HashSet<string>(current.Surfaces.Select(s => s.OutputRelativePath), StringComparer.Ordinal);
+        var removed = previous.Surfaces
+            .Select(s => s.OutputRelativePath)
+            .Where(p => !live.Contains(p))
+            .OrderBy(p => p, StringComparer.Ordinal)
+            .ToList();
+
+        var payload = new
+        {
+            frame = DeltaFrameDiscriminator,
+            sequence,
+            siteTitle = current.SiteTitle,
+            entry = current.EntryPath,
+            // The entry DOCUMENT is the biggest single string on the wire, so it rides only when it actually
+            // moved. Null ⇒ "keep what you have"; the consumer must not treat an absent document as an empty one.
+            document = string.Equals(previous.EntryDocument, current.EntryDocument, StringComparison.Ordinal)
+                ? null
+                : current.EntryDocument,
+            configuredOutputRoot,
+            sourceRoot,
+            adrRoot,
+            repoRoot,
+            // Named `changedSurfaces`/`removedSurfaces` rather than reusing `surfaces`: a consumer that failed to
+            // notice the discriminator would MERGE a partial `surfaces` map as if it were the whole site and
+            // silently lose every unchanged page. Different meaning, different name — a misread degrades to a
+            // missing key, never to data loss.
+            changedSurfaces = changed,
+            removedSurfaces = removed,
+            // Always shipped whole. It is the navigation spine (activity-bar tree + status bar) and is small
+            // relative to the surface set, so diffing it would trade real complexity for negligible bytes.
+            outline = current.Outline,
+        };
+        return JsonSerializer.Serialize(payload, CamelCase);
+    }
+
+    /// <summary>One webview surface's change fingerprint. Delegates to <see cref="SpaDelivery.ContentHash"/> — the
+    /// single hash function this repo has for "did this rendered region move" — over the title, source path and
+    /// content, so a change to ANY of the three is detected — hashing content alone would report a retitled or
+    /// re-sourced surface as unchanged.
+    /// <para>The three fields are LENGTH-PREFIXED rather than joined by a delimiter, so the concatenation is
+    /// unambiguous using only printable ASCII. A plain separator like a space occurs inside page titles
+    /// routinely, which would let <c>("A B", null, x)</c> and <c>("A", "B", x)</c> hash identically — and the
+    /// obvious fix of a control character puts a raw NUL in a .cs file, which makes the whole source read as
+    /// binary to grep and diff tooling.</para></summary>
+    private static string SurfaceHash(WebviewSurface surface) =>
+        SpaDelivery.ContentHash(
+            $"{surface.Title.Length}:{surface.Title}"
+            + $"|{surface.SourcePath?.Length ?? -1}:{surface.SourcePath}"
+            + $"|{surface.ContentHtml}");
 
     /// <summary>Projects the run's non-fatal <see cref="DiagnosticNotice"/> notices into the JSON-lines stderr
     /// payload the VS Code shim parses into the Problems panel — one JSON object per line (newline-terminated),
@@ -448,6 +588,10 @@ public sealed class WatchCommand : Command<SiteSettings>
     /// <summary>Blocks watching for changes until Ctrl+C (or process exit); shared with interactive runs.</summary>
     public static int RunWatchLoop(ForgeOptions options, SiteGenerator generator)
     {
+        // AD-8's "sidecar polling" transport clause: from here on, each --spa emit also writes spa/delta.json
+        // naming what changed. Turned on HERE rather than by --spa so a one-shot `generate --spa` stays
+        // byte-reproducible — the document carries a wall clock (NFR9). No-op without --spa. [Story 22.6 AC #2]
+        generator.EmitDeltaSidecar = true;
         using var watcher = new FileWatcherService(options, generator, ConsoleUi.LogEvent);
         watcher.Start();
         ConsoleUi.PrintWatchingFooter();

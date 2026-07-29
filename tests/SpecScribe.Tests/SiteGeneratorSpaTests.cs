@@ -248,19 +248,22 @@ public class SiteGeneratorSpaTests : IDisposable
         Assert.True(spaIndex.IndexOf("class=\"ss-hierarchy-data\"", StringComparison.Ordinal) > mainStart);
         Assert.True(spaIndex.IndexOf(twinId, StringComparison.Ordinal) > mainStart);
 
-        // STORY 20.9: the count went from five instances site-wide to TEN, and four of them are on ONE page. A
-        // collision there would not be subtle-in-theory - `code-map.html`'s four panels differ only by filter, so
-        // two sharing a DomId would leave one permanently unmountable and two sharing a HashKey would have them
-        // fighting over the fragment. Extended here rather than in a parallel test, per Task 5.3.
+        // STORY 20.9 took the instance count from five site-wide to TEN (four of them on code-map.html alone).
+        // Story 20.10 collapsed those four Code Map panels into ONE shared-payload instance — back down to one
+        // island on this page, now carrying all four views' data instead of four independent islands. Extended
+        // here rather than in a parallel test, per Task 7.3.
         var spaCodeMap = gen.RenderSpaBundle().Pages.SingleOrDefault(p => p.OutputRelativePath == "code-map.html");
         if (spaCodeMap is not null)
         {
+            Assert.Contains("id=\"codemap-data\"", spaCodeMap.ContentHtml);
+            Assert.Single(System.Text.RegularExpressions.Regex.Matches(spaCodeMap.ContentHtml, "ss-hierarchy-data"));
+            // Every view's own scaffold + membership rides the ONE island, so the capture carries all four.
             foreach (var key in new[] { "full", "no-spec", "no-tests", "no-spec-no-tests" })
             {
-                Assert.Contains($"id=\"codemap-{key}-data\"", spaCodeMap.ContentHtml);
+                Assert.Contains($"\"key\":\"{key}\"", spaCodeMap.ContentHtml);
             }
-            // The per-variant file table is this surface's twin (Story 20.6 D1), so IT is what has to ride the
-            // capture - the component emits no generic twin here at all.
+            // The (now shared, deduplicated) file table is this surface's twin (Story 20.6 D1), so IT is what has
+            // to ride the capture - the component emits no generic twin here at all.
             Assert.Contains("class=\"codemap-table\"", spaCodeMap.ContentHtml);
             Assert.DoesNotContain("ss-hierarchy-twin", spaCodeMap.ContentHtml);
         }
@@ -541,9 +544,13 @@ public class SiteGeneratorSpaTests : IDisposable
             Assert.Equal(page.Value.GetProperty("title").GetString(), head.GetProperty("title").GetString());
             Assert.False(string.IsNullOrWhiteSpace(head.GetProperty("description").GetString()));
 
-            // Delta addressing describes the region that shipped.
+            // Delta addressing describes the region that shipped. `bytes` is the region's JSON-ENCODED size
+            // (code review fix) — the same exact measurement the chunk ceiling budgets against, not raw UTF-8
+            // content bytes, which under-report escape-heavy regions by up to 6x.
             Assert.Equal(SpaDelivery.ContentHash(region), page.Value.GetProperty("contentHash").GetString());
-            Assert.Equal(System.Text.Encoding.UTF8.GetByteCount(region), page.Value.GetProperty("bytes").GetInt32());
+            Assert.Equal(
+                System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(region)),
+                page.Value.GetProperty("bytes").GetInt32());
 
             // Every embedded <script> in the region is declared, with the strip-or-nonce kind a consumer needs.
             var declared = page.Value.GetProperty("scriptIslands").EnumerateArray().ToList();
@@ -1009,4 +1016,302 @@ public class SiteGeneratorSpaTests : IDisposable
             "Fix the fixture rather than deleting this guard.");
     }
 
+    // ===== Story 22.6: the watch-mode delta sidecar =========================================================
+
+    private string DeltaFile => Path.Combine(Site, SpaDelivery.DeltaPath.Replace('/', Path.DirectorySeparatorChar));
+
+    private JsonElement ReadDelta() => JsonDocument.Parse(File.ReadAllText(DeltaFile)).RootElement;
+
+    private static string[] DeltaArr(JsonElement delta, string name) =>
+        delta.GetProperty(name).EnumerateArray().Select(e => e.GetString()!).ToArray();
+
+    /// <summary>A generator wired the way <see cref="WatchCommand.RunWatchLoop"/> wires one: <c>--spa</c> on and
+    /// the sidecar enabled BEFORE the first pass, so the session's basis and sequence start where the watch loop's
+    /// would.</summary>
+    private SiteGenerator WatchingSite()
+    {
+        var gen = new SiteGenerator(Options(spa: true)) { EmitDeltaSidecar = true };
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+        return gen;
+    }
+
+    /// <summary>AC #2 + AC #4, and the NFR9 hazard the story's Trap 7 names: a cold one-shot <c>generate --spa</c>
+    /// must emit NO delta at all. The document carries a wall-clock <c>generatedAt</c> by nature, so emitting one
+    /// "helpfully" on a cold build is exactly how a timestamp reaches a CI artifact and a byte-reproducible build
+    /// stops being byte-reproducible.</summary>
+    [Fact]
+    public void OneShotGenerateWithSpa_EmitsNoDeltaSidecar_SoAColdBuildStaysReproducible()
+    {
+        GeneratedSite(spa: true);
+
+        Assert.False(File.Exists(DeltaFile));
+        Assert.DoesNotContain(
+            SpaDelivery.DeltaPath,
+            Directory.EnumerateFiles(Site, "*.json", SearchOption.AllDirectories)
+                .Select(p => PathUtil.NormalizeSlashes(Path.GetRelativePath(Site, p))));
+    }
+
+    /// <summary>The gate is the SIDECAR SWITCH, not <c>--spa</c>: a generator with the switch on but no
+    /// <c>--spa</c> emits no IR at all, so there is nothing to diff and nothing to write.</summary>
+    [Fact]
+    public void DeltaSidecar_WritesNothing_WhenSpaIsOff()
+    {
+        var gen = new SiteGenerator(Options(spa: false)) { EmitDeltaSidecar = true };
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+
+        Assert.False(File.Exists(DeltaFile));
+    }
+
+    /// <summary>AC #7's first degrade condition, made real rather than dead code: the first emit of a watch
+    /// session has no basis to diff against, so it is a <c>full</c> marker with EMPTY lists. A polling consumer
+    /// attaching mid-session reads it and knows to refetch.</summary>
+    [Fact]
+    public void FirstEmitOfAWatchSession_IsAFullMarker_WithEmptyLists()
+    {
+        WatchingSite();
+
+        var delta = ReadDelta();
+        Assert.True(delta.GetProperty("full").GetBoolean());
+        Assert.Empty(DeltaArr(delta, "changed"));
+        Assert.Empty(DeltaArr(delta, "added"));
+        Assert.Empty(DeltaArr(delta, "removed"));
+        Assert.Empty(DeltaArr(delta, "chunks"));
+        Assert.Equal(1, delta.GetProperty("sequence").GetInt64());
+        Assert.Equal(SpaDelivery.DeltaSchemaVersion, delta.GetProperty("deltaSchemaVersion").GetInt32());
+        Assert.Equal(SpaDelivery.SchemaVersion, delta.GetProperty("schemaVersion").GetInt32());
+    }
+
+    /// <summary>Task 3's core claim: two consecutive watch regens produce a sidecar whose contents are EXACTLY
+    /// what <see cref="SpaDelivery.BuildDelta"/> computes from the two manifests. Asserted by recomputing the
+    /// delta from the emitted manifests rather than by re-stating the expected page list — a hand-written
+    /// expectation would drift from the emitter, and this is the seam where the two must agree.</summary>
+    [Fact]
+    public void ASecondWatchRegen_WritesADeltaMatchingBuildDelta_OverTheTwoEmittedManifests()
+    {
+        var gen = WatchingSite();
+        var manifestPath = Path.Combine(Site, SpaDelivery.ManifestPath.Replace('/', Path.DirectorySeparatorChar));
+        var manifestAfterFirst = File.ReadAllText(manifestPath);
+
+        var doc = Path.Combine(Source, "planning-artifacts", "a-doc.md");
+        File.WriteAllText(doc, "# A Doc\n\nOriginal body.\n");
+        gen.SetWatchTrigger("_bmad-output/planning-artifacts/a-doc.md");
+        Assert.NotEqual(GenerationOutcome.Error, gen.GenerateOne(doc).Outcome);
+
+        var manifestAfterSecond = File.ReadAllText(manifestPath);
+        var expected = SpaDelivery.BuildDelta(
+            manifestAfterFirst, manifestAfterSecond, 2,
+            "_bmad-output/planning-artifacts/a-doc.md", DateTimeOffset.UnixEpoch);
+
+        var actual = ReadDelta();
+        var expectedDoc = JsonDocument.Parse(expected).RootElement;
+
+        Assert.False(actual.GetProperty("full").GetBoolean());
+        Assert.Equal(DeltaArr(expectedDoc, "changed"), DeltaArr(actual, "changed"));
+        Assert.Equal(DeltaArr(expectedDoc, "added"), DeltaArr(actual, "added"));
+        Assert.Equal(DeltaArr(expectedDoc, "removed"), DeltaArr(actual, "removed"));
+        Assert.Equal(DeltaArr(expectedDoc, "chunks"), DeltaArr(actual, "chunks"));
+
+        // The new page is genuinely in it — otherwise the four equalities above could all hold vacuously.
+        Assert.Contains("planning-artifacts/a-doc.html", DeltaArr(actual, "added"));
+        Assert.Equal(2, actual.GetProperty("sequence").GetInt64());
+        Assert.Equal("_bmad-output/planning-artifacts/a-doc.md", actual.GetProperty("trigger").GetString());
+    }
+
+    /// <summary>The sequence is monotonic within a session so a polling consumer can detect a MISSED delta (a gap
+    /// ⇒ refetch) without comparing clocks. Three emits ⇒ 1, 2, 3 — never reset, never repeated.</summary>
+    [Fact]
+    public void DeltaSequence_IsMonotonicAcrossAWatchSession()
+    {
+        var gen = WatchingSite();
+        Assert.Equal(1, ReadDelta().GetProperty("sequence").GetInt64());
+
+        var doc = Path.Combine(Source, "planning-artifacts", "seq.md");
+        File.WriteAllText(doc, "# Seq\n\nOne.\n");
+        gen.GenerateOne(doc);
+        Assert.Equal(2, ReadDelta().GetProperty("sequence").GetInt64());
+
+        File.WriteAllText(doc, "# Seq\n\nTwo.\n");
+        gen.GenerateOne(doc);
+        Assert.Equal(3, ReadDelta().GetProperty("sequence").GetInt64());
+    }
+
+    /// <summary>AC #7 + Trap 5: a topology escalation is a whole-site rebuild, and a literal page diff there would
+    /// produce a thousand-entry <c>changed</c> list — larger and slower than the full payload it was meant to
+    /// replace. It must reach the degrade-to-full branch, and it must be labelled with the SHARED constant rather
+    /// than a third spelling of "directory change".</summary>
+    [Fact]
+    public void ATopologyEscalation_DegradesToFull_AndCarriesTheSharedLabel()
+    {
+        var gen = WatchingSite();
+
+        gen.SetWatchTrigger(FileWatcherService.TopologyEventLabel);
+        Assert.NotEqual(GenerationOutcome.Error, gen.RegenerateTopology().Outcome);
+
+        var delta = ReadDelta();
+        Assert.True(delta.GetProperty("full").GetBoolean());
+        Assert.Empty(DeltaArr(delta, "changed"));
+        Assert.Equal(FileWatcherService.TopologyEventLabel, delta.GetProperty("trigger").GetString());
+    }
+
+    /// <summary>⚠ REGRESSION GUARD for a defect Story 22.6's LIVE verification caught and no unit test had.
+    ///
+    /// <para>The first implementation derived the sidecar's degrade-to-full from the trigger LABEL
+    /// (<c>trigger == "&lt;directory change&gt;"</c>). During Task 8 a concurrent session's save re-set that label
+    /// between <c>RegenerateTopology</c> setting it and the emit reading it — the watch log printed
+    /// <c>&lt;directory change&gt; full rebuild</c> while the sidecar written in the same second read
+    /// <c>"full": false</c> with the sibling's path as its trigger. The label is racy BY CONSTRUCTION (one
+    /// debounce Timer per changed path, each on its own thread-pool thread), so any correctness decision derived
+    /// from it is defeatable exactly that way.</para>
+    ///
+    /// <para>This reproduces the race deterministically — overwrite the label to a plausible sibling path AFTER
+    /// the topology route has been entered is not reachable from a test, so it does the strictly harder thing:
+    /// sets the label to an ordinary file path and calls <c>RegenerateTopology</c> anyway. Under the old
+    /// label-derived logic that produces <c>full: false</c>; under the flag the route sets on itself it stays
+    /// <c>full: true</c>.</para></summary>
+    [Fact]
+    public void ATopologyRebuild_StillDegradesToFull_WhenAConcurrentSaveOverwroteTheTriggerLabel()
+    {
+        var gen = WatchingSite();
+
+        // The label says "an ordinary file changed" — exactly what a concurrent debounce pass would have left
+        // behind. The route must not believe it.
+        gen.SetWatchTrigger("_bmad-output/planning-artifacts/some-sibling.md");
+        Assert.NotEqual(GenerationOutcome.Error, gen.RegenerateTopology().Outcome);
+
+        var delta = ReadDelta();
+        Assert.True(
+            delta.GetProperty("full").GetBoolean(),
+            "a topology rebuild emitted a NON-full delta because the trigger label had been overwritten — the "
+            + "degrade must come from the route's own flag, never from the racy label");
+        Assert.Empty(DeltaArr(delta, "changed"));
+    }
+
+    /// <summary>The other half of the same fix: the full-delta flag is consumed EXACTLY once. A topology rebuild
+    /// must not leave it armed so that some later, unrelated incremental emit degrades to full for no reason —
+    /// which would quietly undo the whole point of the story on every regen after a directory change.</summary>
+    [Fact]
+    public void TheFullDeltaFlag_IsConsumedOnce_SoTheNextIncrementalEmitIsStillADelta()
+    {
+        var gen = WatchingSite();
+        gen.SetWatchTrigger(FileWatcherService.TopologyEventLabel);
+        Assert.NotEqual(GenerationOutcome.Error, gen.RegenerateTopology().Outcome);
+        Assert.True(ReadDelta().GetProperty("full").GetBoolean());
+
+        var doc = Path.Combine(Source, "planning-artifacts", "after-topology.md");
+        File.WriteAllText(doc, "# After Topology\n\nAn ordinary content change.\n");
+        gen.SetWatchTrigger("_bmad-output/planning-artifacts/after-topology.md");
+        gen.GenerateOne(doc);
+
+        var delta = ReadDelta();
+        Assert.False(
+            delta.GetProperty("full").GetBoolean(),
+            "the full-delta flag stayed armed past its own emit, so an ordinary edit degraded to a full refetch");
+        Assert.Contains("planning-artifacts/after-topology.html", DeltaArr(delta, "added"));
+    }
+
+    /// <summary>AC #2's atomicity requirement, verified by what it leaves behind rather than by racing a reader:
+    /// the write goes to a temp file and is MOVED over the target, so no <c>.tmp</c> survives a successful emit
+    /// and the file that exists is always a complete, parseable document.</summary>
+    [Fact]
+    public void DeltaSidecar_IsWrittenAtomically_LeavingNoTempFileBehind()
+    {
+        var gen = WatchingSite();
+        var doc = Path.Combine(Source, "planning-artifacts", "atomic.md");
+        File.WriteAllText(doc, "# Atomic\n\nBody.\n");
+        gen.GenerateOne(doc);
+
+        Assert.Empty(Directory.EnumerateFiles(Path.Combine(Site, SpaDelivery.ChunkDir), "*.tmp"));
+        // Parseable, i.e. never observed torn.
+        Assert.False(ReadDelta().GetProperty("full").GetBoolean());
+    }
+
+    /// <summary>⚠ THE Task 1 FINDING, pinned so it cannot silently regress. The story's Trap 2 said not to advance
+    /// the delta basis on a <see cref="GenerationOutcome.Skipped"/> outcome "because the generator's in-memory
+    /// state is unchanged". That premise is FALSE for <see cref="SiteGenerator.RegenerateFromDataSource"/>, which
+    /// calls <see cref="SiteGenerator.GenerateAll"/> on its first line and only afterwards inspects the events to
+    /// decide what to report — so an unparseable data source returns <c>Skipped</c> having already rewritten the
+    /// entire IR. Capturing the basis at the EMIT seam (rather than gating it on the reported outcome) is what
+    /// makes this correct: the emit happened, so the basis advanced, so the NEXT delta is computed against what
+    /// is actually on disk. A basis gated on the outcome would emit a false "unchanged" here — the failure AC #7
+    /// names as worse than a false "changed".</summary>
+    [Fact]
+    public void ASkippedOutcomeThatStillReEmittedTheIr_StillAdvancesTheDeltaBasis()
+    {
+        var gen = WatchingSite();
+
+        // A data source that does not parse: the route rebuilds everything, then reports Skipped.
+        var dataSource = Path.Combine(Source, "implementation-artifacts", "sprint-status.yaml");
+        File.WriteAllText(dataSource, ":\n  this is not valid yaml at all\n    - [\n");
+        var ev = gen.RegenerateFromDataSource(dataSource);
+
+        // The premise under test — if this route ever stops reporting Skipped here, the trap is gone and this
+        // test is measuring nothing, so fail loudly rather than passing vacuously.
+        Assert.Equal(GenerationOutcome.Skipped, ev.Outcome);
+
+        // The basis advanced anyway (sequence moved), which is the whole point.
+        Assert.Equal(2, ReadDelta().GetProperty("sequence").GetInt64());
+
+        // And the NEXT real edit diffs against THAT emit, naming only the newly added page — not a stale basis's
+        // worth of spurious changes, and not a false "nothing changed".
+        var doc = Path.Combine(Source, "planning-artifacts", "after-skip.md");
+        File.WriteAllText(doc, "# After Skip\n\nBody.\n");
+        gen.SetWatchTrigger("_bmad-output/planning-artifacts/after-skip.md");
+        gen.GenerateOne(doc);
+
+        var delta = ReadDelta();
+        Assert.False(delta.GetProperty("full").GetBoolean());
+        Assert.Contains("planning-artifacts/after-skip.html", DeltaArr(delta, "added"));
+    }
+
+    // ===== Story 22.6 AC #5: the Quiet Stamp ================================================================
+
+    /// <summary>AC #5: the stamp is in the INITIAL server-rendered markup, so it is not a JS-only artifact — with
+    /// JS off it still reads, and it reads the honest state ("unavailable", because nothing is updating it).</summary>
+    [Fact]
+    public void TheEntryShell_CarriesTheQuietStamp_InServerRenderedMarkup()
+    {
+        GeneratedSite(spa: true);
+
+        var shell = File.ReadAllText(Path.Combine(Site, SpaDelivery.EntryFileName));
+
+        Assert.Contains($"id=\"{SpaDelivery.LiveStampId}\"", shell);
+        Assert.Contains("Live updates: unavailable", shell);
+    }
+
+    /// <summary>AC #5's exclusion, and AC #4's byte-identity guard in one. A static page has NO live channel, so
+    /// claiming one would be a lie — and putting the stamp in the shared <c>PathUtil.RenderHeadOpen</c> (the
+    /// obvious place) would both do that AND move every page's bytes, breaking the
+    /// <c>GoldenContentFingerprint</c> gate.</summary>
+    [Fact]
+    public void NoStaticPage_CarriesTheQuietStamp()
+    {
+        GeneratedSite(spa: true);
+
+        foreach (var page in StaticHtmlPages())
+        {
+            var html = File.ReadAllText(Path.Combine(Site, page.Replace('/', Path.DirectorySeparatorChar)));
+            Assert.DoesNotContain(SpaDelivery.LiveStampId, html);
+            Assert.DoesNotContain("Live updates:", html);
+        }
+    }
+
+    /// <summary>CLAUDE.md § Verification — no state may be signalled by color alone. The stamp's two states differ
+    /// in their WORDS, so they read identically to a screen reader, a monochrome display and a colorblind reader.
+    /// Pinned structurally: the markup carries no inline color, no status token, and no motion.</summary>
+    [Fact]
+    public void TheQuietStamp_ConveysStateAsText_NeverByColorOrMotion()
+    {
+        // The at-rest state names itself in words rather than relying on a swatch.
+        Assert.Contains("Live updates: unavailable", SpaDelivery.LiveStampMarkup);
+
+        // No color-only signalling: no inline style, no --status-* token, no state-carrying class suffix.
+        Assert.DoesNotContain("style=", SpaDelivery.LiveStampMarkup);
+        Assert.DoesNotContain("--status-", SpaDelivery.LiveStampMarkup);
+        // No motion: the direction is deliberately motionless, so no --motion-* token rides along.
+        Assert.DoesNotContain("--motion-", SpaDelivery.LiveStampMarkup);
+
+        // Announced to assistive tech without stealing focus.
+        Assert.Contains("role=\"status\"", SpaDelivery.LiveStampMarkup);
+        Assert.Contains("aria-live=\"polite\"", SpaDelivery.LiveStampMarkup);
+    }
 }

@@ -107,14 +107,20 @@ public static class CodeFileType
 /// snapshot tests. [Story 7.6]</summary>
 public sealed record TreemapRect(CodeMapNode Node, double X, double Y, double W, double H, int Depth);
 
-/// <summary>One precomputed code-map filter combination the page bakes ahead of time (Story 7.6 round 2's "exclude
-/// spec-driven development directories" / "exclude tests" checkboxes). Rather than relaying out the treemap client
-/// side — which would need a second, JS-ported copy of the squarified algorithm and risks the two implementations
-/// silently diverging — the generator computes all four combinations once in C# (the single source of truth for
-/// tiling) and the page swaps between four pre-rendered panels via pure CSS, so the toggle needs no JavaScript at
-/// all and every combination is fully correct — including re-tiled, gap-free layouts — with JS off.
-/// <see cref="Key"/> is the CSS class/id suffix distinguishing the four panels.</summary>
-public sealed record CodeMapVariant(string Key, bool ExcludesSpecDev, bool ExcludesTests, CodeMap Map, IReadOnlyList<TreemapRect> Layout);
+/// <summary>One precomputed code-map filter combination (Story 7.6 round 2's "exclude spec-driven development
+/// directories" / "exclude tests" checkboxes; Story 20.9 converted the chart to the client-side Plotly component,
+/// which lays itself out — see <see cref="Key"/>'s own history below). <see cref="Key"/> is the CSS class/id
+/// suffix distinguishing the four filter combinations, still used by the (now shared, Story 20.10) file table's
+/// row-visibility toggle and the chart's view switch.
+/// <para><b>No longer carries a squarified <see cref="TreemapRect"/> layout (Story 20.10 F6).</b> That field was
+/// this record's original reason to exist — "the generator computes all four combinations once in C#... and the
+/// page swaps between four pre-rendered panels" — but Story 20.9 replaced the four server-rendered SVGs with one
+/// client-side Plotly instance per panel, and nothing production has read a variant's own <c>Layout</c> since:
+/// searched at Story 20.10's drafting, the only remaining references were tests and one stale comment naming a
+/// <c>Charts.CodeFreshnessTreemap</c> that no longer exists. <see cref="Layout(double, double)"/> the METHOD stays
+/// (still exercised directly by tests as a pure function of a <see cref="CodeMap"/>); only the four-times-per-
+/// generation call computing an unread field is gone.</para></summary>
+public sealed record CodeMapVariant(string Key, bool ExcludesSpecDev, bool ExcludesTests, CodeMap Map);
 
 /// <summary>A pure, source-code-derived treemap model of a repository's files sized by lines of code and nested by
 /// directory. Mirrors the shape every pure model in this repo uses (<see cref="WorkInventory"/>,
@@ -286,12 +292,11 @@ public sealed class CodeMap
 
     /// <summary>Builds all four <see cref="CodeMapVariant"/> filter combinations (full / exclude spec-dev dirs /
     /// exclude tests / exclude both) in one pass — the single place the "exclude spec-driven development
-    /// directories" and "exclude tests" checkboxes' filtering happens, so the page-level toggle is pure CSS with
-    /// no client-side relayout. Each combination gets its own <see cref="Build"/> + <see cref="Layout"/> call (the
-    /// SAME deterministic squarified algorithm every other variant uses), so a filtered view genuinely re-tiles to
-    /// fill the freed space rather than leaving the excluded files' rectangles as unfilled gaps. Pure, never throws
-    /// (an individual combo that filters down to nothing degrades to that variant's own <see cref="Empty"/>, exactly
-    /// like the unfiltered page does when there are no source files at all).</summary>
+    /// directories" and "exclude tests" checkboxes' filtering happens. Each combination gets its own
+    /// <see cref="Build"/> call; layout is the client-side Plotly component's job now (Story 20.9), and no longer
+    /// computed here per variant (Story 20.10 F6 — <see cref="CodeMapVariant"/> no longer carries one). Pure, never
+    /// throws (an individual combo that filters down to nothing degrades to that variant's own
+    /// <see cref="Empty"/>, exactly like the unfiltered page does when there are no source files at all).</summary>
     public static IReadOnlyList<CodeMapVariant> BuildVariants(
         IReadOnlyList<(string RepoRelativePath, long Lines)> sourceFiles,
         IReadOnlyDictionary<string, CodeFileMetrics> gitMetrics)
@@ -315,7 +320,7 @@ public sealed class CodeMap
                 : sourceFiles;
 
             var map = Build(filtered, gitMetrics);
-            result.Add(new CodeMapVariant(key, excludeSpec, excludeTests, map, map.Layout()));
+            result.Add(new CodeMapVariant(key, excludeSpec, excludeTests, map));
         }
         return result;
     }
