@@ -386,15 +386,25 @@ public sealed class FileWatcherService : IDisposable
             var relative = Path.GetRelativePath(_options.RepoRoot, fullPath).Replace('\\', '/');
             ev = RunGuarded(() => _generator.IsDataSource(fullPath)
                 ? _generator.RegenerateFromDataSource(fullPath)
+                // Story 22.5 AC #3: the SCOPE question is answered once, by one named classifier, BEFORE the family
+                // question — a topology change strands cross-artifact surfaces no family route re-renders, so which
+                // family the path belongs to is not the deciding fact. RegenerateTopology is reused rather than a
+                // second full-rebuild path being added: it already IS "collapse GenerateAll's event list to one
+                // event", which is exactly the single coherent GenerationEvent AC #7 requires an escalated pass to
+                // report. It deliberately takes no outer lock (GenerateAll takes _gate itself), so nothing here may
+                // wrap it in one either. IsDataSource stays FIRST and unchanged — sprint-status.yaml already
+                // escalates through its own route, and its precedence over IsEpicsRelated is load-bearing.
+                : _generator.ClassifyRebuildScope(fullPath) == RebuildScope.Full
+                ? _generator.RegenerateTopology()
                 : _generator.IsAdr(fullPath)
-                    ? _generator.RegenerateAdrs()
-                    : _generator.IsEpicsRelated(fullPath)
-                        ? _generator.RegenerateEpics()
-                        : !fullPath.EndsWith(".md", StringComparison.OrdinalIgnoreCase)
-                            ? new GenerationEvent(GenerationOutcome.Skipped, relative, TimeSpan.Zero, "non-markdown, not a recognized data source")
-                            : File.Exists(fullPath)
-                                ? _generator.GenerateOne(fullPath)
-                                : _generator.RemoveFor(fullPath), relative);
+                ? _generator.RegenerateAdrs()
+                : _generator.IsEpicsRelated(fullPath)
+                ? _generator.RegenerateEpics()
+                : !fullPath.EndsWith(".md", StringComparison.OrdinalIgnoreCase)
+                ? new GenerationEvent(GenerationOutcome.Skipped, relative, TimeSpan.Zero, "non-markdown, not a recognized data source")
+                : File.Exists(fullPath)
+                ? _generator.GenerateOne(fullPath)
+                : _generator.RemoveFor(fullPath), relative);
         }
         catch (Exception ex)
         {

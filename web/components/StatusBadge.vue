@@ -3,16 +3,31 @@
  * The six-stage lifecycle badge — the Vue counterpart of `StatusStyles.Badge` / `.status-badge` in
  * specscribe.css.
  *
- * UX-DR17 is enforced BY THE COMPONENT'S SHAPE, not by discipline at each call site: `label` is a required
- * prop, so a badge cannot be rendered as colour alone. The stage class only ever adds reinforcement.
+ * UX-DR17 — never signal by colour alone — is served here by the required `label` prop: the word is always
+ * present, so the badge is legible in greyscale and to a screen reader.
  *
- * Note what is NOT here: no stage -> word map and no stage -> meaning map. Those belong to the data
+ * ⚠️ WHAT THIS COMPONENT DOES NOT YET DO, stated plainly because an earlier version of this header claimed
+ * otherwise. The portal's `StatusStyles.Badge` emits `icon + word` and documents the rule as "color + icon +
+ * word, never icon-only". **This component renders no icon.** That matters for two pairs the portal separates
+ * by glyph alone: `ready`/`drafted` share a border colour, and `deferred`/`retired` are byte-identical rule
+ * sets here. Supplying the glyph is a **Story 23.3 dependency** — the stage -> icon mapping needs a data
+ * source, and the canonical IR is it (see CONVENTIONS.md §5). Until then the word carries the whole load.
+ *
+ * Note what is also NOT here: no stage -> word map and no stage -> meaning map. Those belong to the data
  * (C# `StatusStyles` today, the canonical IR from 23.3 on). A parallel copy in JS would be a second status
  * vocabulary free to drift from the one the portal renders — exactly the class of drift Epic 23 exists to
  * end. This component styles a status; it does not know what statuses exist.
  */
+import { computed } from 'vue'
 
-/** Canonical stage tokens — the `.status-badge.<stage>` modifiers the shared stylesheet defines. */
+/**
+ * Canonical stage tokens — the `.status-badge.<stage>` modifiers the shared stylesheet defines.
+ *
+ * All TEN of `StatusStyles.LegendStages`. `unmapped` was missing until the 2026-07-28 re-review, which left
+ * 23.3 no legal way to render a requirement that is listed but mapped to no epic: the only substitute was
+ * `stage="pending"`, collapsing exactly the distinction `StatusStyles.Badge`'s three-arg overload exists to
+ * preserve. Like the portal, `unmapped` borrows the pending COLOUR and stays distinct by word.
+ */
 export type StatusStage =
   | 'pending'
   | 'drafted'
@@ -21,10 +36,24 @@ export type StatusStage =
   | 'review'
   | 'done'
   | 'deferred'
+  | 'unmapped'
   | 'retired'
   | 'unrecognized'
 
-withDefaults(
+const KNOWN_STAGES: readonly StatusStage[] = [
+  'pending',
+  'drafted',
+  'ready',
+  'active',
+  'review',
+  'done',
+  'deferred',
+  'unmapped',
+  'retired',
+  'unrecognized',
+]
+
+const props = withDefaults(
   defineProps<{
     /** Lifecycle stage token. Drives colour only — never the meaning. */
     stage: StatusStage
@@ -35,10 +64,38 @@ withDefaults(
   }>(),
   { meaning: undefined },
 )
+
+/**
+ * TypeScript unions erase at runtime, so a stage string from the IR can be anything. An unknown value used to
+ * match no `.is-*` rule and fall through to the base rule — which this file's own comment describes as "the
+ * pending/deferred reading", i.e. an out-of-vocabulary status silently displayed as if it were Pending.
+ * `unrecognized` is the stage that MEANS "no canonical mapping", and it is hatched and dashed, so an unknown
+ * value now reads as outside the vocabulary by texture rather than impersonating a real stage.
+ */
+const stageClass = computed(() =>
+  KNOWN_STAGES.includes(props.stage) ? `is-${props.stage}` : 'is-unrecognized',
+)
+
+if (import.meta.dev) {
+  if (!KNOWN_STAGES.includes(props.stage)) {
+    console.warn(
+      `[StatusBadge] unknown stage "${props.stage}" — rendering as "unrecognized". ` +
+        `Known stages: ${KNOWN_STAGES.join(', ')}.`,
+    )
+  }
+  // Required-ness guards `undefined`, not `''`. An empty label is a colour-only badge, which is the one thing
+  // this component must never render — so it is a loud dev failure rather than a silent UX-DR17 breach.
+  if (props.label.trim() === '') {
+    console.warn(
+      `[StatusBadge] empty label for stage "${props.stage}" — this renders a colour-only badge and breaks ` +
+        `UX-DR17. Pass the status WORD (StatusStyles.LegendWord on the C# side).`,
+    )
+  }
+}
 </script>
 
 <template>
-  <span class="status-badge" :class="`is-${stage}`" :title="meaning">{{ label }}</span>
+  <span class="status-badge" :class="stageClass" :title="meaning">{{ label }}</span>
 </template>
 
 <style scoped>
@@ -88,7 +145,11 @@ withDefaults(
   border-color: var(--status-ready);
 }
 
-.is-pending {
+/* `unmapped` deliberately shares pending's COLOUR — it is a requirement-level state, not an eleventh
+   lifecycle stage — and stays distinct by word ("Not yet mapped"). Mirrors the portal's own remap in
+   `StatusStyles.LegendKey` / `RequirementBadge`, where the colour is shared and the glyph is not. */
+.is-pending,
+.is-unmapped {
   background: var(--parchment-dark);
   color: var(--ink-light);
   border-color: var(--status-pending);

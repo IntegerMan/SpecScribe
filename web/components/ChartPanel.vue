@@ -26,7 +26,15 @@ defineProps<{
 </script>
 
 <template>
-  <section class="chart-panel">
+  <!-- `<div>`, matching `Charts.Framed` (`Charts.cs:168`) exactly. This was a `<section>` with an inner
+       `.chart-panel-body` wrapper — neither of which the C# frame emits, and neither of which has any rule in
+       specscribe.css. The wrapper was the load-bearing half: it inserted a DOM level the portal has no
+       counterpart for, so any `.chart-panel > …` child-combinator rule would apply on the generated portal
+       and silently not apply here the moment a surface migrated (23.4) — the same wrapper hazard
+       CONVENTIONS §9 already documents for `IrHtml.ts`. It was also unguarded, so `<ChartPanel title="x" />`
+       with no children shipped an empty padded div, contradicting this page's own stated contract that an
+       unfilled slot renders nothing. [Story 23.2 re-review 2026-07-28] -->
+  <div class="chart-panel">
     <div class="chart-frame-head">
       <h3>{{ title }}</h3>
       <span v-if="window" class="chart-frame-window">{{ window }}</span>
@@ -35,16 +43,17 @@ defineProps<{
     <p v-if="ranking" class="chart-frame-ranking">{{ ranking }}</p>
     <p v-if="note" class="chart-frame-note">{{ note }}</p>
 
-    <div class="chart-panel-body">
-      <slot />
-    </div>
+    <slot />
 
+    <!-- The one region the C# frame has no concept of. Additive and always guarded, so it cannot change the
+         anatomy of a panel that does not use it; `Charts.Framed` renders its legend inside `body`. If a
+         legend ever needs to be styled from the shared sheet, add the slot to `Charts.Framed` first. -->
     <div v-if="$slots.legend" class="chart-panel-legend">
       <slot name="legend" />
     </div>
 
     <p v-if="why" class="chart-frame-why">{{ why }}</p>
-  </section>
+  </div>
 </template>
 
 <style scoped>

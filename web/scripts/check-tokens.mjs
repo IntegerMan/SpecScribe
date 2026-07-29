@@ -6,7 +6,10 @@
 // the only way the Vue app's token values can disagree with the shipped portal's is for this check to fail.
 // [Story 23.2 AC #1]
 
-import { SOURCE_LABEL, declaredTokenNames, readCommittedTokensCss, renderTokensCss, sliceRootBlock } from './tokens-lib.mjs'
+import { SOURCE_LABEL, declaredTokenNames, findRootBlocks, readCommittedTokensCss, renderTokensCss } from './tokens-lib.mjs'
+
+/** Repo-relative label for the GENERATED file, so a fault in it is never attributed to the C# source. */
+const TOKENS_LABEL = 'web/assets/tokens.css'
 
 let expected
 try {
@@ -26,15 +29,39 @@ if (actual === null) {
 }
 
 if (actual === expected) {
-  const count = declaredTokenNames(sliceRootBlock(actual).body).length
-  console.log(`check:tokens OK — ${count} tokens in sync with ${SOURCE_LABEL}`)
+  // Count across EVERY block, not just the first — the one-block count was how a whole missing token family
+  // still reported "in sync". [Story 23.2 re-review 2026-07-28]
+  const blocks = findRootBlocks(actual, TOKENS_LABEL)
+  const count = blocks.reduce((n, b) => n + declaredTokenNames(b.body).length, 0)
+  console.log(
+    `check:tokens OK — ${count} tokens across ${blocks.length} \`:root\` block(s), in sync with ${SOURCE_LABEL}`,
+  )
   process.exit(0)
 }
 
 // Report the divergence at TOKEN granularity, not just "files differ" — a value drift and a renamed family
 // need different fixes, and the first line of a failing CI log should already say which one happened.
-const expectedTokens = tokenMap(expected)
-const actualTokens = tokenMap(actual)
+//
+// ⚠️ Both parses are guarded, and each names the file it actually read. Unguarded, a committed tokens.css whose
+// `:root {` header had been stripped — a bad merge, a truncated write, precisely what this gate exists to catch
+// — threw an UNCAUGHT stack trace naming the C# SOURCE stylesheet, sending the operator to debug the wrong file.
+let expectedTokens
+let actualTokens
+try {
+  expectedTokens = tokenMap(expected, SOURCE_LABEL)
+} catch (err) {
+  console.error(`check:tokens FAILED — could not parse the tokens extracted from ${SOURCE_LABEL}`)
+  console.error(`  ${err.message}`)
+  process.exit(1)
+}
+try {
+  actualTokens = tokenMap(actual, TOKENS_LABEL)
+} catch (err) {
+  console.error(`check:tokens FAILED — ${TOKENS_LABEL} is present but could not be parsed.`)
+  console.error(`  ${err.message}`)
+  console.error('  This is the generated file, not the source. Run `npm run extract:tokens` to rewrite it.')
+  process.exit(1)
+}
 
 const added = [...expectedTokens.keys()].filter((k) => !actualTokens.has(k))
 const removed = [...actualTokens.keys()].filter((k) => !expectedTokens.has(k))
@@ -57,12 +84,26 @@ if (added.length + removed.length + changed.length === 0) {
 console.error('  Fix: run `npm run extract:tokens` and commit the result.')
 process.exit(1)
 
-/** Top-level custom-property name -> declared value, from a rendered tokens.css. */
-function tokenMap(text) {
-  const body = sliceRootBlock(text).body.replace(/\/\*[\s\S]*?\*\//g, '')
+/**
+ * Top-level custom-property name -> declared value, across every `:root` block of a rendered tokens.css.
+ *
+ * ⚠️ The value is terminated by `;` **or by the end of the block**. CSS permits the final declaration in a
+ * rule to omit its semicolon, and the old `([^;]*);` regex silently skipped it — so dropping the trailing `;`
+ * on `--motion-stagger` and changing its value produced empty added/removed/changed sets, and a real value
+ * drift on a motion token was reported as "the difference is comments, ordering, or the generated banner".
+ * [Story 23.2 re-review 2026-07-28]
+ */
+function tokenMap(text, label) {
+  const blocks = findRootBlocks(text, label)
+  if (blocks.length === 0) {
+    throw new Error(`no top-level ':root {' rule found in ${label}`)
+  }
   const map = new Map()
-  for (const m of body.matchAll(/(^|[\s;{])(--[A-Za-z0-9-]+)\s*:([^;]*);/g)) {
-    map.set(m[2], m[3].trim())
+  for (const block of blocks) {
+    const body = block.body.replace(/\/\*[\s\S]*?\*\//g, '')
+    for (const m of body.matchAll(/(^|[\s;{])(--[A-Za-z0-9-]+)\s*:([^;]*?)\s*(?:;|$)/g)) {
+      map.set(m[2], m[3].trim())
+    }
   }
   return map
 }

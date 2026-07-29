@@ -23,6 +23,50 @@ frameworks is planned — see the [Roadmap](#roadmap) for feature-level plans.
 | GSD-Pi | — | 🧭 Planned |
 | Superpowers | — | 🧭 Planned |
 
+### BMad modules
+
+BMad is not one thing — it installs as a set of modules under `_bmad/{code}/`, and BMad Builder can mint
+new ones with arbitrary codes. SpecScribe identifies the installed module(s) from that directory name and
+tells you honestly how deeply it understands each one. Installing a second module never degrades the one
+you already had; a repo running BMM alongside Test Architect keeps its full BMM surface.
+
+| Module | Code | What SpecScribe does |
+|--------|------|----------------------|
+| BMad Method | `bmm` | **Full projection** — epics, stories, requirements, sprint, retros, planning docs, next-step commands, and the BMM glossary |
+| Game Dev Studio | `gds` | **Full projection** — the same families, with GDD / narrative planning docs and GDS commands |
+| Test Architect | `tea` | **Named, with its test artifacts interpreted** — they get their own page and a dashboard *Module Coverage* panel carrying the quality-gate verdict and coverage figures (see below) |
+| Creative Intelligence Suite | `cis` | **Named** — its real label and its parsed command catalog; its markdown renders through the generic document pass |
+| BMad Builder | `bmb` | **Named** — as above |
+| Anything BMad Builder mints | any | **Named** — module identity is open-world, so a custom module is named rather than misidentified |
+
+"Named" is a deliberate, stated boundary rather than a gap. For every module below the top two — **Test
+Architect included** — SpecScribe publishes no glossary and no planning-doc set, and the dashboard's
+artifact-coverage panel is omitted rather than reporting eight BMad Method artifact families the module
+never produces. The run records that omission as a non-fatal note on the Diagnostics page, which also
+names the module actually detected.
+
+Two BMad **core** skills — present in every install regardless of module — get first-class surfaces:
+
+- **`bmad-forge-idea`** → an **Ideas** page listing every forged idea workspace grouped by outcome
+  (hardened / in progress / killed), each with a detail page, the original `forge-report.html` carried
+  through verbatim, and forward links to the brief, PRD, or epic an idea produced where that link is
+  evidenced on disk.
+- **`bmad-testarch-*` (Test Architect)** → a **Test Artifacts** page, plus the first non-markdown sources
+  SpecScribe reads: `gate-decision.json` and `e2e-trace-summary.json` are read by exact filename so the
+  `PASS`/`CONCERNS`/`FAIL`/`WAIVED` gate verdict is visible instead of silently invisible to the `*.md` scan.
+
+Every discovered module artifact carries one of three **coverage tiers**, so the interpretation boundary is
+stated rather than guessed at:
+
+| Tier | Meaning |
+|------|---------|
+| **Rendered** | The document has its own page; SpecScribe reads its prose but interprets none of its structure |
+| **Summarized** | SpecScribe extracts a structured headline — verdict, coverage figures — and surfaces it alongside the artifact, while the file itself is not fully modelled |
+| **Unsupported** | Discovered and named, nothing interpreted. Not an error — an honest statement of the boundary |
+
+Optional surfaces are omitted entirely when their artifacts don't exist: no forge workspaces means no Ideas
+page and no nav entry; no Test Architect artifacts means no Test Artifacts page and no Module Coverage panel.
+
 ## Install
 
 SpecScribe is a [.NET global tool](https://learn.microsoft.com/dotnet/core/tools/global-tools) targeting .NET 10.
@@ -166,6 +210,10 @@ This is useful if you prefer static output tracked in git instead of artifact-ba
 - **Requirements traceability** — FR/NFR inventory with epic coverage maps; requirement IDs in any
   document become anchor links
 - **ADRs** — hand-authored architecture decision records rendered with rewritten cross-links
+- **Ideas** — forged idea workspaces grouped by outcome, with the original forge report and forward links
+  to whatever the idea became (omitted when no ideas exist)
+- **Test artifacts** — Test Architect output with its quality-gate verdict, coverage figures, and a
+  per-artifact coverage tier, plus a Module Coverage panel on the dashboard (omitted when absent)
 - **Mermaid diagrams** — fenced ` ```mermaid ` blocks render client-side
 - **Task lists** — GitHub-style checkboxes render as progress
 
@@ -186,9 +234,16 @@ Planned framework support (Spec Kit, GSD, GSD-Pi, Superpowers) is tracked in the
 dotnet build            # build everything
 dotnet test             # run the unit tests
 dotnet run --project src/SpecScribe -- generate    # run without installing
+pwsh tools/coverage/Get-Coverage.ps1               # browsable coverage report (add -Open to launch it)
 ```
 
 The solution is `SpecScribe.slnx`; the tool lives in `src/SpecScribe`, tests in `tests/SpecScribe.Tests`.
+
+The coverage report is written to the gitignored `artifacts/coverage/html/`. It renders the OpenCover file
+`dotnet test` already produces — it is not a second coverage mechanism — and it covers **C# only**, so its
+percentage is deliberately not the same number as the SonarCloud figure, which uses a different formula and
+also counts `extension/` and `web/`. [`tools/coverage/README.md`](tools/coverage/README.md) explains the
+difference and shows which figures to compare.
 
 ### Continuous integration
 

@@ -13,9 +13,15 @@ content-semantic tokens; host chrome is host-owned).
 
 ## 1. Tokens are generated. Never hand-edit them.
 
-`assets/tokens.css` is a **verbatim extraction** of the `:root` block from
+`assets/tokens.css` is a **verbatim extraction** of **every top-level `:root` block** in
 `src/SpecScribe/assets/specscribe.css`. That C# stylesheet is the single source of truth for SpecScribe's
 presentation tokens (AD-7). The extracted file is a copy, never a second definition.
+
+> Every top-level block, plural, since 2026-07-28. The extractor took only the **first** until then, so when
+> the Impact Map added a second `:root` (the `--impact-lvl-*` ramp) that family silently never crossed — and
+> because the gate ran the same one-block extractor on both sides, it could not disagree about tokens neither
+> side looked at. It printed "OK — 36 tokens in sync" throughout. A `:root` nested inside an at-rule is *not*
+> carried: that is a viewport-conditional override, and this app owns its own breakpoints.
 
 ```bash
 npm run extract:tokens   # regenerate after ANY token change in the C# stylesheet
@@ -90,28 +96,46 @@ away.
 ## 4. Measured: use build-time data. Neither `useAsyncData` nor `<NuxtIsland>`.
 
 AC #4's experiment. Three routes render **identical markup from identical data** (200 story-shaped rows
-through `ListRow` + `StatusBadge`) and differ only in how the data reaches the component. Measured with
-`npm run generate && npm run measure:payload` on Nuxt 3.21.9 / Vue 3.5.40 / Node 24.11.1:
+through `ListRow` + `StatusBadge`) and differ only in how the data reaches the component. Re-measured
+2026-07-28 with `npm run generate && npm run measure:payload` on **Nuxt 4.5.1 / Vue 3.5.40 / Node 24.11.1**;
+the run is committed at [`measurements/payload.json`](measurements/payload.txt) so the numbers are checkable
+rather than quoted:
 
 | variant | HTML | payload | island JSON | total | vs control |
 | --- | --- | --- | --- | --- | --- |
-| A — `useAsyncData` | 125.5 KB | 44.5 KB | — | **170.0 KB** | 1.36× |
-| B — `.server.vue` island | 125.1 KB | 3.1 KB | 121.8 KB | **250.0 KB** | 1.99× |
-| C — build-time (control) | 125.4 KB | 0.1 KB | — | **125.4 KB** | 1.00× |
+| A — `useAsyncData` | 119.3 KB | 44.5 KB | — | **163.9 KB** | 1.37× |
+| B — `.server.vue` island | 119.0 KB | 0.3 KB | 119.0 KB | **238.4 KB** | 2.00× |
+| C — module-scope control | 119.3 KB | 0.1 KB | — | **119.4 KB** | 1.00× |
+
+_(The original 23.2 run on Nuxt 3.21.9 gave 1.36× / 1.99× / 1.00×. The conclusion survived the Nuxt 4 major
+unchanged; the table had been left pinned to a version the app no longer used.)_
 
 **The server-component shape lost, and it lost badly.** The 23.1 spike hypothesised that `<NuxtIsland>` would
 avoid the hydration-payload duplication behind its measured 2.26× site weight. It does drain the route's
-`_payload.json` (44.5 KB → 3.1 KB), but it then emits the island's **entire rendered HTML and its scoped CSS a
-second time** into `__nuxt_island/<Component>_<hash>.json` so the client can re-fetch it. For content that is
-static once prerendered, that is a payload *amplifier*: 1.99× against 1.36× for the thing it was supposed to
-beat.
+`_payload.json`, but it then emits the island's **entire rendered HTML and its scoped CSS a second time** into
+`__nuxt_island/<Component>_<hash>.json` so the client can re-fetch it. For content that is static once
+prerendered, that is a payload *amplifier*: 2.00× against 1.37× for the thing it was supposed to beat. **This
+half of the experiment is sound and is the durable finding.**
 
-**Recommendation for 23.3: resolve IR data at build time, at module scope, with no data composable.** That is
-variant C, it costs essentially nothing (0.1 KB of payload for a 125 KB page), and it is the shape 23.2's own
-primitives already use. The IR is available at build time by construction — there is no reason for it to
-arrive through a composable that exists to serve runtime fetching.
+### ⚠️ What variant C does and does not prove (corrected 2026-07-28)
 
-Two caveats, so the recommendation is not over-generalised:
+The control is **not a data path**, and the original write-up over-read it. `pages/measure/static.vue` calls
+`buildRows(200)` at module scope, but the route still hydrates, so the browser **re-runs that generator** from
+`utils/measure-rows.ts` — 14 deterministic lines bundled into `_nuxt/`. And `measure-payload.mjs` totals
+`html + payload + island` and **never counts `_nuxt/` chunks**, so those bytes are invisible to the table.
+
+So variant C measures *"no data had to cross the boundary, because the data is a pure function"* — not
+*"build-time resolution is free"*. Real IR content is not a pure function, and the difference is not academic:
+getting there in 23.3 took a `#ir` Vite-environment resolver, a throwing browser stub, and
+`routeRules: { '/**': { noScripts: true } }` (see §12) — machinery this measurement neither used nor implied.
+
+**Recommendation for 23.3, restated honestly:** resolve IR data at build time and **ship the route with no
+Nuxt runtime at all** (`noScripts: true`). A route with no scripts cannot carry a hydration payload, which
+makes the guarantee structural instead of measured-and-hoped. Variant C is the *floor* that shape aims at, not
+a recipe that transfers on its own. What the table does establish, firmly, is the ordering: **do not reach for
+`<NuxtIsland>` for prerendered content, and do not route static data through `useAsyncData`.**
+
+Two further caveats, so the recommendation is not over-generalised:
 
 - Island JSON is keyed by component **and props hash**, so N routes rendering the same island with the same
   props share one file. That sharing does not help 23.3, whose per-page IR content differs on every route.
@@ -137,6 +161,22 @@ renders — the exact class of drift this epic exists to end.
 The `/design-system` page holds the vocabulary as page data for its gallery. That is a showcase fixture, not
 a source of truth; 23.3 replaces it with the IR.
 
+The union carries **all ten** of `StatusStyles.LegendStages`. Two of them have no `--status-*` token of their
+own and borrow one — `unmapped` shares `--status-pending`, `retired` shares `--status-deferred` — and both
+stay distinct by WORD. Never publish `--status-unmapped` or `--status-retired`; neither exists.
+
+### ⚠️ Open dependency on 23.3: the badge glyph
+
+`StatusStyles.Badge` emits **icon + word** and documents the portal rule as "color + icon + word, never
+icon-only". `StatusBadge.vue` renders **the word only** — there is no icon prop, slot or sprite. UX-DR17 still
+holds (the word is always present), but two pairs the portal separates by glyph do not separate here:
+`ready`/`drafted` share a border colour, and `deferred`/`retired` are byte-identical rule sets.
+
+Supplying the glyph is deferred to **Story 23.3**, where the stage→icon mapping gains a data source in the
+canonical IR. Until then, do not write a component or a doc that claims the icon channel exists. (An earlier
+version of `StatusBadge.vue`'s header asserted UX-DR17 was "enforced BY THE COMPONENT'S SHAPE"; it was not,
+and required-ness guards `undefined`, not `''`.)
+
 ---
 
 ## 6. Accessibility and motion are structural, not per-component
@@ -149,6 +189,16 @@ a source of truth; 23.3 replaces it with the IR.
   carries a hatch texture so it differs from the six real stages by more than hue.
 - Wide content scrolls inside its own container. `ChartPanel` is `overflow-x: auto` for this reason — a wide
   table must never make the page body scroll sideways.
+- That global reduce block neutralises **delay as well as duration**. Clamping duration alone is the trap:
+  with `animation-fill-mode: both` an element is held at its `from` keyframe — usually `opacity: 0` — for the
+  whole delay, so a list staggered by `--motion-stagger` would show a reduce-motion reader seconds of blank
+  page. Content missing, not merely still.
+
+### CSS modules
+
+Not used, deliberately. Scoped SFCs give the same containment with less indirection, and the styling that
+cannot be scoped at all (`v-html`'d IR content, §3 and §10) is not something modules would solve either. If
+you find yourself reaching for one, the answer is a scoped SFC or the `ir-content.css` layer.
 
 ---
 

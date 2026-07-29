@@ -158,6 +158,18 @@ public sealed class SiteGenerator
     // found → the "Code Map" nav item, quick link, and page all omit together (one signal, never a broken link).
     private IReadOnlyList<(string RepoRelativePath, long Lines)> _codeFiles = Array.Empty<(string, long)>();
 
+    /// <summary>Story 22.5: every renderable source path the last completed pass actually saw — BOTH watched
+    /// roots, since ADRs live outside <see cref="ForgeOptions.SourceRoot"/> and strand their own surfaces when
+    /// one is deleted. This is the "before" half of <see cref="ClassifyRebuildScope"/>'s comparison; the "after"
+    /// half is <see cref="File.Exists(string)"/> at fire time. Full paths, case-insensitive, because that is what
+    /// a watcher event carries.
+    /// <para>Written by every route that completes — from the list it is rendering in
+    /// <see cref="GenerateAll"/>'s case, and by re-walking afterwards in the narrow routes' — so it always
+    /// describes what the OUTPUT reflects rather than what the disk currently holds. That distinction is the whole
+    /// mechanism: comparing a watch event against the disk tells you nothing, because the disk is the thing that
+    /// just changed.</para></summary>
+    private HashSet<string> _sourceInventory = new(StringComparer.OrdinalIgnoreCase);
+
     private SprintStatus? _sprint;
     // Story 8.3: portal-wide count ledger — built once after progress/sprint/workInventory are known and
     // threaded into every summary surface so no render site recounts. Null until the index/work phase.
@@ -215,6 +227,12 @@ public sealed class SiteGenerator
             // RegenerateTopology gave GenerateAll a caller other than watch startup.
             _codeFiles = EnumerateCodeFiles();
 
+            // Story 22.5: seed the rebuild-scope baseline from the set this pass is about to render. `watch` and
+            // `serve` both run a full generation before their first dispatch (WatchCommand/RunServeLoop), so by the
+            // time ClassifyRebuildScope is ever consulted this is populated — a watch session can never open with an
+            // empty inventory and read every save as a brand-new file.
+            RefreshSourceInventory(files);
+
             // A full rebuild starts from a clean slate so renamed/removed source docs don't leave
             // orphaned HTML behind (incremental watch-mode updates never wipe the whole tree).
             if (Directory.Exists(_options.OutputRoot))
@@ -225,6 +243,7 @@ public sealed class SiteGenerator
             EnsureScaffold();
             _docs.Clear();
             _prelude = null; // see BuildSurfacePrelude's lifetime rule
+            ResetDerivedStateForFullRebuild();
 
             // Fresh capture buffer for this full build when the opt-in SPA form is on OR the webview asked for
             // page capture (null otherwise → no capture). Capture is memory-only either way.
@@ -591,12 +610,18 @@ public sealed class SiteGenerator
         {
             EnsureScaffold();
             _prelude = null; // see BuildSurfacePrelude's lifetime rule
+            // Same lifetime rule, same reason: this map is built from _docs/_adrs/_referenceMap, all of which
+            // this pass is about to change, and RefreshCodeSurfaces below re-links every code-map cell through
+            // it. Cached across a pass, it answers with the PREVIOUS pass's hrefs. [Story 22.5]
+            _artifactHrefByRepoRel = null;
             var nav = _nav ?? BuildNav(Array.Empty<string>());
             var ev = GenerateOneInternal(sourceFullPath, nav);
             RefreshCoverage();
+            RefreshCodeSurfaces(nav);
             var inventory = RefreshFollowUpSurfaces(nav);
             RefreshDatePagesAndTimeline(nav, new List<GenerationEvent>());
             WriteIndex(nav, inventory);
+            RefreshSourceInventory();
             // Keep the opt-in SPA form in sync in watch mode: _spaCapture already holds the fresh page (captured by
             // GenerateOneInternal's WriteOutput), so re-emitting rebuilds the manifest/chunks from current state.
             if (_options.EmitSpa) EmitSpaSite(nav);
@@ -612,6 +637,10 @@ public sealed class SiteGenerator
         lock (_gate)
         {
             _prelude = null; // see BuildSurfacePrelude's lifetime rule
+            // Same lifetime rule, same reason: this map is built from _docs/_adrs/_referenceMap, all of which
+            // this pass is about to change, and RefreshCodeSurfaces below re-links every code-map cell through
+            // it. Cached across a pass, it answers with the PREVIOUS pass's hrefs. [Story 22.5]
+            _artifactHrefByRepoRel = null;
             if (_docs.TryGetValue(relative, out var doc))
             {
                 var outputFullPath = Path.Combine(_options.OutputRoot, doc.OutputRelativePath);
@@ -625,7 +654,9 @@ public sealed class SiteGenerator
                 if (_spaCapture is not null) _spaCapture.Remove(PathUtil.NormalizeSlashes(doc.OutputRelativePath));
                 RefreshCoverage();
                 var nav = _nav ?? BuildNav(Array.Empty<string>());
+                RefreshCodeSurfaces(nav);
                 WriteIndex(nav);
+                RefreshSourceInventory();
                 if (_options.EmitSpa) EmitSpaSite(nav);
                 return new GenerationEvent(GenerationOutcome.Removed, relative, sw.Elapsed);
             }
@@ -642,6 +673,45 @@ public sealed class SiteGenerator
     private void RefreshCoverage()
     {
         _coverage = BuildArtifactCoverage(EnumerateSourceFiles().Select(ToSourceRelative).ToList());
+    }
+
+    /// <summary>Re-walks the source code and rewrites the three surfaces projected from it —
+    /// <c>code-map.html</c>, <c>risk-quadrant.html</c> and <c>git-insights.html</c>. The narrow counterpart of
+    /// <see cref="RefreshCoverage"/>, and called from the same routes for the same reason. [Story 22.5 AC #4]
+    ///
+    /// <para><b>Why a CONTENT edit needs this, which Story 22.1 did not find.</b> The Code Map is a treemap of the
+    /// source walk, and the walk carries each file's LINE COUNT — which is also what sizes every cell and what the
+    /// page's own subtitle states ("N files across M directories · L lines of code"). So editing ONE tracked file,
+    /// changing nothing else, is already enough to make the cached page wrong. Measured against the oracle, this was
+    /// the single surviving divergence on <i>every</i> change class once Story 22.4 closed the work-graph one:
+    /// content-doc and content-story diverged here exactly as add/rename/delete did. Story 22.1 listed
+    /// <c>code-map.html</c> under topology changes only and warned its list was a lower bound; this is one of the
+    /// entries that bound was hiding.</para>
+    ///
+    /// <para>Escalation is NOT the fix for the content case: a save is the dominant edit class in a live watch
+    /// session, and rebuilding the whole site on every keystroke-save is precisely the cost owner decision D3
+    /// declined to pay. The topology case still escalates (<see cref="ClassifyRebuildScope"/>) — there the page set
+    /// itself changes and far more than these two surfaces is stranded.</para>
+    ///
+    /// <para><b>The nav gate cannot flip here, and that is load-bearing.</b> <c>hasCodeMap</c> is
+    /// <c>_codeFiles.Count &gt; 0</c>, and these routes reuse a cached <see cref="_nav"/>, so a walk that went from
+    /// non-empty to empty would leave a nav entry pointing at a page that no longer renders. It cannot: a change in
+    /// the FILE SET is a topology change and escalated before reaching any narrow route, so by the time this runs
+    /// only line counts can have moved. <see cref="WriteCodeMap"/> is never-throw and returns null when it omits,
+    /// which <see cref="WriteRiskQuadrant"/> already treats as "omit too".</para></summary>
+    private void RefreshCodeSurfaces(SiteNav nav)
+    {
+        _codeFiles = EnumerateCodeFiles();
+        WriteRiskQuadrant(nav, WriteCodeMap(nav));
+        // git-insights.html is the THIRD surface on this walk, and the one a non-git fixture cannot reveal: its
+        // ownership section builds `CodeMap.Build(_codeFiles, …)` for the same reason the Code Map page does (the
+        // hub's own GitInsightsData.Files is top-N-capped, wrong for a whole-tree sunburst), so it inherits the
+        // line-count dependence verbatim. It surfaced only in the deep-git-ON matrix at repo scale — which is
+        // exactly why Story 22.5 AC #1 required that re-measure instead of trusting Story 22.1's deep-git-OFF list.
+        // Self-gating on `_progress?.DeepGit`, so with --deep-git off this is a return, and it re-uses the deep-git
+        // pulse already in memory rather than shelling out to git again (no new subprocess, no 3s-budget exposure).
+        // deep-analytics.html is deliberately NOT here: it takes no CodeMap, and the matrix measured it clean.
+        GenerateGitInsightsInternal(nav, new List<GenerationEvent>(), reporter: null);
     }
 
     /// <summary>True for a non-markdown DATA SOURCE the site reads but the <c>.md</c> dispatch routes don't refresh:
@@ -689,6 +759,147 @@ public sealed class SiteGenerator
         BmadArtifactAdapter.IsEpicsFile(sourceFullPath)
         || BmadArtifactAdapter.IsUnderImplementationArtifacts(sourceFullPath);
 
+    /// <summary>THE rebuild-scope decision for one watch-mode change event: does the family route suffice, or must
+    /// this escalate to a full rebuild? One method, so the rule is readable and testable in one place instead of
+    /// being implied by which route a path happens to reach. [Story 22.5 AC #3]
+    ///
+    /// <para><b>The rule.</b> A change is TOPOLOGY when the file's existence at fire time disagrees with whether the
+    /// last completed pass rendered it (<see cref="_sourceInventory"/>) — i.e. a page must now appear or disappear.
+    /// Everything else is CONTENT: the same pages exist, they just say something different. Deliberately ONE rule
+    /// rather than a per-family one: "did the page set change" is the question every stranded surface actually turns
+    /// on, and a family-shaped rule would need re-deciding each time a family is added.</para>
+    ///
+    /// <para><b>Ground truth at fire time, never the event kind</b> — the same discipline
+    /// <see cref="FileWatcherService.RunDebouncedPass"/> already applies. A single editor save emits
+    /// Changed/Created/Deleted in any order before the debounce settles, so believing the event kind would
+    /// classify an ordinary save as a delete roughly whenever the editor writes via a temp-file swap.</para>
+    ///
+    /// <para><b>Why escalating is correct and not merely conservative:</b> the surfaces a file-level add / rename /
+    /// delete strands are derived from the WHOLE tree — the Code Map and its risk quadrant, delivery cadence, the
+    /// reference/citation seam (<c>_referenceMap</c> / <c>_codeReverseMap</c>), the per-file code-view pages — and
+    /// no narrow route re-renders them. Worse, a delete leaves ORPHANED output that only
+    /// <see cref="GenerateAll"/>'s output-root wipe removes. Story 22.1 measured every one of those.</para>
+    ///
+    /// <para><b>Non-markdown returns <see cref="RebuildScope.Narrow"/></b> so this can never manufacture a full
+    /// rebuild from a file that would never have become a page. The DATA SOURCES (<c>sprint-status.yaml</c>,
+    /// <c>_bmad/config.toml</c>) are the one exception, and they are classified by <see cref="IsDataSource"/>
+    /// BEFORE this method is consulted — they escalate through <see cref="RegenerateFromDataSource"/>, which is
+    /// already a full rebuild. Ignored files (editor temp files, dotfiles) likewise never become pages, so they are
+    /// excluded on exactly the predicate the source walk itself applies; without that, a lock file appearing beside
+    /// an artifact would trigger a whole rebuild.</para>
+    ///
+    /// <para><b><c>epics.md</c> is NOT exempt, and that was measured rather than assumed (Story 22.5 Trap 4).</b>
+    /// Its deletion has a deliberate, tested teardown of its own — <see cref="RegenerateEpics"/>'s
+    /// <c>ingest.SourceFullPath is null</c> branch → <see cref="ClearEpicsFamilyOutputs"/> (Story 5.3 AC #3) — whose
+    /// reporting is strictly more honest than an escalation's: <see cref="GenerationOutcome.Removed"/> with a page
+    /// count when it actually tore something down, and the long-standing <see cref="GenerationOutcome.Skipped"/>
+    /// no-op for a project that simply never had an <c>epics.md</c>. Exempting it to preserve that was the obvious
+    /// call, so it was tried first and diffed against the oracle: the teardown left <b>16 pages stale and 3
+    /// missing</b>. The missing ones are the point — once <c>epics.md</c> is gone the story artifacts stop being
+    /// consumed by the epics family and a full rebuild renders them as ORDINARY DOCS, which no teardown of the
+    /// epics family could ever produce. So the honest resolution is escalation, at the cost of the watch log
+    /// reading <c>&lt;directory change&gt;</c> instead of "epics.md removed; N stale page(s) deleted".
+    /// <see cref="ClearEpicsFamilyOutputs"/> and its 8 tests are untouched and still reachable through the public
+    /// <see cref="RegenerateEpics"/> API (which is how they drive it) — this narrows only what the WATCH DISPATCH
+    /// chooses.</para>
+    ///
+    /// <para>Takes <see cref="_gate"/> because it reads <see cref="_sourceInventory"/>, which a concurrent route may
+    /// be replacing. It calls no route, so it cannot deadlock the way a caller wrapping
+    /// <see cref="GenerateAll"/> in this lock would.</para></summary>
+    public RebuildScope ClassifyRebuildScope(string sourceFullPath)
+    {
+        if (!sourceFullPath.EndsWith(".md", StringComparison.OrdinalIgnoreCase)) return RebuildScope.Narrow;
+        if (IsIgnored(sourceFullPath)) return RebuildScope.Narrow;
+
+        string full;
+        try
+        {
+            full = Path.GetFullPath(sourceFullPath);
+        }
+        catch (Exception ex) when (ex is ArgumentException or PathTooLongException or NotSupportedException)
+        {
+            // An unresolvable path cannot be matched against the inventory, and guessing "topology" here would turn
+            // a pathological path into a whole rebuild. Narrow keeps the existing family routing, which is what
+            // happened before this classifier existed. (NFR2 — degrade, never amplify.)
+            return RebuildScope.Narrow;
+        }
+
+        lock (_gate)
+        {
+            var existsNow = File.Exists(full);
+            var wasRendered = _sourceInventory.Contains(full);
+            return existsNow == wasRendered ? RebuildScope.Narrow : RebuildScope.Full;
+        }
+    }
+
+    /// <summary>Drops every model this generator DERIVED from a previous pass, so a full rebuild renders from
+    /// source alone. Called from <see cref="GenerateAll"/> beside <c>_docs.Clear()</c>. [Story 22.5 AC #3]
+    ///
+    /// <para><b>The bug this closes, and why it only appears on a REUSED generator.</b> Watch mode holds ONE
+    /// <see cref="SiteGenerator"/> for the life of the session, so an escalated rebuild is
+    /// <see cref="GenerateAll"/> called a second, third, n-th time on an instance that already has models. A cold
+    /// <c>specscribe generate</c> — the oracle — starts from nulls. Every field below was therefore stale-able in
+    /// watch mode and unreachable from any test that built a fresh generator, which is why this survived: measured
+    /// against the oracle, deleting <c>epics.md</c> and then escalating still left <c>cadence.html</c> and
+    /// <c>traceability.html</c> ORPHANED (written from an <c>_epicsModel</c> whose source no longer existed) and
+    /// the Code Map still linking story artifacts to <c>epics/story-N-M.html</c> pages that were gone.</para>
+    ///
+    /// <para><b>Why this does not contradict the partial-failure caching rule</b> that keeps the last good models
+    /// when a mid-edit save fails to parse. That rule protects the INCREMENTAL routes, which leave the rest of the
+    /// output tree in place and need the cached models to keep linkifying against it. <see cref="GenerateAll"/> has
+    /// already deleted <see cref="ForgeOptions.OutputRoot"/> by this point, so there is no surviving page for a
+    /// stale model to keep consistent — retaining one can only write a page whose source is gone. The assignments
+    /// downstream are unchanged and still conditional; they now start from "nothing known" exactly as a cold run
+    /// does.</para>
+    ///
+    /// <para><b>Byte-parity note:</b> on a FRESH generator every field below is already at the value assigned here,
+    /// so a cold <c>generate</c> — and therefore <c>GoldenContentFingerprint</c> — cannot move. This narrows only
+    /// what a SECOND pass on a live generator inherits.</para></summary>
+    private void ResetDerivedStateForFullRebuild()
+    {
+        _epicsModel = null;
+        _requirements = null;
+        _counts = null;
+        _cadence = null;
+        _progress = null;
+        _workGraph = WorkGraphModel.Empty;
+        _planningImpact = PlanningCodeImpactData.Empty;
+        _storyEpicByOutputPath = null;
+        _referenceMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        _codeReverseMap = new Dictionary<string, List<(string, string)>>(StringComparer.Ordinal);
+        // The one that produced the measured `readme.html` divergence, and the clearest illustration of the whole
+        // class. README.md renders EARLY — before the code-page phase populates this map — so on a cold run its
+        // source citations resolve against an EMPTY map and stay plain text. On a reused generator they resolved
+        // against the PREVIOUS pass's map and came out linkified, making watch mode's readme.html permanently
+        // different from `specscribe generate`'s. Ordering, not content, is the whole of the difference.
+        _codePages = new Dictionary<string, string>(StringComparer.Ordinal);
+        // Lazily built and cached "once per generation run" — but nothing enforced the per-RUN part, so on a reused
+        // generator the second run answered every code-item link out of the FIRST run's map.
+        _artifactHrefByRepoRel = null;
+    }
+
+    /// <summary>Re-reads the renderable source set into <see cref="_sourceInventory"/>. Called at the end of every
+    /// route that completes — including the narrow ones, where it is normally a no-op but is what makes the
+    /// inventory SELF-HEALING: if a pass ever misclassifies, the next event compares against real state rather than
+    /// compounding the error.
+    /// <para><paramref name="sourceFiles"/> lets a caller that already walked the source root hand its list in
+    /// rather than pay for a second walk; the ADR half is always enumerated here, since no caller has it.</para></summary>
+    private void RefreshSourceInventory(IReadOnlyList<string>? sourceFiles = null)
+    {
+        var inventory = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            foreach (var file in sourceFiles ?? EnumerateSourceFiles()) inventory.Add(Path.GetFullPath(file));
+            foreach (var file in EnumerateAdrFiles()) inventory.Add(Path.GetFullPath(file));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // A tree that moved under the walk. Keep whatever was collected: a partial inventory misclassifies
+            // toward Full (escalation), which is always output-correct, never toward a missed rebuild. [NFR2]
+        }
+        _sourceInventory = inventory;
+    }
+
     /// <summary>Re-parses epics.md and rewrites epics.html + every epics/epic-N.html + epics/story-N-M.html.
     /// Also refreshes the nav and the artifact map, so added/removed/renamed story files self-heal without
     /// needing a full restart.</summary>
@@ -699,6 +910,10 @@ public sealed class SiteGenerator
         {
             EnsureScaffold();
             _prelude = null; // see BuildSurfacePrelude's lifetime rule
+            // Same lifetime rule, same reason: this map is built from _docs/_adrs/_referenceMap, all of which
+            // this pass is about to change, and RefreshCodeSurfaces below re-links every code-map cell through
+            // it. Cached across a pass, it answers with the PREVIOUS pass's hrefs. [Story 22.5]
+            _artifactHrefByRepoRel = null;
 
             var files = EnumerateSourceFiles();
             var navDiagnostics = new List<AdapterDiagnostic>();
@@ -742,7 +957,9 @@ public sealed class SiteGenerator
                     WriteActionItems(nav, skippedInventory);
                 }
                 RefreshDatePagesAndTimeline(nav, new List<GenerationEvent>());
+                RefreshCodeSurfaces(nav);
                 WriteIndex(nav, skippedInventory);
+                RefreshSourceInventory(files);
                 if (_options.EmitSpa) EmitSpaSite(nav);
 
                 // Only a pass that actually tore down a stale output family reports Removed — a project that simply
@@ -815,7 +1032,9 @@ public sealed class SiteGenerator
             if (_counts is not null)
                 AppendCountDivergenceNotice(epicsEvents, _counts);
             RefreshDatePagesAndTimeline(nav, epicsEvents);
+            RefreshCodeSurfaces(nav);
             WriteIndex(nav, followUpInventory);
+            RefreshSourceInventory(files);
             if (_options.EmitSpa) EmitSpaSite(nav);
 
             var errored = epicsEvents.FirstOrDefault(e => e.Outcome == GenerationOutcome.Error);
@@ -1064,10 +1283,16 @@ public sealed class SiteGenerator
         {
             EnsureScaffold();
             _prelude = null; // see BuildSurfacePrelude's lifetime rule
+            // Same lifetime rule, same reason: this map is built from _docs/_adrs/_referenceMap, all of which
+            // this pass is about to change, and RefreshCodeSurfaces below re-links every code-map cell through
+            // it. Cached across a pass, it answers with the PREVIOUS pass's hrefs. [Story 22.5]
+            _artifactHrefByRepoRel = null;
             var nav = _nav ?? BuildNav(Array.Empty<string>());
             var events = GenerateAdrsInternal(nav);
             RefreshCoverage();
+            RefreshCodeSurfaces(nav);
             WriteIndex(nav);
+            RefreshSourceInventory();
             if (_options.EmitSpa) EmitSpaSite(nav);
 
             var errored = events.FirstOrDefault(e => e.Outcome == GenerationOutcome.Error);
@@ -5113,6 +5338,23 @@ public sealed class SiteGenerator
     /// for inline code-page rendering only. Bounded (<see cref="MaxCodeMapFiles"/>) and wrapped never-throw
     /// (NFR1/NFR2): any failure yields an empty list, so the whole surface omits and generation still succeeds. Runs
     /// once per full generation. [spec-7-1-deferred-debt-cleanup]</summary>
+    /// <summary>Dependency lockfiles are MACHINE-WRITTEN inventories, not source. A code page for one is
+    /// thousands of lines nobody reads, and its size dominates whatever bucket the Code Map puts it in — this
+    /// repo's own portal had an 11,132-line <c>web/package-lock.json</c> page swamping the Config bucket.
+    /// <para>Applies to every documented repo, not just this one: `git ls-files` has no extension filter (the
+    /// Story 23.2 completion notes assumed a "code-page extension set" that does not exist), so any project
+    /// with a lockfile hit this. Matched by FILENAME so a source file that merely lives in a <c>lock/</c>
+    /// directory is unaffected. [Story 23.2 re-review 2026-07-28]</para></summary>
+    private static bool IsGeneratedLockFile(string repoRelativePath)
+    {
+        var name = repoRelativePath[(repoRelativePath.LastIndexOf('/') + 1)..];
+        return name.EndsWith("-lock.json", StringComparison.OrdinalIgnoreCase)   // package-lock, npm-shrinkwrap forks
+            || name.EndsWith(".lock", StringComparison.OrdinalIgnoreCase)        // yarn.lock, Cargo.lock, poetry.lock, Gemfile.lock
+            || name.Equals("pnpm-lock.yaml", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("packages.lock.json", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("composer.lock", StringComparison.OrdinalIgnoreCase);
+    }
+
     private IReadOnlyList<(string RepoRelativePath, long Lines)> EnumerateCodeFiles()
     {
         try
@@ -5139,6 +5381,8 @@ public sealed class SiteGenerator
 
                 // Defense in depth: a stray "../" in the list must never escape the repo root.
                 if (!full.StartsWith(repoRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) continue;
+
+                if (IsGeneratedLockFile(normalized)) continue;
 
                 try
                 {

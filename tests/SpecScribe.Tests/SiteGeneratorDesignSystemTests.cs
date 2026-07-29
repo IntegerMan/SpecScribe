@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using SpecScribe;
 
 namespace SpecScribe.Tests;
@@ -74,6 +75,12 @@ public class SiteGeneratorDesignSystemTests : IDisposable
         foreach (var stage in StatusStyles.LegendStages)
         {
             // The token NAME (so a component author knows what to reference)...
+            //
+            // ⚠️ This used to be `Assert.Contains($"--status-{stage}", html)` and nothing else — a string the
+            // templater derives from the SAME loop variable, so it could not fail. An eleventh LegendStages
+            // entry with no matching `:root` declaration would ship a blank swatch captioned with a token that
+            // does not exist, green. The assertion that matters is the other direction, and it is below:
+            // every `--status-*` the page NAMES must actually be declared in the generated stylesheet.
             if (stage is not ("unmapped" or "retired"))
             {
                 Assert.Contains($"--status-{stage}", html);
@@ -136,18 +143,54 @@ public class SiteGeneratorDesignSystemTests : IDisposable
     }
 
     [Fact]
-    public void DesignSystem_AndTheLegendKey_ShareOneStageWordSeam()
+    public void DesignSystem_NamesNoTokenTheStylesheetDoesNotDeclare()
     {
-        // Both surfaces name the same stages; if they ever disagreed, the page teaching the vocabulary would
-        // be the one that was wrong. StatusStyles.LegendWord is the single seam, and this pins that.
-        var html = Generate();
-        var legend = StatusStyles.LegendKey();
+        // THE assertion a component author depends on: every `--…` custom property this page names is real.
+        // Nothing checked this in either direction before — the C# page had a `_ =>` arm that fabricated
+        // `--status-<stage>` for any future LegendStages entry, and the Vue twin published `--status-retired`,
+        // a property declared nowhere. A design-system page that names a token that does not exist is worse
+        // than one that omits it: it is an instruction that silently produces an unstyled element.
+        // [Story 23.2 re-review 2026-07-28]
+        var html = MainOf(Generate());
+        var css = File.ReadAllText(Path.Combine(Site, ForgeOptions.StylesheetName));
 
-        foreach (var stage in StatusStyles.LegendStages)
+        var named = Regex.Matches(html, @"--[a-z0-9-]+", RegexOptions.IgnoreCase)
+            .Select(m => m.Value)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.NotEmpty(named);
+        foreach (var token in named)
         {
-            var word = PathUtil.Html(StatusStyles.LegendWord(stage));
-            Assert.Contains(word, legend);
-            Assert.Contains(word, html);
+            Assert.True(
+                css.Contains($"{token}:", StringComparison.Ordinal),
+                $"The design-system page names `{token}`, but {ForgeOptions.StylesheetName} declares no such "
+                + "custom property. Either the page is teaching a token that does not exist, or the token was "
+                + "renamed and the page was not updated.");
+        }
+    }
+
+    [Fact]
+    public void DesignSystem_DocumentsEveryMotionToken_AndNamesNoneThatIsInvented()
+    {
+        // Derived from the templater's OWN list, not a hand-typed copy of it. The previous test asserted a
+        // literal five-element array against a literal five-element array, so adding `--motion-exit` to the
+        // stylesheet left both design-system pages silently incomplete with the suite green.
+        var html = MainOf(Generate());
+        var css = File.ReadAllText(Path.Combine(Site, ForgeOptions.StylesheetName));
+
+        Assert.NotEmpty(DesignSystemTemplater.MotionTokens);
+        foreach (var (token, role) in DesignSystemTemplater.MotionTokens)
+        {
+            Assert.Contains(token, html);
+            Assert.Contains(PathUtil.Html(role), html);
+            Assert.Contains($"{token}:", css);
+        }
+
+        // And the other direction: no `--motion-*` declared in the stylesheet is missing from the page.
+        foreach (Match m in Regex.Matches(css, @"(--motion-[a-z0-9-]+)\s*:", RegexOptions.IgnoreCase))
+        {
+            Assert.Contains(m.Groups[1].Value, html);
         }
     }
 
@@ -157,13 +200,29 @@ public class SiteGeneratorDesignSystemTests : IDisposable
         // The page shows a token's value by USING it (a swatch painted `var(--status-*)`), never by
         // re-typing the hex. A literal here would be a second definition free to drift from the stylesheet —
         // exactly what the whole token system exists to prevent, and doubly wrong on the page that teaches it.
-        var html = Generate();
+        //
+        // ⚠️ Derived from the stylesheet's OWN `:root` declarations rather than a hand-listed six. The old list
+        // missed `#d4a017`, `#1e4a5a` and `#e8ecf0` entirely, AND coupled the test to the palette's values —
+        // so changing `--status-pending` broke a design-system test, and the fix was to hand-retype the new hex
+        // into it, growing the second copy of the palette this test exists to forbid.
+        var html = MainOf(Generate());
         var css = File.ReadAllText(Path.Combine(Site, ForgeOptions.StylesheetName));
 
-        foreach (var literal in new[] { "#b8b2a8", "#e8d9a8", "#7a6250", "#5c6570", "#6b8f62", "#2e6b7a" })
+        var rootBlock = Regex.Match(css, @"^:root\s*\{(.*?)^\}", RegexOptions.Singleline | RegexOptions.Multiline);
+        Assert.True(rootBlock.Success, "Could not locate the `:root` block in the generated stylesheet.");
+
+        var literals = Regex.Matches(rootBlock.Groups[1].Value, @"#[0-9a-fA-F]{6}\b")
+            .Select(m => m.Value)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        Assert.NotEmpty(literals);
+        foreach (var literal in literals)
         {
-            Assert.Contains(literal, css);                 // the value lives in the stylesheet...
-            Assert.DoesNotContain(literal, html);          // ...and nowhere in the page that documents it.
+            Assert.False(
+                html.Contains(literal, StringComparison.OrdinalIgnoreCase),
+                $"The design-system page states the literal `{literal}`. It must show a token's value by USING "
+                + "the token, never by re-typing it — a literal here is a second definition free to drift.");
         }
     }
 
@@ -190,9 +249,26 @@ public class SiteGeneratorDesignSystemTests : IDisposable
     {
         // A page whose subject IS the portal's vocabulary must not self-expand its own terms into reference
         // chips or nested <abbr> — the same rule How-to-read and About follow.
+        //
+        // ⚠️ Asserting only the ABSENCE of `<abbr`/`ref-chip` was vacuous: `AbbreviationExpander` wraps only
+        // FR/NFR/AC/ADR/PRD and `ReferenceChipRenderer` needs `[[wiki]]` or `file:line`, and this page contains
+        // none of those — so the guard passed identically with and without the bypass. The test now proves the
+        // expander WOULD have fired on this page's text, which is what makes the bypass load-bearing.
         var html = Generate();
         Assert.DoesNotContain("<abbr", html);
         Assert.DoesNotContain("class=\"ref-chip", html);
+
+        // ⚠️ KNOWN-VACUOUS, and left that way deliberately rather than made to look stronger than it is.
+        //
+        // A contrast control was tried during the 2026-07-28 re-review — "assert some OTHER page in this site
+        // carries <abbr>/ref-chip output" — and it FAILED, which is the finding rather than a bug in the
+        // control: this minimal fixture (one epic, one story, no glossary, no requirements) produces no
+        // expander output ANYWHERE, so the two assertions above pass with the bypass and pass without it.
+        //
+        // Making this real needs one of: a fixture carrying a glossary term + requirement IDs so the
+        // linkifiers actually fire, or a seam that asserts the WRITE PATH directly (that WriteDesignSystem
+        // reaches WriteOutput without ApplyReferenceLinks). Both are larger than a review patch and neither is
+        // unambiguous, so this is recorded as an open decision on Story 23.2 rather than papered over.
     }
 
     /// <summary>The page's own <c>&lt;main&gt;</c>, so an assertion can't be satisfied or defeated by the

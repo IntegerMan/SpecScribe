@@ -7275,6 +7275,18 @@ a.deferred-item-resolving:hover { color: var(--rust); }
   text-align: left;
 }
 .sdd-support-matrix--compact { max-width: 22rem; }
+/* The BMad modules table carries a prose "what SpecScribe does" cell, so it left-aligns rather than
+   inheriting the check-mark matrix's centered cells. [Epic 18] */
+.sdd-support-matrix--modules td { text-align: left; }
+.sdd-support-matrix--modules td code { font-size: 0.85em; color: var(--teal-deep); }
+/* Coverage-tier definitions reuse the shared .cap-row grammar, with the wider label column the glossary
+   uses — the tier words are single words but need to read as terms, not table cells. [Epic 18] */
+.sdd-tier-list { margin: 0.5rem 0 1.25rem; }
+.sdd-tier-list .cap-row { grid-template-columns: 9rem 1fr; }
+/* Same narrow-screen stack as .cap-row — this two-class rule outranks the shared one-column media query. */
+@media (max-width: 560px) {
+  .sdd-tier-list .cap-row { grid-template-columns: 1fr; gap: 0.1rem; }
+}
 .sdd-check { color: var(--emerald-deep, #3d6b35); font-weight: 700; }
 .sdd-check--no { color: var(--ink-light); font-weight: 500; }
 .sdd-detected,

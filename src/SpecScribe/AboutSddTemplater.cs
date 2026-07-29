@@ -35,7 +35,10 @@ public static class AboutSddTemplater
         sb.Append("that keep briefs, requirements, stories, and decisions as first-class artifacts. SpecScribe ");
         sb.Append("renders those artifacts into this portal.</p>\n");
         sb.Append("  <p>Use the matrix below for a quick support snapshot, then open a framework page for ");
-        sb.Append("orientation, install steps, and what SpecScribe can show today.</p>\n");
+        sb.Append("orientation, install steps, and what SpecScribe can show today. BMad itself installs as ");
+        sb.Append("several modules — support varies by module, and ");
+        sb.Append($"<a href=\"{PathUtil.Html(SiteNav.AboutSddBmadOutputPath)}#modules\">BMad &rsaquo; Modules</a> ");
+        sb.Append("says which does what.</p>\n");
 
         AppendSupportMatrix(sb);
 
@@ -183,6 +186,8 @@ public static class AboutSddTemplater
         sb.Append("requirements, sprint, retros, planning docs, and next-step commands when those artifacts exist.</p>\n");
         AppendFamilySupportTable(sb, supported: true);
 
+        AppendBmadModulesSection(sb);
+
         sb.Append("  <h2 id=\"commands\">Common commands</h2>\n");
         sb.Append("  <ul class=\"sdd-commands\">\n");
         sb.Append("    <li><code>/bmad-help</code> — guided help</li>\n");
@@ -201,6 +206,76 @@ public static class AboutSddTemplater
         sb.Append("inside a sprint (with optional course correction), and close with a retrospective.</p>\n");
         sb.Append(Mermaid.Block(Mermaid.SddMethodDiagram()));
     }
+
+    /// <summary>How SpecScribe treats BMad's MODULE ecosystem — the Epic 18 answer. BMad installs as a set of
+    /// modules under <c>_bmad/{code}/</c> and BMad Builder can mint new ones, so this section states the
+    /// open-world posture (<see cref="BmadModule.Unmodeled"/>), names the coverage-tier vocabulary
+    /// (<see cref="CoverageTiers"/>), and points at the two core-skill surfaces (Ideas, Test Artifacts).
+    /// <para>Deliberately framework-agnostic about WHICH module is installed here: this page is written on every
+    /// run and takes only the two presence booleans, so naming a detected module would require threading
+    /// <see cref="ModuleContext"/> through. Diagnostics already reports the detected module by label and code,
+    /// and this section links there rather than restating it — one source of truth (NFR8).</para>
+    /// [Epic 18; ADR 0015; ADR 0020; ADR 0021]</summary>
+    private static void AppendBmadModulesSection(StringBuilder sb)
+    {
+        sb.Append("  <h2 id=\"modules\">Modules</h2>\n");
+        sb.Append("  <p>BMad is not one thing: it installs as a set of modules under <code>_bmad/{code}/</code>, ");
+        sb.Append("and BMad Builder can mint new ones with codes nobody has seen before. SpecScribe identifies ");
+        sb.Append("each installed module from that directory name and states how deeply it understands it. ");
+        sb.Append("Installing a second module never degrades the one you already had.</p>\n");
+
+        sb.Append("  <table class=\"sdd-support-matrix sdd-support-matrix--modules\">\n");
+        sb.Append("    <thead><tr><th>Module</th><th>Code</th><th>What SpecScribe does</th></tr></thead>\n");
+        sb.Append("    <tbody>\n");
+        AppendModuleRow(sb, "BMad Method", "bmm",
+            "<strong>Full projection</strong> — every family above, plus this module's glossary and next-step commands.");
+        AppendModuleRow(sb, "Game Dev Studio", "gds",
+            "<strong>Full projection</strong> — the same families, with GDD / narrative planning docs and GDS commands.");
+        AppendModuleRow(sb, "Test Architect", "tea",
+            "<strong>Named, with its test artifacts interpreted</strong> — they get their own page and a Module Coverage panel on the home page, carrying the quality-gate verdict and coverage figures.");
+        AppendModuleRow(sb, "Any other module", "cis, bmb, …",
+            "<strong>Named</strong> — its real label and its own commands, and its documents render as pages.");
+        sb.Append("    </tbody>\n  </table>\n");
+
+        // The boundary paragraph is load-bearing, not padding: Test Architect is `BmadModule.Unmodeled` like any
+        // other non-BMM/GDS module (`ModuleContext.ModuleForCode`), so the no-glossary / no-coverage-panel rule
+        // applies to it TOO. A table row alone would have implied a middle tier that the identity layer does not
+        // have, which is exactly the confidently-wrong failure NFR8 forbids. [ADR 0015 Decision 2; Story 18.6]
+        sb.Append("  <p>&ldquo;Named&rdquo; is a stated boundary, not a gap. For every module below the top two — ");
+        sb.Append("<strong>Test Architect included</strong> — SpecScribe publishes no glossary and no planning-doc ");
+        sb.Append("set, and the artifact-coverage panel on the home page is omitted rather than reporting BMad ");
+        sb.Append("Method artifact families the module never produces. The run records that omission on ");
+        sb.Append($"<a href=\"{PathUtil.Html(SiteNav.DiagnosticsOutputPath)}\">Diagnostics</a>, which also names ");
+        sb.Append("the module actually detected in this project.</p>\n");
+
+        sb.Append("  <h3 id=\"coverage-tiers\">Coverage tiers</h3>\n");
+        sb.Append("  <p>Where SpecScribe interprets a module's artifacts, each one carries a tier saying how far ");
+        sb.Append("that interpretation goes:</p>\n");
+        sb.Append("  <dl class=\"sdd-tier-list\">\n");
+        foreach (var tier in CoverageTiers.Order)
+        {
+            sb.Append($"    <div class=\"cap-row\"><dt>{PathUtil.Html(CoverageTiers.Word(tier))}</dt>");
+            sb.Append($"<dd>{PathUtil.Html(CoverageTiers.Description(tier))}</dd></div>\n");
+        }
+        sb.Append("  </dl>\n");
+
+        sb.Append("  <h3 id=\"core-surfaces\">Surfaces from BMad core</h3>\n");
+        sb.Append("  <p>Two skills ship in BMad <em>core</em>, so they are present whichever module you run. Each ");
+        sb.Append("gets its own surface, and each is omitted entirely when the underlying artifacts don't exist:</p>\n");
+        sb.Append("  <ul class=\"sdd-commands\">\n");
+        sb.Append("    <li><code>/bmad-forge-idea</code> &mdash; an <strong>Ideas</strong> page grouping every forged ");
+        sb.Append("idea by how it turned out (hardened, in progress, killed), each with a detail page, the forge's ");
+        sb.Append("own report carried through unchanged, and a forward link to the brief, PRD, or epic the idea ");
+        sb.Append("became where that link is evidenced on disk.</li>\n");
+        sb.Append("    <li><code>/bmad-testarch-*</code> &mdash; a <strong>Test Artifacts</strong> page. This is also ");
+        sb.Append("the one place SpecScribe reads something other than markdown: the Test Architect gate decision ");
+        sb.Append("and end-to-end trace summary are read by exact filename, so the gate verdict is visible rather ");
+        sb.Append("than invisible to a markdown-only scan.</li>\n");
+        sb.Append("  </ul>\n");
+    }
+
+    private static void AppendModuleRow(StringBuilder sb, string label, string code, string treatment) =>
+        sb.Append($"      <tr><th scope=\"row\">{PathUtil.Html(label)}</th><td><code>{PathUtil.Html(code)}</code></td><td>{treatment}</td></tr>\n");
 
     private static void AppendGdsBody(StringBuilder sb, bool detected)
     {
@@ -221,6 +296,9 @@ public static class AboutSddTemplater
         sb.Append("  <p>SpecScribe projects BMad GDS through the same adapter families as BMad — including ");
         sb.Append("GDD / narrative / architecture planning docs and GDS-oriented commands when installed.</p>\n");
         AppendFamilySupportTable(sb, supported: true);
+        sb.Append("  <p>GDS is one of BMad's modules, and a repo may install several at once. For how SpecScribe ");
+        sb.Append($"treats the rest of them, see <a href=\"{PathUtil.Html(SiteNav.AboutSddBmadOutputPath)}#modules\">");
+        sb.Append("BMad &rsaquo; Modules</a>.</p>\n");
 
         sb.Append("  <h2 id=\"commands\">Common commands</h2>\n");
         sb.Append("  <ul class=\"sdd-commands\">\n");

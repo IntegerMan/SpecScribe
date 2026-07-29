@@ -1385,29 +1385,68 @@ public class SiteGeneratorAdapterTests : IDisposable
         // `dotnet build --no-incremental` — an incremental run re-uses the cached assembly and never re-embeds a
         // changed .css asset, which is exactly the stale-build trap in [[golden-diff-normalization-gotchas]].
         // [Story 24.1; CLAUDE.md shared-main + Verification; [[golden-diff-normalization-gotchas]]]
-        const string expected = "ee00f94746bd56b7786a4603ad90680ea17797dffbb8fcdcd497546171338d6d";
+        // Regenerated for the Epic 18 documentation pass: `about-sdd-bmad.html` gained a "Modules" section (the
+        // BMad module-coverage table, the Rendered/Summarized/Unsupported coverage-tier definitions rendered
+        // FROM `CoverageTiers` rather than restated, and the Ideas / Test Artifacts core-skill surfaces),
+        // `about-sdd-gds.html` and `about-sdd.html` each gained one cross-link into it, and specscribe.css
+        // gained `.sdd-support-matrix--modules` + `.sdd-tier-list`. Content + every-page stylesheet; the file
+        // SET is unchanged (no new page — the section lives on the existing BMad framework page).
+        //
+        // PROVENANCE (shared main) — `git status` at capture time showed a concurrent session's edits to
+        // `_bmad-output/implementation-artifacts/25-5-local-coverage-report.md` and `sprint-status.yaml`, plus
+        // an untracked `.config/`. All three are planning/tooling artifacts outside the synthetic fixture this
+        // fingerprint is taken over, so this regeneration reflects THIS change alone. Nothing was reset and
+        // nothing of theirs was reverted (CLAUDE.md § Concurrent work).
+        //
+        // The same pass also reworded `CoverageTiers.Description(Summarized)`: it said "…and shows that HERE",
+        // which named the Test Artifacts page and went silently wrong the moment About-SDD started rendering the
+        // same strings as its tier legend. Now location-neutral. That string is not in this fixture's output
+        // (no TEA artifacts), so it does not move this hash — recorded because it moves the REAL site's.
+        //
+        // VERIFICATION: `9544578b…` confirmed byte-identical across two consecutive runs, both after an explicit
+        // `dotnet build --no-incremental` — required because this change touches the embedded specscribe.css
+        // asset, the exact stale-build trap in [[golden-diff-normalization-gotchas]].
+        //
+        // ── Regenerated again 2026-07-28 by the Story 23.2 CODE RE-REVIEW: 9544578b… -> a649bd17… ──
+        //
+        // `design-system.html` only. Two content changes, both review patches:
+        //   1. The "Framed panel" demo no longer passes prose into `ChartMeta.Window`. That slot is documented
+        //      as "the ONE place a NUMERIC analysis window is rendered", and the page whose job is to TEACH the
+        //      frame was the page misusing it. The slot now renders empty, which also demonstrates its own
+        //      contract (an unfilled slot renders nothing).
+        //   2. Retired's badge now carries `class="status-badge retired"` instead of the remapped
+        //      `…deferred`. `.status-badge.retired` is its own rule and `StatusStyles.LegendKey` — the real
+        //      caller — remaps only `unmapped`. Byte-identical to `.deferred` visually; the CLASS is the fix,
+        //      on a page whose stated claim is "built from the ACTUAL primitives, never look-alike markup".
+        // The file SET is unchanged; specscribe.css was NOT touched by this review (see provenance below).
+        //
+        // PROVENANCE (shared main) — this regeneration SITS ON TOP OF the Epic 18 pass recorded immediately
+        // above, which was still UNCOMMITTED in the working tree when this hash was taken: that session's
+        // `specscribe.css` (+12 lines of `.sdd-support-matrix--modules` / `.sdd-tier-list` rules),
+        // `AboutSddTemplater.cs` and `TestArtifactsModel.cs` edits are all inside `a649bd17…` as well as mine.
+        // specscribe.css is copied verbatim into the output, so the two could not be separated without
+        // destroying uncommitted work, which CLAUDE.md forbids and which was not attempted. Nothing of theirs
+        // was reset, reverted or cleaned. If their pass lands separately, this constant is expected to move
+        // again — that is the shared-main condition, not a defect.
+        //
+        // A deliberate NON-change, for the record: the review's third owner-decided item (tokenizing the four
+        // literal `.status-badge` backgrounds at specscribe.css:3177) was NOT applied, precisely because it
+        // edits the stylesheet this hash embeds while a concurrent session is mid-regeneration on it.
+        //
+        // VERIFICATION: `a649bd17…` confirmed byte-identical across two consecutive runs, both after an
+        // explicit `dotnet build --no-incremental`.
+        const string expected = "a649bd1776366a49b2149dceb337545c658b8ffde1f9f740e09e2565a09cfb45";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
             + $"to:\n  {fingerprint}\nOtherwise this is an unexpected drift from the byte-parity baseline (AC #1).");
     }
 
-    // The footer date is now human-friendly + culture-invariant, e.g. "on July 10, 2026 at 5:14 PM".
-    // Story 10.4: the footer clock is now "on {PortalDates day} at HH:mm UTC±HH:mm" (24-hour + machine-local zone
-    // label). Widened from the old 12-hour "[AP]M" shape so the per-machine time+zone can't leak into the hash.
-    private static readonly Regex FooterClock = new(@"on [A-Za-z]+ \d{1,2}, \d{4} at \d{1,2}:\d{2} UTC[+-]\d{2}:\d{2}", RegexOptions.Compiled);
-    private static readonly Regex AssetCacheBust = new(@"\?v=[0-9a-fA-F]+", RegexOptions.Compiled);
-    private static readonly Regex SubtitleVersion = new(@"SpecScribe v[^<]+", RegexOptions.Compiled);
-    private static readonly Regex VersionRow = new(@"(<dt>Version</dt><dd>)[^<]*(</dd>)", RegexOptions.Compiled);
-    // The About page's dynamic build identifier (build date · short commit hash) varies per build/commit.
-    // `.*?` rather than `[^<]*`: FoldToday runs FIRST and rewrites the build date to the `<date-iso>` PLACEHOLDER,
-    // whose leading `<` the negated class cannot cross — so this pattern silently stopped matching its own row and
-    // let the short commit hash through into the hash. That made the golden constant drift on every commit: it was
-    // captured pre-commit (when the row still showed the PREVIOUS sha), then failed the moment the work landed,
-    // which reads as a rendering regression and invites a needless regeneration. Verified by rendering this fixture
-    // at two different commits and confirming both now produce the (unchanged) constant below.
-    // [Story 5.2; golden-diff-normalization-gotchas]
-    private static readonly Regex BuildRow = new(@"(<dt>Build</dt><dd>).*?(</dd>)", RegexOptions.Compiled);
+    // The volatile-token folds themselves live in GoldenNormalization, SHARED with the Story 22.5 oracle-diff
+    // harness. They were inlined here until Story 22.5 AC #5 required one copy rather than two: this gate pins
+    // full-generation output and that one pins incremental output AGAINST full-generation output, so a fold in
+    // one and not the other is a hole in whichever gate lacks it. The fold set is byte-for-byte what this file
+    // carried before the extraction — the constant below did not move.
 
     /// <summary>SHA-256 over every output file's normalized content (path-prefixed, ordinal-sorted), so ANY
     /// rendered-byte change flips one hash. Normalizes only per-run/per-build/per-machine noise, never artifact
@@ -1519,26 +1558,11 @@ public class SiteGeneratorAdapterTests : IDisposable
     /// <summary>Folds today's date (the ISO filename/href form and the readable heading form) to stable
     /// placeholders. Story 7.3's artifact-mtime date page + timeline are stamped with the generation date, so
     /// without this the fingerprint would drift day to day even with no rendering change.</summary>
-    private static string FoldToday(string s)
-    {
-        var today = DateOnly.FromDateTime(DateTime.Now);
-        return s.Replace(Charts.DReadable(today), "<date-readable>").Replace(Charts.D(today), "<date-iso>");
-    }
+    private static string FoldToday(string s) => GoldenNormalization.FoldToday(s);
 
-    private string NormalizeVolatile(string content)
-    {
-        content = content.Replace("\r\n", "\n");
-        content = FoldToday(content);
-        // The diagnostics page prints the ABSOLUTE repo root (a random per-run temp dir, and machine-specific);
-        // fold every form of the fixture root to a placeholder so the golden pins rendered content, not the box.
-        content = content.Replace(PathUtil.NormalizeSlashes(_root), "<root>").Replace(_root, "<root>");
-        content = FooterClock.Replace(content, "on <ts>");
-        content = AssetCacheBust.Replace(content, "?v=<ver>");
-        content = SubtitleVersion.Replace(content, "SpecScribe v<ver>");
-        content = VersionRow.Replace(content, "$1<ver>$2");
-        content = BuildRow.Replace(content, "$1<build>$2");
-        return content;
-    }
+    /// <summary>The fixture root is folded because the diagnostics page prints the ABSOLUTE repo root (a random
+    /// per-run temp dir, and machine-specific), so the golden pins rendered content, not the box.</summary>
+    private string NormalizeVolatile(string content) => GoldenNormalization.NormalizeVolatile(content, _root);
 
     [Fact]
     public void GenerateAll_UnusableSprintYaml_ReportsSkippedDiagnosticAndSiblingsStillRender()

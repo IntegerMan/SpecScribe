@@ -55,7 +55,11 @@ public static class CoverageTiers
         CoverageTier.Rendered =>
             "The document is rendered in full on its own page; SpecScribe reads its prose but interprets none of its structure.",
         CoverageTier.Summarized =>
-            "SpecScribe extracts a structured headline from this artifact — its verdict and coverage figures — and shows that here; the file itself is not fully modelled.",
+            // "…shows that here" until the Epic 18 documentation pass, when the About-SDD page began rendering
+            // these same descriptions as the coverage-tier legend. "Here" meant the Test Artifacts page and
+            // silently became wrong on the second surface — the hazard of a shared vocabulary string that names
+            // its own location. Now location-neutral, so any surface may render it.
+            "SpecScribe extracts a structured headline from this artifact — its verdict and coverage figures — and surfaces that alongside it; the file itself is not fully modelled.",
         _ =>
             "Discovered and named, but not interpreted. SpecScribe does not model this artifact family, so nothing is claimed about its contents.",
     };

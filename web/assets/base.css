@@ -67,5 +67,14 @@ pre {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+    /* ⚠️ DELAY, not just duration. Clamping duration alone is the trap: with `animation-fill-mode: both`
+       (the house pattern — see PageShell's entrance) the element is held at its `from` keyframe, typically
+       `opacity: 0`, for the WHOLE delay. A 200-row list staggered by --motion-stagger would then show a
+       reduce-motion reader seconds of BLANK PAGE — content missing, not merely still. The C# stylesheet
+       solves the same case with `animation: none` and says so in its comment; this copy had dropped that
+       half, and CONVENTIONS §6 forbids a per-SFC fix, so there was no second place to catch it.
+       [Story 23.2 re-review 2026-07-28; motion-token-system] */
+    animation-delay: 0s !important;
+    transition-delay: 0s !important;
   }
 }

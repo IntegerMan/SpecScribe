@@ -1,0 +1,49 @@
+{
+  "story": "23.2",
+  "ac": 4,
+  "runtime": {
+    "nuxt": "4.5.1",
+    "vue": "3.5.40",
+    "node": "24.11.1"
+  },
+  "caveats": [
+    "CAVEATS — read before quoting these numbers:",
+    "  · total = html + payload + island. `_nuxt/` CLIENT BUNDLE bytes are NOT counted.",
+    "  · Variant C therefore measures \"no data had to cross the boundary\", NOT \"build-time data is free\":",
+    "    its rows come from a deterministic generator (utils/measure-rows.ts) that is bundled into `_nuxt/`",
+    "    and RE-RUN in the browser on hydration. Real IR content is not a generator, so C is a floor, not a",
+    "    transferable recipe — 23.3 needed a #ir build-time resolver plus `noScripts: true` to get there.",
+    "  · Island JSON dedupes across routes sharing a component+props hash; that does not help per-page content."
+  ],
+  "control": "measure/static",
+  "variants": [
+    {
+      "route": "measure/async",
+      "label": "A · useAsyncData",
+      "htmlBytes": 122211,
+      "payloadBytes": 45589,
+      "islandBytes": 0,
+      "totalBytes": 167800,
+      "vsControl": 1.37
+    },
+    {
+      "route": "measure/island",
+      "label": "B · server component",
+      "htmlBytes": 121887,
+      "payloadBytes": 330,
+      "islandBytes": 121863,
+      "totalBytes": 244080,
+      "vsControl": 2
+    },
+    {
+      "route": "measure/static",
+      "label": "C · static (control)",
+      "htmlBytes": 122194,
+      "payloadBytes": 69,
+      "islandBytes": 0,
+      "totalBytes": 122263,
+      "vsControl": 1
+    }
+  ],
+  "unattributedIslands": []
+}

@@ -247,7 +247,7 @@
         "--directory",
         "C:/Users/MattE/AppData/Local/Temp/claude/C--Dev-SpecScribe/3ae69b7f-75d8-40f1-bf78-b9800cd66014/scratchpad/tea-site"
       ],
-      "port": 8109
+      "port": 8121
     },
     {
       "name": "bmm-control-18-6",
@@ -295,7 +295,7 @@
         "--directory",
         "SpecScribeOutput"
       ],
-      "port": 8110
+      "port": 8122
     },
     {
       "name": "static-jsoff-22-4",

@@ -23,7 +23,14 @@ useHead({
   ],
 })
 
-/** Mirrors StatusStyles.LegendStages + its label/meaning seams. Ordered as the portal's legend teaches them. */
+/**
+ * Mirrors StatusStyles.LegendStages + its label/meaning seams, in the order the portal's legend teaches them.
+ *
+ * ⚠️ All TEN stages. `unmapped` was missing until the 2026-07-28 re-review, and the aside that stood in for it
+ * stated the word as "Unmapped" where `StatusStyles.LegendWord("unmapped")` renders **"Not yet mapped"** — so
+ * the page whose subject IS the status vocabulary taught a word the portal does not use. Two stages have no
+ * `--status-*` token of their own and borrow one; `tokenFor` below is the single place that is stated.
+ */
 const stages: { stage: StatusStage; label: string; meaning: string }[] = [
   { stage: 'pending', label: 'Pending', meaning: 'Not yet ready to pick up' },
   { stage: 'drafted', label: 'Drafted', meaning: 'Stories or a plan exist; work has not started' },
@@ -32,17 +39,38 @@ const stages: { stage: StatusStage; label: string; meaning: string }[] = [
   { stage: 'review', label: 'In review', meaning: 'Implementation complete; awaiting review or retrospective' },
   { stage: 'done', label: 'Done', meaning: 'Finished and closed' },
   { stage: 'deferred', label: 'Deferred', meaning: 'Shelved on purpose for later' },
+  { stage: 'unmapped', label: 'Not yet mapped', meaning: 'Listed as a requirement but mapped to no epic' },
   { stage: 'retired', label: 'Retired', meaning: 'Removed from the active plan; kept for ledger history' },
   { stage: 'unrecognized', label: 'Unrecognized', meaning: 'Native status word has no canonical mapping' },
 ]
 
-/** The motion vocabulary. Roles, not durations — the value is whatever the token says it is. */
+/**
+ * Which `--status-*` token a stage actually paints with.
+ *
+ * ⚠️ The caption used to interpolate `--status-{{ stage }}` unconditionally, which published
+ * **`--status-retired`** — a custom property declared in neither `tokens.css` nor `specscribe.css`. A
+ * component author who followed the design-system page got an unstyled element. The C# twin has exactly this
+ * guard (`DesignSystemTemplater.cs`); this is its mirror, and the two must be changed together.
+ */
+function tokenFor(stage: StatusStage): string {
+  if (stage === 'unmapped') return '--status-pending'
+  if (stage === 'retired') return '--status-deferred'
+  return `--status-${stage}`
+}
+
+/**
+ * The motion vocabulary. Roles, not durations — the value is whatever the token says it is.
+ *
+ * ⚠️ VERBATIM from `DesignSystemTemplater.MotionTokens`. The duplication is owner-accepted until 23.4 retires
+ * the C# page; DIVERGENCE is not, and all five sentences had drifted apart on day one. If you edit one, edit
+ * both — `SiteGeneratorDesignSystemTests` pins the C# side.
+ */
 const motion = [
-  { token: '--motion-fast', role: 'Hover and opacity feel — the shortest deliberate change.' },
-  { token: '--motion-entrance', role: 'The standard reveal: panels, charts, cards.' },
-  { token: '--motion-entrance-long', role: 'Sweeps that travel a distance, such as a progress bar filling.' },
-  { token: '--motion-ease', role: 'The one easing curve every entrance shares.' },
-  { token: '--motion-stagger', role: 'Per-item delay unit when a group enters in sequence.' },
+  { token: '--motion-fast', role: 'Hover and opacity changes — the shortest deliberate movement on the page.' },
+  { token: '--motion-entrance', role: 'The standard reveal, used by charts, panels and cards as they appear.' },
+  { token: '--motion-entrance-long', role: 'Movement that travels a distance, such as a progress bar filling.' },
+  { token: '--motion-ease', role: 'The single easing curve every entrance shares, so nothing feels out of place.' },
+  { token: '--motion-stagger', role: 'The delay between items when a group enters one after another.' },
 ]
 
 /** A fragment standing in for content the app does not author — the shape 23.3 injects from the IR. */
@@ -58,21 +86,23 @@ const injectedHtml = `<p class="injected-note">This paragraph arrived as an HTML
   >
     <ChartPanel
       title="Status tokens"
-      ranking="Nine canonical stages, in the order the portal teaches them."
+      ranking="Ten canonical stages, in the order the portal teaches them."
       why="One token per lifecycle stage means a stage reads as the same colour on every chart, legend, badge and row — and changing it changes all of them at once."
     >
       <ul class="swatch-grid">
         <li v-for="s in stages" :key="s.stage" class="swatch-row">
           <span class="swatch" :class="`swatch-${s.stage}`" aria-hidden="true" />
-          <code class="swatch-token">--status-{{ s.stage }}</code>
+          <code class="swatch-token">{{ tokenFor(s.stage) }}</code>
           <StatusBadge :stage="s.stage" :label="s.label" :meaning="s.meaning" />
           <span class="swatch-meaning">{{ s.meaning }}</span>
         </li>
       </ul>
       <template #legend>
         <p class="panel-aside">
-          A requirement that is listed but mapped to no epic reuses the <code>pending</code> swatch and
-          carries its own word, <em>Unmapped</em> — the colour is shared, the meaning is not.
+          Two stages have no token of their own and say so above: <em>Not yet mapped</em> shares
+          <code>--status-pending</code> (it is a requirement-level state, not an eleventh lifecycle stage) and
+          <em>Retired</em> shares <code>--status-deferred</code>. In both cases the colour is shared and the
+          word is not — which is the whole point, because the vocabulary is carried by language.
         </p>
       </template>
     </ChartPanel>
@@ -96,8 +126,7 @@ const injectedHtml = `<p class="injected-note">This paragraph arrived as an HTML
 
     <ChartPanel
       title="Status badge"
-      window="StatusBadge.vue"
-      why="A badge's label is a required prop, so a status can never be shown by colour alone."
+      why="The word is always present, so a status stays legible in greyscale and to a screen reader. The stage colour is only ever reinforcement."
     >
       <div class="badge-row">
         <StatusBadge v-for="s in stages" :key="s.stage" :stage="s.stage" :label="s.label" :meaning="s.meaning" />
@@ -106,7 +135,6 @@ const injectedHtml = `<p class="injected-note">This paragraph arrived as an HTML
 
     <ChartPanel
       title="List row"
-      window="ListRow.vue"
       ranking="Summary, optional badge, metadata chips, one primary link — plus the accent and resolved states."
       why="One row anatomy across requirements, epics, ADRs and timelines means a reader learns to scan once."
     >
@@ -114,7 +142,7 @@ const injectedHtml = `<p class="injected-note">This paragraph arrived as an HTML
         <ListRow summary="A row with nothing but a summary." />
         <ListRow
           summary="A row carrying a status badge, two chips, and its one primary affordance."
-          accent="review"
+          accent="ready"
           :chips="['2026-07-25', '3 tasks']"
           primary-href="#"
           primary-label="Open story"
@@ -134,7 +162,6 @@ const injectedHtml = `<p class="injected-note">This paragraph arrived as an HTML
 
     <ChartPanel
       title="Framed panel"
-      window="ChartPanel.vue"
       ranking="Every panel on this page is one — including this one."
       note="A note is a caveat about the DATA. The italic line below is the generic framing sentence. They are different slots because they answer different questions."
       why="Framing every chart the same way means a reader never has to work out what they are looking at from the chart alone."
@@ -147,7 +174,6 @@ const injectedHtml = `<p class="injected-note">This paragraph arrived as an HTML
 
     <ChartPanel
       title="Styling injected content"
-      window="the :deep() convention"
       note="This is the single most load-bearing convention on this page for Story 23.3, which injects the IR's rendered prose."
       why="Scoped styles are scoped to what the TEMPLATE authored. Content that arrives as a string is outside that boundary, and reaching it needs a deliberate escape hatch."
     >
@@ -207,7 +233,13 @@ const injectedHtml = `<p class="injected-note">This paragraph arrived as an HTML
 .swatch-review { background: var(--status-review); }
 .swatch-done { background: var(--status-done); }
 .swatch-deferred { background: var(--status-deferred); }
-.swatch-retired { background: var(--parchment-dark); }
+/* `unmapped` and `retired` borrow, exactly as the portal's own legend swatches do
+   (`.status-legend-key-swatch.retired { background: var(--status-deferred) }`). This said
+   `var(--parchment-dark)` until the 2026-07-28 re-review — a colour the portal never renders for Retired, and
+   4/255 in one channel away from --status-drafted, so on the page whose subject IS the colour vocabulary
+   Retired and Drafted were the same swatch. */
+.swatch-unmapped { background: var(--status-pending); }
+.swatch-retired { background: var(--status-deferred); }
 .swatch-unrecognized {
   background: repeating-linear-gradient(
     -45deg,

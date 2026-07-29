@@ -29,8 +29,12 @@ namespace SpecScribe;
 public static class DesignSystemTemplater
 {
     /// <summary>The motion vocabulary as roles rather than durations. Naming what each token is FOR is the
-    /// durable half; the value belongs to the stylesheet and is deliberately not repeated here. [Story 3.5]</summary>
-    private static readonly (string Token, string Role)[] MotionTokens =
+    /// durable half; the value belongs to the stylesheet and is deliberately not repeated here. [Story 3.5]
+    /// <para>Internal rather than private so <c>SiteGeneratorDesignSystemTests</c> can assert against THIS
+    /// list instead of a hand-typed copy of it. The status half of the page derives from
+    /// <see cref="StatusStyles.LegendStages"/> and so cannot fall behind; this half could, and a test that
+    /// re-listed the same five names could not detect it. [Story 23.2 re-review 2026-07-28]</para></summary>
+    internal static readonly (string Token, string Role)[] MotionTokens =
     [
         ("--motion-fast", "Hover and opacity changes — the shortest deliberate movement on the page."),
         ("--motion-entrance", "The standard reveal, used by charts, panels and cards as they appear."),
@@ -96,7 +100,11 @@ public static class DesignSystemTemplater
         sb.Append(Charts.Framed(
             new Charts.ChartMeta(
                 "Framed panel",
-                Window: "the panel you are reading",
+                // No Window. `Charts.ChartMeta` documents the slot as "the ONE place a NUMERIC analysis window
+                // is rendered"; this page passed prose into it and the Vue twin passed component filenames — on
+                // the two pages whose stated job is to teach the frame, which is where a 23.3 author copies the
+                // pattern from. Leaving it empty also demonstrates the slot's own contract: unfilled renders
+                // nothing. [Story 23.2 re-review 2026-07-28]
                 Ranking: "Title, analysis window, ranking caption, data note, body, and the framing sentence.",
                 Note: "A note flags something about the DATA. The italic line below is the generic framing sentence. They sit in different slots because they answer different questions.",
                 Why: "Framing every chart the same way means a reader never has to work out what they are looking at from the picture alone."),
@@ -148,7 +156,9 @@ public static class DesignSystemTemplater
         {
             // Two stages have no token of their own, and saying so is part of the documentation: "unmapped"
             // borrows the pending swatch (it is a requirement-level state, not a seventh lifecycle stage) and
-            // "retired" borrows deferred's. Both stay distinct by word and icon, which is the point — the
+            // "retired" borrows deferred's. `unmapped` stays distinct by word AND icon; `retired` stays distinct
+            // by WORD ONLY — `Icons.ForStatus("retired")` and `("deferred")` emit byte-identical SVG, so claiming
+            // "both, by word and icon" was untrue, and this page must not misstate its own subject. The
             // vocabulary is carried by language, and colour is only ever shorthand for it.
             var (swatchClass, tokenNote) = stage switch
             {
@@ -159,7 +169,10 @@ public static class DesignSystemTemplater
 
             sb.Append("  <li class=\"status-legend-key-row\">\n");
             sb.Append($"    <span class=\"status-legend-key-swatch {swatchClass}\" aria-hidden=\"true\"></span>\n");
-            sb.Append($"    <span class=\"status-legend-key-label\">{StatusStyles.Badge(swatchClass, StatusStyles.LegendWord(stage), stage)}</span>\n");
+            // Swatch borrows; badge does not (see BadgeBody). Only `unmapped` remaps its colour class, exactly
+            // as `StatusStyles.LegendKey` does — `retired` carries `.status-badge.retired`, its own rule.
+            var badgeClass = stage == "unmapped" ? "pending" : stage;
+            sb.Append($"    <span class=\"status-legend-key-label\">{StatusStyles.Badge(badgeClass, StatusStyles.LegendWord(stage), stage)}</span>\n");
             sb.Append($"    <span class=\"status-legend-key-meaning\">{PathUtil.Html(StatusStyles.StageMeaning(stage))} &middot; {tokenNote}</span>\n");
             sb.Append("  </li>\n");
         }
@@ -186,8 +199,14 @@ public static class DesignSystemTemplater
         sb.Append("<div class=\"story-status-pair\">\n");
         foreach (var stage in StatusStyles.LegendStages)
         {
-            var swatchClass = stage == "unmapped" ? "pending" : stage == "retired" ? "deferred" : stage;
-            sb.Append($"  {StatusStyles.Badge(swatchClass, StatusStyles.LegendWord(stage), stage)}\n");
+            // The SWATCH borrows a colour; the BADGE does not. `.status-badge.retired` is its own rule in
+            // specscribe.css, and `StatusStyles.LegendKey` — the real caller — remaps only `unmapped`. Passing
+            // the remapped class emitted `class="status-badge deferred"`, which no production caller emits, on
+            // the page whose load-bearing claim is "built from the ACTUAL primitives, never look-alike markup".
+            // Byte-identical to `.deferred` today, so nothing looked wrong; wrong by construction all the same.
+            // [Story 23.2 re-review 2026-07-28]
+            var badgeClass = stage == "unmapped" ? "pending" : stage;
+            sb.Append($"  {StatusStyles.Badge(badgeClass, StatusStyles.LegendWord(stage), stage)}\n");
         }
         sb.Append("</div>\n");
         return sb.ToString();

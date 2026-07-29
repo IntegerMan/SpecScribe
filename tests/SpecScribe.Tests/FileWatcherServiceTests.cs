@@ -160,10 +160,18 @@ public class FileWatcherServiceTests : IDisposable
 
         File.Delete(EpicsPath);
 
-        Assert.True(WaitFor(() => !File.Exists(SitePath("epics.html")) && !Directory.Exists(SitePath("epics"))),
-            "deleting epics.md should remove epics.html and the epics/ subtree");
-        Assert.False(File.Exists(SitePath("requirements.html")));
-        Assert.False(Directory.Exists(SitePath("requirements")));
+        // All four conditions are waited for TOGETHER, not asserted at the moment the first two happen to hold.
+        // Story 22.5 routes an epics.md deletion through the escalated full rebuild (see ClassifyRebuildScope's
+        // remarks on Trap 4), and GenerateAll's `Directory.Delete(OutputRoot, recursive: true)` is not atomic — it
+        // removes entries one at a time. So there is a real window in which epics.html and epics/ are already gone
+        // while requirements.html has not been reached yet, and a wait that stops at the first two lands the next
+        // three assertions inside it. Waiting for the settled state asserts the same thing without racing the wipe.
+        Assert.True(WaitFor(() =>
+                !File.Exists(SitePath("epics.html"))
+                && !Directory.Exists(SitePath("epics"))
+                && !File.Exists(SitePath("requirements.html"))
+                && !Directory.Exists(SitePath("requirements"))),
+            "deleting epics.md should remove epics.html, requirements.html, and both subtrees");
         Assert.DoesNotContain(Observed(), e => e.Outcome == GenerationOutcome.Error);
     }
 
@@ -277,7 +285,17 @@ public class FileWatcherServiceTests : IDisposable
         // its page — a regression that regenerated on every raw notification would fail this. GenerateOneInternal
         // labels its event with the SOURCE-relative path (.md) via Path.GetRelativePath (OS separator), not the
         // output page (.html) with the site's normalized forward slashes.
+        //
+        // Wait for the EVENT, not just the page. The page is written partway through GenerateOne, and the event is
+        // only published once the whole route returns — so "bulk-0.html says REPLACED" does not imply "its event has
+        // been observed". That gap has always existed; Story 22.5 widened it by giving the route real work to do
+        // after the page write (the code-surface refresh + source-inventory rewalk), which is what turned a latent
+        // race into a reproducible failure. Waiting on the observable the assertion is actually about removes it
+        // without weakening the assertion: it still has to be exactly ONE, and a per-notification regression would
+        // overshoot to five and fail.
         var bulk0Relative = Path.Combine("notes", "bulk-0.md");
+        Assert.True(WaitFor(() => Observed().Any(e => e.RelativePath == bulk0Relative)),
+            "bulk-0.md's own regeneration event should be observed");
         Assert.Equal(1, Observed().Count(e => e.RelativePath == bulk0Relative));
     }
 

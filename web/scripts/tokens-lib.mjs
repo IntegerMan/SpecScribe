@@ -29,6 +29,16 @@ export const SOURCE_LABEL = 'src/SpecScribe/assets/specscribe.css'
 // the set 23.3's primitives bind to.
 const REQUIRED_TOKENS = [
   '--status-pending',
+  // ⚠️ This list must name every token the SHIPPED PRIMITIVES BIND TO, not just one per family. The original
+  // list guarded the extraction TARGET ("did we latch onto the right rule?") but not the CONSUMPTION SURFACE,
+  // so renaming `--parchment-dark` in the C# stylesheet passed every gate green while four of nine badge
+  // stages lost their background to invalid-at-computed-value-time — transparent chips on a cream page.
+  // When a component starts binding a new token, add it here. [Story 23.2 re-review 2026-07-28]
+  '--parchment-dark', // StatusBadge base + .is-pending/.is-deferred/.is-retired; design-system retired swatch
+  '--ink-faded', // ChartPanel framing sentence
+  '--moss', // StatusBadge .is-done text
+  '--gold', // StatusBadge .is-ready/.is-drafted text
+  '--rust-light', // ChartPanel .chart-frame-note left rule
   '--status-drafted',
   '--status-ready',
   '--status-active',
@@ -58,21 +68,18 @@ const REQUIRED_TOKENS = [
   '--shadow',
 ]
 
+/** 1-based line number of a character offset. */
+function lineOf(css, index) {
+  return css.slice(0, index).split('\n').length
+}
+
 /**
- * Slices the first top-level `:root { … }` rule out of a stylesheet, comment-aware.
+ * Index of the `}` matching the `{` at `braceAt`, comment-aware.
  *
- * Naive brace counting is not safe here: the `:root` block is heavily commented and a future comment
- * containing a brace would silently truncate the copy. Tracking comment state makes the scan structural.
- *
- * @returns {{ body: string, startLine: number, endLine: number }} the block's INNER text (between the
- *   braces, exclusive) and the 1-based line span it occupied in the source.
+ * Naive brace counting is not safe here: the `:root` block is heavily commented and a comment containing a
+ * brace would silently truncate the copy. Tracking comment state makes the scan structural.
  */
-export function sliceRootBlock(css) {
-  const open = css.search(/(^|\n):root\s*\{/)
-  if (open < 0) {
-    throw new Error(`token bridge: no top-level ':root {' rule found in ${SOURCE_LABEL}`)
-  }
-  const braceAt = css.indexOf('{', open)
+function matchBrace(css, braceAt, label) {
   let i = braceAt + 1
   let depth = 1
   let inComment = false
@@ -96,19 +103,110 @@ export function sliceRootBlock(css) {
     if (ch === '{') depth += 1
     else if (ch === '}') {
       depth -= 1
-      if (depth === 0) break
+      if (depth === 0) return i
     }
     i += 1
   }
 
-  if (depth !== 0) {
-    throw new Error(`token bridge: ':root' block in ${SOURCE_LABEL} is unterminated (unbalanced braces)`)
+  throw new Error(
+    `token bridge: ':root' block at ${label}:${lineOf(css, braceAt)} is unterminated (unbalanced braces)`,
+  )
+}
+
+/**
+ * Every **top-level** `:root { … }` rule in a stylesheet, in source order, comment-aware throughout.
+ *
+ * ⚠️ This used to be a `css.search(/(^|\n):root\s*\{/)` that returned the FIRST match and stopped. Two bugs
+ * came out of that one line, and both failed OPEN — the shape a drift gate must never have:
+ *
+ *   1. `specscribe.css` grew a second top-level `:root` (the Impact Map's `--impact-lvl-1`…`-5` ramp,
+ *      Story 21.3). It never crossed the bridge — and because `check-tokens.mjs` ran the SAME one-block
+ *      extractor on both sides, the two could not disagree about tokens neither of them looked at. The gate
+ *      printed "OK — 36 tokens in sync" while a whole family silently did not exist in the Vue app.
+ *   2. Finding the block was comment-BLIND while scanning it was comment-AWARE. A comment whose text began a
+ *      line with `:root {` would have set the open brace inside the comment and sliced from the wrong offset
+ *      — the same class as the star-slash-in-a-custom-property truncation that once killed ~1,000 rules here.
+ *      (Spelling that sequence out is itself the bug, in CSS and in this docblock alike, so it is not spelled.)
+ *
+ * A single comment-aware pass fixes both: the selector buffer only accumulates outside comments, so a
+ * commented-out `:root {` cannot be mistaken for a real one.
+ *
+ * **Deliberately top-level only.** A `:root` nested inside an at-rule (today: the `--nav-offset: 5.5rem`
+ * override inside `@media (max-width: …)`) is a VIEWPORT-CONDITIONAL override, not a token definition — the
+ * Nuxt app owns its own layout and must not inherit the portal's breakpoints. The base value still crosses,
+ * because it is declared in the first block.
+ *
+ * @returns {{ body: string, startLine: number, endLine: number }[]} each block's INNER text (between the
+ *   braces, exclusive) and the 1-based line span it occupied in the source.
+ */
+export function findRootBlocks(css, label = SOURCE_LABEL) {
+  const blocks = []
+  let i = 0
+  let depth = 0
+  let inComment = false
+  let selector = ''
+
+  while (i < css.length) {
+    if (inComment) {
+      if (css.startsWith('*/', i)) {
+        inComment = false
+        i += 2
+        continue
+      }
+      i += 1
+      continue
+    }
+    if (css.startsWith('/*', i)) {
+      inComment = true
+      i += 2
+      continue
+    }
+
+    const ch = css[i]
+    if (ch === '{') {
+      if (depth === 0 && selector.trim() === ':root') {
+        const end = matchBrace(css, i, label)
+        blocks.push({ body: css.slice(i + 1, end), startLine: lineOf(css, i), endLine: lineOf(css, end) })
+        i = end + 1
+        selector = ''
+        continue
+      }
+      depth += 1
+      selector = ''
+      i += 1
+      continue
+    }
+    if (ch === '}') {
+      if (depth > 0) depth -= 1
+      selector = ''
+      i += 1
+      continue
+    }
+    // A top-level at-rule statement (`@charset "…";`) ends its selector without ever opening a block.
+    if (ch === ';' && depth === 0) {
+      selector = ''
+      i += 1
+      continue
+    }
+    if (depth === 0) selector += ch
+    i += 1
   }
 
-  const body = css.slice(braceAt + 1, i)
-  const startLine = css.slice(0, braceAt).split('\n').length
-  const endLine = css.slice(0, i).split('\n').length
-  return { body, startLine, endLine }
+  return blocks
+}
+
+/**
+ * The FIRST top-level `:root` block. Retained for callers that only need the primary palette block; prefer
+ * {@link findRootBlocks} anywhere completeness matters.
+ *
+ * @returns {{ body: string, startLine: number, endLine: number }}
+ */
+export function sliceRootBlock(css, label = SOURCE_LABEL) {
+  const blocks = findRootBlocks(css, label)
+  if (blocks.length === 0) {
+    throw new Error(`token bridge: no top-level ':root {' rule found in ${label}`)
+  }
+  return blocks[0]
 }
 
 /** Every custom property declared at the top level of an extracted block body, in declaration order. */
@@ -125,13 +223,32 @@ export function declaredTokenNames(body) {
  */
 export function renderTokensCss(cssText = readFileSync(SOURCE_CSS, 'utf8')) {
   const css = cssText.replace(/\r\n/g, '\n')
-  const { body, startLine, endLine } = sliceRootBlock(css)
+  const blocks = findRootBlocks(css)
+  if (blocks.length === 0) {
+    throw new Error(`token bridge: no top-level ':root {' rule found in ${SOURCE_LABEL}`)
+  }
+  const spans = blocks.map((b) => `${b.startLine}-${b.endLine}`).join(', ')
 
-  const declared = new Set(declaredTokenNames(body))
+  const names = blocks.flatMap((b) => declaredTokenNames(b.body))
+  const declared = new Set(names)
+
+  // A property declared twice across the extracted blocks is a real ambiguity, not a curiosity: `tokenMap`
+  // resolves last-wins, so a drift confined to the FIRST copy would compare equal and be misreported as a
+  // comment-only difference. Fail rather than carry a set the gate cannot reason about.
+  const seen = new Set()
+  const duplicates = [...new Set(names.filter((n) => (seen.has(n) ? true : (seen.add(n), false))))]
+  if (duplicates.length > 0) {
+    throw new Error(
+      `token bridge: ${duplicates.length} custom propert${duplicates.length === 1 ? 'y is' : 'ies are'} ` +
+        `declared more than once across the ':root' blocks of ${SOURCE_LABEL} (lines ${spans}): ` +
+        `${duplicates.join(', ')}. The drift gate cannot distinguish which copy moved — de-duplicate first.`,
+    )
+  }
+
   const missing = REQUIRED_TOKENS.filter((t) => !declared.has(t))
   if (missing.length > 0) {
     throw new Error(
-      `token bridge: the extracted ':root' block (${SOURCE_LABEL}:${startLine}-${endLine}) is missing ` +
+      `token bridge: the extracted ':root' block(s) (${SOURCE_LABEL}:${spans}) ${'are'} missing ` +
         `${missing.length} required token(s): ${missing.join(', ')}. Either the extractor latched onto the ` +
         `wrong rule, or a token family was renamed in the C# stylesheet — reconcile before regenerating.`,
     )
@@ -144,7 +261,7 @@ export function renderTokensCss(cssText = readFileSync(SOURCE_CSS, 'utf8')) {
   // `ir-content-build.mjs`.) The span is still reported in the thrown error above, which is not committed.
   const banner = [
     '/* GENERATED FILE — DO NOT EDIT.',
-    ` * Extracted verbatim from the \`:root\` block of ${SOURCE_LABEL}`,
+    ` * Extracted verbatim from EVERY top-level \`:root\` block of ${SOURCE_LABEL}`,
     ' * by `npm run extract:tokens`. That C# stylesheet is the single source of truth for SpecScribe\'s',
     ' * presentation tokens (AD-7); this file is a copy, never a second definition.',
     ' *',
@@ -153,11 +270,14 @@ export function renderTokensCss(cssText = readFileSync(SOURCE_CSS, 'utf8')) {
     ' *',
     ' * Host CHROME remaps (specscribe-webview-theme.css) are deliberately NOT carried here — those are',
     ' * host-owned under AD-7. Only content-semantic tokens cross this bridge.',
+    ' *',
+    ' * A `:root` nested inside an at-rule is a VIEWPORT-CONDITIONAL override, not a token definition, and is',
+    ' * deliberately not carried: the Nuxt app owns its own breakpoints. Base values still cross.',
     ' */',
-    ':root {',
   ].join('\n')
 
-  return `${banner}${body}}\n`
+  const body = blocks.map((b) => `:root {${b.body}}`).join('\n\n')
+  return `${banner}\n${body}\n`
 }
 
 /** The committed generated file, line-ending-normalized for comparison. Null when it doesn't exist yet. */

@@ -1,5 +1,5 @@
 /* GENERATED FILE — DO NOT EDIT.
- * Extracted verbatim from the `:root` block of src/SpecScribe/assets/specscribe.css
+ * Extracted verbatim from EVERY top-level `:root` block of src/SpecScribe/assets/specscribe.css
  * by `npm run extract:tokens`. That C# stylesheet is the single source of truth for SpecScribe's
  * presentation tokens (AD-7); this file is a copy, never a second definition.
  *
@@ -8,6 +8,9 @@
  *
  * Host CHROME remaps (specscribe-webview-theme.css) are deliberately NOT carried here — those are
  * host-owned under AD-7. Only content-semantic tokens cross this bridge.
+ *
+ * A `:root` nested inside an at-rule is a VIEWPORT-CONDITIONAL override, not a token definition, and is
+ * deliberately not carried: the Nuxt app owns its own breakpoints. Base values still cross.
  */
 :root {
   --parchment: #f4ead5;
@@ -85,4 +88,12 @@
   --motion-entrance-long: 0.9s; /* the progress-bar width sweep */
   --motion-ease: ease-out;
   --motion-stagger: 0.04s;      /* per-item entrance delay unit — heatmap columns wipe left-to-right */
+}
+
+:root {
+  --impact-lvl-1: #f3e8c6;
+  --impact-lvl-2: #e9cd82;
+  --impact-lvl-3: #dcae4d;
+  --impact-lvl-4: #c8912b;
+  --impact-lvl-5: #a86f1e;
 }

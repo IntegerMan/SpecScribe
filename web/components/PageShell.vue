@@ -76,9 +76,13 @@ withDefaults(
   min-height: 100vh;
 }
 
-/* Visually hidden until focused, then pinned so a keyboard user can jump past the header. */
+/* Visually hidden until focused, then pinned so a keyboard user can jump past the header.
+   `fixed`, not `absolute`: `.shell` establishes no containing block, so absolute offsets resolved against the
+   DOCUMENT — a keyboard user who had scrolled down and shift-tabbed back out of the content focused a link
+   rendered at the top of the page, off-screen, with :focus-visible drawing an outline nobody could see. It
+   must be visible wherever the viewport is (UX-DR16). [Story 23.2 re-review 2026-07-28] */
 .skip-link {
-  position: absolute;
+  position: fixed;
   left: -9999px;
   top: 0;
   background: var(--warm-white);

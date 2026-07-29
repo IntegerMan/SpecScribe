@@ -1,0 +1,21 @@
+
+Story 23.2 AC #4 — hydration-payload shape, 200 identical rows per route
+
+variant                 html        payload     island      total       vs control
+------------------------------------------------------------------------------------
+A · useAsyncData        119.3 KB    44.5 KB     —           163.9 KB    1.37x
+B · server component    119.0 KB    0.3 KB      119.0 KB    238.4 KB    2.00x
+C · static (control)    119.3 KB    0.1 KB      —           119.4 KB    1.00x
+
+total emitted output: 102735.0 KB across 1451 files
+
+runtime: nuxt 4.5.1 / vue 3.5.40 / node 24.11.1
+
+CAVEATS — read before quoting these numbers:
+  · total = html + payload + island. `_nuxt/` CLIENT BUNDLE bytes are NOT counted.
+  · Variant C therefore measures "no data had to cross the boundary", NOT "build-time data is free":
+    its rows come from a deterministic generator (utils/measure-rows.ts) that is bundled into `_nuxt/`
+    and RE-RUN in the browser on hydration. Real IR content is not a generator, so C is a floor, not a
+    transferable recipe — 23.3 needed a #ir build-time resolver plus `noScripts: true` to get there.
+  · Island JSON dedupes across routes sharing a component+props hash; that does not help per-page content.
+
