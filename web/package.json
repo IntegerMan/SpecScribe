@@ -16,6 +16,7 @@
     "check:tokens": "node scripts/check-tokens.mjs",
     "extract:ir-content": "node scripts/extract-ir-content.mjs",
     "check:ir-content": "node scripts/check-ir-content.mjs",
+    "report:ir-content-residue": "node scripts/report-ir-content-residue.mjs",
     "sync:assets": "node scripts/sync-runtime-assets.mjs",
     "check:assets": "node scripts/sync-runtime-assets.mjs --check",
     "check:links": "node scripts/check-links.mjs",

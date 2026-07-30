@@ -278,6 +278,70 @@ public class SpaDeliveryTests
             Arr(JsonDocument.Parse(first).RootElement, "changed"));
     }
 
+    /// <summary>Code review finding (Story 22.6): a page's <c>ContentHash</c> is not the whole story. Once a
+    /// top-level group holds exactly <see cref="SpaDelivery.MaxPagesPerChunk"/> pages, inserting one more
+    /// earlier-sorting page pushes the ordinally-LAST pre-existing page into a second chunk batch — its content
+    /// never changed, but the FILE that carries it did. Before this fix, <c>BuildDelta</c> compared only
+    /// <c>ContentHash</c> and silently omitted that page from <c>changed</c>/<c>chunks</c>, leaving a polling
+    /// consumer holding a stale chunk pointer for a page it never knew moved.</summary>
+    [Fact]
+    public void BuildDelta_NamesAPage_WhenOnlyItsChunkAssignmentMoved_NotItsContent()
+    {
+        var pageCount = SpaDelivery.MaxPagesPerChunk;
+        var beforePages = Enumerable.Range(1, pageCount)
+            .Select(i => ($"docs/page-{i:0000}.html", "same"))
+            .ToArray();
+        var before = Manifest(beforePages);
+
+        // One new, ordinally-EARLIER page pushes every "docs" page's batch index up by one slot once the group
+        // exceeds MaxPagesPerChunk — the ordinally-last pre-existing page spills into a second chunk file.
+        var after = Manifest(new[] { ("docs/page-0000.html", "new") }.Concat(beforePages).ToArray());
+
+        var delta = Delta(before, after);
+
+        Assert.False(delta.GetProperty("full").GetBoolean());
+        Assert.Contains("docs/page-0000.html", Arr(delta, "added"));
+        var pushedPage = $"docs/page-{pageCount:0000}.html";
+        Assert.Contains(pushedPage, Arr(delta, "changed"));
+        Assert.Contains($"{SpaDelivery.ChunkDir}/pages-docs-2.json", Arr(delta, "chunks"));
+    }
+
+    /// <summary>Code review finding (Story 22.6): site-level identity (title/nav) is invisible to a page-keyed
+    /// diff. A retitle with zero page-content edits must not ship as an empty, non-full delta — the consumer
+    /// would never learn the title changed and has no other signal to refetch on.</summary>
+    [Fact]
+    public void BuildDelta_DegradesToFull_WhenSiteTitleChanges_WithNoPageContentEdits()
+    {
+        var before = Manifest(("index.html", "home"), ("docs/a.html", "alpha"));
+        const string titleField = "\"siteTitle\":\"Test Site\"";
+        Assert.Contains(titleField, before); // sanity: the substitution target actually exists in the manifest
+        var after = before.Replace(titleField, "\"siteTitle\":\"Renamed Site\"", StringComparison.Ordinal);
+
+        var delta = Delta(before, after);
+
+        AssertIsFullMarker(delta);
+    }
+
+    /// <summary>Same code review finding, exercised on the <c>nav</c> half of the site-identity fingerprint
+    /// rather than <c>siteTitle</c> — a nav-label rename with zero page-content edits must also force full.
+    /// Built directly through <see cref="SpaDelivery.BuildDataFiles"/> (bypassing the <see cref="Manifest"/>
+    /// helper, which always emits an empty nav) so the bundle can carry a real nav item.</summary>
+    [Fact]
+    public void BuildDelta_DegradesToFull_WhenNavChanges_WithNoPageContentEdits()
+    {
+        var page = new SpaPage("index.html", "index.html", "<main id=\"main-content\">home</main>", Array.Empty<BreadcrumbCrumb>());
+        string ManifestWithNavLabel(string label) =>
+            SpaDelivery.BuildDataFiles(new SpaBundle("Test Site", "index.html", new[] { (label, "index.html") }, new[] { page }))
+                .Single(f => f.OutputRelativePath == SpaDelivery.ManifestPath).Content;
+
+        var before = ManifestWithNavLabel("Home");
+        var after = ManifestWithNavLabel("Dashboard");
+
+        var delta = Delta(before, after);
+
+        AssertIsFullMarker(delta);
+    }
+
     /// <summary>A full marker is not merely <c>full: true</c> — AC #7 requires the page lists be EMPTY, so a
     /// consumer can never half-apply a delta it was told to distrust.</summary>
     private static void AssertIsFullMarker(JsonElement delta)

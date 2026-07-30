@@ -1617,7 +1617,27 @@ public class SiteGeneratorAdapterTests : IDisposable
         //
         // VERIFICATION: `ad661dca…` confirmed byte-identical across two consecutive runs, EACH preceded by an
         // explicit `dotnet build --no-incremental`.
-        const string expected = "ad661dca850a40c068da4485dd0ea43864aa4ce5206983fd9cf7df45d540be20";
+        //
+        // ── Regenerated 2026-07-30 by code review fix on Story 22.6's own Quiet Stamp: ad661dca… -> dbfa172b… ──
+        //
+        // ONE cause: `.spa-live-stamp` in `specscribe.css` gained `white-space: nowrap; overflow: hidden;
+        // text-overflow: ellipsis; max-width: 100%` — a code-review finding that the stamp's "no layout shift on
+        // update" claim (AC #5) was only verified at a wide 1280px viewport, not the narrow panel width this same
+        // codebase calls "the norm" elsewhere, and `min-height` alone sets a floor, not a ceiling, so the longer of
+        // the stamp's two possible strings could wrap and grow the toolbar. Nothing else moved: no row, no page
+        // count, no other stylesheet declaration.
+        //
+        // PROVENANCE (shared main): `git status` at the time of this regeneration showed `docs/adrs/0018-...md` as
+        // the only OTHER concurrently-modified file with any plausible bearing on rendering, and it is untouched by
+        // and unrelated to this change; every other modified `src/SpecScribe/*` file in the tree at this time was
+        // this same code-review pass's own work (`FileWatcherService.cs`, `SiteGenerator.cs`, `SiteSettings.cs`,
+        // `SpaDelivery.cs`, `specscribe-spa.js`) and none of it renders through this golden fixture, which generates
+        // WITHOUT `--spa` (only the CSS asset is shared with the non-SPA static site). The delta isolates to the
+        // one CSS rule.
+        //
+        // VERIFICATION: `dbfa172b…` confirmed byte-identical across two consecutive runs, EACH preceded by an
+        // explicit `dotnet build --no-incremental`.
+        const string expected = "dbfa172b30abdda0a7ca3dbf828ff255d33d3665b4b88b33ca5a50c68fbb6b0f";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "
@@ -1633,7 +1653,90 @@ public class SiteGeneratorAdapterTests : IDisposable
     /// <summary>SHA-256 over every output file's normalized content (path-prefixed, ordinal-sorted), so ANY
     /// rendered-byte change flips one hash. Normalizes only per-run/per-build/per-machine noise, never artifact
     /// content — so the constant is portable across machines and CI, not pinned to this box.</summary>
-    private string FingerprintTree(string root)
+    /// <summary>Story 23.4 AC #5's REPLACEMENT content-drift gate: a fingerprint over the IR itself.
+    /// <para><b>Why this has to exist before the C# writer is deleted, not after.</b>
+    /// <see cref="GenerateAll_GoldenContentFingerprint_IsStableAfterNormalizingVolatileTokens"/> hashes every
+    /// output FILE, so it is a gate on the `.html` SpecScribe writes. Story 23.4 moves page-writing to the Nuxt
+    /// projection; the moment no C# code path emits a content `.html`, that fingerprint stops covering anything
+    /// this project renders and has to be retired. AC #5 names the successor — "a fingerprint over the IR is the
+    /// obvious candidate and does not exist yet" — and this is it. Landing it in the same story that switched the
+    /// IR's producer means the drift gate never lapses: there is no window in which content can move silently.</para>
+    /// <para><b>What it pins that nothing else does.</b> The C# fingerprint hashes rendered documents; this hashes
+    /// the <c>spa/</c> manifest and its content chunks — the composed regions, their titles, breadcrumbs and meta
+    /// descriptions. After Story 23.4 those come from each page's own <see cref="PageView"/> rather than from
+    /// regexes run over finished HTML, so this is the gate on the seam that actually feeds every downstream
+    /// surface: the Nuxt site, the SPA and the webview. `measure:parity`'s committed per-page hashes cover the
+    /// `&lt;main&gt;` region only; this covers the whole IR payload including the region's post-`&lt;/main&gt;`
+    /// content, which is precisely where a real defect hid this story.</para>
+    /// <para>⚠️ Uses the SAME <c>FingerprintTree</c> normalization, so the same rules apply: rebuild
+    /// non-incrementally before trusting a moved hash (an embedded asset is not re-embedded by an incremental
+    /// build), and confirm any regeneration across two consecutive runs. Continue the log below rather than
+    /// replacing it. [Story 23.4 AC #5]</para></summary>
+    [Fact]
+    public void GenerateAll_GoldenIrFingerprint_IsStableAfterNormalizingVolatileTokens()
+    {
+        var options = ForgeOptions.Resolve(
+            source: Source, adrs: Adrs, output: Site, projectName: "SpecScribe", includeReadme: false,
+            emitSpa: true);
+        var gen = new SiteGenerator(options);
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+
+        // The IR only — not the `.html` beside it. That separation is the whole point: this hash must survive the
+        // deletion of the page writer, so it must not depend on a single generated document.
+        var irRoot = Path.Combine(Site, "spa");
+        Assert.True(Directory.Exists(irRoot), "No spa/ directory — the --spa emit did not run.");
+
+        var fingerprint = FingerprintIr(irRoot);
+
+        // ── REGENERATION LOG (continue this; do not replace it) ───────────────────────────────────────────────
+        // 2026-07-29 — Story 23.4, INITIAL CAPTURE. Taken in the same session that switched the IR's producer
+        // from `SpaDelivery.ExtractContentRegion` (slice a rendered document) to a region COMPOSED from each
+        // page's own PageView at the write seam. Captured AFTER that switch deliberately: capturing before it
+        // would have pinned the slice this story replaces. Confirmed byte-identical across two consecutive runs,
+        // and `GoldenContentFingerprint` was verified STATIONARY in the same session — so the page render did not
+        // move while this was taken, which is what makes the two hashes independently meaningful.
+        // PROVENANCE (shared main): a concurrent session had README.md, epics.md, docs/SonarCloudSetup.md,
+        // docs/adrs/README.md, the 25-6 story file and three untracked files (24-2, an Epic 20 retro, ADR 0031)
+        // uncommitted. None can reach this fixture's IR. Nothing was reset, checked out or cleaned.
+        // Confirmed byte-identical across THREE consecutive runs after folding the manifest's derived
+        // contentHash values (see FingerprintIr — the two-run rule caught this moving between the first two
+        // captures, and the cause was a hash-of-an-unfolded-path, not a rendering change).
+        Assert.Equal("3acee6c2bede29b59d2afdbf37ff4fe0e88860bde3c69d99aeff4d0eb7de4131", fingerprint);
+    }
+
+    /// <summary>The IR fingerprint's own normalization — <see cref="FingerprintTree"/> plus ONE extra fold, and
+    /// the extra fold has a precise justification rather than being a convenience.
+    /// <para><b>Why a hash has to be folded.</b> <c>manifest.json</c> records a <c>contentHash</c> per page,
+    /// computed by the GENERATOR from unnormalized content. Exactly one page — <c>diagnostics.html</c> — prints
+    /// the configured output root and repo root verbatim, so its bytes are machine- and output-path dependent.
+    /// <see cref="GoldenNormalization.NormalizeVolatile"/> already folds those roots to <c>&lt;root&gt;</c>,
+    /// which is what keeps <see cref="GenerateAll_GoldenContentFingerprint_IsStableAfterNormalizingVolatientTokens"/>
+    /// portable — but it cannot fold a HASH OF the unfolded text. Each test run gets a fresh
+    /// <c>CreateTempSubdirectory</c> path, so that one hash changes every run and the IR fingerprint moved
+    /// between two consecutive runs with no code change behind it. Caught by the two-run rule
+    /// (<c>golden-diff-normalization-gotchas</c>), which is exactly the trap that rule exists for.</para>
+    /// <para><b>Why folding it loses no coverage.</b> A <c>contentHash</c> is DERIVED from chunk content that this
+    /// same fingerprint already hashes directly, byte for byte. Folding the derived value removes the one
+    /// machine-dependent input while the thing it summarizes stays fully covered — so a real content drift still
+    /// moves this hash, via the chunk. Folding the CHUNKS would be the mistake; folding a redundant digest is not.
+    /// </para></summary>
+    private string FingerprintIr(string irRoot) =>
+        FingerprintTree(irRoot, IrContentHash.Replace);
+
+    /// <summary>Matches the manifest's derived per-page digests. Deliberately anchored to the JSON key so it
+    /// cannot touch a hash-shaped string that happens to appear inside rendered content.</summary>
+    private static readonly (Regex Rx, string To) IrContentHashPattern =
+        (new Regex("(\"contentHash\"\\s*:\\s*\")[0-9a-fA-F]+(\")", RegexOptions.Compiled), "$1<hash>$2");
+
+    private static class IrContentHash
+    {
+        public static string Replace(string s) =>
+            IrContentHashPattern.Rx.Replace(s, IrContentHashPattern.To);
+    }
+
+    private string FingerprintTree(string root) => FingerprintTree(root, static s => s);
+
+    private string FingerprintTree(string root, Func<string, string> extraFold)
     {
         var sb = new StringBuilder();
         foreach (var rel in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
@@ -1644,7 +1747,7 @@ public class SiteGeneratorAdapterTests : IDisposable
             sb.Append(FoldToday(rel)).Append('\n')
               .Append(IsVendoredAsset(rel) ? VendoredAssetToken(full)
                   : IsCopiedAsset(rel) ? FoldLineEndings(File.ReadAllText(full))
-                  : NormalizeVolatile(File.ReadAllText(full)))
+                  : extraFold(NormalizeVolatile(File.ReadAllText(full))))
               .Append("\n \n");
         }
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString()))).ToLowerInvariant();

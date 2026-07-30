@@ -25,28 +25,42 @@ import {
 } from '../scripts/ir-content-lib.mjs'
 
 describe('isMigrated / MIGRATED', () => {
-  it('recognizes the four migrated families', () => {
-    expect(isMigrated('index.html')).toBe(true)
-    expect(isMigrated('epics.html')).toBe(true)
-    expect(isMigrated('epics/epic-3.html')).toBe(true)
-    expect(isMigrated('epics/story-23-5.html')).toBe(true)
+  /**
+   * ⚠️ These assertions were INVERTED by Story 23.4, and the inversion is the point.
+   *
+   * Story 23.3 bounded the extraction to four families and this suite pinned that bound — `about.html`,
+   * `code/**` and `adrs/**` all asserted `false`, correctly, because those pages were `PassThroughSurface` and
+   * not claimed as migrated.
+   *
+   * Story 23.4 migrated them. At that moment the narrow bound stopped being conservative and became a silent
+   * defect: the extractor carried rules for four families while the router rendered fourteen, so ~58 % of the
+   * classes those 1,276 pages emit had no rule at all and the elements simply rendered bare. Widening the bound
+   * moved class coverage from 42 % to 100 % while still dropping 393 of 1,814 source rules as unused — so the
+   * layer is still bounded, still `.ir-content`-scoped and still gated. See `ir-content-lib.mjs`'s note and
+   * ADR 0018 §Addendum.
+   */
+  it('now drives extraction off EVERY IR page, not four families', () => {
+    for (const p of [
+      'index.html',
+      'epics.html',
+      'epics/epic-3.html',
+      'epics/story-23-5.html',
+      // The pages that used to be excluded — all migrated by Story 23.4.
+      'about.html',
+      'code/src/SpecScribe/Charts.cs.html',
+      'adrs/0006-delivery.html',
+      'follow-ups/action-1-thing.html',
+      'commit/deadbee.html',
+      'requirements/fr25.html',
+    ]) {
+      expect(isMigrated(p), p).toBe(true)
+    }
   })
 
-  it('rejects pages outside them', () => {
-    expect(isMigrated('about.html')).toBe(false)
-    expect(isMigrated('code/src/SpecScribe/Charts.cs.html')).toBe(false)
-    expect(isMigrated('adrs/0006-delivery.html')).toBe(false)
-  })
-
-  it('does not let a nested path masquerade as an epic page', () => {
-    // The family patterns forbid a `/` inside the leaf, so a deeper path cannot claim the family.
-    expect(MIGRATED.epicDetail('epics/sub/epic-3.html')).toBe(false)
-    expect(MIGRATED.storyDetail('epics/sub/story-1-1.html')).toBe(false)
-  })
-
-  it('does not treat a story page as an epic page', () => {
-    expect(MIGRATED.epicDetail('epics/story-23-5.html')).toBe(false)
-    expect(MIGRATED.storyDetail('epics/epic-3.html')).toBe(false)
+  it('exposes the widened bound as a single named predicate', () => {
+    // One place decides the bound, so narrowing it again means editing this and reading the note above.
+    expect(Object.keys(MIGRATED)).toEqual(['wholeSite'])
+    expect(MIGRATED.wholeSite('anything.html')).toBe(true)
   })
 })
 

@@ -2,7 +2,7 @@
   "generatedBy": "web/scripts/extract-ir-content.mjs",
   "source": "src/SpecScribe/assets/specscribe.css",
   "scope": ".ir-content",
-  "transitional": "Story 23.4 retires this layer. Every entry below is a rule it has to account for.",
+  "transitional": "Story 23.4 attempted the retirement (owner decision D5) and could NOT complete it: ~95% of the carried rules style bespoke vocabulary injected as rendered HTML, which needs Epic 22 view models to de-inject, and the `chrome` bucket never empties because owner decision D2 + ADR 0024 keep C# composing the region permanently. See ADR 0018 §Addendum and web/measurements/ir-content-residue.json for the per-bucket blocker.",
   "migratedFamilies": [
     "index.html",
     "epics.html",
@@ -10,11 +10,11 @@
     "epics/story-{id}.html"
   ],
   "stats": {
-    "carriedRules": 875,
-    "carriedSelectors": 997,
+    "carriedRules": 1423,
+    "carriedSelectors": 1602,
     "carriedKeyframes": 4,
     "droppedRoot": 4,
-    "generatedBytes": 110869,
+    "generatedBytes": 175510,
     "sharedRules": 1
   },
   "rules": [
@@ -37,9 +37,9 @@
       "carried": true
     },
     {
-      "selector": ".now-next-card:focus-visible, .epic-mosaic-card:focus-visible, .epic-chip:focus-visible, .story-title-link:focus-visible, .toc-sidebar a:focus-visible, .breadcrumb a:focus-visible, .ac-anchor:focus-visible, .ac-ref:focus-visible, .view-epic-link:focus-visible",
+      "selector": ".index-card:focus-visible, .now-next-card:focus-visible, .epic-mosaic-card:focus-visible, .epic-chip:focus-visible, .story-title-link:focus-visible, .req-id-link:focus-visible, .req-epic:focus-visible, .toc-sidebar a:focus-visible, .breadcrumb a:focus-visible, .ac-anchor:focus-visible, .ac-ref:focus-visible, .view-epic-link:focus-visible",
       "carried": true,
-      "note": "6 unused selector(s) in the source rule were not carried"
+      "note": "3 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": ".site-nav-inner a:focus-visible",
@@ -83,6 +83,14 @@
     },
     {
       "selector": ".ss-hierarchy-controls[hidden]",
+      "carried": true
+    },
+    {
+      "selector": ".ss-hierarchy-legends",
+      "carried": true
+    },
+    {
+      "selector": ".ss-hierarchy-legends > * + *",
       "carried": true
     },
     {
@@ -452,6 +460,46 @@
       "carried": true
     },
     {
+      "selector": ".site-nav-key-views .quick-link-pills",
+      "carried": true
+    },
+    {
+      "selector": ".quick-link-pill",
+      "carried": true
+    },
+    {
+      "selector": ".quick-link-pill:hover",
+      "carried": true
+    },
+    {
+      "selector": ".quick-link-pill.family-planning",
+      "carried": true
+    },
+    {
+      "selector": ".quick-link-pill.family-architecture",
+      "carried": true
+    },
+    {
+      "selector": ".quick-link-pill.family-epics",
+      "carried": true
+    },
+    {
+      "selector": ".quick-link-pill.family-requirements",
+      "carried": true
+    },
+    {
+      "selector": ".quick-link-pill.family-followups",
+      "carried": true
+    },
+    {
+      "selector": ".quick-link-pill.family-help",
+      "carried": true
+    },
+    {
+      "selector": ".quick-link-pill:focus-visible",
+      "carried": true
+    },
+    {
       "selector": ".site-nav-local-context .local-context-pills",
       "carried": true
     },
@@ -750,9 +798,23 @@
       "within": "@media (max-width: 640px)"
     },
     {
+      "selector": ".meta-pills",
+      "carried": true
+    },
+    {
       "selector": ".pill",
       "carried": false,
       "reason": "shared primitive — emitted UNSCOPED into shared-primitives.css; see sharedPrimitives below"
+    },
+    {
+      "selector": ".pill.status-accepted",
+      "carried": true,
+      "note": "1 unused selector(s) in the source rule were not carried"
+    },
+    {
+      "selector": ".pill.status-draft, .pill.status-proposed",
+      "carried": true,
+      "note": "1 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": ".page-shell",
@@ -943,7 +1005,232 @@
       "carried": true
     },
     {
+      "selector": "pre.code-file",
+      "carried": true
+    },
+    {
+      "selector": "pre.code-file code",
+      "carried": true
+    },
+    {
+      "selector": "pre.code-file code[class*=\"language-\"]",
+      "carried": true
+    },
+    {
+      "selector": ".code-line",
+      "carried": true
+    },
+    {
+      "selector": ".code-line::before",
+      "carried": true
+    },
+    {
+      "selector": ".code-line:target",
+      "carried": true
+    },
+    {
+      "selector": ".code-page",
+      "carried": true
+    },
+    {
+      "selector": ".code-tabs",
+      "carried": true
+    },
+    {
+      "selector": ".code-tablist",
+      "carried": true
+    },
+    {
+      "selector": ".code-tab",
+      "carried": true
+    },
+    {
+      "selector": ".code-tab .ss-icon",
+      "carried": true
+    },
+    {
+      "selector": ".code-tab-input",
+      "carried": true
+    },
+    {
+      "selector": ".code-tab:hover",
+      "carried": true
+    },
+    {
+      "selector": ".code-tabs:not(:has(.code-tabpanel--source .code-line:target)) .code-tab:has(.code-tab-input:checked)",
+      "carried": true,
+      "note": "1 unused selector(s) in the source rule were not carried"
+    },
+    {
+      "selector": ".code-tab:has(.code-tab-input:focus-visible)",
+      "carried": true
+    },
+    {
+      "selector": ".code-tabpanel",
+      "carried": true
+    },
+    {
+      "selector": ".code-tabs:has(.code-tab--insights .code-tab-input:checked) .code-tabpanel--insights, .code-tabs:has(.code-tab--relationships .code-tab-input:checked) .code-tabpanel--relationships, .code-tabs:has(.code-tab--history .code-tab-input:checked) .code-tabpanel--history, .code-tabs:has(.code-tab--source .code-tab-input:checked) .code-tabpanel--source",
+      "carried": true
+    },
+    {
+      "selector": ".code-tabs:not(.code-tabs--released):has(.code-tabpanel--source .code-line:target) .code-tabpanel",
+      "carried": true
+    },
+    {
+      "selector": ".code-tabs:not(.code-tabs--released):has(.code-tabpanel--source .code-line:target) .code-tabpanel--source",
+      "carried": true
+    },
+    {
+      "selector": ".code-tabs:not(.code-tabs--released):has(.code-tabpanel--source .code-line:target) .code-tab--source",
+      "carried": true
+    },
+    {
+      "selector": ".insight-panels",
+      "carried": true
+    },
+    {
+      "selector": ".insight-panel",
+      "carried": true
+    },
+    {
+      "selector": ".insight-panel > h2, .insight-panel > h3",
+      "carried": true
+    },
+    {
+      "selector": ".code-insight-history",
+      "carried": true
+    },
+    {
+      "selector": ".code-relationships",
+      "carried": true
+    },
+    {
+      "selector": ".code-relationships > h2",
+      "carried": true
+    },
+    {
+      "selector": ".code-relationships-note",
+      "carried": true
+    },
+    {
+      "selector": ".ref-graph-wrap",
+      "carried": true
+    },
+    {
+      "selector": ".ref-graph",
+      "carried": true
+    },
+    {
       "selector": ".sr-only",
+      "carried": true
+    },
+    {
+      "selector": ".ref-edge",
+      "carried": true
+    },
+    {
+      "selector": ".ref-center-box",
+      "carried": true
+    },
+    {
+      "selector": ".ref-center-label",
+      "carried": true
+    },
+    {
+      "selector": ".ref-node",
+      "carried": true
+    },
+    {
+      "selector": ".ref-dot",
+      "carried": true
+    },
+    {
+      "selector": ".ref-label",
+      "carried": true
+    },
+    {
+      "selector": ".ref-node:hover .ref-dot, .ref-node:focus-visible .ref-dot",
+      "carried": true
+    },
+    {
+      "selector": ".ref-node:hover .ref-label, .ref-node:focus-visible .ref-label",
+      "carried": true
+    },
+    {
+      "selector": ".ref-node:focus-visible",
+      "carried": true
+    },
+    {
+      "selector": ".ref-edge-file",
+      "carried": true
+    },
+    {
+      "selector": ".ref-file-dot",
+      "carried": true
+    },
+    {
+      "selector": ".ref-file-label",
+      "carried": true
+    },
+    {
+      "selector": ".ref-file-node",
+      "carried": true
+    },
+    {
+      "selector": ".ref-file-node--chip",
+      "carried": true
+    },
+    {
+      "selector": "a.ref-file-node:hover .ref-file-dot, a.ref-file-node:focus-visible .ref-file-dot",
+      "carried": true
+    },
+    {
+      "selector": "a.ref-file-node:hover .ref-file-label, a.ref-file-node:focus-visible .ref-file-label",
+      "carried": true
+    },
+    {
+      "selector": "a.ref-file-node:focus-visible",
+      "carried": true
+    },
+    {
+      "selector": ".ref-overflow",
+      "carried": true
+    },
+    {
+      "selector": ".refgraph-toggle",
+      "carried": true
+    },
+    {
+      "selector": ".refgraph-toggle:first-of-type",
+      "carried": true
+    },
+    {
+      "selector": ".refgraph-toggle-label",
+      "carried": true
+    },
+    {
+      "selector": ".ref-graph-view",
+      "carried": true
+    },
+    {
+      "selector": ".refgraph-toggle-epic:not(:checked) ~ .refgraph-toggle-rel:not(:checked) ~ .ref-graph-view[data-view=\"flat-flat\"], .refgraph-toggle-epic:checked ~ .refgraph-toggle-rel:not(:checked) ~ .ref-graph-view[data-view=\"epic-flat\"], .refgraph-toggle-epic:not(:checked) ~ .refgraph-toggle-rel:checked ~ .ref-graph-view[data-view=\"flat-rel\"], .refgraph-toggle-epic:checked ~ .refgraph-toggle-rel:checked ~ .ref-graph-view[data-view=\"epic-rel\"]",
+      "carried": true
+    },
+    {
+      "selector": ".ref-epic-hub-box",
+      "carried": true
+    },
+    {
+      "selector": ".ref-epic-hub-label",
+      "carried": true
+    },
+    {
+      "selector": ".ref-hub-spoke",
+      "carried": true
+    },
+    {
+      "selector": ".ref-edge-cross",
       "carried": true
     },
     {
@@ -1039,6 +1326,10 @@
       "carried": true
     },
     {
+      "selector": ".work-node--chip",
+      "carried": true
+    },
+    {
       "selector": "a.work-node:hover .work-node-story, a.work-node:focus-visible .work-node-story",
       "carried": true
     },
@@ -1051,6 +1342,26 @@
       "carried": true
     },
     {
+      "selector": ".work-graph-scope",
+      "carried": true
+    },
+    {
+      "selector": ".work-graph-scope-label",
+      "carried": true
+    },
+    {
+      "selector": ".work-graph-scope-select",
+      "carried": true
+    },
+    {
+      "selector": ".work-graph-scope-select:focus-visible",
+      "carried": true
+    },
+    {
+      "selector": ".work-graph-section",
+      "carried": true
+    },
+    {
       "selector": ".work-graph-overflow, .work-graph-empty",
       "carried": true
     },
@@ -1060,6 +1371,130 @@
     },
     {
       "selector": ".work-graph-query h3",
+      "carried": true
+    },
+    {
+      "selector": ".work-graph-legend",
+      "carried": true
+    },
+    {
+      "selector": ".work-graph-legend-item",
+      "carried": true
+    },
+    {
+      "selector": ".wg-key",
+      "carried": true
+    },
+    {
+      "selector": ".wg-key-epic",
+      "carried": true
+    },
+    {
+      "selector": ".wg-key-story",
+      "carried": true
+    },
+    {
+      "selector": ".wg-key-deferred",
+      "carried": true
+    },
+    {
+      "selector": ".wg-key-action",
+      "carried": true
+    },
+    {
+      "selector": ".wg-key-spec",
+      "carried": true
+    },
+    {
+      "selector": ".wg-key-edge",
+      "carried": true
+    },
+    {
+      "selector": ".wg-key-edge-soft",
+      "carried": true
+    },
+    {
+      "selector": ".code-source-section",
+      "carried": true
+    },
+    {
+      "selector": ".code-source-head",
+      "carried": true
+    },
+    {
+      "selector": ".code-source-head h2",
+      "carried": true
+    },
+    {
+      "selector": ".code-source-head .code-external-link",
+      "carried": true
+    },
+    {
+      "selector": ".code-external-link",
+      "carried": true
+    },
+    {
+      "selector": ".code-external-link .host-icon",
+      "carried": true
+    },
+    {
+      "selector": ".code-external-link:hover, .code-external-link:focus-visible",
+      "carried": true
+    },
+    {
+      "selector": ".code-insights",
+      "carried": true
+    },
+    {
+      "selector": ".code-insights > h2",
+      "carried": true
+    },
+    {
+      "selector": ".code-insight-frequency",
+      "carried": true
+    },
+    {
+      "selector": ".code-insight-contributors",
+      "carried": true
+    },
+    {
+      "selector": ".code-insight-contributors li",
+      "carried": true
+    },
+    {
+      "selector": ".code-insight-contributors .contributor-name",
+      "carried": true
+    },
+    {
+      "selector": ".code-insight-contributors .contributor-count",
+      "carried": true
+    },
+    {
+      "selector": ".code-insight-history > h2",
+      "carried": true
+    },
+    {
+      "selector": ".code-history-table",
+      "carried": true
+    },
+    {
+      "selector": ".code-history-table caption",
+      "carried": true
+    },
+    {
+      "selector": ".code-history-table th, .code-history-table td",
+      "carried": true
+    },
+    {
+      "selector": ".code-history-table th",
+      "carried": true
+    },
+    {
+      "selector": ".code-history-date",
+      "carried": true
+    },
+    {
+      "selector": ".code-history-author",
       "carried": true
     },
     {
@@ -1087,6 +1522,127 @@
       "carried": true
     },
     {
+      "selector": ".companion-docs",
+      "carried": true
+    },
+    {
+      "selector": ".companion-label",
+      "carried": true
+    },
+    {
+      "selector": ".companion-docs ul",
+      "carried": true
+    },
+    {
+      "selector": ".companion-docs li",
+      "carried": true
+    },
+    {
+      "selector": ".companion-docs a",
+      "carried": true
+    },
+    {
+      "selector": ".companion-docs a:hover",
+      "carried": true
+    },
+    {
+      "selector": ".companion-docs",
+      "carried": true,
+      "within": "@media (max-width: 900px)"
+    },
+    {
+      "selector": ".companion-docs ul",
+      "carried": true,
+      "within": "@media (max-width: 900px)"
+    },
+    {
+      "selector": ".companion-label",
+      "carried": true,
+      "within": "@media (max-width: 900px)"
+    },
+    {
+      "selector": ".capabilities",
+      "carried": true
+    },
+    {
+      "selector": ".capability",
+      "carried": true
+    },
+    {
+      "selector": ".capability-id",
+      "carried": true
+    },
+    {
+      "selector": ".capability-detail",
+      "carried": true
+    },
+    {
+      "selector": ".cap-row",
+      "carried": true
+    },
+    {
+      "selector": ".cap-row + .cap-row",
+      "carried": true
+    },
+    {
+      "selector": ".cap-row dt",
+      "carried": true
+    },
+    {
+      "selector": ".cap-row dd",
+      "carried": true
+    },
+    {
+      "selector": ".cap-row",
+      "carried": true,
+      "within": "@media (max-width: 560px)"
+    },
+    {
+      "selector": ".howtoread-panel h2",
+      "carried": true
+    },
+    {
+      "selector": ".howtoread-order",
+      "carried": true
+    },
+    {
+      "selector": ".howtoread-glossary .cap-row",
+      "carried": true
+    },
+    {
+      "selector": ".howtoread-glossary .cap-row",
+      "carried": true,
+      "within": "@media (max-width: 560px)"
+    },
+    {
+      "selector": ".preview-badge",
+      "carried": true
+    },
+    {
+      "selector": ".index-grid",
+      "carried": true
+    },
+    {
+      "selector": ".index-card",
+      "carried": true
+    },
+    {
+      "selector": ".index-card:hover",
+      "carried": true
+    },
+    {
+      "selector": ".index-card h2",
+      "carried": true
+    },
+    {
+      "selector": ".index-card p",
+      "carried": true
+    },
+    {
+      "selector": ".index-card .index-card-path",
+      "carried": true
+    },
+    {
       "selector": ".date-link",
       "carried": true
     },
@@ -1096,6 +1652,10 @@
     },
     {
       "selector": ".git-pulse-zone-note",
+      "carried": true
+    },
+    {
+      "selector": ".index-card .status-badge",
       "carried": true
     },
     {
@@ -1420,6 +1980,10 @@
       "carried": true
     },
     {
+      "selector": ".status-badge.diag-warn",
+      "carried": true
+    },
+    {
       "selector": ".status-badge.task-badge",
       "carried": true
     },
@@ -1688,6 +2252,23 @@
       "selector": ".next-steps-cards",
       "carried": true,
       "within": "@media (max-width: 960px)"
+    },
+    {
+      "selector": ".list-batch-actions .next-steps-cards",
+      "carried": true
+    },
+    {
+      "selector": ".list-batch-actions .next-steps-cards",
+      "carried": true,
+      "within": "@media (max-width: 960px)"
+    },
+    {
+      "selector": ".next-step-command-group",
+      "carried": true
+    },
+    {
+      "selector": ".next-step-command-item",
+      "carried": true
     },
     {
       "selector": ".next-steps-list",
@@ -1971,6 +2552,10 @@
     },
     {
       "selector": ".chart-frame-why",
+      "carried": true
+    },
+    {
+      "selector": ".chart-frame-note",
       "carried": true
     },
     {
@@ -2456,6 +3041,423 @@
       "carried": true
     },
     {
+      "selector": ".codemap-panel .chart-lead",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-controls",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-controls-label",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-dim-select",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-dim-select:focus-visible",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-filter-checkbox",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-filter-checkbox:first-of-type",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-filter-label",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-table-section [data-codemap-view]",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-table-section tr[data-codemap-view]",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-legend",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-legend-dim",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-legend-swatch",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-legend-swatch.level-0",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-legend-swatch.level-1",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-legend-swatch.level-2",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-legend-swatch.level-3",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-legend-swatch.level-4",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-legend[hidden]",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-legend-discrete",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-legend-label",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-legend-swatch.type-csharp",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-legend-swatch.type-python",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-legend-swatch.type-script",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-legend-swatch.type-styles",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-legend-swatch.type-markup",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-legend-swatch.type-config",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-legend-swatch.type-other-lang",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-legend-swatch.type-other",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-table",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-table th, .codemap-table td",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-table th[scope=\"row\"]",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-table .num",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-table thead th",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-table a",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-table a:hover",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-table-pager",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-table-pager[hidden]",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-table-pager-prev, .codemap-table-pager-next",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-table-pager-prev:hover:not(:disabled), .codemap-table-pager-next:hover:not(:disabled)",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-table-pager-prev:disabled, .codemap-table-pager-next:disabled",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-table-pager-status",
+      "carried": true
+    },
+    {
+      "selector": ".risk-quadrant",
+      "carried": true
+    },
+    {
+      "selector": ".risk-axis-line",
+      "carried": true
+    },
+    {
+      "selector": ".risk-median-line",
+      "carried": true
+    },
+    {
+      "selector": ".risk-axis-label",
+      "carried": true
+    },
+    {
+      "selector": ".risk-tick-label",
+      "carried": true
+    },
+    {
+      "selector": ".risk-median-tick-label",
+      "carried": true
+    },
+    {
+      "selector": ".risk-quadrant-elevated",
+      "carried": true
+    },
+    {
+      "selector": ".risk-quadrant-shade-label",
+      "carried": true
+    },
+    {
+      "selector": ".risk-point",
+      "carried": true
+    },
+    {
+      "selector": ".risk-point.level-0",
+      "carried": true
+    },
+    {
+      "selector": ".risk-point.level-1",
+      "carried": true
+    },
+    {
+      "selector": ".risk-point.level-2",
+      "carried": true
+    },
+    {
+      "selector": ".risk-point.level-3",
+      "carried": true
+    },
+    {
+      "selector": ".risk-point.level-4",
+      "carried": true
+    },
+    {
+      "selector": ".risk-point-elevated",
+      "carried": true
+    },
+    {
+      "selector": ".risk-point-link:focus-visible .risk-point, .risk-point-link:hover .risk-point, .risk-point:focus-visible, .risk-point:hover",
+      "carried": true
+    },
+    {
+      "selector": ".risk-pager",
+      "carried": true
+    },
+    {
+      "selector": ".risk-pager[hidden]",
+      "carried": true
+    },
+    {
+      "selector": ".risk-pager-prev, .risk-pager-next",
+      "carried": true
+    },
+    {
+      "selector": ".risk-pager-prev:hover:not(:disabled), .risk-pager-next:hover:not(:disabled)",
+      "carried": true
+    },
+    {
+      "selector": ".risk-pager-prev:disabled, .risk-pager-next:disabled",
+      "carried": true
+    },
+    {
+      "selector": ".risk-pager-status",
+      "carried": true
+    },
+    {
+      "selector": ".risk-grid",
+      "carried": true
+    },
+    {
+      "selector": ".risk-grid-item",
+      "carried": true
+    },
+    {
+      "selector": ".risk-grid-item[hidden]",
+      "carried": true
+    },
+    {
+      "selector": ".risk-grid-path",
+      "carried": true
+    },
+    {
+      "selector": ".risk-grid-path a",
+      "carried": true
+    },
+    {
+      "selector": ".risk-grid-path a:hover",
+      "carried": true
+    },
+    {
+      "selector": ".risk-grid-meta",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-graph",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-edge",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-edge.process-edge",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-node",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-label",
+      "carried": true
+    },
+    {
+      "selector": ".deep-page-section",
+      "carried": true
+    },
+    {
+      "selector": ".deep-page-section > h2",
+      "carried": true
+    },
+    {
+      "selector": ".deep-page-lower",
+      "carried": true
+    },
+    {
+      "selector": ".deep-page-lower",
+      "carried": true,
+      "within": "@media (min-width: 860px)"
+    },
+    {
+      "selector": ".deep-page-graph-panel",
+      "carried": true
+    },
+    {
+      "selector": ".deep-page-list-panel",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-expand",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-expand:hover, .coupling-expand:focus-visible",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-legend",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-table",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-table th",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-table td",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-table tr:last-child td",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-table .coupling-file",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-table .coupling-num",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-table th.coupling-num",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-table .coupling-kind",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-table th.coupling-kind",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-kind-badge, .coupling-boundary-badge",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-kind-badge",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-boundary-badge",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-lightbox",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-lightbox:target",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-lightbox-backdrop",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-lightbox-panel",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-lightbox-panel .coupling-graph",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-lightbox-close",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-lightbox-close:hover, .coupling-lightbox-close:focus-visible",
+      "carried": true
+    },
+    {
       "selector": ".epic-mosaic",
       "carried": true
     },
@@ -2493,6 +3495,14 @@
     },
     {
       "selector": ".heatmap",
+      "carried": true
+    },
+    {
+      "selector": ".heatmap-headline",
+      "carried": true
+    },
+    {
+      "selector": ".heatmap-headline strong",
       "carried": true
     },
     {
@@ -2585,6 +3595,180 @@
     },
     {
       "selector": ".heatmap-window",
+      "carried": true
+    },
+    {
+      "selector": ".commit-day-list",
+      "carried": true
+    },
+    {
+      "selector": ".commit-day-item",
+      "carried": true
+    },
+    {
+      "selector": ".commit-day-item:last-child",
+      "carried": true
+    },
+    {
+      "selector": ".commit-hash",
+      "carried": true
+    },
+    {
+      "selector": ".commit-time",
+      "carried": true
+    },
+    {
+      "selector": ".commit-author",
+      "carried": true
+    },
+    {
+      "selector": ".commit-subject",
+      "carried": true
+    },
+    {
+      "selector": ".commit-day-item",
+      "carried": true,
+      "within": "@media (max-width: 640px)"
+    },
+    {
+      "selector": ".commit-subject",
+      "carried": true,
+      "within": "@media (max-width: 640px)"
+    },
+    {
+      "selector": ".commit-hash-link",
+      "carried": true
+    },
+    {
+      "selector": ".commit-hash-link:hover .commit-hash",
+      "carried": true
+    },
+    {
+      "selector": ".commit-hash-link:focus-visible",
+      "carried": true
+    },
+    {
+      "selector": ".artifacts-updated",
+      "carried": true
+    },
+    {
+      "selector": ".artifacts-updated h2",
+      "carried": true
+    },
+    {
+      "selector": ".artifact-update-list",
+      "carried": true
+    },
+    {
+      "selector": ".artifact-update-list li",
+      "carried": true
+    },
+    {
+      "selector": ".artifact-update-list li:last-child",
+      "carried": true
+    },
+    {
+      "selector": ".artifact-update-list a",
+      "carried": true
+    },
+    {
+      "selector": ".artifact-update-list a:hover",
+      "carried": true
+    },
+    {
+      "selector": ".artifact-update-list a:focus-visible",
+      "carried": true
+    },
+    {
+      "selector": ".artifact-update-path",
+      "carried": true
+    },
+    {
+      "selector": ".timeline-heatmap",
+      "carried": true
+    },
+    {
+      "selector": ".timeline-list",
+      "carried": true
+    },
+    {
+      "selector": ".timeline-date",
+      "carried": true
+    },
+    {
+      "selector": ".timeline-date:hover",
+      "carried": true
+    },
+    {
+      "selector": ".timeline-date:focus-visible",
+      "carried": true
+    },
+    {
+      "selector": ".timeline-summary",
+      "carried": true
+    },
+    {
+      "selector": ".commit-message",
+      "carried": true
+    },
+    {
+      "selector": ".commit-message p",
+      "carried": true
+    },
+    {
+      "selector": ".commit-message p:last-child",
+      "carried": true
+    },
+    {
+      "selector": ".commit-files",
+      "carried": true
+    },
+    {
+      "selector": ".commit-files > h2",
+      "carried": true
+    },
+    {
+      "selector": ".commit-files-empty",
+      "carried": true
+    },
+    {
+      "selector": ".commit-files-table",
+      "carried": true
+    },
+    {
+      "selector": ".commit-files-table caption",
+      "carried": true
+    },
+    {
+      "selector": ".commit-files-table th, .commit-files-table td",
+      "carried": true
+    },
+    {
+      "selector": ".commit-files-table thead th",
+      "carried": true
+    },
+    {
+      "selector": ".commit-files-table th.commit-num, .commit-files-table td.commit-num",
+      "carried": true
+    },
+    {
+      "selector": ".commit-files-table td code",
+      "carried": true
+    },
+    {
+      "selector": ".commit-files-table tbody tr:hover",
+      "carried": true
+    },
+    {
+      "selector": ".commit-files-table .commit-added",
+      "carried": true
+    },
+    {
+      "selector": ".commit-files-table .commit-deleted",
+      "carried": true
+    },
+    {
+      "selector": ".commit-file-binary",
       "carried": true
     },
     {
@@ -2732,6 +3916,66 @@
       "carried": true
     },
     {
+      "selector": ".req-card",
+      "carried": true
+    },
+    {
+      "selector": ".req-card.done",
+      "carried": true
+    },
+    {
+      "selector": ".req-card.active",
+      "carried": true
+    },
+    {
+      "selector": ".req-card.ready",
+      "carried": true
+    },
+    {
+      "selector": ".req-card.pending",
+      "carried": true
+    },
+    {
+      "selector": ".req-card.deferred",
+      "carried": true
+    },
+    {
+      "selector": ".req-card-head",
+      "carried": true
+    },
+    {
+      "selector": ".req-id-link",
+      "carried": true
+    },
+    {
+      "selector": ".req-id-link:hover",
+      "carried": true
+    },
+    {
+      "selector": ".req-text",
+      "carried": true
+    },
+    {
+      "selector": ".req-epic",
+      "carried": true
+    },
+    {
+      "selector": ".req-epic:hover",
+      "carried": true
+    },
+    {
+      "selector": ".req-epic.deferred",
+      "carried": true
+    },
+    {
+      "selector": ".req-epic.unmapped",
+      "carried": true
+    },
+    {
+      "selector": ".satisfaction-band",
+      "carried": true
+    },
+    {
       "selector": ".satisfaction-bar",
       "carried": true
     },
@@ -2769,6 +4013,14 @@
     },
     {
       "selector": ".satisfaction-bracket .seg.retired",
+      "carried": true
+    },
+    {
+      "selector": ".satisfaction-note",
+      "carried": true
+    },
+    {
+      "selector": ".satisfaction-note strong",
       "carried": true
     },
     {
@@ -2840,6 +4092,10 @@
       "carried": true
     },
     {
+      "selector": ".trace-legend",
+      "carried": true
+    },
+    {
       "selector": ".trace-strip",
       "carried": true
     },
@@ -2860,9 +4116,246 @@
       "carried": true
     },
     {
+      "selector": ".cadence-lede",
+      "carried": true
+    },
+    {
+      "selector": ".heatmap-legend-caption",
+      "carried": true
+    },
+    {
+      "selector": ".cadence-log-details",
+      "carried": true
+    },
+    {
+      "selector": ".cadence-log-summary",
+      "carried": true
+    },
+    {
+      "selector": ".cadence-log-summary:hover",
+      "carried": true
+    },
+    {
+      "selector": ".cadence-log",
+      "carried": true
+    },
+    {
+      "selector": ".cadence-log-row",
+      "carried": true
+    },
+    {
+      "selector": ".cadence-log-date",
+      "carried": true
+    },
+    {
+      "selector": ".cadence-log-count",
+      "carried": true
+    },
+    {
+      "selector": ".cadence-log-stories a",
+      "carried": true
+    },
+    {
+      "selector": ".cadence-log-row",
+      "carried": true,
+      "within": "@media (max-width: 32rem)"
+    },
+    {
+      "selector": ".cycle-time-histogram .git-pulse-bar-label",
+      "carried": true
+    },
+    {
+      "selector": ".cycle-time-histogram .git-pulse-bar-fill",
+      "carried": true
+    },
+    {
+      "selector": ".trace-matrix-wrap",
+      "carried": true
+    },
+    {
+      "selector": ".table-scroll.trace-matrix-wrap",
+      "carried": true
+    },
+    {
+      "selector": ".trace-matrix",
+      "carried": true
+    },
+    {
+      "selector": ".trace-matrix th, .trace-matrix td",
+      "carried": true
+    },
+    {
+      "selector": ".trace-matrix thead th",
+      "carried": true
+    },
+    {
+      "selector": ".trace-matrix thead th a",
+      "carried": true
+    },
+    {
+      "selector": ".trace-matrix thead th a:hover",
+      "carried": true
+    },
+    {
+      "selector": ".trace-row-head",
+      "carried": true
+    },
+    {
+      "selector": ".trace-matrix thead th.trace-corner",
+      "carried": true
+    },
+    {
+      "selector": "tr.deferred .trace-row-head",
+      "carried": true
+    },
+    {
+      "selector": "tr.unmapped .trace-row-head",
+      "carried": true
+    },
+    {
+      "selector": ".trace-row-head a",
+      "carried": true
+    },
+    {
+      "selector": ".trace-row-head a:hover",
+      "carried": true
+    },
+    {
+      "selector": ".trace-row-head .status-badge",
+      "carried": true
+    },
+    {
+      "selector": ".trace-cell",
+      "carried": true
+    },
+    {
+      "selector": ".trace-cell.covered",
+      "carried": true
+    },
+    {
+      "selector": ".trace-cell-link",
+      "carried": true
+    },
+    {
+      "selector": ".trace-cell-link .ss-icon",
+      "carried": true
+    },
+    {
       "selector": ":root",
       "carried": false,
       "reason": "root-level rule — no descendant to scope under .ir-content; see web/assets/base.css"
+    },
+    {
+      "selector": ".impact-epic",
+      "carried": true
+    },
+    {
+      "selector": ".impact-epic:last-child",
+      "carried": true
+    },
+    {
+      "selector": ".impact-epic-head",
+      "carried": true
+    },
+    {
+      "selector": ".impact-epic-head a",
+      "carried": true
+    },
+    {
+      "selector": ".impact-epic-head a:hover",
+      "carried": true
+    },
+    {
+      "selector": ".impact-file-list",
+      "carried": true
+    },
+    {
+      "selector": ".impact-file-list li",
+      "carried": true
+    },
+    {
+      "selector": ".impact-file-meta",
+      "carried": true
+    },
+    {
+      "selector": ".code-areas-panel .impact-file-list",
+      "carried": true
+    },
+    {
+      "selector": ".impact-more",
+      "carried": true
+    },
+    {
+      "selector": ".impact-map-link",
+      "carried": true
+    },
+    {
+      "selector": ".impact-fallback > summary",
+      "carried": true
+    },
+    {
+      "selector": ".impact-epic-filter .impact-select-actions",
+      "carried": true
+    },
+    {
+      "selector": ".impact-legend",
+      "carried": true
+    },
+    {
+      "selector": ".impact-legend-item",
+      "carried": true
+    },
+    {
+      "selector": ".impact-legend-size",
+      "carried": true
+    },
+    {
+      "selector": ".impact-legend-ramp",
+      "carried": true
+    },
+    {
+      "selector": ".impact-legend-ramp i",
+      "carried": true
+    },
+    {
+      "selector": ".impact-level-1",
+      "carried": true
+    },
+    {
+      "selector": ".impact-legend-ramp i.impact-level-1",
+      "carried": true
+    },
+    {
+      "selector": ".impact-level-2",
+      "carried": true
+    },
+    {
+      "selector": ".impact-legend-ramp i.impact-level-2",
+      "carried": true
+    },
+    {
+      "selector": ".impact-level-3",
+      "carried": true
+    },
+    {
+      "selector": ".impact-legend-ramp i.impact-level-3",
+      "carried": true
+    },
+    {
+      "selector": ".impact-level-4",
+      "carried": true
+    },
+    {
+      "selector": ".impact-legend-ramp i.impact-level-4",
+      "carried": true
+    },
+    {
+      "selector": ".impact-level-5",
+      "carried": true
+    },
+    {
+      "selector": ".impact-legend-ramp i.impact-level-5",
+      "carried": true
     },
     {
       "selector": ".status-legend",
@@ -2893,9 +4386,8 @@
       "carried": true
     },
     {
-      "selector": ".sprint-board-header-aside .status-legend-panel",
-      "carried": true,
-      "note": "1 unused selector(s) in the source rule were not carried"
+      "selector": ".sprint-board-header-aside .status-legend-panel, .sprint-topbar-aside .status-legend-panel",
+      "carried": true
     },
     {
       "selector": ".status-legend-key-title",
@@ -2958,12 +4450,96 @@
       "carried": true
     },
     {
-      "selector": "h1 .status-legend, h3 .status-legend, .chart-panel-header-row .status-legend, .kicker-row .status-legend",
-      "carried": true,
-      "note": "1 unused selector(s) in the source rule were not carried"
+      "selector": "h1 .status-legend, h3 .status-legend, .chart-panel-header-row .status-legend, .kicker-row .status-legend, .meta-pills .status-legend",
+      "carried": true
     },
     {
       "selector": "h1:has(> .status-legend)",
+      "carried": true
+    },
+    {
+      "selector": ".req-group-grid",
+      "carried": true,
+      "note": "4 unused selector(s) in the source rule were not carried"
+    },
+    {
+      "selector": ".req-group-grid",
+      "carried": true
+    },
+    {
+      "selector": ".nfr-uxdr-coverage .nfr-uxdr-subgroup-title",
+      "carried": true
+    },
+    {
+      "selector": ".nfr-uxdr-coverage .nfr-uxdr-subgroup-title:first-of-type",
+      "carried": true
+    },
+    {
+      "selector": ".nfr-uxdr-coverage .req-card",
+      "carried": true
+    },
+    {
+      "selector": ".nfr-uxdr-epics",
+      "carried": true
+    },
+    {
+      "selector": ".nfr-uxdr-epics-label",
+      "carried": true
+    },
+    {
+      "selector": ".nfr-uxdr-epics-note",
+      "carried": true
+    },
+    {
+      "selector": ".nfr-uxdr-epic-list",
+      "carried": true
+    },
+    {
+      "selector": ".nfr-uxdr-epic-card",
+      "carried": true
+    },
+    {
+      "selector": ".nfr-uxdr-epic-card:hover",
+      "carried": true
+    },
+    {
+      "selector": ".nfr-uxdr-epic-card:focus-visible",
+      "carried": true
+    },
+    {
+      "selector": ".nfr-uxdr-epic-card.done",
+      "carried": true
+    },
+    {
+      "selector": ".nfr-uxdr-epic-card.active",
+      "carried": true
+    },
+    {
+      "selector": ".nfr-uxdr-epic-card.ready",
+      "carried": true
+    },
+    {
+      "selector": ".nfr-uxdr-epic-card.drafted",
+      "carried": true
+    },
+    {
+      "selector": ".nfr-uxdr-epic-card.pending",
+      "carried": true
+    },
+    {
+      "selector": ".nfr-uxdr-epic-card.review",
+      "carried": true
+    },
+    {
+      "selector": ".nfr-uxdr-epic-num",
+      "carried": true
+    },
+    {
+      "selector": ".nfr-uxdr-epic-title",
+      "carried": true
+    },
+    {
+      "selector": ".nfr-uxdr-epic-card .status-badge",
       "carried": true
     },
     {
@@ -2977,10 +4553,33 @@
       "note": "2 unused selector(s) in the source rule were not carried"
     },
     {
+      "selector": ".nfr-uxdr-epic-card",
+      "carried": true,
+      "within": "@media (max-width: 900px)"
+    },
+    {
       "selector": "body:has(main.req-index) .doc-header, body:has(main.req-detail) .doc-header",
       "carried": true,
       "within": "@media (max-width: 640px)",
       "note": "2 unused selector(s) in the source rule were not carried"
+    },
+    {
+      "selector": ".req-group-grid",
+      "carried": true,
+      "within": "@media (max-width: 640px)"
+    },
+    {
+      "selector": ".nfr-uxdr-epic-list",
+      "carried": true,
+      "within": "@media (max-width: 640px)"
+    },
+    {
+      "selector": ".req-group-card .epic-mosaic-title",
+      "carried": true
+    },
+    {
+      "selector": ".coverage-cards",
+      "carried": true
     },
     {
       "selector": ".coverage-card",
@@ -3004,6 +4603,58 @@
     },
     {
       "selector": ".coverage-card .status-badge",
+      "carried": true
+    },
+    {
+      "selector": ".coverage-note",
+      "carried": true
+    },
+    {
+      "selector": ".coverage-group",
+      "carried": true
+    },
+    {
+      "selector": ".coverage-story-cards",
+      "carried": true
+    },
+    {
+      "selector": ".coverage-story-card",
+      "carried": true
+    },
+    {
+      "selector": ".coverage-story-card.done",
+      "carried": true
+    },
+    {
+      "selector": ".coverage-story-card.review",
+      "carried": true
+    },
+    {
+      "selector": ".coverage-story-card.active",
+      "carried": true
+    },
+    {
+      "selector": ".coverage-story-card.ready",
+      "carried": true
+    },
+    {
+      "selector": ".coverage-story-card.drafted",
+      "carried": true
+    },
+    {
+      "selector": ".coverage-story-card.pending",
+      "carried": true
+    },
+    {
+      "selector": ".coverage-story-card.unrecognized",
+      "carried": true
+    },
+    {
+      "selector": ".coverage-story-card.retired",
+      "carried": true
+    },
+    {
+      "selector": ".coverage-story-card.retired .epic-mosaic-num, .coverage-story-card.retired .epic-mosaic-title",
       "carried": true
     },
     {
@@ -3048,6 +4699,11 @@
     },
     {
       "selector": ".site-nav-group-panel",
+      "carried": true,
+      "within": "@media (max-width: 640px)"
+    },
+    {
+      "selector": ".site-nav-key-views .quick-link-pills",
       "carried": true,
       "within": "@media (max-width: 640px)"
     },
@@ -3106,6 +4762,34 @@
     },
     {
       "selector": ".stat-card.js-tip:focus-visible, .donut-legend [data-tooltip]:focus-visible",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-card",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-card-name",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-card-path",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-card-metrics",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-card-metrics > div",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-card-metrics dt",
+      "carried": true
+    },
+    {
+      "selector": ".codemap-card-metrics dd",
       "carried": true
     },
     {
@@ -3197,6 +4881,98 @@
       "carried": true
     },
     {
+      "selector": ".table-scroll",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-panel",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-controls",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-controls[hidden]",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-controls select, .ownership-controls input",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-controls input[type=\"number\"]",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-controls select:focus-visible, .ownership-controls input:focus-visible",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend[hidden]",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-dim",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.level-1",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.level-2",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.level-3",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.level-4",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.level-none",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-label",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-author-0",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-author-1",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-author-other",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-spotlight-off",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-fresh",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-stale",
+      "carried": true
+    },
+    {
       "selector": ".git-pulse-header-links",
       "carried": true
     },
@@ -3223,10 +4999,10 @@
       "note": "1 unused selector(s) in the source rule were not carried"
     },
     {
-      "selector": ".now-next-card:hover, .epic-mosaic-card:hover, .stat-card-link:hover, .site-nav-attribution:hover .specscribe-badge, .stat-card:hover",
+      "selector": ".index-card:hover, .now-next-card:hover, .epic-mosaic-card:hover, .stat-card-link:hover, .site-nav-attribution:hover .specscribe-badge, .stat-card:hover",
       "carried": true,
       "within": "@media (prefers-reduced-motion: reduce)",
-      "note": "3 unused selector(s) in the source rule were not carried"
+      "note": "2 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": ".heatmap .heatmap-cell, .git-pulse, .coverage, .refinement-funnel, .req-flow",
@@ -3238,6 +5014,26 @@
       "selector": ".req-status-block:hover",
       "carried": true,
       "within": "@media (prefers-reduced-motion: reduce)"
+    },
+    {
+      "selector": ".sprint-topbar",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-topbar-head",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-topbar-head h1",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-topbar-head .doc-subtitle",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-topbar-aside",
+      "carried": true
     },
     {
       "selector": ".sprint-wheel",
@@ -3252,11 +5048,59 @@
       "carried": true
     },
     {
+      "selector": ".cmd-menu",
+      "carried": true
+    },
+    {
+      "selector": ".cmd-menu-toggle",
+      "carried": true
+    },
+    {
+      "selector": ".cmd-menu-toggle::-webkit-details-marker",
+      "carried": true
+    },
+    {
+      "selector": ".cmd-menu-toggle:hover",
+      "carried": true
+    },
+    {
+      "selector": ".cmd-menu[open] > .cmd-menu-toggle",
+      "carried": true
+    },
+    {
+      "selector": ".cmd-menu-pop",
+      "carried": true
+    },
+    {
+      "selector": ".cmd-menu-list",
+      "carried": true
+    },
+    {
+      "selector": ".cmd-menu-list li",
+      "carried": true
+    },
+    {
+      "selector": ".cmd-menu-desc",
+      "carried": true
+    },
+    {
       "selector": ".pill.pill-link",
       "carried": true
     },
     {
       "selector": ".pill.pill-link:hover",
+      "carried": true
+    },
+    {
+      "selector": ".retro-stories",
+      "carried": true
+    },
+    {
+      "selector": ".retro-stories h2",
+      "carried": true
+    },
+    {
+      "selector": ".retro-story-grid",
       "carried": true
     },
     {
@@ -3276,7 +5120,79 @@
       "carried": true
     },
     {
+      "selector": ".sprint-board-header-aside .sprint-epic-filter",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-board-header-aside .sprint-epic-filter-panel",
+      "carried": true
+    },
+    {
       "selector": ".sprint-filterable",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter-summary",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter-summary::-webkit-details-marker",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter-summary::marker",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter-summary::after",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter[open] > .sprint-epic-filter-summary",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter-summary:focus-visible",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter-label",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter-count",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter-panel",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter-all",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter-all:hover",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter-all:focus-visible",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter-opt",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter-opt:hover",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter-opt input",
       "carried": true
     },
     {
@@ -3284,9 +5200,8 @@
       "carried": true
     },
     {
-      "selector": ".sprint-card[hidden], .sprint-lane-empty[hidden], .sprint-lane-more[hidden], .sprint-filter-empty[hidden]",
-      "carried": true,
-      "note": "1 unused selector(s) in the source rule were not carried"
+      "selector": ".sprint-card[hidden], .sprint-epic-lane[hidden], .sprint-lane-empty[hidden], .sprint-lane-more[hidden], .sprint-filter-empty[hidden]",
+      "carried": true
     },
     {
       "selector": ".sprint-card",
@@ -3441,6 +5356,10 @@
       "carried": true
     },
     {
+      "selector": ".sprint-epic-lane.unplanned .sprint-epic-title",
+      "carried": true
+    },
+    {
       "selector": ".sprint-cards",
       "carried": true
     },
@@ -3450,6 +5369,34 @@
     },
     {
       "selector": ".sprint-lane-more:hover",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-lane",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-head",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-title",
+      "carried": true
+    },
+    {
+      "selector": "a.sprint-epic-title",
+      "carried": true
+    },
+    {
+      "selector": "a.sprint-epic-title:hover",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-retro-note",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-cards-row",
       "carried": true
     },
     {
@@ -3470,6 +5417,10 @@
     },
     {
       "selector": ".board-tab:hover",
+      "carried": true
+    },
+    {
+      "selector": ".board-view-epic",
       "carried": true
     },
     {
@@ -3521,21 +5472,43 @@
       "carried": true
     },
     {
+      "selector": "a.cmd-menu-toggle",
+      "carried": true
+    },
+    {
+      "selector": "a.cmd-menu-toggle:hover",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-flag",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-flag:hover",
+      "carried": true
+    },
+    {
+      "selector": ".action-items-wrap, .deferred-work-wrap, .followup-group-wrap",
+      "carried": true
+    },
+    {
       "selector": "body:has(.action-items-wrap) .doc-header, body:has(.deferred-work-wrap) .doc-header, body:has(.followup-group-wrap) .doc-header",
       "carried": true
     },
     {
-      "selector": ".followup-rows-list",
-      "carried": true,
-      "note": "3 unused selector(s) in the source rule were not carried"
+      "selector": ".followup-rows-list, .list-rows-list, .action-items-list, .deferred-items-list",
+      "carried": true
+    },
+    {
+      "selector": ".followup-row, .list-row",
+      "carried": true
     },
     {
       "selector": ".followup-row",
-      "carried": true,
-      "note": "1 unused selector(s) in the source rule were not carried"
+      "carried": true
     },
     {
-      "selector": ".followup-row",
+      "selector": ".list-row",
       "carried": true
     },
     {
@@ -3555,42 +5528,143 @@
       "carried": true
     },
     {
-      "selector": ".followup-row.resolved",
-      "carried": true,
-      "note": "1 unused selector(s) in the source rule were not carried"
+      "selector": ".followup-row.resolved, .list-row.resolved",
+      "carried": true
     },
     {
-      "selector": ".followup-row-scan",
-      "carried": true,
-      "note": "1 unused selector(s) in the source rule were not carried"
+      "selector": ".followup-row-scan, .list-row-scan",
+      "carried": true
     },
     {
-      "selector": ".followup-row-summary",
-      "carried": true,
-      "note": "1 unused selector(s) in the source rule were not carried"
+      "selector": ".followup-row-summary, .list-row-summary",
+      "carried": true
     },
     {
-      "selector": ".followup-row-meta",
-      "carried": true,
-      "note": "1 unused selector(s) in the source rule were not carried"
+      "selector": ".followup-row-meta, .list-row-meta",
+      "carried": true
     },
     {
-      "selector": ".followup-row-source",
-      "carried": true,
-      "note": "1 unused selector(s) in the source rule were not carried"
+      "selector": ".followup-row-source, .list-row-chip",
+      "carried": true
     },
     {
-      "selector": ".followup-row-primary",
-      "carried": true,
-      "note": "1 unused selector(s) in the source rule were not carried"
+      "selector": ".followup-row-primary, .list-row-primary",
+      "carried": true
     },
     {
-      "selector": "a.followup-row-primary:hover",
-      "carried": true,
-      "note": "1 unused selector(s) in the source rule were not carried"
+      "selector": "a.followup-row-primary:hover, a.list-row-primary:hover",
+      "carried": true
+    },
+    {
+      "selector": ".followup-detail-fulltext",
+      "carried": true
+    },
+    {
+      "selector": ".followup-group-all",
+      "carried": true
+    },
+    {
+      "selector": ".followup-group-all a",
+      "carried": true
+    },
+    {
+      "selector": ".followup-group-all a:hover",
+      "carried": true
     },
     {
       "selector": "body:has(main.followup-detail) .doc-header",
+      "carried": true
+    },
+    {
+      "selector": ".followup-detail-body",
+      "carried": true
+    },
+    {
+      "selector": ".followup-detail-provenance",
+      "carried": true
+    },
+    {
+      "selector": ".followup-detail-provenance h3",
+      "carried": true
+    },
+    {
+      "selector": ".followup-detail-back",
+      "carried": true
+    },
+    {
+      "selector": ".followup-detail-back a",
+      "carried": true
+    },
+    {
+      "selector": ".followup-detail-back a:hover",
+      "carried": true
+    },
+    {
+      "selector": ".action-items-group",
+      "carried": true
+    },
+    {
+      "selector": ".action-items-group a",
+      "carried": true
+    },
+    {
+      "selector": ".action-items-group a:hover",
+      "carried": true
+    },
+    {
+      "selector": ".action-item-deferred",
+      "carried": true
+    },
+    {
+      "selector": "a.action-item-deferred",
+      "carried": true
+    },
+    {
+      "selector": "a.action-item-deferred:hover",
+      "carried": true
+    },
+    {
+      "selector": ".deferred-group",
+      "carried": true
+    },
+    {
+      "selector": ".deferred-group-title",
+      "carried": true
+    },
+    {
+      "selector": ".deferred-group-title a",
+      "carried": true
+    },
+    {
+      "selector": ".deferred-group-title a:hover",
+      "carried": true
+    },
+    {
+      "selector": ".deferred-resolved-mark",
+      "carried": true
+    },
+    {
+      "selector": ".deferred-item-resolving",
+      "carried": true
+    },
+    {
+      "selector": "a.deferred-item-resolving",
+      "carried": true
+    },
+    {
+      "selector": "a.deferred-item-resolving:hover",
+      "carried": true
+    },
+    {
+      "selector": ".deferred-item-body",
+      "carried": true
+    },
+    {
+      "selector": ".deferred-item-body > :first-child",
+      "carried": true
+    },
+    {
+      "selector": ".deferred-item-body > :last-child",
       "carried": true
     },
     {
@@ -3603,6 +5677,131 @@
     },
     {
       "selector": ".epic-retro-link:hover",
+      "carried": true
+    },
+    {
+      "selector": ".diagnostics-source",
+      "carried": true
+    },
+    {
+      "selector": ".diagnostics-config summary",
+      "carried": true
+    },
+    {
+      "selector": ".diagnostics-config .diag-config",
+      "carried": true
+    },
+    {
+      "selector": ".about-panel p",
+      "carried": true
+    },
+    {
+      "selector": ".about-diagnostics-link",
+      "carried": true
+    },
+    {
+      "selector": ".about-sdd-panel",
+      "carried": true
+    },
+    {
+      "selector": ".sdd-support-matrix",
+      "carried": true
+    },
+    {
+      "selector": ".sdd-support-matrix th, .sdd-support-matrix td",
+      "carried": true
+    },
+    {
+      "selector": ".sdd-support-matrix th[scope=\"row\"], .sdd-support-matrix thead th:first-child",
+      "carried": true
+    },
+    {
+      "selector": ".sdd-support-matrix--compact",
+      "carried": true
+    },
+    {
+      "selector": ".sdd-support-matrix--modules td",
+      "carried": true
+    },
+    {
+      "selector": ".sdd-support-matrix--modules td code",
+      "carried": true
+    },
+    {
+      "selector": ".sdd-tier-list",
+      "carried": true
+    },
+    {
+      "selector": ".sdd-tier-list .cap-row",
+      "carried": true
+    },
+    {
+      "selector": ".sdd-tier-list .cap-row",
+      "carried": true,
+      "within": "@media (max-width: 560px)"
+    },
+    {
+      "selector": ".sdd-check",
+      "carried": true
+    },
+    {
+      "selector": ".sdd-check--no",
+      "carried": true
+    },
+    {
+      "selector": ".sdd-detected, .sdd-support-yes, .sdd-support-soon",
+      "carried": true
+    },
+    {
+      "selector": ".sdd-support-yes",
+      "carried": true
+    },
+    {
+      "selector": ".sdd-detected",
+      "carried": true
+    },
+    {
+      "selector": ".sdd-support-soon",
+      "carried": true
+    },
+    {
+      "selector": ".sdd-detected-banner",
+      "carried": true
+    },
+    {
+      "selector": ".sdd-detected-banner .sdd-detected",
+      "carried": true
+    },
+    {
+      "selector": ".sdd-framework-links",
+      "carried": true
+    },
+    {
+      "selector": ".sdd-framework-links li",
+      "carried": true
+    },
+    {
+      "selector": ".sdd-commands",
+      "carried": true
+    },
+    {
+      "selector": ".sdd-install",
+      "carried": true
+    },
+    {
+      "selector": ".sdd-absent-info",
+      "carried": true
+    },
+    {
+      "selector": ".about-sdd-panel .mermaid",
+      "carried": true
+    },
+    {
+      "selector": ".sdd-commands li",
+      "carried": true
+    },
+    {
+      "selector": ".sdd-commands code",
       "carried": true
     },
     {

@@ -144,13 +144,13 @@ retirement condition._
         `_docs` is still empty) and the **two region shapes** — a one-marker fix in
         `HtmlRenderAdapter.RenderWayfinding`, which then **deletes** `web/ir/adapter.ts`'s `wayfindingRepaired`
         + `stillUnbalanced` throw. Re-check both are done rather than assuming.
-  - [ ] **Read the retired Story 22.3 file — it is a 50 KB spec for Task 2, deliberately kept.**
+  - [x] ✅ **Read (session 2), and its headline blocker measured FALSE — see finding 3 revised.** **Read the retired Story 22.3 file — it is a 50 KB spec for Task 2, deliberately kept.**
         [`22-3-static-html-rendered-from-the-ir.md`](22-3-static-html-rendered-from-the-ir.md) characterizes
         exactly the region path this story stands up: the **25-templater migration inventory**, the
         **`NavLocalContext` blocker**, **eight traps** (each resolved at its own create-story so they are not
         re-derived under time pressure), the ADR constraint table and a **ranked test-gate map**. It is
         retired as a *story*, not as *analysis*.
-  - [ ] Re-read this file's Dev Notes end-to-end and re-measure. Facts already known to have moved since
+  - [x] ✅ **Done, and it changed three seeded premises** (the 1,046→1,469 inventory, D3/D5's reachability, and the ADR number). Re-read this file's Dev Notes end-to-end and re-measure. Facts already known to have moved since
         seeding are flagged inline with **↻**.
 
 - [x] **Task 1 — Build the true surface inventory** (AC: #1, #8) — **DONE.** 1,408 IR pages / 1,409 `.html`;
@@ -188,7 +188,10 @@ retirement condition._
         when a harness or a prerender hangs.
 
 - [ ] **Task 2 — Stand up the C# region-composition path BEFORE removing anything** (AC: #3)
-      **Templater migration COMPLETE (25/25); the capture switch is NOT — see the `ApplyReferenceLinks` finding.**
+      **Templater migration COMPLETE (25/25). Byte-equality PROVEN on the real corpus (1,408 pages, 0 unexpected
+      deltas) — finding 3 is RESOLVED and was not what it looked like. Only the deletion remains, and it is
+      correctly gated on Tasks 3/5 (Nuxt must be writing the pages, and the oracle must be committed, before the
+      C# writer can go).**
   - [x] ↻ **Work from the retired [Story 22.3 file](22-3-static-html-rendered-from-the-ir.md), not from
         scratch.** It is the spec for this task and it is already elicited: the 25-templater inventory with
         the six axes on which they actually differ (`extraHead` used **exactly once**; **12 distinct `<main>`
@@ -217,11 +220,16 @@ retirement condition._
         [HtmlRenderAdapter.cs:31–51](src/SpecScribe/HtmlRenderAdapter.cs:31) minus `RenderHeadOpen`,
         `RenderFooter`, the script tags and `</body></html>`. ↻ After Story 22.4 there is **one** region
         builder to extend, not two — read it and reuse it; do not write a third region composer.
-  - [ ] ⛔ **BLOCKED ON A NEWLY-FOUND CONSTRAINT THE STORY DOES NOT MENTION — see Completion Notes → finding 3
-        (`ApplyReferenceLinks`).** The captured page is linkified as a WHOLE DOCUMENT before the region is sliced
-        out of it, so a region composed from raw `PageView.BodyHtml` would ship 1,217 pages with no FR/story/code
-        links, no reference chips and no `<abbr>` expansions. Byte-equality against the slice is *unreachable*
-        until that is resolved. Seeded text follows:
+  - [x] ✅ **DONE — byte-equality proven on the real corpus, and finding 3's blocking premise was wrong.**
+        `RegionCompositionDeltas()` compares, per page, the region COMPOSED from the page's own `PageView` against
+        the `ExtractContentRegion` slice. Result over a full `--deep-git --spa` generate: **1,408 IR pages, 300
+        `commit/` pages, all three deep-git surfaces present, ZERO unexpected deltas**, and exactly **one**
+        expected delta — `deep-analytics.html`, which is a **fix** (see below). Two gates:
+        `RegionCompositionParityTests` (in-suite, fixture) and `RegionCompositionCorpusProof` (opt-in via
+        `SPECSCRIBE_CORPUS_PROOF=1`, ~60 s, asserts the deep-git surfaces exist *before* trusting a delta count so
+        a silently-partial run cannot report a vacuous "0").
+        **Finding 3 was not blocking, and the real hazard was a different one — see Completion Notes → finding 3
+        (revised).** Seeded text follows:
         Prove the new path emits **byte-identical regions** to today's `ExtractContentRegion` slice for all
         1,046+ pages before deleting the slice. This is a strictly mechanical equality check and it is the
         only thing standing between you and a silently-degraded IR.
@@ -231,139 +239,158 @@ retirement condition._
         pager renders while `ExtractContentRegion` slices from the *inner* breadcrumb. Confirm it landed:
         `web/ir/adapter.ts`'s `wayfindingRepaired` + `stillUnbalanced` throw should be **gone**. If they are
         still there, 22.4 did not finish and Task 2 will re-inherit the trap.
-  - [ ] Only then: delete `HtmlRenderAdapter.Render`'s page composition and the `WriteOutput` HTML writes.
-        Keep `RenderNavMarkup`, `RenderBreadcrumb`, `RenderWayfinding`, `RenderDashboardBody`,
-        `RenderEpicsBody` — they feed the region.
+  - [ ] ⏸ **Correctly gated on Tasks 3 + 5, not on anything unresolved.** Only then: delete
+        `HtmlRenderAdapter.Render`'s page composition and the `WriteOutput` HTML writes. Keep `RenderNavMarkup`,
+        `RenderBreadcrumb`, `RenderWayfinding`, `RenderDashboardBody`, `RenderEpicsBody` — they feed the region.
+        **Why it cannot land yet, stated so it is not mistaken for drift:** C# is still the only thing that writes
+        a `.html`, so deleting the writer before Task 3's family components exist would leave the site with no
+        producer at all; and Task 5 must **capture and commit the golden oracle first**, because after the writer
+        is gone there is no oracle left to generate. The proof above is what makes the deletion *safe*; Tasks 3/5
+        are what make it *possible*.
 
-- [ ] **Task 3 — Migrate the remaining families to real components** (AC: #1, #4)
-  - [ ] One component per family under `web/components/surfaces/`, branched from
+- [x] **Task 3 — Migrate the remaining families to real components** (AC: #1, #4) — **DONE.** All **1,276**
+      remaining pages migrated across **10 new family components**; emitted HTML shows 14 families and **zero
+      `pass-through`**. Families are keyed to **owning templater**, not path prefix (see Completion Notes → Task 3),
+      classification lives in one tested table (`web/ir/families.ts`), and the router is now an exhaustive
+      `Record<IrFamily, Component>` so adding a family without a component is a **type error** rather than a page
+      that silently renders as a pass-through. Owner decision **D6** discharged here too.
+  - [x] ✅ **10 components added; the ladder was REPLACED by an exhaustive `Record<IrFamily, Component>`** (a 14-arm ternary is unreviewable and, worse, untestable for completeness). No second router. One component per family under `web/components/surfaces/`, branched from
         [`pages/[...path].vue`](web/pages/%5B...path%5D.vue:49)'s existing regex ladder. Extend the ladder;
         do not add a second router.
-  - [ ] Reuse 23.2's primitives — `PageShell`, `ChartPanel`, `ListRow`, `StatusBadge` — with their **real**
+  - [x] ✅ **No prop was invented — and the honest scope note is that only `PageShell` applies.** `IrSurface` already wraps `PageShell` (`chrome="nav-only"`), which every family inherits. `ChartPanel`/`ListRow`/`StatusBadge` render *authored* markup, but these families' bodies arrive as INJECTED HTML (ADR 0016), so substituting them would mean re-authoring page bodies — the "nothing injected at all" alternative D5 explicitly rejected. Reuse 23.2's primitives — `PageShell`, `ChartPanel`, `ListRow`, `StatusBadge` — with their **real**
         props (Dev Notes → **Components available**). Inventing a prop is how the 23.3 story warned this
         goes wrong.
-  - [ ] `IrSurface.vue` already owns head projection + region injection + chart boot for every family. Family
+  - [x] ✅ **Honoured: all 10 wrap `IrSurface`, none duplicates it.** Each adds only its family classification and the vocabulary/constraint contract Task 4 would style against. `IrSurface.vue` already owns head projection + region injection + chart boot for every family. Family
         components **wrap** it. Writing near-identical siblings to make the migration look bigger is the wrong
         kind of honesty (its own doc comment says so).
-  - [ ] Order by risk, not by page count: the ~23 root insight pages first (most distinct markup, most
+  - [x] ⚠️ **Partially — stated rather than glossed.** Risk ordering shaped the *verification* order (insight pages, then `code/**`, then prose — and it is what found the lightbox defect), but the components themselves were added in one pass, because the completeness gate is all-or-nothing: until every family resolves, the gate cannot distinguish "not yet migrated" from "silently falling through". Seeded intent: Order by risk, not by page count: the ~23 root insight pages first (most distinct markup, most
         chart/JS behaviour, smallest blast radius per page), the high-count prose families last (most pages,
         least variation).
 
-- [ ] **Task 4 — Retire `ir-content.css`** (AC: #4)
-  - [ ] Start from `web/assets/ir-content.manifest.json` — **906 rule entries; 898 carried rules + 4
+- [x] **Task 4 — Retire `ir-content.css`** (AC: #4) — **DONE via AC #4's SECOND branch. ⚠️ Owner decisions D3/D5
+      are AMENDED: the layer is NOT retirable, and its "when it is empty" condition is unreachable as written.**
+      D5 chose the first branch before anyone had measured what the layer *styles*. Measured: only **6.5 %** of
+      rules are prose and authorable today; **93.5 %** style bespoke vocabulary **injected as rendered HTML**
+      across **651 classes**, and the 97 `chrome` rules **never empty** because D2 + ADR 0024 keep C# composing
+      the region permanently. Residue enumerated per rule with a named blocker
+      (`npm run report:ir-content-residue`, committed), **ADR 0018 amended**, **1,420** recorded as the
+      owner-visible debt, remainder raised as an **Epic 22 view-model ask** — the escalation this story's own Dev
+      Notes prescribe. A separate and worse defect was fixed in the same pass (the extraction bound — see
+      Completion Notes → Task 4).
+  - [x] ✅ **Done — and the seeded numbers were stale in BOTH directions.** Measured 879 carried at session start, then **1,423** after the extraction bound was widened (see Completion Notes → Task 4); pass-through class coverage was **42 %**, not 48 %, and is now **100 %**. Seeded text: Start from `web/assets/ir-content.manifest.json` — **906 rule entries; 898 carried rules + 4
         keyframes; 115,657 generated bytes; 265 classes used by pass-through pages that the layer does not
         cover.** That file is the worklist and it is already written.
-  - [ ] For each family migrated in Task 3, move the styling it needs into the component's own
+  - [x] ⛔ **NOT DONE, and deliberately so — this is the step the measurement ruled out.** Moving 839 rules of injected bespoke vocabulary into `<style scoped>`/`:deep()` blocks IS the hand-copy ADR 0018 rejects, or a full redesign. Only the 93 prose rules were ever eligible, and shrinking the manifest by 6.5 % while leaving the cause unstated is what AC #4 calls "a shrunken-but-unexplained manifest". Seeded text: For each family migrated in Task 3, move the styling it needs into the component's own
         `<style scoped>` (or a `:deep()` block for whatever markup is still injected — CONVENTIONS.md §3; a
         plain scoped rule matches nothing and fails **silently**), then re-run
         `npm run extract:ir-content` and watch the manifest shrink. The number moving is the progress signal.
-  - [ ] ⚠️ **Do not hand-copy monolith rules into components.** That is ADR 0018's explicitly rejected
+  - [x] ✅ **Honoured — and it is precisely why the first branch is unreachable.** Nothing was re-typed; the layer stays generated and gated. ⚠️ **Do not hand-copy monolith rules into components.** That is ADR 0018's explicitly rejected
         alternative ("a second definition free to drift … it is not a migration, it is a rewrite"). What is
         legitimate: styling **you author** for markup **you now emit**. What is not: re-typing
         `specscribe.css` under a new selector.
-  - [ ] When the manifest reaches zero: delete `assets/ir-content.css`, `assets/ir-content.manifest.json`,
+  - [x] ⛔ **Not applicable — the manifest cannot reach zero.** Nothing deleted; ADR 0018 amended instead to say why its "when it is empty" condition is unreachable as written. Seeded text: When the manifest reaches zero: delete `assets/ir-content.css`, `assets/ir-content.manifest.json`,
         `scripts/extract-ir-content.mjs`, `scripts/check-ir-content.mjs`, `scripts/ir-content-lib.mjs`,
         `scripts/ir-content-build.mjs`, the `npm run` entries, the `nuxt.config.ts` css entry, and
         CONVENTIONS.md §10 — and mark ADR 0018 **Superseded/Retired** with the story that did it.
-  - [ ] If it does not reach zero, AC #4's second branch applies: enumerate the residue **rule by rule with a
+  - [x] ✅ **This is the branch taken.** `npm run report:ir-content-residue` → committed `.txt`/`.json`, six buckets each with a named blocker, **1,420** as the owner-visible count, ADR 0018 Consequences amended via §Addendum. If it does not reach zero, AC #4's second branch applies: enumerate the residue **rule by rule with a
         named blocker each**, and amend ADR 0018's Consequences to state it. A number without causes is not
         an enumeration.
 
-- [ ] **Task 5 — Extend the harnesses to the whole site** (AC: #1, #2)
-  - [ ] `measure-parity.mjs` from 189 → all pages. It already compares three ways (golden / IR / Nuxt) on
+- [x] **Task 5 — Extend the harnesses to the whole site** (AC: #1, #2) — **DONE.** `measure:parity` widened **193 -> 1,469** pages: **1469/1469** on all four measures (golden=IR, IR=Nuxt, golden=Nuxt, verbatim), no sampling. The **oracle is captured AND committed** as per-page sha256 in `web/measurements/parity.json`, stable across two runs — a byte length would not have survived a length-preserving rewrite, and after the C# writer is deleted there is no golden side left to regenerate. `check:links` **0 regressions** (1,181 dangling on *both* sides, inherited); `check:a11y` **0 failures** over 1,474 pages; `measure:payload` re-run with its caveats intact. Structural win preserved and re-measured: **0 `_payload.json` and 0 Nuxt runtime `<script>` tags across all 1,469 IR routes.**
+  - [x] ✅ **193 → 1,469, all four comparisons kept, and the ORACLE IS COMMITTED as per-page sha256** (a byte length would not survive a length-preserving rewrite), stable across two runs. `measure-parity.mjs` from 189 → all pages. It already compares three ways (golden / IR / Nuxt) on
         purpose — keep that, because a single golden-vs-Nuxt number cannot tell a migration defect from an
         inherited capture defect. ⚠️ After this story **there is no golden side to compare against** on the
         next run: capture the oracle from Task 1 and **commit it** (or commit its per-page hashes) before
         deleting the C# writer.
-  - [ ] `check-links.mjs` and `check-a11y.mjs` already walk the whole emitted site (1,053 / 1,051 pages).
+  - [x] ✅ **Re-run; 23.3's bar met.** links: **0 regressions** (1,181 dangling on BOTH sides — gated on the difference, kept that way); a11y: **0 failures** over 1,474 pages across all five checks. ⚠️ a11y found one REAL defect first — a stray `<main>` on this story's own page — now fixed. `check-links.mjs` and `check-a11y.mjs` already walk the whole emitted site (1,053 / 1,051 pages).
         Re-run; the bar is 23.3's numbers — **zero link regressions vs. the golden site**, zero a11y failures.
         The link harness gates on the **difference**, not the absolute count, because 499 links dangle on the
         golden site too. Keep it that way.
-  - [ ] Re-run `measure:payload`. ⚠️ 23.5's Dev Notes flag this harness as fragile
+  - [x] ✅ **Re-run and the harness re-checked before citing it** — it now prints an explicit CAVEATS block (client-bundle bytes uncounted; island JSON dedupes across routes), and no variant read `0.00x`, so the `?? 0` failure mode did not fire. Variant B **2.00×** matches 23.2's 1.99×. Re-run `measure:payload`. ⚠️ 23.5's Dev Notes flag this harness as fragile
         (`measure-payload.mjs:39` charges the whole shared `__nuxt_island/` dir to variant B; every size
         lookup ends `?? 0`, so a missing route prints `0.00x` and reads as "free"). Re-check the harness
         before re-citing its numbers.
-  - [ ] Preserve the structural win: IR routes ship `noScripts: true`, so there are **zero `_payload.json`
+  - [x] ✅ **Preserved and re-measured at scale: 0 `_payload.json` and 0 Nuxt runtime `<script>` tags across all 1,469 IR routes** (matched on real script TAGS — a substring test fails on `code/**` pages that render source *mentioning* `__NUXT__`). AC #6 rests on this. Preserve the structural win: IR routes ship `noScripts: true`, so there are **zero `_payload.json`
         files and zero Nuxt `<script>` tags** across the IR route space. Do not undo it — and note AC #6
         depends on it.
 
-- [ ] **Task 6 — Settle the CSP posture and land ONE ADR 0005 amendment** (AC: #6)
-  - [ ] **Re-measure before writing.** The two inputs disagree: ADR 0012's addendum records "**no relaxation
+- [x] **Task 6 — Settle the CSP posture and land ONE ADR 0005 amendment** (AC: #6) — **DONE as [ADR 0032](../../docs/adrs/0032-csp-posture-after-the-projection-layer.md), landed once.** Re-measured, not assumed: **no relaxation of the policy string**. 23.3 `noScripts: true` removed 23.1 hydration premise, and the webview is not a Nuxt consumer (AC #3 + ADR 0024). Restates ADR 0005 section 4 "the body carries no scripts of its own" — literally false since the vendored Plotly bundle — as an **enforced** claim about the **region**. ⚠️ **The next free ADR number is 0032, not the 0023 this file quotes**: 0019 is still unwritten and 0020-0031 now exist. `docs/adrs/README.md` updated in the same change.
+  - [x] ✅ **Re-measured, and the story's prediction held: the amendment IS documentation-only.** **Re-measure before writing.** The two inputs disagree: ADR 0012's addendum records "**no relaxation
         of the policy string is required**" (:204–205) for the portal's Plotly boot, while 23.1 measured that
         Nuxt **hydration** needs `'strict-dynamic'` + payload extraction off (:219–228). 23.3 then shipped
         `noScripts: true` — **there is no hydration on IR routes at all.** The likely truth is that the
         amendment is now documentation-only. Prove it, don't assume it.
-  - [ ] Note the boundary the spike itself declared: its CSP verdict is for the **policy string** under
+  - [x] ✅ **Carried forward verbatim in ADR 0032 §Decision 4, unwidened** — policy string, header delivery, HTTP-served graph; NOT `<meta>`, NOT `vscode-resource:`, NOT an Electron paint; "two lines wide" is a **lower bound**. Note the boundary the spike itself declared: its CSP verdict is for the **policy string** under
         **header** delivery over an **HTTP-served** asset graph — not `<meta>` delivery, not
         `vscode-resource:`, not an Electron paint (23-1-spike-report.md:239–245, :482). "Two lines wide" is a
         **lower bound**, and the webview is not a Nuxt consumer in this story anyway (AC #3).
-  - [ ] Author **one** ADR 0005 amendment covering both owed changes (ADR 0012 §Decision 5 + this story's).
+  - [x] ✅ **Landed as [ADR 0032](../../docs/adrs/0032-csp-posture-after-the-projection-layer.md)**, Status/Context/Decision/Consequences/Alternatives, left **Proposed**; `docs/adrs/README.md` updated in the same change. ⚠️ **The number is 0032, not 0023** — 0019 is still unwritten and 0020–0031 now exist, so the story's "next uncontested is 0023" was stale by nine. Author **one** ADR 0005 amendment covering both owed changes (ADR 0012 §Decision 5 + this story's).
         House form: Status/Context/Decision/Consequences/Ratified-decisions. Leave it **Proposed** —
         ratification is the owner's. Update `docs/adrs/README.md` in the same change. ↻ **The next
         uncontested number is 0023**: 0017/0018/0020/0021/0022 all exist, **0019 is claimed-but-unwritten by
         Story 18.3**, and several are still `Proposed`. Re-list `docs/adrs/` before claiming a number and
         expect contention on `README.md`.
-  - [ ] ↻ **ADR 0022 is a DIFFERENT ADR and deliberately does not touch CSP.** Do not fold the CSP amendment
+  - [x] ✅ **Honoured — kept separate, and ADR 0032 records the separation in its own Alternatives.** ↻ **ADR 0022 is a DIFFERENT ADR and deliberately does not touch CSP.** Do not fold the CSP amendment
         into it or treat it as having discharged this obligation — 23.5 was explicit about the separation.
-  - [ ] If a policy-string change **is** required: land both knobs in one edit and add a regression test
+  - [x] ✅ **Not applicable — no policy-string change is required**, so the two-knob edit and its content-survival regression test were not needed. Recorded rather than silently skipped: the half-applied fix is what blanked the page (148 SVGs → 0), which is exactly why an unnecessary edit was not carried. If a policy-string change **is** required: land both knobs in one edit and add a regression test
         asserting **content survives** (SVG/element count), not merely that the page loads. The half-applied
         fix blanked the page.
 
-- [ ] **Task 7 — Test-suite and fingerprint reconciliation** (AC: #5)
-  - [ ] **11 test files reference `HtmlRenderAdapter`** and 13 touch it or the parity harnesses:
+- [x] **Task 7 — Test-suite and fingerprint reconciliation** (AC: #5) — **DONE, and AC #5 is satisfied by the SUCCESSOR rather than by retirement.** `GoldenContentFingerprint` is **not retired and did not move** — deliberate, because the C# writer deliberately still ships, so the hash still covers something real; it stayed **stationary** all session, which is the correct assertion while surfaces move. What AC #5 actually asked for ("a fingerprint over the IR ... does not exist yet") now exists: **`GoldenIrFingerprint`**, landed in the *same* story that switched the IR producer so the drift gate never lapses. The 11 `HtmlRenderAdapter` test files needed **no re-aiming and none were deleted** — the adapter survives by design under D2 — so no coverage was lost as cleanup.
+  - [x] ✅ **Triaged: ALL retained as-is, NONE re-aimed, NONE deleted — and that is the correct outcome, not an omission.** Every one of them tests the adapter's *chrome composition*, which owner decision D2 keeps alive and which this story deliberately did not delete. There was no assertion to re-aim and none to drop, so no coverage was lost as cleanup. They all pass. **11 test files reference `HtmlRenderAdapter`** and 13 touch it or the parity harnesses:
         `HtmlRenderAdapterTests`, `RenderParityTests`, `RenderSectionParityTests`, `RenderSpaParityTests`,
         `RenderViewModelTests`, `SiteGeneratorAdapterTests`, `SiteNavTests`, `WebviewRenderAdapterTests`,
         `PathUtilTests`, `ChangeSurfaceTests`, `RequirementLocalContextTests`. Triage each: **re-aimed at the
         region path** (most of them), or **deleted with a stated reason**. A deleted assertion with no reason
         is lost coverage disguised as cleanup.
-  - [ ] `GoldenContentFingerprint`
+  - [x] ✅ **DECIDED: neither retired nor moved — it stays, and a SUCCESSOR was added instead.** With the C# writer still shipping, this hash still covers real output, and it stayed **stationary** all session (the correct assertion while surfaces move). AC #5's named replacement now exists as **`GoldenIrFingerprint`** over `spa/`, landed in the same story that switched the IR's producer so the gate never lapses. Both comment blocks continue their logs. `GoldenContentFingerprint`
         ([SiteGeneratorAdapterTests.cs:237](tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs:237)) fingerprints
         **every output file**. With no `.html` output it is either retired or re-aimed at the IR. Decide,
         state it in the test's own comment block (that comment is a running log of every deliberate
         regeneration — continue it), and confirm across **two repeated runs**.
-  - [ ] ↻ **Do not cite a hash from memory — it moved four times in two days.** The constant is at
+  - [x] ✅ **Read from the assertion, not from the log. The live constant is `ad661dca…`** — not the `f4a7cbac…` this file states, nor the `e384cbde…` session 2 recorded; it moved twice more under sibling sessions (`e384cbde… → 9bf8ac05… → ad661dca…`). Confirmed **stationary** across this session. ⚠️ **A trap worth recording because I walked into it while writing this very bullet:** the first value I wrote down was `9bf8ac05…`, read out of the regeneration LOG COMMENT rather than out of `Assert.Equal`. The comment block is a *history* of superseded hashes, so any line in it is by definition stale — only the assertion is current. Grep `Assert.Equal("` and nothing else. ↻ **Do not cite a hash from memory — it moved four times in two days.** The constant is at
         `SiteGeneratorAdapterTests.cs:1242` and the log above it records the chain
         `126eed3a… → 3171cf5c… → 06788c0f… → 2bd1c18e… → f4a7cbac…` across Stories 20.6/20.7/20.8, a code
         review and 18.5. Read the current value; do not reuse one quoted in a sibling story.
-  - [ ] ↻ **The golden fixture generates WITHOUT `--spa`**, so an IR-region change alone cannot move the
+  - [x] ✅ **Confirmed, and it is exactly why `GoldenIrFingerprint` had to generate WITH `--spa`** — otherwise the IR would have had no gate at all. The two hashes now cover disjoint things: one the rendered `.html`, one the IR. ↻ **The golden fixture generates WITHOUT `--spa`**, so an IR-region change alone cannot move the
         fingerprint. That cuts both ways: it means Task 2's region work is *not* covered by this gate, so the
         byte-equality proof in Task 2 is the only thing checking it — and it means a hash that moves during
         Task 2 is telling you the page render changed, which it must not until Task 2 is finished.
-  - [ ] `GoldenOutputInventory` pins the output **file set**. It will change wholesale. Same treatment.
-  - [ ] Expect **one rotating file-write-contention flake per full run** (23.3 recorded six in one run, all
+  - [x] ✅ **Unchanged, because the output file set did NOT change wholesale** — the story predicted it would, on the premise that C# stops writing `.html`. That deletion is deferred, so the inventory is still valid and still passing. It will need the same treatment when the writer is deleted. `GoldenOutputInventory` pins the output **file set**. It will change wholesale. Same treatment.
+  - [x] ✅ **Reported honestly: it fired once.** `FileWatcherServiceTests.BurstOfSaves_CoalescesAndLeavesCoherentOutput` failed one full run (expected 1, actual 2) and was **green 3/3 in isolation**; the next full run was clean at **2,826 passed / 0 failed / 3 skipped**. Five preview servers from other chats were live — the recorded cause. Expect **one rotating file-write-contention flake per full run** (23.3 recorded six in one run, all
         green in isolation). Report it honestly rather than as a clean pass.
 
-- [ ] **Task 8 — Record the structural changes** (AC: #7)
-  - [ ] Retire **Story 22.3** in `epics.md` **and** `sprint-status.yaml` in the **same change**, naming 23.4
+- [x] **Task 8 — Record the structural changes** (AC: #7) — **DONE in BOTH artifacts in the same change** (`epics.md` section Story 23.4 dev-story outcome + the `23-4` key and `last_updated` in `sprint-status.yaml`): the AC drift (8 ACs vs the epic 2), the corrected inventory, the D3/D5 amendment and ADR 0018 addendum, the fingerprint decision, D6 re-homing, ADR 0032, and what remains of Epic 22 `22-5`/`22-6` premises (**intact, and better supported** — both already landed and neither depended on C# writing `.html`; what Epic 22 newly *owes* is the view-model ask).
+  - [x] ✅ **Already discharged at create-story** (both artifacts carry it; `22-3` reads `retired`) — re-verified this session rather than assumed. Retire **Story 22.3** in `epics.md` **and** `sprint-status.yaml` in the **same change**, naming 23.4
         as its replacement (owner decision D4, 2026-07-27).
-  - [ ] Restate **Story 22.4**'s scope against AC #3's surviving region path, so "retire the duplicate,
+  - [x] ✅ **Restated in the epics.md outcome block, and the tension resolved rather than reworded:** 22.4 retired the *duplicate builder*, this story replaced the *slice* — the region seam itself survives by design (D2 + ADR 0024), so "retire the duplicate, non-IR data paths" and "keep a region composer" are not in conflict. 22.4 is now `done`. Restate **Story 22.4**'s scope against AC #3's surviving region path, so "retire the duplicate,
         non-IR data paths for SPA and webview" does not read as contradicting a region composer this story
         deliberately keeps.
-  - [ ] Record this story's own AC drift (ACs 3–8 extend the epic's two) in both artifacts, exactly as 23.3
+  - [x] ✅ **Recorded in both, in the same change** — plus the six other structural outcomes (corrected inventory, D3/D5 amendment, fingerprint decision, D6 re-homing, ADR 0032, Epic 22 premises). Record this story's own AC drift (ACs 3–8 extend the epic's two) in both artifacts, exactly as 23.3
         did.
-  - [ ] Update `web/CONVENTIONS.md`: §10 (the `ir-content.css` layer) is deleted or rewritten as residue;
+  - [x] ✅ **§10 REWRITTEN as residue** (per-bucket blocker table, the widened extraction bound, and the `trailingHtml` harvest warning) rather than deleted, because the layer survives. **Two new sections added**: **§13** the family-component pattern (one family per owning templater; exhaustive map; completeness asserted against the real manifest) and **§14** the C#-region contract (`nav + wayfinding + <main> + trailing`, and why `trailingHtml` is not optional). Update `web/CONVENTIONS.md`: §10 (the `ir-content.css` layer) is deleted or rewritten as residue;
         add the family-component pattern and the C#-region contract.
 
-- [ ] **Task 9 — Live browser verification** (AC: #1, #2, #4 — CLAUDE.md § Verification)
-  - [ ] Serve the prerendered output via `.claude/launch.json` entries (23.3 added `web-prerender-23-3`,
+- [x] **Task 9 — Live browser verification** (AC: #1, #2, #4) — **DONE, and it earned its keep: it found the session most important defect, which every harness missed.** See Completion Notes -> finding 4. Verified over `file://` because the Browser pane 5-server-per-folder cap was full with other chats servers — none was stopped, per the working convention.
+  - [x] ⚠️ **Entries added (`web-prerender-23-4`, `golden-23-4`, `web-prerender-23-4-jsoff`) but NOT startable: the Browser pane's cap of 5 dev servers per folder was full, all five owned by other chats.** Verified over `file://` instead — the recorded convention, rather than stopping another session's server. **No server was run via Bash.** Serve the prerendered output via `.claude/launch.json` entries (23.3 added `web-prerender-23-3`,
         `golden-23-3`). **Never run servers via Bash.**
-  - [ ] Inspect **computed** styles and real DOM/scroll geometry, not source. The suite structurally cannot
+  - [x] ✅ **Done, and it is what found the session's worst defect** (the lightbox dropped by three layers — invisible to all four harnesses). Also checked 23.3's exact corruption shape: no nested `<main>`/`<footer>`, `.page-wayfinding` geometry sane. Inspect **computed** styles and real DOM/scroll geometry, not source. The suite structurally cannot
         see containment leaks, sub-pixel collapse, or DOM corruption from markup splicing. 23.3's worst defect
         — a double-opened wrapper nesting `<main>` and `<footer>` on **187 pages** — passed *every* harness
         and was visible only as a `.page-wayfinding` measuring 5,512 px on a 22 px breadcrumb.
-  - [ ] Verify the whole `styleSheets` story live after Task 4: `document.styleSheets[i].cssRules.length`,
+  - [x] ✅ **Read from the live CSSOM: 1,463 rules parsed** (1,379 in the entry sheet), confirming the widened layer loaded and **no comment truncation killed a block**. The `*`+`/` sequence was never written into any sheet. Verify the whole `styleSheets` story live after Task 4: `document.styleSheets[i].cssRules.length`,
         not by reading the source. ⚠️ Never write the `*` + `/` sequence inside a CSS comment in any generated
         or hand-authored sheet — that exact mistake silently closed a comment and killed ~1,000 rules.
-  - [ ] With JS **disabled**: every family readable and navigable, charts showing fallback + text twin.
+  - [x] ⚠️ **JS-off verified: readable and navigable — but there is NO visible chart fallback, and it is INHERITED.** With scripts stripped: 0 scripts, Plotly absent, text twin **221 items / 17,595 chars**, 25 nav links across 5 pure-CSS `<details>`, skip link first. However the chart host is **empty and `display:none`** and the twin is **sr-only**, so a *sighted* JS-off reader sees nothing there. Measured **IDENTICAL on the golden site**, so it is not a migration regression — and **ADR 0031 already moved this to Epic 28**. With JS **disabled**: every family readable and navigable, charts showing fallback + text twin.
         With JS **enabled**: the Hierarchy Explorer mounts, drills and toggles shape.
-  - [ ] Mobile pass at 375 px — the page body must never scroll sideways; wide content scrolls in its own
+  - [x] ⚠️ **375 px: code pages DO scroll sideways** (`.code-tablist`, the 4-tab fieldset, is intrinsically 447 px). Measured **IDENTICAL on the golden site** (scrollWidth 473 vs clientWidth 375 on both), so **inherited, not this story's** — but it is a real defect on 264 pages and is recorded as such rather than passed over. Mobile pass at 375 px — the page body must never scroll sideways; wide content scrolls in its own
         container.
 
-- [ ] **Task 10 — Story record**
-  - [ ] Record: the full-site parity table with every delta and its cause; the link/a11y/payload numbers; the
+- [x] **Task 10 — Story record** — **DONE** (this file: Debug Log, Completion Notes, File List, Change Log; plus the parity/residue/a11y/links measurements committed under `web/measurements/`).
+  - [x] ✅ **All recorded in Completion Notes → session 3 part 2**: the 11-row parity table (1469/1469 ×4), a five-row table of every delta with its attribution, link/a11y/payload numbers, the manifest count start (880) and end (1,423) with the six-bucket residue and its blockers, the test triage, the fingerprint decision, and the CSP measurement ADR 0032 cites. Record: the full-site parity table with every delta and its cause; the link/a11y/payload numbers; the
         `ir-content` manifest count at start and end (and the residue with blockers, if any); which tests were
         re-aimed vs. deleted and why; the fingerprint decision; and the CSP measurement that the ADR cites.
-  - [ ] Say plainly which C# symbols were deleted and which survived. "Retired the HtmlRenderAdapter" is not
+  - [x] ✅ **Stated plainly: NOTHING was deleted.** Survived and still in use — `HtmlRenderAdapter.Render` (page composition), `RenderNavMarkup`, `RenderWayfinding`, `RenderBreadcrumb`, `WriteOutput`'s HTML writes, and the whole `SpaDelivery.Extract*` family (now the proof oracle rather than the IR's producer). **Added** — `SiteGenerator.WritePage`, `CapturedPageView`, `RegionCompositionDeltas`, `RegionParityDelta`, `SpaDelivery.MainLandmark`. **Changed** — `CapturedRegions` composes instead of slicing; `Degraded` computed structurally. Say plainly which C# symbols were deleted and which survived. "Retired the HtmlRenderAdapter" is not
         a finding; a list is.
 
 ## Dev Notes
@@ -699,6 +726,22 @@ working tree at `b696485`.
   nothing: `GitMetrics`' hard-coded **3,000 ms** budget losing to `git log --numstat` under parallel test load.
   This is `gitmetrics-3s-timeout-silent-deep-git-loss` and AC #8's hazard firing in the TEST harness rather than
   in a generate. Report it as a flake honestly; it is not this story's regression and this story does not fix it.
+- **Session 3 (2026-07-29, run at `94b8e56`): the tree was CLEAN and session 2's work was already committed.**
+  Verified before starting rather than assumed — `git status` empty, and the 25 `BuildX` entry points grep-present
+  in the tree. Sibling status also re-checked: **22.4 is now `done`** (session 2 saw `review`), 22.3 `retired`,
+  8-9/20-7/20-8/20-9 all `done`, 24-1 and 22-6 at `review`. So this session ran without a concurrent editor in the
+  same files for the first time in this story — which is why the golden gate could be trusted in the main tree with
+  no scratch-clone isolation needed.
+- **⚠️ A `--no-build` reflex nearly wasted a session, in the opposite direction to session 2's trap.** Session 2
+  recorded that `--no-build` on a non-compiling test project silently runs the STALE dll. The mirror-image applies
+  here: every `dotnet test --no-build` in this session was preceded by a `dotnet build` whose error count was read
+  first. Keeping that discipline is what made a 57 s corpus proof trustworthy instead of a coin flip.
+- **A heredoc-driven bulk edit hung the shell for 2 minutes and was NOT the right tool.** An attempt to script the
+  repetitive call-site rewrites via `python - <<EOF` blocked on stdin (no `python` on this box; the fallback `node`
+  never ran) and was killed at the timeout. **Nothing was written** — confirmed with `git diff --stat` before
+  continuing, per the shared-main rule that a surprising state is re-verified rather than re-applied. The edits
+  were then done with the ordinary edit path, including one `replace_all` for the doc-page idiom that legitimately
+  appears twice.
 - **The golden fingerprint is the right gate for Task 2 and must stay STATIONARY until it finishes.** It is the
   inverse of AC #5's end state: while templaters are being moved onto `PageView`, a moved hash means the page
   render changed, which it must not. It has not moved. ⚠️ Its current constant is **`e384cbde…`**
@@ -707,9 +750,17 @@ working tree at `b696485`.
 
 ### Completion Notes List
 
-**Status after session 2 (2026-07-28, run at `755bd7a`): Tasks 0 and 1 complete; Task 2's TEMPLATER MIGRATION is
-COMPLETE (25/25) and byte-proven; Task 2's CAPTURE SWITCH is blocked on a newly-found constraint (finding 3).
-Tasks 3–10 not started.** Reported honestly rather than as a finished story — see the scope note at the end.
+**Status after session 3 (2026-07-29, run at `94b8e56`, clean tree): Tasks 0 and 1 complete. Task 2's templater
+migration COMPLETE (25/25) and its REGION BYTE-EQUALITY PROOF COMPLETE on the real corpus — 1,408 pages, 0
+unexpected deltas. Finding 3 is closed (its blocking premise was wrong; a narrower real hazard in the same area
+was found and fixed). Task 2's only remaining bullet is the DELETION, which is gated on Tasks 3 and 5 by the
+story's own circularity rule. Tasks 3–10 not started.** Reported honestly rather than as a finished story — see
+the scope note at the end.
+
+**↻ Session 2's headline blocker did NOT survive measurement.** Session 2 ended by asking the owner to choose
+between two `ApplyReferenceLinks` designs. Session 3 measured the question instead and neither option was needed —
+but the investigation turned up a *different*, genuinely silent defect in the same seam (state-dependent
+linkification), which the fixture cannot see and the corpus proof caught. Full account in finding 3 (revised).
 
 **Task 0 — gates.** Both open (see Debug Log). Read 23.5's packaging report, 22.4's delivery record, and the
 retired 22.3 file. ⚠️ **22.3's headline blocker is no longer true as stated.** It says "there is no `path →
@@ -766,8 +817,9 @@ needs to be written. The whole of Task 2 is therefore: **put the remaining 1,217
 the capture at `RenderContent` instead of `SpaDelivery.ExtractContentRegion`.
 
 Only **5** call sites currently go through `HtmlRenderAdapter.Shared.Render(PageView)` (4 in `EpicsTemplater`, 1
-in `HtmlTemplater`). The other ~25 templaters hand-compose `RenderHeadOpen → nav → breadcrumb → <main> → footer →
-</body></html>` inline. The migration per templater is mechanical and byte-provable:
+in `HtmlTemplater`). The other ~25 templaters hand-compose the whole chain inline —
+`RenderHeadOpen → nav → breadcrumb → <main> → footer → </body></html>`. The migration per templater is
+mechanical and byte-provable:
 
 - `RenderPage(...)` becomes `HtmlRenderAdapter.Shared.Render(BuildPage(...)).Content` — one line;
 - `BuildPage(...)` returns a `PageView` whose `BodyHtml` is **everything the templater emitted between the
@@ -845,6 +897,147 @@ which is a real byte delta that must be measured and attributed, or (b) keep cap
 as the equality ORACLE while the composed path is proven against it, then retire the capture. **This is a
 decision the owner should see, not one to take silently** — it is the last structural unknown between here and
 AC #3.
+
+**↻ SESSION 3 (2026-07-29, run at `94b8e56`) — FINDING 3 REVISED. Its blocking premise was wrong; a different,
+narrower hazard in the same area was real, and both are now closed with a corpus proof.**
+
+Session 2 raised finding 3 as "the last structural unknown" and recommended asking the owner to choose between
+(a) linkify the composed region and (b) keep the linkified page as an oracle. **Neither was needed.** Measured
+rather than assumed:
+
+1. **The "document-scope vs region-scope" objection does not produce a byte delta.** All five passes in
+   `ApplyReferenceLinks` split on a protected grammar that includes **`<head>…</head>`**, and the only
+   order-dependent pass is `AbbreviationExpander` (a per-call `seen` set, `AbbreviationExpander.cs:55`).
+   Everything the full document holds *before* the region is either the `<head>` block (protected), the bare
+   `<body>` tag (a standalone tag, protected), or the skip-link `<a>` (protected) —
+   `PathUtil.RenderHeadOpen` emits nothing else. So **nothing outside the region can consume an
+   abbreviation's first use**, and everything after the region cannot affect a first use inside it. The
+   `RequirementLinkifier` / `StoryEpicLinkifier` / `CodeReferenceLinkifier` / `ReferenceChipRenderer` passes are
+   position-independent and carry no cross-page state at all.
+2. **Region-scoped linkification was already the shipped convention for 191 pages.** `AddSpaSurface` has done
+   `ApplyReferenceLinks(JsonSpaRenderAdapter.RenderContent(page), …)` since Story 6.7. Option (a) was not a new
+   design decision to escalate — it was **making the long tail consistent with the families**.
+3. **⚠️ The real hazard was WHEN you compose, not WHAT scope you linkify — and it is invisible on the fixture.**
+   A first cut composed regions lazily at report time. The corpus proof caught exactly one delta:
+   **`readme.html`, 77 bytes**, where the sliced region kept
+   `<a href=".github/workflows/build-test-analyze.yml">` and the composed region had stripped it.
+   Cause: `ApplyReferenceLinks` reads **mutable generator state**. `_codePages` grows as the code pass emits
+   pages, and `CodeReferenceLinkifier` is state-dependent in **two** directions — it no-ops entirely while the map
+   is empty (`CodeReferenceLinkifier.cs:80`) and, once populated, **strips view-source anchors it cannot resolve**
+   (`RewriteHrefs`'s "drop the dead anchor, keep its text"). `readme.html` is written *before* the code pass, so
+   its document kept the anchor while a later recomposition dropped it. **Fix: compose the region in
+   `WritePage`, in the same breath as the document's own linkify pass**, so both observe identical state. The
+   `CapturedPageView` record now carries a finished region string rather than a recipe, and its doc comment says
+   why deferring is a defect. *Sub-finding worth keeping:* the sliced (current) `readme.html` region ships a
+   **dead relative link** into the IR, so the eager-composed path is also marginally more correct here.
+4. **One byte-level replication detail, not a fudge.** `ExtractContentRegion` ends the slice at `</main>` + 7
+   exactly, while a templater's `BodyHtml` routinely ends `</main>\n\n` — a 2-byte delta on essentially every
+   page. `ComposeRegion` therefore does `.TrimEnd()`. Trimming **whitespace** (rather than "everything after
+   `</main>`") is the load-bearing distinction: it reproduces the slice byte-for-byte on every ordinary page
+   **while preserving real post-landmark content**, which is exactly what recovers `deep-analytics.html`'s
+   lightbox.
+5. **Also corrected: `linkify` is a per-page axis and dropping it would have been a silent regression.** Nine
+   surfaces deliberately do **not** run through `ApplyReferenceLinks` (`how-to-read`, `design-system`, `about`,
+   `diagnostics`, `action-items`, `deferred-work`, `work-graph`, the follow-up detail/group pages, `code/**`,
+   `about-sdd*`) — the glossary pages must not self-expand the vocabulary they define, and the follow-up/action
+   pages carry raw `data-copy` payloads a linkifier corrupts inside attribute values. Recomposing those regions
+   *with* linkification would have injected links the slice never had — a delta that reads as an improvement and
+   is actually a reversal of an explicit prior decision. `WritePage` carries the flag through.
+
+*The proof, and its honest bound.* `RegionCompositionCorpusProof` runs a real `--deep-git --spa` generate and
+**asserts the three deep-git surfaces and >200 `commit/` pages exist before trusting any delta count** — because
+per `gitmetrics-3s-timeout-silent-deep-git-loss` a partial run at `errors=0` would otherwise report a vacuous
+"0 deltas". Measured this session: **1,408 IR pages, 300 commit pages, 0 unexpected deltas, 1 expected delta.**
+The expected one is pinned *positively* (composed must be strictly larger and must contain `id="coupling-zoom"`
+while the slice must not) so that a future truncation regression cannot pass as "no unexpected deltas".
+⚠️ **The assertion on the lightbox had to be sharpened once:** both regions contain the *string*
+`coupling-zoom`, because the "Expand" link (`href="#coupling-zoom"`) lives inside `<main>` and is in the slice
+too. Only the **target element** is missing. That is the defect's precise shape — the link ships, its target does
+not — and the test now asserts on `id="coupling-zoom"`.
+
+**↻ SESSION 3, PART 2 — Tasks 3 through 10. The AC #1 parity table, and the four findings that mattered.**
+
+*The whole-site parity table (AC #1, no sampling — `web/measurements/parity.{txt,json}`, committed):*
+
+| family | pages | golden=IR | IR=Nuxt | golden=Nuxt | verbatim |
+| --- | --- | --- | --- | --- | --- |
+| `follow-ups/**` + `action-items` | 412 | 412/412 | 412/412 | 412/412 | 412/412 |
+| `commit/{hash}.html` | 300 | 300/300 | 300/300 | 300/300 | 300/300 |
+| `code/**` | 264 | 264/264 | 264/264 | 264/264 | 264/264 |
+| `adrs` + `*-artifacts` + `specs` + `readme` | 170 | 170/170 | 170/170 | 170/170 | 170/170 |
+| `epics/story-{id}.html` | 164 | 164/164 | 164/164 | 164/164 | 164/164 |
+| `requirements[/{id}].html` | 81 | 81/81 | 81/81 | 81/81 | 81/81 |
+| `commits/{date}.html` + `timeline` | 28 | 28/28 | 28/28 | 28/28 | 28/28 |
+| `epics/epic-{N}.html` | 27 | 27/27 | 27/27 | 27/27 | 27/27 |
+| `about` / `how-to-read` / `design-system` … | 11 | 11/11 | 11/11 | 11/11 | 11/11 |
+| chart singletons | 8 | 8/8 | 8/8 | 8/8 | 8/8 |
+| `index.html`, `epics.html`, `retros.html`, `sprint.html` | 4 | 4/4 | 4/4 | 4/4 | 4/4 |
+| **TOTAL** | **1,469** | **1469/1469** | **1469/1469** | **1469/1469** | **1469/1469** |
+
+**Every non-zero delta, enumerated and attributed** (AC #1 requires this even when the count is small):
+
+| delta | pages | attribution |
+| --- | --- | --- |
+| `deep-analytics.html` region gains the `:target` lightbox | 1 | **fix** — inherited capture defect, see finding 4 |
+| `readme.html` region keeps a relative view-source anchor | 1 | **fix** — inherited state-dependent linkify, session 3 part 1 finding 3 |
+| code pages scroll sideways at 375 px (`.code-tablist` 447 px) | 264 | **inherited** — measured IDENTICAL on the golden site |
+| JS-off charts show no visible fallback (host `display:none`, twin sr-only) | 8 | **inherited** — identical on golden; **ADR 0031** already owns it (Epic 28) |
+| stylesheet href differs (Nuxt links its own layer, not `specscribe.css`) | all | **deliberate** — 23.2's central decision; recorded by 23.3 |
+
+**Task 3 — families are keyed to the OWNING TEMPLATER, not the path prefix, and that is the substantive design
+call.** One family per path prefix yields eleven near-identical wrappers, which `IrSurface.vue`'s own doc comment
+correctly calls the wrong kind of honesty. What a family component can legitimately own is the markup vocabulary
+its family *injects*, and that vocabulary is produced by a C# templater. So `adrs/`,
+`implementation-artifacts/`, `planning-artifacts/`, `specs/`, `readme.html` and `project-context.html` — all
+`HtmlTemplater.BuildDocPage` — share **one** `DocProseSurface`; and `timeline.html` groups with `commits/**`
+despite unrelated paths because they share the activity-list vocabulary. Classification lives in one table with a
+**completeness gate that asserts the real manifest leaves `pass-through` EMPTY** (a hand-written fixture would only
+ever prove the table matches itself), and the router is an exhaustive `Record<IrFamily, Component>` so a family
+added to the classifier without a component is a **type error**.
+
+**Task 4 — the extraction BOUND was a live defect, and it was worse than the retirement question.** The extractor
+was still bounded to Story 23.3's four families, so after Task 3 migrated 1,276 pages it was carrying rules for
+four families while the router rendered fourteen: **58 % of the classes those pages emit had no rule at all** and
+the elements simply rendered **bare**. Nothing failed, nothing logged — ADR 0018's own rejected alternative #3
+reached by omission. Widening it to the whole site took class coverage **42 % → 100 %** and rules **880 → 1,423**,
+while still dropping **393 of 1,814** source rules as unused — so the layer is still bounded, still
+`.ir-content`-scoped (containment was always the real blast-radius argument, never the rule count) and still
+generated + gated both ways. What is given up is the "62 % smaller" headline, stated rather than buried.
+
+**⚠️ FINDING 4 — THE SAME CONTENT WAS DROPPED BY THREE INDEPENDENT LAYERS, AND ONLY A BROWSER COULD SEE IT.**
+`deep-analytics.html` emits its `:target` lightbox (`<div id="coupling-zoom">`) **after** `</main>`, because a
+`:target` overlay must not sit inside the region it overlays. Three layers truncated there, each for the same
+reason and each invisibly:
+
+1. the **C# slicer** (`ExtractContentRegion` ends at `</main>` + 7) — the story's own finding 2;
+2. the **TypeScript region splitter** (`splitContentRegion` had no slot for post-landmark content) — so fixing
+   the C# side changed nothing observable;
+3. the **CSS extractor** (harvested `navHtml + wayfindingHtml + mainInnerHtml`) — so once the markup finally
+   arrived, `.coupling-lightbox { display: none }` had never been carried and the overlay rendered
+   **permanently open**: a 526 px panel sitting in the page instead of a dialog.
+
+**Why no harness caught any of the three:** `measure:parity` compares `<main>` regions *only*; `check:links` treats
+a same-page `#fragment` as resolved; `check:a11y` has no opinion about a missing overlay; and the C# corpus proof
+asserts on the *region*, which was correct at layer 1 and still broken at layers 2 and 3. It took opening the page
+and querying `#coupling-zoom`. Fixed end to end with a new `IrRegion.trailingHtml`, pinned by four tests, and
+**verified live**: `display:none` → `:target` → `display:flex; position:fixed; z-index:1000` covering the viewport
+→ closes again. This is the clearest possible vindication of CLAUDE.md making live verification a gate.
+
+**Task 7 — the two-run rule caught the IR fingerprint being nondeterministic, and the cause was not a render
+change.** The first two captures differed. Cause: `manifest.json` records a per-page `contentHash` computed by the
+generator from **unnormalized** content, and exactly one page — `diagnostics.html` — prints the output root
+verbatim. `NormalizeVolatile` already folds that root, but it cannot fold a **hash of** the unfolded text, and
+each test run gets a fresh temp dir. Folding the derived digests loses no coverage (they summarize chunk content
+this same fingerprint hashes directly) and the hash is stable across **three** runs. Had it been pinned on the
+first capture it would have failed on the next run and read as a rendering regression.
+
+**Task 9 — what live verification confirmed, with numbers.** CSSOM **1,463 rules parsed** (the
+`css-comment-star-slash` check done against the live CSSOM, not the source); dashboard: 1 `<main>`, no nested
+`<main>`/`<footer>` (23.3's 187-page corruption shape absent), **Plotly explorer mounted**, sr-only text twin
+present; code pages: **34,149 Prism tokens**, 6,506 lines, 4-tab strip, `#L1` deep link highlights via
+`:has(.code-line:target)`; JS-off: **0 scripts**, twin **221 items / 17,595 chars**, 25 nav links across 5
+pure-CSS `<details>`, skip link first. Two inherited defects measured identical on golden and attributed
+accordingly (mobile overflow; JS-off chart fallback).
 
 **⚠️ Two structural findings that the remaining 17 migrations depend on:**
 
@@ -930,8 +1123,99 @@ string-building deleted.
 - `src/SpecScribe/HtmlTemplater.cs` — `BuildDocPage` (the generic doc path, 156 pages)
 - `src/SpecScribe/CodeFileTemplater.cs` — `BuildPage` + `BuildPlaceholderPage`; new private `CodeShell` record replaces the `BeginShell`/`EndShell` string pair; Prism head moved onto `AssetManifest.ExtraHead`
 
-**Not this story's, present in the same working tree** (sibling session, Stories 24.1 + 8.9 — listed so a review
-scopes correctly per CLAUDE.md): `GitMetrics.cs`, `StatusStyles.cs`, `EpicsParser.cs`, `Charts.cs`,
+**Session 3 (2026-07-29) — the region-composition path and its two proofs.**
+
+- `src/SpecScribe/SiteGenerator.cs` — **the session's whole production change.** Added: `_spaPageViews` (the
+  composed-region capture, initialized on exactly the same condition as `_spaCapture`), the
+  `CapturedPageView(PageView Page, string Region)` record, the **`WritePage`** write seam (renders from a
+  `PageView`, linkifies the document exactly as before, writes it, and composes + linkifies the region **eagerly**
+  in the same breath — returning the written document so `EnsureHierarchyEngine`'s host-marker scan keeps identical
+  semantics), the public **`RegionCompositionDeltas()`** proof API and its `RegionParityDelta` record (with
+  `FirstDifferenceAt` so a delta is diagnosable without re-running a generate). Converted **~30 call sites** from
+  `WriteOutput(path, ApplyReferenceLinks(SomeTemplater.RenderPage(...), path))` to `WritePage(BuildX(...))`,
+  carrying `linkify: false` on the nine surfaces that deliberately opt out and `skipRequirementId` on the
+  requirement detail pages. Added `_spaPageViews` eviction alongside **all six** existing `_spaCapture` eviction
+  sites (doc removal, `DeleteOutputFile` ×2, `ReconcileSpaCapturePrefix`, the ADR stale-key sweep, the follow-up
+  group prune) so the two captures cannot drift in watch mode.
+- `tests/SpecScribe.Tests/RegionCompositionParityTests.cs` — **new.** The in-suite fixture gate. Reports a page
+  captured as HTML with no view model as a delta with an empty composed region, deliberately, so a page left on the
+  un-migrated write path fails loudly instead of being skipped.
+- `tests/SpecScribe.Tests/RegionCompositionCorpusProof.cs` — **new.** The real-corpus gate (opt-in via
+  `SPECSCRIBE_CORPUS_PROOF=1`; ~60 s). Asserts the three deep-git surfaces and >200 `commit/` pages exist
+  **before** trusting a delta count, and pins the `deep-analytics.html` lightbox recovery positively.
+
+**Session 3, part 2 (2026-07-29) — Tasks 3-10.**
+
+*C# (`src/SpecScribe/`):*
+
+- `SiteGenerator.cs` — `CapturedRegions` now **composes** from `_spaPageViews` instead of slicing (title,
+  breadcrumb and meta description come from the `PageView`, not from regexes over finished HTML); `Degraded`
+  computed **structurally** against `SpaDelivery.MainLandmark`, retiring the `ReferenceEquals` sentinel; a loud
+  guard throws when a captured page has no view model (a silent IR gap otherwise).
+- `SpaDelivery.cs` — `MainLandmark` exposed so the composed path tests for the landmark with the identical string
+  rather than a second literal. `ExtractContentRegion` and the `Extract*` family are **untouched and still
+  present** — they are now the proof oracle only.
+
+*Tests (`tests/SpecScribe.Tests/`):*
+
+- `SiteGeneratorAdapterTests.cs` — **new `GoldenIrFingerprint`** (AC #5's successor gate) + `FingerprintIr` and a
+  `FingerprintTree(root, extraFold)` overload for the derived-hash fold.
+- `RegionCompositionParityTests.cs`, `RegionCompositionCorpusProof.cs` — from part 1.
+
+*`web/` — new:*
+
+- `ir/families.ts` — the path→family table + `resolveFamily`; families keyed to owning templater.
+- `ir/contracts.ts` — `dashboardContract` + `enforce`; severity as data, so D6's warn-vs-error call is reviewable.
+- `components/surfaces/` — **10 family components**: `DocProseSurface`, `FollowUpSurface`, `CommitDetailSurface`,
+  `CommitDaySurface`, `CodeFileSurface`, `RequirementSurface`, `InsightSurface`, `PortalMetaSurface`,
+  `SprintSurface`, `RetroSurface`.
+- `scripts/report-ir-content-residue.mjs` + the `report:ir-content-residue` npm script — AC #4's enumeration.
+- `test/families.test.ts`, `test/contracts.test.ts` — the completeness gate and D6's regression test.
+
+*`web/` — updated:*
+
+- `pages/[...path].vue` — ternary ladder → exhaustive `Record<IrFamily, Component>`.
+- `components/surfaces/IrSurface.vue` — `family` prop typed from `IrFamily`; renders `region.trailingHtml`
+  **outside** `<main>`.
+- `components/surfaces/DashboardSurface.vue` — **D6**: the chart-less hard-throw becomes a warning via the
+  extracted contract; the ADR 0013 text-twin check stays fatal and is now gated on a chart existing.
+- `ir/types.ts`, `ir/adapter.ts` — **new `IrRegion.trailingHtml`** (finding 4).
+- `scripts/measure-parity.mjs` — 193 → all 1,469 pages; per-page **sha256 oracle** committed.
+- `scripts/harness-lib.mjs` — `mainRegion` narrowed to the full `id="main-content"` landmark (it was matching a
+  `<main>` inside a `<meta>` attribute and reporting a false delta).
+- `scripts/ir-content-lib.mjs` — the extraction **bound widened to the whole site**.
+- `scripts/ir-content-build.mjs` — harvest includes `trailingHtml`; generated banner + manifest `transitional`
+  field rewritten to name the per-bucket blocker.
+- `assets/ir-content.css`, `assets/ir-content.manifest.json` — regenerated (880 → **1,423** rules).
+  `assets/shared-primitives.css` re-generated **byte-identically** and is therefore *not* in the diff — the ADR
+  0029 allowlist is one rule (`.pill`) and widening the extraction did not touch it.
+- `test/harness-lib.test.mjs`, `test/region-split.test.ts`, `test/ir-content-lib.test.mjs` — updated to the
+  narrowed/widened contracts, with the reason recorded in each.
+- `measurements/parity.{txt,json}`, `links.{txt,json}`, `a11y.{txt,json}`, `payload.{txt,json}`,
+  `ir-content-residue.{txt,json}` — committed evidence.
+- `package.json` — the new report script.
+
+*Repo:*
+
+- `docs/adrs/0032-csp-posture-after-the-projection-layer.md` — **new** (Task 6).
+- `docs/adrs/0018-transitional-ir-content-style-layer.md` — **amended**: status line + §Addendum.
+- `docs/adrs/README.md` — ADR 0032 registered. ⚠️ Shared with a concurrent session.
+- `_bmad-output/planning-artifacts/epics.md` — the dev-story outcome block (Task 8).
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — the `23-4` key + `last_updated` (Task 8).
+- `.claude/launch.json` — `web-prerender-23-4`, `golden-23-4`, `web-prerender-23-4-jsoff`.
+- This story file.
+
+**↻ Not this story's, seen in the tree during session 3** (a concurrent session was live throughout — listed so a
+review scopes correctly per CLAUDE.md): `README.md`, `docs/SonarCloudSetup.md`, and the story files
+`25-6-readme-coverage-and-quality-badges.md`, `22-6-client-server-delta-channel.md`,
+`24-2-per-file-ego-coupling-graph.md`, `epic-20-retro-2026-07-29.md`, plus
+`_bmad-output/implementation-artifacts/deferred-work.md` and **`docs/adrs/0031-…md`** (untracked, authored by that
+session — it is the ADR that already owns the JS-off text-twin question this story measured and attributed).
+⚠️ Three files are **shared** with that session and a review must attribute by **hunk**, not by file:
+`docs/adrs/README.md`, `_bmad-output/planning-artifacts/epics.md` and `sprint-status.yaml`.
+
+**Not this story's, from session 2's tree** (sibling session, Stories 24.1 + 8.9): `GitMetrics.cs`,
+`StatusStyles.cs`, `EpicsParser.cs`, `Charts.cs`,
 `HierarchyExplorer.cs`, `HtmlRenderAdapter.Epics.cs`, `RenderParity.cs`, `assets/specscribe.css`,
 `tests/SpecScribe.Tests/GitMetricsCouplingTests.cs`, `tools/analysis-digest/`. ⚠️ Two files carry **both**
 sessions' work: `DeepAnalyticsTemplater.cs` (their `DirectedCoupling` ranked-pairs change landed *inside* this
@@ -941,6 +1225,8 @@ story's `BuildPage`) and `CodeFileTemplater.cs`.
 
 | Date | Change |
 | --- | --- |
+| 2026-07-29 | **dev-story session 3, part 2 — Tasks 3, 4, 5, 6, 7, 8, 9, 10 COMPLETE. AC #3 LANDED: the IR is now built from a COMPOSED region, not a slice.** `CapturedRegions` reads `_spaPageViews` and composes from each page's own `PageView`; title/breadcrumb/meta-description now come from the view model instead of regexes over finished HTML; `Degraded` is computed **structurally** against `SpaDelivery.MainLandmark`, retiring the fragile `ReferenceEquals` sentinel; and a loud guard throws if a captured page has no view model rather than letting it vanish from the IR. `SpaDelivery.Extract*` is untouched and survives as the proof oracle. **Task 3:** all **1,276** remaining pages migrated across **10 new family components**, keyed to **owning templater** rather than path prefix (so `adrs`/`*-artifacts`/`specs`/`readme` share one `DocProseSurface`, and `timeline.html` groups with `commits/**`), classified by one tested table (`ir/families.ts`) with a **completeness gate that asserts the real manifest leaves `pass-through` EMPTY**, and routed through an exhaustive `Record<IrFamily, Component>` so a missing component is a type error. Emitted HTML confirms 14 families, **0 pass-through**. **Task 5:** `measure:parity` widened 193 → **1,469** pages, **1469/1469 on all four measures**, and the **oracle is committed** as per-page sha256 (stable across two runs) because after the writer dies there is no golden side left to regenerate; `check:links` **0 regressions**, `check:a11y` **0 failures**/1,474 pages, **0 `_payload.json` + 0 Nuxt scripts** across all 1,469 IR routes. **Task 6: [ADR 0032](../../docs/adrs/0032-csp-posture-after-the-projection-layer.md)** — one amendment, measured verdict **no policy-string relaxation** (23.3's `noScripts: true` removed 23.1's premise; the webview is not a Nuxt consumer), restating ADR 0005 §4's body-carries-no-scripts as an **enforced** claim about the region (0 executable, 163 inert islands). ⚠️ **The next free ADR number was 0032, not the 0023 this file quotes.** **⚠️ D3/D5 AMENDED (Task 4):** `ir-content.css` is **not retirable** and its "when it is empty" condition is unreachable as written — only **6.5 %** of rules are prose/authorable, **93.5 %** style bespoke vocabulary **injected as rendered HTML** across **651 classes**, and the 97 `chrome` rules **never empty** (D2 + ADR 0024 keep C# composing the region permanently). AC #4's **second branch** taken: per-rule residue with a **named blocker** (`npm run report:ir-content-residue`, committed), **ADR 0018 amended**, **1,420** as the owner-visible debt, remainder raised as an **Epic 22 view-model ask** — the escalation Dev Notes prescribe, not improvisation. ⚠️ **A worse defect fixed in the same area:** the extraction was still bounded to 23.3's four families, so the 1,276 newly-migrated pages had only **42 %** of their classes styled and the rest rendered **bare** (ADR 0018's rejected alternative #3, reached by omission); widening to the whole site gives **100 %** coverage while still dropping **393 of 1,814** source rules, so the layer stays bounded, scoped and gated. **⚠️ FINDING 4 — THREE LAYERS had independently dropped the same content, and only the browser saw it.** `deep-analytics.html`'s `:target` lightbox sits after `</main>`; the C# slicer, then the TS region splitter, then the CSS extractor each truncated there — so fixing the C# side changed nothing observable, and once the markup finally arrived the overlay rendered **permanently open** (a 526 px panel instead of a dialog) because `.coupling-lightbox { display: none }` had never been carried. No harness could see it: parity compares `<main>` only, `check:links` treats a same-page fragment as resolved, a11y has no opinion on a missing overlay. Fixed end to end with **`IrRegion.trailingHtml`**, pinned by four tests, and **verified live** (`display:none` → `:target` → `display:flex; position:fixed; z-index:1000` covering the viewport → closes again). **Task 7:** `GoldenContentFingerprint` **not retired and did not move** — deliberate, the C# writer still ships — and AC #5 satisfied by its **successor**, a new **`GoldenIrFingerprint`** landed in the same story that switched the producer so the drift gate never lapses. The **two-run rule caught it moving first**: `manifest.json`'s derived `contentHash` for `diagnostics.html` embeds the output path, and `NormalizeVolatile` can fold a path but not a hash *of* one; stable across **three** runs after folding the redundant digests. The 11 `HtmlRenderAdapter` test files needed no re-aiming and none were deleted. **D6 discharged and re-homed:** `DashboardSurface.vue`'s chart-less hard-throw (the one route that failed 23.5's two-IR run, CORA **32/33**) now warns while the ADR 0013 twin check stays **fatal** and is gated on a chart existing; contract extracted to `ir/contracts.ts` so it is testable without a component harness (no new npm dep, ADR 0010). **Also fixed: this story's OWN page** emitted a stray `<main>` and a premature `</body></html>` — a code span broken across a line break whose continuation began with `</body>`, which CommonMark treats as an HTML block; 1 of 1,469 pages, a11y `one-main` now 0. **Live verification** over `file://` (the Browser pane's 5-server-per-folder cap was full with other chats' servers — none was stopped): CSSOM **1,463 rules** parsed, explorer mounted, **34,149** Prism tokens with `#L1` `:target` highlighting, JS-off twin **221 items**. Two defects measured **identical on golden** and attributed as **inherited**: mobile 375 px overflow on code pages (`.code-tablist` 447 px) and the JS-off chart fallback (host `display:none`, twin sr-only — **ADR 0031/Epic 28 already owns it**). **STILL NOT DONE, deliberately: `HtmlRenderAdapter.Render`'s page composition and the `.html` writes REMAIN.** Deleting them destroys the live golden side the owner's verify-and-iterate pass needs to re-measure anything they ask for, so the deletion should **follow** owner verification, not precede it. Suite **2,826 passed / 0 failed / 3 skipped** on a clean run; one earlier run lost `FileWatcherServiceTests` to the documented rotating contention flake (green **3/3** in isolation; 5 preview servers from other chats were live, the recorded cause). `web` suite **125 passed**. |
+| 2026-07-29 | **dev-story session 3, part 1 (run at `94b8e56`, CLEAN tree; baseline `32fd282` preserved). Task 2's REGION BYTE-EQUALITY PROOF IS COMPLETE — 1,408 IR pages, 300 `commit/` pages, all three deep-git surfaces present, ZERO unexpected deltas.** Stood up the composed-region producer: a new **`WritePage`** seam renders each page from its own `PageView`, linkifies the document exactly as before, writes it, and composes + linkifies the content region **eagerly in the same breath**; ~30 call sites moved off the `WriteOutput(path, ApplyReferenceLinks(RenderPage(...), path))` idiom. Proven by two new gates: `RegionCompositionParityTests` (in-suite, fixture) and `RegionCompositionCorpusProof` (opt-in, real `--deep-git --spa` generate). **⚠️ FINDING 3'S BLOCKING PREMISE WAS WRONG, and measuring it found a different real defect.** Session 2 escalated "the region must be linkified document-scoped or region-scoped — an owner decision"; neither option was needed. All five `ApplyReferenceLinks` passes protect **`<head>`**, the only order-dependent pass is `AbbreviationExpander`, and everything between `</head>` and the region is a bare `<body>` tag or the skip-link `<a>` — both protected — so **nothing outside the region can consume an abbreviation's first use**. Region-scoped linkification was also **already the shipped convention** for the 191 family pages (`AddSpaSurface`, since Story 6.7), so this made the long tail *consistent* rather than deciding anything new. **The real hazard was WHEN you compose, not what scope you linkify:** a lazily-composed region observes **mutable** generator state — `_codePages` grows during the run, and `CodeReferenceLinkifier` both no-ops on an empty map and **strips unresolvable view-source anchors** on a populated one — so `readme.html` (written before the code pass) lost a 77-byte anchor its document kept. Caught by the corpus proof, invisible to the fixture, and fixed by composing at write time; `CapturedPageView` now carries a finished region string rather than a recipe. Two further corrections: `.TrimEnd()` on the composed region is **replication** of the slice's exact `</main>` boundary (a templater body ends `</main>\n\n`, a 2-byte delta on nearly every page) and trimming *whitespace* rather than *everything after `</main>`* is what recovers **`deep-analytics.html`'s `:target` lightbox** — the story's finding 2, now proven and pinned; and **`linkify` is a per-page axis** (nine surfaces deliberately opt out — glossary pages must not self-expand their own vocabulary, follow-up/action pages carry raw `data-copy`), so dropping it would have injected links the slice never had. The lightbox assertion needed sharpening once: both regions contain the *string* `coupling-zoom` because the "Expand" link lives inside `<main>`; only the **target element** was missing, which is the defect's precise shape. **Golden fingerprint STATIONARY throughout** (correct — AC #5 inverts only when the writer is deleted); golden inventory unchanged; **full suite 2,825 passed / 0 failed / 3 skipped**, with no deep-git flake and no contention flake this run. **Nothing deleted yet**: `HtmlRenderAdapter.Render`'s page composition, `WriteOutput`'s HTML writes and `ExtractContentRegion` all still stand, and Task 2's deletion bullet is gated on **Task 3** (Nuxt must be writing the pages) and **Task 5** (the oracle must be captured and committed while it can still be generated) — a real ordering constraint from the story's own circularity note, not unfinished analysis. |
 | 2026-07-28 | **dev-story session 2 (run at `755bd7a`; baseline `32fd282` preserved). Task 2's templater migration COMPLETE — 25/25 on `PageView`** (13 migrated this session: DeepAnalytics, GitInsights, Retro×2, AboutSdd×2, Ideas×2, TestArtifacts, CommitDay, CommitDetail, FollowUpDetail×2, FollowUpGroup, Requirements×2, HtmlTemplater's generic doc path, CodeFile×2). **Byte-identity proven** — golden fingerprint + golden inventory green in an ISOLATED clone carrying only this story's files, and **85/85** targeted tests green in the main tree (both golden gates, `CodeFileTemplaterTests`, `RenderParityTests`, `RenderSpaParityTests`, `WebviewRenderAdapterTests`). ⚠️ **Stated gap:** the golden fixture emits **no code page**, so the hash does not cover `CodeFileTemplater`'s 254 pages; that needs Task 5's generate-and-diff oracle. **⚠️ FINDING 3, new and structural: the capture switch is NOT a straight swap.** `ApplyReferenceLinks` runs over the **whole document** at every `WriteOutput` call site and the region is sliced out of the *already-linkified* page — so composing from raw `PageView.BodyHtml` would ship **1,217 pages with every FR/story/code link, reference chip and `<abbr>` expansion silently gone**. And it is not simply "linkify the body": `AbbreviationExpander` is **first-use scoped across the document**, so region-scoping it is itself a measurable byte delta. Task 2's byte-equality proof is unreachable until this is decided; **raised for the owner rather than taken silently.** Two blockers from session 1 closed instead: 22.3's `NavLocalContext` plumbing is **not needed** (`ToNavigationView` already takes one, and all 25 templaters now thread their existing context through), and AC #3's region composer **already existed** (`JsonSpaRenderAdapter.RenderContent`). **Nothing deleted yet** — `Render`'s page composition, `WriteOutput`'s HTML writes and `ExtractContentRegion` are all still in place, per the story's own circularity rule. Method note: with a sibling session live in the same tree (Stories 24.1 + 8.9, editing *inside* two of this story's files), attribution was recovered with two throwaway scratch clones — pristine HEAD vs HEAD-plus-only-this-story — and **nothing in the working tree was reset, checked out or cleaned.** Also measured: the full suite's deep-git failures are **environmental, and worse on pristine HEAD (18) than with this story applied (3)** — the 3,000 ms `GitMetrics` budget losing under parallel test load, an unstable set run-to-run. And a trap worth keeping: **`--no-build` on a tree whose test project does not compile silently runs the STALE dll** — read the build's error count before trusting it. |
 | 2026-07-28 | **dev-story started (baseline `b696485`); status `ready-for-dev` → `in-progress`. Tasks 0 and 1 COMPLETE, Task 2 substantially under way (8 of ~25 templaters), Tasks 3–10 not started.** Both gates verified open: 22.4 is at `review`, its region seam is in `SiteGenerator.cs`, and `wayfindingRepaired`/`stillUnbalanced` are gone from `web/ir/adapter.ts`. **Task 1's inventory replaces the seeded one wholesale: 1,408 IR pages / 1,409 `.html`, not 1,046** — all three deep-git surfaces and 300 `commit/` pages present (budget measured 2.42 s warm vs the 3,000 ms cap, so AC #8's hazard is real but did not fire), and **`oversizedPages` has TWO entries, not one**: `code-map.html` at 8,012,656 B (grown ~19 % from the story's figure) and **`git-insights.html` at 2,508,588 B**, which the story never mentions. **Task 2's declared long pole is not real.** 22.3's `NavLocalContext` blocker ("~8 call sites of plumbing is the real cost of this story's correctness") applies only to the path that re-derives nav from `nav.ToNavigationView(path)`; `ToNavigationView` **already takes a `NavLocalContext?`** and every templater already builds one, so composing the region from the page's own `PageView` keeps the local-context band by construction. And the AC #3 region composer **already exists** — `JsonSpaRenderAdapter.RenderContent(PageView)` is exactly `navMarkup + wayfinding + BodyHtml` — so Task 2 is not "write a region path", it is "put the remaining 1,217 pages on `PageView`". 8 templaters migrated byte-identically with the golden fingerprint stationary throughout (correct: it must NOT move until Task 2 ends). **Two findings the remaining migrations depend on:** (1) four pages emit `<header class="doc-header">` BEFORE `<main>`, so `BodyHtml` must start at that header — starting at `<main>` keeps the golden gate green while silently dropping the page's own title block from the IR, the same invisible-to-every-harness class as 23.3's double-wrapped band; (2) **`deep-analytics.html`'s `:target` lightbox sits after `</main>` and is therefore already missing from today's IR** — an inherited capture defect the composed region fixes, and AC #1's first documented delta. ⚠️ The golden constant is **`e384cbde…`**, not the `f4a7cbac…` this file quotes — stale for the fourth story running. |
 | 2026-07-28 | **Revisited and re-measured at `811ba17`; status reconciled `blocked` → `ready-for-dev`** (the file said `blocked` while `sprint-status.yaml` had said `ready-for-dev` since 23.5 landed — a one-artifact drift, now closed). **The packaging gate is CLEARED**: ADR 0022 makes Node a build/CI-time toolchain *and* a generate-time runtime, the shipped artefact is a project-independent 3.78 MB prebuilt `.output/` proven against a second project's IR (1056/1056 + 32/33 at ~4 ms/route), and the standalone binary takes a **documented Node prerequisite** rather than degrading to the C# renderer — so **Q1 and Q2 are answered**. **One new gate replaces it: Story 22.4 runs BEFORE this story** (owner D2), unifying the two region builders, converging the 46-delta and fixing the two-region-shape trap — so Task 2 inherits one region producer, not two. **Story 22.3's retired 50 KB file is now Task 2's spec** (the `NavLocalContext` blocker — there is no `path → NavLocalContext` resolver and ~8 call sites of plumbing is the real cost of correctness — the 25-templater inventory, eight pre-resolved traps, the ranked test-gate map). Stale premises corrected: **Nuxt 3 → `^4.5.1`** with `engines.node` pinned (the EOL trap is closed), **`web/` now has a vitest suite and a coverage gate** (the "zero tests" fact is false), the **next uncontested ADR number is 0023** (0019 claimed-unwritten by 18.3; 0020–0022 exist), and the golden fingerprint has moved four times in two days to `f4a7cbac…` at `SiteGeneratorAdapterTests.cs:1242` — read it, never quote it. Two items inherited from 23.5 and named rather than patched by it: **`DashboardSurface.vue` hard-throws on any project with no Hierarchy Explorer** (the one thing that broke in the two-IR run) and **the ADR 0005 CSP amendment is still this story's** — ADR 0022 deliberately does not touch CSP. |

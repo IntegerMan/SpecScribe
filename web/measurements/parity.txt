@@ -1,141 +1,28 @@
 
-Story 23.3 AC #1 — <main> region parity, per migrated surface family
+Story 23.4 AC #1 — <main> region parity, per surface family, WHOLE SITE
 
-family                    pages   golden=IR   IR=Nuxt     golden=Nuxt   verbatim
-------------------------------------------------------------------------------------
-index.html                1       1/1         0/1         0/1           0/1
-epics.html                1       1/1         0/1         0/1           0/1
-epics/epic-{N}.html       27      27/27       7/27        7/27          7/27
-epics/story-{id}.html     162     162/162     54/162      54/162        54/162
-------------------------------------------------------------------------------------
-TOTAL                     191     191/191     61/191      61/191        61/191
+family                              pages   golden=IR   IR=Nuxt     golden=Nuxt   verbatim
+----------------------------------------------------------------------------------------------
+follow-ups/**|action-items          412     412/412     412/412     412/412       412/412
+commit/{hash}.html                  300     300/300     300/300     300/300       300/300
+code/**                             264     264/264     264/264     264/264       264/264
+adrs|*-artifacts|specs|readme       170     170/170     170/170     170/170       170/170
+epics/story-{id}.html               164     164/164     164/164     164/164       164/164
+requirements[/{id}].html            81      81/81       81/81       81/81         81/81
+commits/{date}.html|timeline        28      28/28       28/28       28/28         28/28
+epics/epic-{N}.html                 27      27/27       27/27       27/27         27/27
+about|how-to-read|design-system     11      11/11       11/11       11/11         11/11
+chart singletons (8)                8       8/8         8/8         8/8           8/8
+index.html                          1       1/1         1/1         1/1           1/1
+epics.html                          1       1/1         1/1         1/1           1/1
+retros[/{slug}].html                1       1/1         1/1         1/1           1/1
+sprint.html                         1       1/1         1/1         1/1           1/1
+----------------------------------------------------------------------------------------------
+TOTAL                               1469    1469/1469   1469/1469   1469/1469     1469/1469
 
-⚠ 2 migrated surface(s) were not found in .output/public — run `npm run generate`.
+MIGRATION: no deltas. Every migrated surface renders the IR byte-for-byte, and every one of them
+           contains the IR's `<main>` body verbatim.
 
-MIGRATION: 130 surface(s) where the emitted page differs from the IR. These are
-           this story's to fix.
-
-  index.html
-    verbatim: false
-    at byte:  347
-    golden:   " wm-show-requirements wm-show-track\" href=\"requirements.html\" data-tip=\"Functional reqs: 25 done of 38. Open the requirements view to refine coverage and follow the epic → story ch"
-    nuxt:     " wm-show-requirements wm-show-track\" href=\"requirements.html\" data-tip=\"Functional reqs: 28 done of 38. Open the requirements view to refine coverage and follow the epic → story ch"
-
-  epics.html
-    verbatim: false
-    at byte:  350
-    golden:   "s=\"stat-label\">Epics drafted</div></div><div class=\"stat-card\"><div class=\"stat-number\">164</div><div class=\"stat-label\">Stories defined</div><div class=\"stat-sub\">130 with a task "
-    nuxt:     "s=\"stat-label\">Epics drafted</div></div><div class=\"stat-card\"><div class=\"stat-number\">162</div><div class=\"stat-label\">Stories defined</div><div class=\"stat-sub\">124 with a task "
-
-  epics/epic-1.html
-    verbatim: false
-    at byte:  34290
-    golden:   "s=\"view-epic-link\" href=\"../epics/story-1-5.html\">View full story plan &rarr;</a>\n</div>\n\n\n  </div>\n  <div class=\"ss-tabpanel ss-tabpanel--graph\">\n<p class=\"work-graph-intro\">This "
-    nuxt:     "s=\"view-epic-link\" href=\"../epics/story-1-5.html\">View full story plan &rarr;</a>\n</div>\n\n<section class=\"chart-panel code-areas-panel\" id=\"sec-code-areas\">\n  <h3>Code Areas Touche"
-
-  epics/epic-10.html
-    verbatim: false
-    at byte:  36389
-    golden:   "complete\">&#10003; 7 tasks</span></span>\n    <span class=\"story-card-updated\">Updated Jul 18, 2026</span>\n  </div>\n  <div class=\"user-story\">As a tech lead reading insight charts, "
-    nuxt:     "complete\">&#10003; 7 tasks</span></span>\n    <span class=\"story-card-updated\">Updated Jul 20, 2026</span>\n  </div>\n  <div class=\"user-story\">As a tech lead reading insight charts, "
-
-  epics/epic-17.html
-    verbatim: false
-    at byte:  33356
-    golden:   "11–15, not on the release-blocking path. Run create-story when scheduled.</aside>\n</div>\n\n\n  </div>\n  <div class=\"ss-tabpanel ss-tabpanel--graph\">\n<p class=\"work-graph-empty\">No pr"
-    nuxt:     "11–15, not on the release-blocking path. Run create-story when scheduled.</aside>\n</div>\n\n<section class=\"chart-panel code-areas-panel\" id=\"sec-code-areas\">\n  <h3>Code Areas Touche"
-
-  epics/epic-18.html
-    verbatim: false
-    at byte:  205
-    golden:   "\"kicker-row\">\n    <span class=\"story-kicker\">Epic 18</span>\n    <span class=\"status-badge done js-tip\" data-tip=\"Finished and closed\" title=\"Finished and closed\"><svg class=\"ss-ico"
-    nuxt:     "\"kicker-row\">\n    <span class=\"story-kicker\">Epic 18</span>\n    <span class=\"status-badge active js-tip\" data-tip=\"Actively being developed\" title=\"Actively being developed\"><svg c"
-
-  epics/epic-19.html
-    verbatim: false
-    at byte:  27813
-    golden:   "mplete\">&#10003; 13 tasks</span></span>\n    <span class=\"story-card-updated\">Updated Jul 22, 2026</span>\n  </div>\n  <div class=\"user-story\">As a maintainer who traces debt across r"
-    nuxt:     "mplete\">&#10003; 13 tasks</span></span>\n    <span class=\"story-card-updated\">Updated Jul 23, 2026</span>\n  </div>\n  <div class=\"user-story\">As a maintainer who traces debt across r"
-
-  epics/epic-2.html
-    verbatim: false
-    at byte:  40163
-    golden:   "complete\">&#10003; 5 tasks</span></span>\n    <span class=\"story-card-updated\">Updated Jul 7, 2026</span>\n  </div>\n  <div class=\"user-story\">As a reader of generated documents, I wa"
-    nuxt:     "complete\">&#10003; 5 tasks</span></span>\n    <span class=\"story-card-updated\">Updated Jul 8, 2026</span>\n  </div>\n  <div class=\"user-story\">As a reader of generated documents, I wa"
-
-  epics/epic-20.html
-    verbatim: false
-    at byte:  15571
-    golden:   "\" aria-valuenow=\"100\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"Stories detailed: 10 / 10\"><div class=\"progress-fill done\" style=\"width:100%\"></div></div>\n  <div class=\"pro"
-    nuxt:     "\" aria-valuenow=\"100\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"Stories detailed: 9 / 9\"><div class=\"progress-fill done\" style=\"width:100%\"></div></div>\n  <div class=\"progr"
-
-  epics/epic-21.html
-    verbatim: false
-    at byte:  41959
-    golden:   "=\"view-epic-link\" href=\"../epics/story-21-3.html\">View full story plan &rarr;</a>\n</div>\n\n\n  </div>\n  <div class=\"ss-tabpanel ss-tabpanel--graph\">\n<p class=\"work-graph-intro\">This "
-    nuxt:     "=\"view-epic-link\" href=\"../epics/story-21-3.html\">View full story plan &rarr;</a>\n</div>\n\n<section class=\"chart-panel code-areas-panel\" id=\"sec-code-areas\">\n  <h3>Code Areas Touche"
-
-  epics/epic-22.html
-    verbatim: false
-    at byte:  14402
-    golden:   "progress-label\">Tasks</div>\n  <div class=\"progress-bar\" role=\"progressbar\" aria-valuenow=\"79\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"Tasks: 70 / 89\"><div class=\"progress"
-    nuxt:     "progress-label\">Tasks</div>\n  <div class=\"progress-bar\" role=\"progressbar\" aria-valuenow=\"27\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"Tasks: 17 / 63\"><div class=\"progress"
-
-  epics/epic-23.html
-    verbatim: false
-    at byte:  15077
-    golden:   "progress-label\">Tasks</div>\n  <div class=\"progress-bar\" role=\"progressbar\" aria-valuenow=\"77\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"Tasks: 98 / 127\"><div class=\"progres"
-    nuxt:     "progress-label\">Tasks</div>\n  <div class=\"progress-bar\" role=\"progressbar\" aria-valuenow=\"68\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"Tasks: 63 / 93\"><div class=\"progress"
-
-  epics/epic-24.html
-    verbatim: false
-    at byte:  205
-    golden:   "\"kicker-row\">\n    <span class=\"story-kicker\">Epic 24</span>\n    <span class=\"status-badge active js-tip\" data-tip=\"Actively being developed\" title=\"Actively being developed\"><svg c"
-    nuxt:     "\"kicker-row\">\n    <span class=\"story-kicker\">Epic 24</span>\n    <span class=\"status-badge ready js-tip\" data-tip=\"Task plan exists and dependencies met\" title=\"Task plan exists and"
-
-  epics/epic-25.html
-    verbatim: false
-    at byte:  10512
-    golden:   "bel\">Stories detailed</div>\n  <div class=\"progress-bar\" role=\"progressbar\" aria-valuenow=\"100\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"Stories detailed: 6 / 6\"><div class"
-    nuxt:     "bel\">Stories detailed</div>\n  <div class=\"progress-bar\" role=\"progressbar\" aria-valuenow=\"50\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-label=\"Stories detailed: 3 / 6\"><div class="
-
-  epics/epic-26.html
-    verbatim: false
-    at byte:  205
-    golden:   "\"kicker-row\">\n    <span class=\"story-kicker\">Epic 26</span>\n    <span class=\"status-badge ready js-tip\" data-tip=\"Task plan exists and dependencies met\" title=\"Task plan exists and"
-    nuxt:     "\"kicker-row\">\n    <span class=\"story-kicker\">Epic 26</span>\n    <span class=\"status-badge drafted js-tip\" data-tip=\"Stories or a plan exist; work has not started\" title=\"Stories or"
-
-  epics/epic-3.html
-    verbatim: false
-    at byte:  37067
-    golden:   "omplete\">&#10003; 12 tasks</span></span>\n    <span class=\"story-card-updated\">Updated Jul 8, 2026</span>\n  </div>\n  <div class=\"user-story\">As an advanced user, I want deeper git a"
-    nuxt:     "omplete\">&#10003; 12 tasks</span></span>\n    <span class=\"story-card-updated\">Updated Jul 19, 2026</span>\n  </div>\n  <div class=\"user-story\">As an advanced user, I want deeper git "
-
-  epics/epic-4.html
-    verbatim: false
-    at byte:  18050
-    golden:   "complete\">&#10003; 8 tasks</span></span>\n    <span class=\"story-card-updated\">Updated Jul 9, 2026</span>\n  </div>\n  <div class=\"user-story\">As a maintainer supporting multiple fram"
-    nuxt:     "complete\">&#10003; 8 tasks</span></span>\n    <span class=\"story-card-updated\">Updated Jul 10, 2026</span>\n  </div>\n  <div class=\"user-story\">As a maintainer supporting multiple fra"
-
-  epics/epic-5.html
-    verbatim: false
-    at byte:  21866
-    golden:   "-item\" tabindex=\"0\"><span class=\"swatch sb-followup-open-sw\"></span>Open follow-up</span>\n  <span class=\"sb-legend-item sb-followup-done-item\" tabindex=\"0\"><span class=\"swatch sb-f"
-    nuxt:     "-item\" tabindex=\"0\"><span class=\"swatch sb-followup-open-sw\"></span>Open follow-up</span>\n</div>\n<p class=\"ss-hierarchy-legend-note\">Hatched sectors are work outside the normal sto"
-
-  epics/epic-6.html
-    verbatim: false
-    at byte:  73811
-    golden:   "mplete\">&#10003; 22 tasks</span></span>\n    <span class=\"story-card-updated\">Updated Jul 10, 2026</span>\n  </div>\n  <div class=\"user-story\"></div>\n  <a class=\"view-epic-link\" href="
-    nuxt:     "mplete\">&#10003; 22 tasks</span></span>\n    <span class=\"story-card-updated\">Updated Jul 11, 2026</span>\n  </div>\n  <div class=\"user-story\"></div>\n  <a class=\"view-epic-link\" href="
-
-  epics/epic-7.html
-    verbatim: false
-    at byte:  62826
-    golden:   "mplete\">&#10003; 23 tasks</span></span>\n    <span class=\"story-card-updated\">Updated Jul 12, 2026</span>\n  </div>\n  <aside class=\"md-comment\">2026-07-11 (SCP 2026-07-11, correct-co"
-    nuxt:     "mplete\">&#10003; 23 tasks</span></span>\n    <span class=\"story-card-updated\">Updated Jul 13, 2026</span>\n  </div>\n  <aside class=\"md-comment\">2026-07-11 (SCP 2026-07-11, correct-co"
-
-
-Surfaces measured: 191 of 193 migrated pages in the IR (no sampling).
+Surfaces measured: 1469 of 1469 migrated pages in the IR (no sampling).
 Golden root: C:\Dev\SpecScribe\SpecScribeOutput
 

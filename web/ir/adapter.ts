@@ -252,6 +252,7 @@ export function splitContentRegion(contentHtml: string, path: string): IrRegion 
       mainAttributes: '',
       mainAttrs: {},
       mainInnerHtml: '',
+      trailingHtml: '',
       degraded: true,
     }
   }
@@ -280,6 +281,9 @@ export function splitContentRegion(contentHtml: string, path: string): IrRegion 
     mainAttributes,
     mainAttrs: parseAttributes(mainAttributes, path),
     mainInnerHtml: contentHtml.slice(openTagEnd + 1, mainClose),
+    // Everything after `</main>` — see IrRegion.trailingHtml. Normally '', but on deep-analytics.html it is
+    // the `:target` lightbox, and dropping it here silently broke that page's "Expand" link.
+    trailingHtml: contentHtml.slice(mainClose + MAIN_CLOSER.length),
     degraded: false,
   }
 }

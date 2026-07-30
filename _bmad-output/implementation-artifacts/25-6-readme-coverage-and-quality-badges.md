@@ -16,7 +16,7 @@ touches:
 
 # Story 25.6: Coverage and Quality Badges on the README
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -169,85 +169,96 @@ package listing"* — that verification is Epic 16's, not this story's. Note the
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Re-measure before writing any number** (AC: #1)
-  - [ ] Run the four commands in § *Re-measure first* and record the output in the Dev Agent Record.
-  - [ ] If `alert_status` has become `OK`, **STOP and ask the owner** — D1's premise has changed and the
+- [x] **Task 1 — Re-measure before writing any number** (AC: #1)
+  - [x] Run the four commands in § *Re-measure first* and record the output in the Dev Agent Record.
+  - [x] If `alert_status` has become `OK`, **STOP and ask the owner** — D1's premise has changed and the
         gate badge may now be shippable. Do not silently add it; AC #2 makes it an owner-visible decision.
-  - [ ] If `coverage` is no longer `89.8`, use the new figure everywhere. Never carry a stale number forward.
-  - [ ] Confirm the build badge still reads `passing`. If CI is red, **STOP** — AC #1 is not satisfiable today.
+        → **Still `ERROR`. Premise holds; no STOP triggered.**
+  - [x] If `coverage` is no longer `89.8`, use the new figure everywhere. Never carry a stale number forward.
+        → **It moved to `89.9`. Every figure in this story's output is the re-measured one.**
+  - [x] Confirm the build badge still reads `passing`. If CI is red, **STOP** — AC #1 is not satisfiable today.
+        → **`passing`.**
 
-- [ ] **Task 2 — Badge row under the H1** (AC: #1)
-  - [ ] Insert **two** badges as a single line immediately after `# SpecScribe` (`README.md:1`) and
+- [x] **Task 2 — Badge row under the H1** (AC: #1)
+  - [x] Insert **two** badges as a single line immediately after `# SpecScribe` (`README.md:1`) and
         **before** the bold tagline on line 3. Blank line either side.
-  - [ ] Build badge — image
+  - [x] Build badge — image
         `https://github.com/IntegerMan/SpecScribe/actions/workflows/build-test-analyze.yml/badge.svg?branch=main`,
         linking to
         `https://github.com/IntegerMan/SpecScribe/actions/workflows/build-test-analyze.yml`.
         Keep `?branch=main` so a PR run cannot flip the front page.
-  - [ ] Coverage badge — image
+  - [x] Coverage badge — image
         `https://sonarcloud.io/api/project_badges/measure?project=IntegerMan_SpecScribe&metric=coverage`,
         linking to `https://sonarcloud.io/summary/overall/component_measures?id=IntegerMan_SpecScribe&metric=coverage`.
-  - [ ] Alt text must carry the meaning in **words**, not rely on the image ("Build status", "Coverage").
-  - [ ] **Absolute `https://` link targets only** (fact 5). No relative paths.
-  - [ ] **Do NOT add** `alert_status`, `reliability_rating`, or `security_rating` badges — all three
+  - [x] Alt text must carry the meaning in **words**, not rely on the image ("Build status", "Coverage").
+        → *"Build status for the main branch"* / *"Coverage, measured by SonarQube Cloud"*. **No measured
+        value is baked into the alt text** — see Deviation D-2.
+  - [x] **Absolute `https://` link targets only** (fact 5). No relative paths.
+  - [x] **Do NOT add** `alert_status`, `reliability_rating`, or `security_rating` badges — all three
         render red today. `sqale_rating` is green (A) but is not in D2's set; leave it out.
 
-- [ ] **Task 3 — Project health table + the gate-badge absence, in § Continuous integration** (AC: #1, #2)
-  - [ ] Anchor by the **heading text** `### Continuous integration`, **not by line number** — a concurrent
+- [x] **Task 3 — Project health table + the gate-badge absence, in § Continuous integration** (AC: #1, #2)
+  - [x] Anchor by the **heading text** `### Continuous integration`, **not by line number** — a concurrent
         session is holding ~47 uncommitted README lines right now (see § *Concurrent work*).
-  - [ ] Add a `#### Project health` table after the existing two paragraphs. Columns:
+  - [x] Add a `#### Project health` table after the existing two paragraphs. Columns:
         *Measure* · *Value* · *What it means*. Rows: Build, Coverage, Line coverage, Branch coverage,
-        Maintainability, Reliability, Security, Quality gate.
-  - [ ] **Every row states its status in words.** No cell may signal state by color or by a bare emoji alone.
-  - [ ] Carry a provenance line under the table in the shape ADR 0023 uses for the analysis digest:
+        Maintainability, Reliability, Security, Quality gate. → **All 8 rows present, verified in the DOM.**
+  - [x] **Every row states its status in words.** No cell may signal state by color or by a bare emoji alone.
+        → No emoji used at all; ratings are written as *"A — best rating"*, *"D — third-worst of five"*, etc.
+  - [x] Carry a provenance line under the table in the shape ADR 0023 uses for the analysis digest:
         *"Measured `<date>` against SonarCloud's analysis of `<short-sha>`."* Plus the one-line
         re-measure command so the next reader can refresh it rather than trust it.
-  - [ ] Add one short paragraph stating **why there is no quality-gate badge**: the gate is
+  - [x] Add one short paragraph stating **why there is no quality-gate badge**: the gate is
         `Sonar way`, every condition is advisory (`sonar.qualitygate.wait` unset), it currently reports
         failing, and a red front-page badge is worse than none. Link to `docs/SonarCloudSetup.md`.
         **This paragraph is how AC #2's "the story says so explicitly" reaches a reader.**
 
-- [ ] **Task 4 — Correct `docs/SonarCloudSetup.md` § What would make the gate blocking** (AC: #2)
-  - [ ] Replace the 3-item checklist's items 2 and 3 and the `> Both remaining blockers are in
+- [x] **Task 4 — Correct `docs/SonarCloudSetup.md` § What would make the gate blocking** (AC: #2)
+  - [x] Replace the 3-item checklist's items 2 and 3 and the `> Both remaining blockers are in
         web/scripts/**` block-quote with the measured truth from fact 3: **12 open new-code bugs and
         164 open new-code vulnerabilities**, 9 bugs and 160 vulns of which are in `src/`.
-  - [ ] Delete the sentence *"the `csharpsquid:S6444` band no longer drives the new-code security
+        → **Measured truth is 10 bugs in `src/`, not 9, and 161 vulns, not 160. See Deviation D-1.**
+  - [x] Delete the sentence *"the `csharpsquid:S6444` band no longer drives the new-code security
         rating"* — it is false and contradicts the same file's § *Current decisions* row.
-  - [ ] State the correct ownership: **Story 17.2** owns the `S6444`/`S4036` band; the reliability
+        → Removed from the operative text; preserved inside the Correction note as the quoted prior wording.
+  - [x] State the correct ownership: **Story 17.2** owns the `S6444`/`S4036` band; the reliability
         sweep across `src/` is unowned and should be named as such rather than implied to be Epic 23's.
-  - [ ] Explain **why** the claim went stale — the sliding `days: 30` window absorbed the band — and
+  - [x] Explain **why** the claim went stale — the sliding `days: 30` window absorbed the band — and
         cross-reference § *The new-code period*, which already predicts exactly this.
-  - [ ] Follow the file's own precedent (§ *Quality gate* opening) of **preserving the prior wording and
+  - [x] Follow the file's own precedent (§ *Quality gate* opening) of **preserving the prior wording and
         saying it was wrong**, rather than silently rewriting history.
-  - [ ] Do **not** touch § *Rule-level decisions* — that half was right.
+  - [x] Do **not** touch § *Rule-level decisions* — that half was right. → Untouched.
 
-- [ ] **Task 5 — Badge disclosure record, `docs/SonarCloudSetup.md` § Badges** (AC: #3)
-  - [ ] New section stating, per badge: the exact URL, what it discloses, and who serves it.
+- [x] **Task 5 — Badge disclosure record, `docs/SonarCloudSetup.md` § Badges** (AC: #3)
+  - [x] New section stating, per badge: the exact URL, what it discloses, and who serves it.
         Draft content is in § *Disclosure analysis (AC #3)* below — verify each claim, do not paste blind.
-  - [ ] State explicitly that **neither URL carries a token**, that the SonarCloud project is
+        → Every claim re-verified against the live tree before writing; see Debug Log.
+  - [x] State explicitly that **neither URL carries a token**, that the SonarCloud project is
         `visibility: public` so every badge endpoint answers anonymously, and that
-        **`api/project_badges/token` must never be called** for this project. NFR12's literal scope is
-        generated output and committed directory-scoped settings files, so a README token would sit just
-        outside it — but it plainly crosses NFR12's *intent* ("credential-safe"), and Story 25.4 already
-        holds the project to "writes no token value anywhere". Public project, public metrics, no token
-        needed: there is no upside to weigh against it.
-  - [ ] Record the NuGet.org allow-list dependency (fact 5) so a future badge swap re-checks it.
+        **`api/project_badges/token` must never be called** for this project.
+  - [x] Record the NuGet.org allow-list dependency (fact 5) so a future badge swap re-checks it.
+  - [x] **D4's declined-story trigger** recorded in prose in the same section (added beyond the subtask
+        list because D4 requires it and no other subtask carried it).
 
-- [ ] **Task 6 — Verify rendering** (AC: #1)
-  - [ ] `curl -sI` each badge URL: expect `200` and `content-type: image/svg+xml`.
-  - [ ] Grep each fetched SVG for its rendered text (`passing`, `89.8%`) to confirm the values match
-        Task 1's measurements. A `200` proves the endpoint answers, not that it says what you think.
-  - [ ] Render the README in a live browser (CLAUDE.md § Verification) and confirm the badge row sits
+- [x] **Task 6 — Verify rendering** (AC: #1)
+  - [x] `curl -sI` each badge URL: expect `200` and `content-type: image/svg+xml`.
+        → Build badge `200 image/svg+xml`. **Coverage badge returns `405` to HEAD — the endpoint is
+        GET-only.** GET gives `200 image/svg+xml`. See Deviation D-3.
+  - [x] Grep each fetched SVG for its rendered text (`passing`, `89.8%`) to confirm the values match
+        Task 1's measurements. → `passing` and `89.9%`, both matching Task 1.
+  - [x] Render the README in a live browser (CLAUDE.md § Verification) and confirm the badge row sits
         under the H1, both images resolve, both links land on the right surface, and the health table
-        does not overflow. **A markdown preview is not sufficient — the badges are remote requests.**
-  - [ ] Confirm `git diff --stat` shows **only** `README.md`, `docs/SonarCloudSetup.md`, and
+        does not overflow. → **Both images genuinely loaded** (`naturalWidth` 194×20 and 131×20 — not
+        merely present in the DOM). Table `scrollWidth == clientWidth`, no page overflow. Both link
+        targets return `200`.
+  - [x] Confirm `git diff --stat` shows **only** `README.md`, `docs/SonarCloudSetup.md`, and
         `sprint-status.yaml` **from this story**. Sibling sessions will have other files staged.
+        → Confirmed; `src/SpecScribe/SiteGenerator.cs` and an untracked test file are a sibling
+        session's and were left untouched.
 
-- [ ] **Task 7 — Confirm the fingerprint is unmoved** (AC: n/a — scope guard)
-  - [ ] Prove it **by scope**, not by quoting a hash: this story changes no file under `src/`, so
-        `GoldenContentFingerprint` cannot move. Concurrent sessions are editing `src/` and the hash
-        **will** shift underneath you for reasons that are not yours (CLAUDE.md § Concurrent work,
-        and Story 25.5's identical guard).
+- [x] **Task 7 — Confirm the fingerprint is unmoved** (AC: n/a — scope guard)
+  - [x] Prove it **by scope**, not by quoting a hash: this story changes no file under `src/`, so
+        `GoldenContentFingerprint` cannot move. → **Proven by scope. No hash quoted, no generation run.**
 
 ## Dev Notes
 
@@ -416,8 +427,172 @@ precisely the kind of thing a markdown preview renders convincingly and wrongly.
 
 ### Agent Model Used
 
+`claude-opus-5` (Claude Opus 5) via `/bmad-dev-story 25.6`, 2026-07-29.
+
 ### Debug Log References
+
+**Execution baseline.** Story `baseline_commit` is `8a2fb83` (preserved, not overwritten). Actual `HEAD`
+at execution was **`94b8e56`** — the concurrent session's ~47 uncommitted README lines the story warned
+about had since been committed, so the tree was clean at start apart from a sibling's `src/` work.
+
+#### Task 1 — re-measurement (2026-07-29, SonarCloud analysis `240afae` @ 2026-07-30T01:49:15Z)
+
+The story's create-time snapshot was `8a2fb83` @ 2026-07-28T23:55:45Z. **Several figures moved.**
+
+| Measure | Story (2026-07-28) | Measured (2026-07-29) | Moved? |
+|---|---|---|---|
+| `alert_status` | `ERROR` | **`ERROR`** | no — D1's premise holds |
+| `coverage` | 89.8% | **89.9%** | ✅ moved |
+| `line_coverage` | 91.9% | 91.9% | no |
+| `branch_coverage` | 85.5% | **85.7%** | ✅ moved |
+| `new_coverage` | 90.5% | **90.19%** | ✅ moved |
+| `ncloc` | 43,132 | **44,268** | ✅ moved |
+| `sqale_rating` | 1.0 (A) | 1.0 (A) | no |
+| `reliability_rating` | 4.0 (D) | 4.0 (D) | no |
+| `security_rating` | 3.0 (C) | 3.0 (C) | no |
+| `new_maintainability_rating` | A | A | no |
+| `new_duplicated_lines_density` | 0.8% | **0.62%** | ✅ moved |
+| `new_security_hotspots_reviewed` | 100% | 100% | no |
+| Open new-code bugs | 12 | 12 | no |
+| Open new-code vulnerabilities | 164 | 164 | no |
+| Project visibility | `public` | `public` | no |
+
+Badge SVGs, fetched anonymously: build renders `Build, Test &amp; Analyze - passing`; coverage renders the
+text nodes `coverage` and `89.9%`.
+
+#### Deviation D-1 — the story's own bug count was wrong, and I used the measured one
+
+Fact 3 and Task 4 both say **"9 of the 12 bugs are in `src/`"**, but fact 3's own file list enumerates
+**ten** `src/` paths. Counting the issues array precisely (`ps=100`, `resolved=false`, deduplicating against
+the response's trailing `components[]` array, which double-counts if grepped naively):
+
+| Location | Open new-code bugs |
+|---|---|
+| `src/SpecScribe/SiteGenerator.cs` | 4 |
+| `src/SpecScribe/assets/specscribe.css` | 3 |
+| `src/SpecScribe/CapabilityStyler.cs` | 1 |
+| `src/SpecScribe/WorkGraph.cs` | 1 |
+| `src/SpecScribe/HtmlRenderAdapter.Dashboard.cs` | 1 |
+| **`src/` subtotal** | **10** |
+| `extension/src/extension.ts` | 1 |
+| `web/scripts/check-links.mjs` | 1 |
+| **Total** | **12** |
+
+Severities: 1 CRITICAL, 9 MAJOR, 2 MINOR.
+
+Vulnerabilities likewise: the story says "160 of the 164 … in `src/`", but 160 is the `S6444` count, not the
+`src/` count. `src/` also holds one `csharpsquid:S4036`, so **161 of 164 are in `src/`** and only **3** are in
+`web/scripts/` (`javascript:S4036`, `jssecurity:S8707`, `jssecurity:S8705`). Severities: 2 MAJOR, 162 MINOR.
+
+**The corrected numbers are what went into `docs/SonarCloudSetup.md`.** Writing 9 and 160 would have made a
+correction section itself inaccurate — the exact failure this story exists to fix. This does not change any
+conclusion: the gate is still red, the band is still Story 17.2's, and the sweep is still unowned.
+
+#### Deviation D-2 — no measured value in badge alt text
+
+First draft used alt text `"Build status: passing"`. That bakes a live value into a static string and becomes
+a lie the moment CI goes red — the same defect as anti-pattern 5, but *unfixable by a date stamp* because alt
+text cannot carry provenance. Replaced with `"Build status for the main branch"`, matching the story's own
+value-free examples (*"Build status"*, *"Coverage"*).
+
+#### Deviation D-3 — `curl -sI` on the coverage badge returns 405, and that is correct
+
+Task 6 asks for `curl -sI` (HEAD) expecting `200`. SonarCloud's badge endpoint is **GET-only** and answers
+HEAD with `405 application/json`. This is a method rejection, not a broken badge: the same URL under GET
+returns `200 image/svg+xml` and renders `89.9%`. Recorded so a future reader does not read the 405 as a
+regression. The build badge answers HEAD normally with `200 image/svg+xml`.
+
+#### Task 6 — live-browser verification
+
+`README.md` and `docs/SonarCloudSetup.md` were rendered to HTML with `marked` (GFM) — installed into the
+**session scratchpad**, `--no-save`, never into the repo — and written to the gitignored
+`artifacts/readme-check/`, then loaded in the browser pane over `file://`. Rendering the real markdown rather
+than hand-writing equivalent HTML was deliberate: a hand-built stand-in cannot catch a markdown syntax error.
+
+Evidence gathered from the live DOM, not from a preview:
+
+- **Both badge images actually loaded.** `naturalWidth × naturalHeight` = **194×20** (build) and **131×20**
+  (coverage). A non-zero `naturalWidth` is the proof; presence of the `<img>` tag alone is not.
+- Badge row sits **between the H1 and the tagline paragraph**; `&metric=` query params survived markdown
+  parsing intact; both `<a href>` targets are the intended absolute URLs.
+- Health table: 8 rows in the required order; `scrollWidth == clientWidth == 900`; no document-level
+  horizontal overflow.
+- Both badge **link targets** return `200` (checked with `curl`, not by clicking away from the page).
+- `docs/SonarCloudSetup.md`: the Correction note renders as a blockquote carrying its `h3` heading, with the
+  preserved prior wording rendering as a **nested** blockquote inside it, plus 2 ownership list items. The new
+  `## Badges` section renders with its comparison table.
+
+**Limitation, stated rather than glossed:** the narrow-viewport check was **inconclusive**. The browser pane
+serves out-of-project files as a static snapshot and did not honour the `mobile` resize — the viewport stayed
+at 980px. The table's own geometry showed no overflow, and GitHub/NuGet supply their own table styling, but
+this story did not positively verify a 375px render.
+
+#### Concurrent work encountered
+
+`src/SpecScribe/SiteGenerator.cs` (modified) and `tests/SpecScribe.Tests/RegionCompositionParityTests.cs`
+(untracked) were dirty in the tree throughout and belong to a **sibling session**. Left entirely untouched;
+no `git checkout --`, `reset`, or `clean` was run at any point. Both README edits were grep-verified after
+writing, per CLAUDE.md § *Concurrent work*.
 
 ### Completion Notes List
 
+**All three ACs satisfied. Documentation only — no product code, no test changes, no generated output.**
+
+- **AC #1 — badges render green at the moment they land, link to explaining surfaces, and the coverage
+  figure is CI's own.** Build (`passing`) and coverage (`89.9%`) both verified green *and verified as
+  actually loading* in a live browser. Coverage is SonarCloud's own render of its own `coverage` measure, so
+  "not a separately-computed one" holds **by construction** — nothing is recomputed anywhere, and Story
+  25.5's local report was deliberately not used. Per fact 4, the README never captions it "line coverage";
+  the health table distinguishes the blend (89.9%) from line (91.9%) and branch (85.7%) explicitly.
+- **AC #2 — the gate badge is withheld, and the story says so explicitly.** `alert_status` is still `ERROR`,
+  so AC #2's escape hatch was exercised **as written, not waived**. The "Why there is no quality-gate badge"
+  paragraph in the README's § *Continuous integration* is how that reaches a reader. Task 4's correction to
+  `docs/SonarCloudSetup.md` resolves the file's self-contradiction, preserving the wrong wording verbatim
+  inside a Correction note per that file's own precedent, and naming the sliding `days: 30` window as the
+  reason it went stale.
+- **AC #3 — disclosure recorded.** New `## Badges` section in `docs/SonarCloudSetup.md`: per-badge URL,
+  server, and what it discloses; explicit no-token statement plus the standing prohibition on
+  `api/project_badges/token`; the NuGet allow-list constraint on any future badge swap; and the honest
+  point that the genuinely new disclosure is **about the reader** — `camo.githubusercontent.com` proxies on
+  github.com, but a nuget.org or mirror render sends the viewer's IP and User-Agent straight to SonarSource.
+
+**Owner decisions honoured.** D1 (build + coverage only, plus the setup-doc correction) · D2 (badge row under
+the H1 + Project health table) · D3 (disclosure record lands in `docs/SonarCloudSetup.md`, not the README) ·
+D4 (**no new story seated**; the gate-badge trigger is recorded in prose in the § *Badges* section, paired
+with an instruction to delete the README's "why there is no badge" paragraph when the gate turns green).
+
+**Scope guards held.** No file under `src/`, `tests/`, `web/`, `extension/`, `.github/workflows/`, or
+`epics.md` was modified. `GoldenContentFingerprint` is proven unmoved **by scope**, with no hash quoted and no
+generation run — per CLAUDE.md, quoting a hash here would be meaningless while a sibling session edits `src/`.
+No ADR was raised; the create-story rationale for declining one was re-checked and stands.
+
+**Three anti-patterns actively avoided:** the gate badge was not added on "it'll be green soon"; no second
+coverage number was computed; and `web/scripts/check-links.mjs:204` was left alone despite being a
+one-line fix.
+
+**Two things a reviewer should look at first:** (1) Deviation **D-1** — I wrote measured counts that differ
+from the story's own prose (10 not 9, 161 not 160); if the story's numbers were authoritative for some reason
+I did not find, the setup-doc correction needs revisiting. (2) The narrow-viewport render was **not**
+positively verified (see Task 6 limitation).
+
+**No tests were run and none were added.** This story ships no code; `dotnet test` is unaffected by a README
+and a docs file, and the suite is documented as flaky while a preview server runs. Per § *Testing standards*,
+verification here is the `curl` checks plus the live-browser render, both completed above.
+
 ### File List
+
+| File | Change |
+|---|---|
+| `README.md` | Badge row (build + coverage) inserted between the H1 and the tagline; `#### Project health` table, dated provenance line, refresh command, and the "why there is no quality-gate badge" paragraph added to § *Continuous integration*. |
+| `docs/SonarCloudSetup.md` | § *What would make the gate blocking* — checklist items 2 and 3 rewritten with measured counts; the stale block-quote replaced by a Correction note that preserves it verbatim and explains why it went stale; ownership corrected to Story 17.2 + an unowned sweep. **New** `## Badges` section (AC #3 disclosure record + D4's gate-badge trigger). § *Rule-level decisions* untouched. |
+| `_bmad-output/implementation-artifacts/sprint-status.yaml` | `25-6-…: ready-for-dev` → `review`; `last_updated` header entry prepended. |
+| `_bmad-output/implementation-artifacts/25-6-readme-coverage-and-quality-badges.md` | This story file — tasks checked, Dev Agent Record, File List, Change Log, Status. |
+
+Not modified, and deliberately so: `src/**`, `tests/**`, `web/**`, `extension/**`, `.github/workflows/**`,
+`_bmad-output/planning-artifacts/epics.md`.
+
+## Change Log
+
+| Date | Change |
+|---|---|
+| 2026-07-29 | Story 25.6 implemented. Build and coverage badges added to `README.md` with a Project health table; quality-gate badge deliberately withheld (gate still `ERROR`), exercising AC #2's escape hatch as written. `docs/SonarCloudSetup.md` § *What would make the gate blocking* corrected and a new § *Badges* disclosure record added. Re-measurement moved `coverage` 89.8 → 89.9 and corrected the story's own `src/` bug count from 9 to 10. Documentation only; golden fingerprint unmoved by scope. Status → review. |

@@ -1,0 +1,40 @@
+
+Story 23.4 AC #4 — ir-content.css residue, enumerated with a named blocker per rule
+
+bucket    rules   share    blocker
+----------------------------------------------------------------------------------------------------
+prose     93      6.5%     NONE — authorable today
+chart     284     20.0%    EPIC 22 — IR carries no structured chart data
+card      459     32.3%    EPIC 22 — IR carries no per-family view models
+chrome    97      6.8%     AC #3 BY DESIGN — C# composes the region, permanently
+status    91      6.4%     TOKEN BRIDGE — must stay in step with the six --status-* tokens
+other     396     27.9%    EPIC 22 — uncategorized injected vocabulary
+----------------------------------------------------------------------------------------------------
+TOTAL     1420    
+
+VERDICT: AC #4's FIRST branch is not reachable, and the measurement is why.
+  93 of 1420 rules (6.5%) are prose and authorable today.
+  The other 1327 (93.5%) style INJECTED bespoke vocabulary across 651 distinct classes.
+  Retiring them means either ADR 0018's explicitly rejected hand-copy, a full visual redesign, or
+  structured per-family data in the IR — the last of which is an EPIC 22 ASK, raised, not improvised.
+
+  Taking AC #4's SECOND branch: residue enumerated below, ADR 0018 amended, Epic 22 ask recorded.
+
+── prose (93) — NONE — authorable today
+   Markdig prose vocabulary. ADR 0016 puts rendered prose HTML in the IR, so this markup is injected and always will be — but its styling is generic typography that `web/` can legitimately AUTHOR (owner decision D5's "authored, owned prose stylesheet"). This is the one bucket the first branch of AC #4 actually reaches, and it is 5% of the layer.
+
+── chart (284) — EPIC 22 — IR carries no structured chart data
+   Chart shells, legends, swatches and text-twin layout. The IR carries the finished inline SVG plus its sr-only twin as opaque HTML; there is no chart MODEL to render from, so these vocabularies cannot be componentized without Epic 22 adding structured per-chart data. ADR 0012 also forbids a second Hierarchy Explorer implementation, so re-drawing them in Vue is not an option either.
+
+── card (459) — EPIC 22 — IR carries no per-family view models
+   Dashboard tiles, coverage/sprint/now-next cards, epic chips, requirement blocks. These are the page BODIES, produced by ~25 C# templaters as rendered HTML. Story 23.4 deliberately did NOT decompose them (that is the "nothing injected at all" alternative D5 rejected as pulling an Epic 22 dependency into this story). Largest bucket, and the one that most needs a real view-model contract.
+
+── chrome (97) — AC #3 BY DESIGN — C# composes the region, permanently
+   Site nav, key-views band, breadcrumb/wayfinding, TOC rail, tab strips. ⚠️ This bucket is NOT waiting on anything and will never empty: owner decision D2 keeps C# composing nav + wayfinding + <main> into the IR region, and the webview and SPA consume that same path. So these rules describe markup this story deliberately KEEPS injecting. They belong in an owned sheet in `web/`, but their provenance problem is real — they are currently a generated extract of the monolith.
+
+── status (91) — TOKEN BRIDGE — must stay in step with the six --status-* tokens
+   Status badges, stage swatches, satisfaction brackets. These cannot simply be re-authored in `web/`: the six `--status-*` custom properties in `specscribe.css` are the single stage→colour source of truth, and `npm run check:tokens` gates both directions. Re-authoring the RULES while the TOKENS stay generated is how the two drift — and UX-DR17 (no state by colour alone) is enforced by badge SHAPE, so a partial re-author risks an accessibility regression, not just a cosmetic one.
+
+── other (396) — EPIC 22 — uncategorized injected vocabulary
+   Vocabularies the coarse classifier above did not claim (explorer layout, related-work rails, story kickers, and the long tail of one-off page furniture). Same blocker class as `card`: injected rendered HTML with no view model behind it.
+

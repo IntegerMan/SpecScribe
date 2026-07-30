@@ -3,11 +3,11 @@ Story 23.2 AC #4 — hydration-payload shape, 200 identical rows per route
 
 variant                 html        payload     island      total       vs control
 ------------------------------------------------------------------------------------
-A · useAsyncData        119.3 KB    44.5 KB     —           163.9 KB    1.37x
-B · server component    119.0 KB    0.3 KB      119.0 KB    238.4 KB    2.00x
-C · static (control)    119.3 KB    0.1 KB      —           119.4 KB    1.00x
+A · useAsyncData        121.2 KB    44.5 KB     —           165.8 KB    1.37x
+B · server component    120.9 KB    0.3 KB      121.0 KB    242.2 KB    2.00x
+C · static (control)    121.2 KB    0.1 KB      —           121.3 KB    1.00x
 
-total emitted output: 102735.0 KB across 1451 files
+total emitted output: 104924.4 KB across 1513 files
 
 runtime: nuxt 4.5.1 / vue 3.5.40 / node 24.11.1
 

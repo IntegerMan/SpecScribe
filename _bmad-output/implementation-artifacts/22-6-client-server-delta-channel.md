@@ -10,7 +10,7 @@ owner_decisions: 2026-07-28 # D1 run now on 22.2's hashes; D2 delta-ify `--serve
 
 # Story 22.6: Client-Server Delta Channel
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -122,14 +122,14 @@ The document's shape is a **contract**, not an implementation detail — Story 2
 **Given** `specscribe webview --serve --serve-delta`
 **When** the first payload is produced
 **Then** it is a **full** payload, byte-identical in shape to today's `SerializePayload` output — a cold consumer needs no special case
-**And** every subsequent push is a delta frame carrying only changed/removed surfaces plus the (small) `outline`, tagged with a discriminator field and a monotonically increasing `sequence`
+**And** every subsequent push is a delta frame carrying `siteTitle`/`entry`/the configured root paths unconditionally (small, fixed-size strings — cheap to always include, so a consumer never needs a separate fetch to keep them current) alongside the changed/removed surfaces and the (small) `outline`, tagged with a discriminator field and a monotonically increasing `sequence` — **amended 2026-07-30, owner decision**, code review: the literal original wording ("carrying ONLY changed/removed surfaces plus the outline") did not match what `WebviewCommand.SerializeDeltaPayload` ships, and never has; this amendment ratifies the shipped contract rather than narrowing the frame to match the stricter original text
 **And** `--serve` **without** `--serve-delta` streams full payloads exactly as it does today, so an older VSIX against a newer core is unaffected.
 
 ### 4. Disabled is byte-identical to today
 
 **Given** neither `--serve-delta` nor watch mode is active
 **When** `specscribe generate` (with or without `--spa`) runs
-**Then** every output byte is unchanged, and `GoldenContentFingerprint` does not move
+**Then** every rendered **page's** bytes are unchanged (verified per-page, e.g. `NoStaticPage_CarriesTheQuietStamp`) — **amended 2026-07-30, owner decision**, code review: `GoldenContentFingerprint` covers the shared, always-embedded `specscribe.css` too, and is EXPECTED to move when a story adds a CSS rule (Task 6's Quiet Stamp) even though no page's own content changed; the fingerprint's literal original wording ("every output byte is unchanged... does not move") did not anticipate that shared-asset case and is corrected here rather than moving the Quiet Stamp's CSS rule out of the fingerprinted stylesheet
 **And** `SpaDelivery.SchemaVersion` is **not** bumped — a new sidecar file is additive, and its own version lives in a separate `DeltaSchemaVersion` constant.
 
 ### 5. Freshness is signalled as text — the "Quiet Stamp" direction
@@ -403,11 +403,13 @@ one, and must not be "fixed" by normalizing the hash (a delta omitting it would 
 
 **Modified — tests**
 
-- `tests/SpecScribe.Tests/SpaDeliveryTests.cs` — 16 `BuildDelta` tests
-- `tests/SpecScribe.Tests/SiteGeneratorSpaTests.cs` — sidecar + Quiet Stamp + the two race regression guards
+- `tests/SpecScribe.Tests/SpaDeliveryTests.cs` — 16 `BuildDelta` tests + 3 code-review tests (chunk-reassignment, siteTitle/nav degrade-to-full)
+- `tests/SpecScribe.Tests/SiteGeneratorSpaTests.cs` — sidecar + Quiet Stamp + the two race regression guards + 1 code-review test (sidecar write-failure isolation)
 - `tests/SpecScribe.Tests/WebviewCommandTests.cs` — 8 delta-frame contract tests
-- `tests/SpecScribe.Tests/FileWatcherServiceTests.cs` — Trap 1 concurrency test
-- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — `GoldenContentFingerprint` → `501ee958…` with isolation + provenance
+- `tests/SpecScribe.Tests/FileWatcherServiceTests.cs` — Trap 1 concurrency test + 2 code-review tests (real topology-race, RunTopologyPass trigger label)
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` — `GoldenContentFingerprint` → `501ee958…` with isolation + provenance; code review moved it again to `dbfa172b…` (Quiet Stamp CSS overflow guard)
+- `tests/SpecScribe.Tests/DeltaOracleTests.cs` — code review: 1 test (real directory rename via `Directory.Move`)
+- `tests/SpecScribe.Tests/SettingsResolverTests.cs` — code review: 2 tests (`--serve-delta` requires `--serve`)
 
 **Modified — records**
 
@@ -430,3 +432,169 @@ one, and must not be "fixed" by normalizing the hash (a delta omitting it would 
 | 2026-07-29 | `DeltaOracleTests` (AC #6); the separately-generated-site oracle was tried, failed on `diagnostics.html`/`code-map.html`, and rejected as conflating transport with recompute. |
 | 2026-07-29 | **Live verification caught the topology degrade being derived from a racy label**; moved to a route-owned flag, re-verified live, 2 regression tests added. |
 | 2026-07-29 | ADR 0028 written and cross-referenced; `epics.md` + `sprint-status.yaml` updated in the same change. |
+
+### Review Findings
+
+Code review run 2026-07-30, scoped by File List / declared symbols (not commit range) per CLAUDE.md, in 9
+task-scoped groups with hunk-level sibling attribution for shared files (`SiteGenerator.cs`,
+`FileWatcherService.cs`, `SpaDelivery.cs`, `specscribe.css`). Three independent review layers per group
+(Blind Hunter, Edge Case Hunter, Acceptance Auditor). `spike/delta-transport/` findings were dismissed
+wholesale — that harness is quarantined, throwaway, and explicitly deleted with the story per its own README;
+patching code that will never ship provides no value. Full raw findings archived at
+`C:\Users\MattE\AppData\Local\Temp\claude\C--Dev-SpecScribe\184dd7f2-c34b-44da-81dd-d206f9fe65f0\scratchpad\22-6-findings.md`.
+
+**Two defects were independently reproduced/confirmed by 4+ separate reviewer runs each** (Group 2+7+9 for the
+first; Group 3+8, 3 reviewers apiece, for the second) — treat both as CONFIRMED, not merely plausible.
+
+#### Decisions needed — RESOLVED by owner 2026-07-30
+
+- [x] [Review][Decision] NDJSON `DeltaFrame` field-set vs. AC #3's literal wording — **owner decision: amend AC
+  #3's wording to match the shipped contract** (frame carries `siteTitle`/`entry`/roots unconditionally; no code
+  change). See Patch list below.
+- [x] [Review][Decision] AC #4 fingerprint-move reframing — **owner decision: ratify the reframing.** AC #4 means
+  page bytes are unchanged, not the whole output tree; amend AC #4's wording accordingly (no code change). See
+  Patch list below.
+- [x] [Review][Decision] Site-level-metadata-only changes producing an empty delta — **owner decision:
+  conservative degrade-to-full.** If site-level metadata (`siteTitle`/nav) differs from the previous manifest,
+  `BuildDelta` should emit `full: true` rather than an empty delta. No `DeltaDocument` contract change. See
+  Patch list below.
+
+#### Patches
+
+- [x] [Review][Patch] `BuildDelta` diffs pages by `ContentHash` only, never `Chunk` — a page whose chunk
+  membership shifts (batch-boundary resequencing when a sibling page is added/removed in the same top-level
+  group, crossing `MaxPagesPerChunk`=75/`MaxChunkBytes`=2MB) without its content changing is silently omitted
+  from `changed` and from `chunks`; a polling consumer keeps a stale chunk pointer for that page. **CONFIRMED
+  independently by 4 reviewer runs** (2 with live reproduction), and the oracle test (Task 7) and all 16
+  `SpaDeliveryTests.cs` fixtures are too small to ever reach the batch-boundary scale where this fires — fix
+  must include a regression test at >75-page/2MB scale, not just the code fix. [src/SpecScribe/SpaDelivery.cs:438]
+- [x] [Review][Patch] `RegenerateTopology` sets `_nextEmitIsFullDelta = true` *before* acquiring `_gate` (the
+  lock is only taken inside the subsequent `GenerateAll()` call) — a concurrent ordinary-file pass on another
+  debounce thread can win the lock first and consume/clear the flag meant for the topology thread, so the
+  topology rebuild's own delta is wrongly marked `full: false` (a false "unchanged" for a whole-site rebuild —
+  AC #7's named worst failure). **CONFIRMED independently by 6 reviewer runs across two review groups** — this
+  reproduces the exact race class the story's own Dev Agent Record claims Task 8's live verification already
+  found and fixed for the trigger *label*; the bug moved, it wasn't fixed. Also add `try`/`finally` around the
+  flag write (a mid-rebuild exception currently leaves it stuck `true`), and add a genuine two-thread
+  concurrency regression test that actually drives `RegenerateTopology` racing an ordinary pass — the existing
+  "Trap 1" test (`ConcurrentDebouncedPasses_LeaveTheDeltaSidecarCoherent`) never triggers a topology pass at
+  all, so it cannot and did not catch this. [src/SpecScribe/SiteGenerator.cs:1497]
+- [x] [Review][Patch] `PersistentRenderer.onStdoutChunk`'s two new delta-handling teardown paths ("delta before
+  any full payload", "sequence gap") call `teardown()` without first calling `killWithEscalation(this.proc)` —
+  unlike the pre-existing byte-ceiling teardown path in the same method. The old process is never signalled to
+  exit, keeps its file watchers running, and (since `onStdoutChunk` has no `torndown` guard and the stdout
+  listener is never detached) keeps calling `applyPayload`/`dataChanged.fire()` on the shared
+  `SpecScribeStore`, racing the freshly-spawned recovery renderer and corrupting `hasLiveChannel` (the exact
+  datum the Quiet Stamp surfaces as truth). **CONFIRMED independently by all 3 reviewers in this group** —
+  directly violates Task 5's stated invariant that a live-pushed payload and a one-shot payload are
+  indistinguishable. [extension/src/extension.ts:1570]
+- [x] [Review][Patch] `--serve-delta` passed without `--serve` silently no-ops (nothing in `Validate()` rejects
+  it) — user believes delta streaming is active when it never starts. [src/SpecScribe/SiteSettings.cs]
+- [x] [Review][Patch] `.spa-live-stamp` has no `white-space`/`overflow`/`text-overflow` guard — `min-height`
+  only sets a floor, not a ceiling, so the two possible stamp strings (differing substantially in length) can
+  wrap inside `.ss-webview-toolbar` (`flex-wrap:wrap`) and shift layout, contradicting AC #5's "no layout
+  shift." The Dev Agent Record's live-verification only measured a wide 1280px viewport, not the narrow panel
+  width this same file's own comment calls "the norm" — re-verify live at narrow width after fixing.
+  [src/SpecScribe/assets/specscribe.css]
+- [x] [Review][Patch] `specscribe-spa.js`'s delta poller sets text to "Live updates: unavailable" on a
+  transient fetch failure but never resets `lastSequence` — if no new build lands before the next successful
+  poll, the unchanged sequence number short-circuits the update and the stamp stays wedged on "unavailable"
+  indefinitely, the exact dishonesty its own code comment warns against. Compounded by no in-flight/ordering
+  guard (no AbortController, overlapping polls can resolve out of order and reset `lastSequence` backwards).
+  [src/SpecScribe/assets/specscribe-spa.js]
+- [x] [Review][Patch] `isDeltaFrame`/`applyDeltaFrame` throw uncaught inside the `stdout.on('data', ...)`
+  handler on malformed input: `isDeltaFrame` dereferences `.frame` with no null/object guard (a literal `null`
+  JSON line throws), and `applyDeltaFrame` has no shape validation (a non-array `removedSurfaces` throws from
+  `for...of`) — most likely to occur right after a sequence-gap recovery, when data quality is already
+  suspect. Also add `?? base.X` fallback to the `siteTitle`/`entry` merge, which is unguarded unlike every
+  other field. [extension/src/extension.ts:152]
+- [x] [Review][Patch] `RunTopologyPass` (the directory-level topology entry point — folder create/rename/
+  delete, watcher buffer-overflow fallback) never calls `SetWatchTrigger` before escalating, unlike the
+  file-level path — a genuine directory-level rebuild can report a stale, unrelated file path as the delta
+  sidecar's `trigger` field instead of the `<directory change>` sentinel. [src/SpecScribe/FileWatcherService.cs:352]
+- [x] [Review][Patch] `EmitSpaSite` has no error isolation around `EmitDelta`/`WriteSpaFileAtomic` — a
+  delta-sidecar write failure (e.g. a lost `File.Move` race) unwinds past the calling route's already-computed
+  successful `GenerationEvent`, so a fully successful rebuild gets reported as a generic Error because the
+  optional, watch-only sidecar failed to write. [src/SpecScribe/SiteGenerator.cs]
+- [x] [Review][Patch] `DeltaOracleTests`'s "directory rename" scenario (Task 7's own checklist item) is
+  implemented as a directory *creation* (`Directory.CreateDirectory` + a new file), not a rename — undisclosed
+  substitution, checkbox marked complete regardless. Mitigating: both `Created` and `Renamed` directory watcher
+  events funnel through the same escalation sentinel, so the code path is very likely identical to a real
+  rename — but add a genuine rename-scenario test (old path removed + new path added) for literal coverage.
+  [tests/SpecScribe.Tests/DeltaOracleTests.cs]
+- [x] [Review][Patch] (from resolved decision) Amend AC #3's wording in this story file to state that a delta
+  frame carries `siteTitle`/`entry`/`configuredOutputRoot`/`sourceRoot`/`adrRoot`/`repoRoot` unconditionally
+  alongside changed/removed surfaces and the outline — matching what `SerializeDeltaPayload`/`DeltaFrame`
+  actually ship — rather than the current literal "ONLY changed/removed surfaces plus the outline." Doc-only,
+  no production code change. [22-6-client-server-delta-channel.md AC #3]
+- [x] [Review][Patch] (from resolved decision) Amend AC #4's wording to read "every rendered *page's* bytes are
+  unchanged" rather than "every output byte is unchanged," reflecting that `GoldenContentFingerprint` covers the
+  shared, always-embedded `specscribe.css` and is expected to move when a story adds a CSS rule even if no page
+  content changes. Doc-only, no production code change. [22-6-client-server-delta-channel.md AC #4]
+- [x] [Review][Patch] (from resolved decision) `BuildDelta` should degrade to `full: true` when the current
+  manifest's site-level metadata (`siteTitle`, nav) differs from the previous manifest's, even if no individual
+  page's `ContentHash` changed — currently this case silently emits an empty, non-full delta. Add a test
+  (retitle/nav-rename with zero page-content edits → `full: true`). [src/SpecScribe/SpaDelivery.cs BuildDelta]
+
+#### Deferred
+
+- [x] [Review][Defer] `EmitDelta`'s manifest lookup (`dataFiles.First(f => ...ManifestPath)`) has no fallback —
+  throws `InvalidOperationException` if ever absent; guarded by the watch loop's catch-all today, but the
+  public `GenerateOne`/`RegenerateEpics`/etc. routes are reachable directly with no equivalent guard.
+  [src/SpecScribe/SiteGenerator.cs] — deferred, low likelihood, pre-existing pattern elsewhere in this file
+- [x] [Review][Defer] `_watchTrigger` is never cleared after `EmitDelta` consumes it — a pass reached without an
+  immediately preceding `SetWatchTrigger` call reports the previous pass's label; diagnostic-field honesty
+  only, doesn't affect changed/added/removed correctness. [src/SpecScribe/SiteGenerator.cs] — deferred,
+  cosmetic/diagnostic impact only
+- [x] [Review][Defer] ADR 0028 documentation gaps: no link to its own evidence
+  (`22-6-delta-measurement-report.md`), the NDJSON delta-frame shape only partially documented
+  (`removedSurfaces`/`document`/`outline` unmentioned), no cross-reference to ADR 0024 (the surface model the
+  mechanism is built on), `docs/adrs/README.md`'s ADR 0008 summary bullet left stale, no AD-8 back-link in
+  ARCHITECTURE-SPINE.md (sibling ADR 0027 got one for AD-5), no numbering-guess note like sibling ADR 0027's.
+  [docs/adrs/0028-delta-transport-is-a-sidecar-and-a-stream-never-a-server.md] — deferred, documentation-only,
+  no correctness impact
+- [x] [Review][Defer] `TryReadPageIndex` discards the entire page index over one malformed page entry rather
+  than just that entry, silently forcing permanent full-refresh mode until the one bad entry is fixed with no
+  visible signal why. [src/SpecScribe/SpaDelivery.cs] — deferred, defensive-programming hardening, not a
+  currently-reachable production path
+- [x] [Review][Defer] Six distinct "degrade to full" causes (no previous manifest, forceFull, schema mismatch,
+  unparseable current/previous, malformed page entry) collapse into one wire boolean (`full`) with no reason
+  code — undercuts the doc comment's own "degrade LOUDLY" framing for an actual consumer, not just the source
+  reader. [src/SpecScribe/SpaDelivery.cs] — deferred, observability nicety
+
+#### Patches applied — verification
+
+All 13 patches (10 original + 3 folded in from resolved decisions) applied 2026-07-30. Verification:
+
+- Full suite: **2834 passed, 0 failed, 3 skipped** (pre-existing symlink-privilege skips), across two full runs.
+  Two rotating flakes hit once each (`SiteGeneratorCodeCitationTests.Output_IsDeterministicAcrossRuns` — a
+  minute-boundary timestamp comparison, and `BurstOfSaves_CoalescesAndLeavesCoherentOutput` — the second of this
+  story's own two documented pre-existing flakes); both confirmed green in isolation immediately after, per this
+  story's own Testing Standards note.
+- New/extended tests added alongside the fixes: 3 in `SpaDeliveryTests.cs` (chunk-reassignment,
+  siteTitle-change, nav-change degrade-to-full), 2 in `FileWatcherServiceTests.cs` (genuine 2-thread topology
+  race, RunTopologyPass trigger-label), 1 in `SiteGeneratorSpaTests.cs` (delta-sidecar write failure isolation),
+  1 in `DeltaOracleTests.cs` (real directory rename via `Directory.Move`), 2 in `SettingsResolverTests.cs`
+  (`--serve-delta` validation) — 9 new tests, all passing.
+- `GoldenContentFingerprint` moved `ad661dca…` → `dbfa172b…` (the Quiet Stamp CSS overflow-guard patch touches
+  the shared, always-embedded `specscribe.css`) — causality isolated, confirmed stable across two
+  `dotnet build --no-incremental` runs, provenance recorded at the constant per CLAUDE.md.
+- Live-browser verification (file:// snapshot of `SpecScribeOutput/app.html`, 340px viewport): the Quiet Stamp's
+  `getBoundingClientRect()` height was measured pixel-identical (22.171875px) before and after swapping in the
+  longer of its two possible strings, with `white-space: nowrap; overflow: hidden; text-overflow: ellipsis`
+  confirmed applied and `scrollWidth === clientWidth` (text clipped, not wrapped) — the "no layout shift" claim
+  now holds at the narrow width the codebase itself calls typical, not just the 1280px width the original
+  implementation checked.
+- TypeScript (`extension/`): `npm run typecheck` clean, 0 errors.
+- AC #3 and AC #4 wording amended in this file per the owner's 2026-07-30 decisions (see the resolved Decisions
+  section above).
+- [x] [Review][Defer] `sequence` has no cross-process guard — two SpecScribe processes (e.g. `watch` +
+  `webview --serve --serve-delta`) targeting the same output root would each run an independent, unsynchronized
+  `_deltaSequence` while atomically overwriting the same `spa/delta.json`. [src/SpecScribe/SiteGenerator.cs] —
+  deferred, unlikely operating mode, not exercised by any current caller
+
+**Dismissed as noise (19):** all `spike/delta-transport/` findings (the harness is quarantined and explicitly
+deleted with the story per its own README — patching throwaway code has no future value), plus minor
+test-harness-only style nits (a helper throwing `XunitException` directly instead of `Assert.Fail`, a `Dispose()`
+that swallows cleanup exceptions silently, a concurrency test not marking threads background, a `WaitForQuiet`
+helper's zero-events edge case) that don't affect the shipped artifact.

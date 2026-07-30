@@ -1,5 +1,7 @@
 # SpecScribe
 
+[![Build status for the main branch](https://github.com/IntegerMan/SpecScribe/actions/workflows/build-test-analyze.yml/badge.svg?branch=main)](https://github.com/IntegerMan/SpecScribe/actions/workflows/build-test-analyze.yml) [![Coverage, measured by SonarQube Cloud](https://sonarcloud.io/api/project_badges/measure?project=IntegerMan_SpecScribe&metric=coverage)](https://sonarcloud.io/summary/overall/component_measures?id=IntegerMan_SpecScribe&metric=coverage)
+
 **SpecScribe turns spec-driven-development artifacts into a human-readable website.**
 
 Frameworks like [BMad](https://github.com/bmad-code-org/BMAD-METHOD) (including its GDS game-development
@@ -256,6 +258,35 @@ token and storing it as the `SONAR_TOKEN` repository secret — described in
 **[SonarCloud Setup](docs/SonarCloudSetup.md)**. Until that is done CI still runs green; the scanner steps
 simply skip, which is also what happens on pull requests from forks, since GitHub does not share secrets with
 them.
+
+#### Project health
+
+| Measure | Value | What it means |
+|---|---|---|
+| Build | **Passing** | The latest `main` run of `build-test-analyze.yml` built the solution and the full test suite went green. |
+| Coverage | **89.9%** | SonarQube Cloud's blended figure — covered lines *and* covered conditions over all lines and conditions to cover. This is the number the badge above shows. |
+| Line coverage | **91.9%** | Executable lines hit by the tests. Higher than the blended figure. |
+| Branch coverage | **85.7%** | Conditional branches taken by the tests. Lower than the blended figure. |
+| Maintainability | **A** — best rating | No technical-debt band is dragging the rating down. |
+| Reliability | **D** — third-worst of five | 12 open bugs sit inside the analysis's new-code window, the worst of them rated critical. |
+| Security | **C** — middle of five | 164 open vulnerabilities sit inside the new-code window; 160 of them are one rule, `csharpsquid:S6444` (regular expressions declared without a timeout). |
+| Quality gate | **Failing** — no badge shown | The `Sonar way` gate reports `ERROR`, because it demands the best rating on both reliability and security for new code. See the paragraph below. |
+
+Measured 2026-07-29 against SonarQube Cloud's analysis of `240afae`. These figures are a hand-written
+snapshot and go stale as soon as CI runs again — the two badges under the title are always live, this table
+is not. Refresh it with:
+
+```bash
+curl -s "https://sonarcloud.io/api/measures/component?component=IntegerMan_SpecScribe&metricKeys=alert_status,coverage,line_coverage,branch_coverage,sqale_rating,reliability_rating,security_rating"
+```
+
+**Why there is no quality-gate badge.** The gate is SonarQube Cloud's built-in `Sonar way`, and every one of
+its conditions is advisory here: the workflow deliberately leaves `sonar.qualitygate.wait` unset, so a failing
+gate never fails the build. The gate currently reports failing, and it will keep reporting failing until two
+sizeable cleanups land, because Sonar's `A` rating means *zero* open issues of that class rather than *no
+severe* ones. A permanently-red badge on the front page is worse than no badge, so the build and coverage
+badges ship on their own. [SonarCloud Setup](docs/SonarCloudSetup.md) records what the gate asserts, what is
+holding it red, and who owns each cleanup.
 
 ## License
 

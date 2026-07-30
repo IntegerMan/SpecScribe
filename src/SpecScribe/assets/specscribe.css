@@ -7709,4 +7709,13 @@ a.deferred-item-resolving:hover { color: var(--rust); }
   font-size: 0.84rem;
   color: var(--ink-light);
   min-height: 1.2em;
+  /* min-height sets a floor, not a ceiling — the two stamp strings ("Live updates: unavailable" vs "Live
+     updates: connected · updated 14:32 · full refresh") differ enough in length to wrap onto a second
+     line inside the flex-wrapping .ss-webview-toolbar at a narrow panel width, which shifts layout below it —
+     exactly what AC #5's "no layout shift on update" forbids. Truncated rather than wrapped so an update never
+     changes the stamp's own height. (code review, Story 22.6) */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }

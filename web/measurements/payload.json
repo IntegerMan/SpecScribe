@@ -20,28 +20,28 @@
     {
       "route": "measure/async",
       "label": "A · useAsyncData",
-      "htmlBytes": 122211,
+      "htmlBytes": 124151,
       "payloadBytes": 45589,
       "islandBytes": 0,
-      "totalBytes": 167800,
+      "totalBytes": 169740,
       "vsControl": 1.37
     },
     {
       "route": "measure/island",
       "label": "B · server component",
-      "htmlBytes": 121887,
+      "htmlBytes": 123827,
       "payloadBytes": 330,
-      "islandBytes": 121863,
-      "totalBytes": 244080,
+      "islandBytes": 123863,
+      "totalBytes": 248020,
       "vsControl": 2
     },
     {
       "route": "measure/static",
       "label": "C · static (control)",
-      "htmlBytes": 122194,
+      "htmlBytes": 124134,
       "payloadBytes": 69,
       "islandBytes": 0,
-      "totalBytes": 122263,
+      "totalBytes": 124203,
       "vsControl": 1
     }
   ],

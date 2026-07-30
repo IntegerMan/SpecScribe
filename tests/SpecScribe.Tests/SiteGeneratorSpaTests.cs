@@ -1225,6 +1225,31 @@ public class SiteGeneratorSpaTests : IDisposable
         Assert.False(ReadDelta().GetProperty("full").GetBoolean());
     }
 
+    /// <summary>Code review finding (Story 22.6): the delta sidecar is an OPTIONAL, additive, watch-only file
+    /// (AC #2/#4) — a failure writing it must never turn an otherwise-successful IR/site emit into a reported
+    /// <see cref="GenerationOutcome.Error"/>. Forces a real write failure (a directory sitting where the sidecar
+    /// file needs to land, so <c>File.Move</c> cannot replace it) rather than asserting on the try/catch's
+    /// existence.</summary>
+    [Fact]
+    public void ADeltaSidecarWriteFailure_DoesNotFailTheOtherwiseSuccessfulRoute()
+    {
+        var gen = WatchingSite();
+
+        // A directory at the sidecar's own path makes File.Move(temp, full, overwrite: true) throw — a real,
+        // reproducible I/O failure rather than a mocked one. WatchingSite()'s own first pass already wrote a
+        // real delta.json file there, so it has to come out before a directory can take its place.
+        File.Delete(DeltaFile);
+        Directory.CreateDirectory(DeltaFile);
+
+        var doc = Path.Combine(Source, "planning-artifacts", "sidecar-fail.md");
+        File.WriteAllText(doc, "# Sidecar Fail\n\nBody.\n");
+        var ev = gen.GenerateOne(doc);
+
+        Assert.NotEqual(GenerationOutcome.Error, ev.Outcome);
+        // The page itself still rendered — the failure was isolated to the sidecar, not the site.
+        Assert.True(File.Exists(Path.Combine(Site, "planning-artifacts", "sidecar-fail.html")));
+    }
+
     /// <summary>⚠ THE Task 1 FINDING, pinned so it cannot silently regress. The story's Trap 2 said not to advance
     /// the delta basis on a <see cref="GenerationOutcome.Skipped"/> outcome "because the generator's in-memory
     /// state is unchanged". That premise is FALSE for <see cref="SiteGenerator.RegenerateFromDataSource"/>, which

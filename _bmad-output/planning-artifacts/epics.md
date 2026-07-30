@@ -4440,6 +4440,60 @@ So that SpecScribe has a single renderer and no drift hazard between two templat
 > probably documentation-only** now that 23.3's `noScripts: true` removed the hydration 23.1's
 > `'strict-dynamic'` finding was about.
 
+<!-- ── DEV-STORY OUTCOME 2026-07-29 (structural changes recorded in BOTH artifacts in the same change, per
+     CLAUDE.md § Decision records; the `23-4` key in sprint-status.yaml carries the same summary) ──────────── -->
+
+> **↻ Dev-story outcome, 2026-07-29. Three of the seeded premises did not survive measurement, and two owner
+> decisions are amended as a result. Recorded here because each changes a shared contract, not just this story.**
+>
+> **AC drift.** The epic states two ACs for this story; the story file carries **eight** (ACs 3–8 are the four
+> owner decisions, the 23.1 gate's CSP assignment, and ADR 0018's retirement condition). Same shape as 23.3.
+>
+> 1. **The inventory was wrong by 40 %, in both directions over time.** Seeded as "857 pass-through of 1,046".
+>    Measured from a `--deep-git --spa` generate: **1,469 IR pages**, of which 193 were already migrated and
+>    **1,276** were not. A default generate omits `git-insights.html`, `deep-analytics.html`, `impact-map.html`
+>    and all 300 `commit/` pages, so any count taken without `--deep-git` understates the story by ~300 pages.
+> 2. **D3/D5 is AMENDED: `ir-content.css` is NOT retired, and its "when it is empty" condition is unreachable
+>    as written.** Only **6.5 %** of the layer's rules are prose and authorable today; **93.5 %** style bespoke
+>    vocabulary *injected as rendered HTML* across **651 classes**. Retiring those means either ADR 0018's
+>    explicitly rejected hand-copy, a full visual redesign, or **structured per-family data in the IR — an Epic
+>    22 ask**, raised rather than improvised (the escalation the story's own Dev Notes prescribe). One bucket,
+>    the 97 `chrome` rules, **never empties**: owner decision D2 and ADR 0024 keep C# composing nav + wayfinding
+>    + `<main>` permanently. AC #4's **second branch** is taken: residue enumerated per rule with a named
+>    blocker (`npm run report:ir-content-residue`, committed), **[ADR 0018](../../docs/adrs/0018-transitional-ir-content-style-layer.md)
+>    amended with an addendum**, and **1,420** is the owner-visible debt figure.
+>    ⚠️ A separate, *worse* defect was found and fixed in the same area: the extractor was still bounded to
+>    Story 23.3's four families, so the 1,276 newly-migrated pages had only **42 %** of their classes styled and
+>    the rest rendered **bare**. Widening it to the whole site took coverage to **100 %** while still dropping
+>    393 of 1,814 source rules as unused — so the layer is still bounded, still scoped, still gated.
+> 3. **`GoldenContentFingerprint` is NOT retired and did NOT move — deliberately, and AC #5 is satisfied by its
+>    successor instead.** The C# page writer still ships, so the hash still covers something real and stayed
+>    **stationary** all session (the correct assertion while templaters move). What AC #5 actually asked for —
+>    "a fingerprint over the IR … does not exist yet" — now exists: **`GoldenIrFingerprint`**, hashing the
+>    `spa/` manifest and chunks, landed in the *same* story that switched the IR's producer, so the drift gate
+>    never lapses. Its capture caught real nondeterminism via the two-run rule (the manifest's derived
+>    `contentHash` for `diagnostics.html` embeds the output path); stable across **three** runs after folding it.
+> 4. **AC #3 LANDED; the DELETION did not, and that is a sequencing decision, not drift.** The IR is now built
+>    from a region **composed** from each page's own `PageView` at the write seam — proven byte-equal to the old
+>    `ExtractContentRegion` slice across **1,469 pages with 0 unexpected deltas** — and `SpaDelivery.Extract*`
+>    survives only as that proof's oracle. But `HtmlRenderAdapter.Render` and the `.html` writes **remain**,
+>    because deleting them destroys the live golden side that the owner's verify-and-iterate pass needs in order
+>    to re-measure any change they ask for. Deletion should follow owner verification, not precede it.
+> 5. **Owner decision D6 discharged and re-homed.** `DashboardSurface.vue`'s hard-throw on a chart-less
+>    dashboard — the one route that failed Story 23.5's two-IR experiment (CORA **32/33**) — is fixed here and
+>    Story 23.5's open-items row 1 moves from Story 23.3 to this story.
+> 6. **The CSP amendment landed as [ADR 0032](../../docs/adrs/0032-csp-posture-after-the-projection-layer.md),
+>    once**, discharging ADR 0012 §Decision 5. Measured verdict: **no relaxation of the policy string** — 23.3's
+>    `noScripts: true` removed 23.1's hydration premise (0 Nuxt scripts, 0 `_payload.json` across 1,469 routes)
+>    and the webview is not a Nuxt consumer anyway. It restates ADR 0005 §4's "the body carries no scripts of
+>    its own" as an enforced claim about the **region** (0 executable, 163 inert data islands).
+> 7. **Epic 22's `22-5`/`22-6` premises: intact, and now better supported.** Both stories have already landed
+>    (`done` / `review`), and neither depended on C# writing `.html` — 22.5's incremental engine keys on the
+>    classifier and 22.6's delta channel on the IR. Switching the IR's producer to a composed region *helps*
+>    both: page title, breadcrumb and meta description now come from the view model instead of being regex-scraped
+>    back out of finished HTML, so an incremental recompute no longer depends on re-parsing its own output. What
+>    Epic 22 newly **owes** is item 2's view-model ask.
+
 ### Story 23.5: Packaging Reconciliation
 
 As a maintainer responsible for SpecScribe's distribution,
@@ -5340,3 +5394,20 @@ So that I can target the code most likely to break rather than chasing a global 
 **Given** per-line coverage marks were explicitly scoped OUT of this epic
 **When** this story is planned
 **Then** it records whether the analytics work changed the case for per-line marks, so that decision is revisited **on evidence** rather than silently dropped or silently expanded.
+
+## Epic 28: Text-Twin & JS-Off Standardization — One Proven Pattern, Then a Verified Rollout
+
+Prove a single, standardized, reusable text-twin pattern on one representative hierarchy/graph surface, verify it live (JavaScript disabled, keyboard, screen reader), then broaden it to every remaining surface as its own scoped rollout — the same spike → component → site-wide-rollout shape Epic 20 used to standardize the chart engine itself, applied this time to the accessibility contract ADR 0013 made mandatory.
+
+This epic exists because ADR 0013's hard per-surface gate ("no SVG retires until its twin is audited complete") had no durable owner once Epic 20 closed: ADR 0030 named the gap directly (no Epic 24 story owns `Charts.ReferenceGraph`'s text-twin audit), and the Epic 20 retrospective found the same gate pulling ordinary feature stories toward accessibility-audit breadth instead of core-UX depth while the project has exactly one confirmed consumer. [ADR 0031](../../docs/adrs/0031-text-twin-standardization-moves-to-its-own-epic.md) seats this epic and retires the per-story gate for new work; NFR-5's wording is unchanged.
+
+**FRs covered:** none new · **NFRs:** NFR-5 (as amended by ADR 0013; delivery sequencing changed by ADR 0031, not the requirement) · **UX-DRs:** UX-DR17, UX-DR19, UX-DR21 · **Design-locked by:** [ADR 0013](../../docs/adrs/0013-text-twin-is-the-no-js-contract.md) (the contract) and [ADR 0031](../../docs/adrs/0031-text-twin-standardization-moves-to-its-own-epic.md) (the epic seat + gate removal) · **Status:** backlog · unscheduled · no stories yet · **Depends on:** Epic 20 (the Hierarchy Explorer component and Story 20.6/20.9's partial audit — dashboard, story detail, Code Map, Impact Map, and Git Insights already have twins and are not in scope for re-work); resolves the open item ADR 0030 named for Epic 24's `Charts.ReferenceGraph`.
+
+<!-- Epic 28 seated 2026-07-29 (Epic 20 retrospective, owner-ratified via ADR 0031). No stories written yet —
+     story breakdown (which surface proves the pattern first, what "standardized" means concretely, how the
+     rollout is sequenced) is deferred to its own create-epics-and-stories / create-story pass, not decided here.
+     Known already-audited surfaces per Story 20.6/20.9: dashboard, story detail, Code Map, Impact Map, Git
+     Insights. Known gaps at seed time: epics index, epic detail (both FAIL in Story 20.6's audit, unaddressed
+     since); Epic 24's force-directed graph views (ADR 0030's named gap); any surface added after 2026-07-29
+     without an audited twin should be recorded here as debt owed to this epic, per ADR 0031 Decision 4. -->
+

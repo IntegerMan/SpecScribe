@@ -1,6 +1,6 @@
 # ADR 0018: A Generated, Bounded, Self-Retiring Style Layer for Injected IR Content
 
-**Status:** Proposed (authored 2026-07-27 by Story 23.3; ratification is the owner's)
+**Status:** Proposed (authored 2026-07-27 by Story 23.3; ratification is the owner's) — **amended 2026-07-29 by Story 23.4: the retirement clause in §Decision 4 is NOT discharged, and its "when it is empty" condition is unreachable as written. See §Addendum.**
 **Date:** 2026-07-27
 **Deciders:** Matthew-Hope Eland
 **Relates to:** [ADR 0009](0009-frontend-framework-for-projection-layer.md) (the projection layer this styles); [ADR 0016](0016-ir-carries-rendered-prose-html.md) (the reason injected markup exists at all); [ADR 0010](0010-client-side-charting-js-for-opt-in-analytics-surfaces.md) §zero-dependency posture (why the extractor is hand-written); AD-7 in ARCHITECTURE-SPINE.md (SpecScribe owns content-semantic tokens); Story 23.2 (the token bridge this sits beside), Stories 23.3 and 23.4 (the story that retires it)
@@ -52,6 +52,47 @@ The 23.1 spike took the first option, which is part of why its result did not tr
 **Neutral.**
 
 - Source comments are stripped rather than carried. That removes the `*`+`/`-inside-a-comment hazard from the generated output by construction, and it means the generated sheet is not a place to look for the source's reasoning.
+
+## Addendum — Story 23.4's retirement attempt, and the measured residue (2026-07-29)
+
+**Status of the retirement clause: NOT DISCHARGED. The layer survives, with a named blocker per rule.**
+
+§Decision 4 says "that list **is** the surface Story 23.4 has to retire … when it is empty, the layer and its gate are deleted". Story 23.4 attempted exactly that under owner decision **D5** (AC #4's first branch: componentize fully, retire the layer to empty, style the remaining injected prose from a hand-authored sheet in `web/`). It does not reach empty, and the reason is architectural rather than a matter of effort.
+
+**First, a correction this ADR's §Consequences forced.** That section accepted that non-migrated pages "get only whatever the migrated families already paid for (**48 %** of the classes they use)" because those pages were `PassThroughSurface` and not claimed. Once Story 23.4 migrated the remaining **1,276** pages, that bound stopped being conservative and became wrong — the extractor was carrying rules for four families while the router rendered fourteen, so ~58 % of the classes those pages emit had **no rule at all**. Nothing fails and nothing is logged; the element just renders bare, which is this ADR's own rejected alternative #3 reached by omission. So Story 23.4 **widened the extraction to the whole site**, and the feared outcome did not occur:
+
+| | before (4 families) | after (whole site) |
+| --- | --- | --- |
+| pages driving extraction | 4 | **1,469** |
+| rules carried | 880 | **1,416** |
+| source rules dropped as unused | — | **393 of 1,814 (21.7 %)** |
+| layer vs. source stylesheet | 62 % smaller | **46 % smaller** |
+| class coverage of the other pages | 42 % | **100 %** |
+
+It is therefore still a *bounded* layer, not a wholesale import: a fifth of the monolith is still dropped, every rule is still `.ir-content`-scoped (containment — the actual blast-radius argument, which never depended on rule count), and every rule is still generated and gated in both directions, so alternative #2's drift risk is still avoided. What is given up is the headline size reduction, stated here rather than buried.
+
+**The residue measurement** (`npm run report:ir-content-residue`, committed at `web/measurements/ir-content-residue.{txt,json}`) then buckets all **1,420** carried rules by what would have to change for each to stop existing:
+
+| bucket | rules | share | blocker |
+| --- | --- | --- | --- |
+| prose | 93 | 6.5 % | **none — authorable today** |
+| chart | 284 | 20.0 % | Epic 22 — the IR carries no structured chart data |
+| card | 459 | 32.3 % | Epic 22 — the IR carries no per-family view models |
+| chrome | 97 | 6.8 % | **ADR 0024 / 23.4 AC #3, by design — permanent** |
+| status | 91 | 6.4 % | the token bridge — must stay in step with the six `--status-*` tokens |
+| other | 396 | 27.9 % | Epic 22 — uncategorized injected vocabulary |
+
+**Why D5's first branch cannot be taken.** D5 was locked before anyone measured what the layer *styles*. It assumed the injected residue was essentially prose. It is not: **93.5 %** of it is the portal's bespoke visual vocabulary — chart legends, dashboard cards, status badges, nav chrome — spread over **651 distinct classes** and emitted as rendered HTML by ~25 C# templaters. With ADR 0016 keeping rendered HTML in the IR and 23.4's owner decision D2 keeping C# composing the region, the only ways to retire those rules are:
+
+1. hand-copy the monolith rules into components — **this ADR's explicitly rejected alternative** ("a second definition free to drift … it is not a migration, it is a rewrite");
+2. author genuinely new styling for 380 vocabularies — a **visual redesign of the whole portal**, which is neither what D5 asked for nor verifiable inside one story;
+3. de-inject the markup — which needs **structured per-family data in the IR** that ADR 0016 deliberately does not carry.
+
+(3) is the real answer and it is an **Epic 22 ask**, raised rather than improvised, exactly as Story 23.4's Dev Notes → "Escalation, not improvisation" instructs.
+
+**One bucket will never empty, and that changes this ADR's own end state.** The `chrome` 92 rules style the nav, key-views band, breadcrumb/wayfinding, TOC rail and tab strips — markup that owner decision D2 and [ADR 0024](0024-spa-and-webview-are-filtered-projections-of-one-region-seam.md) keep C# composing into the region **permanently**, because the webview and SPA consume that same seam. So §Decision 4's "when it is empty" condition is unreachable as written even after Epic 22 lands: a residue floor exists by design. What those rules need is not deletion but a change of **provenance** — an owned sheet in `web/` rather than a generated extract — which is a smaller, separable piece of work than the other buckets.
+
+**Consequently this ADR stays `Proposed` and its retirement clause is amended:** the layer retires when the Epic 22 view-model work lands for the `chart`/`card`/`other` buckets (**1,139 rules, 80.2 %**), the token bridge absorbs `status` (**91**), and `chrome` (**97**) is re-homed to an authored sheet. Until then the layer, its manifest and `npm run check:ir-content` **stay**, and **1,420** is the owner-visible debt figure.
 
 ## Alternatives considered
 

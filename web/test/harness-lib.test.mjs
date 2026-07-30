@@ -11,22 +11,49 @@ import { describe, expect, it } from 'vitest'
 import { excerpt, firstDifference, kb, mainRegion, normalizeVolatile, pad } from '../scripts/harness-lib.mjs'
 
 describe('mainRegion', () => {
-  it('returns the whole <main> element including its tags', () => {
-    expect(mainRegion('<div>x</div><main id="m" class="a">body</main><footer>f</footer>')).toBe(
-      '<main id="m" class="a">body</main>',
-    )
+  it('returns the whole landmark element including its tags', () => {
+    expect(
+      mainRegion('<div>x</div><main id="main-content" class="a">body</main><footer>f</footer>'),
+    ).toBe('<main id="main-content" class="a">body</main>')
   })
 
   it('spans newlines', () => {
-    expect(mainRegion('<main>\nline\n</main>')).toBe('<main>\nline\n</main>')
+    expect(mainRegion('<main id="main-content">\nline\n</main>')).toBe(
+      '<main id="main-content">\nline\n</main>',
+    )
   })
 
   it('is greedy to the LAST </main>, so a nested one cannot truncate the region', () => {
-    expect(mainRegion('<main>a<main>b</main>c</main>')).toBe('<main>a<main>b</main>c</main>')
+    expect(mainRegion('<main id="main-content">a<main>b</main>c</main>')).toBe(
+      '<main id="main-content">a<main>b</main>c</main>',
+    )
   })
 
   it('returns null when there is no <main>', () => {
     expect(mainRegion('<div>no landmark here</div>')).toBeNull()
+  })
+
+  /**
+   * Story 23.4 NARROWED this from `/<main\b/` to the full `id="main-content"` landmark, and these two cases
+   * are why. The loose pattern reported a parity delta on a page that was byte-correct.
+   */
+  it('does NOT match a <main> that appears inside an attribute value', () => {
+    // Real page, real failure: this repo has a deferred-work item whose own title is about the landmark
+    // extraction, so its page carries the literal text `<main> body…` in its meta description. `<` needs no
+    // escaping inside a quoted attribute value and Nuxt's `useHead` does not escape it (C#'s PathUtil.Html
+    // does), so the extractor sliced a "region" out of the <head> and reported a false delta on
+    // follow-ups/deferred-the-shared-6-7-landmark-extraction-truncates-a.html.
+    const html =
+      '<head><meta name="description" content="… truncates a <main> body… — SpecScribe"></head>' +
+      '<body><main id="main-content">real body</main></body>'
+    expect(mainRegion(html)).toBe('<main id="main-content">real body</main>')
+  })
+
+  it('returns null for a bare <main> with no id, rather than guessing', () => {
+    // Every page this project emits carries the universal Story 1.4 landmark, and SpaDelivery's own
+    // MainLandmarkMarker is the same string — so a bare <main> is content (a doc quoting HTML), not a region.
+    // Matching structure rather than text is the rule; this is the third bug of that class here.
+    expect(mainRegion('<main>quoted in a doc</main>')).toBeNull()
   })
 })
 

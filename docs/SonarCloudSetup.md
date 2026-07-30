@@ -284,23 +284,51 @@ The alternatives were rejected as costing more than they are worth *today*, not 
 findings that live in `src/` and `web/` — code Epic 25 is explicitly forbidden to touch — and would break CI
 for concurrent work mid-epic.
 
-Set it once **all three** of these are true. **Measured on `main` at `b86fc27`, the first analysis with the
-full C# + JS coverage path wired:**
+Set it once **all three** of these are true. **Re-measured by Story 25.6 on 2026-07-29 against the analysis of
+`240afae`:**
 
-1. ✅ `new_coverage` — **PASSES, at 89.3% against 80%.** This condition was the whole story on 2026-07-27
+1. ✅ `new_coverage` — **PASSES, at 90.2% against 80%.** This condition was the whole story on 2026-07-27
    morning (59.4%) and is now the least of the problem. Story 23.5's Vitest lcov report plus its *narrowed*
    coverage exclusions did it: excluding `web/scripts/**` (743 of the 918 uncovered lines) and
    `web/**/*.vue` left a denominator of genuinely testable code.
-2. ❌ `new_reliability_rating` must be A — it is **D**, from one CRITICAL `javascript:S2871` at
-   `web/scripts/check-links.mjs:204` (a `.sort()` with no compare function). **Owned by Epic 23.**
-3. ❌ `new_security_rating` must be A — it is **C**, from two MAJOR `jssecurity:S8707` / `S8705` at
-   `web/scripts/experiment-two-ir.mjs:95` (argument handling that can escape filesystem and shell sandbox
-   restrictions). **Owned by Epic 23.**
+2. ❌ `new_reliability_rating` must be A — it is **D**, from **12 open bugs inside the new-code window**:
+   1 CRITICAL, 9 MAJOR, 2 MINOR. **10 of the 12 are in `src/SpecScribe/`** (`SiteGenerator.cs` ×4,
+   `assets/specscribe.css` ×3, `CapabilityStyler.cs`, `WorkGraph.cs`, `HtmlRenderAdapter.Dashboard.cs`),
+   1 in `extension/src/extension.ts`, and 1 in `web/scripts/check-links.mjs`.
+3. ❌ `new_security_rating` must be A — it is **C**, from **164 open vulnerabilities inside the new-code
+   window**: 2 MAJOR, 162 MINOR. **161 of the 164 are in `src/`** — 160 `csharpsquid:S6444` plus one
+   `csharpsquid:S4036` — and only 3 are in `web/scripts/`.
 
-> **Both remaining blockers are in `web/scripts/**`** — dev-time harness scripts, coverage-excluded but still
-> fully analyzed, which is exactly the intended arrangement. Neither is C# and neither is Story 17.2's:
-> the `csharpsquid:S6444` band no longer drives the *new-code* security rating, though it still drives the
-> project-level one.
+> ### ⚠ Correction (Story 25.6, 2026-07-29): the paragraph this replaces was wrong
+>
+> This section previously carried the following block-quote, measured at `b86fc27`:
+>
+> > **Both remaining blockers are in `web/scripts/**`** — dev-time harness scripts, coverage-excluded but
+> > still fully analyzed, which is exactly the intended arrangement. Neither is C# and neither is Story
+> > 17.2's: the `csharpsquid:S6444` band no longer drives the *new-code* security rating, though it still
+> > drives the project-level one.
+>
+> **Every load-bearing claim in it is now false**, and the last one contradicted this same file's
+> § *Rule-level decisions* → *Current decisions*, which said all along that `S6444` "drives security rating
+> **C** and keeps `new_security_rating` at **B**". That half was right; this one was not.
+>
+> **Why it went stale:** the new-code period is a **sliding `days: 30` window**, and it has since swallowed
+> the `S6444` band whole. § *The new-code period* above predicts exactly this failure mode — "new code ≈ all
+> code" — and this is what it looks like when it happens. Nothing was fixed and nothing regressed; the window
+> simply moved to cover code that was already there. Expect any *count* in this section to age the same way.
+>
+> **Ownership, corrected:**
+>
+> - The `csharpsquid:S6444` / `S4036` band — 161 of the 164 vulnerabilities — is **Story 17.2's**, per
+>   § *Rule-level decisions*. It was never Epic 23's.
+> - The 12-bug reliability sweep is **unowned**. 10 of the 12 are in `src/SpecScribe/`, which is outside
+>   Epic 23's scope entirely; the single `check-links.mjs` bug is the only one Epic 23 could be said to own.
+>   Naming it unowned is deliberate — it needs a home before the gate can be made blocking.
+
+**Fixing the named `web/scripts/` files does not turn the gate green.** On Sonar's scale, `A` means *zero*
+open issues of that class — not "none severe". Clearing `check-links.mjs:204` moves reliability D → C;
+clearing `experiment-two-ir.mjs:95` moves security C → B. Both conditions still fail. The real precondition
+is Story 17.2's 161-issue band **plus** the 12-bug sweep across `src/`.
 
 Until then the actionable channel is **pull-request decoration** by the SonarQube Cloud GitHub App, not a red
 CI job.
@@ -506,6 +534,83 @@ anything this project would build, and it costs no code.
 - It has **no provenance/staleness contract** — nothing tells you which revision an answer describes.
 
 Use both, with those roles.
+
+## Badges
+
+Story 25.6 put two badges under the README's H1: **build status** and **coverage**. This section is the
+disclosure record for them — what each URL reveals, and to whom. The README is a front door; this is the
+record.
+
+### What ships, and what deliberately does not
+
+| | Build badge | Coverage badge |
+|---|---|---|
+| **Image URL** | `https://github.com/IntegerMan/SpecScribe/actions/workflows/build-test-analyze.yml/badge.svg?branch=main` | `https://sonarcloud.io/api/project_badges/measure?project=IntegerMan_SpecScribe&metric=coverage` |
+| **Links to** | the workflow's run history | the SonarQube Cloud `coverage` measure page |
+| **Served by** | GitHub | SonarSource |
+| **Discloses** | repo owner and name, the workflow *filename*, the branch name `main`, and pass/fail of the latest run | the SonarCloud project key and the current `coverage` value |
+| **Already public?** | Yes — the repo is public and the workflow file is in it | Yes — `IntegerMan_SpecScribe` and `integerman-github` are literals in `build-test-analyze.yml:185-186`, and the project is `visibility: public` |
+| **Carries a token?** | **No** | **No** |
+
+No quality-gate, reliability, or security badge ships. All three render red today, and a permanently-red
+badge on the front page is worse than none. `sqale_rating` is green (A) but was left out as well — the README
+carries two live badges, not a wall.
+
+**Trigger for revisiting the gate badge.** No story is seated for it; Story 25.6 offered one and the owner
+declined, on the grounds that seating a story against a precondition nobody has scheduled is bookkeeping
+rather than work. The trigger lives here instead:
+
+> When `alert_status` reads `OK` — check with the `project_status` command in § *The conditions, transcribed* —
+> add the gate badge to the README's badge row, pointing at
+> `https://sonarcloud.io/api/project_badges/measure?project=IntegerMan_SpecScribe&metric=alert_status`, and
+> delete the "Why there is no quality-gate badge" paragraph in the README's § *Continuous integration*. That
+> paragraph and this trigger are a matched pair; neither should outlive the red gate.
+
+Reaching `OK` needs Story 17.2's `S6444`/`S4036` band cleared **and** the 12-bug reliability sweep across
+`src/` — see § *What would make the gate blocking*. Neither is a README task.
+
+### No token, ever, for this project
+
+Neither URL carries a credential, and neither needs one: the project is `visibility: public`, so every badge
+endpoint answers anonymously. SonarCloud's `api/project_badges/token` endpoint mints a badge token for
+*private* projects, and **it must never be called for this project**. A token in a README image URL is a
+credential published on the front page and in the NuGet listing — and rotating it silently breaks every
+rendered copy.
+
+NFR12's literal scope is generated output and committed directory-scoped settings files, so a README token
+would sit just outside it. It plainly crosses NFR12's *intent*, and Story 25.4 already holds this project to
+writing no token value anywhere. Public project, public metrics, no token needed: there is nothing to weigh
+against it.
+
+### The disclosure that is about the reader, not the project
+
+Nothing in either URL reveals a private repository, a credential, a contributor identity, a source path, or a
+finding. The rendered values are already published on a public SonarCloud dashboard and a public Actions tab.
+
+The genuinely new disclosure is about **whoever views the README**:
+
+- **On github.com**, README images are proxied through `camo.githubusercontent.com`. The viewer's IP reaches
+  GitHub, not SonarSource.
+- **Rendered anywhere else** — nuget.org, a docs mirror, an RSS reader, an IDE package pane — the image
+  request goes **direct to `sonarcloud.io`**, disclosing the viewer's IP and User-Agent to SonarSource.
+
+That is a normal and accepted cost of badges. The point is that it is written down rather than unnoticed.
+
+### Constraint on any future badge change: the NuGet allow-list
+
+`src/SpecScribe/SpecScribe.csproj:23,56` sets `PackageReadmeFile` and packs the repo-root `README.md` into the
+package, so **this README is also the NuGet.org package listing**. NuGet.org renders README images only from
+an allow-list of domains; anything else is dropped and raises a warning visible to package owners. Relative
+image and link paths do not resolve there either — badge links must be absolute `https://` URLs.
+
+Both current hosts are allow-listed: `sonarcloud.io`, and the
+`github.com/<owner>/<repo>/actions/workflows/<file>/badge.svg` path shape. **Re-check the allow-list before
+swapping in any other badge host** (shields.io, badgen, a self-hosted SVG). A self-generated coverage SVG is
+additionally forbidden on different grounds: it would be a second, separately-computed coverage number, which
+Story 25.6's AC #1 rules out. The badge must be SonarQube Cloud's own render of its own measure.
+
+Whether the packaged README actually renders on the package listing is Epic 16's verification, not this
+record's.
 
 ## Security notes
 

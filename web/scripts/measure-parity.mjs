@@ -14,6 +14,7 @@
 //
 // Run `npm run generate` first; this script measures, it does not build.
 
+import { createHash } from 'node:crypto'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
@@ -27,23 +28,59 @@ import {
   PUBLIC_DIR,
   readOrNull,
 } from './harness-lib.mjs'
-import { isMigrated, MIGRATED } from './ir-content-lib.mjs'
+import { resolveFamily } from '../ir/families.ts'
 
 assertFullRun('measure:parity')
 
 const ir = await import('../ir/adapter.ts')
 const goldenRoot = ir.IR_DIR
 
+/**
+ * Story 23.4 widened this harness from Story 23.3's four migrated families to the WHOLE site. The family
+ * labels are now the `IrFamily` union from `ir/families.ts` — the same classifier the router uses — so the
+ * parity table and the rendered `data-ir-family` attribute can never disagree about what a family is.
+ */
 const FAMILY_LABEL = {
   dashboard: 'index.html',
-  epicsIndex: 'epics.html',
-  epicDetail: 'epics/epic-{N}.html',
-  storyDetail: 'epics/story-{id}.html',
+  'epics-index': 'epics.html',
+  'epic-detail': 'epics/epic-{N}.html',
+  'story-detail': 'epics/story-{id}.html',
+  'doc-prose': 'adrs|*-artifacts|specs|readme',
+  requirement: 'requirements[/{id}].html',
+  'follow-up': 'follow-ups/**|action-items',
+  'commit-detail': 'commit/{hash}.html',
+  'commit-day': 'commits/{date}.html|timeline',
+  'code-file': 'code/**',
+  insight: 'chart singletons (8)',
+  'portal-meta': 'about|how-to-read|design-system',
+  sprint: 'sprint.html',
+  retro: 'retros[/{slug}].html',
+  'pass-through': '⚠ UNMIGRATED',
 }
 
-const familyOf = (path) => Object.entries(MIGRATED).find(([, test]) => test(path))?.[0]
+const familyOf = (path) => resolveFamily(path, ir.site.entry)
 
-const surfaces = ir.site.paths.filter(isMigrated)
+/**
+ * ⚠️ **The committed ORACLE, and the reason it is a hash and not a byte count. [Story 23.4 Task 5]**
+ *
+ * After this story retires the C# page writer there is **no golden side left to generate** — the comparison
+ * this whole harness rests on becomes unrepeatable the moment the writer goes. So the golden region's digest
+ * is recorded per page and `measurements/parity.json` is COMMITTED, making it the durable oracle a future run
+ * can still check the IR and the emitted page against.
+ *
+ * A byte LENGTH would not do: the failure this has to survive is a rewrite that preserves length while
+ * changing content, which is exactly what a markup or escaping change looks like. Length is a weak digest;
+ * sha256 over the NORMALIZED region (wall clock, asset cache-bust and version token already neutralized, so
+ * the hash is stable across runs) is a real one.
+ */
+const sha = (s) => createHash('sha256').update(s, 'utf8').digest('hex').slice(0, 16)
+
+/**
+ * EVERY IR page, not the migrated subset — AC #1 requires the table to cover all of them with no sampling.
+ * `ir.site.paths` is the manifest's own key set, so this cannot silently miss a family the way a hand-kept
+ * list would.
+ */
+const surfaces = ir.site.paths
 const rows = []
 const deltas = []
 let missingOutput = 0
@@ -77,6 +114,11 @@ for (const path of surfaces) {
     goldenBytes: goldenMain.length,
     irBytes: irMain.length,
     nuxtBytes: nuxtMain.length,
+    // The committed oracle — see `sha` above. Recorded for all three sides so a future run can tell WHICH
+    // side moved once the golden site can no longer be regenerated.
+    goldenSha: sha(goldenMain),
+    irSha: sha(irMain),
+    nuxtSha: sha(nuxtMain),
     goldenVsIr: goldenMain === irMain,
     irVsNuxt: irMain === nuxtMain,
     goldenVsNuxt: goldenMain === nuxtMain,
@@ -122,15 +164,15 @@ const say = (s = '') => {
 }
 
 say('')
-say('Story 23.3 AC #1 — <main> region parity, per migrated surface family')
+say('Story 23.4 AC #1 — <main> region parity, per surface family, WHOLE SITE')
 say('')
 say(
-  pad('family', 26) + pad('pages', 8) + pad('golden=IR', 12) + pad('IR=Nuxt', 12) + pad('golden=Nuxt', 14) + 'verbatim',
+  pad('family', 36) + pad('pages', 8) + pad('golden=IR', 12) + pad('IR=Nuxt', 12) + pad('golden=Nuxt', 14) + 'verbatim',
 )
-say('-'.repeat(84))
-for (const [family, f] of byFamily) {
+say('-'.repeat(94))
+for (const [family, f] of [...byFamily].sort((a, b) => b[1].n - a[1].n)) {
   say(
-    pad(FAMILY_LABEL[family] ?? family, 26) +
+    pad(FAMILY_LABEL[family] ?? family, 36) +
       pad(f.n, 8) +
       pad(`${f.gi}/${f.n}`, 12) +
       pad(`${f.irn}/${f.n}`, 12) +
@@ -148,9 +190,9 @@ const t = measured.reduce(
   }),
   { n: 0, gi: 0, irn: 0, gn: 0, verb: 0 },
 )
-say('-'.repeat(84))
+say("-".repeat(94))
 say(
-  pad('TOTAL', 26) +
+  pad('TOTAL', 36) +
     pad(t.n, 8) +
     pad(`${t.gi}/${t.n}`, 12) +
     pad(`${t.irn}/${t.n}`, 12) +

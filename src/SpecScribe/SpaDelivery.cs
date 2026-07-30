@@ -128,6 +128,13 @@ public static class SpaDelivery
     /// (code review).</summary>
     private const string MainLandmarkMarker = "<main id=\"main-content\"";
 
+    /// <summary>The same universal Story 1.4 landmark, exposed so the COMPOSED region path can test for it with
+    /// the identical string rather than a second literal. Story 23.4's <c>CapturedRegions</c> uses it to decide
+    /// whether a composed region degraded — replacing the <c>ReferenceEquals</c> sentinel the slice signalled
+    /// with, which only worked because the slicer returned the very nav-markup instance it was handed and which
+    /// any copy or re-concatenation would have silently broken. [Story 23.4 AC #3]</summary>
+    public const string MainLandmark = MainLandmarkMarker;
+
     // JSON is fetched and JSON.parse'd by the client (never inlined into a <script>), so default (HTML-safe)
     // escaping is used — <, >, & become \uXXXX in the payload and decode back to the exact HTML on parse. Compact
     // (no indentation) because this is a delivery payload, not a hand-edited file.
@@ -386,7 +393,12 @@ public static class SpaDelivery
     /// <item>either manifest is unparseable or structurally unrecognizable;</item>
     /// <item>the two manifests carry DIFFERENT <see cref="SchemaVersion"/>s — page content means something
     /// different across a schema bump (version 2 moved the content region's start marker and moved 594 pages'
-    /// hashes by +30 bytes each), so a page-level diff across that boundary is meaningless.</item>
+    /// hashes by +30 bytes each), so a page-level diff across that boundary is meaningless;</item>
+    /// <item>site-level metadata (<c>siteTitle</c>, <c>entry</c>, or the <c>nav</c> tree) differs between the two
+    /// manifests even when no individual page's <see cref="ContentHash"/> moved — e.g. a retitle or a nav-label
+    /// rename with zero content edits. A page-keyed diff has no way to represent that, so rather than silently
+    /// shipping an empty, non-full delta that never tells the consumer the title/nav changed, this degrades to
+    /// full (code review finding, Story 22.6).</item>
     /// </list>
     ///
     /// <para><b>⚠ THE TRUST BOUNDARY, stated in code because AC #7 requires it to be.</b> This delta is only ever
@@ -417,14 +429,22 @@ public static class SpaDelivery
         DateTimeOffset generatedAt,
         bool forceFull = false)
     {
-        var current = TryReadPageIndex(currentManifestJson, out var currentSchema);
-        var previous = TryReadPageIndex(previousManifestJson, out var previousSchema);
+        var current = TryReadPageIndex(currentManifestJson, out var currentSchema, out var currentSiteFingerprint);
+        var previous = TryReadPageIndex(previousManifestJson, out var previousSchema, out var previousSiteFingerprint);
         // A caller-declared untrustworthy basis and a cross-schema basis are the same answer as no basis at all.
         if (forceFull || previousSchema != currentSchema) previous = null;
 
-        // `full` is the honest answer whenever the basis is missing OR the current manifest itself could not be
-        // read: a delta computed from an unreadable "current" would report every page as removed.
-        var full = current is null || previous is null;
+        // Site-level identity (title/entry/nav) is invisible to a page-keyed diff: a retitle or nav-rename with
+        // zero page-content edits would otherwise produce an empty, non-full delta that never tells the consumer
+        // anything changed. Only meaningful once both sides are readable; an already-null `previous` already
+        // means `full` below. (code review finding, Story 22.6)
+        var siteMetadataChanged = previous is not null && current is not null
+            && !string.Equals(previousSiteFingerprint, currentSiteFingerprint, StringComparison.Ordinal);
+
+        // `full` is the honest answer whenever the basis is missing, the current manifest itself could not be
+        // read (a delta computed from an unreadable "current" would report every page as removed), or site-level
+        // metadata moved without any page-level signal of it.
+        var full = current is null || previous is null || siteMetadataChanged;
 
         var changed = new List<string>();
         var added = new List<string>();
@@ -441,8 +461,14 @@ public static class SpaDelivery
                 {
                     added.Add(path);
                 }
-                else if (string.Equals(before.ContentHash, entry.ContentHash, StringComparison.Ordinal))
+                else if (string.Equals(before.ContentHash, entry.ContentHash, StringComparison.Ordinal)
+                    && string.Equals(before.Chunk, entry.Chunk, StringComparison.Ordinal))
                 {
+                    // Genuinely unchanged only when BOTH the content hash AND the chunk assignment match. A page
+                    // can keep identical content but still move to a different chunk file when a sibling page
+                    // earlier in the same top-level group is added/removed and BuildDataFiles' batch packer
+                    // reseats the boundary — that page still needs to be named here so a consumer refetches the
+                    // chunk it now actually lives in. (code review finding, Story 22.6)
                     continue;
                 }
                 else
@@ -476,15 +502,18 @@ public static class SpaDelivery
         return JsonSerializer.Serialize(doc, JsonOptions);
     }
 
-    /// <summary>Reads just the two things <see cref="BuildDelta"/> diffs on — each page's
-    /// <see cref="ContentHash"/> and its chunk — plus the manifest's own <see cref="SchemaVersion"/>. Returns
+    /// <summary>Reads the things <see cref="BuildDelta"/> diffs on — each page's <see cref="ContentHash"/> and
+    /// its chunk, the manifest's own <see cref="SchemaVersion"/>, and a site-level identity fingerprint
+    /// (<paramref name="siteFingerprint"/>, covering <c>siteTitle</c>/<c>entry</c>/<c>nav</c>). Returns
     /// <c>null</c> for ANY unusable input (absent, malformed, or structurally unrecognizable) rather than
     /// throwing: a delta computation is a best-effort optimization sitting on a watch loop, and NFR2 says degrade,
     /// never amplify. Every null here becomes a <c>"full": true</c> document, which is always correct — merely
     /// expensive.</summary>
-    private static Dictionary<string, DeltaPage>? TryReadPageIndex(string? manifestJson, out int schemaVersion)
+    private static Dictionary<string, DeltaPage>? TryReadPageIndex(
+        string? manifestJson, out int schemaVersion, out string? siteFingerprint)
     {
         schemaVersion = 0;
+        siteFingerprint = null;
         if (manifestJson is not { Length: > 0 }) return null;
         try
         {
@@ -499,6 +528,18 @@ public static class SpaDelivery
             {
                 return null;
             }
+
+            // Site-level identity, independent of any single page's hash — a retitle or nav-rename with zero
+            // page-content edits still needs to force `full` (see BuildDelta). Serialized as a small JSON array
+            // rather than delimiter-joined, so no field's own content can ever be mistaken for a separator.
+            var siteTitle = doc.RootElement.TryGetProperty("siteTitle", out var st) && st.ValueKind == JsonValueKind.String
+                ? st.GetString() ?? string.Empty
+                : string.Empty;
+            var entry = doc.RootElement.TryGetProperty("entry", out var en) && en.ValueKind == JsonValueKind.String
+                ? en.GetString() ?? string.Empty
+                : string.Empty;
+            var navJson = doc.RootElement.TryGetProperty("nav", out var nav) ? nav.GetRawText() : string.Empty;
+            siteFingerprint = JsonSerializer.Serialize(new[] { siteTitle, entry, navJson });
 
             var index = new Dictionary<string, DeltaPage>(StringComparer.Ordinal);
             foreach (var page in pages.EnumerateObject())

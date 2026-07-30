@@ -217,6 +217,33 @@ public sealed class SiteGenerator
     // (RenderSpaBundle / RenderWebviewSurfaces) for strongest parity. [Story 6.7; spec-webview-doc-page-surfaces]
     private Dictionary<string, string>? _spaCapture;
 
+    /// <summary>One captured page's own <see cref="PageView"/> plus the reference-link skip identity its full-page
+    /// linkify pass used — everything needed to recompose its content region WITHOUT slicing a rendered document.
+    /// <para>The skip ids are part of the capture and not re-derivable: <see cref="ApplyReferenceLinks"/> takes
+    /// them so a page never links to itself, and a region linkified without them would grow a self-link the sliced
+    /// region does not have. Capturing the page and dropping its skip identity is the one way to make this path
+    /// look byte-equal on the fixture (which has no self-referencing prose) and diverge on the real
+    /// corpus. [Story 23.4 AC #3]</para></summary>
+    /// <param name="Page">The page's own view model — the source of the structural projections the slicer used to
+    /// scrape out of a rendered document (<c>Title</c>, <c>Breadcrumb</c>, <c>MetaDescription</c>).</param>
+    /// <param name="Region">The composed content region, <b>computed eagerly at write time</b> — see
+    /// <see cref="WritePage"/>. This is deliberately a finished string rather than a recipe.
+    /// <para>⚠️ <b>Composing the region lazily is a real defect, and it is invisible until the corpus proof runs.</b>
+    /// <see cref="ApplyReferenceLinks"/> reads MUTABLE generator state — <see cref="_codePages"/> grows as the code
+    /// pass emits pages — and <c>CodeReferenceLinkifier</c> is state-dependent in TWO directions: it no-ops entirely
+    /// while the map is empty, and once populated it STRIPS view-source anchors it cannot resolve. So a page written
+    /// before the code pass (<c>readme.html</c>) keeps a relative anchor in its document, while the same region
+    /// recomposed after that pass loses it. Measured: 77 bytes on <c>readme.html</c>, and it was the only unexpected
+    /// delta in 1,408 pages. Composing at the same instant the document is linkified removes the whole class.</para></param>
+    private readonly record struct CapturedPageView(PageView Page, string Region);
+
+    // Story 23.4 AC #3: the REPLACEMENT for _spaCapture's slice-a-rendered-page path. Populated at the same write
+    // seam and under the same conditions, but with the page's own view model rather than its finished HTML string,
+    // so the content region can be COMPOSED (nav + wayfinding + body) instead of sliced back out of a document.
+    // Both run in parallel while the byte-equality proof stands (RegionCompositionDeltas); _spaCapture and the
+    // SpaDelivery.Extract* family retire once it is green on the real corpus, not on the fixture alone.
+    private Dictionary<string, CapturedPageView>? _spaPageViews;
+
     /// <summary>Opt-in page capture WITHOUT the SPA delivery outputs: when true, <see cref="GenerateAll"/> fills the
     /// same write-seam capture <c>--spa</c> uses, and <see cref="RenderWebviewSurfaces"/> turns every captured
     /// long-tail page (docs, ADRs, requirements, sprint, retros…) into a navigable webview surface so the panel's
@@ -275,8 +302,11 @@ public sealed class SiteGenerator
     /// by <see cref="EmitDelta"/> the moment it is consumed. Separate from <see cref="_watchTrigger"/> ON PURPOSE:
     /// the trigger is a racy diagnostic label, and Story 22.6's live verification caught a topology pass emitting
     /// <c>full: false</c> because a concurrent save had overwritten the label between the route setting it and the
-    /// emit reading it. Set and consumed on one call stack under <see cref="_gate"/>, so no other thread can
-    /// overwrite it. [Story 22.6 AC #7]</summary>
+    /// emit reading it. Set and consumed under <see cref="_gate"/>, held continuously by
+    /// <see cref="RegenerateTopology"/> across its own write AND its <see cref="GenerateAll"/> call (a reentrant
+    /// acquisition, not two separate ones) — a code review found the original version set this flag BEFORE
+    /// acquiring <see cref="_gate"/> at all, reproducing the exact race this field exists to close. [Story 22.6
+    /// AC #7]</summary>
     private bool _nextEmitIsFullDelta;
 
     /// <summary>Sets the <c>trigger</c> label for the next emit's delta document — see <see cref="_watchTrigger"/>
@@ -325,6 +355,11 @@ public sealed class SiteGenerator
             _spaCapture = _options.EmitSpa || CapturePages
                 ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 : null;
+            // Story 23.4 AC #3: the composed-region capture runs on exactly the same condition, so the two paths
+            // are always comparable on any run that produces an IR at all.
+            _spaPageViews = _spaCapture is null
+                ? null
+                : new Dictionary<string, CapturedPageView>(StringComparer.OrdinalIgnoreCase);
 
             // All planning-artifact ingestion (sprint, module detection, retros, epics → requirements) runs
             // through the framework adapter, which returns one normalized bundle + non-fatal diagnostics.
@@ -554,8 +589,7 @@ public sealed class SiteGenerator
                 var sw = Stopwatch.StartNew();
                 try
                 {
-                    var html = DeepAnalyticsTemplater.RenderPage(deepPulse, nav, fileHref: CodeItemHref);
-                    WriteOutput(SiteNav.DeepAnalyticsOutputPath, ApplyReferenceLinks(html, SiteNav.DeepAnalyticsOutputPath));
+                    WritePage(DeepAnalyticsTemplater.BuildPage(deepPulse, nav, fileHref: CodeItemHref));
                     events.Add(new GenerationEvent(GenerationOutcome.Generated, SiteNav.DeepAnalyticsOutputPath, sw.Elapsed));
                 }
                 catch (Exception ex)
@@ -763,6 +797,7 @@ public sealed class SiteGenerator
                 _docs.Remove(relative);
                 // Drop the removed page from the SPA capture so a stale region can't linger in the next bundle.
                 if (_spaCapture is not null) _spaCapture.Remove(PathUtil.NormalizeSlashes(doc.OutputRelativePath));
+                _spaPageViews?.Remove(PathUtil.NormalizeSlashes(doc.OutputRelativePath));
                 RefreshCoverage();
                 var nav = _nav ?? BuildNav(Array.Empty<string>());
                 RefreshCodeSurfaces(nav);
@@ -1360,6 +1395,7 @@ public sealed class SiteGenerator
         {
             // Already gone from disk (e.g. an earlier partial cleanup) — still converge a stale capture entry.
             _spaCapture?.Remove(key);
+            _spaPageViews?.Remove(key);
             return false;
         }
         try
@@ -1374,6 +1410,7 @@ public sealed class SiteGenerator
             return false;
         }
         _spaCapture?.Remove(key);
+        _spaPageViews?.Remove(key);
         return true;
     }
 
@@ -1425,6 +1462,7 @@ public sealed class SiteGenerator
             if (!File.Exists(candidate))
             {
                 _spaCapture.Remove(key);
+                _spaPageViews?.Remove(key);
             }
         }
     }
@@ -1456,12 +1494,31 @@ public sealed class SiteGenerator
         // save re-set the label between this route's own SetWatchTrigger and its emit, and the topology pass
         // emitted `full: false` with that sibling's path as its trigger. The label is racy by construction (one
         // debounce Timer per changed path, each on its own thread) and is documented as a diagnostic; deriving a
-        // correctness decision from it contradicted that and was defeated exactly as the race predicts. This flag
-        // is set and consumed under `_gate` on one call stack, so it cannot be overwritten by another thread.
-        // [Story 22.6]
-        _nextEmitIsFullDelta = true;
-        // GenerateAll takes _gate itself, so no outer lock here — a full rebuild is the whole point of this route.
-        var events = GenerateAll();
+        // correctness decision from it contradicted that and was defeated exactly as the race predicts.
+        //
+        // CODE REVIEW FIX (Story 22.6): the flag write below used to happen BEFORE this call site entered
+        // GenerateAll()'s own `lock (_gate)`, which reproduced the exact class of race this comment describes —
+        // a concurrent debounce-Timer thread could win `_gate` first and consume/clear a flag meant for THIS
+        // pass, before this pass's own GenerateAll() ever reached its emit. `_gate` is a reentrant Monitor lock
+        // (`lock` supports same-thread re-entry), so acquiring it HERE, across both the flag write and the
+        // GenerateAll() call, closes that window completely: GenerateAll()'s own internal `lock (_gate)` simply
+        // re-enters on this same thread, and no other thread can acquire `_gate` in between. The flag is now
+        // GENUINELY set-and-consumed under one lock acquisition, not merely commented as if it were. The
+        // `finally` clears it even if GenerateAll() throws (or never reaches EmitDelta because `--spa` is off),
+        // so a mid-rebuild failure can never leave it armed for some later, unrelated emit to consume.
+        IReadOnlyList<GenerationEvent> events;
+        lock (_gate)
+        {
+            _nextEmitIsFullDelta = true;
+            try
+            {
+                events = GenerateAll();
+            }
+            finally
+            {
+                _nextEmitIsFullDelta = false;
+            }
+        }
 
         var errored = events.FirstOrDefault(e => e.Outcome == GenerationOutcome.Error);
         if (errored is not null)
@@ -1648,7 +1705,7 @@ public sealed class SiteGenerator
                 }
                 else
                 {
-                    WriteOutput(outputRelative, ApplyReferenceLinks(HtmlTemplater.RenderPage(doc, nav), outputRelative));
+                    WritePage(HtmlTemplater.BuildDocPage(doc, nav));
                     writtenAdrPaths.Add(PathUtil.NormalizeSlashes(outputRelative));
                     if (string.Equals(outputRelative, SiteNav.AdrsLandingOutputPath, StringComparison.OrdinalIgnoreCase))
                     {
@@ -1718,7 +1775,7 @@ public sealed class SiteGenerator
                         e.Title,
                         prefix + e.OutputRelativePath,
                         string.Equals(e.OutputRelativePath, entry.OutputRelativePath, StringComparison.OrdinalIgnoreCase))).ToList());
-                WriteOutput(entry.OutputRelativePath, ApplyReferenceLinks(HtmlTemplater.RenderPage(recordDoc, nav, pager, localContext: adrLocalContext), entry.OutputRelativePath));
+                WritePage(HtmlTemplater.BuildDocPage(recordDoc, nav, pager, localContext: adrLocalContext));
                 writtenAdrPaths.Add(PathUtil.NormalizeSlashes(entry.OutputRelativePath));
                 // A record occupying the landing slot (e.g. an `index.md`) must, on successful write, suppress the
                 // synthesized landing below so it isn't clobbered — same "only on a successful write" rule the
@@ -1794,8 +1851,7 @@ public sealed class SiteGenerator
                     BodyHtml = body.ToString(),
                     Headings = Array.Empty<Heading>(),
                 };
-                WriteOutput(SiteNav.AdrsLandingOutputPath,
-                    ApplyReferenceLinks(HtmlTemplater.RenderPage(landing, nav), SiteNav.AdrsLandingOutputPath));
+                WritePage(HtmlTemplater.BuildDocPage(landing, nav));
                 writtenAdrPaths.Add(PathUtil.NormalizeSlashes(SiteNav.AdrsLandingOutputPath));
                 events.Add(new GenerationEvent(GenerationOutcome.Generated,
                     $"{ForgeOptions.AdrOutputSubdir}/index.html (synthesized landing)", sw.Elapsed));
@@ -1820,7 +1876,11 @@ public sealed class SiteGenerator
             var staleKeys = captureAfterAdrs.Keys
                 .Where(k => k.StartsWith(stalePrefix, StringComparison.OrdinalIgnoreCase) && !writtenAdrPaths.Contains(k))
                 .ToList();
-            foreach (var key in staleKeys) captureAfterAdrs.Remove(key);
+            foreach (var key in staleKeys)
+            {
+                captureAfterAdrs.Remove(key);
+                _spaPageViews?.Remove(key);
+            }
         }
 
         return events;
@@ -1905,9 +1965,8 @@ public sealed class SiteGenerator
                 var dayLocalContext = new NavLocalContext(
                     "Recent activity",
                     days.Select(d => new NavLocalItem(Charts.DReadable(d), prefix + DayPageOutputPath(d), d == day)).ToList());
-                var html = CommitDayTemplater.RenderPage(day, dayCommits, dayArtifacts, pager, nav, commitHref, dayLocalContext);
-
-                WriteOutput(outputRelative, ApplyReferenceLinks(html, outputRelative));
+                WritePage(CommitDayTemplater.BuildPage(
+                    day, dayCommits, dayArtifacts, pager, nav, commitHref, dayLocalContext));
 
                 entries.Add(new CommitDayEntry(day, outputRelative));
                 events.Add(new GenerationEvent(GenerationOutcome.Generated, outputRelative, sw.Elapsed));
@@ -2075,8 +2134,7 @@ public sealed class SiteGenerator
         try
         {
             var newestFirst = days.OrderByDescending(d => d).ToList();
-            var html = TimelineTemplater.RenderPage(git, newestFirst, commitsByDay, artifactsByDay, nav, _today);
-            WriteOutput(SiteNav.TimelineOutputPath, ApplyReferenceLinks(html, SiteNav.TimelineOutputPath));
+            WritePage(TimelineTemplater.BuildPage(git, newestFirst, commitsByDay, artifactsByDay, nav, _today));
             _timelinePath = SiteNav.TimelineOutputPath;
             events.Add(new GenerationEvent(GenerationOutcome.Generated, SiteNav.TimelineOutputPath, sw.Elapsed));
         }
@@ -2161,8 +2219,7 @@ public sealed class SiteGenerator
                         CommitPagerLabel(s.Commit),
                         prefix + s.OutputRelative,
                         string.Equals(s.OutputRelative, outputRelative, StringComparison.OrdinalIgnoreCase))).ToList());
-                var html = CommitDetailTemplater.RenderPage(commit, nav, CodePageHref, pager, commitLocalContext);
-                WriteOutput(outputRelative, ApplyReferenceLinks(html, outputRelative));
+                WritePage(CommitDetailTemplater.BuildPage(commit, nav, CodePageHref, pager, commitLocalContext));
 
                 entries.Add(new CommitDetailEntry(commit.Hash, outputRelative));
                 // Key on the full %H so the resolver can match the hub's full hash exactly and the day page's
@@ -2691,11 +2748,11 @@ public sealed class SiteGenerator
                         codePrefix + PathUtil.NormalizeSlashes($"code/{p}.html"),
                         string.Equals(p, rel, StringComparison.OrdinalIgnoreCase))).ToList());
 
-                string html;
+                PageView page;
                 GenerationOutcome outcome;
                 if (new FileInfo(full).Length > MaxCodeFileBytes)
                 {
-                    html = CodeFileTemplater.RenderPlaceholder(repoRelative, outputRelative,
+                    page = CodeFileTemplater.BuildPlaceholderPage(repoRelative, outputRelative,
                         "This file is too large to render inline.", nav, referencedBy, externalUrl, pager: pager,
                         localContext: localContext, insight: insight, coupledFileHref: CodePageHref,
                         commitHref: CommitHref, dayHref: DayHref,
@@ -2705,14 +2762,14 @@ public sealed class SiteGenerator
                 else if (TryReadCodeText(full, out var text))
                 {
                     var lines = SplitCodeLines(text);
-                    html = CodeFileTemplater.RenderPage(repoRelative, outputRelative, lines, nav, referencedBy, externalUrl,
+                    page = CodeFileTemplater.BuildPage(repoRelative, outputRelative, lines, nav, referencedBy, externalUrl,
                         insight, CodePageHref, CommitHref, dayHref: DayHref, pager: pager,
                         storyRelatedEdges: storyRelatedEdges, relatedRelatedEdges: relatedRelatedEdges, localContext: localContext);
                     outcome = GenerationOutcome.Generated;
                 }
                 else
                 {
-                    html = CodeFileTemplater.RenderPlaceholder(repoRelative, outputRelative,
+                    page = CodeFileTemplater.BuildPlaceholderPage(repoRelative, outputRelative,
                         "This file is not a readable text file and can't be shown inline.", nav, referencedBy, externalUrl,
                         pager: pager, localContext: localContext, insight: insight, coupledFileHref: CodePageHref,
                         commitHref: CommitHref, dayHref: DayHref,
@@ -2720,7 +2777,7 @@ public sealed class SiteGenerator
                     outcome = GenerationOutcome.Skipped;
                 }
 
-                WriteOutput(outputRelative, html);
+                WritePage(page, linkify: false);
                 events.Add(new GenerationEvent(outcome, outputRelative, sw.Elapsed));
             }
             catch (Exception ex)
@@ -3095,8 +3152,8 @@ public sealed class SiteGenerator
             // categorical scheme Story 7.9's file-type legend uses), a different bound than "how many contributors
             // show up per file."
             var topAuthors = GitMetrics.BuildTopAuthors(_progress.DeepGit.Commits, capN: Charts.OwnershipTopAuthorPaletteSize);
-            var html = GitInsightsTemplater.RenderPage(insights, _progress.Git, nav, codeMap, topAuthors, fileHref: CodeItemHref, today: _today);
-            WriteOutput(SiteNav.GitInsightsOutputPath, ApplyReferenceLinks(html, SiteNav.GitInsightsOutputPath));
+            var html = WritePage(GitInsightsTemplater.BuildPage(
+                insights, _progress.Git, nav, codeMap, topAuthors, fileHref: CodeItemHref, today: _today));
             // Story 20.9: this page now hosts a Hierarchy Explorer, so it needs the vendored engine on disk in its
             // own right. It cannot rely on the dashboard having copied it first — a repo with git history but no
             // epics renders this page and no dashboard chart. Idempotent, and it reads the FINISHED html rather
@@ -3524,13 +3581,15 @@ public sealed class SiteGenerator
         return families;
     }
 
-    /// <summary>One captured page's sliced content region and everything either consumer projects from it.
-    /// <para>⚠️ <b>Trap 3.</b> <see cref="SpaDelivery.ExtractContentRegion"/> signals "this page carries no
-    /// landmark" by returning the nav-markup INSTANCE it was handed, and the webview detects that with a
-    /// REFERENCE comparison. <see cref="Degraded"/> is computed at the point of slicing, inside the one loop,
-    /// precisely so no consumer has to re-derive it — a caller that recomputed, copied or re-concatenated the nav
-    /// markup would silently break the detection with no test failing, and ship a content-empty surface into the
-    /// webview. Read this flag; never re-compare.</para></summary>
+    /// <summary>One captured page's COMPOSED content region and everything either consumer projects from it.
+    /// <para>↻ <b>Trap 3 is GONE as of Story 23.4, and this note is kept to say so.</b> While the region was
+    /// sliced, <see cref="SpaDelivery.ExtractContentRegion"/> signalled "this page carries no landmark" by
+    /// returning the nav-markup INSTANCE it was handed, and the webview detected that with a REFERENCE
+    /// comparison — a fragile contract in which any caller that copied or re-concatenated the nav markup would
+    /// silently break the detection with no test failing. The composed path computes <see cref="Degraded"/>
+    /// structurally instead (does the region contain <see cref="SpaDelivery.MainLandmark"/>), so the hazard is
+    /// designed out rather than documented around. Still read this flag rather than re-deriving it — one
+    /// producer, one answer — but a copy can no longer corrupt it.</para></summary>
     private readonly record struct CapturedRegion(
         string Path,
         string Title,
@@ -3539,12 +3598,20 @@ public sealed class SiteGenerator
         string? MetaDescription,
         bool Degraded);
 
-    /// <summary>Slices every captured page that is not already a family surface — the ONE captured-region
-    /// producer, consumed unfiltered by the SPA and filtered by the webview.
-    /// <para>Nothing here is deleted by this story: <see cref="_spaCapture"/>, <see cref="CapturedNavMarkup"/> and
-    /// the <c>SpaDelivery.Extract*</c> family remain the IR's producer for the ~1,200 non-family pages until
-    /// Story 23.4 replaces them (23.4 AC #3 deliberately keeps one C# region-composition path). This method is
-    /// where that path now lives, once. [Story 22.4 AC #1/#3]</para></summary>
+    /// <summary>COMPOSES every captured page's content region that is not already a family surface — the ONE
+    /// region producer, consumed unfiltered by the SPA and filtered by the webview.
+    /// <para>⚠️ <b>Story 23.4 AC #3 landed here: this no longer SLICES a rendered document.</b> Each region is
+    /// composed from the page's own <see cref="PageView"/> at write time (<see cref="WritePage"/>) and read back
+    /// from <see cref="_spaPageViews"/>. <see cref="SpaDelivery.ExtractContentRegion"/> and the
+    /// <c>SpaDelivery.Extract*</c> scrapers are no longer on the IR's path — they survive only as the equality
+    /// ORACLE that <see cref="RegionCompositionDeltas"/> proves this producer against (1,469 pages, 0 unexpected
+    /// deltas), and as the pre-23.4 comparison a future run can still check.</para>
+    /// <para><b>Two things get structurally better, not just cleaner.</b> Title, breadcrumb and meta description
+    /// now come from the view model instead of being regex-scraped back out of finished HTML. And the region no
+    /// longer truncates at <c>&lt;/main&gt;</c>, which is what restores <c>deep-analytics.html</c>'s
+    /// <c>:target</c> lightbox — content the slice had been silently dropping, leaving that page's "Expand" link
+    /// resolving to nothing in both the SPA and the webview.</para>
+    /// [Story 22.4 AC #1/#3; Story 23.4 AC #3]</summary>
     /// <param name="skip">A consumer's exclusion predicate, applied to the normalized path BEFORE any slicing.
     /// Optional: the SPA passes none and consumes the sequence whole. It exists because a consumer that filters
     /// afterwards still pays for what it discards — <see cref="CapturedNavMarkup"/> (a Singleline regex over the
@@ -3558,22 +3625,45 @@ public sealed class SiteGenerator
     private IEnumerable<CapturedRegion> CapturedRegions(
         SiteNav nav, HashSet<string> familyPaths, Func<string, bool>? skip = null)
     {
-        if (_spaCapture is not { } capture) yield break;
+        if (_spaPageViews is not { } views) yield break;
 
-        foreach (var (path, fullHtml) in capture)
+        // A page whose finished HTML was captured but whose VIEW MODEL was not is a page still on the
+        // pre-23.4 `WriteOutput(path, ApplyReferenceLinks(...))` path. It would simply be absent from the IR —
+        // no error, no log, just a route the SPA and webview cannot reach while its .html sits on disk beside
+        // them. That is the exact silent-gap class this story exists to close, so it throws.
+        if (_spaCapture is { } capture && capture.Count != views.Count)
+        {
+            var missing = capture.Keys
+                .Select(PathUtil.NormalizeSlashes)
+                .Where(k => !views.ContainsKey(k))
+                .OrderBy(k => k, StringComparer.Ordinal)
+                .ToList();
+            if (missing.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"{missing.Count} captured page(s) have no PageView and would be silently missing from the "
+                    + "IR — they are still written through WriteOutput rather than WritePage. Route them "
+                    + $"through WritePage (Story 23.4 AC #3). First: {string.Join(", ", missing.Take(5))}");
+            }
+        }
+
+        foreach (var (path, captured) in views)
         {
             var normalized = PathUtil.NormalizeSlashes(path);
             if (familyPaths.Contains(normalized)) continue;
             if (skip is not null && skip(normalized)) continue;
-            var navMarkup = CapturedNavMarkup(fullHtml, nav, normalized);
-            var region = SpaDelivery.ExtractContentRegion(fullHtml, navMarkup);
+            var page = captured.Page;
             yield return new CapturedRegion(
                 normalized,
-                SpaDelivery.ExtractTitle(fullHtml),
-                region,
-                SpaDelivery.ExtractBreadcrumb(fullHtml, normalized),
-                SpaDelivery.ExtractMetaDescription(fullHtml),
-                Degraded: ReferenceEquals(region, navMarkup));
+                page.Title,
+                captured.Region,
+                page.Breadcrumb.Crumbs,
+                page.MetaDescription,
+                // Computed STRUCTURALLY now, replacing the ReferenceEquals sentinel the slice used to signal
+                // with. A composed region degrades only if the page's own body carries no landmark — which is
+                // the same condition, asked of the thing itself rather than inferred from an object identity
+                // that any copy or re-concatenation would have silently broken.
+                Degraded: !captured.Region.Contains(SpaDelivery.MainLandmark, StringComparison.Ordinal));
         }
     }
 
@@ -3858,6 +3948,125 @@ public sealed class SiteGenerator
         }
     }
 
+    /// <summary>The Story 23.4 write seam: renders one page from its OWN <see cref="PageView"/>, reference-linkifies
+    /// the finished document exactly as the pre-23.4 call sites did, writes it, and captures BOTH forms — the
+    /// finished HTML string (<see cref="_spaCapture"/>, today's slice oracle) and the page view plus its skip
+    /// identity (<see cref="_spaPageViews"/>, the composed-region producer).
+    /// <para><b>Why the full-page linkify stays here.</b> The static page must not change a byte while the region
+    /// path is being proven — the golden fingerprint is the gate and AC #5 inverts only once Task 2 ends. So this
+    /// seam is deliberately NOT "linkify the region and assemble a page from it": it is the old behaviour, plus a
+    /// second capture. The composed region is derived in <see cref="RegionCompositionDeltas"/> and consumed by
+    /// <see cref="CapturedRegions"/>; nothing about the written document depends on it.</para>
+    /// <para>Replaces the <c>WriteOutput(path, ApplyReferenceLinks(SomeTemplater.RenderPage(...), path))</c>
+    /// idiom at every migrated call site. A page that is carried in verbatim from outside (Story 18.4's
+    /// <c>forge-report.html</c>) has no <see cref="PageView"/> and stays on <see cref="WriteOutput"/>.</para>
+    /// [Story 23.4 AC #3]</summary>
+    /// <param name="linkify">False for the pages that deliberately do NOT run through
+    /// <see cref="ApplyReferenceLinks"/> — see <see cref="CapturedPageView.Linkify"/>. The flag is carried into the
+    /// capture so the composed region reproduces the same decision.</param>
+    /// <returns>The finished document exactly as written — so a caller that must inspect its own output
+    /// (<see cref="EnsureHierarchyEngine"/>'s host-marker scan) keeps byte-identical semantics instead of
+    /// re-deriving the question from the view model.</returns>
+    private string WritePage(
+        PageView page,
+        string? skipRequirementId = null,
+        string? skipStoryId = null,
+        int? skipEpicNumber = null,
+        bool capture = true,
+        bool linkify = true)
+    {
+        var path = page.OutputRelativePath;
+        var rendered = HtmlRenderAdapter.Shared.Render(page).Content;
+        var html = linkify
+            ? ApplyReferenceLinks(
+                rendered, path,
+                skipRequirementId: skipRequirementId, skipStoryId: skipStoryId, skipEpicNumber: skipEpicNumber)
+            : rendered;
+        WriteOutput(path, html, capture);
+        if (capture && _spaPageViews is not null)
+        {
+            // Composed HERE, in the same breath as the document's own linkify pass, so both observe identical
+            // generator state. See CapturedPageView.Region for why deferring this is a defect and not an
+            // optimisation. TrimEnd is replication of the slice's `</main>` boundary, not taste — same note.
+            var region = JsonSpaRenderAdapter.Shared.RenderContent(page).TrimEnd();
+            if (linkify)
+            {
+                region = ApplyReferenceLinks(
+                    region, path,
+                    skipRequirementId: skipRequirementId, skipStoryId: skipStoryId, skipEpicNumber: skipEpicNumber);
+            }
+            _spaPageViews[PathUtil.NormalizeSlashes(path)] = new CapturedPageView(page, region);
+        }
+        return html;
+    }
+
+    /// <summary>One page on which the composed region and the sliced region disagree — the unit of AC #1's
+    /// "every non-zero delta enumerated with its cause and attributed".</summary>
+    /// <param name="Path">The page's normalized output-relative path.</param>
+    /// <param name="Composed">What <see cref="JsonSpaRenderAdapter.RenderContent"/> + <see cref="ApplyReferenceLinks"/>
+    /// produce from the page's own view model — the Story 23.4 producer.</param>
+    /// <param name="Sliced">What <see cref="SpaDelivery.ExtractContentRegion"/> produces from the rendered
+    /// document — the pre-23.4 producer, and the oracle.</param>
+    public readonly record struct RegionParityDelta(string Path, string Composed, string Sliced)
+    {
+        /// <summary>The 0-based index of the first differing char, or -1 when one string is a prefix of the
+        /// other. Reported so a delta is diagnosable from the harness output without re-running a generate.</summary>
+        public int FirstDifferenceAt
+        {
+            get
+            {
+                var shared = Math.Min(Composed.Length, Sliced.Length);
+                for (var i = 0; i < shared; i++)
+                {
+                    if (Composed[i] != Sliced[i]) return i;
+                }
+                return Composed.Length == Sliced.Length ? -1 : shared;
+            }
+        }
+    }
+
+    /// <summary>Story 23.4 AC #3's byte-equality proof: for every captured page, compares the region COMPOSED from
+    /// its <see cref="PageView"/> against the region SLICED out of its rendered document, and returns only the
+    /// pages that disagree. An empty result is the licence to delete
+    /// <see cref="SpaDelivery.ExtractContentRegion"/> and the full-page capture behind it.
+    /// <para>⚠️ <b>This must be run against a real <c>--deep-git --spa</c> generate, not only the fixture.</b> The
+    /// test fixture cites no real repo files, so it emits no <c>code/</c> page at all and exercises neither the
+    /// 254-page <c>CodeFileTemplater</c> family nor the 300 <c>commit/</c> pages. A green fixture run is a
+    /// necessary condition, never a sufficient one.</para>
+    /// <para>Pages captured as HTML but with no view model are reported as deltas with an empty
+    /// <see cref="RegionParityDelta.Composed"/> — a page still on the un-migrated write path is exactly the kind of
+    /// silent gap this proof exists to catch, so it must not be skipped.</para></summary>
+    public IReadOnlyList<RegionParityDelta> RegionCompositionDeltas()
+    {
+        lock (_gate)
+        {
+            if (_spaCapture is not { } capture || _spaPageViews is not { } views)
+            {
+                throw new InvalidOperationException(
+                    "RegionCompositionDeltas requires a completed GenerateAll() pass with --spa (or CapturePages) "
+                    + "on this generator, so both the sliced and the composed region are available to compare.");
+            }
+            var nav = _nav ?? throw new InvalidOperationException(
+                "RegionCompositionDeltas requires a completed GenerateAll() pass on this generator.");
+
+            var deltas = new List<RegionParityDelta>();
+            foreach (var (path, fullHtml) in capture)
+            {
+                var normalized = PathUtil.NormalizeSlashes(path);
+                var sliced = SpaDelivery.ExtractContentRegion(
+                    fullHtml, CapturedNavMarkup(fullHtml, nav, normalized));
+                var composed = views.TryGetValue(normalized, out var captured)
+                    ? captured.Region
+                    : string.Empty;
+                if (!string.Equals(composed, sliced, StringComparison.Ordinal))
+                {
+                    deltas.Add(new RegionParityDelta(normalized, composed, sliced));
+                }
+            }
+            return deltas.OrderBy(d => d.Path, StringComparer.Ordinal).ToList();
+        }
+    }
+
     /// <summary>Builds the whole-site SPA bundle: the five dashboard/epics families rendered through their view
     /// models (the same strongest-parity path the webview uses), plus EVERY other page's content region sliced from
     /// the render output captured at the write seam (<see cref="_spaCapture"/>) via the universal
@@ -3981,7 +4190,18 @@ public sealed class SiteGenerator
         var entryRegion = bundle.Pages.First(p => p.OutputRelativePath == bundle.EntryPath).ContentHtml;
         WriteSpaFile(SpaDelivery.EntryFileName, SpaDelivery.BuildEntryShell(bundle.SiteTitle, entryRegion));
 
-        EmitDelta(dataFiles);
+        try
+        {
+            EmitDelta(dataFiles);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // The delta sidecar is an OPTIONAL, additive, watch-only file (AC #2/#4) — a failure writing it (a
+            // lost File.Move race under real concurrent watch activity, a locked temp file, a full disk) must
+            // never turn an otherwise-successful IR/site emit into a reported Error for the calling route. NFR2:
+            // degrade, never amplify. (code review, Story 22.6)
+            Console.Error.WriteLine($"[delta] failed to write the watch-mode delta sidecar: {ex.Message}");
+        }
     }
 
     /// <summary>Writes the watch-mode delta sidecar (<see cref="SpaDelivery.DeltaPath"/>) and advances the basis —
@@ -4089,7 +4309,7 @@ public sealed class SiteGenerator
             var doc = MarkdownConverter.Convert(sourceFullPath, relative, outputRelative);
             doc.Companions = ResolveSpecCompanions(doc);
 
-            WriteOutput(outputRelative, ApplyReferenceLinks(HtmlTemplater.RenderPage(doc, nav), outputRelative));
+            WritePage(HtmlTemplater.BuildDocPage(doc, nav));
 
             _docs[relative] = doc;
             var outcome = alreadyExisted ? GenerationOutcome.Updated : GenerationOutcome.Generated;
@@ -4359,7 +4579,7 @@ public sealed class SiteGenerator
             var pager = EntityPager.FromSequence(ordered, ordered.FindIndex(r => ReferenceEquals(r, retro)),
                 r => prefix + r.OutputRelativePath,
                 r => r.Title);
-            WriteOutput(outputRel, ApplyReferenceLinks(RetroTemplater.RenderPage(retro, _epicsModel, nav, pager), outputRel));
+            WritePage(RetroTemplater.BuildPage(retro, _epicsModel, nav, pager));
         }
     }
 
@@ -4385,8 +4605,8 @@ public sealed class SiteGenerator
         var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, work, _epicsModel, _requirements);
         var followUps = BuildFollowUpGeometry(work, counts);
         var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel, retros: _retros);
-        var html = SprintTemplater.RenderIndex(_sprint, _epicsModel, nav, _module.Commands, _retros, counts, unplanned);
-        WriteOutput(SiteNav.SprintOutputPath, ApplyReferenceLinks(html, SiteNav.SprintOutputPath));
+        WritePage(SprintTemplater.BuildIndexPage(
+            _sprint, _epicsModel, nav, _module.Commands, _retros, counts, unplanned));
     }
 
     /// <summary>Writes <c>code-map.html</c> — the source-code treemap (Story 7.6). Builds the pure
@@ -4422,8 +4642,7 @@ public sealed class SiteGenerator
         var full = variants.FirstOrDefault(v => v.Key == "full");
         if (full is null || full.Map.IsEmpty) return null;
 
-        var html = CodeMapTemplater.RenderPage(variants, nav, fileHref: CodeItemHref);
-        WriteOutput(SiteNav.CodeMapOutputPath, ApplyReferenceLinks(html, SiteNav.CodeMapOutputPath));
+        var html = WritePage(CodeMapTemplater.BuildPage(variants, nav, fileHref: CodeItemHref));
         // Story 20.9: four Hierarchy Explorer instances live on this page, so the engine has to be on disk even in
         // a source-only repo with no epics and therefore no dashboard chart. See EnsureHierarchyEngine — the flag
         // is an optimization and the disk is the truth.
@@ -4443,8 +4662,7 @@ public sealed class SiteGenerator
     {
         if (fullMap is null || fullMap.IsEmpty) return;
 
-        var html = RiskQuadrantTemplater.RenderPage(fullMap, nav, fileHref: CodeItemHref);
-        WriteOutput(SiteNav.RiskQuadrantOutputPath, ApplyReferenceLinks(html, SiteNav.RiskQuadrantOutputPath));
+        WritePage(RiskQuadrantTemplater.BuildPage(fullMap, nav, fileHref: CodeItemHref));
     }
 
     /// <summary>Writes <c>traceability.html</c> — the requirement × covering-epic traceability matrix (Story
@@ -4455,8 +4673,7 @@ public sealed class SiteGenerator
     {
         if (_epicsModel is null || _requirements is null || _counts is null) return;
 
-        var html = TraceabilityTemplater.RenderPage(_requirements, _epicsModel, nav, _counts);
-        WriteOutput(SiteNav.TraceabilityOutputPath, ApplyReferenceLinks(html, SiteNav.TraceabilityOutputPath));
+        WritePage(TraceabilityTemplater.BuildPage(_requirements, _epicsModel, nav, _counts));
     }
 
     /// <summary>Writes <c>impact-map.html</c> — the planning ↔ code impact map (Story 21.3). Rides the combined
@@ -4470,8 +4687,7 @@ public sealed class SiteGenerator
     {
         if (_epicsModel is null || _progress?.DeepGit is null) return;
 
-        var html = ImpactMapTemplater.RenderPage(_epicsModel, _planningImpact, nav);
-        WriteOutput(SiteNav.ImpactMapOutputPath, ApplyReferenceLinks(html, SiteNav.ImpactMapOutputPath));
+        WritePage(ImpactMapTemplater.BuildPage(_epicsModel, _planningImpact, nav));
     }
 
     /// <summary>Projects the epic-scoped work graph (Story 19.2) from already-parsed models. Reads
@@ -4524,7 +4740,7 @@ public sealed class SiteGenerator
     private void WriteWorkGraph(SiteNav nav)
     {
         if (_workGraph.IsEmpty) return;
-        WriteOutput(SiteNav.WorkGraphOutputPath, WorkGraphTemplater.RenderPage(_workGraph, nav));
+        WritePage(WorkGraphTemplater.BuildPage(_workGraph, nav), linkify: false);
     }
 
     /// <summary>Writes <c>ideas.html</c>, one <c>ideas/{slug}.html</c> per discovered forge session, and each
@@ -4576,8 +4792,7 @@ public sealed class SiteGenerator
                     WriteOutput(reportPath, reportHtml, capture: false);
                 }
 
-                WriteOutput(idea.DetailOutputPath,
-                    ApplyReferenceLinks(IdeasTemplater.RenderDetailPage(idea, nav), idea.DetailOutputPath));
+                WritePage(IdeasTemplater.BuildDetailPage(idea, nav));
                 events.Add(new GenerationEvent(GenerationOutcome.Generated, idea.DetailOutputPath, detailSw.Elapsed));
                 writtenIdeas.Add(idea);
             }
@@ -4594,8 +4809,7 @@ public sealed class SiteGenerator
         var sw = Stopwatch.StartNew();
         try
         {
-            WriteOutput(SiteNav.IdeasOutputPath,
-                ApplyReferenceLinks(IdeasTemplater.RenderListPage(listModel, nav), SiteNav.IdeasOutputPath));
+            WritePage(IdeasTemplater.BuildListPage(listModel, nav));
             events.Add(new GenerationEvent(GenerationOutcome.Generated, SiteNav.IdeasOutputPath, sw.Elapsed));
         }
         catch (Exception ex)
@@ -4626,9 +4840,7 @@ public sealed class SiteGenerator
         var sw = Stopwatch.StartNew();
         try
         {
-            WriteOutput(SiteNav.TestArtifactsOutputPath,
-                ApplyReferenceLinks(
-                    TestArtifactsTemplater.RenderListPage(_testArtifacts, nav), SiteNav.TestArtifactsOutputPath));
+            WritePage(TestArtifactsTemplater.BuildListPage(_testArtifacts, nav));
             events.Add(new GenerationEvent(GenerationOutcome.Generated, SiteNav.TestArtifactsOutputPath, sw.Elapsed));
         }
         catch (Exception ex)
@@ -4779,16 +4991,14 @@ public sealed class SiteGenerator
         if (_epicsModel is null || _cadence is null) return;
 
         var today = DateOnly.FromDateTime(DateTime.Now);
-        var html = CadenceTemplater.RenderPage(_cadence, nav, today);
-        WriteOutput(SiteNav.CadenceOutputPath, ApplyReferenceLinks(html, SiteNav.CadenceOutputPath));
+        WritePage(CadenceTemplater.BuildPage(_cadence, nav, today));
     }
     /// <summary>Writes the retrospectives index (<c>retros.html</c>) when any retro exists — the target of the
     /// sprint page's "Retros" link. [Story 2.3 polish #5]</summary>
     private void WriteRetroIndex(SiteNav nav)
     {
         if (_retros.Count == 0) return;
-        var html = RetroTemplater.RenderIndex(_retros, nav);
-        WriteOutput(SiteNav.RetrosOutputPath, ApplyReferenceLinks(html, SiteNav.RetrosOutputPath));
+        WritePage(RetroTemplater.BuildIndexPage(_retros, nav));
     }
 
     /// <summary>Writes the open-action-items page (<c>action-items.html</c>) when the sprint tracks open items —
@@ -4808,10 +5018,11 @@ public sealed class SiteGenerator
         // only. [Story 2.3 polish #5; Story 9.6]
         var counts = _counts ?? ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, inventory, _epicsModel, _requirements);
         var hrefMap = FollowUpRefs.BuildHrefMap(_epicsModel, _docs.Values);
-        var html = ActionItemsTemplater.RenderPage(
-            open, EpicRetroMap, _module.Commands, nav, deferredHref, counts, _epicsModel, hrefMap,
-            allActionItemsForSlugs: _sprint?.ActionItems);
-        WriteOutput(SiteNav.ActionItemsOutputPath, html);
+        WritePage(
+            ActionItemsTemplater.BuildPage(
+                open, EpicRetroMap, _module.Commands, nav, deferredHref, counts, _epicsModel, hrefMap,
+                allActionItemsForSlugs: _sprint?.ActionItems),
+            linkify: false);
     }
 
     /// <summary>Rebuilds and rewrites the date pages + activity timeline (Story 7.3) from current
@@ -4933,13 +5144,14 @@ public sealed class SiteGenerator
         var prefix = PathUtil.RelativePrefix(outputPath);
         var hrefMap = FollowUpRefs.BuildHrefMap(_epicsModel, _docs.Values);
         var model = DeferredWorkParser.Parse(markdown, hrefMap, prefix, doc.BodyHtml);
-        var html = DeferredWorkTemplater.RenderPage(
-            model, nav, outputPath, doc.Title, _module.Commands, _epicsModel, hrefMap);
         // NOT reference-linkified: the list-batch pane's Address/Close data-copy payloads embed raw item
         // text (which can contain "Story N.M"/"Epic N"/"FR-N" mentions) — the linkifier would wrap those
         // in <a> tags INSIDE the attribute value and corrupt the copyable command, the same trap
         // WriteActionItems already avoids. [spec-follow-up-list-batch-actions]
-        WriteOutput(outputPath, html);
+        WritePage(
+            DeferredWorkTemplater.BuildPage(
+                model, nav, outputPath, doc.Title, _module.Commands, _epicsModel, hrefMap),
+            linkify: false);
     }
 
     /// <summary>Writes <c>diagnostics.html</c> — the whole-run report of the run's non-fatal notices plus the
@@ -4955,8 +5167,7 @@ public sealed class SiteGenerator
         var sw = Stopwatch.StartNew();
         var notices = DiagnosticNotice.FromEvents(events);
         var config = DiagnosticsConfig.FromRun(_options, _module);
-        var html = DiagnosticsTemplater.RenderPage(notices, config, nav);
-        WriteOutput(SiteNav.DiagnosticsOutputPath, html);
+        WritePage(DiagnosticsTemplater.BuildPage(notices, config, nav), linkify: false);
         return new GenerationEvent(GenerationOutcome.Generated, SiteNav.DiagnosticsOutputPath, sw.Elapsed);
     }
 
@@ -4967,8 +5178,7 @@ public sealed class SiteGenerator
     private GenerationEvent WriteAbout(SiteNav nav)
     {
         var sw = Stopwatch.StartNew();
-        var html = AboutTemplater.RenderPage(nav);
-        WriteOutput(SiteNav.AboutOutputPath, html);
+        WritePage(AboutTemplater.BuildPage(nav), linkify: false);
         return new GenerationEvent(GenerationOutcome.Generated, SiteNav.AboutOutputPath, sw.Elapsed);
     }
 
@@ -4979,8 +5189,7 @@ public sealed class SiteGenerator
     private GenerationEvent WriteHowToRead(SiteNav nav)
     {
         var sw = Stopwatch.StartNew();
-        var html = HowToReadTemplater.RenderPage(nav, _module);
-        WriteOutput(SiteNav.HowToReadOutputPath, html);
+        WritePage(HowToReadTemplater.BuildPage(nav, _module), linkify: false);
         return new GenerationEvent(GenerationOutcome.Generated, SiteNav.HowToReadOutputPath, sw.Elapsed);
     }
 
@@ -4993,8 +5202,7 @@ public sealed class SiteGenerator
     private GenerationEvent WriteDesignSystem(SiteNav nav)
     {
         var sw = Stopwatch.StartNew();
-        var html = DesignSystemTemplater.RenderPage(nav);
-        WriteOutput(SiteNav.DesignSystemOutputPath, html);
+        WritePage(DesignSystemTemplater.BuildPage(nav), linkify: false);
         return new GenerationEvent(GenerationOutcome.Generated, SiteNav.DesignSystemOutputPath, sw.Elapsed);
     }
 
@@ -5005,13 +5213,14 @@ public sealed class SiteGenerator
         var gdsPresent = ModuleContext.IsGdsPresent(_options.RepoRoot);
 
         var sw = Stopwatch.StartNew();
-        WriteOutput(SiteNav.AboutSddOutputPath, AboutSddTemplater.RenderHub(nav, methodPresent, gdsPresent));
+        WritePage(AboutSddTemplater.BuildHubPage(nav, methodPresent, gdsPresent), linkify: false);
         yield return new GenerationEvent(GenerationOutcome.Generated, SiteNav.AboutSddOutputPath, sw.Elapsed);
 
         foreach (var fw in AboutSddTemplater.Frameworks)
         {
             sw.Restart();
-            WriteOutput(fw.OutputPath, AboutSddTemplater.RenderFrameworkPage(nav, fw.Id, methodPresent, gdsPresent));
+            WritePage(
+                AboutSddTemplater.BuildFrameworkPage(nav, fw.Id, methodPresent, gdsPresent), linkify: false);
             yield return new GenerationEvent(GenerationOutcome.Generated, fw.OutputPath, sw.Elapsed);
         }
     }
@@ -5034,7 +5243,7 @@ public sealed class SiteGenerator
         try
         {
             var doc = MarkdownConverter.Convert(ReadmeSourcePath, "README.md", SiteNav.ReadmeOutputPath);
-            WriteOutput(SiteNav.ReadmeOutputPath, ApplyReferenceLinks(HtmlTemplater.RenderPage(doc, nav), SiteNav.ReadmeOutputPath));
+            WritePage(HtmlTemplater.BuildDocPage(doc, nav));
             return new GenerationEvent(GenerationOutcome.Generated, "README.md", sw.Elapsed);
         }
         catch (Exception ex)
@@ -5063,10 +5272,9 @@ public sealed class SiteGenerator
 
         foreach (var group in groups)
         {
-            var html = FollowUpGroupTemplater.RenderPage(group, nav, _module.Commands);
             // No ApplyReferenceLinks — the list-batch pane's data-copy payloads embed raw item text
             // (same corruption trap as WriteActionItems / WriteDeferredWork); row summaries stay plain.
-            WriteOutput(group.OutputPath, html);
+            WritePage(FollowUpGroupTemplater.BuildPage(group, nav, _module.Commands), linkify: false);
             emitted.Add(Path.GetFileName(group.OutputPath.Replace('/', Path.DirectorySeparatorChar)));
         }
 
@@ -5080,6 +5288,7 @@ public sealed class SiteGenerator
                 File.Delete(file);
                 if (_spaCapture is not null)
                     _spaCapture.Remove(PathUtil.NormalizeSlashes(Path.Combine(FollowUpSlug.Folder, name)));
+                _spaPageViews?.Remove(PathUtil.NormalizeSlashes(Path.Combine(FollowUpSlug.Folder, name)));
             }
         }
     }
@@ -5100,8 +5309,7 @@ public sealed class SiteGenerator
             var chrome = BuildQuickDevChrome(doc, followUps, unplanned, _epicsModel, _retros);
             if (chrome is null) continue;
             var outputRelative = PathUtil.NormalizeSlashes(doc.OutputRelativePath);
-            WriteOutput(outputRelative, ApplyReferenceLinks(
-                HtmlTemplater.RenderPage(doc, nav, quickDev: chrome), outputRelative));
+            WritePage(HtmlTemplater.BuildDocPage(doc, nav, quickDev: chrome));
         }
     }
 
@@ -5214,11 +5422,12 @@ public sealed class SiteGenerator
             if (!actionSlugs.TryGetValue(item, out var slug)) continue;
             var outputRelative = FollowUpSlug.OutputPath(slug);
             var actionLocalContext = BuildFollowUpGroupLocalContext(groupByHref, outputRelative);
-            var html = FollowUpDetailTemplater.RenderActionPage(
-                item, slug, nav, _module.Commands, EpicRetroMap, deferredHref,
-                _epicsModel, hrefMap, crossLinks, actionLocalContext);
             // No ApplyReferenceLinks — Resolve-with-AI data-copy must stay raw.
-            WriteOutput(outputRelative, html);
+            WritePage(
+                FollowUpDetailTemplater.BuildActionPage(
+                    item, slug, nav, _module.Commands, EpicRetroMap, deferredHref,
+                    _epicsModel, hrefMap, crossLinks, actionLocalContext),
+                linkify: false);
         }
 
         if (deferredPairs.Count > 0)
@@ -5238,10 +5447,12 @@ public sealed class SiteGenerator
                 var outputRelative = FollowUpSlug.OutputPath(slug);
                 var epicNumber = deferredEpicByItem[item];
                 var deferredLocalContext = BuildFollowUpGroupLocalContext(groupByHref, outputRelative);
-                var html = FollowUpDetailTemplater.RenderDeferredPage(
-                    item, provenanceLabel, sourceHref, slug, nav, listPath, _module.Commands, epicNumber, deferredLocalContext);
                 // No ApplyReferenceLinks — Address/Close data-copy must stay raw.
-                WriteOutput(outputRelative, html);
+                WritePage(
+                    FollowUpDetailTemplater.BuildDeferredPage(
+                        item, provenanceLabel, sourceHref, slug, nav, listPath, _module.Commands, epicNumber,
+                        deferredLocalContext),
+                    linkify: false);
             }
         }
     }
@@ -5485,8 +5696,7 @@ public sealed class SiteGenerator
     private void WriteRequirements(
         RequirementsModel requirements, EpicsModel model, ProgressModel progress, SiteNav nav, WorkInventory? work = null)
     {
-        WriteOutput("requirements.html",
-            ApplyReferenceLinks(RequirementsTemplater.RenderIndex(requirements, model, progress, nav, _counts), "requirements.html"));
+        WritePage(RequirementsTemplater.BuildIndexPage(requirements, model, progress, nav, _counts));
 
         var requirementsDir = Path.Combine(_options.OutputRoot, "requirements");
         Directory.CreateDirectory(requirementsDir);
@@ -5501,9 +5711,10 @@ public sealed class SiteGenerator
         // Everything (FR+NFR+Design) so UX-DR detail pages generate alongside FR/NFR. [Story 9.2 Task 5]
         foreach (var req in requirements.Everything)
         {
-            var outputRelative = $"requirements/{req.Slug}.html";
-            var html = RequirementsTemplater.RenderRequirement(req, progress, nav, model, EpicRetroMap, deferredWorkHref, requirements);
-            WriteOutput(outputRelative, ApplyReferenceLinks(html, outputRelative, skipRequirementId: req.Id));
+            WritePage(
+                RequirementsTemplater.BuildRequirementPage(
+                    req, progress, nav, model, EpicRetroMap, deferredWorkHref, requirements),
+                skipRequirementId: req.Id);
         }
     }
 

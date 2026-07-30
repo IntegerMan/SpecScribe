@@ -94,21 +94,45 @@ export function isSharedPrimitive(selector) {
 }
 
 /**
- * The families whose markup drives the extraction. [owner decision D4]
+ * The families whose markup drives the extraction.
  *
- * Deliberately NOT every page in the manifest: driving usage off all 1,042 pages would pull in most of the
- * monolith and turn a bounded layer back into a wholesale import. Pass-through pages are 23.4's, and get
- * whatever overlap the migrated families already paid for — `extract-ir-content.mjs` reports that coverage
- * as a number rather than leaving it implied.
+ * ⚠️ **Story 23.4 widened this from four families to the WHOLE SITE, and the reason is not tidiness.**
+ *
+ * Story 23.3 bounded it to four families deliberately — "driving usage off all 1,042 pages would pull in most
+ * of the monolith and turn a bounded layer back into a wholesale import" — and reported the shortfall for
+ * everything else as a coverage number, because those pages were `PassThroughSurface` and explicitly not
+ * claimed as migrated.
+ *
+ * Once Story 23.4 migrated the remaining **1,276** pages, that bound stopped being conservative and became
+ * simply WRONG: the extractor was reporting 42 % class coverage for pages the router now renders as real
+ * families, which means ~58 % of the classes those pages emit had **no rule at all**. Nothing fails, nothing
+ * is logged — the element just renders bare. That is exactly ADR 0018's rejected alternative #3 ("ship
+ * unstyled and fix it in 23.4"), arrived at by omission rather than by decision.
+ *
+ * **What widening does and does not give up.** It does give up the "62 % smaller than source" figure — with
+ * every family in scope the layer converges toward a scoped mirror of the monolith, and that is reported
+ * honestly rather than buried. It does NOT give up the two properties ADR 0018 actually rests on:
+ *
+ *   · **Containment.** Every rule is still re-nested under `.ir-content`, so a monolith rule still cannot
+ *     reach a template-authored component. That was always the blast-radius argument, not the rule count.
+ *   · **Generated + gated both ways.** `npm run check:ir-content` still re-derives and still fails on a
+ *     hand-edit or an un-re-extracted source change. No rule is hand-copied, so ADR 0018's rejected
+ *     alternative #2 ("a second definition free to drift") is still avoided.
+ *
+ * A usage-driven extractor is *supposed* to track its usage set. The set grew; the layer grows with it. What
+ * this makes undeniable is the size of the Epic 22 ask — see ADR 0018 §Addendum and
+ * `npm run report:ir-content-residue`.
  */
 export const MIGRATED = {
-  dashboard: (p) => p === 'index.html',
-  epicsIndex: (p) => p === 'epics.html',
-  epicDetail: (p) => /^epics\/epic-[^/]+\.html$/.test(p),
-  storyDetail: (p) => /^epics\/story-[^/]+\.html$/.test(p),
+  wholeSite: () => true,
 }
 
-export const isMigrated = (path) => Object.values(MIGRATED).some((f) => f(path))
+/**
+ * Every IR page drives the extraction now. Kept as a named predicate (rather than deleting the call sites)
+ * because it is the one place the bound is decided, and a future story narrowing it again should have to
+ * change this function and read the note above.
+ */
+export const isMigrated = () => true
 
 // ── Data-conditional classes ─────────────────────────────────────────────────────────────────────────────
 //

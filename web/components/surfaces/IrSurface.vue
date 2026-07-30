@@ -7,6 +7,7 @@
  * declared by the family components around this one, and everything they share lives here once.
  */
 import { relativePrefix, site, type IrPage } from '#ir'
+import type { IrFamily } from '../../ir/families'
 import IrHtml from '../IrHtml'
 import IrMain from '../IrMain'
 import PageShell from '../PageShell.vue'
@@ -18,8 +19,12 @@ const props = withDefaults(
      * Which migrated family this is, or `pass-through`. Surfaces the classification in the DOM
      * (`data-ir-family`) so the harnesses and a live inspection can both tell a migrated page from one
      * that is only here to make the link graph resolve.
+     *
+     * The union lives in `ir/families.ts` alongside `resolveFamily`, so the classifier and the renderable
+     * set cannot drift apart — adding a family to the table without giving it a component is then a type
+     * error rather than a page that silently renders as a pass-through. [Story 23.4 AC #1]
      */
-    family: 'dashboard' | 'epics-index' | 'epic-detail' | 'story-detail' | 'pass-through'
+    family: IrFamily
   }>(),
   {},
 )
@@ -128,6 +133,15 @@ useHead({
 
     <!-- The `<main>` landmark and its body, both verbatim. See IrMain for why it is not PageShell's. -->
     <IrMain :attrs="page.region.mainAttrs" :html="page.region.mainInnerHtml" />
+
+    <!--
+      Content the region carries AFTER `</main>` — normally nothing. It MUST render outside the landmark, not
+      inside it: the one page that uses this is `deep-analytics.html`, whose `:target` lightbox has to sit
+      outside the scrolling region it overlays. Injecting it into `<main>` would satisfy "the markup is on the
+      page" while breaking both the overlay and the single-landmark a11y invariant.
+      See IrRegion.trailingHtml — dropping this shipped a dead "Expand" link twice over. [Story 23.4]
+    -->
+    <IrHtml v-if="page.region.trailingHtml" :html="page.region.trailingHtml" />
 
     <template #footer>
       <!--

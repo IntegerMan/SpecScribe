@@ -334,6 +334,49 @@ public class DeltaOracleTests : IDisposable
         AssertMatchesOracle(ApplyDelta(Site, held, deltaJson), ColdOracle());
     }
 
+    /// <summary>Code review finding (Story 22.6): Task 7's own checklist names "a directory RENAME" as a minimum
+    /// required scenario, and the test above exercises a directory CREATION instead (an undisclosed
+    /// substitution). This is the literal case — <see cref="Directory.Move"/> on a pre-existing directory, old
+    /// path gone, new path present — proving the rename converges to a full marker AND that the renamed path's
+    /// old and new locations are exactly right, not merely that "something changed" produced a full delta.</summary>
+    [Fact]
+    public void DirectoryRename_DegradesToFull_AndTheRefetchEqualsAColdFetch()
+    {
+        var gen = StartSession();
+
+        // A real rename needs a pre-existing directory to move — create and commit it via an ordinary topology
+        // pass first, so the rename below is the only thing that changes.
+        Directory.CreateDirectory(Path.Combine(Source, "notes", "movable"));
+        File.WriteAllText(Path.Combine(Source, "notes", "movable", "inside.md"), "# Inside\n\nOriginal.\n");
+        gen.SetWatchTrigger(FileWatcherService.TopologyEventLabel);
+        Assert.NotEqual(GenerationOutcome.Error, gen.RegenerateTopology().Outcome);
+
+        var held = ColdFetch(Site);
+        Assert.Contains("notes/movable/inside.html", held.Pages.Keys);
+
+        // The actual rename: the old path disappears and the new path appears in the SAME filesystem operation —
+        // not a fresh CreateDirectory, which is what the sibling test above exercises instead.
+        Directory.Move(Path.Combine(Source, "notes", "movable"), Path.Combine(Source, "notes", "relocated"));
+        gen.SetWatchTrigger(FileWatcherService.TopologyEventLabel);
+        Assert.NotEqual(GenerationOutcome.Error, gen.RegenerateTopology().Outcome);
+
+        var deltaJson = ReadDelta();
+        using (var delta = JsonDocument.Parse(deltaJson))
+        {
+            Assert.True(
+                delta.RootElement.GetProperty("full").GetBoolean(),
+                "a directory rename must degrade to a full marker exactly like a directory creation does");
+        }
+
+        var applied = ApplyDelta(Site, held, deltaJson);
+        var oracle = ColdOracle();
+        AssertMatchesOracle(applied, oracle);
+        // Named explicitly, the same way the removal case elsewhere in this file does: the rename is the point,
+        // and AssertMatchesOracle alone would also pass if the old path had simply been left behind as stale.
+        Assert.DoesNotContain("notes/movable/inside.html", oracle.Pages.Keys);
+        Assert.Contains("notes/relocated/inside.html", oracle.Pages.Keys);
+    }
+
     /// <summary>The multi-step case, and the one most likely to expose a basis bug: THREE consecutive deltas
     /// applied in sequence to a single held state. A basis that advanced at the wrong moment (or failed to)
     /// survives one delta easily and falls apart by the third.</summary>

@@ -270,6 +270,27 @@ public class SettingsResolverTests : IDisposable
         Assert.True(new SiteSettings().Validate().Successful);
     }
 
+    /// <summary>Code review finding (Story 22.6): without this gate, <c>--serve-delta</c> passed alone (or on a
+    /// command other than <c>webview</c>) silently no-ops, because nothing downstream ever reads
+    /// <see cref="SiteSettings.ServeDelta"/> unless <see cref="SiteSettings.Serve"/> is also set — a user typing
+    /// it by itself would believe delta streaming had started when it never did.</summary>
+    [Fact]
+    public void Validate_RejectsServeDeltaWithoutServe()
+    {
+        var result = new SiteSettings { ServeDelta = true }.Validate();
+
+        Assert.False(result.Successful);
+        Assert.Contains("--serve-delta", result.Message!, StringComparison.Ordinal);
+        Assert.Contains("--serve", result.Message!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Validate_AcceptsServeDelta_WhenServeIsAlsoSet()
+    {
+        Assert.True(new SiteSettings { Serve = true, ServeDelta = true }.Validate().Successful);
+        Assert.True(new SiteSettings { Serve = true }.Validate().Successful);
+    }
+
     [Fact]
     public void ResolveDateCutoff_ThrowsOnAnUnrecognizedValue()
     {

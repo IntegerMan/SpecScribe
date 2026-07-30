@@ -348,9 +348,19 @@ public sealed class FileWatcherService : IDisposable
     /// scope that stays coherent across a rename (pages appear at the new location AND the stale ones at the old are
     /// gone). Internal so tests can drive it ON THE CALLING THREAD: see <see cref="RunDebouncedPass"/>'s remarks for
     /// why exercising it through a real <see cref="Timer"/> would be a hostile way to test the crash guard.
-    /// [Story 5.3]</summary>
-    internal void RunTopologyPass() =>
+    /// [Story 5.3]
+    /// <para><b>Sets the delta sidecar's trigger label before escalating</b> (code review, Story 22.6) — this is
+    /// the ONLY topology entry point <see cref="RunDebouncedPass"/>'s file-level <c>RunTopology</c> local does not
+    /// cover, so without this a genuine directory-level rebuild (a folder create/rename/delete, or the watcher's
+    /// own buffer-overflow fallback) left <c>_watchTrigger</c> holding whatever unrelated file last set it, and the
+    /// sidecar's <c>trigger</c> field named a stale path instead of the shared
+    /// <see cref="TopologyEventLabel"/> sentinel. Label only — <see cref="SiteGenerator.RegenerateTopology"/>'s own
+    /// <c>_nextEmitIsFullDelta</c> flag, not this label, decides the delta's <c>full</c> marker.</para></summary>
+    internal void RunTopologyPass()
+    {
+        _generator.SetWatchTrigger(TopologyEventLabel);
         SafeNotify(RunGuarded(() => _generator.RegenerateTopology(), TopologyEventLabel));
+    }
 
     private Timer CreateTimer(string fullPath)
     {

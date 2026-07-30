@@ -50,6 +50,22 @@ export interface IrRegion {
   /** Everything BETWEEN `<main …>` and `</main>`. This is what gets injected. */
   mainInnerHtml: string
   /**
+   * Everything AFTER `</main>` in the region — normally empty. [Story 23.4]
+   *
+   * ⚠️ **This field exists because dropping it shipped a broken feature, silently, on the one page that uses
+   * it.** `deep-analytics.html` emits its `:target` lightbox (`<div id="coupling-zoom" class="coupling-lightbox">`)
+   * AFTER the landmark, because a `:target` overlay must not be inside the scrolling region it overlays. The
+   * pre-23.4 C# slicer truncated at `</main>` and dropped it, so the page's "Expand" link resolved to nothing
+   * in the SPA and the webview. Story 23.4's composed region restores it — and then this splitter dropped it
+   * again one layer further on, for the same reason.
+   *
+   * Neither loss was visible to any harness: `measure:parity` compares `<main>` regions only, the link checker
+   * sees a same-page `#` fragment as resolved, and a11y has nothing to say about a missing overlay. It was
+   * found by opening the page in a browser and querying for `#coupling-zoom` — which is why CLAUDE.md makes
+   * live verification a gate rather than a courtesy.
+   */
+  trailingHtml: string
+  /**
    * The emitter degraded this page to nav-only: it carries no `<main id="main-content">` landmark, so there is
    * no page body to render. ADR 0024 §Decision 3 keeps such pages in the IR deliberately (the SPA retains what
    * the webview skips), which means a consumer MUST be able to skip one — before Story 22.4's code review

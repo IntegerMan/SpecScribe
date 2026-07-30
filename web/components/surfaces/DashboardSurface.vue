@@ -13,26 +13,27 @@
  * has a server-rendered text twin that survives with JavaScript off.
  */
 import type { IrPage } from '#ir'
+import { dashboardContract, enforce } from '../../ir/contracts'
 import IrSurface from './IrSurface.vue'
 
 const props = defineProps<{ page: IrPage }>()
 
-if (!props.page.needsHierarchyEngine) {
-  throw new Error(
-    'The dashboard IR region carries no [data-hierarchy] mount point. Either the Hierarchy Explorer was ' +
-      'removed from index.html (ADR 0012 §Decision 2 makes it the only route to a sunburst or treemap), or ' +
-      'the capture stopped including it. Both are regressions, not migration noise.',
-  )
-}
-
-// ADR 0013: the text twin IS the no-JS contract. If it stopped being server-rendered, the JS-off page would
-// lose the chart's content entirely and no amount of chart-booting here would put it back.
-if (!props.page.region.mainInnerHtml.includes('ss-hierarchy-twin')) {
-  throw new Error(
-    'The dashboard IR region carries a Hierarchy Explorer but no `ss-hierarchy-twin` text equivalent. ' +
-      'ADR 0013 makes the twin the no-JS contract — a chart without one is not shippable.',
-  )
-}
+/**
+ * The dashboard's contract: ADR 0012 (one Hierarchy Explorer) + ADR 0013 (the text twin IS the no-JS
+ * contract). Both live in `ir/contracts.ts` as data, with an explicit severity each, because the severity is
+ * the reviewable decision — and because a pure function is testable with the vitest already here, whereas
+ * mounting this `.vue` would need a component harness `web/` deliberately does not depend on (ADR 0010).
+ *
+ * ⚠️ **A missing Hierarchy Explorer is a WARNING, not an error. [owner decision D6]**
+ * It was a hard `throw` (Story 23.3), and that is a **project-independence defect**: whether a dashboard
+ * carries a sunburst depends on whether the *target project* has roadmap data. It was the single route that
+ * failed Story 23.5's two-IR experiment (CORA: **32/33**). Story 23.5 attributed the open item to Story 23.3
+ * and left it; 23.4 touches this surface anyway, so it is fixed here and that open-items row is re-homed to
+ * this story. A chart-less project needs no placeholder markup — its dashboard body is complete as the IR
+ * describes it. The missing-text-twin check stays **fatal**, because unlike the other it is provable from the
+ * IR for every project. See `test/contracts.test.ts`.
+ */
+enforce(dashboardContract(props.page))
 </script>
 
 <template>

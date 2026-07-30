@@ -194,13 +194,21 @@
     if (!stamp) return;
 
     var lastSequence = -1;
+    // Bumped on every poll and captured per-call (code review, Story 22.6): setInterval does not wait for the
+    // previous fetch to settle, so two overlapping requests can resolve OUT OF ORDER. Without this, a late
+    // response for an OLDER poll could overwrite a newer display (or reset lastSequence backwards) after a
+    // fresher one already landed. Only the response belonging to the MOST RECENT poll is ever allowed to touch
+    // the stamp or lastSequence.
+    var pollId = 0;
     function poll() {
+      var thisPoll = ++pollId;
       // Deliberately NOT versioned(): the sidecar changes WITHIN a build, so the build's cache-bust token would
       // pin it to the first response forever. cache:"no-store" is the correct freshness control here.
       fetch(basePrefix + "spa/delta.json", { cache: "no-store" }).then(function (r) {
         if (!r.ok) throw new Error("no delta channel");
         return r.json();
       }).then(function (d) {
+        if (thisPoll !== pollId) return;           // a newer poll already started; this response is stale
         if (d.sequence === lastSequence) return;   // nothing new since the last poll; leave the stamp alone
         lastSequence = d.sequence;
         var when = new Date(d.generatedAt);
@@ -211,8 +219,15 @@
         // consumer must refetch, and a reader watching the stamp should see that a full reload happened.
         stamp.textContent = "Live updates: connected" + time + (d.full ? " · full refresh" : "");
       }).catch(function () {
+        if (thisPoll !== pollId) return;           // a newer poll already started; this failure is stale too
         // Any failure — no sidecar, a torn read, a parse error — is reported as the one honest state. Never
         // silently leave a stale "connected" up: a stamp that lies about being live is worse than no stamp.
+        //
+        // lastSequence is reset here too (code review, Story 22.6): without this, a TRANSIENT failure between
+        // two polls that would otherwise report the SAME sequence number wedges the stamp on "unavailable"
+        // forever — the next successful poll sees d.sequence === lastSequence and short-circuits before ever
+        // re-reporting "connected", which is the exact dishonesty this catch block exists to prevent.
+        lastSequence = -1;
         stamp.textContent = "Live updates: unavailable";
       });
     }

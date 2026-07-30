@@ -467,4 +467,122 @@ public class FileWatcherServiceTests : IDisposable
                 $"notes/concurrent-{i}.html is missing from the IR after concurrent passes");
         }
     }
+
+    /// <summary>⚠ REGRESSION GUARD for a code-review-found race the test above does NOT cover: none of its eight
+    /// fixture paths trip <see cref="SiteGenerator.ClassifyRebuildScope"/>'s <c>Full</c> scope, so
+    /// <see cref="FileWatcherService.RunTopologyPass"/> — and the <c>_nextEmitIsFullDelta</c> flag it arms on
+    /// <see cref="SiteGenerator.RegenerateTopology"/> — is never exercised under real concurrency by that test.
+    /// <para>The flag used to be set BEFORE <c>RegenerateTopology</c> entered <c>GenerateAll</c>'s own
+    /// <c>lock (_gate)</c>, so a concurrent ordinary-file pass on another debounce thread could win the lock
+    /// first and consume/clear the flag meant for the topology pass — the topology rebuild's own delta would
+    /// then report <c>full: false</c> for a whole-site rebuild, the exact failure AC #7 names as worst. This
+    /// drives <see cref="FileWatcherService.RunTopologyPass"/> on one real thread AGAINST several
+    /// <see cref="FileWatcherService.RunDebouncedPass"/> calls on other real threads, all released together, and
+    /// then proves the flag never leaked past its own consumption: an uncontended edit run immediately afterward
+    /// must still see a non-full delta.</para></summary>
+    [Fact]
+    public void ATopologyPass_RacingConcurrentOrdinaryPasses_NeitherStealsNorLeaksTheFullDeltaFlag()
+    {
+        var options = ForgeOptions.Resolve(
+            source: Source, adrs: Adrs, output: Site, projectName: "SpecScribe", includeReadme: false, emitSpa: true);
+        var gen = new SiteGenerator(options) { EmitDeltaSidecar = true };
+
+        // Seed all the "ordinary" docs BEFORE the first GenerateAll(), so they are already in `_sourceInventory`
+        // once the racy passes start — a BRAND NEW file's first save is itself a RebuildScope.Full event
+        // (ClassifyRebuildScope: existsNow != wasRendered), which would make every "ordinary" thread below an
+        // unintended second source of topology escalation rather than the Narrow-scope edits this test needs to
+        // race against the ONE explicit topology pass.
+        const int OrdinaryPasses = 8;
+        var docs = Enumerable.Range(1, OrdinaryPasses)
+            .Select(i => Path.Combine(Source, "notes", $"topo-race-{i}.md")).ToList();
+        foreach (var (doc, i) in docs.Select((d, i) => (d, i)))
+        {
+            File.WriteAllText(doc, $"# Topo Race {i}\n\nOriginal body {i}.\n");
+        }
+        var probe = Path.Combine(Source, "notes", "after-topo-race.md");
+        File.WriteAllText(probe, "# After Topo Race\n\nOriginal probe.\n");
+
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+
+        using var watcher = new FileWatcherService(options, gen, _ => { });
+
+        using var start = new ManualResetEventSlim(false);
+        var ordinaryThreads = docs.Select(doc => new Thread(() =>
+        {
+            start.Wait();
+            File.AppendAllText(doc, "edited during the race\n");
+            watcher.RunDebouncedPass(doc);
+        })).ToList();
+        var topologyThread = new Thread(() =>
+        {
+            start.Wait();
+            watcher.RunTopologyPass();
+        });
+
+        foreach (var t in ordinaryThreads) { t.IsBackground = true; t.Start(); }
+        topologyThread.IsBackground = true;
+        topologyThread.Start();
+        start.Set();
+
+        foreach (var t in ordinaryThreads)
+        {
+            Assert.True(t.Join(TimeSpan.FromMinutes(2)), "an ordinary debounced pass never completed");
+        }
+        Assert.True(topologyThread.Join(TimeSpan.FromMinutes(2)), "the topology pass never completed");
+
+        // Whichever pass's write landed last, the flag must never leak: one more, UNCONTENDED edit to an
+        // ALREADY-KNOWN file (Narrow scope, never Full) run after everything above has settled must see a
+        // non-full delta — proving the topology pass's flag was cleared under the SAME lock it was set under,
+        // not stolen by (or left armed for) a concurrent pass.
+        File.AppendAllText(probe, "edited after the race\n");
+        watcher.RunDebouncedPass(probe);
+
+        var deltaPath = Path.Combine(Site, SpaDelivery.DeltaPath.Replace('/', Path.DirectorySeparatorChar));
+        var delta = System.Text.Json.JsonDocument.Parse(File.ReadAllText(deltaPath)).RootElement;
+        Assert.False(
+            delta.GetProperty("full").GetBoolean(),
+            "the full-delta flag leaked past a concurrent topology pass into a later, unrelated edit");
+    }
+
+    /// <summary>Code review finding (Story 22.6): <see cref="FileWatcherService.RunTopologyPass"/> — the
+    /// directory-level topology entry point (folder create/rename/delete, and the directory watcher's own
+    /// buffer-overflow fallback) — never called <see cref="SiteGenerator.SetWatchTrigger"/> before escalating,
+    /// unlike the file-level path in <see cref="FileWatcherService.RunDebouncedPass"/>. A genuine directory-level
+    /// rebuild could therefore report a stale, unrelated file path as the delta sidecar's <c>trigger</c> field
+    /// instead of the shared <see cref="FileWatcherService.TopologyEventLabel"/> sentinel. Reproduced here without
+    /// even needing concurrency: an ordinary file-level pass sets the label first, then <c>RunTopologyPass</c> is
+    /// invoked directly (exactly what a real folder event would drive) with no intervening
+    /// <c>SetWatchTrigger</c> call of its own.</summary>
+    [Fact]
+    public void RunTopologyPass_SetsTheSharedTriggerLabel_EvenWhenNoFileLevelPassRanFirst()
+    {
+        var options = ForgeOptions.Resolve(
+            source: Source, adrs: Adrs, output: Site, projectName: "SpecScribe", includeReadme: false, emitSpa: true);
+        var gen = new SiteGenerator(options) { EmitDeltaSidecar = true };
+
+        // Known to the inventory BEFORE the first GenerateAll(), so the follow-up edit below classifies Narrow
+        // (existsNow == wasRendered) and its own file-level RunDebouncedPass leaves a STALE FILE PATH as the
+        // trigger label — not TopologyEventLabel, which a NEW file's own Full-scope escalation would set anyway
+        // and would defeat the point of this test.
+        var stale = Path.Combine(Source, "notes", "unrelated.md");
+        File.WriteAllText(stale, "# Unrelated\n\nOriginal body.\n");
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+
+        using var watcher = new FileWatcherService(options, gen, _ => { });
+
+        var deltaPath = Path.Combine(Site, SpaDelivery.DeltaPath.Replace('/', Path.DirectorySeparatorChar));
+
+        File.AppendAllText(stale, "edited\n");
+        watcher.RunDebouncedPass(stale);
+        // Sanity: the setup pass actually left a STALE FILE PATH as the trigger, not the topology sentinel —
+        // otherwise this test would trivially pass for the wrong reason.
+        Assert.Equal(
+            "_bmad-output/notes/unrelated.md",
+            System.Text.Json.JsonDocument.Parse(File.ReadAllText(deltaPath)).RootElement.GetProperty("trigger").GetString());
+
+        watcher.RunTopologyPass();
+
+        var delta = System.Text.Json.JsonDocument.Parse(File.ReadAllText(deltaPath)).RootElement;
+        Assert.Equal(FileWatcherService.TopologyEventLabel, delta.GetProperty("trigger").GetString());
+    }
 }

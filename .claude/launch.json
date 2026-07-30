@@ -443,6 +443,44 @@
         "--silent"
       ],
       "port": 8136
+    },
+    {
+      "name": "web-prerender-23-4",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "--yes",
+        "http-server",
+        "web/.output/public",
+        "-p",
+        "8140",
+        "-c-1",
+        "--silent"
+      ],
+      "port": 8140
+    },
+    {
+      "name": "golden-23-4",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "--yes",
+        "http-server",
+        "SpecScribeOutput",
+        "-p",
+        "8141",
+        "-c-1",
+        "--silent"
+      ],
+      "port": 8141
+    },
+    {
+      "name": "web-prerender-23-4-jsoff",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "C:/Users/MattE/AppData/Local/Temp/claude/C--Dev-SpecScribe/1f19790d-8de0-416a-b6b2-6907c04f3916/scratchpad/jsoff-server.mjs",
+        "8142",
+        "C:/Dev/SpecScribe/web/.output/public"
+      ],
+      "port": 8142
     }
   ]
 }

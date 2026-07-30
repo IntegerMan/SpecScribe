@@ -287,12 +287,49 @@ npm run extract:ir-content   # regenerate after ANY change to specscribe.css OR 
 npm run check:ir-content     # drift gate — proven red three ways, not only green
 ```
 
-What makes it a transition rather than a re-import: it is **bounded** by measured selector usage across the
-migrated families (897 rules + 4 keyframes, 62 % smaller than source), **generated** and gated, **scoped**
-under `.ir-content` so it cannot reach a template-authored component, and **enumerated** in
-`assets/ir-content.manifest.json` — that list is what Story 23.4 retires. Pass-through pages get whatever
-overlap the migrated families already paid for; the extractor prints that coverage (48 % here) as a number
-rather than leaving it implied.
+What makes it a transition rather than a re-import: it is **bounded** by measured selector usage, **generated**
+and gated, **scoped** under `.ir-content` so it cannot reach a template-authored component, and **enumerated**
+in `assets/ir-content.manifest.json`.
+
+**↻ Story 23.4 changed two things here, and neither is what the story planned.**
+
+**1. The extraction bound is now the WHOLE SITE, not four families.** Story 23.3 bounded it to the four families
+it migrated and reported the shortfall for everything else as a coverage number, correctly — those pages were
+`PassThroughSurface` and not claimed. Once Story 23.4 migrated the remaining **1,276** pages that bound became a
+silent defect: the extractor carried rules for four families while the router rendered fourteen, so **~58 % of
+the classes those pages emit had no rule at all** and the elements rendered **bare** — nothing failed, nothing
+logged. Current numbers: **1,469** pages drive the extraction, **1,423 rules + 4 keyframes**, **393 of 1,814**
+source rules still dropped as unused, **45 % smaller** than source, and pass-through class coverage **100 %**.
+The size headline shrank; **containment and the gate did not**, and those are what ADR 0018 actually rests on.
+
+**2. The layer is NOT retired, and "when it is empty" is unreachable as written.** Owner decisions D3/D5 asked
+for retirement to empty. Measured: only **6.5 %** of carried rules are prose and authorable today; **93.5 %**
+style bespoke vocabulary **injected as rendered HTML** across **651 classes**. So AC #4's **second branch** was
+taken — residue enumerated with a named blocker per bucket:
+
+```bash
+npm run report:ir-content-residue   # → measurements/ir-content-residue.{txt,json} (committed)
+```
+
+| bucket | rules | what it waits on |
+| --- | --- | --- |
+| prose | 93 | **nothing** — authorable today |
+| chart | 284 | **Epic 22** — the IR carries no structured chart data |
+| card | 459 | **Epic 22** — the IR carries no per-family view models |
+| chrome | 97 | **nothing — it NEVER empties.** Owner decision D2 + [ADR 0024](../docs/adrs/0024-spa-and-webview-are-filtered-projections-of-one-region-seam.md) keep C# composing nav + wayfinding + `<main>` permanently. These need a change of **provenance** (an owned sheet here), not deletion. |
+| status | 91 | the **token bridge** — rules must not drift from the six `--status-*` tokens, and UX-DR17 is enforced by badge *shape*, so a partial re-author risks an a11y regression |
+| other | 396 | **Epic 22** — uncategorized injected vocabulary |
+
+**Do not "finish the retirement" by hand-copying monolith rules into components.** That is ADR 0018's explicitly
+rejected alternative ("a second definition free to drift … it is not a migration, it is a rewrite"). The
+remaining work is an **Epic 22 view-model ask**, recorded in
+[ADR 0018 §Addendum](../docs/adrs/0018-transitional-ir-content-style-layer.md). **1,420** is the owner-visible
+debt figure.
+
+⚠️ **The harvest reads `trailingHtml` too.** It used to be `navHtml + wayfindingHtml + mainInnerHtml`, which
+missed the region's post-`</main>` content — so `deep-analytics.html`'s `:target` lightbox rules were never
+carried and the overlay rendered **permanently open** once the markup finally reached the IR. Any code that
+reconstructs "the region" from its parts must use **all** the parts.
 
 Attribute selectors deliberately do **not** bound the extraction. Nearly every one expresses runtime state
 (`[data-ss-hierarchy-boot]`, `[data-hierarchy-ready]`, `[open]`) that is absent from server-rendered markup,
@@ -406,6 +443,63 @@ alias entry resolves it to the server adapter before the environment-aware plugi
 Measured consequence: **zero `_payload.json` files** for the 1,043 IR routes, and zero Nuxt `<script>` tags
 on any of them. The whole prerendered site is **64.3 MB across 1,079 files** against the generated portal's
 65.9 MB across 1,049 — smaller than the thing it projects, against the 23.1 spike's 2.26×.
+
+↻ Re-measured at whole-site scale by Story 23.4: **0 `_payload.json` and 0 Nuxt runtime `<script>` tags across
+all 1,469 IR routes.** Match against real `<script>` **tags**, never as a substring — several `code/**` pages
+render source files that *mention* `_payload.json` and `window.__NUXT__` as prose, and a substring test failed
+six of them. [ADR 0032](../docs/adrs/0032-csp-posture-after-the-projection-layer.md) rests on this measurement.
+
+---
+
+## 13. One family per OWNING TEMPLATER, and the classifier is a table
+
+Ratified shape: Story 23.4 AC #1. Every IR path resolves to an `IrFamily` in `ir/families.ts`; the router
+(`pages/[...path].vue`) maps that to a component through an exhaustive `Record<IrFamily, Component>`.
+
+**Families are keyed to the C# templater that produces the markup, NOT to the path prefix.** One family per
+prefix yields eleven near-identical wrappers, which is the wrong kind of honesty — what a family component can
+legitimately own is the markup *vocabulary* its family injects, and that vocabulary comes from a templater. So
+`adrs/`, `implementation-artifacts/`, `planning-artifacts/`, `specs/`, `readme.html` and `project-context.html`
+are all `HtmlTemplater.BuildDocPage` ⇒ **one** `DocProseSurface`; and `timeline.html` groups with `commits/**`
+because `TimelineTemplater` and `CommitDayTemplater` share the activity-list vocabulary, despite unrelated paths.
+
+Two rules follow, and both exist to make a silent gap impossible:
+
+- **The map is exhaustive over the union.** Adding a family to the classifier without giving it a component is a
+  **type error**, not a page that quietly renders as `pass-through`.
+- **Completeness is asserted against the REAL manifest** (`test/families.test.ts`): every page in the generated
+  IR must resolve, and the `pass-through` bucket must be **empty**. A hand-written fixture would only ever prove
+  the table matches itself. A pass-through renders correctly, links correctly and passes every other harness —
+  it is invisible except to a deliberate count.
+
+**Family components wrap `IrSurface`; they never duplicate it.** Head projection, region injection and chart boot
+live there once. What a family adds is its classification and its own vocabulary contract.
+
+## 14. The C# region contract: nav + wayfinding + `<main>` + trailing
+
+Ratified shape: Story 23.4 AC #3, [ADR 0024](../docs/adrs/0024-spa-and-webview-are-filtered-projections-of-one-region-seam.md).
+
+C# no longer slices the region out of a rendered document — it **composes** it from each page's own `PageView`
+at the write seam, and `splitContentRegion` inverts that into four parts:
+
+```
+region = navHtml + wayfindingHtml + <main …>mainInnerHtml</main> + trailingHtml
+```
+
+⚠️ **`trailingHtml` is not optional, and omitting it has broken the same page three times.**
+`deep-analytics.html` emits a `:target` lightbox **after** `</main>` (a `:target` overlay must not sit inside the
+region it overlays). The C# slicer truncated there, then the TS splitter did, then the CSS extractor's harvest
+did — each independently, each silently. No harness can see it: `measure:parity` compares `<main>` regions only,
+`check:links` treats a same-page `#fragment` as resolved, `check:a11y` has no opinion about a missing overlay. It
+was found by opening the page in a browser and querying for `#coupling-zoom`.
+
+**So: any code that reconstructs "the region" from its parts must use ALL the parts** — and `trailingHtml` must
+render **outside** `<main>`, or it breaks both the overlay and the one-landmark a11y invariant.
+
+Also note what the region does **not** carry, now enforced rather than observed: **no executable script.** Inert
+`<script type="application/json">` data islands are fine (163 of them ship; the Hierarchy Explorer reads them),
+but `IrSurface` **throws at build time** on an executable island rather than shipping a page that `v-html` would
+render silently inert. ADR 0032 restates ADR 0005 §4 around this.
 
 ---
 

@@ -1,11 +1,11 @@
 
 Story 23.3 AC #2 — accessibility and motion conventions, over the emitted HTML
 
-  pages checked        1412
+  pages checked        1474
   excluded             2  200.html, 404.html — Nitro SPA-fallback shells,
                        build artifacts rather than pages. Story 23.5 owns them (see the script).
   stylesheets checked  10
-  status chips seen    4090
+  status chips seen    4278
   failures             0
 
   one-main                every page has exactly one <main id="main-content">

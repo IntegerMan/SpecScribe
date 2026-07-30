@@ -150,7 +150,10 @@ interface DeltaFrame {
 }
 
 function isDeltaFrame(value: WebviewPayload | DeltaFrame): value is DeltaFrame {
-  return (value as DeltaFrame).frame === DELTA_FRAME;
+  // `typeof null === 'object'`, so the null check has to be explicit — without it a literal `null` JSON line
+  // (valid JSON, invalid payload) throws reading `.frame` off it instead of being recognized as "not a delta
+  // frame" and falling through to the full-payload branch. [Review][Patch]
+  return typeof value === 'object' && value !== null && (value as DeltaFrame).frame === DELTA_FRAME;
 }
 
 /** Folds one delta frame onto the payload the consumer currently holds, producing a payload of exactly the shape
@@ -158,11 +161,17 @@ function isDeltaFrame(value: WebviewPayload | DeltaFrame): value is DeltaFrame {
  * consumer holding the previous payload never observes it change underneath. [Story 22.6 AC #3/#6] */
 function applyDeltaFrame(base: WebviewPayload, frame: DeltaFrame): WebviewPayload {
   const surfaces: Record<string, SurfaceContent> = { ...base.surfaces, ...frame.changedSurfaces };
-  for (const removed of frame.removedSurfaces ?? []) delete surfaces[removed];
+  // `frame.removedSurfaces` is a non-optional array by contract, but a malformed/truncated line (most likely
+  // right after a sequence-gap recovery, when data quality is already suspect) could carry a non-array value —
+  // `for...of` throws uncaught on a non-iterable, inside a `stdout.on('data', ...)` handler. [Review][Patch]
+  const removedSurfaces = Array.isArray(frame.removedSurfaces) ? frame.removedSurfaces : [];
+  for (const removed of removedSurfaces) delete surfaces[removed];
   return {
     ...base,
-    siteTitle: frame.siteTitle,
-    entry: frame.entry,
+    // `?? base.X`, matching every other field below: a malformed frame missing these must not corrupt the
+    // cached payload with `undefined`. [Review][Patch]
+    siteTitle: frame.siteTitle ?? base.siteTitle,
+    entry: frame.entry ?? base.entry,
     // `?? base.document` is the load-bearing half: an absent/null document means unchanged, and coercing it to
     // '' would blank the dashboard on every unrelated edit.
     document: frame.document ?? base.document,
@@ -1541,6 +1550,11 @@ class PersistentRenderer implements vscode.Disposable {
   }
 
   private onStdoutChunk(chunk: string): void {
+    // A stdout listener is never detached once attached (Node has no such API on a stream), so without this
+    // guard a process that already tore down for one reason (buffer ceiling, a bad delta frame, a sequence gap)
+    // keeps parsing and re-dispatching every further chunk it happens to emit before the kill below actually
+    // lands — racing whatever fresh connection `onUnavailable`'s caller spawns to replace it. [Review][Patch]
+    if (this.torndown) return;
     this.buffer += chunk;
     // Same rationale as the one-shot path's MAX_RENDERER_STDOUT_BYTES cap, applied to the unterminated-line
     // buffer here — this connection is explicitly designed to run far longer (indefinitely) than the bounded
@@ -1567,7 +1581,14 @@ class PersistentRenderer implements vscode.Disposable {
         // A delta with nothing to merge onto cannot be applied. The core never does this (the first push of a
         // session is always full), so reaching here means the stream is not what we think it is — fall back
         // rather than render a payload assembled from a guess.
+        //
+        // The process is still alive and producing output at this point — unlike the buffer-ceiling branch
+        // above, this used to tear down without killing it, leaving the old connection's file watchers running
+        // and its (now stale) closures still able to call onPayload/applyPayload on the shared store after a
+        // replacement connection had already been spawned. Killing it here, before teardown, closes that.
+        // [Review][Patch]
         if (!this.lastPayload) {
+          if (this.proc) killWithEscalation(this.proc);
           this.teardown(new Error('specscribe webview --serve sent a delta frame before any full payload'));
           return;
         }
@@ -1575,8 +1596,13 @@ class PersistentRenderer implements vscode.Disposable {
         // Tearing down is the honest response: `onUnavailable(err, hadPayload=true)` makes the store run a fresh
         // recovery load, where silently applying the frame would leave the panel showing a half-applied state
         // that nothing downstream could detect. [Story 22.6 AC #3]
+        //
+        // Killed before teardown for the same reason as the "delta before any full payload" branch above: this
+        // process is still alive and would otherwise keep pushing frames the replacement connection races
+        // against. [Review][Patch]
         const expected = this.lastSequence + 1;
         if (parsed.sequence !== expected) {
+          if (this.proc) killWithEscalation(this.proc);
           this.teardown(new Error(
             `specscribe webview --serve delta sequence gap: expected ${expected}, got ${parsed.sequence}`));
           return;

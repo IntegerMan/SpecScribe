@@ -2,6 +2,27 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: code review of 22-6-client-server-delta-channel (2026-07-30)
+
+- source_spec: `22-6-client-server-delta-channel.md`
+  summary: `SiteGenerator.EmitDelta`'s manifest lookup (`dataFiles.First(f => f.OutputRelativePath == SpaDelivery.ManifestPath)`) has no fallback and throws `InvalidOperationException` if that entry is ever absent.
+  evidence: Acceptance Auditor + Blind Hunter (Group 3). Guarded today by `FileWatcherService.RunGuarded`'s catch-all on the real watch path, but `GenerateOne`/`RegenerateEpics`/`RegenerateAdrs`/`RegenerateFromDataSource` are public API reachable directly (as this story's own tests do) with no equivalent guard — low likelihood, pre-existing brittle-lookup pattern elsewhere in this file. [`src/SpecScribe/SiteGenerator.cs`]
+- source_spec: `22-6-client-server-delta-channel.md`
+  summary: `_watchTrigger` is never cleared after `EmitDelta` consumes it — a pass reached without an immediately preceding `SetWatchTrigger` call reports the previous pass's trigger label instead of "no watcher event drove this."
+  evidence: Edge Case Hunter (Group 3). Diagnostic-field honesty only; does not affect changed/added/removed correctness. [`src/SpecScribe/SiteGenerator.cs`]
+- source_spec: `22-6-client-server-delta-channel.md`
+  summary: ADR 0028 has several documentation completeness gaps — no link to its own evidence (`22-6-delta-measurement-report.md`), the NDJSON delta-frame shape only partially documented (`removedSurfaces`/`document`/`outline` unmentioned though `spa/delta.json` gets a full worked example), no cross-reference to ADR 0024 (the surface model the mechanism is built on, despite sibling ADR 0027 setting that precedent one day earlier), `docs/adrs/README.md`'s ADR 0008 summary bullet left stale (still reads as if ADR 0013 were its only amendment), no back-link from AD-8 in ARCHITECTURE-SPINE.md (sibling ADR 0027 got one for AD-5 in the same commit sweep), and no numbering-guess note like sibling ADR 0027's own ("0024 was guessed, four ADRs landed first, 0028 is the real slot" lives only in sprint-status.yaml).
+  evidence: Blind Hunter + Edge Case Hunter (Group 9). Documentation-only, no correctness impact. Revisit next time ADR 0028 or ADR 0008 is touched. [`docs/adrs/0028-delta-transport-is-a-sidecar-and-a-stream-never-a-server.md`]
+- source_spec: `22-6-client-server-delta-channel.md`
+  summary: `SpaDelivery.TryReadPageIndex` discards the entire page index over one malformed page entry (missing `contentHash`/`chunk`, or a non-object) rather than just that entry, silently forcing permanent full-refresh mode until the one bad entry is fixed, with no visible signal why.
+  evidence: Blind Hunter (Group 2). Defensive-programming hardening; not a currently-reachable production path (the manifest is machine-written by this same codebase). [`src/SpecScribe/SpaDelivery.cs`]
+- source_spec: `22-6-client-server-delta-channel.md`
+  summary: `BuildDelta`'s six distinct "degrade to full" causes (no previous manifest, `forceFull`, schema-version mismatch, unparseable current manifest, unparseable/structurally-invalid previous manifest, a malformed page entry) collapse into a single wire boolean (`full`) with no reason code.
+  evidence: Blind Hunter (Group 2). Undercuts the doc comment's own "degrade LOUDLY" framing for an actual downstream consumer (vs. the source reader, who does see the six causes in code). Observability nicety, not a correctness bug. [`src/SpecScribe/SpaDelivery.cs`]
+- source_spec: `22-6-client-server-delta-channel.md`
+  summary: `_deltaSequence` has no cross-process guard — two SpecScribe processes targeting the same output root (e.g. a `watch` session and a `webview --serve --serve-delta` session run side-by-side) would each maintain an independent, unsynchronized sequence counter while atomically overwriting the same shared `spa/delta.json`.
+  evidence: Edge Case Hunter (Group 9). Unlikely operating mode not exercised by any current caller; revisit if a future story adds a supported multi-process watch scenario. [`src/SpecScribe/SiteGenerator.cs`]
+
 ## Deferred from: code review of 8-9-retired-is-a-first-class-story-status (2026-07-29)
 
 - source_spec: `8-9-retired-is-a-first-class-story-status.md`

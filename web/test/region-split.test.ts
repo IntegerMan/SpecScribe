@@ -126,6 +126,44 @@ describe('splitContentRegion — pages with no wayfinding band', () => {
   })
 })
 
+describe('splitContentRegion — content AFTER </main> (the deep-analytics lightbox)', () => {
+  // Regression test for a loss that happened TWICE, at two layers, and was invisible to every harness.
+  //
+  // `deep-analytics.html` emits `<div id="coupling-zoom" class="coupling-lightbox">` AFTER `</main>`, because a
+  // `:target` overlay must not live inside the region it overlays. The pre-23.4 C# slicer truncated at
+  // `</main>` and dropped it, so the page's "Expand" link resolved to nothing in the SPA and webview. Story
+  // 23.4 fixed the C# side — and this splitter then dropped it again for exactly the same reason.
+  //
+  // Why no harness caught either: `measure:parity` compares `<main>` regions only; `check:links` treats a
+  // same-page `#fragment` as resolved; `check:a11y` has no opinion about a missing overlay. It took opening the
+  // page in a browser and querying `#coupling-zoom`.
+  const LIGHTBOX = '<div id="coupling-zoom" class="coupling-lightbox"><a href="#">close</a></div>'
+
+  it('captures post-landmark content in trailingHtml instead of discarding it', () => {
+    const region = splitContentRegion(`${NAV}${MAIN_OPEN}${BODY}</main>\n${LIGHTBOX}`, 'deep-analytics.html')
+    expect(region.mainInnerHtml).toBe(BODY)
+    expect(region.trailingHtml).toContain('id="coupling-zoom"')
+  })
+
+  it('does NOT pull it inside <main>', () => {
+    // Rendering it inside the landmark would satisfy "the markup is on the page" while breaking both the
+    // overlay's positioning and the one-<main> a11y invariant. The split must keep them separate.
+    const region = splitContentRegion(`${NAV}${MAIN_OPEN}${BODY}</main>${LIGHTBOX}`, 'deep-analytics.html')
+    expect(region.mainInnerHtml).not.toContain('coupling-zoom')
+  })
+
+  it('is empty for the overwhelming majority of pages, which carry nothing after </main>', () => {
+    const region = splitContentRegion(`${NAV}${MAIN_OPEN}${BODY}</main>`, 'index.html')
+    expect(region.trailingHtml).toBe('')
+  })
+
+  it('is empty on a degraded page rather than undefined', () => {
+    const region = splitContentRegion(`${NAV}<div>no landmark</div>`, 'forge-report.html')
+    expect(region.degraded).toBe(true)
+    expect(region.trailingHtml).toBe('')
+  })
+})
+
 describe('splitContentRegion — the degraded (landmark-less) shape', () => {
   // ADR 0024 §Decision 3 keeps a landmark-less page IN the IR (the SPA retains what the webview skips), so
   // this shape is real and a consumer must be able to skip it. It used to throw — and because Nuxt prerenders

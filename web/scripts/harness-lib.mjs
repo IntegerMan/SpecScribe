@@ -21,9 +21,27 @@ export function walk(dir, root = dir, out = []) {
   return out
 }
 
-/** The `<main …>…</main>` region, or null. Greedy on purpose — a page has exactly one. */
+/**
+ * The `<main id="main-content" …>…</main>` region, or null. Greedy on purpose — a page has exactly one.
+ *
+ * ⚠️ **Anchored on the FULL landmark, not on `<main`.** [Story 23.4]
+ *
+ * The looser `/<main\b/` pattern matched page CONTENT, not just the landmark: this repo has a deferred-work
+ * item whose own title is about the landmark extraction, so its page carries the literal text `<main> body…`
+ * inside `<meta name="description" content="…">`. `<` needs no escaping inside a quoted attribute value, and
+ * Nuxt's `useHead` does not escape it (C#'s `PathUtil.Html` does) — so the extractor sliced the "region" from
+ * inside the `<head>` and reported a 1-page parity delta on a page that was in fact byte-correct
+ * (`verbatim: true` at the same time, which is the contradiction that gave it away).
+ *
+ * `<main id="main-content"` is the universal Story 1.4 landmark and the SAME anchor
+ * `SpaDelivery.ExtractContentRegion` uses (`MainLandmarkMarker`), so the two sides of every parity comparison
+ * now agree on where a region starts. This is the third time this class of bug has been hit here — Story 23.3
+ * with `data-hierarchy`, `experiment-two-ir.mjs` with `_payload.json` in rendered source — and the lesson is
+ * the same each time: in a portal that renders its own source and its own docs, ANY substring probe will
+ * eventually match prose. Match structure, not text.
+ */
 export function mainRegion(html) {
-  const m = html.match(/<main\b[^>]*>[\s\S]*<\/main>/i)
+  const m = html.match(/<main\s+id="main-content"[^>]*>[\s\S]*<\/main>/i)
   return m ? m[0] : null
 }
 

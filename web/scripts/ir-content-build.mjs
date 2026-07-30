@@ -54,7 +54,17 @@ export async function buildIrContentCss() {
     // than folding its raw nav markup into the used/other sets, which would attribute nav-only selectors to a
     // page that renders nothing. [Story 22.4 code review — owner decision DR2]
     if (r.degraded) continue
-    const markup = `${r.navHtml}${r.wayfindingHtml}${r.mainInnerHtml}`
+    // ⚠️ `trailingHtml` is part of the harvest, and leaving it out was a real defect. [Story 23.4]
+    //
+    // It is the region's post-`</main>` content — normally empty, but on `deep-analytics.html` it is the
+    // `:target` lightbox. Harvesting only the body meant `.coupling-lightbox { display: none }` and its
+    // `:target` companion were never carried, so once the lightbox finally reached the IR the overlay rendered
+    // PERMANENTLY OPEN: a 526 px panel sitting in the page instead of a dialog that opens on demand. Present in
+    // the DOM, correct in the region, invisible to every harness, and visibly wrong to a reader.
+    //
+    // This is the third layer that dropped the same content (C# slicer → TS splitter → this harvest). Any code
+    // that reconstructs "the region" from its parts must use ALL the parts.
+    const markup = `${r.navHtml}${r.wayfindingHtml}${r.mainInnerHtml}${r.trailingHtml}`
     if (isMigrated(path)) {
       migratedPages += 1
       harvest(markup, used)
@@ -259,9 +269,21 @@ export async function buildIrContentCss() {
     ` * Extracted from ${SOURCE_LABEL} by \`npm run extract:ir-content\` (Story 23.3 AC #6).`,
     ' *',
     ' * The IR ships markup authored against that 7,041-line stylesheet; this app imports only the token',
-    ' * bridge. This layer carries the rules the four MIGRATED families actually use, re-nested under',
-    ` * \`${SCOPE}\` so they cannot reach a template-authored component. It is TRANSITIONAL: Story 23.4`,
-    ' * retires it, and web/assets/ir-content.manifest.json names every source rule it carries.',
+    ' * bridge. This layer carries the rules the IR surfaces actually use, re-nested under',
+    ` * \`${SCOPE}\` so they cannot reach a template-authored component.`,
+    ' *',
+    ' * ⚠️ STILL TRANSITIONAL, BUT NO LONGER "Story 23.4 retires it". Story 23.4 ATTEMPTED the retirement',
+    ' * (owner decision D5) and could not complete it. Measured: only ~5% of the carried rules are prose and',
+    ' * authorable today; ~95% style bespoke vocabulary INJECTED as rendered HTML across ~380 classes, which',
+    ' * cannot be de-injected while ADR 0016 keeps rendered HTML in the IR and no per-family view models exist.',
+    ' *',
+    ' * What the residue waits on, per bucket (see ADR 0018 §Addendum and',
+    ' * web/measurements/ir-content-residue.json, regenerate with `npm run report:ir-content-residue`):',
+    ' *   chart / card / other  → EPIC 22: structured per-family + per-chart data in the IR',
+    ' *   status                → the token bridge, so rules cannot drift from the six --status-* tokens',
+    ' *   chrome                → NEVER EMPTIES. Owner decision D2 + ADR 0024 keep C# composing nav +',
+    ' *                           wayfinding + <main> into the region permanently. These need a change of',
+    ' *                           PROVENANCE (an owned sheet here), not deletion.',
     ' *',
     ' * Re-run `npm run extract:ir-content` after any change to the C# stylesheet or to what the migrated',
     ' * surfaces render. `npm run check:ir-content` fails the build when this file and the source diverge.',
@@ -342,7 +364,12 @@ export async function buildIrContentCss() {
     generatedBy: 'web/scripts/extract-ir-content.mjs',
     source: SOURCE_LABEL,
     scope: SCOPE,
-    transitional: 'Story 23.4 retires this layer. Every entry below is a rule it has to account for.',
+    transitional:
+      'Story 23.4 attempted the retirement (owner decision D5) and could NOT complete it: ~95% of the ' +
+      'carried rules style bespoke vocabulary injected as rendered HTML, which needs Epic 22 view models to ' +
+      'de-inject, and the `chrome` bucket never empties because owner decision D2 + ADR 0024 keep C# ' +
+      'composing the region permanently. See ADR 0018 §Addendum and ' +
+      'web/measurements/ir-content-residue.json for the per-bucket blocker.',
     migratedFamilies: ['index.html', 'epics.html', 'epics/epic-{N}.html', 'epics/story-{id}.html'],
     stats: {
       carriedRules: stats.carriedRules,

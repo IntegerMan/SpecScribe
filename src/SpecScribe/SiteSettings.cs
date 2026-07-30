@@ -74,9 +74,20 @@ public class SiteSettings : CommandSettings
     /// values.</item>
     /// </list>
     /// Two AGREEING values (<c>--today-policy as-of:2026-07-27 --as-of 2026-07-27</c>) are not a conflict; two
-    /// as-of dates that differ ARE, since only one of them can be the run's cutoff.</para></summary>
+    /// as-of dates that differ ARE, since only one of them can be the run's cutoff.</para>
+    /// <para><b>The <c>--serve-delta</c> check is an independent gate</b> (code review, Story 22.6): without it,
+    /// <c>--serve-delta</c> passed alone (or on a command other than <c>webview</c>) silently no-ops — nothing
+    /// downstream ever reads <see cref="ServeDelta"/> unless <see cref="Serve"/> is also set, so a user typing it
+    /// by itself would believe delta streaming is active when it never starts.</para></summary>
     public override ValidationResult Validate()
     {
+        if (ServeDelta && !Serve)
+        {
+            return ValidationResult.Error(
+                "--serve-delta requires --serve — delta frames are only ever pushed on the persistent "
+                + "`webview --serve` channel.");
+        }
+
         if (TodayPolicy is { Length: > 0 } && !DatePolicies.TryParse(TodayPolicy, out _))
         {
             return ValidationResult.Error(DatePolicies.RejectionMessage(TodayPolicy));
