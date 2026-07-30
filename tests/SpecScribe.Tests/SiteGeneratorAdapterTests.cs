@@ -1701,7 +1701,33 @@ public class SiteGeneratorAdapterTests : IDisposable
         // Confirmed byte-identical across THREE consecutive runs after folding the manifest's derived
         // contentHash values (see FingerprintIr — the two-run rule caught this moving between the first two
         // captures, and the cause was a hash-of-an-unfolded-path, not a rendering change).
-        Assert.Equal("3acee6c2bede29b59d2afdbf37ff4fe0e88860bde3c69d99aeff4d0eb7de4131", fingerprint);
+        //
+        // ── Regenerated 2026-07-30 — a REAL cross-platform portability bug, not a rendering change ──
+        //
+        // ROOT CAUSE, established before touching this constant (CLAUDE.md's rule): CI's `portability-probe`
+        // job started failing with a DIFFERENT actual hash than the `build-test-analyze` (Windows) job, on the
+        // SAME commit — the one signature that rules out "just needs regeneration" and points at genuine
+        // non-determinism. Traced to `SiteGenerator.FallbackCodeWalk` (the non-git code-map source this fixture
+        // exercises): it fed `Directory.GetFileSystemEntries`'s result straight into a stack-based walk with
+        // NO sort. `GetFileSystemEntries` makes no ordering guarantee, and NTFS enumerates a directory
+        // differently than ext4/APFS in practice — so `code-map.html`'s file listing (and therefore this IR
+        // fingerprint, which hashes it) was stable on any ONE OS but not PORTABLE across them. Fixed by sorting
+        // entries ordinally before each directory's files are added and its subdirectories are pushed (see
+        // `FallbackCodeWalk`'s own comment) — the walk is now deterministic regardless of filesystem.
+        // New regression coverage: `SiteGeneratorSpaTests.CodeMapFallbackWalk_ListsFiles_InDeterministicSortedOrder_NotFilesystemEnumerationOrder`.
+        //
+        // WHY THIS CONSTANT MOVED AND `GoldenContentFingerprint` DID NOT: that gate's fixture
+        // (`SiteGeneratorAdapterTests.Options()`, no `--spa`) is documented as "not a git repo and cites no real
+        // files, so no code page... renders here" for the cases the sort fix touches — so `FallbackCodeWalk`'s
+        // walk order was never part of ITS hash. This fixture explicitly DOES render `code-map.html` from a
+        // real fallback walk, which is exactly why it is the gate that caught the bug.
+        // VERIFICATION: `4e15c41e…` confirmed byte-identical across two consecutive runs on this machine, EACH
+        // preceded by an explicit `dotnet build --no-incremental`. Cross-platform agreement (the actual claim
+        // being fixed) could not be verified locally — no Linux .NET runtime was available in this environment
+        // (Docker Desktop's daemon was not running; its WSL VM carries no `dotnet`) — so CI's next run, where
+        // `build-test-analyze` (Windows) and `portability-probe` (Ubuntu) must now agree with EACH OTHER as
+        // well as with this constant, is the real proof.
+        Assert.Equal("4e15c41ea020c600814a4c4c292589974498427ab1ac7d1ac06a73b18297fcf8", fingerprint);
     }
 
     /// <summary>The IR fingerprint's own normalization — <see cref="FingerprintTree"/> plus ONE extra fold, and

@@ -636,6 +636,38 @@ public class SiteGeneratorSpaTests : IDisposable
         Assert.All(firstChunks, kv => Assert.Equal(kv.Value, secondChunks[kv.Key]));
     }
 
+    /// <summary>Code review finding: the non-git fallback code walk (<c>FallbackCodeWalk</c>, the branch this
+    /// non-git fixture exercises per the comment above) fed <c>Directory.GetFileSystemEntries</c>'s result
+    /// straight into a stack-based walk with no sort. <c>GetFileSystemEntries</c> makes NO ordering guarantee,
+    /// and NTFS vs. ext4/APFS enumerate the same directory differently in practice — a genuine PORTABILITY bug
+    /// (stable on one OS, different between Windows and Linux for byte-identical source), which is exactly what
+    /// <c>portability-probe</c> exists to catch, and which moved <c>GenerateAll_GoldenIrFingerprint...</c>
+    /// between CI's Windows and Ubuntu jobs. Files are created here in DELIBERATELY descending name order so an
+    /// unsorted walk would surface them in creation order; the fix must show them in ascending order in
+    /// <c>code-map.html</c> regardless.</summary>
+    [Fact]
+    public void CodeMapFallbackWalk_ListsFiles_InDeterministicSortedOrder_NotFilesystemEnumerationOrder()
+    {
+        var codeDir = Path.Combine(_root, "tools-probe");
+        Directory.CreateDirectory(codeDir);
+        // Created descending: zebra first, apple last — the OPPOSITE of the order the assertion requires.
+        File.WriteAllText(Path.Combine(codeDir, "zebra.py"), "print('z')\n");
+        File.WriteAllText(Path.Combine(codeDir, "mango.py"), "print('m')\n");
+        File.WriteAllText(Path.Combine(codeDir, "apple.py"), "print('a')\n");
+
+        var gen = GeneratedSite(spa: false);
+        var codeMapPath = Path.Combine(Site, "code-map.html");
+        Assert.True(File.Exists(codeMapPath), "code-map.html did not render — the fallback walk found nothing");
+        var html = File.ReadAllText(codeMapPath);
+
+        var apple = html.IndexOf("apple.py", StringComparison.Ordinal);
+        var mango = html.IndexOf("mango.py", StringComparison.Ordinal);
+        var zebra = html.IndexOf("zebra.py", StringComparison.Ordinal);
+        Assert.True(apple >= 0 && mango >= 0 && zebra >= 0, "not all three probe files appear in code-map.html");
+        Assert.True(apple < mango, "apple.py (alphabetically first) must appear before mango.py, not in creation order");
+        Assert.True(mango < zebra, "mango.py must appear before zebra.py (alphabetically last, created first)");
+    }
+
     [Fact]
     public void LongTailRegion_IsTheSameCSharpRenderedContent_AsTheStaticPageMainBlock()
     {

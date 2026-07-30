@@ -588,6 +588,37 @@ All 13 patches (10 original + 3 folded in from resolved decisions) applied 2026-
 - TypeScript (`extension/`): `npm run typecheck` clean, 0 errors.
 - AC #3 and AC #4 wording amended in this file per the owner's 2026-07-30 decisions (see the resolved Decisions
   section above).
+
+#### Out-of-band fix: CI portability bug found while verifying this story's patches (2026-07-30)
+
+Pushing this story's patches through CI (`build-test-analyze` + the non-gating `portability-probe` job) surfaced
+`GenerateAll_GoldenIrFingerprint_IsStableAfterNormalizingVolatileTokens` (a **Story 23.4** gate, not this
+story's) failing with a **different actual hash on Windows vs. Ubuntu for the identical commit** — the one
+signature that rules out "just needs regeneration" and points at real non-determinism, not content drift.
+
+**Root-caused, not papered over** (per CLAUDE.md's "establish causality before touching a golden constant"
+rule): `SiteGenerator.FallbackCodeWalk` (the non-git code-map source walk) fed
+`Directory.GetFileSystemEntries`'s result straight into a stack-based walk with no sort.
+`GetFileSystemEntries` makes no ordering guarantee, and NTFS enumerates a directory differently than ext4/APFS
+in practice — so `code-map.html`'s file listing (and anything hashing it) was stable on any one OS but not
+portable across them. This is pre-existing code (Story 7.6), unrelated to Story 22.6's own changes, but blocked
+this story's CI run, so it's fixed here rather than left blocking indefinitely.
+
+- **Fix**: [`src/SpecScribe/SiteGenerator.cs`](../../src/SpecScribe/SiteGenerator.cs) `FallbackCodeWalk` — sort
+  each directory's entries ordinally before adding files / pushing subdirectories (reversed on push so the
+  LIFO stack pops them back out in ascending order). The walk is now deterministic regardless of filesystem.
+- **New regression test**: `SiteGeneratorSpaTests.CodeMapFallbackWalk_ListsFiles_InDeterministicSortedOrder_NotFilesystemEnumerationOrder`
+  — creates probe files in deliberately descending name order and asserts `code-map.html` still lists them
+  ascending.
+- **`GenerateAll_GoldenIrFingerprint`** regenerated `3acee6c2…` → `4e15c41e…` at
+  [`SiteGeneratorAdapterTests.cs`](../../tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs) with a full
+  regeneration-log entry recording the root cause. Confirmed stable across two `dotnet build --no-incremental`
+  runs **on this machine**; true cross-platform agreement could not be verified locally (no Linux .NET runtime
+  available — Docker Desktop's daemon was not running, and its WSL VM carries no `dotnet`), so CI's next run —
+  where `build-test-analyze` (Windows) and `portability-probe` (Ubuntu) must now agree with each other, not just
+  with the constant — is the actual proof.
+- `web/` (`npm test`, `npm run check`) and `extension/` (`npm run typecheck`) all re-verified clean after this
+  fix; full C# suite re-run green (2836 passed / 0 failed / 3 skipped) with the fix in place.
 - [x] [Review][Defer] `sequence` has no cross-process guard — two SpecScribe processes (e.g. `watch` +
   `webview --serve --serve-delta`) targeting the same output root would each run an independent, unsynchronized
   `_deltaSequence` while atomically overwriting the same `spa/delta.json`. [src/SpecScribe/SiteGenerator.cs] —

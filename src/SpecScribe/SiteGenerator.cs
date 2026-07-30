@@ -5975,6 +5975,15 @@ public sealed class SiteGenerator
                 continue;
             }
 
+            // Sorted ordinally so the walk — and therefore which files land inside MaxCodeMapFiles's cap on a
+            // large tree, and in what order — is deterministic across filesystems. Directory.GetFileSystemEntries
+            // makes NO ordering guarantee, and NTFS vs. ext4/APFS enumerate the SAME directory differently in
+            // practice: an unsorted walk fed a genuine portability bug into every downstream consumer of the
+            // resulting file list (code-map.html, and transitively any fingerprint/hash taken over it) — stable
+            // on one OS, but different between Windows and Linux for byte-identical source. (code review finding)
+            Array.Sort(entries, StringComparer.Ordinal);
+
+            var subdirs = new List<string>();
             foreach (var entry in entries)
             {
                 if (results.Count >= MaxCodeMapFiles) break;
@@ -5982,13 +5991,16 @@ public sealed class SiteGenerator
                 if (Directory.Exists(entry))
                 {
                     if (name.StartsWith('.') || name is "bin" or "obj" or "node_modules") continue;
-                    stack.Push(entry);
+                    subdirs.Add(entry);
                 }
                 else if (!PathUtil.IsIgnoredSourceFile(entry))
                 {
                     results.Add(PathUtil.NormalizeSlashes(Path.GetRelativePath(repoRoot, entry)));
                 }
             }
+            // Pushed in REVERSE sorted order so the stack (LIFO) pops them back out in ASCENDING order — a
+            // deterministic depth-first walk, not one that happens to depend on push order inverting cleanly.
+            for (var i = subdirs.Count - 1; i >= 0; i--) stack.Push(subdirs[i]);
         }
 
         return results;
