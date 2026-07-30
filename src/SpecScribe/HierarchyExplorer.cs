@@ -631,6 +631,14 @@ public static partial class HierarchyExplorer
         // of message. Hidden by default; the client toggles it alongside the live-region announcement.
         if (cfg.Filterable)
             body.Append("<p class=\"chart-empty ss-hierarchy-filter-empty\" hidden>Nothing selected — choose at least one to see the chart.</p>\n");
+        // [Review][Patch] The same affordance for a views-bearing instance whose ACTIVE VIEW is empty. Story
+        // 20.10's Task 3.6 claimed this element was already reused for the chart, but it was emitted only behind
+        // `cfg.Filterable`, which Code Map never sets — so switching to a view that filters every file out left a
+        // blank Plotly frame with no notice at all, and NFR8 ("a missing panel is not an empty state; an empty view
+        // says so") held for the file table's per-view lead text and failed for the chart. Wording is
+        // surface-neutral: the component does not know it is drawing files.
+        else if (model.Views is not null)
+            body.Append("<p class=\"chart-empty ss-hierarchy-filter-empty\" hidden>No items match the current filter.</p>\n");
 
         // --- The boot placeholder — the anti-flash half of the JS handshake.
         //
@@ -656,7 +664,13 @@ public static partial class HierarchyExplorer
         body.Append(IslandHtml(model));
         body.Append(TextTwinHtml(model));
 
-        return Charts.Framed(cfg.Meta, body.ToString(), panelClass, panelAttributes);
+        // [Review][Patch] A views-bearing instance's analysis window is a per-VIEW fact (`HierarchyView.Window`),
+        // and the server can only bake ONE of them into the frame head. Ship it `hidden` and let the component
+        // reveal it with the active view's own string: with JS off the pure-CSS row filter really does filter the
+        // twin below, so a baked "every file · 1,220 files" heading actively misdescribed it. D4's rule — a scale
+        // and its legend move together or the story is wrong — applied to the frame head. The TITLE stays visible:
+        // "Source Code Map" is true of every view, only the counts are not.
+        return Charts.Framed(cfg.Meta, body.ToString(), panelClass, panelAttributes, windowHiddenUntilMount: model.Views is not null);
     }
 
     private static string Checked(string shape, string value) =>
@@ -799,6 +813,40 @@ public static partial class HierarchyExplorer
 
         var cfg = model.Config;
         var dimensions = cfg.Dimensions is { Count: > 0 } dims ? dims : null;
+
+        // [Review][Patch] Two invariants the shared-payload contract (ADR 0012 Ratified decision #8) depends on and
+        // that nothing enforced. Both fail LOUDLY here rather than shipping a silently-wrong island, and neither
+        // moves a byte on any existing surface — a `Views: null` model reaches neither branch.
+        //
+        // 1. `views` is serialized ONLY on the dimension-bearing branch below. That is deliberate — the six
+        //    already-shipped non-dimension islands must keep emitting exactly the bytes they emit today or the
+        //    golden fingerprint moves for no reason (Story 20.9 Task 1.1; Story 20.10 anti-pattern 12) — but it
+        //    made "an instance may present N server-declared views" only CONDITIONALLY true, and a views-bearing
+        //    model with no dimensions would have had its views dropped with no error, leaving the client to read
+        //    `nodes` directly: files only, every one with a null parent, under `branchvalues: "total"`.
+        if (model.Views is not null && dimensions is null)
+            throw new InvalidOperationException(
+                $"HierarchyExplorer instance '{cfg.DomId}' declares {model.Views.Count} views but no dimensions. " +
+                "The views payload rides on the dimension-bearing island shape only, so this combination would " +
+                "silently drop every view. Declare at least one HierarchyDimension, or extend the non-dimension " +
+                "island branch deliberately (it is byte-frozen — see ADR 0012 Ratified decision #8).");
+
+        // 2. View-key uniqueness. Story 20.7's F3 left `HierarchyDimension.Key` uniqueness unenforced and Story
+        //    20.10's own Previous-story-intelligence section asked for the view analogue to be enforced in the
+        //    emitter. A duplicate key silently wins in `activeViewKey()`'s legend match and in `{hashKey}-view=`
+        //    resolution, so the visible legend and the drawn view can disagree with nothing to catch it.
+        if (model.Views is { Count: > 1 })
+        {
+            var keys = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var v in model.Views)
+            {
+                if (!keys.Add(v.Key))
+                    throw new InvalidOperationException(
+                        $"HierarchyExplorer instance '{cfg.DomId}' declares more than one view with key '{v.Key}'. " +
+                        "View keys address the per-view legend blocks and the deep-link fragment, so they must be unique.");
+            }
+        }
+
         var payload = new
         {
             config = new

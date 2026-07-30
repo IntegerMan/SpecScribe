@@ -11,11 +11,20 @@
 
 import { readFileSync, writeFileSync } from 'node:fs'
 import { buildIrContentCss } from './ir-content-build.mjs'
-import { OUT_CSS, OUT_MANIFEST, SCOPE, SOURCE_CSS, SOURCE_LABEL } from './ir-content-lib.mjs'
+import {
+  OUT_CSS,
+  OUT_MANIFEST,
+  OUT_SHARED_CSS,
+  SCOPE,
+  SHARED_PRIMITIVES,
+  SOURCE_CSS,
+  SOURCE_LABEL,
+} from './ir-content-lib.mjs'
 
-const { css, manifest, stats } = await buildIrContentCss()
+const { css, sharedCss, manifest, stats } = await buildIrContentCss()
 
 writeFileSync(OUT_CSS, css, 'utf8')
+writeFileSync(OUT_SHARED_CSS, sharedCss, 'utf8')
 writeFileSync(OUT_MANIFEST, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
 
 const kb = (n) => `${(n / 1024).toFixed(1)} KB`
@@ -37,5 +46,11 @@ console.log(`  pass-through coverage   ${stats.passThroughCoveredPct}% of the cl
 console.log(`                          ${stats.totalPages - stats.migratedPages} pages use are already carried.`)
 console.log(`                          Those pages are Story 23.4's — this is reported, not claimed.`)
 console.log('')
-console.log('  wrote web/assets/ir-content.css + web/assets/ir-content.manifest.json')
+console.log(`  shared primitives       ${stats.sharedRules} rule(s), UNSCOPED, from the allowlist`)
+console.log(`                          [${SHARED_PRIMITIVES.map((c) => `.${c}`).join(', ')}] — ADR 0029.`)
+console.log(`                          ${kb(Buffer.byteLength(sharedCss))}. These are REMOVED from the scoped`)
+console.log(`                          layer, not duplicated: one definition, reachable by Vue components.`)
+console.log('')
+console.log('  wrote web/assets/ir-content.css + web/assets/shared-primitives.css')
+console.log('       + web/assets/ir-content.manifest.json')
 console.log('')

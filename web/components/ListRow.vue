@@ -132,29 +132,22 @@ const primaryText = computed(() => props.primaryLabel || 'Open')
   margin-left: auto;
 }
 
-/* The chip carries `list-row-chip pill`, exactly as `ListRow.Chip` (`ListRow.cs:73`) emits it, and every
-   property below is `.pill`'s (`specscribe.css:1234`) — Courier, 0.03em tracking, 0.2rem/0.7rem, the 999px
-   radius, --warm-white, --ink-faded. Before the 2026-07-28 re-review this rule declared serif, no tracking,
-   0.1rem/0.55rem and --parchment/--ink-light, so the Vue chip and the portal chip were visibly different
-   objects inside a file whose header calls itself "the Vue counterpart of ListRow.Render".
-
-   ⚠️ THIS IS STILL A SECOND COPY, and knowingly so. `.pill` is shared vocabulary that lives in the C#
-   monolith; the Vue app imports only `tokens.css`, `base.css` and the GENERATED `ir-content.css`, and the
-   latter scopes it as `.ir-content .pill` — so it reaches IR-injected markup and never reaches a
-   template-authored component. Dropping these properties in favour of the `pill` class alone ships an
-   UNSTYLED chip. Closing this properly needs a channel for shared non-IR primitive classes, which does not
-   exist yet; it is raised as a decision on Story 23.2's re-review. The `pill` class is kept on the element
-   so that the day such a channel lands, this block deletes cleanly. */
+/* The chip carries `list-row-chip pill`, exactly as `ListRow.Chip` (`ListRow.cs`) emits it.
+ *
+ * ⚠️ EVERY VISUAL PROPERTY IS DELIBERATELY ABSENT HERE. It comes from `.pill` in the generated
+ * `assets/shared-primitives.css` — the UNSCOPED shared-primitive layer (ADR 0029), extracted verbatim from
+ * `specscribe.css`. This block used to re-declare `.pill`'s ten properties by hand, which drifted exactly as
+ * you would expect: serif instead of Courier, no letter-spacing, the wrong padding, and --parchment/--ink-light
+ * instead of --warm-white/--ink-faded. The 2026-07-28 re-review fixed the VALUES but could not remove the
+ * copy — the scoped `ir-content.css` layer emits `.ir-content .pill`, which reaches injected markup and never
+ * a template-authored component, so deleting the properties then shipped an unstyled chip. The shared layer is
+ * that missing channel, and this is the copy it deleted.
+ *
+ * What stays is `flex-shrink`, which is NOT `.pill`'s business: it is this row's layout contract for the meta
+ * cluster. A shared primitive describes how a chip LOOKS; where it sits belongs to the component around it.
+ * Adding a look property back here re-opens the drift — change `specscribe.css` and re-extract instead. */
 .list-row-chip {
   flex-shrink: 0;
-  font-family: 'Courier New', monospace;
-  font-size: 0.72rem;
-  letter-spacing: 0.03em;
-  padding: 0.2rem 0.7rem;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--warm-white);
-  color: var(--ink-faded);
 }
 
 .list-row-primary {

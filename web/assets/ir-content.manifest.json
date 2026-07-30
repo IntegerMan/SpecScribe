@@ -10,11 +10,12 @@
     "epics/story-{id}.html"
   ],
   "stats": {
-    "carriedRules": 876,
-    "carriedSelectors": 998,
+    "carriedRules": 875,
+    "carriedSelectors": 997,
     "carriedKeyframes": 4,
     "droppedRoot": 4,
-    "generatedBytes": 110990
+    "generatedBytes": 110869,
+    "sharedRules": 1
   },
   "rules": [
     {
@@ -750,7 +751,8 @@
     },
     {
       "selector": ".pill",
-      "carried": true
+      "carried": false,
+      "reason": "shared primitive — emitted UNSCOPED into shared-primitives.css; see sharedPrimitives below"
     },
     {
       "selector": ".page-shell",
@@ -3623,5 +3625,24 @@
       "carried": true,
       "within": "@media (prefers-reduced-motion: no-preference)"
     }
-  ]
+  ],
+  "sharedPrimitives": {
+    "generatedFile": "web/assets/shared-primitives.css",
+    "unscoped": true,
+    "allowlist": [
+      "pill"
+    ],
+    "admission": "A class qualifies only if a C# primitive emits it AND a template-authored Vue component consumes it. Classes that appear only in injected markup are covered by the scoped layer and must not be added here.",
+    "stats": {
+      "rules": 1,
+      "generatedBytes": 1496
+    },
+    "rules": [
+      {
+        "selector": ".pill",
+        "carried": true,
+        "unscoped": true
+      }
+    ]
+  }
 }

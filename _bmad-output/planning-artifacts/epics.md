@@ -4649,6 +4649,19 @@ So that dense relationships that overwhelm a node-link graph read unambiguously 
 > the spike [ADR 0012](../../docs/adrs/0012-plotly-hierarchy-chart-engine-and-standardized-explorer-component.md) §4
 > hands the graph-engine decision to. Decision-first, timeboxed (~2d), throwaway: **no production code**. Durable
 > deliverables are `24-6-spike-report.md` and a **ratified ADR**.
+>
+> **DECIDED 2026-07-29 — [ADR 0030](../../docs/adrs/0030-epic-24-graph-engine.md), Accepted.** Engine =
+> the **already-vendored Plotly `scatter` trace** over a **generation-time C# layout**; marginal bundle cost
+> **zero bytes** (the shipped `plotly-hierarchy.min.js` was measured to register `heatmap, scatter, sunburst,
+> treemap`). **ADR 0012 is EXTENDED, not superseded** — no new engine family, no second dependency, and §4's
+> allowance of a second family is left unspent. Node position is **data**, not presentation; determinism verified
+> byte-identical across **3 separate processes**; filters **hide, never re-lay-out** (a confidence slider yields
+> **236 distinct edge sets** vs 17 node sets, so precompute-per-state is not viable). ECharts 6.1.0 measured and
+> rejected on **cost-of-change, not merit** (Epic 20 is complete; two live defects found). Cytoscape rejected on
+> **UX-DR7** (canvas, zero per-node DOM). **Three things this did NOT resolve, each named in the ADR:** Plotly has
+> no chord trace so **Story 24.4** must hand-draw arcs or amend ADR 0030; retiring `Charts.ReferenceGraph`'s SVG
+> needs an **ADR 0013 §3 text-twin audit no Epic 24 story owns**; and `StripDataIslands` means the **webview cannot
+> receive a graph payload today**. Report: `24-6-spike-report.md`.
 
 As a maintainer about to build four interactive relationship views,
 I want Epic 24's graph engine decided on measured evidence before Story 24.2 writes a line of rendering code,
@@ -5010,11 +5023,21 @@ So that "done" carries quality context and not only a status badge.
 
 **Acceptance Criteria:**
 
+<!-- AMENDED 2026-07-29 by Story 26.1's ideation record (§ 3.4, § 6, § 11 items 1-2), owner-selected:
+     (a) REQUIREMENT PAGES ARE OUT. Story 26.1 surface S4 = "explicitly out", honoring ADR 0023 § Decision 5 —
+         `requirement` is not a first-class attachment key, so observation → file → epic → requirement is two hops
+         with the second at epic granularity only, composed on a join already amplifying 10.02x. AC #1's entity
+         list is narrowed to epic and story pages accordingly. The prior wording read "epic, story, and requirement
+         pages surface the findings in the code their work touched".
+     (b) The chosen direction is S3 = B, "a chip per row" — a total-count chip on each file row INSIDE the existing
+         Code Areas Touched block, plus ONE rollup sentence above the table which is where the mandatory
+         approximateness caveat lives. See AC #4 for the re-parenting this story also owns. -->
 1.
 **Given** Story 25.3's attachment rule and the shipped `PlanningCodeImpact` (`src/SpecScribe/PlanningCodeImpact.cs:54`)
 **When** findings are attached to planning entities
-**Then** epic, story, and requirement pages surface the findings in the code their work touched, using the existing miner as the join — never a second, divergent story↔file mapping
-**And** the attachment's **approximateness is stated on the surface**, following the Story 21.2 cycle-time precedent, so an inferred link is never presented as a tracked fact.
+**Then** epic and story pages surface the findings in the code their work touched — in the direction Story 26.1 selected (a total-count chip per file row inside the existing Code Areas Touched block, plus one rollup sentence above the table) — using the existing miner as the join, never a second, divergent story↔file mapping
+**And** the attachment's **approximateness is stated on the surface** in that rollup sentence, following the Story 21.2 cycle-time precedent, so an inferred link is never presented as a tracked fact
+**And** requirement pages surface nothing: Story 26.1 recorded them **explicitly out** with its reason, so their absence is a decision and not an omission.
 
 2.
 **Given** many findings attach to no planning entity
@@ -5027,6 +5050,16 @@ So that "done" carries quality context and not only a status badge.
 **When** the surfaces render for a non-BMad project
 **Then** they degrade to absent rather than broken where the framework lacks the underlying artifact types, with any framework-specific vocabulary supplied through the Epic 4 adapter contract.
 
+<!-- AC #4 ADDED 2026-07-29 by Story 26.1's ideation record (§ 6, § 11 item 2), owner-selected. Story 26.1 settled
+     the live vocabulary collision: ADR 0023 § Decision 1 locks the machine-ingested noun as "Analysis
+     Observations", while story pages already render an authored-prose <h3>Review Findings</h3>. The owner chose to
+     apply the re-parenting NOW rather than leave it a latent policy, so it is this story's work. -->
+4.
+**Given** ADR 0023 § Decision 1 locks the machine-ingested noun as "Analysis Observations" and story pages already render an authored-prose `Review Findings` section (`src/SpecScribe/HtmlRenderAdapter.Epics.cs`, `id="sec-review-findings"`)
+**When** story pages render
+**Then** both sit under one **Quality** parent heading as sibling subsections, so the human/machine distinction is structural rather than inferred from two similar headings — epic pages are unaffected, having no `Review Findings` equivalent
+**And** the `sec-review-findings` anchor is preserved so existing deep links do not break, the chips and the rollup remain **one** count routed through the FR21 single generator-side count source rather than two tallies, and the resulting golden-fingerprint move — larger than the chips alone, because section nesting and TOC depth change on every story page carrying review prose — is intentional and re-baselined with a stability check across two runs (CLAUDE.md).
+
 ### Story 26.6: Analysis Hub Page and Dashboard Signal
 
 As a maintainer,
@@ -5035,10 +5068,19 @@ So that findings have a home and a 30-second summary.
 
 **Acceptance Criteria:**
 
+<!-- AMENDED 2026-07-29 by Story 26.1's ideation record (§ 3.5, § 11 item 3), OWNER-INVENTED direction that
+     superseded the pre-researched menu: "I like the rule leaderboard and triage inbox approaches, but both might
+     need separate pages with a highlight style widget teasing the most actionable." The hub is therefore THREE
+     pages, not one. The prior wording read "a dedicated page presents the findings set in the direction Story 26.1
+     selected". Still ONE nav entry (the landing page), following the Git Insights -> Deep Analytics precedent.
+     Deliberately NO hierarchy chart on the hub: Story 26.1's S2 = A puts the portal's only observation hierarchy on
+     the Code Map, and a second one over the same file tree is the exact UX-DR21 pressure the rule exists to
+     prevent. -->
 1.
 **Given** an ingested findings set
 **When** the hub renders
-**Then** a dedicated page presents the findings set in the direction Story 26.1 selected — reachable from the insight-pages nav (FR27) on the integration's own gate, mirroring the Git Insights hub pattern — with sortable/filterable access to every finding including those attached to no planning entity
+**Then** a **landing page** carries the highlight widget, the four normalized severity levels, and the provenance/staleness block, with two full-surface link cards (UX-DR9) into **two child pages** — a **rule leaderboard** ranking the distinct rules so a single fix that clears many occurrences is visible, and a **triage inbox** giving sortable/filterable access to every observation including those attached to no planning entity — all reachable from a single insight-pages nav entry (FR27) on the integration's own gate, mirroring the Git Insights hub pattern
+**And** the highlight widget's ranking is reader-selectable across count, quality type, and a blended score, defaulting to blended, with the blended formula written out in the framing sentence (FR28) so the default ranking is auditable and its inputs limited to severity level, occurrence count, and file concentration
 **And** every chart on it carries a Story 10.2 real-value legend, analysis window, and framing sentence, plus a text twin per ADR 0013 §3.
 
 2.
@@ -5052,6 +5094,16 @@ So that findings have a home and a 30-second summary.
 **When** any surface renders
 **Then** the analysis timestamp is shown using the portal-wide date token (UX-DR25) and stale analysis is marked honestly rather than presented as current
 **And** output remains generation-time deterministic (FR31).
+
+<!-- AC #4 ADDED 2026-07-29 by Story 26.1's ideation record (§ 3.7, § 11 item 4), owner-directed. Story 26.1's
+     candidate surface S7 (the traceability matrix) was the one surface the owner chose NOT to close in the ideation
+     round: "keep it open for 26.6". The recommendation is OUT and its reasoning is recorded in that record; this AC
+     makes the deferred decision this story's, so it cannot fall between the two. -->
+4.
+**Given** Story 26.1 deferred the traceability-matrix candidate (its surface S7) to this story rather than closing it, with a recorded recommendation of **out**
+**When** this story's scope is set
+**Then** it states whether a severity axis is added to `TraceabilityTemplater`'s requirement × covering-epic grid, weighing the two recorded arguments against it — that a third axis on a two-axis grid is a different chart, and that ADR 0023 § Decision 5 already refused the requirement edge (the same reasoning that made Story 26.1's S4 explicitly out) — plus the grid's placement in the **Delivery** nav group rather than Insights
+**And** whichever way it lands, the decision and its reason are recorded so Epic 26 closes with a complete in/out list.
 
 ### Story 26.7: INVESTIGATION — Future External-Service Integration Points
 

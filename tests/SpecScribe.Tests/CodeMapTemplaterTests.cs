@@ -245,6 +245,17 @@ public class CodeMapTemplaterTests
         // new attribute (the per-view lead-text toggle), so check for the retired wrapper CLASS specifically.
         Assert.DoesNotContain("class=\"codemap-view\"", html);
         Assert.DoesNotContain("data-hierarchy-reveal-when", html);
+        // Story 20.9's retired bespoke drill breadcrumb, restored as a guard. [Review][Patch] Story 20.10 dropped
+        // `Assert.DoesNotContain("codemap-drill", html)` along with the panel-structure rewrite; unlike its
+        // `codemap-shape` sibling it had no reason to go — the component's own breadcrumb is `ss-hierarchy-drill`,
+        // so nothing legitimate emits `codemap-drill` and a regression that reintroduced it would have passed.
+        //
+        // The `codemap-shape` guard genuinely COULD NOT survive and is recorded as a real coverage loss rather than
+        // reinstated: with `DomId: "codemap"` the shared component now legitimately emits `name="codemap-shape"` and
+        // `id="codemap-shape-treemap"` for its own shape radios, so the string no longer distinguishes the retired
+        // pure-CSS toggle from the live control. The `codemap-sunburst`/`cs-sunburst-radio` guards above cover the
+        // retired markup that still has a unique name.
+        Assert.DoesNotContain("codemap-drill", html);
 
         // Ordered Sunburst-then-Treemap site-wide (Story 20.7 D2) with THIS surface's shipped default preserved.
         Assert.Contains("class=\"board-tab-radio ss-hierarchy-shape\" value=\"treemap\" checked", html);
@@ -360,6 +371,77 @@ public class CodeMapTemplaterTests
     }
 
     [Fact]
+    public void RenderPage_EachViewRollsUpToTheSameParentValuesASingleVariantServerRenderWouldProduce()
+    {
+        // AC#2's THIRD clause — "the same rolled-up values a from-scratch server render of that variant would have
+        // produced" — and the one clause the story shipped with no coverage at all. [Review][Patch]
+        //
+        // `ProjectCodeMapViews` deliberately does NOT roll up: a shared payload cannot carry four sets of directory
+        // values, so every scaffold directory ships `value: 0` and the roll-up is the client's job (ADR 0012
+        // Ratified decision #8, as amended by this review). That makes the invariant a property of
+        // scaffold + membership + the roll-up RULE, not of the emitted bytes — so it is asserted by reconstructing
+        // each view's node list exactly as the client does and running it through the PRODUCTION rule
+        // (`HierarchyExplorer.RollUp`), never a mirrored copy of it (anti-patterns 1 and 2).
+        //
+        // `RenderPage_EachViewsFourInvariantsHold` covers the other two clauses (one root, branchvalues); this one
+        // covers rolled-up values and no-null-values.
+        var variants = VariantsWithMetrics();
+        var config = new HierarchyExplorerConfig("codemap-rollup", "treemap", HierarchyMode.Navigate, "cm-rollup", 640, true,
+            new Charts.ChartMeta("rollup"), Dimensions: HierarchyExplorer.CodeMapDimensions(true));
+
+        var shared = HierarchyExplorer.ProjectCodeMapViews(variants, config);
+        Assert.NotNull(shared.Views);
+
+        var asserted = 0;
+        foreach (var view in shared.Views!)
+        {
+            if (view.Scaffold.Count == 0) continue; // an empty view (no files survive that combination)
+
+            // Reparent the shared file nodes under THIS view's scaffold, in the client's own order:
+            // all scaffold directories (parent-before-child) then the view's files.
+            var reconstructed = view.Scaffold.ToList();
+            for (var i = 0; i < view.Files.Count; i++)
+            {
+                var parent = view.Scaffold[view.ParentScaffoldIndex[i]];
+                reconstructed.Add(shared.Nodes[view.Files[i]] with { ParentId = parent.Id });
+            }
+
+            var rolled = HierarchyExplorer.RollUp(reconstructed);
+            var byId = rolled.ToDictionary(n => n.Id, n => n, StringComparer.Ordinal);
+
+            // The "no null in values" invariant is structural here — `HierarchyNode.Value` is a non-nullable `int`,
+            // so the payload cannot carry a null; what IS worth pinning is that no roll-up produced a negative or
+            // absent total, which is how a broken reparent would show up.
+            Assert.All(rolled, n => Assert.True(n.Value >= 0, $"view '{view.Key}' node '{n.Id}' rolled up to {n.Value}"));
+
+            // parent == Σ children, over the rolled result.
+            foreach (var group in rolled.Where(n => n.ParentId is not null).GroupBy(n => n.ParentId!))
+            {
+                Assert.True(byId.ContainsKey(group.Key), $"view '{view.Key}' has a child pointing at absent parent '{group.Key}'");
+                Assert.Equal(group.Sum(c => c.Value), byId[group.Key].Value);
+            }
+
+            // And the values match what a from-scratch single-variant server render produces for the same variant —
+            // the literal words of AC#2. Compared on DIRECTORIES and the root, which are the only nodes a roll-up
+            // changes; files keep their own line counts and are already covered byte-identically by the colour
+            // -neutrality test below.
+            var variant = variants.Single(v => v.Key == view.Key);
+            var oracle = HierarchyExplorer.ProjectCodeMap(variant, config).Nodes
+                .Where(n => n.Kind != "file")
+                .ToDictionary(n => n.Id, n => n.Value, StringComparer.Ordinal);
+            Assert.NotEmpty(oracle);
+            foreach (var pair in oracle)
+            {
+                Assert.True(byId.ContainsKey(pair.Key), $"view '{view.Key}' is missing directory '{pair.Key}' the single-variant projection produced");
+                Assert.Equal(pair.Value, byId[pair.Key].Value);
+            }
+            asserted++;
+        }
+
+        Assert.True(asserted >= 2, $"expected at least two non-empty views to assert against, got {asserted}");
+    }
+
+    [Fact]
     public void RenderPage_ColorClassAndMetricsAreColourNeutral_ByteIdenticalToTheSingleVariantProjection()
     {
         // AC#2/D4: deduplicating files must not recolour anything. Every file's colorClass and raw metric bag in
@@ -464,6 +546,78 @@ public class CodeMapTemplaterTests
         Assert.DoesNotContain("src/file-00001.cs<", html);
         // The cap is applied ONCE — exactly one truncation row on the whole page.
         Assert.Single(Regex.Matches(html, "codemap-table-truncated"));
+    }
+
+    [Fact]
+    public void RenderPage_AboveTheDetailCap_ANonDefaultViewReportsItsOWNOmissionsNotTheDistinctSets()
+    {
+        // [Review][Patch] The multi-variant-above-cap fixture Task 8.7 admitted it did not write — and the case the
+        // review found broken. Rows are capped ONCE against the DISTINCT set (F7's better rule), so a view SMALLER
+        // than the cap can still lose rows: its members simply rank below the global top-`cap`. The old lead
+        // arithmetic was `variant.Map.FileCount - cap`, which reports ZERO omissions for exactly that view and
+        // printed "Every file in the treemap" over a table missing rows — breaking the ADR 0013 §2 twin-completeness
+        // claim AC#3 makes for EVERY variant, silently, on any repo past 4,000 files.
+        //
+        // Fixture: `cap + 40` distinct files. Significance order without metrics is by SIZE, so the smallest files
+        // are the ones cut. The 40 smallest are all tests, so the `no-tests` view (cap files, i.e. NOT above the cap
+        // itself) keeps every one of its own files, while the `full` view loses exactly those 40.
+        var cap = Charts.MaxDetailedCodeMapFiles;
+        var all = new List<(string, long)>();
+        for (var i = 0; i < cap; i++) all.Add(($"src/file-{i:00000}.cs", 5_000L + i)); // big → always inside the cap
+        for (var i = 0; i < 40; i++) all.Add(($"tests/small-{i:00000}.cs", 1L + i));   // smallest → cut first
+
+        var fullMap = CodeMap.Build(all.ToArray(), NoMetrics);
+        var noTestsMap = CodeMap.Build(all.Where(f => !CodeMap.IsTestPath(f.Item1)).ToArray(), NoMetrics);
+        var variants = new[]
+        {
+            new CodeMapVariant("full", ExcludesSpecDev: false, ExcludesTests: false, fullMap),
+            new CodeMapVariant("no-tests", ExcludesSpecDev: false, ExcludesTests: true, noTestsMap),
+        };
+
+        var html = CodeMapTemplater.RenderPage(variants, Nav());
+
+        // `full` genuinely lost its 40 smallest, and says so with ITS own number.
+        Assert.Contains($"data-codemap-view=\"full\"><td colspan=\"3\">+40 more files not shown", html);
+        Assert.Contains($"The {cap:N0} most significant files in the treemap", html);
+
+        // `no-tests` lost NOTHING — every file it contains has a row — so it gets no truncation row and its lead is
+        // allowed to say "Every file". Under the old `FileCount - cap` arithmetic this view ALSO reported 0 omissions
+        // while sharing `full`'s single un-markered "+40 more files" row, which is the defect.
+        Assert.Contains("data-codemap-view=\"no-tests\">Every file in the treemap", html);
+        Assert.DoesNotContain("data-codemap-view=\"no-tests\"><td", html);
+
+        // One truncation row PER VIEW THAT OMITS SOMETHING — not one for the whole page, and never un-markered.
+        Assert.Single(Regex.Matches(html, "codemap-table-truncated"));
+        Assert.DoesNotContain("<tr class=\"codemap-table-truncated\"><td", html); // i.e. always view-tagged
+    }
+
+    [Fact]
+    public void RenderPage_AboveTheDetailCap_AViewWhoseOwnFilesRankBelowTheGlobalTopCapReportsThemAsOmitted()
+    {
+        // The sharper half of the same defect: a view that is SMALLER than the cap but whose files are the LOWEST
+        // -ranked ones. `no-tests` here holds only small files, so the distinct-set cap cuts them even though the
+        // view has far fewer than `cap` files. `FileCount - cap` is negative → clamped to 0 → "Every file", over a
+        // table with no rows for them at all. The correct figure is |view| - |view ∩ shown|. [Review][Patch]
+        var cap = Charts.MaxDetailedCodeMapFiles;
+        var all = new List<(string, long)>();
+        for (var i = 0; i < cap; i++) all.Add(($"tests/big-{i:00000}.cs", 5_000L + i));  // tests, all large
+        for (var i = 0; i < 30; i++) all.Add(($"src/tiny-{i:00000}.cs", 1L + i));        // non-test, all tiny → cut
+
+        var fullMap = CodeMap.Build(all.ToArray(), NoMetrics);
+        var noTestsMap = CodeMap.Build(all.Where(f => !CodeMap.IsTestPath(f.Item1)).ToArray(), NoMetrics);
+        var variants = new[]
+        {
+            new CodeMapVariant("full", ExcludesSpecDev: false, ExcludesTests: false, fullMap),
+            new CodeMapVariant("no-tests", ExcludesSpecDev: false, ExcludesTests: true, noTestsMap),
+        };
+
+        var html = CodeMapTemplater.RenderPage(variants, Nav());
+
+        // The no-tests view holds 30 files and EVERY ONE was cut by the distinct-set cap.
+        Assert.Contains("data-codemap-view=\"no-tests\"><td colspan=\"3\">+30 more files not shown", html);
+        // And its lead must NOT claim completeness. Zero of its files are shown, so "Every file" would be a lie.
+        Assert.DoesNotContain("data-codemap-view=\"no-tests\">Every file in the treemap", html);
+        Assert.Contains("data-codemap-view=\"no-tests\">The 0 most significant files in the treemap", html);
     }
 
     // ---- File table pagination (owner feedback, Story 7.12 review) ------------------------

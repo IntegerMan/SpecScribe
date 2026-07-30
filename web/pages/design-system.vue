@@ -59,6 +59,21 @@ function tokenFor(stage: StatusStage): string {
 }
 
 /**
+ * The paired FILL token, for the four stages that have one.
+ *
+ * ⚠️ VERBATIM from `DesignSystemTemplater.StageFillTokens`. `--status-*` is a stage's ACCENT (border + text);
+ * four stages also sit on a pale fill. Those fills were inline hexes in `specscribe.css` until Story 23.2's
+ * re-review, so the bridge could not carry them and `StatusBadge.vue` substituted one flat `--parchment` for
+ * all four — the two design systems disagreed about the colours they both exist to document. `ready` and
+ * `drafted` share ONE fill, exactly as the stylesheet pairs them.
+ */
+function fillFor(stage: StatusStage): string | null {
+  if (stage === 'done' || stage === 'active' || stage === 'review') return `--status-${stage}-bg`
+  if (stage === 'ready' || stage === 'drafted') return '--status-ready-bg'
+  return null
+}
+
+/**
  * The motion vocabulary. Roles, not durations — the value is whatever the token says it is.
  *
  * ⚠️ VERBATIM from `DesignSystemTemplater.MotionTokens`. The duplication is owner-accepted until 23.4 retires
@@ -92,7 +107,9 @@ const injectedHtml = `<p class="injected-note">This paragraph arrived as an HTML
       <ul class="swatch-grid">
         <li v-for="s in stages" :key="s.stage" class="swatch-row">
           <span class="swatch" :class="`swatch-${s.stage}`" aria-hidden="true" />
-          <code class="swatch-token">{{ tokenFor(s.stage) }}</code>
+          <code class="swatch-token"
+            >{{ tokenFor(s.stage) }}<template v-if="fillFor(s.stage)"> on {{ fillFor(s.stage) }}</template></code
+          >
           <StatusBadge :stage="s.stage" :label="s.label" :meaning="s.meaning" />
           <span class="swatch-meaning">{{ s.meaning }}</span>
         </li>

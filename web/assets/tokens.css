@@ -71,6 +71,24 @@
   /* Alternate hatch stripe for unrecognized chrome — token so dark/webview remaps can retune it. */
   --status-unrecognized-hatch: #e8ecf0;
 
+  /* ---- Stage FILL tints, paired with the --status-* accents above ----
+     The --status-* tokens above are the stage's ACCENT (border + text). These four are the pale FILL the
+     badge sits on. They were inline literals on `.status-badge.<stage>` until Story 23.2's re-review: the
+     Vue counterpart could not bind a value that was not a token, so `StatusBadge.vue` substituted
+     --parchment for all four and the two design systems rendered visibly different badges — the exact drift
+     Epic 23 exists to prevent, on the surface whose subject IS the colour vocabulary.
+
+     Each is consumed in TWO places, and that is the point: `.status-badge.<stage>` and the `.epic-status`
+     rules that already described themselves in a comment as "mirrors .status-badge.review". A self-declared
+     mirror held as a second literal is a drift waiting to happen; one token, two consumers, no drift.
+
+     `ready` and `drafted` deliberately SHARE one fill (they share the gold accent too) — a story with a plan
+     and a story merely drafted are one visual tier, separated by word and glyph. [Story 23.2 re-review] */
+  --status-done-bg: #e8f0e4;    /* pale moss  — .status-badge.done, .epic-status.done */
+  --status-active-bg: #e0ecea;  /* pale teal  — .status-badge.active, .epic-status.active */
+  --status-review-bg: #d9e6ea;  /* pale deep-teal — .status-badge.review, .epic-status.review */
+  --status-ready-bg: #f5ecd4;   /* pale gold  — .status-badge.ready AND .drafted */
+
   /* Diagnostics severity background (Story 4.8) — a pale rust tint pairing with --rust, deliberately outside
      the six-stage --status-* vocabulary (a run notice isn't a delivery stage) but still a named token rather
      than an inline literal, per the project's variable-only palette convention. [Review][Patch] */

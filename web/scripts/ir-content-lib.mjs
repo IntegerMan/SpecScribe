@@ -30,12 +30,68 @@ export const SOURCE_CSS = fileURLToPath(
 )
 export const OUT_CSS = fileURLToPath(new URL('../assets/ir-content.css', import.meta.url))
 export const OUT_MANIFEST = fileURLToPath(new URL('../assets/ir-content.manifest.json', import.meta.url))
+export const OUT_SHARED_CSS = fileURLToPath(new URL('../assets/shared-primitives.css', import.meta.url))
 
 /** Repo-relative label — never an absolute machine path, which would differ per checkout. */
 export const SOURCE_LABEL = 'src/SpecScribe/assets/specscribe.css'
 
 /** The scope every emitted rule is nested under. Falls through onto `PageShell`'s root element. */
 export const SCOPE = '.ir-content'
+
+// ── The shared-primitive layer (UNSCOPED) ────────────────────────────────────────────────────────────────
+//
+// ⚠️ This layer deliberately breaks property 3 (SCOPED) above, for a bounded allowlist. See ADR 0029, which
+// amends ADR 0018 to permit exactly this and no more.
+//
+// WHY IT EXISTS. `.pill` is SHARED VOCABULARY: `ListRow.Chip` (`ListRow.cs`) emits
+// `class="list-row-chip pill"`, and every visual property of that chip comes from `.pill` in the C# monolith.
+// `ListRow.vue` is a TEMPLATE-AUTHORED component, so the scoped layer cannot reach it — `.ir-content .pill`
+// only ever matches injected markup. That left exactly two options, and for a while the code took the wrong
+// one: hand-retype `.pill`'s declarations inside the SFC. Story 23.2's re-review found the copy had drifted
+// (serif instead of Courier, wrong padding, wrong tokens), fixed the VALUES, and recorded that it was still a
+// second definition with no channel to remove it. This is that channel.
+//
+// WHAT KEEPS IT HONEST. The other three ADR 0018 properties are strengthened rather than relaxed:
+//
+//   BOUNDED    — an explicit allowlist, not a usage harvest. Nothing enters it by accident, and a rule is
+//                carried only when EVERY class it names is on the list, so `.pill.status-complete` stays in
+//                the scoped layer where it belongs (those ADR-status variants are IR content's business).
+//   GENERATED  — same source, same builder, same both-directions gate as the scoped layer.
+//   ENUMERATED — the manifest's `sharedPrimitives` block names every rule that moved, so Story 23.4 sees
+//                this layer in the same list it already has to retire. Implied debt is debt nobody pays.
+//
+// EXACTLY ONE DEFINITION. A selector that lands here is REMOVED from the scoped layer rather than duplicated
+// into both. An unscoped `.pill` still matches inside `.ir-content`, so injected markup keeps its styling,
+// and the app now has one place `.pill` is defined instead of two. The manifest records the handoff so the
+// rule does not simply vanish from the scoped layer's list.
+//
+// ADDING TO THIS LIST IS AN ARCHITECTURAL DECISION, not a convenience. The test that a candidate must pass:
+// is this class emitted by a C# primitive AND consumed by a template-authored Vue component? If it is only
+// ever in injected markup, the scoped layer already covers it and this list must not grow.
+
+/**
+ * Class names whose rules are emitted UNSCOPED, so template-authored components can use them.
+ *
+ * One entry today. `list-row-chip` is deliberately NOT here: it is the Vue component's own class and belongs
+ * in its `<style scoped>` block — only the SHARED half (`pill`) crosses.
+ */
+export const SHARED_PRIMITIVES = ['pill']
+
+const SHARED_SET = new Set(SHARED_PRIMITIVES)
+
+/**
+ * Does this selector belong to the unscoped shared layer?
+ *
+ * Requires that it names at least one class, that EVERY class it names is on the allowlist, and that it names
+ * no id. The all-or-nothing rule is what keeps the layer from growing by association: `.pill.status-draft`
+ * names a class that is not shared vocabulary, so it stays scoped even though `.pill` is on the list.
+ */
+export function isSharedPrimitive(selector) {
+  const normalized = selector.replace(/:root\b/g, 'html')
+  const { classes, ids } = selectorTokens(normalized)
+  if (classes.length === 0 || ids.length > 0) return false
+  return classes.every((c) => SHARED_SET.has(c))
+}
 
 /**
  * The families whose markup drives the extraction. [owner decision D4]

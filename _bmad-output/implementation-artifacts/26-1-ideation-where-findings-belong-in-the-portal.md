@@ -18,7 +18,7 @@ touches:
 
 # Story 26.1: IDEATION — Where Analysis Findings Belong in the Portal
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -390,36 +390,36 @@ whose run contains them. Severity is a closed four-value domain — say so, so 2
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Refresh the numbers before you quote any of them** (AC: #1)
-  - [ ] Run `node tools/analysis-digest/index.mjs`; read `.specscribe/analysis/index.json` totals only (~31 KB — do **not** read the shards en masse; the whole digest is 1.34 MB).
-  - [ ] Apply CLAUDE.md's read-time staleness rule: compare `git rev-parse HEAD` against `provenance.evaluatedAtRevision`. Record the revision you measured at.
-  - [ ] Record the live level counts, distinct rule count, file count, unlocated count, worst-file observation count, `relatedLocations` max, and whether any `BLOCKER` still exists in `severity.provider[]`.
-- [ ] **Task 2 — Prepare the elicitation, one surface at a time** (AC: #1, #2)
-  - [ ] For each of S1–S7 above, restate the 2–3 named directions **with the refreshed numbers substituted**, so the owner is choosing against real density, not the authoring-time figures.
-  - [ ] Confirm each cited attach point still exists **by symbol, not line number** (CLAUDE.md § Concurrent work — a concurrent session may have moved it). Every symbol in this story was verified at `8a2fb83`; re-verify before quoting a line.
-- [ ] **Task 3 — Run the owner round and record selections** (AC: #1, #2)
-  - [ ] **Mechanic:** one surface at a time, in S1→S7 order, each as a discrete choice with its named trade-off — not seven questions at once. S1–S3 are the load-bearing ones; if the round has to be shortened, S4 and S7 are the two that can be settled by recommendation-plus-confirmation.
-  - [ ] Per surface capture: **selection · placement · density · all four empty states · severity-without-color · reuse-vs-new-page (UX-DR21) · in/out for 26.4–26.6**.
-  - [ ] Capture the **reasoning**, not just the pick — 26.4/26.5/26.6 need to derive detail decisions from it without re-asking.
-  - [ ] An owner-invented direction supersedes the menu; record it as such.
-  - [ ] Settle the three pre-assigned decisions: the **`relatedLocations` cap** (with its mandatory truncation count), the **fan-out presentation direction** for 26.5, and any **severity collapse** per surface.
-  - [ ] Settle the site-wide noun ("Analysis Observations") and how it coexists with the existing "Review Findings" heading on story pages.
-- [ ] **Task 4 — Answer AC #2's default case explicitly** (AC: #2)
-  - [ ] A dedicated section stating what an unconfigured project sees on every surface, mapped to idioms (a)/(b)/(c), and confirming byte-identical baseline output plus no network call.
-- [ ] **Task 5 — Settle AC #3** (AC: #3)
-  - [ ] Record the in-scope-or-deferred decision for non-Sonar source classes **with the language-dependence trade-off written down**, and what would have to be true to change the answer.
-- [ ] **Task 6 — Write `26-1-ideation-record.md` and close the scope** (AC: #1, #2, #3)
-  - [ ] Deliverable at `_bmad-output/implementation-artifacts/26-1-ideation-record.md`, following the `25-3-spike-report.md` shape: executive summary → per-surface decisions → the default case → source-class scope → handoff to 26.2–26.6.
-  - [ ] A **handoff section per downstream story** (26.2, 26.3, 26.4, 26.5, 26.6, 26.7) saying exactly what that story inherits — the mechanism that made 25.3's report usable.
-  - [ ] A closed **IN / OUT** list. AC #1 is not met by an IN list alone.
-  - [ ] **If a selection changes 26.4–26.6's scope, amend `epics.md` AND `sprint-status.yaml` in the same change** (CLAUDE.md § Decision records — a change recorded in only one artifact is a drift bug).
-- [ ] **Task 7 — ADR trigger check** (AC: #1)
-  - [ ] CLAUDE.md: *propose an ADR without being asked* for any decision that changes shared architecture, a cross-cutting contract, or amends a prior ADR. A visual-direction record normally does **not** trigger one — 26.2 owns Epic 26's ADR. **But** if a selection would amend ADR 0023 (e.g. requiring a field it does not carry) or ADR 0012/0013 (a new hierarchy or text-twin obligation), propose the ADR rather than burying it here.
-  - [ ] Read `docs/adrs/` before declaring any project rule is being crossed (memory `adr-consultation-gap-three-arc-renderers`) — ADR 0010 § 1/2/6 is superseded by 0012/0013, and JS on opt-in deep-analytics surfaces is **already permitted**.
-- [ ] **Task 8 — Verify the no-code contract** (AC: all)
-  - [ ] `git status` shows **no** `src/`, `tests/`, `extension/src/`, or `web/` changes.
-  - [ ] Golden fingerprint unmoved — no generation run is required by this story. If you regenerated for any reason, confirm the fingerprint is unchanged and say so.
-  - [ ] Update `sprint-status.yaml` for `26-1-…` and add a `## Change Log` entry.
+- [x] **Task 1 — Refresh the numbers before you quote any of them** (AC: #1)
+  - [x] Run `node tools/analysis-digest/index.mjs`; read `.specscribe/analysis/index.json` totals only (~31 KB — do **not** read the shards en masse; the whole digest is 1.34 MB).
+  - [x] Apply CLAUDE.md's read-time staleness rule: compare `git rev-parse HEAD` against `provenance.evaluatedAtRevision`. Record the revision you measured at.
+  - [x] Record the live level counts, distinct rule count, file count, unlocated count, worst-file observation count, `relatedLocations` max, and whether any `BLOCKER` still exists in `severity.provider[]`.
+- [x] **Task 2 — Prepare the elicitation, one surface at a time** (AC: #1, #2)
+  - [x] For each of S1–S7 above, restate the 2–3 named directions **with the refreshed numbers substituted**, so the owner is choosing against real density, not the authoring-time figures.
+  - [x] Confirm each cited attach point still exists **by symbol, not line number** (CLAUDE.md § Concurrent work — a concurrent session may have moved it). Every symbol in this story was verified at `8a2fb83`; re-verify before quoting a line.
+- [x] **Task 3 — Run the owner round and record selections** (AC: #1, #2)
+  - [x] **Mechanic:** one surface at a time, in S1→S7 order, each as a discrete choice with its named trade-off — not seven questions at once. S1–S3 are the load-bearing ones; if the round has to be shortened, S4 and S7 are the two that can be settled by recommendation-plus-confirmation.
+  - [x] Per surface capture: **selection · placement · density · all four empty states · severity-without-color · reuse-vs-new-page (UX-DR21) · in/out for 26.4–26.6**.
+  - [x] Capture the **reasoning**, not just the pick — 26.4/26.5/26.6 need to derive detail decisions from it without re-asking.
+  - [x] An owner-invented direction supersedes the menu; record it as such.
+  - [x] Settle the three pre-assigned decisions: the **`relatedLocations` cap** (with its mandatory truncation count), the **fan-out presentation direction** for 26.5, and any **severity collapse** per surface.
+  - [x] Settle the site-wide noun ("Analysis Observations") and how it coexists with the existing "Review Findings" heading on story pages.
+- [x] **Task 4 — Answer AC #2's default case explicitly** (AC: #2)
+  - [x] A dedicated section stating what an unconfigured project sees on every surface, mapped to idioms (a)/(b)/(c), and confirming byte-identical baseline output plus no network call.
+- [x] **Task 5 — Settle AC #3** (AC: #3)
+  - [x] Record the in-scope-or-deferred decision for non-Sonar source classes **with the language-dependence trade-off written down**, and what would have to be true to change the answer.
+- [x] **Task 6 — Write `26-1-ideation-record.md` and close the scope** (AC: #1, #2, #3)
+  - [x] Deliverable at `_bmad-output/implementation-artifacts/26-1-ideation-record.md`, following the `25-3-spike-report.md` shape: executive summary → per-surface decisions → the default case → source-class scope → handoff to 26.2–26.6.
+  - [x] A **handoff section per downstream story** (26.2, 26.3, 26.4, 26.5, 26.6, 26.7) saying exactly what that story inherits — the mechanism that made 25.3's report usable.
+  - [x] A closed **IN / OUT** list. AC #1 is not met by an IN list alone. — *IN and OUT lists are both closed at § 4, **except** S7, which the owner deferred to 26.6. Recorded as a named disposition with its recommendation, and the residual gap is stated in § 3.7, § 4, and § 12 rather than papered over.*
+  - [x] **If a selection changes 26.4–26.6's scope, amend `epics.md` AND `sprint-status.yaml` in the same change** (CLAUDE.md § Decision records — a change recorded in only one artifact is a drift bug). — *Six amendments, both artifacts, this change. Listed at record § 11.*
+- [x] **Task 7 — ADR trigger check** (AC: #1)
+  - [x] CLAUDE.md: *propose an ADR without being asked* for any decision that changes shared architecture, a cross-cutting contract, or amends a prior ADR. A visual-direction record normally does **not** trigger one — 26.2 owns Epic 26's ADR. **But** if a selection would amend ADR 0023 (e.g. requiring a field it does not carry) or ADR 0012/0013 (a new hierarchy or text-twin obligation), propose the ADR rather than burying it here. — *Evaluated and declined; the three conditions that WOULD fire it are named at record § 10.2.*
+  - [x] Read `docs/adrs/` before declaring any project rule is being crossed (memory `adr-consultation-gap-three-arc-renderers`) — ADR 0010 § 1/2/6 is superseded by 0012/0013, and JS on opt-in deep-analytics surfaces is **already permitted**.
+- [x] **Task 8 — Verify the no-code contract** (AC: all)
+  - [x] `git status` shows **no** `src/`, `tests/`, `extension/src/`, or `web/` changes. — ⚠️ *Not literally true, and not because of this story. Those directories carry ~20 uncommitted files from a **concurrent session** (design-system + IR-content work). This story's tracked changes are exactly three files, all under `_bmad-output/`. Verified by **attribution**, not by a clean status — see record § 10.3.*
+  - [x] Golden fingerprint unmoved — no generation run is required by this story. If you regenerated for any reason, confirm the fingerprint is unchanged and say so. — *No generation run performed, so the fingerprint was never measured or re-baselined. Deliberate: a concurrent session is editing `specscribe.css`, an embedded resource, so any hash measured here would have been reading somebody else's in-flight change.*
+  - [x] Update `sprint-status.yaml` for `26-1-…` and add a `## Change Log` entry.
 
 ## Dev Notes
 
@@ -533,12 +533,117 @@ workable default, but each changes a downstream story if answered differently.
 
 ### Agent Model Used
 
+Claude Opus 5 (`claude-opus-5`), `/bmad-dev-story 26.1`, 2026-07-29. Session HEAD `630ae25` (story baseline was
+`8a2fb83`, two commits behind — the frontmatter `baseline_commit` is preserved unchanged per the workflow).
+
 ### Debug Log References
+
+- `node tools/analysis-digest/index.mjs` — digest regenerated at `630ae25`. Output:
+  `1534 observations (125 error, 1013 warning, 396 note, 0 none) across 208 shards + 0 unlocated`;
+  `provenance: analysis 630ae25 | tree 630ae25 DIRTY | commitsBehind 0 | isStale true [working-tree-dirty]`.
+- Three throwaway measurement scripts in the session scratchpad (not in the repo) walked all 208 shards to derive
+  what `index.json` does not carry: distinct rule count, `relatedLocations` distribution and cap trade-offs,
+  `severity.provider[]` axis shapes, `BLOCKER` presence, the engine × directory split, and the directory rollup.
+  Kept out of the repo deliberately — `ships_product_code: false`, and the numbers move (§ 1.1 of the record).
+- Symbol re-verification by `grep`, not by line number, per CLAUDE.md § Concurrent work. Five cited lines had
+  drifted since `8a2fb83`; corrections tabulated at record § 2.
 
 ### Completion Notes List
 
+1. **Deliverable:** `_bmad-output/implementation-artifacts/26-1-ideation-record.md` (~61 KB, 13 sections), following
+   the `25-3-spike-report.md` shape. Every selection in it is the owner's; this session facilitated.
+2. **All seven surfaces settled.** S1 = B (Third Insight Panel) · S2 = A (Seventh Dimension) with **two selectable
+   weightings** · S3 = B (chip per row) **+ a rollup sentence** · S4 = **explicitly OUT** · S5 = **owner-invented
+   three-page hub** (landing + rule leaderboard + triage inbox), superseding the pre-researched menu · S6 = A
+   (Quality Strip) · S7 = **deferred to 26.6** with the OUT recommendation standing.
+3. **The three upstream-assigned decisions are settled:** `relatedLocations` cap = **5**, uniform, with a mandatory
+   explicit "+ N more locations" count (136 of the 237 issues carrying secondaries exceed it, so the truncation
+   notice is the *common* case and must be first-class); fan-out presentation = **total-count chip + rollup
+   sentence**, from which 26.5 derives a rule governing which file *rows* appear rather than a per-observation cap;
+   severity collapse = **none**, four levels on every surface, `BLOCKER` **not** surfaced.
+4. **⚠️ AC #1's OUT list is closed except for one candidate.** The owner chose to keep S7 (the traceability matrix)
+   open for 26.6 rather than close it in this round. That is a named disposition with a recorded recommendation, not
+   an omission — but it is not the same thing as a fully closed scope, and the record says so plainly in three
+   places (§ 3.7, § 4, § 12) rather than claiming otherwise. `epics.md` gained a new 26.6 AC #4 making the deferred
+   decision that story's, so it cannot fall between the two.
+5. **Three measurements changed the round away from the story file's own defaults.** (a) `tests/SpecScribe.Tests`
+   is **39 % of all observations (599) and contains exactly one error** — a raw-count density tree therefore names
+   the test tree the worst region in the repository, which is false; this is why S2 took two weightings instead of
+   the story's stated raw-count default. (b) **859 of 1,534 (56 %) are already `external_roslyn:` rules** — Roslyn
+   analyzer output *already* flows through SonarCloud, and it is 100 % .NET-specific, which reframed AC #3 from
+   "should we add a second source class" to "should we distinguish the one already here". (c) **`severity.provider[]`
+   is not a flat string list** but an array of axis records (`mqr.softwareQuality`, `legacy.type`), exposing a
+   quality dimension the story file did not name — and that is what the hub's "type" sort reads.
+6. **AC #3 = in scope as-is, no engine distinction rendered.** Not a deferral: the non-Sonar population in the
+   payload is fully rendered, just not labelled by engine. The language-dependence trade-off is written down with a
+   concrete figure — a non-.NET project sees roughly **44 %** of this repository's density, degrading in *density*
+   rather than *correctness*, so nothing becomes empty-but-present or broken (NFR8).
+7. **AC #2's default case = idiom (a), absent, everywhere.** No nav entry, no strip, no panel, no chips,
+   byte-identical baseline output, and no network call. Idiom (b) applies only where a surface must exist anyway
+   (the hub pages and the S1 panel when analysis *is* configured but clean), always with a **specific** sentence —
+   a generic "no data" is indistinguishable from "not configured" to a reader, which is the CLAUDE.md
+   "absent means UNKNOWN, never clean" violation.
+8. **Site-wide noun settled, and the owner chose to act on it now.** "Analysis Observations" is the machine noun;
+   story pages get one **Quality** parent heading with `Review Findings` and Analysis Observations as sibling
+   subsections. This **moves shipped markup and TOC depth**, so 26.5's fingerprint move is larger than the chips
+   alone — recorded as new work in `epics.md` 26.5 AC #4, with `id="sec-review-findings"` to be preserved as an
+   anchor. Epic pages are unaffected: `ReviewFindingsHtml` renders in the story branch only.
+9. **Two structural traps found that the story file did not know about.** Code-page tabs are assembled at **two**
+   call sites (`CodeFileTemplater.cs:104-108` **and** `:786-790`) — an additional argument for S1 = B, and a trap
+   for anyone who revisits S1 = A. And **every dashboard panel is `wm-show-*` gated**
+   (`specscribe.css:7041-7045`, five modes) — an undeclared Quality Strip would be invisible in *every* workflow
+   mode. Both carried into the 26.4 / 26.6 handoffs.
+10. **ADR trigger evaluated and declined,** with `docs/adrs/` read first. Nothing here amends ADR 0023 (consumed),
+    0012/0013 (complied with — S2 adds a dimension to an existing Explorer whose twin is already `External`, and
+    S5 deliberately adds **no** hierarchy), or 0026 (applied). Epic 26's ADR is 26.2's by design. The three
+    conditions that *would* fire one are named at record § 10.2 so they cannot be missed later.
+11. **Six structural amendments landed in `epics.md` AND `sprint-status.yaml` in this same change** (record § 11):
+    26.5 AC #1 narrowed + new AC #4; 26.6 AC #1 rewritten to three pages + new AC #4; sprint-status mirrors for
+    26.4/26.5/26.6; and a 26.7 scope refinement.
+12. **⚠️ Task 8's literal check does not pass, and it is not this story's doing.** `src/`, `tests/`, and `web/`
+    carry ~20 uncommitted files from a **concurrent session** (design-system + IR-content work, including
+    `specscribe.css` and a new `web/assets/shared-primitives.css`). This story authored none of them and left them
+    strictly alone — no `git reset --hard`, no `git checkout --`, no `git clean`. Verified by **attribution**:
+    `git status --porcelain -- _bmad-output/` shows exactly this story's three files.
+13. **No generation run was performed, deliberately.** With a concurrent session editing `specscribe.css` — an
+    embedded resource — any fingerprint measured here would have been reading somebody else's in-flight change, and
+    an incremental build would not have re-embedded it anyway. The fingerprint was never measured, moved, or
+    re-baselined by this story.
+14. **All five create-story open questions resolved** (record § 12): severity weighting → two selectable weightings
+    (against the stated default); `BLOCKER` → no; the Review Findings adjacency → re-parent now; hub nav asymmetry
+    → nav entry, no quick-link tile, *derived* from S6 = A rather than decided separately; posture-independence →
+    yes, explicitly, so 26.2 is not blocked on re-running this round.
+15. **A standing hazard carried into the 26.4 handoff:** Sonar returns `impacts[]` in **non-deterministic order**
+    (the emitter sorts it; seven shards flipped on identical input). 26.4 puts this shape into the Epic 22 IR, and
+    the IR *is* covered by the golden fingerprint — unsorted, the fingerprint would flap at random with no source
+    change. `relatedLocations` is deliberately **not** sorted; do not "fix" that by symmetry.
+
 ### File List
+
+- `_bmad-output/implementation-artifacts/26-1-ideation-record.md` — **NEW.** The deliverable.
+- `_bmad-output/planning-artifacts/epics.md` — MODIFIED. Story 26.5 AC #1 narrowed (requirement pages out) + new
+  AC #4 (the Quality-heading re-parenting); Story 26.6 AC #1 rewritten (three-page hub + reader-selectable
+  highlight ranking) + new AC #4 (26.6 decides S7). Each amendment carries a dated `<!-- AMENDED … -->` comment
+  preserving the prior wording and its cause.
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — MODIFIED. `26-1-…` → `review`; `last_updated` entry;
+  inherited-selection context notes on 26-4 / 26-5 / 26-6; scope-refinement note on 26-7.
+- `_bmad-output/implementation-artifacts/26-1-ideation-where-findings-belong-in-the-portal.md` — MODIFIED (this
+  file): task checkboxes, Dev Agent Record, File List, Change Log, Status.
+
+Not in the File List, deliberately: `.specscribe/analysis/` (regenerated in Task 1, but **gitignored and dev-time
+only**), and the three measurement scripts (session scratchpad, never in the repo).
 
 ## Change Log
 
+- 2026-07-29: **Ideation round run with the owner; story complete.** Digest refreshed at `630ae25` (1,534
+  observations — 125/1,013/396/0 — vs the story's 1,488 at `755bd7a`, the third movement in days). All seven
+  candidate surfaces settled: S1 = B, S2 = A with two selectable weightings, S3 = B plus a rollup sentence,
+  S4 = explicitly out, S5 = an **owner-invented** three-page hub superseding the menu, S6 = A, S7 = deferred to
+  26.6. The three upstream-assigned decisions settled: `relatedLocations` cap = 5 with a mandatory truncation
+  count, fan-out = total-count chip + rollup, severity collapse = none and no `BLOCKER`. Site-wide noun =
+  "Analysis Observations" with the story-page `Review Findings` re-parented under a Quality heading now. AC #3 =
+  in scope as-is with no engine distinction, on the finding that 56 % of the payload is already `external_roslyn`.
+  AC #2's default case = idiom (a) everywhere. Deliverable written; six structural amendments landed in `epics.md`
+  and `sprint-status.yaml` in the same change; ADR trigger evaluated and declined with its firing conditions
+  named. No product code, no generation run, fingerprint never measured. Status → review.
 - 2026-07-28: Story created. Context assembled from Epic 26, SCP 2026-07-25, ADR 0023 (Accepted), the 25.3 spike report, the shipped 25.4 digest, and a verified attach-point inventory across the portal's code, directory, planning, hub, and dashboard surfaces. Candidate design directions pre-researched for seven surfaces so the owner's round is a selection exercise. Status → ready-for-dev.

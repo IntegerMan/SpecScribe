@@ -66,17 +66,46 @@ On a fresh generator every reset field is already at the value assigned, so a co
 
 ### 4. A narrow route must refresh every whole-tree surface that content can move
 
-Staying narrow is not permission to skip a surface. `code-map.html` and `risk-quadrant.html` are projected from the source walk, and the walk's line counts move on an ordinary save, so the three narrow routes re-walk and rewrite them (`RefreshCodeSurfaces`) — the narrow counterpart of the existing `RefreshCoverage`.
+Staying narrow is not permission to skip a surface. `code-map.html`, `risk-quadrant.html` and (under `--deep-git`) the ownership section of `git-insights.html` are projected from the source walk, and the walk's line counts move on an ordinary save, so the narrow routes re-walk and rewrite them (`RefreshCodeSurfaces`) — the narrow counterpart of the existing `RefreshCoverage`.
 
 Escalating instead would have been the smaller change and the wrong one: a save is the dominant edit class in a live session, and rebuilding the whole site on every save is precisely the cost the narrow routes exist to avoid.
+
+**This refresh is contained, and its failure is reported rather than fatal to the pass** (2026-07-29 code review). It is not a cheap addition: on this repo it opens and line-counts ~1,200 tracked files, builds four Code Map variants, and rewrites a ~1.5 MB page — and it originally sat *ahead* of `WriteIndex`, the inventory record and the IR emit with an incorrect "`WriteCodeMap` is never-throw" justification, so a single `IOException` on that large file (an open browser tab is enough) silently cost the pass its index and its IR. It is now wrapped, and a failure emits an `Error` event on the caller's own event list instead of a discarded one.
+
+**A related claim in the first implementation was simply false and is corrected rather than papered over:** the comment asserted the Code Map's nav gate could not flip mid-session because "a change in the file set is a topology change and escalated". It is not — `_codeFiles` is the git-tracked *code* set, no watcher observes `.cs`/`.ts`/`.css`, and this classifier returns `Narrow` for every non-markdown path by construction, so that set moves freely with nothing escalating. The observable effect is a stale page rather than a broken link, which is what watch mode did before this refresh existed; giving the code walk its own change signal is future work, not a claim this ADR should make.
 
 ### 5. A class may stay narrow only if it is *proven* byte-identical
 
 `tests/SpecScribe.Tests/IncrementalOracleParityTests.cs` drives the shipped watch dispatch through `FileWatcherService.RunDebouncedPass` for six change classes plus two no-op controls, then diffs against a cold `GenerateAll` of the identical tree. A class that cannot be proven escalates instead. The normalization is shared with `GoldenContentFingerprint` (`GoldenNormalization`) — a second copy folding one extra token is a hole in whichever gate lacks it, and Story 22.1's private copy had already drifted.
 
+### 6. The proven-narrow class list — the contract Decision 5 is enforcing
+
+This table is the decision's actual content and belongs here rather than in a story record. Anything not listed is **unclassified, therefore escalates**: the default is Full, and moving a class into the Narrow column requires a passing case in the harness, not an argument.
+
+| change class | scope | route | proven by |
+|---|---|---|---|
+| content edit, generic doc | **Narrow** | `GenerateOne` | `ContentEditToGenericDoc_MatchesOracle` (+ `--spa` row) |
+| content edit, story artifact | **Narrow** | `RegenerateEpics` | `ContentEditToStoryArtifact_MatchesOracle` (+ `--spa` row) |
+| content edit, ADR | **Narrow** | `RegenerateAdrs` | `ContentEditToAdr_MatchesOracle` |
+| content edit, `epics.md` | **Narrow** | `RegenerateEpics` | `ContentEditToEpicsFile_MatchesOracle` |
+| add `.md` | **Full** | `RegenerateTopology` | `AddedGenericDoc_MatchesOracle` |
+| rename `.md` | **Full** | `RegenerateTopology` | `RenamedGenericDoc_MatchesOracle` (both event orders) |
+| delete `.md` artifact | **Full** | `RegenerateTopology` | `DeletedStoryArtifact_MatchesOracle` |
+| delete ADR | **Full** | `RegenerateTopology` | `DeletedAdr_MatchesOracle` |
+| delete `epics.md` | **Full** | `RegenerateTopology` | `DeletedEpicsFile_EscalatesAndMatchesOracle` |
+| `sprint-status.yaml` / `config.toml` | **Full** | `RegenerateFromDataSource` | pre-existing; `IsDataSource` keeps precedence ahead of this classifier |
+
+Per-epic work-graph node and edge counts are additionally asserted equal between `RegenerateEpics` and `GenerateAll` (`RegenerateEpics_ProducesTheSamePerEpicWorkGraphCountsAsAFullRebuild`), because the divergence this whole classifier grew out of was a *number* — 16 items / 20 links against 13 / 12, across 56 pages — and a whole-tree byte diff reports "a page differs" where the number is the diagnosis.
+
+The last two rows of the Narrow column and the two `--spa` rows were added in the 2026-07-29 code review: the class table originally claimed content-ADR and content-`epics.md` were proven when no case exercised either, and the harness ran with the IR off, so Decision 4's "the IR inherits every recompute defect verbatim" was itself unmeasured.
+
 ## Consequences
 
-**Deleting `epics.md` now reports `<directory change>` instead of "epics.md removed; N stale page(s) deleted".** A real loss of log honesty, accepted because the alternative was 16 stale and 3 missing pages. `ClearEpicsFamilyOutputs` and its 8 tests are untouched and still reachable through the public `RegenerateEpics` API, which is how those tests drive it; only what the **watch dispatch** selects has narrowed.
+**Deleting `epics.md` loses its page-count report.** The pass reports one escalated `full rebuild` event instead of "epics.md removed; N stale page(s) deleted". A real loss of log detail, accepted because the alternative was 16 stale and 3 missing pages.
+
+**A file-level escalation is labelled with the path that fired; only a directory-level pass reports `<directory change>`.** The first implementation labelled every escalation with that sentinel, which inverted the constant's own contract — it exists to say "a directory changed, so do **not** attribute this to some arbitrary contained file", which is precisely backwards when a named file is the whole event. Corrected in the 2026-07-29 code review; still exactly one event per pass, as Decision 2 requires. `RegenerateTopology`'s doc comment was also corrected: Story 22.5 gave it a second, file-level caller, so its original "DIRECTORY-level topology change" framing no longer described it.
+
+**`ClearEpicsFamilyOutputs` and `RemoveFor`'s `Removed` branch are no longer reachable from the production watch dispatch — recorded here explicitly, because their 8 green tests do not prove otherwise.** `SiteGeneratorEpicsRemovalTests` drives `RegenerateEpics` / `RegenerateTopology` directly on a bare `SiteGenerator` with no `FileWatcherService`, so it passes by bypassing the dispatch. `RemoveFor` is likewise only reached when `Narrow && !File.Exists`, which under Decision 1's rule implies the path was never rendered — so `_docs` cannot contain it and only the `Skipped` branch can run. The teardown code, its tests and its more honest `Removed`/`Skipped` reporting are all retained and correct; what changed is that no input selects them. Owner decision (2026-07-29): **accept**, on the measured ground that escalation is strictly more correct, and state it here so the next reader does not mistake test reachability for production reachability. Removing the teardown, or narrowing the escalation to re-reach it, are both changes to this ADR.
 
 **Topology changes cost a full rebuild.** This is the AD-5 trade taken deliberately. Content edits — the dominant class — keep the narrow route and its measured win, now paying one additional source walk for the code surfaces.
 

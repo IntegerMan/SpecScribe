@@ -1501,7 +1501,123 @@ public class SiteGeneratorAdapterTests : IDisposable
         //
         // VERIFICATION: 501ee958… confirmed byte-identical across two consecutive runs, both after an explicit
         // `dotnet build --no-incremental`.
-        const string expected = "501ee958271a56096003bdbea806b42d233a08192202cd849e516dddd2f57b4e";
+        //
+        // ── Regenerated 2026-07-29 by Story 23.2's re-review FOLLOW-UP: 501ee958… -> 22c921de… ──
+        //
+        // This closes the one item the 2026-07-28 re-review deliberately HELD (see its provenance note above:
+        // "a deliberate NON-change … NOT applied, precisely because it edits the stylesheet this hash embeds
+        // while a concurrent session is mid-regeneration on it"). That session's Epic 18 work has since landed,
+        // so the owner's 2026-07-26 decision was finally applied. CAUSALITY, established before touching the
+        // constant rather than after — both causes are this change's, and no third cause exists:
+        //
+        //   1. `specscribe.css` (copied VERBATIM into the output, so it moves every page's hash): the four stage
+        //      FILL literals on `.status-badge.done/.active/.review/.ready+.drafted` became `--status-*-bg`
+        //      tokens, and so did the rules that already DESCRIBED THEMSELVES as mirroring them — three
+        //      `.epic-status.*`, `.status-badge.evidence-pill.tests-pass`, and `.sprint-flag` (which already
+        //      bound `--status-review` for its border and held only the fill as a literal). Same four values,
+        //      one declaration each. The bridge structurally cannot carry a literal, which is why StatusBadge.vue
+        //      had substituted one flat `--parchment` for four distinct tints; that divergence is now gone.
+        //      Pinned going forward by StylesheetTests.Stylesheet_StageFillsOnBadgeFamilies_AreTokensNotInline-
+        //      Literals, which is STRUCTURAL (any `.status-badge.*`/`.epic-status.*` background hex fails it, not
+        //      a remembered list of four) and was proven RED by reintroducing one literal.
+        //   2. `design-system.html`: each stage's token note now also names its paired fill
+        //      (`--status-done` on `--status-done-bg`), derived from the new `DesignSystemTemplater.StageFillTokens`
+        //      map rather than hand-typed. Documenting the accent while omitting the fill is what let a component
+        //      author reproduce defect 1 from the very page that exists to prevent it.
+        //
+        // The file SET is unchanged. No page's STRUCTURE moved — only stylesheet declarations and one text run.
+        //
+        // PROVENANCE (shared main) — CLEAN, unusually, and checked rather than assumed. At regeneration time the
+        // working tree carried a concurrent session's edits to `_bmad-output/planning-artifacts/epics.md`,
+        // `sprint-status.yaml`, two story files, an untracked `26-1-ideation-record.md` and an untracked
+        // `spike/graph-engine/` — and NONE of it can reach this hash: this fixture generates from its OWN
+        // `Directory.CreateTempSubdirectory("specscribe-adaptergen-")` tree, so repo `_bmad-output` content is
+        // not an input. The only modified files under `src/` were this change's two. Nothing was reset, reverted
+        // or cleaned. Unlike the four preceding regenerations, this constant therefore measures THIS CHANGE ALONE.
+        //
+        // VERIFICATION: `22c921de…` confirmed byte-identical across two consecutive runs, EACH preceded by an
+        // explicit `dotnet build --no-incremental` — mandatory here because the change touches the embedded
+        // `specscribe.css` asset, which an incremental build reuses from the cached assembly without re-embedding
+        // (the stale-build trap in [[golden-diff-normalization-gotchas]]).
+        //
+        // ── Regenerated 2026-07-29 by Story 20.10's CODE REVIEW patches: 22c921de… -> 62fbf765… ──
+        //
+        // CAUSALITY, established by BISECT before touching the constant — not inferred from "I edited rendering, so
+        // it was probably me". Three measurements, each in a throwaway `git archive HEAD` tree in the scratchpad so
+        // the shared working tree was never reset, reverted or cleaned (CLAUDE.md § Concurrent work):
+        //
+        //   A. Pristine HEAD (630ae25), zero edits, `--no-incremental` → **PASSES at 501ee958…**. This is the
+        //      control that matters most: it proves the harness and `GoldenNormalization` are NOT leaking a volatile
+        //      token, so the move is a real rendering change rather than the Epic 5 defect class where the
+        //      normalizer itself was broken and regenerating would have hidden it behind a green test.
+        //   B. HEAD + ONLY this review's own hunks → **932d507b…**, byte-identical across two consecutive
+        //      `--no-incremental` runs. `specscribe.css` is shared with a concurrent session's uncommitted Story
+        //      23.2 token work, so it could not be copied wholesale: the pristine HEAD stylesheet was taken and this
+        //      review's TWO hunks re-applied to it alone, verified by asserting `--status-done-bg` (23.2's token) was
+        //      absent from the measured file. So B measures THIS REVIEW ALONE: 501ee958… -> 932d507b….
+        //   C. The real working tree (this review + the concurrent uncommitted work) → **62fbf765…**, byte-identical
+        //      across two consecutive `--no-incremental` runs. That is the constant below.
+        //
+        // So 22c921de… (Story 23.2's re-review, immediately above) measures 23.2 alone; 932d507b… measures this
+        // review alone; 62fbf765… measures the two together, which is what the tree currently contains.
+        //
+        // WHAT MOVED IT, from this review's side — three rendering changes, all on the Code Map surface plus the
+        // embedded stylesheet:
+        //   1. `Charts.FrameWindowSlot` gained an opt-in `hiddenUntilMount`, and `HierarchyExplorer.Render` passes it
+        //      for a `Views`-bearing model — so Code Map's `<span class="chart-frame-window">` now ships `hidden`.
+        //      A views-bearing instance's window counts are a per-VIEW fact and the server can only bake one of
+        //      them; with JS off the baked value read "every file · 1,220 files" above a table the pure-CSS filter
+        //      had already cut to 461 rows. Every other caller passes the default and is byte-unchanged.
+        //   2. `HierarchyExplorer.Render` now emits the `.ss-hierarchy-filter-empty` notice for a `Views`-bearing
+        //      model too, not only a `Filterable` one (NFR8: an empty view must say so — Story 20.10 Task 3.6
+        //      claimed this affordance was already reused for the chart, and it was not).
+        //   3. `specscribe.css`: the per-view truncation `<tr>` needs `display: table-row`, not the generic
+        //      `[data-codemap-view]` block rules' `display: block`, plus a corrected stale comment.
+        // The per-view truncation ROWS themselves cannot reach this hash — they only render above
+        // `Charts.MaxDetailedCodeMapFiles` (4,000) files and this fixture is far smaller. The file SET is unchanged.
+        //
+        // PROVENANCE (shared main) — NOT clean, and it moved DURING this pass. At regeneration time the working tree
+        // carried a concurrent session's uncommitted edits to `src/SpecScribe/SiteGenerator.cs`,
+        // `FileWatcherService.cs`, `DesignSystemTemplater.cs`, `specscribe.css` (Story 23.2's status-fill tokens),
+        // `tests/…/IncrementalOracleParityTests.cs`, `SiteGeneratorDesignSystemTests.cs`, `StylesheetTests.cs`, the
+        // whole `web/` Nuxt tree, plus untracked `docs/adrs/0029`/`0030`, `spike/graph-engine/`, `24-6-spike-report.md`
+        // and `web/assets/shared-primitives.css`. `SiteGenerator.cs`, `FileWatcherService.cs` and
+        // `IncrementalOracleParityTests.cs` were NOT modified when this review opened — they appeared mid-pass — and
+        // that session briefly left the test project uncompilable (a missing `using System.Text.RegularExpressions;`
+        // in its own new file). Per CLAUDE.md it was WAITED OUT, never worked around and never edited. None of it was
+        // reset, reverted or cleaned. Measurement B above is what isolates this review's own contribution from all
+        // of it; when their pass lands separately this constant is expected to move again — the shared-main
+        // condition, not a defect.
+        //
+        // VERIFICATION: `62fbf765…` confirmed byte-identical across two consecutive runs, EACH preceded by an
+        // explicit `dotnet build --no-incremental` — mandatory here because the change touches the embedded
+        // `specscribe.css` asset, which an incremental build reuses from the cached assembly without re-embedding
+        // (the stale-build trap in [[golden-diff-normalization-gotchas]]).
+        //
+        // ── Regenerated 2026-07-29 by owner feedback on the file-table pager: 62fbf765… -> ad661dca… ──
+        //
+        // ONE cause, and it is a single attribute: `CodeMapTablePageSize` 30 -> 18, which changes
+        // `data-page-size="30"` to `data-page-size="18"` on `code-map.html`'s one `<table class="codemap-table">`.
+        // Nothing else moved — no row, no cell, no stylesheet declaration, and the file SET is unchanged. The pager
+        // itself is progressive enhancement, so the SERVER-rendered row set is byte-identical either way; only the
+        // number the client reads to slice it changed.
+        //
+        // WHY: the 30 was justified in its own doc comment as "sized larger since a table row is far denser than a
+        // card", and measurement on the live page did not support the conclusion — a row renders at 55.4 px against
+        // the risk grid's 83.8 px card (denser by 1.5×) while 30-vs-12 is 2.5×, giving a 1,719 px page that is 1.89
+        // viewports tall. 18 puts the page at ~998 px against the risk grid's 981 px, so the two pagers match in
+        // rendered page HEIGHT, which is the thing a reader perceives. Owner chose 18 from measured options.
+        //
+        // PROVENANCE (shared main): the concurrent session's uncommitted Epic 22 work (`SiteGenerator.cs`,
+        // `FileWatcherService.cs`, `IncrementalOracleParityTests.cs`, ADRs 0008/0027) and Story 23.2's stylesheet
+        // token pass are still in the tree and still carried in the previous constant `62fbf765…` — so the DELTA
+        // 62fbf765… -> ad661dca… isolates this one-attribute change exactly, because that prior hash was measured on
+        // this same tree minutes earlier and re-verified green immediately before this edit. Nothing was reset,
+        // reverted or cleaned.
+        //
+        // VERIFICATION: `ad661dca…` confirmed byte-identical across two consecutive runs, EACH preceded by an
+        // explicit `dotnet build --no-incremental`.
+        const string expected = "ad661dca850a40c068da4485dd0ea43864aa4ce5206983fd9cf7df45d540be20";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

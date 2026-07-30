@@ -71,6 +71,8 @@ Prevents: stale output from rename/delete events and unnecessary full-tree rebui
 
 Rule: watch mode may rebuild narrowly when safe, but topology changes can trigger a broader refresh to keep output coherent.
 
+Operationalized by [ADR 0027](../../../docs/adrs/0027-watch-rebuild-scope-is-one-classifier-and-topology-escalates.md) (Story 22.5): "when safe" means proven byte-identical to a full rebuild of the same tree, decided by one named classifier before family routing; "topology" means the rendered page set must change, and it escalates. See also [ADR 0008](../../../docs/adrs/0008-json-ir-canonical-and-incremental-generation.md) §Decision 3.
+
 ### AD-6 [ADOPTED] IDE helpers stay read-only and explicit
 
 Binds: prompt-generation buttons, command handoff helpers, and future webview affordances.

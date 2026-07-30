@@ -313,7 +313,22 @@ public static class CodeMapTemplater
         // files are "detailed" no matter how many views a file appears in.
         var cap = Charts.MaxDetailedCodeMapFiles;
         var shown = ordered.Count > cap ? ordered.Take(cap).ToList() : ordered;
-        var omittedCount = ordered.Count - shown.Count;
+
+        // [Review][Patch] How many of a VIEW's OWN files have no row is `|view| - |view ∩ shown|`, which is NOT
+        // `view.FileCount - cap`. Rows are capped against the DISTINCT set, so a view smaller than the cap can
+        // still lose files — its members simply rank below the global top-`cap` — and the old arithmetic reported
+        // zero omissions for exactly that case, printing "Every file in the treemap" over a table missing rows.
+        // That breaks the ADR 0013 §2 twin-completeness claim AC#3 makes for EVERY variant, silently, on any repo
+        // past `MaxDetailedCodeMapFiles` files. Invisible at this repo's scale (F7's own caveat), which is why it
+        // needs deriving rather than assuming.
+        var shownPaths = new HashSet<string>(shown.Select(f => f.RepoRelativePath), StringComparer.Ordinal);
+        var omittedByView = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var variant in variants)
+        {
+            omittedByView[variant.Key] = variant.Map.IsEmpty
+                ? 0
+                : variant.Map.Files().Count(f => !shownPaths.Contains(f.RepoRelativePath));
+        }
 
         sb.Append("    <section class=\"chart-panel codemap-table-section\">\n");
         sb.Append("      <h3>All files</h3>\n");
@@ -327,9 +342,10 @@ public static class CodeMapTemplater
             }
             else
             {
-                var vOmitted = Math.Max(0, variant.Map.FileCount - cap);
+                var vOmitted = omittedByView[variant.Key];
+                var vShown = variant.Map.FileCount - vOmitted;
                 var leadScope = vOmitted > 0
-                    ? $"The {cap.ToString("N0", CultureInfo.InvariantCulture)} most significant files in the treemap"
+                    ? $"The {vShown.ToString("N0", CultureInfo.InvariantCulture)} most significant files in the treemap"
                     : "Every file in the treemap";
                 leadText = $"{leadScope}, listed as text{(hasMetrics ? ", ordered by change frequency" : ", ordered by size")}.";
             }
@@ -381,11 +397,19 @@ public static class CodeMapTemplater
             sb.Append("</tr>\n");
         }
 
-        if (omittedCount > 0)
+        // [Review][Patch] ONE truncation row per view, each carrying THAT view's own omission count and tagged with
+        // the same `data-codemap-view` marker every other per-view fact in this section uses. It was a single
+        // un-markered row before, so it showed in all four combinations with the distinct-set count — including
+        // directly beneath "No files match this filter." — and, being outside `.codemap-table-row`, it is invisible
+        // to the pager and so repeated on every page. Views that omit nothing emit no row at all, exactly as
+        // before, so the common (under-cap) case is byte-identical.
+        var colspan = hasMetrics ? 9 : 3;
+        foreach (var variant in variants)
         {
-            var colspan = hasMetrics ? 9 : 3;
-            sb.Append($"          <tr class=\"codemap-table-truncated\"><td colspan=\"{colspan}\">+{omittedCount.ToString("N0", CultureInfo.InvariantCulture)} more ")
-              .Append(Charts.Plural(omittedCount, "file", "files"))
+            var vOmitted = omittedByView[variant.Key];
+            if (vOmitted == 0) continue;
+            sb.Append($"          <tr class=\"codemap-table-truncated\" data-codemap-view=\"{PathUtil.Html(variant.Key)}\"><td colspan=\"{colspan}\">+{vOmitted.ToString("N0", CultureInfo.InvariantCulture)} more ")
+              .Append(Charts.Plural(vOmitted, "file", "files"))
               .Append(" not shown in this table — each still has its own colored, focusable rectangle in the treemap above.</td></tr>\n");
         }
 
@@ -394,11 +418,20 @@ public static class CodeMapTemplater
         sb.Append("    </section>\n\n");
     }
 
-    /// <summary>The number of rows the file table shows per page once client-side pagination kicks in — mirrors
-    /// <see cref="RiskQuadrantTemplater"/>'s elevated-risk grid pager, sized larger since a table row is far
-    /// denser than a card. Owner feedback (Story 7.12 review): the "All files" table could run to hundreds/
-    /// thousands of rows on a real repo with no way to page through it.</summary>
-    private const int CodeMapTablePageSize = 30;
+    /// <summary>The number of rows the file table shows per page once client-side pagination kicks in — sized to
+    /// match <see cref="RiskQuadrantTemplater"/>'s elevated-risk grid pager in rendered PAGE HEIGHT, not in item
+    /// count. Owner feedback (Story 7.12 review): the "All files" table could run to hundreds/thousands of rows on
+    /// a real repo with no way to page through it.
+    ///
+    /// <para><b>Why 18 and not 30.</b> This was 30, justified as "sized larger since a table row is far denser than
+    /// a card". Measured on the live page, that reasoning does not carry its own conclusion: a row renders at
+    /// <b>55.4 px</b> against the risk grid's <b>83.8 px</b> card, so a row is denser by only 1.5× while 30-vs-12 is
+    /// 2.5× — and the result was a 1,719 px page, <b>1.89 viewports</b> tall at a 910 px viewport. Only ~14 rows fit
+    /// on screen, so page 1 always ran about two screens and the reader had to scroll past the entire table to reach
+    /// the Next button. At 18 the page is ~998 px, within a pixel-and-a-half of the risk grid's own 981 px page, so
+    /// the two pagers on the site are consistent in the thing the reader actually perceives. [Owner feedback
+    /// 2026-07-29, after the Story 20.10 code review]</para></summary>
+    private const int CodeMapTablePageSize = 18;
 
     /// <summary>The client-side pager control for the file table (progressive enhancement ONLY — every row
     /// always renders in the markup, in order, as the complete no-JS truth; specscribe.js's

@@ -15,10 +15,12 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   isMigrated,
+  isSharedPrimitive,
   MIGRATED,
   scopeSelector,
   selectorAttributes,
   selectorTokens,
+  SHARED_PRIMITIVES,
   stripComments,
 } from '../scripts/ir-content-lib.mjs'
 
@@ -159,7 +161,15 @@ describe('ir-content.manifest.json committed fields', () => {
     // Whitelist, not a blocklist: a new source-wide counter should fail this the day it is added, and a
     // blocklist would silently wave it through.
     expect(Object.keys(manifest.stats).sort()).toEqual(
-      ['carriedKeyframes', 'carriedRules', 'carriedSelectors', 'droppedRoot', 'generatedBytes'].sort(),
+      [
+        'carriedKeyframes',
+        'carriedRules',
+        'carriedSelectors',
+        'droppedRoot',
+        'generatedBytes',
+        // How many rules moved to the UNSCOPED shared layer. Moves only when that layer moves. [ADR 0029]
+        'sharedRules',
+      ].sort(),
     )
   })
 
@@ -176,10 +186,122 @@ describe('ir-content.manifest.json committed fields', () => {
     // Ties the two halves together: if a future change writes one and not the other, the manifest is
     // internally inconsistent and this fails without needing the C# stylesheet at all.
     const carried = manifest.rules.filter((r) => r.carried)
-    const droppedRoot = manifest.rules.filter((r) => !r.carried)
+    // `carried: false` now has TWO causes, and conflating them would let a shared-layer handoff be counted as
+    // a root-level drop. Partition by the recorded reason so each stat is checked against its own cause.
+    const notCarried = manifest.rules.filter((r) => !r.carried)
+    const droppedRoot = notCarried.filter((r) => r.reason.startsWith('root-level rule'))
+    const handedToShared = notCarried.filter((r) => r.reason.startsWith('shared primitive'))
     const keyframes = carried.filter((r) => r.selector.startsWith('@keyframes '))
     expect(droppedRoot).toHaveLength(manifest.stats.droppedRoot)
+    expect(handedToShared).toHaveLength(manifest.stats.sharedRules)
+    // Every not-carried rule falls into one of the two known causes — no silent third reason.
+    expect(droppedRoot.length + handedToShared.length).toBe(notCarried.length)
     expect(keyframes).toHaveLength(manifest.stats.carriedKeyframes)
     expect(carried.length - keyframes.length).toBe(manifest.stats.carriedRules)
+  })
+})
+
+// ── The unscoped shared-primitive layer ────────────────────────────────────────────────────────────────────
+//
+// ADR 0029 permits a BOUNDED set of rules to be emitted UNSCOPED, so template-authored Vue components can use
+// shared vocabulary (`.pill`) instead of hand-retyping its declarations. The hand-retyped copy is exactly what
+// drifted before this layer existed — serif instead of Courier, wrong padding, wrong tokens — so the
+// properties worth pinning are the ones that keep the layer bounded and singular.
+describe('isSharedPrimitive', () => {
+  it('accepts a selector whose every class is on the allowlist', () => {
+    expect(isSharedPrimitive('.pill')).toBe(true)
+  })
+
+  it('rejects a compound that names anything off the allowlist', () => {
+    // The all-or-nothing rule. `.pill.status-draft` is an ADR-status variant that only injected markup uses,
+    // so unscoping it would grow the global layer by association — the exact creep the allowlist prevents.
+    expect(isSharedPrimitive('.pill.status-draft')).toBe(false)
+    expect(isSharedPrimitive('.pill.pill-link')).toBe(false)
+    expect(isSharedPrimitive('.list-row-chip.pill')).toBe(false)
+    expect(isSharedPrimitive('.pill .ss-icon')).toBe(false)
+  })
+
+  it('rejects selectors that name no class, and any that name an id', () => {
+    expect(isSharedPrimitive('table td')).toBe(false)
+    expect(isSharedPrimitive(':root')).toBe(false)
+    expect(isSharedPrimitive('#main-content .pill')).toBe(false)
+  })
+
+  it('ignores pseudo-classes when deciding, so a state variant of a shared class still qualifies', () => {
+    // `selectorTokens` strips pseudos, so `.pill:hover` is still "only .pill" — correct: a shared primitive's
+    // own hover state belongs with it, unlike a compound with a second real class.
+    expect(isSharedPrimitive('.pill:hover')).toBe(true)
+  })
+})
+
+describe('shared-primitives.css (generated, UNSCOPED)', () => {
+  const sharedCss = readFileSync(new URL('../assets/shared-primitives.css', import.meta.url), 'utf8')
+  const scopedCss = readFileSync(new URL('../assets/ir-content.css', import.meta.url), 'utf8')
+  const manifest = JSON.parse(readFileSync(new URL('../assets/ir-content.manifest.json', import.meta.url), 'utf8'))
+  /** The sheet's body, past the banner — so a selector mentioned in a comment cannot satisfy an assertion. */
+  const body = (css) => css.slice(css.indexOf('*/') + 2)
+  /** Every selector a generated sheet actually emits, one per comma-separated part, whitespace-normalized. */
+  const selectorsOf = (css) =>
+    [...body(css).matchAll(/([^{}]+)\{[^{}]*\}/g)]
+      .flatMap((m) => m[1].split(','))
+      .map((s) => s.trim().replace(/\s+/g, ' '))
+      .filter(Boolean)
+
+  it('has a non-empty allowlist, so the assertions below are not vacuous', () => {
+    // ⚠️ Load-bearing. Every assertion in this block iterates the allowlist or the emitted rules, so with an
+    // EMPTY allowlist they all pass without executing a single loop body — verified by emptying it during this
+    // story and watching only the `isSharedPrimitive` unit tests go red. That is precisely the by-construction
+    // vacuity the 23.2 re-review was called in to find, so it gets a guard rather than a comment.
+    expect(SHARED_PRIMITIVES.length).toBeGreaterThan(0)
+    expect(manifest.sharedPrimitives.rules.length).toBeGreaterThan(0)
+  })
+
+  it('carries no `.ir-content` scope on any rule — that is the whole point of the layer', () => {
+    // If this ever fails the layer has silently become a second copy of its sibling, and every reason for it
+    // to exist (reaching template-authored components) is gone.
+    expect(body(sharedCss)).not.toContain('.ir-content')
+  })
+
+  it('holds exactly ONE definition of each shared class, not a duplicate in both sheets', () => {
+    // `.pill` moved out of the scoped layer rather than being copied into both. An unscoped rule still matches
+    // inside `.ir-content`, so injected markup keeps its styling from this one definition.
+    const shared = selectorsOf(sharedCss)
+    const scoped = selectorsOf(scopedCss)
+    for (const cls of SHARED_PRIMITIVES) {
+      expect(shared, `.${cls} must be defined in the shared layer`).toContain(`.${cls}`)
+      expect(scoped, `.${cls} must NOT also be scoped — that would be two definitions`).not.toContain(
+        `.ir-content .${cls}`,
+      )
+    }
+  })
+
+  it('emits every rule the manifest enumerates, and enumerates every rule it emits', () => {
+    const emitted = [...body(sharedCss).matchAll(/([^{}]+)\{[^{}]*\}/g)].map((m) =>
+      m[1].trim().replace(/\s+/g, ' ').replace(/,\s*/g, ', '),
+    )
+    expect(emitted).toEqual(manifest.sharedPrimitives.rules.map((r) => r.selector))
+    expect(emitted).toHaveLength(manifest.sharedPrimitives.stats.rules)
+  })
+
+  it('records the handoff in the scoped layer rather than letting the rule vanish from its list', () => {
+    // Story 23.4 retires both layers off ONE list. A rule that moved must still appear where it used to be,
+    // with a reason — otherwise the migration surface silently shrinks.
+    for (const rule of manifest.sharedPrimitives.rules) {
+      const handoff = manifest.rules.find((r) => r.selector === rule.selector && !r.carried)
+      expect(handoff, `no handoff recorded for ${rule.selector}`).toBeDefined()
+      expect(handoff.reason).toContain('shared primitive')
+    }
+  })
+
+  it('commits only stats that move when this sheet moves', () => {
+    // The same committed-fields rule its sibling learned the hard way: a whole-corpus or whole-source counter
+    // here would red CI on a commit that could not have touched the layer.
+    expect(Object.keys(manifest.sharedPrimitives.stats).sort()).toEqual(['generatedBytes', 'rules'])
+    expect(manifest.sharedPrimitives.stats.generatedBytes).toBe(Buffer.byteLength(sharedCss))
+  })
+
+  it('publishes the allowlist, because the allowlist IS the boundary', () => {
+    expect(manifest.sharedPrimitives.allowlist).toEqual(SHARED_PRIMITIVES)
+    expect(manifest.sharedPrimitives.unscoped).toBe(true)
   })
 })

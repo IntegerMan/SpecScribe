@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs'
 import {
   conditionalClassNames,
   isMigrated,
+  isSharedPrimitive,
   readBlocks,
   scopePrelude,
   selectorAttributes,
@@ -13,6 +14,7 @@ import {
   selectorTokens,
   stripComments,
   SCOPE,
+  SHARED_PRIMITIVES,
   SOURCE_CSS,
   SOURCE_LABEL,
 } from './ir-content-lib.mjs'
@@ -82,10 +84,27 @@ export async function buildIrContentCss() {
 
   const carried = []
   const manifestRules = []
-  const stats = { sourceRules: 0, carriedRules: 0, carriedSelectors: 0, droppedUnused: 0, droppedRoot: 0 }
+  /** Emitted CSS text for the unscoped shared layer, and its manifest entries. [ADR 0029] */
+  const sharedCarried = []
+  const manifestSharedRules = []
+  const stats = {
+    sourceRules: 0,
+    carriedRules: 0,
+    carriedSelectors: 0,
+    droppedUnused: 0,
+    droppedRoot: 0,
+    sharedRules: 0,
+  }
   const keyframeBlocks = new Map()
 
-  /** Filters + scopes one rule block. Returns the emitted text, or null when nothing survived. */
+  /**
+   * Filters + scopes one rule block. Returns `{ scoped, shared }` — either may be null.
+   *
+   * A source rule can contribute to BOTH layers, because one prelude can carry several selectors: if
+   * `specscribe.css` ever wrote `.pill, .list-row-chip { … }`, the shared half goes out unscoped and the rest
+   * stays scoped, with the split recorded. Splitting per selector rather than per rule is what keeps the
+   * allowlist's all-or-nothing promise honest at the granularity CSS actually applies it. [ADR 0029]
+   */
   function takeRule(block, insideAt) {
     stats.sourceRules += 1
     const selectors = block.prelude
@@ -95,30 +114,61 @@ export async function buildIrContentCss() {
     const keep = selectors.filter((s) => selectorIsUsed(s, used))
     if (keep.length === 0) {
       stats.droppedUnused += 1
-      return null
+      return { scoped: null, shared: null }
     }
-    const scoped = scopePrelude(keep.join(','))
+
+    // Partition BEFORE scoping: a shared primitive is emitted verbatim, never nested under `.ir-content`.
+    const sharedSel = keep.filter(isSharedPrimitive)
+    const scopedSel = keep.filter((s) => !isSharedPrimitive(s))
+
+    let sharedText = null
+    if (sharedSel.length > 0) {
+      stats.sharedRules += 1
+      sharedText = `${sharedSel.join(',\n')} {${block.body.replace(/\n+$/, '\n')}}`
+      manifestSharedRules.push({
+        selector: sharedSel.join(', '),
+        carried: true,
+        unscoped: true,
+        ...(insideAt ? { within: insideAt } : {}),
+      })
+      // Recorded in the SCOPED layer's list too, as a handoff rather than a disappearance — otherwise a rule
+      // that used to be enumerated for Story 23.4 would silently drop off the list it is retired from.
+      manifestRules.push({
+        selector: sharedSel.join(', '),
+        carried: false,
+        ...(insideAt ? { within: insideAt } : {}),
+        reason: 'shared primitive — emitted UNSCOPED into shared-primitives.css; see sharedPrimitives below',
+      })
+    }
+
+    if (scopedSel.length === 0) return { scoped: null, shared: sharedText }
+
+    const scoped = scopePrelude(scopedSel.join(','))
     if (!scoped) {
       // Every surviving selector addressed the document root and had no descendant to scope.
       stats.droppedRoot += 1
       manifestRules.push({
-        selector: keep.join(', '),
+        selector: scopedSel.join(', '),
         carried: false,
         reason: 'root-level rule — no descendant to scope under .ir-content; see web/assets/base.css',
       })
-      return null
+      return { scoped: null, shared: sharedText }
     }
     stats.carriedRules += 1
-    stats.carriedSelectors += keep.length
+    stats.carriedSelectors += scopedSel.length
     manifestRules.push({
-      selector: keep.join(', '),
+      selector: scopedSel.join(', '),
       carried: true,
       ...(insideAt ? { within: insideAt } : {}),
-      ...(keep.length < selectors.length
-        ? { note: `${selectors.length - keep.length} unused selector(s) in the source rule were not carried` }
+      ...(scopedSel.length + sharedSel.length < selectors.length
+        ? {
+            note:
+              `${selectors.length - scopedSel.length - sharedSel.length} unused selector(s) in the source rule ` +
+              'were not carried',
+          }
         : {}),
     })
-    return `${scoped} {${block.body.replace(/\n+$/, '\n')}}`
+    return { scoped: `${scoped} {${block.body.replace(/\n+$/, '\n')}}`, shared: sharedText }
   }
 
   /**
@@ -132,12 +182,14 @@ export async function buildIrContentCss() {
    */
   function walk(level, at) {
     const out = []
+    const shared = []
     for (const block of level) {
       if (block.kind === 'statement') continue
 
       if (block.kind === 'rule') {
         const text = takeRule(block, at)
-        if (text) out.push(text)
+        if (text.scoped) out.push(text.scoped)
+        if (text.shared) shared.push(text.shared)
         continue
       }
 
@@ -154,20 +206,28 @@ export async function buildIrContentCss() {
       }
       if (/^@(media|supports|layer|container)\b/i.test(prelude)) {
         const inner = walk(readBlocks(block.body), prelude)
-        if (inner.length) out.push(`${prelude} {\n${inner.join('\n\n')}\n}`)
+        if (inner.out.length) out.push(`${prelude} {\n${inner.out.join('\n\n')}\n}`)
+        // A shared primitive inside a conditional at-rule keeps its condition — dropping the wrapper would
+        // apply a reduced-motion or narrow-viewport override unconditionally.
+        if (inner.shared.length) shared.push(`${prelude} {\n${inner.shared.join('\n\n')}\n}`)
         continue
       }
       // @font-face and friends: carried whole — they declare a resource, not a selector match.
       out.push(`${prelude} {${block.body}}`)
       manifestRules.push({ selector: prelude, carried: true })
     }
-    return out
+    return { out, shared }
   }
 
-  carried.push(...walk(blocks, null))
+  const walked = walk(blocks, null)
+  carried.push(...walked.out)
+  sharedCarried.push(...walked.shared)
 
   // ── 3. Keyframes, only those the carried rules animate ─────────────────────────────────────────────────
-  const body = carried.join('\n')
+  //
+  // BOTH layers are scanned: a shared primitive that animates would otherwise name a keyframe nobody emitted,
+  // which fails silently — the rule applies, the animation does not, and no markup comparison can see it.
+  const body = [...carried, ...sharedCarried].join('\n')
   const animated = new Set()
   for (const m of body.matchAll(/animation(?:-name)?\s*:\s*([^;}]+)/g)) {
     for (const tok of m[1].split(/[,\s]+/)) if (tok) animated.add(tok.trim())
@@ -209,6 +269,33 @@ export async function buildIrContentCss() {
   ].join('\n')
 
   const css = `${banner}\n\n${[...carried, ...keyframes].join('\n\n')}\n`
+
+  // The unscoped sibling. Its own banner says plainly that it is NOT scoped, because that is the one property
+  // a reader would otherwise assume it shares with `ir-content.css`. [ADR 0029]
+  const sharedBanner = [
+    '/* GENERATED FILE - DO NOT EDIT.',
+    ` * Extracted from ${SOURCE_LABEL} by \`npm run extract:ir-content\` (Story 23.2 re-review; ADR 0029).`,
+    ' *',
+    ' * ⚠️ UNSCOPED, unlike its sibling ir-content.css. These are SHARED PRIMITIVE classes that a C# primitive',
+    ' * emits and a template-authored Vue component consumes — `ListRow.Chip` emits `class="list-row-chip pill"`',
+    " * and every visual property of that chip is `.pill`'s. A rule nested under `.ir-content` can only ever",
+    ' * reach INJECTED markup, so the alternative was hand-retyping those declarations inside the SFC, which is',
+    ' * what drifted before: serif instead of Courier, wrong padding, wrong tokens.',
+    ' *',
+    ' * BOUNDED by an explicit allowlist, not by usage: a rule is carried only when EVERY class it names is on',
+    ` * the list. Today the whole list is: ${SHARED_PRIMITIVES.map((c) => `.${c}`).join(', ')}.`,
+    ' * Growing it is an architectural decision — see ir-content-lib.mjs and ADR 0029 for the admission test.',
+    ' *',
+    ' * Each rule here is REMOVED from ir-content.css rather than duplicated into both, so the app has exactly',
+    ' * one definition. An unscoped rule still matches inside .ir-content, so injected markup is unaffected.',
+    ' *',
+    ' * TRANSITIONAL: Story 23.4 retires this alongside ir-content.css. The manifest enumerates every rule.',
+    ' */',
+  ].join('\n')
+
+  // An empty allowlist must still produce a valid, obviously-empty sheet rather than a banner with a stray
+  // blank body — the file is imported unconditionally by nuxt.config.ts.
+  const sharedCss = `${sharedBanner}\n\n${sharedCarried.join('\n\n')}\n`
 
   // ── 5. Pass-through coverage, reported rather than implied ─────────────────────────────────────────────
   const otherOnly = [...other.classes].filter((c) => !used.classes.has(c))
@@ -263,12 +350,36 @@ export async function buildIrContentCss() {
       carriedKeyframes: stats.carriedKeyframes,
       droppedRoot: stats.droppedRoot,
       generatedBytes: outBytes,
+      sharedRules: stats.sharedRules,
     },
     rules: manifestRules,
+    /**
+     * The UNSCOPED sibling layer. [ADR 0029]
+     *
+     * Enumerated here rather than in a second manifest so Story 23.4 retires ONE list, not two — and so the
+     * handoff is visible from both sides: a rule that moved out of `rules` above appears there with
+     * `carried: false` and a reason, and appears here with `unscoped: true`.
+     *
+     * `allowlist` is committed deliberately: it is a hand-authored constant, so it cannot move on its own,
+     * and it is the whole boundary of the layer. `generatedBytes` obeys the same committed-fields rule as its
+     * sibling above — it moves only when `shared-primitives.css` moves.
+     */
+    sharedPrimitives: {
+      generatedFile: 'web/assets/shared-primitives.css',
+      unscoped: true,
+      allowlist: SHARED_PRIMITIVES,
+      admission:
+        'A class qualifies only if a C# primitive emits it AND a template-authored Vue component consumes '
+        + 'it. Classes that appear only in injected markup are covered by the scoped layer and must not be '
+        + 'added here.',
+      stats: { rules: stats.sharedRules, generatedBytes: Buffer.byteLength(sharedCss) },
+      rules: manifestSharedRules,
+    },
   }
 
   return {
     css,
+    sharedCss,
     manifest,
     stats: {
       ...stats,

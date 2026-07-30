@@ -194,6 +194,42 @@ public class SiteGeneratorDesignSystemTests : IDisposable
         }
     }
 
+    /// <summary>The stage FILL tokens are documented in both directions, derived from the templater's own map.
+    ///
+    /// <para>An accent without its fill is half a pair, and half a pair is what shipped: the four fills lived
+    /// as inline hexes on <c>.status-badge.&lt;stage&gt;</c>, so the token bridge could not carry them and the
+    /// Vue badge substituted one flat parchment for four distinct tints. Documenting only the accent is what
+    /// let a component author reproduce that mistake from this very page. [Story 23.2 re-review
+    /// 2026-07-28]</para></summary>
+    [Fact]
+    public void DesignSystem_DocumentsEveryStageFillToken_AndNamesNoneThatIsInvented()
+    {
+        var html = MainOf(Generate());
+        var css = File.ReadAllText(Path.Combine(Site, ForgeOptions.StylesheetName));
+
+        Assert.NotEmpty(DesignSystemTemplater.StageFillTokens);
+        foreach (var (stage, fill) in DesignSystemTemplater.StageFillTokens)
+        {
+            Assert.Contains(stage, StatusStyles.LegendStages); // the map cannot name a stage that is not real
+            Assert.Contains(fill, html);
+            Assert.Contains($"{fill}:", css);
+        }
+
+        // The other direction: every `--status-*-bg` the stylesheet declares is documented here. Adding a fifth
+        // fill without teaching it is the same silent-omission failure the motion family already guards.
+        foreach (Match m in Regex.Matches(css, @"(--status-[a-z0-9-]+-bg)\s*:", RegexOptions.IgnoreCase))
+        {
+            Assert.Contains(m.Groups[1].Value, html);
+        }
+
+        // `ready` and `drafted` share one fill, exactly as the stylesheet pairs them — the page says so rather
+        // than leaving a reader to notice two identical token names and wonder if it is a mistake.
+        Assert.Equal(
+            DesignSystemTemplater.StageFillTokens["ready"],
+            DesignSystemTemplater.StageFillTokens["drafted"]);
+        Assert.Contains("shared with ready/drafted", html);
+    }
+
     [Fact]
     public void DesignSystem_NeverStatesATokenValueAsALiteral()
     {
@@ -258,17 +294,42 @@ public class SiteGeneratorDesignSystemTests : IDisposable
         Assert.DoesNotContain("<abbr", html);
         Assert.DoesNotContain("class=\"ref-chip", html);
 
-        // ⚠️ KNOWN-VACUOUS, and left that way deliberately rather than made to look stronger than it is.
+        // ── The positive control that makes the two assertions above load-bearing ────────────────────────
         //
-        // A contrast control was tried during the 2026-07-28 re-review — "assert some OTHER page in this site
-        // carries <abbr>/ref-chip output" — and it FAILED, which is the finding rather than a bug in the
-        // control: this minimal fixture (one epic, one story, no glossary, no requirements) produces no
-        // expander output ANYWHERE, so the two assertions above pass with the bypass and pass without it.
+        // Absence assertions alone were VACUOUS, and the 2026-07-28 re-review said so: `AbbreviationExpander`
+        // wraps only FR/NFR/AC/ADR/PRD and `ReferenceChipRenderer` needs `[[wiki]]`/`file:line`, none of which
+        // this page's prose contains — so both passed with the bypass and passed without it.
         //
-        // Making this real needs one of: a fixture carrying a glossary term + requirement IDs so the
-        // linkifiers actually fire, or a seam that asserts the WRITE PATH directly (that WriteDesignSystem
-        // reaches WriteOutput without ApplyReferenceLinks). Both are larger than a review patch and neither is
-        // unambiguous, so this is recorded as an open decision on Story 23.2 rather than papered over.
+        // The re-review's own attempt to fix it looked for expander output on some OTHER page and FAILED,
+        // because this minimal fixture has no glossary and no requirements. It then recorded three costly
+        // options (extend the fixture, add a write-path seam, delete the test). All three miss that
+        // `ApplyReferenceLinks` is FIVE linkifiers, not one: `StoryEpicLinkifier` needs neither a glossary nor
+        // a requirement, only an "Epic N"/"Story N.M" mention in a text node — and this page renders exactly
+        // one, in the ListRow demo chip, while the fixture defines Epic 1. So the control needs no new fixture
+        // and no new production seam.
+        //
+        // ⚠️ It is deliberately NOT the abbreviation expander. Every FR/NFR/PRD occurrence on this page sits
+        // inside an `<a>` in the nav band, and `ProtectedSplit` protects whole anchors — so an expander-based
+        // control would be a second vacuous assertion wearing a positive control's clothes.
+        var main = MainOf(html);
+        var model = EpicsParser.Parse(File.ReadAllText(Path.Combine(Source, "planning-artifacts", "epics.md")));
+        Assert.Contains(1, model.Epics.Select(e => e.Number));
+
+        // The mention is present, and present as PLAIN TEXT — the exact primitive output, unlinkified.
+        var epicHref = StoryEpicLinkifier.EpicPagePath(1);
+        Assert.False(
+            main.Contains(epicHref, StringComparison.Ordinal),
+            $"The design-system page links to `{epicHref}`, which means its \"Epic 1\" chip was rewritten by "
+            + "StoryEpicLinkifier — i.e. WriteDesignSystem is now running the page through ApplyReferenceLinks. "
+            + "A page whose subject IS the portal's vocabulary must not self-expand its own terms; write it "
+            + "directly, as How-to-read and About do.");
+        Assert.Contains(ListRow.Chip("Epic 1"), main);
+
+        // ...and `ApplyReferenceLinks` WOULD have rewritten it. This is the assertion that fails the moment
+        // `WriteDesignSystem` starts running the page through the linkifier chain.
+        var linkified = StoryEpicLinkifier.Linkify(main, model, string.Empty);
+        Assert.NotEqual(main, linkified);
+        Assert.Contains(epicHref, linkified);
     }
 
     /// <summary>The page's own <c>&lt;main&gt;</c>, so an assertion can't be satisfied or defeated by the

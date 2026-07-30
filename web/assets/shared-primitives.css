@@ -1,0 +1,29 @@
+/* GENERATED FILE - DO NOT EDIT.
+ * Extracted from src/SpecScribe/assets/specscribe.css by `npm run extract:ir-content` (Story 23.2 re-review; ADR 0029).
+ *
+ * ⚠️ UNSCOPED, unlike its sibling ir-content.css. These are SHARED PRIMITIVE classes that a C# primitive
+ * emits and a template-authored Vue component consumes — `ListRow.Chip` emits `class="list-row-chip pill"`
+ * and every visual property of that chip is `.pill`'s. A rule nested under `.ir-content` can only ever
+ * reach INJECTED markup, so the alternative was hand-retyping those declarations inside the SFC, which is
+ * what drifted before: serif instead of Courier, wrong padding, wrong tokens.
+ *
+ * BOUNDED by an explicit allowlist, not by usage: a rule is carried only when EVERY class it names is on
+ * the list. Today the whole list is: .pill.
+ * Growing it is an architectural decision — see ir-content-lib.mjs and ADR 0029 for the admission test.
+ *
+ * Each rule here is REMOVED from ir-content.css rather than duplicated into both, so the app has exactly
+ * one definition. An unscoped rule still matches inside .ir-content, so injected markup is unaffected.
+ *
+ * TRANSITIONAL: Story 23.4 retires this alongside ir-content.css. The manifest enumerates every rule.
+ */
+
+.pill {
+  font-family: 'Courier New', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+  padding: 0.2rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--warm-white);
+  color: var(--ink-faded);
+}

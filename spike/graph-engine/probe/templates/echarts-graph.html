@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en" data-probe-meta="__PROBE_META__" data-tab-order="confidence-desc, matching the text twin">
+<head>
+<meta charset="utf-8" />
+<!--CSP-META-->
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>24.6 candidate (b) — Apache ECharts graph/chord, SVG renderer</title>
+<link rel="stylesheet" href="./vendor/specscribe.css" />
+<style>
+  body { margin: 0; padding: 1rem 1.25rem 4rem; }
+  .probe-head { display:flex; gap:1rem; align-items:baseline; flex-wrap:wrap; margin-bottom:.75rem; }
+  .probe-head h1 { font-size:1.05rem; margin:0; }
+  .probe-note { font-size:.8rem; opacity:.75; }
+  #chart { width:100%; max-width:1100px; height:640px; }
+  .chart-panel { overflow:hidden; border:1px solid var(--border); border-radius:10px; padding:.5rem; }
+  .ss-tooltip { position:fixed; z-index:9999; max-width:22rem; padding:.4rem .55rem; font-size:.8rem;
+    background:var(--surface-2, #222); color:var(--ink, #eee); border:1px solid var(--border, #555);
+    border-radius:6px; pointer-events:none; opacity:0; }
+  .ss-tooltip[data-shown="true"] { opacity:1; }
+  .sr-only { position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden;
+    clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+  [data-graph-node]:focus { outline:3px solid var(--focus, #6cf); outline-offset:2px; }
+</style>
+</head>
+<body>
+<div class="probe-head">
+  <h1>Candidate (b) — Apache ECharts <code>graph</code> + <code>chord</code>, <strong>SVG</strong> renderer</h1>
+  <span class="probe-note">tree-shaken IIFE bundle, measured in <code>measurements/bundles.json</code></span>
+</div>
+<div class="chart-panel"><div id="chart"></div></div>
+<div data-graph-live aria-live="polite" class="sr-only"></div>
+<div id="twin" class="sr-only"></div>
+
+<script type="application/json" id="graph-data">__FIXTURE__</script>
+<script nonce="__NONCE__" src="./vendor/echarts-unified-svg.min.js"></script>
+<script nonce="__NONCE__" src="./harness.js"></script>
+<script nonce="__NONCE__">
+(function () {
+  'use strict'
+  var probe = window.__probe
+  var data = JSON.parse(document.getElementById('graph-data').textContent)
+  var host = document.getElementById('chart')
+  var live = document.querySelector('[data-graph-live]')
+
+  probe.engine = {
+    name: 'echarts-unified-svg',
+    version: (window.echarts && echarts.version) || 'unknown',
+    // The material difference from candidate (a): links[].lineStyle is PER-LINK, and the SVG renderer emits one
+    // <path> per link, so per-edge dash/width/text is native rather than reached by trace grouping.
+    edgeModel: 'per-edge-dom',
+    renderer: 'svg',
+    layoutSource: 'generation-time C# coordinates via layout:none (force mode also probed)',
+  }
+
+  function tok(n, fallback) { var v = probe.token(n); return v || fallback }
+  var palette = {
+    code:   tok('--status-done',   '#4a8'),
+    proc:   tok('--status-review', '#a84'),
+    node:   tok('--status-active', '#48a'),
+    hub:    tok('--status-ready',  '#84a'),
+    ink:    tok('--ink',           '#eee'),
+    border: tok('--border',        '#555'),
+  }
+
+  var maxW = data.nodes.reduce(function (m, n) { return Math.max(m, n.w) }, 1)
+  var maxSupport = data.edges.reduce(function (m, e) { return Math.max(m, e.s) }, 1)
+  var hubPath = data.hub
+
+  // ECharts wants pixel-ish coordinates for layout:'none'; the C# solver emits a normalised [0,1] box.
+  var SPAN = 1000
+  var nodes = data.nodes.map(function (n, i) {
+    return {
+      id: n.id, name: n.p,
+      x: n.x * SPAN, y: n.y * SPAN,
+      symbol: n.p === hubPath ? 'diamond' : 'circle',
+      symbolSize: 8 + 22 * Math.sqrt(n.w / maxW),
+      itemStyle: { color: n.p === hubPath ? palette.hub : palette.node, borderColor: palette.border, borderWidth: 1 },
+      value: n.w,
+      _probe: { path: n.p, weight: n.w, degree: n.d, index: i },
+    }
+  })
+
+  var links = data.edges.map(function (e) {
+    var t = maxSupport > 1 ? (e.s - 1) / (maxSupport - 1) : 0
+    return {
+      source: data.nodes[e.a].id, target: data.nodes[e.b].id,
+      // PER-EDGE non-colour channels, R7: dash carries process-vs-code, width carries strength, and
+      // cross-boundary adds a second dash signature. Never a hue-only distinction.
+      lineStyle: {
+        color: e.k === 'proc' ? palette.proc : palette.code,
+        width: 0.6 + t * 2.4 + (e.xb ? 0.8 : 0),
+        type: e.k === 'proc' ? (e.xb ? [10, 4] : [2, 3]) : (e.xb ? [8, 3, 2, 3] : 'solid'),
+        opacity: 0.55,
+      },
+      value: e.s,
+      _probe: { kind: e.k, xb: e.xb, support: e.s, cab: e.cab, cba: e.cba },
+    }
+  })
+
+  var order = data.nodes.map(function (n, i) { return i }).sort(function (i, j) {
+    var a = data.nodes[i], b = data.nodes[j]
+    return (b.d - a.d) || (b.w - a.w) || (a.p < b.p ? -1 : a.p > b.p ? 1 : 0)
+  })
+
+  var chart = echarts.init(host, null, { renderer: 'svg' })
+
+  function option(mode) {
+    return {
+      backgroundColor: 'transparent',
+      textStyle: { color: palette.ink },
+      // ECharts' own aria support: decal patterns are a genuine non-colour channel (v5+).
+      aria: { enabled: true, decal: { show: true } },
+      // The library's default palette is DISABLED so nothing can be painted off-token.
+      color: [palette.node],
+      animation: probe.animationMs() > 0,
+      animationDuration: probe.animationMs(),
+      tooltip: { show: false },  // routed to the shipped .ss-tooltip node instead (R8)
+      series: [{
+        type: 'graph',
+        // layout:'none' consumes the generation-time coordinates. 'force' is probed separately to price the
+        // client-side alternative, and it is what makes determinism a live question.
+        layout: mode === 'force' ? 'force' : 'none',
+        force: mode === 'force' ? { repulsion: 60, edgeLength: 40, gravity: 0.08, layoutAnimation: true } : undefined,
+        roam: true,
+        draggable: false,
+        data: nodes,
+        links: links,
+        emphasis: { focus: 'adjacency', scale: false },
+        label: { show: false },
+        selectedMode: 'single',
+      }],
+    }
+  }
+
+  /* ---- the a11y layer, applied over ECharts' emitted SVG through its public `rendered` / `finished` events.
+          No ECharts internal is patched — the same "configured around" bar Story 20.4 set. ---- */
+  var focusIndex = 0
+  function applyA11yLayer() {
+    var svg = host.querySelector('svg')
+    if (!svg) return
+    svg.setAttribute('role', 'graphics-document')
+    svg.setAttribute('aria-label',
+      'File change-coupling graph — ' + data.nodes.length + ' files, ' + data.edges.length + ' couplings')
+
+    // ECharts' SVG renderer emits paths in series order: links first, then symbols. Identify them by geometry
+    // rather than by index, because relying on emission order is exactly the brittleness a spike should find.
+    // Classify by PAINT ROLE (`fill="none"` = a stroked line) rather than by parsing `d`. A `d`-shape regex
+    // silently misclassifies every link as a symbol during the pre-animation frame, when `d` is still "".
+    var paths = Array.from(svg.querySelectorAll('path'))
+    var linkPaths = paths.filter(function (p) { return p.getAttribute('fill') === 'none' })
+    var symbolPaths = paths.filter(function (p) { return p.getAttribute('fill') !== 'none' })
+
+    probe.domCounts = { totalPaths: paths.length, linkPaths: linkPaths.length, symbolPaths: symbolPaths.length }
+
+    for (var i = 0; i < linkPaths.length && i < links.length; i++) {
+      var lp = linkPaths[i], lm = links[i]._probe
+      lp.setAttribute('data-graph-edge', String(i))
+      lp.dataset.kind = lm.kind
+      lp.dataset.xb = String(lm.xb)
+      lp.setAttribute('aria-label', lm.support + '× together, '
+        + Math.round(lm.cab * 100) + '% / ' + Math.round(lm.cba * 100) + '% confidence'
+        + (lm.xb ? ', cross-boundary' : '') + (lm.kind === 'proc' ? ', process-coupling' : ''))
+    }
+
+    var offset = symbolPaths.length - data.nodes.length
+    probe.symbolOffset = offset
+    for (var j = 0; j < data.nodes.length; j++) {
+      var el = symbolPaths[offset >= 0 ? offset + j : j]
+      if (!el) continue
+      var n = data.nodes[j]
+      el.setAttribute('data-graph-node', n.p)
+      el.setAttribute('role', 'button')
+      el.setAttribute('aria-label',
+        n.p + ' — ' + n.w + ' changes, coupled to ' + n.d + ' file' + (n.d === 1 ? '' : 's')
+        + (n.p === hubPath ? ' (focal file)' : ''))
+      el.setAttribute('tabindex', '-1')
+      el.dataset.graphIndex = String(j)
+    }
+    if (order.length) {
+      if (focusIndex >= order.length) focusIndex = order.length - 1
+      if (focusIndex < 0) focusIndex = 0
+      var first = svg.querySelector('[data-graph-index="' + order[focusIndex] + '"]')
+      if (first) first.setAttribute('tabindex', '0')
+    }
+    buildTwin()
+  }
+
+  function buildTwin() {
+    var twin = document.getElementById('twin')
+    if (twin.dataset.built === 'true') return
+    twin.innerHTML = '<h2>Coupled files, ranked</h2><ol>' + order.slice(0, 200).map(function (i) {
+      var n = data.nodes[i]
+      return '<li><a href="#' + n.id + '">' + n.p + '</a> — ' + n.w + ' changes, ' + n.d + ' coupled</li>'
+    }).join('') + '</ol>'
+    twin.dataset.built = 'true'
+  }
+
+  function moveFocus(delta) {
+    focusIndex = Math.max(0, Math.min(order.length - 1, focusIndex + delta))
+    document.querySelectorAll('[data-graph-node]').forEach(function (n) { n.setAttribute('tabindex', '-1') })
+    var el = document.querySelector('[data-graph-index="' + order[focusIndex] + '"]')
+    if (el) { el.setAttribute('tabindex', '0'); el.focus() }
+    return probe.focusState()
+  }
+  probe.moveFocus = moveFocus
+  probe.focusFirst = function () {
+    var el = document.querySelector('[data-graph-node][tabindex="0"]')
+    if (el) el.focus()
+    return probe.focusState()
+  }
+
+  host.addEventListener('keydown', function (ev) {
+    var el = ev.target
+    if (!el || !el.hasAttribute || !el.hasAttribute('data-graph-node')) return
+    if (ev.key === 'ArrowRight' || ev.key === 'ArrowDown') { ev.preventDefault(); moveFocus(1) }
+    else if (ev.key === 'ArrowLeft' || ev.key === 'ArrowUp') { ev.preventDefault(); moveFocus(-1) }
+    else if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); activate(el) }
+    else if (ev.key === 'Escape') { ev.preventDefault(); probe.resetView() }
+  })
+
+  function activate(el) {
+    var path = el.getAttribute('data-graph-node')
+    live.textContent = 'Selected ' + path
+    probe.emitSelect(path)
+    var r = el.getBoundingClientRect()
+    probe.showTooltip(el.getAttribute('aria-label'), r.left, r.top)
+  }
+  probe.activateFocused = function () {
+    var el = document.activeElement
+    if (el && el.hasAttribute && el.hasAttribute('data-graph-node')) { activate(el); return true }
+    return false
+  }
+
+  probe.resetView = function () {
+    live.textContent = 'View reset to all ' + data.nodes.length + ' files'
+    probe.hideTooltip()
+    chart.dispatchAction({ type: 'restore' })
+  }
+
+  /* ---- filter: positions fixed, elements hidden ---- */
+  probe.applyConfidenceFilter = function (threshold) {
+    var t0 = performance.now()
+    var before = nodes.map(function (n) { return n.x + ',' + n.y }).join(' ')
+    var alive = links.filter(function (l) {
+      return Math.max(l._probe.cab, l._probe.cba) >= threshold
+    })
+    chart.setOption({ series: [{ type: 'graph', links: alive }] }, { replaceMerge: [] })
+    var after = nodes.map(function (n) { return n.x + ',' + n.y }).join(' ')
+    live.textContent = 'Showing couplings at ' + Math.round(threshold * 100) + '% confidence or above'
+    applyA11yLayer()
+    return {
+      threshold: threshold, edgesVisible: alive.length, edgesTotal: links.length,
+      nodePositionsMoved: before !== after,
+      ms: +(performance.now() - t0).toFixed(1),
+    }
+  }
+
+  /* ---- the FORCE mode, for the determinism question ---- */
+  probe.renderForce = function () {
+    var t0 = performance.now()
+    chart.setOption(option('force'), true)
+    return new Promise(function (res) {
+      setTimeout(function () {
+        var series = chart.getOption().series[0]
+        res({
+          mode: 'force',
+          ms: +(performance.now() - t0).toFixed(1),
+          // The point: with layout:'force', ECharts OWNS the positions and does not report stable ones back.
+          coordinatesReadBack: series.data.slice(0, 3).map(function (d) { return [d.x, d.y] }),
+        })
+      }, 2500)
+    })
+  }
+
+  probe.renderNone = function () {
+    var t0 = performance.now()
+    chart.setOption(option('none'), true)
+    probe.renderMs = +(performance.now() - t0).toFixed(1)
+    applyA11yLayer()
+    return probe.renderMs
+  }
+
+  /* ---- UX-DR18's concrete knob, and simultaneously the only way to MEASURE this engine's geometry ----
+   *
+   * MEASURED FINDING: ECharts defers ALL geometry to a requestAnimationFrame-driven entrance animation. At the
+   * instant of initial render the emitted SVG contains every path — with `d=""` on links and `matrix(0,0,0,0,x,y)`
+   * (scale ZERO) on symbols. Attribute-level checks (role / aria-label / tabindex / stroke-dasharray) ALL PASS on
+   * those empty paths, so an audit that reads attributes but never geometry would certify a graph drawing nothing.
+   * `animation:false` with lazyUpdate=false produces the settled state synchronously, which is exactly what
+   * `prefers-reduced-motion` needs — so the same switch answers UX-DR18 and makes the engine measurable.
+   */
+  probe.setReducedMotion = function (reduce) {
+    var t0 = performance.now()
+    // lazyUpdate MUST be false: passing true defers the update to a frame, which never arrives in a
+    // non-compositing tab. (This probe made that mistake first and it looked exactly like a rendering defect.)
+    chart.setOption({ animation: !reduce, animationDuration: reduce ? 0 : probe.animationMs() }, false, false)
+    applyA11yLayer()
+    return { reduced: !!reduce, ms: +(performance.now() - t0).toFixed(1), geometry: probe.geometryAudit() }
+  }
+
+  /** Does the chart actually DRAW anything? Geometry, not attributes. The check the suite structurally cannot do. */
+  probe.geometryAudit = function () {
+    var paths = Array.from(host.querySelectorAll('svg path'))
+    var lines = paths.filter(function (x) { return x.getAttribute('fill') === 'none' })
+    var syms = paths.filter(function (x) { return x.getAttribute('fill') !== 'none' })
+    function scaled(x) {
+      var m = (x.getAttribute('transform') || '').match(/matrix\(([-\d.e]+)/)
+      return m && parseFloat(m[1]) !== 0
+    }
+    return {
+      linePaths: lines.length,
+      linePathsWithGeometry: lines.filter(function (x) { return (x.getAttribute('d') || '').length > 0 }).length,
+      symbolPaths: syms.length,
+      symbolPathsWithNonZeroScale: syms.filter(scaled).length,
+      DRAWS_SOMETHING: lines.filter(function (x) { return (x.getAttribute('d') || '').length > 0 }).length > 0
+        && syms.filter(scaled).length > 0,
+    }
+  }
+
+  /* ---- 24.4's chord view, from the SAME fixture, to test the "native series" claim ---- */
+  probe.renderChord = function (topN) {
+    var n = topN || 14
+    var byStrength = data.edges.slice().sort(function (a, b) { return b.s - a.s }).slice(0, n * 3)
+    var keep = {}
+    byStrength.forEach(function (e) { keep[e.a] = true; keep[e.b] = true })
+    var ids = Object.keys(keep).slice(0, n).map(Number)
+    var idSet = {}
+    ids.forEach(function (i) { idSet[i] = true })
+    var chordNodes = ids.map(function (i) {
+      return { id: data.nodes[i].id, name: data.nodes[i].l,
+               itemStyle: { color: palette.node, borderColor: palette.border } }
+    })
+    var chordLinks = byStrength.filter(function (e) { return idSet[e.a] && idSet[e.b] }).map(function (e) {
+      return { source: data.nodes[e.a].id, target: data.nodes[e.b].id, value: e.s,
+               lineStyle: { color: e.k === 'proc' ? palette.proc : palette.code,
+                            type: e.k === 'proc' ? [2, 3] : 'solid', opacity: 0.55 } }
+    })
+    try {
+      chart.setOption({
+        backgroundColor: 'transparent',
+        aria: { enabled: true, decal: { show: true } },
+        color: [palette.node],
+        series: [{ type: 'chord', data: chordNodes, links: chordLinks,
+                   label: { show: true, color: palette.ink } }],
+      }, true)
+      var svg = host.querySelector('svg')
+      return { ok: true, series: 'chord', nodes: chordNodes.length, links: chordLinks.length,
+               paths: svg ? svg.querySelectorAll('path').length : 0 }
+    } catch (err) {
+      return { ok: false, error: String(err) }
+    }
+  }
+
+  probe.renderNone()
+  chart.on('rendered', applyA11yLayer)
+  live.textContent = 'Graph ready: ' + data.nodes.length + ' files'
+  probe.ready = true
+  probe.registerReinit(function () { probe.renderNone() })
+  probe.reapplyLayer = applyA11yLayer
+  probe.chart = chart
+})()
+</script>
+</body>
+</html>

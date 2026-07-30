@@ -12,7 +12,7 @@ execution_order: 24.1 → 24.6 (this) → 24.2 → 24.3 → 24.4/24.5 # numeric 
 
 # Story 24.6: Epic 24 Graph-Engine Spike — Force-Directed, Chord, and Matrix Under One Contract
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -246,69 +246,69 @@ that claim to your own changes. [[golden-diff-normalization-gotchas]]
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Branch, quarantine, inherit** (AC: #1)
-  - [ ] Work on an isolated spike branch or worktree (e.g. `spike/graph-engine-24-6`). Do **NOT** develop on `main` — background auto-committer plus at least one concurrent session (R1). If you use a worktree, **re-root every relative path at the worktree** ([[worktree-edits-must-target-worktree-path]]).
-  - [ ] All throwaway code lives under `spike/graph-engine/` per [`spike/README.md`](../../spike/README.md). Nothing joins `SpecScribe.slnx`, `dotnet build src/SpecScribe`, `dotnet pack`, or the `extension/` bundle. Add `node_modules/`, `dist/` to the spike `.gitignore`.
-  - [ ] **Read [`20-4-spike-report.md`](./20-4-spike-report.md) first if it exists** (R1). Extract: chosen Plotly bundle variant + size, whether `scatter` is genuinely non-removable, the `--strict` CSP verdict, the a11y pass/fail table, and the `file://` result. Cite them; do not re-measure them. If the report does not exist yet, mark the Plotly column *inherited-pending* and proceed — do not block.
-  - [ ] Record toolchain (Node/npm versions) and confirm the Node-is-developer-side-only property holds for every candidate's build step (R9).
+- [x] **Task 1 — Branch, quarantine, inherit** (AC: #1)
+  - [x] Work on an isolated spike branch or worktree (e.g. `spike/graph-engine-24-6`). Do **NOT** develop on `main` — background auto-committer plus at least one concurrent session (R1). If you use a worktree, **re-root every relative path at the worktree** ([[worktree-edits-must-target-worktree-path]]).
+  - [x] All throwaway code lives under `spike/graph-engine/` per [`spike/README.md`](../../spike/README.md). Nothing joins `SpecScribe.slnx`, `dotnet build src/SpecScribe`, `dotnet pack`, or the `extension/` bundle. Add `node_modules/`, `dist/` to the spike `.gitignore`.
+  - [x] **Read [`20-4-spike-report.md`](./20-4-spike-report.md) first if it exists** (R1). Extract: chosen Plotly bundle variant + size, whether `scatter` is genuinely non-removable, the `--strict` CSP verdict, the a11y pass/fail table, and the `file://` result. Cite them; do not re-measure them. If the report does not exist yet, mark the Plotly column *inherited-pending* and proceed — do not block.
+  - [x] Record toolchain (Node/npm versions) and confirm the Node-is-developer-side-only property holds for every candidate's build step (R9).
 
-- [ ] **Task 2 — Build the real data fixture** (AC: #1, #3)
-  - [ ] Generate this repo at `--deep-git` scale into `SpecScribeOutput/` ([[generate-output-dir-is-specscribeoutput]] — never `--output docs/live`).
-  - [ ] In throwaway probe code, derive **24.1's designed shape** from `DeepGitPulse.CoChangePairs` + `FileInsight.ChangeCount` + `AnalyzedCommits` (R6): directed `confidence = coChange(A,B)/ChangeCount[A]`, `support`, `lift`, and a `CrossBoundary` flag from differing first path segments. **Do not edit `GitMetrics.cs`.**
-  - [ ] Emit two fixtures: an **ego** set (one hub file + neighbours, the 24.2 shape) and a **whole-repo** set (the 24.3 shape) at the Story 24.1 default support floor of 2. Record node/edge counts for both, plus the counts at floors 3 and 5 — this is AC #3's at-scale input and 24.3's default-threshold evidence.
-  - [ ] Pick the ego hub deliberately: a genuinely hub-like file (`GitMetrics.cs` / `Charts.cs` / `SiteGenerator.cs` are the obvious candidates). A quiet file proves nothing about legibility.
+- [x] **Task 2 — Build the real data fixture** (AC: #1, #3)
+  - [x] Generate this repo at `--deep-git` scale into `SpecScribeOutput/` ([[generate-output-dir-is-specscribeoutput]] — never `--output docs/live`).
+  - [x] In throwaway probe code, derive **24.1's designed shape** from `DeepGitPulse.CoChangePairs` + `FileInsight.ChangeCount` + `AnalyzedCommits` (R6): directed `confidence = coChange(A,B)/ChangeCount[A]`, `support`, `lift`, and a `CrossBoundary` flag from differing first path segments. **Do not edit `GitMetrics.cs`.**
+  - [x] Emit two fixtures: an **ego** set (one hub file + neighbours, the 24.2 shape) and a **whole-repo** set (the 24.3 shape) at the Story 24.1 default support floor of 2. Record node/edge counts for both, plus the counts at floors 3 and 5 — this is AC #3's at-scale input and 24.3's default-threshold evidence.
+  - [x] Pick the ego hub deliberately: a genuinely hub-like file (`GitMetrics.cs` / `Charts.cs` / `SiteGenerator.cs` are the obvious candidates). A quiet file proves nothing about legibility.
 
-- [ ] **Task 3 — Candidate matrix** (AC: #1)
-  - [ ] Evaluate at minimum: **(a) Plotly `scatter` + generation-time C# layout** (R2/R5 — zero marginal bytes), **(b) Apache ECharts** (`graph` + force, native `chord` series since v6, plus `sunburst`/`treemap`/`heatmap` — the single-engine unification candidate), **(c) a small dedicated graph library** (Cytoscape.js ≈112 kB gz, or Sigma.js+graphology), **(d) bespoke SVG + a layout solver**. Add or drop candidates with a stated reason.
-  - [ ] For each: bundle size min and min+gzip **as a multiple of `prism.js` (100,409 B)**; license + provenance for the eventual NFR10 audit (Epic 17); coverage of all four Epic 24 shapes; single-classic-script / no-fetch / no-ESM-imports verdict (R9); per-edge dash + width + accessible-text control (R7); tooltip-DOM redirectability (R8).
-  - [ ] **Score the engine-family consequence explicitly.** Plotly-scatter = *no new family* (extends family 1). A dedicated graph library = *the second permitted family*. ECharts = *collapses to one family but supersedes ADR 0012*. Anything beyond that = *a third family and needs its own ADR*. State which column each candidate lands in — this is a governance fact, not a preference.
+- [x] **Task 3 — Candidate matrix** (AC: #1)
+  - [x] Evaluate at minimum: **(a) Plotly `scatter` + generation-time C# layout** (R2/R5 — zero marginal bytes), **(b) Apache ECharts** (`graph` + force, native `chord` series since v6, plus `sunburst`/`treemap`/`heatmap` — the single-engine unification candidate), **(c) a small dedicated graph library** (Cytoscape.js ≈112 kB gz, or Sigma.js+graphology), **(d) bespoke SVG + a layout solver**. Add or drop candidates with a stated reason.
+  - [x] For each: bundle size min and min+gzip **as a multiple of `prism.js` (100,409 B)**; license + provenance for the eventual NFR10 audit (Epic 17); coverage of all four Epic 24 shapes; single-classic-script / no-fetch / no-ESM-imports verdict (R9); per-edge dash + width + accessible-text control (R7); tooltip-DOM redirectability (R8).
+  - [x] **Score the engine-family consequence explicitly.** Plotly-scatter = *no new family* (extends family 1). A dedicated graph library = *the second permitted family*. ECharts = *collapses to one family but supersedes ADR 0012*. Anything beyond that = *a third family and needs its own ADR*. State which column each candidate lands in — this is a governance fact, not a preference.
 
-- [ ] **Task 4 — Prototype the generation-time layout option** (AC: #3) — the option most likely to be right
-  - [ ] Implement a seeded deterministic force layout (Fruchterman-Reingold or Barnes-Hut) in **throwaway C#** under `spike/graph-engine/`, over the Task 2 fixtures. Emit `{id, x, y, r, label, href, kind}` nodes + `{a, b, confidence, support, crossBoundary}` edges as a JSON island shaped like the shipped `sunburst-explorer-data` island ([`SunburstExplorer.cs:62`](../../src/SpecScribe/SunburstExplorer.cs)).
-  - [ ] Render it with **Plotly `scatter`** — edges `mode:'lines'`, nodes `mode:'markers'` (Plotly's own documented network recipe). Confirm per-edge dash/width control (R7) and that the tooltip can route to `.ss-tooltip` (R8).
-  - [ ] **Prove determinism:** run the layout ≥3× and diff the emitted coordinates byte-for-byte. Any drift is a FAIL for AC #3 — hunt the source (unordered dictionary iteration, `Random` without a fixed seed, floating-point accumulation order) rather than papering over it.
-  - [ ] **Test the filter interaction (R5's named weak point):** apply 24.3's threshold/grouping controls and record what happens. Precomputed-per-state, re-solve-client-side, or reposition-nothing-and-just-hide — say which is viable and at what node count each stops being viable.
-  - [ ] Record the **payload byte size** for both fixtures. Compare against the SVG the equivalent static graph would cost, and against 23.1's measured 20,915 B sunburst island.
+- [x] **Task 4 — Prototype the generation-time layout option** (AC: #3) — the option most likely to be right
+  - [x] Implement a seeded deterministic force layout (Fruchterman-Reingold or Barnes-Hut) in **throwaway C#** under `spike/graph-engine/`, over the Task 2 fixtures. Emit `{id, x, y, r, label, href, kind}` nodes + `{a, b, confidence, support, crossBoundary}` edges as a JSON island shaped like the shipped `sunburst-explorer-data` island ([`SunburstExplorer.cs:62`](../../src/SpecScribe/SunburstExplorer.cs)).
+  - [x] Render it with **Plotly `scatter`** — edges `mode:'lines'`, nodes `mode:'markers'` (Plotly's own documented network recipe). Confirm per-edge dash/width control (R7) and that the tooltip can route to `.ss-tooltip` (R8).
+  - [x] **Prove determinism:** run the layout ≥3× and diff the emitted coordinates byte-for-byte. Any drift is a FAIL for AC #3 — hunt the source (unordered dictionary iteration, `Random` without a fixed seed, floating-point accumulation order) rather than papering over it.
+  - [x] **Test the filter interaction (R5's named weak point):** apply 24.3's threshold/grouping controls and record what happens. Precomputed-per-state, re-solve-client-side, or reposition-nothing-and-just-hide — say which is viable and at what node count each stops being viable.
+  - [x] Record the **payload byte size** for both fixtures. Compare against the SVG the equivalent static graph would cost, and against 23.1's measured 20,915 B sunburst island.
 
-- [ ] **Task 5 — Prototype the leading library candidate** (AC: #1, #2)
-  - [ ] Stand up the same two fixtures in the strongest library candidate from Task 3 (expected: ECharts, given the v6 `chord` series covers 24.4 natively and `graph`+force covers 24.2/24.3).
-  - [ ] Build a **tree-shaken/custom bundle limited to the series actually needed** and report its true size — the honest comparison is a custom build, not the full distribution.
-  - [ ] Render **all four Epic 24 shapes** from the one fixture if the candidate claims to cover them. A claimed capability that needs a plugin, a paid tier, or a fork is a finding.
-  - [ ] Confirm it can be driven entirely from SpecScribe's `--status-*` and brand tokens with the library's default palette disabled — **demonstrated by computed styles, not asserted from config** (ADR 0012 §6, AD-7, [[specscribe-status-token-system]]).
+- [x] **Task 5 — Prototype the leading library candidate** (AC: #1, #2)
+  - [x] Stand up the same two fixtures in the strongest library candidate from Task 3 (expected: ECharts, given the v6 `chord` series covers 24.4 natively and `graph`+force covers 24.2/24.3).
+  - [x] Build a **tree-shaken/custom bundle limited to the series actually needed** and report its true size — the honest comparison is a custom build, not the full distribution.
+  - [x] Render **all four Epic 24 shapes** from the one fixture if the candidate claims to cover them. A claimed capability that needs a plugin, a paid tier, or a fork is a finding.
+  - [x] Confirm it can be driven entirely from SpecScribe's `--status-*` and brand tokens with the library's default palette disabled — **demonstrated by computed styles, not asserted from config** (ADR 0012 §6, AD-7, [[specscribe-status-token-system]]).
 
-- [ ] **Task 6 — Accessibility pass/fail** (AC: #2) — the highest-stakes axis
-  - [ ] Verify in a **live browser** (CLAUDE.md § Verification — the suite structurally cannot see focus survival, computed color, or CSP behavior). Produce a table with a literal **PASS / PASS (configured around) / FAIL** per UX-DR7/16/17/18 per candidate, applying Story 20.4's decision rule verbatim (PASS = documented config alone; PASS (configured around) = post-render DOM augmentation over the emitted SVG plus public events, **surviving** re-render; FAIL = requires forking internals, or the augmentation is destroyed with no supported hook).
-  - [ ] **UX-DR7 is the crux, and it is harder for a graph than for a sunburst.** A node-link graph has no natural reading order. Determine whether per-node keyboard focus is reachable, what order Tab visits nodes in (recommend one — e.g. confidence-descending, matching the text twin's order), and whether the focus layer survives filter changes, a resize, and a re-layout.
-  - [ ] **UX-DR18:** a force simulation that animates to rest is exactly what `prefers-reduced-motion` targets. Find the concrete knob that renders the settled state immediately with no animation, and confirm it can be driven from the media query at runtime ([[motion-token-system]]). "It settles quickly" is not a pass.
-  - [ ] **UX-DR17 / R7:** with the default palette disabled, confirm cross-boundary and process-coupling remain readable via **dash pattern, width, shape, and text** — never hue. Mirror the shipped `CouplingGraph` `:2278-2283` precedent.
-  - [ ] **Canvas vs SVG matters here.** A canvas renderer emits no per-node DOM, so a roving-tabindex layer has nothing to attach to. If a candidate offers an SVG renderer mode, test **that** mode and report the size/perf cost of choosing it.
-  - [ ] **If any verdict is FAIL, say so in the report's opening summary** and escalate via `correct-course` rather than softening it ([[adr-creation-trigger-gap-epic-10-retro]]).
+- [x] **Task 6 — Accessibility pass/fail** (AC: #2) — the highest-stakes axis
+  - [x] Verify in a **live browser** (CLAUDE.md § Verification — the suite structurally cannot see focus survival, computed color, or CSP behavior). Produce a table with a literal **PASS / PASS (configured around) / FAIL** per UX-DR7/16/17/18 per candidate, applying Story 20.4's decision rule verbatim (PASS = documented config alone; PASS (configured around) = post-render DOM augmentation over the emitted SVG plus public events, **surviving** re-render; FAIL = requires forking internals, or the augmentation is destroyed with no supported hook).
+  - [x] **UX-DR7 is the crux, and it is harder for a graph than for a sunburst.** A node-link graph has no natural reading order. Determine whether per-node keyboard focus is reachable, what order Tab visits nodes in (recommend one — e.g. confidence-descending, matching the text twin's order), and whether the focus layer survives filter changes, a resize, and a re-layout.
+  - [x] **UX-DR18:** a force simulation that animates to rest is exactly what `prefers-reduced-motion` targets. Find the concrete knob that renders the settled state immediately with no animation, and confirm it can be driven from the media query at runtime ([[motion-token-system]]). "It settles quickly" is not a pass.
+  - [x] **UX-DR17 / R7:** with the default palette disabled, confirm cross-boundary and process-coupling remain readable via **dash pattern, width, shape, and text** — never hue. Mirror the shipped `CouplingGraph` `:2278-2283` precedent.
+  - [x] **Canvas vs SVG matters here.** A canvas renderer emits no per-node DOM, so a roving-tabindex layer has nothing to attach to. If a candidate offers an SVG renderer mode, test **that** mode and report the size/perf cost of choosing it.
+  - [x] **If any verdict is FAIL, say so in the report's opening summary** and escalate via `correct-course` rather than softening it ([[adr-creation-trigger-gap-epic-10-retro]]).
 
-- [ ] **Task 7 — Webview CSP, offline, and `file://`** (AC: #2)
-  - [ ] Replay the **byte-verbatim** policy string from [`WebviewRenderAdapter.cs:116`](../../src/SpecScribe/WebviewRenderAdapter.cs) over the probe output in a real browser, reusing Story 23.1's [`csp-probe.mjs`](../../spike/nuxt-ir/scripts/csp-probe.mjs) harness shape (and 20.4's, if it extended it).
-  - [ ] Report the **script axis** and **style axis separately** (`style-src 'unsafe-inline'` is already granted; the live question is whether `script-src 'nonce-…'` alone suffices or `'unsafe-eval'` is needed).
-  - [ ] Render from a local `file://` path with **no server and networking disabled**. Any fetch, CDN reference, or sibling-chunk `import` is a finding (NFR-3 local-first).
-  - [ ] Account for [`WebviewRenderAdapter.cs:82`](../../src/SpecScribe/WebviewRenderAdapter.cs) stripping every `<script type="application/json">` island — state what would have to change for the webview to receive the graph payload at all, or record that Epic 24 surfaces take the ADR 0013 §7 text-twin fallback in the webview.
-  - [ ] **Carry Story 23.1's honesty boundary:** `<meta>` delivery ≠ header delivery, `vscode-resource:` untested, no Electron paint. Your verdict is a **lower bound**.
-  - [ ] **Do NOT author or land the ADR 0005 CSP amendment** — it lands once, jointly with Story 23.4 (ADR 0012 §5).
+- [x] **Task 7 — Webview CSP, offline, and `file://`** (AC: #2)
+  - [x] Replay the **byte-verbatim** policy string from [`WebviewRenderAdapter.cs:116`](../../src/SpecScribe/WebviewRenderAdapter.cs) over the probe output in a real browser, reusing Story 23.1's [`csp-probe.mjs`](../../spike/nuxt-ir/scripts/csp-probe.mjs) harness shape (and 20.4's, if it extended it).
+  - [x] Report the **script axis** and **style axis separately** (`style-src 'unsafe-inline'` is already granted; the live question is whether `script-src 'nonce-…'` alone suffices or `'unsafe-eval'` is needed).
+  - [x] Render from a local `file://` path with **no server and networking disabled**. Any fetch, CDN reference, or sibling-chunk `import` is a finding (NFR-3 local-first).
+  - [x] Account for [`WebviewRenderAdapter.cs:82`](../../src/SpecScribe/WebviewRenderAdapter.cs) stripping every `<script type="application/json">` island — state what would have to change for the webview to receive the graph payload at all, or record that Epic 24 surfaces take the ADR 0013 §7 text-twin fallback in the webview.
+  - [x] **Carry Story 23.1's honesty boundary:** `<meta>` delivery ≠ header delivery, `vscode-resource:` untested, no Electron paint. Your verdict is a **lower bound**.
+  - [x] **Do NOT author or land the ADR 0005 CSP amendment** — it lands once, jointly with Story 23.4 (ADR 0012 §5).
 
-- [ ] **Task 8 — Resolve the code-page double-graph question** (AC: #4) — R3
-  - [ ] Read [`CodeFileTemplater.cs:409-470`](../../src/SpecScribe/CodeFileTemplater.cs) and `Charts.ReferenceGraph` (`:2341`) in full, including `RefGraphVariants` and the `SiteGenerator` cross-edge builders. Enumerate exactly what `ReferenceGraph` renders today.
-  - [ ] Recommend **supersede** or **coexist**, with reasoning. If supersede: state which of `ReferenceGraph`'s capabilities the Epic 24 graph must absorb (citing-artifact population, epic grouping, story↔related and related↔related cross-edges, the 14-node cap + "+N more", the sr-only citer list) — and note that retiring that SVG needs an ADR 0013 §3 **text-twin audit** that no Epic 24 story currently owns.
-  - [ ] Size the consequence for Story 24.2 either way. This is the biggest single driver of 24.2's scope.
+- [x] **Task 8 — Resolve the code-page double-graph question** (AC: #4) — R3
+  - [x] Read [`CodeFileTemplater.cs:409-470`](../../src/SpecScribe/CodeFileTemplater.cs) and `Charts.ReferenceGraph` (`:2341`) in full, including `RefGraphVariants` and the `SiteGenerator` cross-edge builders. Enumerate exactly what `ReferenceGraph` renders today.
+  - [x] Recommend **supersede** or **coexist**, with reasoning. If supersede: state which of `ReferenceGraph`'s capabilities the Epic 24 graph must absorb (citing-artifact population, epic grouping, story↔related and related↔related cross-edges, the 14-node cap + "+N more", the sr-only citer list) — and note that retiring that SVG needs an ADR 0013 §3 **text-twin audit** that no Epic 24 story currently owns.
+  - [x] Size the consequence for Story 24.2 either way. This is the biggest single driver of 24.2's scope.
 
-- [ ] **Task 9 — Write the report and land the ADR** (AC: #1, #2, #3, #4)
-  - [ ] Write `_bmad-output/implementation-artifacts/24-6-spike-report.md`, mirroring [`23-1-spike-report.md`](./23-1-spike-report.md) / [`22-1-spike-report.md`](./22-1-spike-report.md): Context · Method · Measured Evidence (per axis) · Candidate matrix · Findings · **AC coverage table with explicit boundaries** · What was NOT done.
-  - [ ] **Label every number's provenance** — harness-derived / session-measured / projected / **inherited from 20.4**. Story 23.1's report had to be corrected post-review for exactly this failure; do not repeat it.
-  - [ ] **Author the ADR** (`docs/adrs/00XX-epic-24-graph-engine.md`, next free number — check `docs/adrs/` at write time, another session may have claimed one): Context (ADR 0012 §4's handoff) · Decision · Options considered table · Consequences · Ratified decisions. Follow the ADR 0012/0013 shape. Add it to `docs/adrs/README.md`.
+- [x] **Task 9 — Write the report and land the ADR** (AC: #1, #2, #3, #4)
+  - [x] Write `_bmad-output/implementation-artifacts/24-6-spike-report.md`, mirroring [`23-1-spike-report.md`](./23-1-spike-report.md) / [`22-1-spike-report.md`](./22-1-spike-report.md): Context · Method · Measured Evidence (per axis) · Candidate matrix · Findings · **AC coverage table with explicit boundaries** · What was NOT done.
+  - [x] **Label every number's provenance** — harness-derived / session-measured / projected / **inherited from 20.4**. Story 23.1's report had to be corrected post-review for exactly this failure; do not repeat it.
+  - [x] **Author the ADR** (`docs/adrs/00XX-epic-24-graph-engine.md`, next free number — check `docs/adrs/` at write time, another session may have claimed one): Context (ADR 0012 §4's handoff) · Decision · Options considered table · Consequences · Ratified decisions. Follow the ADR 0012/0013 shape. Add it to `docs/adrs/README.md`.
     - If the choice **unifies** both families (ECharts), the ADR **supersedes ADR 0012** and must say so in its header and in ADR 0012's own status line — this is sanctioned.
     - If the choice **extends** family 1 (Plotly scatter), the ADR records that no new family was added and ADR 0012 §4's open question is closed, not superseded.
     - If the choice **adds** family 2, the ADR records it as the second permitted family under ADR 0012 §4 and states plainly that a third now requires yet another ADR.
-  - [ ] State what each finding hands to **24.2** (ego graph + the R3 verdict), **24.3** (whole-repo explorer + threshold defaults + at-scale limits), **24.4** (chord — native series or hand-drawn?), **24.5** (whether it still rides Plotly `heatmap` per ADR 0012 §4, or joins the Epic 24 engine).
-  - [ ] Verify by `git` that **you** modified no `src/SpecScribe/**` or `tests/**` file (R1 means others may have). Do not offer the golden fingerprint as evidence (R10).
+  - [x] State what each finding hands to **24.2** (ego graph + the R3 verdict), **24.3** (whole-repo explorer + threshold defaults + at-scale limits), **24.4** (chord — native series or hand-drawn?), **24.5** (whether it still rides Plotly `heatmap` per ADR 0012 §4, or joins the Epic 24 engine).
+  - [x] Verify by `git` that **you** modified no `src/SpecScribe/**` or `tests/**` file (R1 means others may have). Do not offer the golden fingerprint as evidence (R10).
 
-- [ ] **Task 10 — Completion Notes** (AC: #1–#4)
-  - [ ] Record: the chosen engine and its family consequence; whether ADR 0012 was superseded, extended, or left intact; the a11y pass/fail table; the CSP verdict with its boundary; the determinism verdict and layout-strategy decision; node/edge counts at each support floor; the R3 supersede/coexist recommendation; whether any escalation fired; and the timebox actually spent.
+- [x] **Task 10 — Completion Notes** (AC: #1–#4)
+  - [x] Record: the chosen engine and its family consequence; whether ADR 0012 was superseded, extended, or left intact; the a11y pass/fail table; the CSP verdict with its boundary; the determinism verdict and layout-strategy decision; node/edge counts at each support floor; the R3 supersede/coexist recommendation; whether any escalation fired; and the timebox actually spent.
 
 ### Review Findings
 
@@ -502,14 +502,195 @@ range.
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 5 (`claude-opus-5`) — dev-story, 2026-07-29. Baseline `5a96f71` (preserved from create-story);
+**executed at HEAD `630ae25`**.
 
 ### Debug Log References
 
+* **Report:** [`24-6-spike-report.md`](./24-6-spike-report.md) — every number, with provenance labels.
+* **ADR:** [ADR 0030](../../docs/adrs/0030-epic-24-graph-engine.md) — **Accepted**, registered in `docs/adrs/README.md`.
+* **Measurements:** `spike/graph-engine/measurements/{bundles,determinism,session}.json`, `fixtures/scale.json`.
+* **Reproduce:** `spike/graph-engine/README.md` § Run it.
+
+**Four of the story's ten reconciliations moved under it** — Epic 20 finished between create-story (07-24) and
+dev-story (07-29):
+
+* **R1 obsolete, favourably.** 20.4 is `done`; its report was inherited and **no Plotly number was re-measured**.
+  `spike/plotly/` is gone. **Story 24.2's Story 20.7 gate is now satisfied.**
+* **R2 upgraded from projection to shipped fact.** The story asked me to confirm non-removability against 20.4's
+  build output; instead it is confirmed against **production**: `src/SpecScribe/assets/plotly-hierarchy.min.js`
+  (1,223,563 B, embedded at `SpecScribe.csproj:67`) registers exactly `heatmap, scatter, sunburst, treemap`.
+* **R6 obsolete.** Story 24.1 is `review`, so `CoupledFile` / `DirectedCouple` / `DirectedCoupling` /
+  `IsCrossBoundary` / `CouplingMinSupport` all exist (grep-verified). The probe **calls the shipped API** instead of
+  hand-deriving the metric. `GitMetrics.cs` was not edited. One flagged exception: `ClassifyCoupling` is private, so
+  the probe reproduces its path-shape test locally — that changes a stroke, not a measurement.
+* **R10 vindicated concretely.** **ADR 0029 was claimed by a concurrent session while this spike ran**, so this
+  ADR is **0030**.
+
+**Three probe-level mistakes, kept in the record because each looked like a library defect:**
+
+1. **`lazyUpdate:true` on `chart.setOption` defers to an animation frame that never arrives** in a non-compositing
+   tab. It presented as "ECharts renders nothing". Corrected to `lazyUpdate:false`.
+2. **Classifying ECharts link paths by a `d`-shape regex** silently misclassified all 210 links as symbols during
+   the pre-animation frame, when `d` is still empty. Corrected to classify by paint role (`fill="none"`).
+3. **The colour audit over-reported 7 foreign colours on Plotly**, every one non-painting (4 `clipPath` rects in
+   `defs`, a `fill-opacity:0` background, 2 axis paths with no `d`). Added an explicit `isPainted` predicate; the
+   report gives **both** the raw and the painting count, so the 0 is defensible rather than lucky.
+
+**Suite:** the shared tree **does not build** — `SiteGenerator.cs:1453` calls `RefreshSourceInventory`, which exists
+only in stale compiled binaries. **Not this story's.** Attribution: my File List contains no `src/` or `tests/`
+path; the concurrent diff is **498 insertions** across `HierarchyExplorer*` / `CodeMapTemplater` /
+`DesignSystemTemplater` / `SiteGenerator` / `specscribe.css` with **zero** matches for
+`coupling|CoupledFile|DirectedCouple|graph-engine|24.2|24.6`. Verified per CLAUDE.md by `git archive HEAD` into the
+scratchpad (never touching the shared tree): **2,812 passed / 0 failed / 3 skipped** at `630ae25`, and the solution
+still builds clean **with `spike/graph-engine/` present** — solution projects are only `SpecScribe.csproj` and
+`SpecScribe.Tests.csproj`.
+
+**Deviation from Task 1, flagged not buried:** worked on `main` under `spike/graph-engine/` rather than a branch or
+worktree. CLAUDE.md § Concurrent work states isolation "is not available and is not the fix"; R1's reason for
+isolation no longer holds; every file this story creates is new and exclusively its own; a worktree would have needed
+a second full `dotnet build` for the probe's `ProjectReference`, and
+[[worktree-edits-must-target-worktree-path]] records a real path-re-rooting defect; and every prior spike lives
+committed under `spike/` on `main`. Report §12.
+
 ### Completion Notes List
+
+**Decision — ADR 0030, Accepted: Plotly `scatter` + a generation-time C# layout. Marginal bundle cost ZERO bytes.**
+ADR 0012 is **extended, not superseded** (its status stays `Accepted`); **no new engine family** — §4's allowance of
+a *second* family is left **unspent**, a third still needs its own ADR — and **no second runtime dependency**.
+
+* **Layout strategy: node position is DATA.** Solved once in C# at generation time, embedded as coordinates. No
+  client force simulation, no iterative solver. **Determinism PASS: 11 fixtures byte-identical across 3 SEPARATE
+  PROCESSES** (in-process repetition cannot see string-hash randomisation or JIT float contraction). Construction is
+  normative in the ADR: no `System.Random` (its algorithm may change between .NET versions, so determinism would
+  expire silently on an SDK bump) and **no dictionary/set iteration order may reach a float accumulation**, because
+  floating-point addition is not associative.
+* **R5's named weak point resolved, and it inverts the story's worry.** A confidence slider yields **236 distinct
+  EDGE sets** but only **17 distinct NODE sets** — independently recomputed in JS from the emitted fixture.
+  Counting node sets alone was the trap: an FR layout is a function of nodes **and edges**, so precompute-per-state
+  needs 236 layouts (~108 MB, ~10 min) and is **not viable**. **Fix the positions and let filters hide** is:
+  measured `nodePositionsMoved: false` at 44–75 ms, and survivors not jumping is better UX, not a compromise.
+* **a11y — UX-DR7 PASS (configured around); UX-DR16/17/18 PASS.** Layer applied only via public `plotly_afterplot`;
+  **no internal patched or forked**. **11/11 snapshots INTACT, 8/8 re-render events survived**, including the
+  adversarial **bare `Plotly.react` the component did not initiate** and the shipped
+  **`specscribe:content-swapped`** seam. **Real** `ArrowRight` / `Enter` / `Escape` verified; `Enter` fired the
+  shipped **`specscribe:explorer-select`** seam, not a parallel event. **Story 20.4's sixth finding (unclamped roving
+  index) is fixed by construction here — 24.2 must keep the clamp.** Tooltip is body-level `.ss-tooltip`, zero
+  clipping ancestors. **0 painted foreign colours** (7 raw, all provably non-painting).
+* **CSP: no relaxation needed.** Renders under the byte-verbatim shipped policy **header AND meta**;
+  `script-src 'nonce-…'` alone suffices for **every** candidate; **no `'unsafe-eval'`**; and
+  `style-src 'unsafe-inline'` was shown **not load-bearing** (renders correctly without it). Policy is **read out of
+  `WebviewRenderAdapter.cs` at runtime** — note it has drifted from the story's `:116` to **`:140`**. Wrong-nonce =
+  **blank box**, with a client-built twin contributing **0 bytes** — the concrete argument for a **server-rendered**
+  twin.
+* **At scale, the answer nobody will like.** Whole-repo at the shipped floor of 2 = **391 nodes / 4,864 edges**,
+  median degree 14, **max degree 359** — `sprint-status.yaml` coupled to **92%** of the graph; **46%** of edges
+  Process-class, **62%** cross-boundary. It is a hairball, and unfiltered it mostly shows the project's own
+  bookkeeping — an *insight-quality* finding, not just legibility. **Recommend 24.3 default support ≥ 5 + Code-only
+  lens** (129 / 937 / 95,514 B / 286 ms); hairball threshold **≈150 nodes**. Solver is **O(n²)** (2.6 s at 391 nodes,
+  4.2 s at 489, projecting ~17 s at 1,000) — bound nodes or use Barnes–Hut above ~500. Cost is paid once by the
+  generator, never by a reader.
+* **The ego graph is not small either: 360 nodes uncapped.** Story 24.2 **must** cap. **Recommend top-20 by
+  confidence** — 21 nodes / 210 edges / **20,253 B**, almost exactly 23.1's measured 20,915 B sunburst island.
+* **ECharts 6.1.0 rejected on cost-of-change, NOT merit — recorded as time-dependent.** It is the better graph
+  engine: per-edge `lineStyle` (**83** distinct widths vs 5 bands), a **native `chord` series confirmed rendering
+  live** (51 real arc paths, 14 labels), `aria.decal`, an SVG renderer for ~4 KB gzip, and a unified bundle
+  **566 KB SMALLER** than the Plotly bundle it would replace — an outcome ADR 0012's options table explicitly
+  pre-authorised. Rejected because **Epic 20 is complete** (20.1–20.9 `done`, incl. a twin audit and a site-wide
+  rollout); adopting it for graphs *only* would add a second dependency **and** family to buy what candidate (a)
+  gives for 0 B; and two live defects were found. **Had Epic 20 still been in flight the recommendation would
+  plausibly have inverted** — the ADR says so, so a future reopening re-prices rather than re-argues.
+* **Two ECharts defects a config-level review would have missed.** (1) **`echarts.init()` on a zero-height container
+  throws an uncaught `TypeError`** — reproduced deterministically after presenting as intermittent; SpecScribe
+  actively creates that condition via `specscribe:content-swapped`, and **Plotly survived every zero-size case**.
+  (2) **All geometry is animation-frame-gated**: at initial render every link path has `d=""` and every symbol
+  `scale(0)` **while every a11y attribute passes** — so an attribute-only audit certifies a chart drawing nothing.
+  `animation:false` + `lazyUpdate:false` is both the UX-DR18 knob and the way to make it measurable.
+  **Hand-off: assert on geometry, not attributes** (and per 20.4, not on the console either).
+* **Cytoscape 3.34.0 eliminated on accessibility before bytes — UX-DR7 FAIL.** DOM census **1 `<div>` + 3
+  `<canvas>`, zero SVG, zero per-node elements**: nothing for a roving-tabindex layer to attach to, and no live SVG
+  renderer exists (`cytoscape-svg` is an *export* plugin). Its one static eval-class construct is a guarded
+  `Function("return this")()` that **never executes** in a browser — verified live, so **no `'unsafe-eval'`**.
+* **R3 resolved: SUPERSEDE, not coexist.** The code page already has exactly **one** relationship surface and it is
+  already the coupled-file surface. Decisive evidence is in shipped code: **Story 24.1 built the `ToGraphNodes`
+  projection seam and its doc comment self-attributes the graph to Story 24.2** ("stays a 24.2 concern, so its
+  signature deliberately does not drift here"). **Recorded as an explicit handoff** per CLAUDE.md § Scoping a code
+  review, so `RelatedNode`'s metric members and `ToGraphNodes` cannot fall between the two reviews. 24.2 must absorb
+  six capabilities; the **four pure-CSS variants** are the biggest scope driver — helped by report §7.2, since both
+  toggles are *edge-visibility* toggles and visibility is exactly what filters can change without moving a node.
+* **⚠️ Gap surfaced, not seated: retiring `ReferenceGraph`'s SVG needs an ADR 0013 §3 text-twin audit that NO Epic 24
+  story owns** (20.6's scope was the hierarchy surfaces). Recommend seating it as 24.7 or folding an explicit
+  twin-audit task into 24.2 — **the owner's call, not mine.**
+* **Story 24.4 is candidate (a)'s one real gap.** Plotly has **no chord trace**: hand-draw SVG arcs — reading
+  `docs/adrs/` first, since three arc renderers already exist — or **amend ADR 0030**. Explicitly **not** improvise a
+  dependency inside an implementation story. **Story 24.5 unchanged**: rides Plotly `heatmap`, confirmed registered.
+* **Escalations: none fired.** No hard a11y FAIL for the chosen candidate; `correct-course` not invoked.
+* **Timebox: one session** against a suggested 2 days. **No production code**; no new tests (a test under `tests/**`
+  would mean leaving the spike). Golden fingerprint **not** offered as evidence (R10).
+* **Owed, named rather than softened:** live `file://` run (the pane refuses a live `file://` context — the same
+  limitation 20.4 hit; structural evidence is 0 fetch / 0 ESM / 0 CDN across every page and bundle); **no
+  screenshot** (the pane never composited — measured **0 rAF frames in 1,200 ms**); **`Tab` traversal itself** (the
+  focus model and real arrow/Enter/Escape are verified); no screen-reader run; `vscode-resource:` + Electron
+  untested, so the webview verdict is a **lower bound**; ECharts force determinism **UNMEASURED** (both runs stalled
+  identically — not reported as determinism); and `StripDataIslands` means the **webview cannot receive a graph
+  payload today** — the same open decision 20.4 §4.4 left for hierarchies, to be decided once for both.
 
 ### File List
 
+**Durable deliverables**
+
+- `_bmad-output/implementation-artifacts/24-6-spike-report.md` — **new**, the spike report
+- `docs/adrs/0030-epic-24-graph-engine.md` — **new**, the ratified ADR (**Accepted**). Numbered 0030, not 0029:
+  a concurrent session claimed 0029 (`0029-unscoped-shared-primitive-layer.md`) while this spike ran
+- `docs/adrs/README.md` — **modified** (one appended index entry for ADR 0030; append-only, because a concurrent
+  session was editing this file for ADR 0029)
+
+**Planning / status**
+
+- `_bmad-output/planning-artifacts/epics.md` — **modified** (a DECIDED outcome note on the Story 24.6 block; its ACs
+  were already mirrored at create-story, so no AC text changed)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — **modified** (`24-6-graph-engine-spike`:
+  `ready-for-dev` → `in-progress` → `review`; `last_updated`)
+- `_bmad-output/implementation-artifacts/24-6-graph-engine-spike.md` — **modified** (this record: checkboxes, Dev
+  Agent Record, File List, Change Log, Status)
+
+**Throwaway probe — all new, quarantined under `spike/graph-engine/`**
+
+- `spike/graph-engine/README.md`
+- `spike/graph-engine/.gitignore` (`node_modules/`, `dist/`, `bin/`, `obj/`, `probe/vendor/`, `echarts-src/`)
+- `spike/graph-engine/package.json`
+- `spike/graph-engine/layout/GraphEngineSpike.csproj` — **not** in `SpecScribe.slnx`; one-way `ProjectReference` to
+  `src/SpecScribe` so the fixture reads the real Story 24.1 metric
+- `spike/graph-engine/layout/Program.cs` — fixture builder + seeded deterministic Fruchterman–Reingold layout +
+  the filter-state probe
+- `spike/graph-engine/scripts/build-bundles.mjs` — candidate bundle measurement + the R2 shipped-`scatter` assertion
+- `spike/graph-engine/scripts/build-probes.mjs` — inlines a fixture as a data island, copies vendored assets
+- `spike/graph-engine/scripts/csp-probe.mjs` — serves the probe under the webview CSP read from source at runtime
+- `spike/graph-engine/scripts/verify-determinism.mjs` — cross-process determinism check
+- `spike/graph-engine/probe/harness.js` — shared measurement surface
+- `spike/graph-engine/probe/templates/plotly-scatter.html` — candidate (a)
+- `spike/graph-engine/probe/templates/echarts-graph.html` — candidate (b)
+- `spike/graph-engine/probe/templates/cytoscape-graph.html` — candidate (c)
+- `spike/graph-engine/fixtures/*.json` — 11 emitted fixtures + `scale.json`
+- `spike/graph-engine/measurements/bundles.json` — **[HARNESS]**
+- `spike/graph-engine/measurements/determinism.json` — **[HARNESS]**
+- `spike/graph-engine/measurements/session.json` — **[SESSION]**
+- *(generated, gitignored: `spike/graph-engine/node_modules/`, `dist/`, `probe/vendor/`, `probe/*.html`,
+  `layout/bin/`, `layout/obj/`, `.determinism/`)*
+
+**Other**
+
+- `spike/README.md` — **modified** (one appended section pointing at `spike/graph-engine/`)
+- `.claude/launch.json` — **modified** (five appended probe-server entries: `graph-24-6-csp` 8131,
+  `graph-24-6-meta` 8132, `graph-24-6-nocsp` 8133, `graph-24-6-wrongnonce` 8134, `graph-24-6-nostyle` 8135)
+
+**NOT modified by this story: no path under `src/SpecScribe/**` or `tests/**`.** The tree shows concurrent-session
+edits to `Charts.cs`, `CodeMapTemplater.cs`, `DesignSystemTemplater.cs`, `HierarchyExplorer.cs`,
+`HierarchyExplorer.Projectors.cs`, `SiteGenerator.cs`, `assets/specscribe.css` and three test files — **none of them
+this story's** (Dev Agent Record § Suite gives the attribution evidence).
+
 ## Change Log
+
+- 2026-07-29 — Story 24.6 **implemented and moved to `review`** (dev-story; baseline `5a96f71`, executed at HEAD `630ae25`). **Decision: [ADR 0030](../../docs/adrs/0030-epic-24-graph-engine.md), Accepted — Epic 24's force-directed views use the already-vendored Plotly `scatter` trace over a generation-time C# layout, at a marginal bundle cost of ZERO bytes.** ADR 0012 is **extended, not superseded** (status stays `Accepted`), **no new engine family** is added — §4's allowance of a *second* family is left **unspent** and a third still needs its own ADR — and SpecScribe acquires **no second runtime dependency**. Numbered 0030 because a concurrent session claimed 0029 mid-spike, exactly as R10 predicted. **Four of the story's ten reconciliations had moved under it**, because Epic 20 completed between create-story and dev-story: **R1** obsolete (20.4 `done`, its numbers inherited, `spike/plotly/` gone — and Story 24.2's Story 20.7 gate is now satisfied); **R2 upgraded from projection to shipped fact** — rather than confirming non-removability against 20.4's build output, it was confirmed against **production**, where `src/SpecScribe/assets/plotly-hierarchy.min.js` (1,223,563 B, embedded at `SpecScribe.csproj:67`) registers exactly `heatmap, scatter, sunburst, treemap`; **R6** obsolete (24.1 is `review`, so the probe **calls** the shipped `CoupledFile`/`DirectedCouple`/`IsCrossBoundary`/`CouplingMinSupport` API instead of hand-deriving the metric — `GitMetrics.cs` untouched); **R10** vindicated. **Node position is DATA, not presentation:** solved once in C# at generation time and embedded, with **no client force simulation**; determinism **PASS — 11 fixtures byte-identical across 3 SEPARATE PROCESSES**, and the ADR makes the construction normative (no `System.Random`, whose algorithm may change between .NET versions; no dictionary/set iteration order reaching a float accumulation, since floating-point addition is not associative). **R5's named weak point resolved, and it inverted the story's worry:** a confidence slider yields **236 distinct EDGE sets** but only **17 distinct NODE sets** (independently recomputed in JS from the emitted fixture), so counting node sets alone was the trap — an FR layout is a function of nodes *and edges*, making precompute-per-state 236 layouts (~108 MB, ~10 min) and **not viable**, while **fixing the positions and letting filters hide** measured `nodePositionsMoved: false` at 44–75 ms. **Accessibility: UX-DR7 PASS (configured around), UX-DR16/17/18 PASS** — the layer rides only Plotly's public `plotly_afterplot` with **no internal patched or forked**, **11/11 snapshots INTACT and 8/8 re-render events survived** including the adversarial bare `Plotly.react` and the shipped `specscribe:content-swapped` seam; **real** `ArrowRight`/`Enter`/`Escape` verified, with `Enter` firing the shipped `specscribe:explorer-select` seam; **0 painted foreign colours** (7 raw, all provably non-painting — a hardened `isPainted` predicate now reports both counts so the 0 is defensible rather than lucky); and Story 20.4's sixth finding, the unclamped roving index, is **fixed by construction** here. **CSP needs no relaxation:** renders under the byte-verbatim shipped policy **header AND meta**, `script-src 'nonce-…'` alone suffices for every candidate, **no `'unsafe-eval'`**, and `style-src 'unsafe-inline'` was shown **not load-bearing** — with the policy **read out of `WebviewRenderAdapter.cs` at runtime** (it has drifted from the story's `:116` to `:140`). The wrong-nonce state is a **blank box** whose client-built twin contributed **0 bytes**, which is the concrete argument for a **server-rendered** twin. **At scale the answer is unflattering:** the whole-repo graph at the shipped support floor of 2 is **391 nodes / 4,864 edges** with median degree 14 and **max degree 359** (`sprint-status.yaml` coupled to **92%** of the graph), **46%** of edges Process-class and **62%** cross-boundary — a hairball that unfiltered mostly shows the project's own bookkeeping, which is an *insight-quality* finding rather than only a legibility one; recommended 24.3 default is **support ≥ 5 with the Code-only lens on** (129/937/95,514 B), the hairball threshold is **≈150 nodes**, and the O(n²) solver (2.6 s at 391 nodes, projecting ~17 s at 1,000) needs a node bound or Barnes–Hut above ~500. **The ego graph is not small either — 360 nodes uncapped — so Story 24.2 must cap**, recommended top-20 by confidence (21/210/**20,253 B**, almost exactly 23.1's measured 20,915 B sunburst island). **Apache ECharts 6.1.0 was measured and rejected on cost-of-change, NOT merit, and that is recorded as time-dependent:** it is the better graph engine (per-edge `lineStyle` with **83** distinct widths vs 5 bands, a **native `chord` series confirmed rendering live** — 51 real arc paths and 14 labels, an SVG renderer for ~4 KB gzip, and a unified bundle **566 KB SMALLER** than the Plotly bundle it would replace, an outcome ADR 0012's options table explicitly pre-authorised), but **Epic 20 is complete** (20.1–20.9 `done`, including a text-twin audit and a site-wide rollout) so superseding ADR 0012 would reopen all of it, adopting it for graphs *only* would add a second dependency **and** family to buy what candidate (a) gives for 0 B, and **two defects a config-level review would have missed** were found live: **`echarts.init()` on a zero-height container throws an uncaught `TypeError`** (reproduced deterministically after presenting as intermittent — and SpecScribe actively creates that condition via `specscribe:content-swapped`, where Plotly survived every zero-size case), and **all geometry is animation-frame-gated** so at initial render every link path carries `d=""` and every symbol `scale(0)` **while every a11y attribute passes**, meaning an attribute-only audit certifies a chart drawing nothing (hand-off: **assert on geometry, not attributes**). **Cytoscape.js 3.34.0 was eliminated on accessibility before bytes — UX-DR7 FAIL:** its DOM census is **1 `<div>` + 3 `<canvas>`, zero SVG, zero per-node elements**, leaving a roving-tabindex layer nothing to attach to, with no live SVG renderer available; its single static eval-class construct is a guarded `Function("return this")()` that **never executes** in a browser, verified live. **R3 resolved: SUPERSEDE, not coexist** — the code page already carries exactly one relationship surface and it is already the coupled-file surface, and the decisive evidence is in shipped code, since **Story 24.1 built the `ToGraphNodes` projection seam and its doc comment self-attributes the graph to Story 24.2** ("stays a 24.2 concern, so its signature deliberately does not drift here"); **that handoff is recorded explicitly** per CLAUDE.md § Scoping a code review so `RelatedNode`'s metric members and `ToGraphNodes` cannot fall between the two reviews. **⚠️ One gap was surfaced and deliberately NOT seated:** retiring `Charts.ReferenceGraph`'s SVG is gated on an **ADR 0013 §3 text-twin audit that no Epic 24 story owns** (Story 20.6's scope was the hierarchy surfaces) — recommended as a new 24.7 or an explicit task in 24.2, the owner's call. **Story 24.4 is candidate (a)'s one real gap** (Plotly has no chord trace: hand-draw arcs, reading `docs/adrs/` first since three arc renderers already exist, or amend ADR 0030 — never improvise a dependency inside an implementation story), and **Story 24.5 is unchanged**, still riding Plotly `heatmap`. **No escalation fired**; timebox **one session** against a suggested two days; **no production code and no new tests**, with the golden fingerprint deliberately not offered as evidence. **The shared tree does not build** — `SiteGenerator.cs:1453` calls `RefreshSourceInventory`, which exists only in stale binaries — and that break is **not this story's**: the concurrent diff is 498 insertions across hierarchy/design-system/watch-mode files with zero Epic-24 matches, and a `git archive HEAD` throwaway tree (never touching the shared tree) runs **2,812 passed / 0 failed / 3 skipped** and still builds the solution clean with `spike/graph-engine/` present. **Task 1 deviation flagged, not buried:** worked on `main` under `spike/graph-engine/` rather than a branch or worktree, because CLAUDE.md § Concurrent work states isolation "is not available and is not the fix", R1's reason for it no longer holds, every file created is new and exclusively this story's, and every prior spike lives committed under `spike/` on `main`. **Owed and named rather than softened:** live `file://` run (the pane refuses a live `file://` context — the same limitation 20.4 hit), no screenshot (the pane never composited — measured **0 rAF frames in 1,200 ms**), `Tab` traversal itself, a screen-reader run, and `vscode-resource:`/Electron — so the webview verdict is a **lower bound**; ECharts force-layout determinism is **UNMEASURED** (both runs stalled identically and it is not reported as determinism); and `StripDataIslands` means the **webview cannot receive a graph payload today**, the same open decision 20.4 §4.4 left for hierarchies, to be decided once for both.
 
 - 2026-07-24 — Story 24.6 **created** (create-story, owner-approved) as the missing Epic 24 graph-engine spike. `create-story 24.2` was halted on discovering that [ADR 0012 §4](../../docs/adrs/0012-plotly-hierarchy-chart-engine-and-standardized-explorer-component.md) defers Epic 24's graph engine to *"Epic 24's own spike"* while Epic 24 contained **no spike story** — leaving SpecScribe's second potential runtime dependency to be selected inside an implementation story, the exact failure [[adr-creation-trigger-gap-epic-10-retro]] records. Owner chose *"seed a spike story first"* over folding the decision into 24.2 or pre-deciding ECharts. Numbered **24.6 but executed after 24.1 and before 24.2** — a renumber was rejected because ADR 0012 §4 names Stories "24.2, 24.3, and 24.4" verbatim, as do `sprint-status.yaml` and project memory; Epic 23's documented non-numeric execution order (23.2→23.3→23.5→23.4) is the house precedent. Ten reconciliations recorded against shipped code, four of which change the answer: **(R2)** Plotly's `scatter` trace cannot be excluded from any bundle (per Story 20.4's R1), and Plotly's own documented network recipe is scatter-lines + scatter-markers with an **externally computed layout** — so "Plotly scatter + generation-time layout" has a marginal bundle cost of **zero bytes** and must be priced as a first-class candidate, not a fallback; **(R3)** the code page **already ships an ego graph** — `Charts.ReferenceGraph` renders the focal file hub-and-spoke with a co-changed-file node population, four pre-rendered toggle variants, and cross-edges — so 24.2's real question is supersede-vs-coexist, not which engine draws a new graph, and superseding it triggers an unowned ADR 0013 §3 text-twin audit; **(R5)** ADR 0010 §3's "computed once at generation time" survives ADR 0012 and collides with iterative force layout, making "is node position data or presentation?" the architectural crux — a seeded C# layout would make FR31 trivially true and cost zero client bytes, but 24.3's threshold/grouping clutter controls change the node set and are where that option most plausibly breaks; **(R1)** Story 20.4 is **in flight in a concurrent session** (`spike/plotly/` untracked, sibling `src/` edits present), so its Plotly numbers are inherited rather than re-measured and CLAUDE.md § Concurrent work applies at full force. Web-researched current library facts: **Apache ECharts 6.0.0 ships a native `chord` series** alongside `graph`+force, `sunburst`, `treemap`, and `heatmap` (tree-shaken ≈100–300 kB gz, Apache 2.0, offers an SVG renderer) — the one candidate that collapses SpecScribe to a single engine family, at the cost of superseding ADR 0012, which ADR 0012's own options table pre-authorizes; counterweighted by the long-open [apache/echarts#18585](https://github.com/apache/echarts/issues/18585) keyboard-accessibility issue, decision-grade under ADR 0013 because no server-rendered SVG sits behind the chart any more. Story 20.4's PASS / PASS-configured-around / FAIL a11y decision rule is reused verbatim so the two spikes' verdicts are comparable.

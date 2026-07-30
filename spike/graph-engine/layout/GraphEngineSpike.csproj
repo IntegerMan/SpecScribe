@@ -1,0 +1,23 @@
+<!-- Story 24.6 throwaway probe. NOT in SpecScribe.slnx, NOT packed, NOT referenced by src/SpecScribe.
+     It references src/SpecScribe one-way so the fixture is built from the REAL Story 24.1 metric
+     (CoupledFile / DirectedCouple / GitMetrics.IsCrossBoundary) rather than a hand-rolled restatement of it.
+     Deleting this whole directory leaves the shipped tool byte-identical. -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>SpecScribe.Spike.GraphEngine</RootNamespace>
+    <AssemblyName>graph-engine-spike</AssemblyName>
+    <!-- The probe is deliberately not warning-clean-gated; it is throwaway. -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\SpecScribe\SpecScribe.csproj" />
+  </ItemGroup>
+
+</Project>

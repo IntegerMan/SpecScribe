@@ -119,28 +119,36 @@ if (import.meta.dev) {
   border: 1px solid var(--border);
 }
 
-/* Every value is a token reference. No stage re-types a colour. */
+/* Every value is a token reference. No stage re-types a colour.
+ *
+ * The four FILLS below used to be `var(--parchment)` for want of a token: the portal's own
+ * `.status-badge.<stage>` rules carried inline hexes (`#e8f0e4`, `#e0ecea`, `#d9e6ea`, `#f5ecd4`), and the
+ * bridge structurally CANNOT carry an untokenized literal — so this component substituted one flat parchment
+ * for four distinct tints and the two design systems rendered visibly different badges. The 2026-07-28
+ * re-review raised it; the owner's fix was to tokenize the source rather than accept the divergence, so
+ * `--status-*-bg` now exists in `specscribe.css` and crosses the bridge like every other token. */
 .is-done {
-  background: var(--parchment);
+  background: var(--status-done-bg);
   color: var(--moss);
   border-color: var(--status-done);
 }
 
 .is-active {
-  background: var(--parchment);
+  background: var(--status-active-bg);
   color: var(--teal);
   border-color: var(--status-active);
 }
 
 .is-review {
-  background: var(--parchment);
+  background: var(--status-review-bg);
   color: var(--teal-deep);
   border-color: var(--status-review);
 }
 
+/* One fill for both, exactly as the portal pairs them — separated by word and glyph, not by tint. */
 .is-ready,
 .is-drafted {
-  background: var(--parchment);
+  background: var(--status-ready-bg);
   color: var(--gold);
   border-color: var(--status-ready);
 }

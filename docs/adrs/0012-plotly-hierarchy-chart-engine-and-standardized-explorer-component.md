@@ -262,5 +262,30 @@ use `Views` speculatively — the same discipline that let Story 20.7's two-cons
 cleanly when Story 20.9 arrived as its second real consumer. A second `Views` consumer should prove the shape
 generalizes rather than have it asserted here.
 
+**Amendment (2026-07-29, Story 20.10 code review): a views-bearing island's structural values are NOT rolled up
+server-side, and a consumer must roll up before trusting `branchvalues`.** Clause 3 above says the client reparents
+and rolls up; what it did not say is the corollary for anything *other* than `specscribe.js` reading the island.
+`ProjectCodeMapViews` deliberately does not call `RollUp`: a shared payload cannot carry N sets of structural
+values without reintroducing exactly the duplication this addendum removes. So in a `Views`-bearing island —
+
+- every structural (scaffold) node, including each view's synthesized root, carries `value: 0`; and
+- every shared leaf carries `parentId: null`, because its parent is a property of (leaf, view);
+
+while `config.branchvalues` is still emitted as `"total"`. Those are consistent only *after* a per-view reparent
+and roll-up. Because the JSON IR **is** the canonical artifact every surface projects from
+([ADR 0008](0008-json-ir-canonical-and-incremental-generation.md)) and
+[ADR 0013 §5](0013-text-twin-is-the-no-js-contract.md) makes component configuration part of what the IR carries,
+this is a **contract on the consumer, not a defect in the payload**: any IR consumer that renders a views-bearing
+hierarchy must select a view, reparent its leaves under that view's scaffold, and roll up children-win — the same
+three steps clause 3 names — before reading `value` or honouring `branchvalues`. A consumer that reads `nodes`
+directly and skips those steps sees N parentless leaves and zero-sized groupings, and will render wrong with only a
+console warning. Stated here because Epic 22's and Epic 23's IR consumers are in flight and nothing else records it.
+
+Two emitter guards enforce what this addendum assumes, and both fail loudly rather than shipping a wrong island
+(`HierarchyExplorer.IslandHtml`): a `Views`-bearing model with **no dimensions** is rejected, because the views
+payload rides on the dimension-bearing island shape only and the non-dimension shape is byte-frozen for the six
+already-shipped surfaces; and **duplicate view keys** are rejected, because a view key addresses both the per-view
+legend blocks and the `{hashKey}-view=` deep-link fragment.
+
 ### Ratified addition to Ratified decisions (2026-07-29)
-8. **A Hierarchy Explorer instance may present N server-declared VIEWS over one shared payload** (`HierarchyExplorerModel.Views`, optional, defaulted). Leaves are serialized once, in the shared payload; a view's own structural scaffold and its leaf membership/parentage are declared per view, never shared, because structural identity is a property of (leaf, view) when a grouping rule can collapse differently per view. The client selects a view, reparents, and rolls up through the SAME children-win rule every instance already uses. Per-view colour normalization (ramps, legends) stays per-view. First and, for now, only consumer: Code Map's four filter combinations (Story 20.10).
+8. **A Hierarchy Explorer instance may present N server-declared VIEWS over one shared payload** (`HierarchyExplorerModel.Views`, optional, defaulted). Leaves are serialized once, in the shared payload; a view's own structural scaffold and its leaf membership/parentage are declared per view, never shared, because structural identity is a property of (leaf, view) when a grouping rule can collapse differently per view. The client selects a view, reparents, and rolls up through the SAME children-win rule every instance already uses. Per-view colour normalization (ramps, legends) stays per-view. **A views-bearing island's structural values are NOT rolled up server-side** (scaffold nodes ship `value: 0`, shared leaves ship `parentId: null`) while `branchvalues` is still `"total"`: selecting a view, reparenting and rolling up is a contract on EVERY consumer of the IR, not just on `specscribe.js` — see the 2026-07-29 amendment above. First and, for now, only consumer: Code Map's four filter combinations (Story 20.10).

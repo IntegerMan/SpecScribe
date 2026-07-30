@@ -45,6 +45,13 @@ const REQUIRED_TOKENS = [
   '--status-review',
   '--status-done',
   '--status-deferred',
+  // The stage FILL tints, paired with the accents above. StatusBadge binds all four; they exist BECAUSE this
+  // list caught their absence — the component had substituted --parchment for four distinct portal tints
+  // because the source rules held inline hexes the bridge could not carry. [Story 23.2 re-review 2026-07-28]
+  '--status-done-bg',
+  '--status-active-bg',
+  '--status-review-bg',
+  '--status-ready-bg', // .is-ready AND .is-drafted — one fill, as the portal pairs them
   '--status-unrecognized',
   '--status-unrecognized-hatch',
   '--motion-fast',

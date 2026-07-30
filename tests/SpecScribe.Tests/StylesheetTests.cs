@@ -122,6 +122,62 @@ public class StylesheetTests
         Assert.DoesNotContain(".evidence-link", css);
     }
 
+    /// <summary>Every stage FILL on the two badge families is a token reference, never an inline hex.
+    ///
+    /// This is the assertion whose absence let the Vue/portal divergence ship. The accents
+    /// (<c>--status-done</c> and friends) were tokens from Story 1.5 on, but the pale BACKGROUNDS behind them
+    /// stayed inline literals — <c>#e8f0e4</c>, <c>#e0ecea</c>, <c>#d9e6ea</c>, <c>#f5ecd4</c> — for four
+    /// stages. The token bridge structurally cannot carry a literal, so <c>StatusBadge.vue</c> substituted one
+    /// flat <c>--parchment</c> for all four, and the Vue and portal badges rendered as visibly different
+    /// objects. Nothing failed: the accents were tokenized, the drift gate was green, and the page whose
+    /// subject IS the colour vocabulary was the one misrepresenting it.
+    ///
+    /// The guard is deliberately structural rather than a list of four stage names — a future eleventh stage
+    /// added with an inline fill fails here without anyone remembering to extend a list.
+    /// [Story 23.2 re-review 2026-07-28]</summary>
+    [Fact]
+    public void Stylesheet_StageFillsOnBadgeFamilies_AreTokensNotInlineLiterals()
+    {
+        var css = ReadStylesheetRules();
+
+        // Innermost rule blocks: this stylesheet nests at-rules one level deep, so a body containing no
+        // braces is exactly one rule, prelude included (possibly preceded by its @media prelude fragment).
+        var offenders = new List<string>();
+        foreach (var rule in Regex.Matches(css, @"([^{}]+)\{([^{}]*)\}", RegexOptions.Singleline).Cast<Match>())
+        {
+            var prelude = rule.Groups[1].Value;
+            if (!prelude.Contains(".status-badge.", StringComparison.Ordinal)
+                && !prelude.Contains(".epic-status.", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            foreach (var decl in Regex.Matches(rule.Groups[2].Value, @"background(?:-color)?\s*:\s*([^;}]+)").Cast<Match>())
+            {
+                // A gradient may legitimately name several colours; what matters is that none is a literal.
+                if (decl.Groups[1].Value.Contains('#'))
+                {
+                    offenders.Add($"{prelude.Trim().ReplaceLineEndings(" ")} => background: {decl.Groups[1].Value.Trim()}");
+                }
+            }
+        }
+
+        Assert.Empty(offenders);
+
+        // ...and the four fill tokens the families now share actually exist, paired with their accents.
+        foreach (var token in new[] { "--status-done-bg", "--status-active-bg", "--status-review-bg", "--status-ready-bg" })
+        {
+            Assert.Contains($"{token}:", css);
+            Assert.Contains($"var({token})", css);
+        }
+
+        // `ready` and `drafted` share ONE fill, as the portal pairs them — asserted so a future edit that
+        // splits them has to be deliberate rather than incidental.
+        Assert.Matches(
+            new Regex(@"\.status-badge\.ready,\s*\.status-badge\.drafted\s*\{[^}]*background:\s*var\(--status-ready-bg\)", RegexOptions.Singleline),
+            css);
+    }
+
     [Fact]
     public void Stylesheet_HasOnBrandTooltipStyles()
     {

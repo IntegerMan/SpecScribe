@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en" data-probe-meta="__PROBE_META__" data-tab-order="confidence-desc, matching the text twin">
+<head>
+<meta charset="utf-8" />
+<!--CSP-META-->
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>24.6 candidate (a) — Plotly scatter + generation-time C# layout</title>
+<link rel="stylesheet" href="./vendor/specscribe.css" />
+<style>
+  /* Probe chrome only. The CHART's colours come from the shipped tokens, resolved through the real cascade —
+     nothing here paints a graph element. The two edge classes mirror the SHIPPED Charts.CouplingGraph precedent
+     (`coupling-edge` / `coupling-edge process-edge`): a dashed stroke plus title text, never a hue change. */
+  body { margin: 0; padding: 1rem 1.25rem 4rem; }
+  .probe-head { display:flex; gap:1rem; align-items:baseline; flex-wrap:wrap; margin-bottom:.75rem; }
+  .probe-head h1 { font-size:1.05rem; margin:0; }
+  .probe-note { font-size:.8rem; opacity:.75; }
+  #chart { width:100%; max-width:1100px; height:640px; }
+  .chart-panel { overflow:hidden; border:1px solid var(--border); border-radius:10px; padding:.5rem; }
+  .ss-tooltip { position:fixed; z-index:9999; max-width:22rem; padding:.4rem .55rem; font-size:.8rem;
+    background:var(--surface-2, #222); color:var(--ink, #eee); border:1px solid var(--border, #555);
+    border-radius:6px; pointer-events:none; opacity:0; }
+  .ss-tooltip[data-shown="true"] { opacity:1; }
+  .sr-only { position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden;
+    clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+  [data-graph-node]:focus { outline:3px solid var(--focus, #6cf); outline-offset:2px; }
+</style>
+</head>
+<body>
+<div class="probe-head">
+  <h1>Candidate (a) — Plotly <code>scatter</code> + generation-time C# layout</h1>
+  <span class="probe-note">marginal bundle cost: <strong>0 B</strong> (already vendored &amp; embedded)</span>
+</div>
+<div class="chart-panel"><div id="chart"></div></div>
+<div data-graph-live aria-live="polite" class="sr-only"></div>
+<div id="twin" class="sr-only"></div>
+
+<script type="application/json" id="graph-data">__FIXTURE__</script>
+<script nonce="__NONCE__" src="./vendor/plotly-hierarchy.min.js"></script>
+<script nonce="__NONCE__" src="./harness.js"></script>
+<script nonce="__NONCE__">
+(function () {
+  'use strict'
+  var probe = window.__probe
+  var data = JSON.parse(document.getElementById('graph-data').textContent)
+  var host = document.getElementById('chart')
+  var live = document.querySelector('[data-graph-live]')
+
+  // Candidate (a) declares its DOM model up front so the comparison against ECharts is honest rather than
+  // implied: Plotly's `scatter` line style is a TRACE-level attribute, so per-edge dash/width is only reachable
+  // by grouping edges into one trace per style combination. There is no per-edge DOM node.
+  probe.engine = {
+    name: 'plotly-scatter',
+    version: (window.Plotly && Plotly.version) || 'unknown',
+    edgeModel: 'per-style-group-dom',
+    renderer: 'svg',
+    layoutSource: 'generation-time C# (Fruchterman-Reingold, seeded)',
+  }
+
+  /* ---- token-driven palette, resolved from the real cascade; no value is typed here ---- */
+  function tok(n, fallback) { var v = probe.token(n); return v || fallback }
+  var palette = {
+    code:    tok('--status-done',   '#4a8'),
+    proc:    tok('--status-review', '#a84'),
+    node:    tok('--status-active', '#48a'),
+    hub:     tok('--status-ready',  '#84a'),
+    ink:     tok('--ink',           '#eee'),
+    border:  tok('--border',        '#555'),
+  }
+
+  /* ---- edges, grouped into style classes. THIS IS THE PLOTLY CONSTRAINT, MADE VISIBLE ----
+     4 semantic classes (code|proc x cross-boundary|same-boundary) x 3 width buckets = up to 12 traces.
+     Within a trace, segments are separated by a null vertex so one trace draws many disjoint lines. */
+  var WIDTH_BUCKETS = 3
+  function widthBucket(support, maxSupport) {
+    var t = maxSupport > 1 ? (support - 1) / (maxSupport - 1) : 0
+    return Math.min(WIDTH_BUCKETS - 1, Math.floor(t * WIDTH_BUCKETS))
+  }
+  var maxSupport = data.edges.reduce(function (m, e) { return Math.max(m, e.s) }, 1)
+
+  var groups = {}
+  data.edges.forEach(function (e) {
+    var b = widthBucket(e.s, maxSupport)
+    var key = e.k + '|' + (e.xb ? 'xb' : 'same') + '|' + b
+    if (!groups[key]) groups[key] = { kind: e.k, xb: e.xb, bucket: b, xs: [], ys: [], count: 0, edges: [] }
+    var g = groups[key]
+    var a = data.nodes[e.a], z = data.nodes[e.b]
+    g.xs.push(a.x, z.x, null)
+    g.ys.push(a.y, z.y, null)
+    g.edges.push(e)
+    g.count++
+  })
+
+  var edgeTraces = Object.keys(groups).sort().map(function (key) {
+    var g = groups[key]
+    return {
+      type: 'scatter', mode: 'lines', x: g.xs, y: g.ys,
+      hoverinfo: 'skip', showlegend: false,
+      // NON-COLOUR CHANNELS, per R7 and the shipped CouplingGraph precedent:
+      //   process coupling  -> dashed        (never a hue change)
+      //   cross-boundary    -> heavier width + a longer dash signature
+      line: {
+        color: g.kind === 'proc' ? palette.proc : palette.code,
+        width: 0.6 + g.bucket * 0.9 + (g.xb ? 0.8 : 0),
+        dash: g.kind === 'proc' ? (g.xb ? 'longdash' : 'dot') : (g.xb ? 'dashdot' : 'solid'),
+      },
+      name: key,
+      meta: { probeEdgeGroup: key, edgeCount: g.count, kind: g.kind, xb: g.xb, edges: g.edges },
+    }
+  })
+
+  /* ---- per-edge hover needs its own invisible midpoint trace: a lines trace hovers on vertices, not segments.
+          Recorded as a finding, not hidden behind a working tooltip. ---- */
+  var midX = [], midY = [], midText = []
+  data.edges.forEach(function (e) {
+    var a = data.nodes[e.a], z = data.nodes[e.b]
+    midX.push((a.x + z.x) / 2)
+    midY.push((a.y + z.y) / 2)
+    midText.push(
+      a.l + ' ↔ ' + z.l + ': ' + e.s + '× together'
+      + ' — ' + Math.round(e.cab * 100) + '% / ' + Math.round(e.cba * 100) + '% confidence'
+      + (e.xb ? ' (cross-boundary)' : '') + (e.k === 'proc' ? ' (process-coupling)' : ''))
+  })
+  var midTrace = {
+    type: 'scatter', mode: 'markers', x: midX, y: midY,
+    marker: { size: 6, opacity: 0.001, color: palette.ink },
+    hoverinfo: 'skip', showlegend: false, name: 'edge-midpoints',
+    customdata: midText,
+  }
+
+  /* ---- nodes: ONE trace, per-point size / colour / SYMBOL. `marker.symbol` accepts an array, which is the
+          non-colour channel available for nodes. ---- */
+  var maxW = data.nodes.reduce(function (m, n) { return Math.max(m, n.w) }, 1)
+  var hubPath = data.hub
+  var nodeTrace = {
+    type: 'scatter', mode: 'markers', x: [], y: [],
+    marker: { size: [], color: [], symbol: [], line: { width: 1, color: palette.border } },
+    hoverinfo: 'skip', showlegend: false, name: 'nodes', customdata: [],
+  }
+  data.nodes.forEach(function (n) {
+    nodeTrace.x.push(n.x)
+    nodeTrace.y.push(n.y)
+    nodeTrace.marker.size.push(8 + 22 * Math.sqrt(n.w / maxW))
+    nodeTrace.marker.color.push(n.p === hubPath ? palette.hub : palette.node)
+    // shape carries "is this the focal file" without relying on hue
+    nodeTrace.marker.symbol.push(n.p === hubPath ? 'diamond' : 'circle')
+    nodeTrace.customdata.push(n.p + ' — ' + n.w + ' changes, ' + n.d + ' coupled files')
+  })
+
+  var layout = {
+    margin: { l: 8, r: 8, t: 8, b: 8 },
+    xaxis: { visible: false, range: [-0.06, 1.06], fixedrange: false },
+    yaxis: { visible: false, range: [-0.06, 1.06], scaleanchor: 'x' },
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { color: palette.ink },
+    showlegend: false,
+    hovermode: 'closest',
+    dragmode: 'pan',
+  }
+  var config = { displaylogo: false, responsive: true, displayModeBar: false, scrollZoom: true }
+
+  var traces = edgeTraces.concat([midTrace, nodeTrace])
+  probe.traceCount = { total: traces.length, edgeStyleGroups: edgeTraces.length, edges: data.edges.length }
+
+  /* ---- the a11y layer, applied ONLY through plotly_afterplot (Plotly's public post-render event) over its
+          emitted DOM. No Plotly internal is patched. This is what makes any verdict "configured around" rather
+          than a fork — Story 20.4's decision rule, verbatim. ---- */
+  var focusIndex = 0
+  // Tab order recommendation: confidence-descending, matching the text twin's order (Story 24.1 Q4), NOT the
+  // DOM order Plotly happens to emit. Computed once from the data.
+  var order = data.nodes.map(function (n, i) { return i }).sort(function (i, j) {
+    var a = data.nodes[i], b = data.nodes[j]
+    return (b.d - a.d) || (b.w - a.w) || (a.p < b.p ? -1 : a.p > b.p ? 1 : 0)
+  })
+
+  function applyA11yLayer() {
+    var host2 = document.getElementById('chart')
+    var svg = host2 && host2.querySelector('svg.main-svg')
+    if (!svg) return
+    svg.setAttribute('role', 'graphics-document')
+    svg.setAttribute('aria-label',
+      'File change-coupling graph — ' + data.nodes.length + ' files, ' + data.edges.length + ' couplings')
+
+    // Node <path> elements of the LAST scatter trace are the nodes.
+    var groupsEls = host2.querySelectorAll('g.scatterlayer g.trace')
+    var nodeGroup = groupsEls[groupsEls.length - 1]
+    if (!nodeGroup) return
+    // The node trace is emitted last (edge traces, then the invisible midpoint trace, then nodes), so its own
+    // point paths are exactly the nodes. Asserted by count rather than trusted, because relying on emission
+    // order is precisely the brittleness a spike is supposed to surface.
+    var pts = nodeGroup.querySelectorAll('path.point')
+    probe.nodeGroupMatchesFixture = pts.length === data.nodes.length
+    for (var i = 0; i < pts.length; i++) {
+      var el = pts[i]
+      var n = data.nodes[i]
+      if (!n) continue
+      el.setAttribute('data-graph-node', n.p)
+      el.setAttribute('role', 'button')
+      el.setAttribute('aria-label',
+        n.p + ' — ' + n.w + ' changes, coupled to ' + n.d + ' file' + (n.d === 1 ? '' : 's')
+        + (n.p === hubPath ? ' (focal file)' : ''))
+      el.setAttribute('tabindex', '-1')
+      el.dataset.graphIndex = String(i)
+    }
+    // Roving tabindex. CLAMPED on every reapply — Story 20.4 §7's sixth finding was an unclamped roving index
+    // making the chart Tab-unreachable after the node count shrank. Fixed here by construction.
+    if (order.length) {
+      if (focusIndex >= order.length) focusIndex = order.length - 1
+      if (focusIndex < 0) focusIndex = 0
+      var first = nodeGroup.querySelector('[data-graph-index="' + order[focusIndex] + '"]')
+      if (first) first.setAttribute('tabindex', '0')
+    }
+    // Edge paths, stamped so the R7 audit reads REAL computed dash/width off REAL elements.
+    //
+    // MEASURED CORRECTION to this probe's first assumption: Plotly emits one `path.js-line` PER null-separated
+    // SEGMENT, so per-edge DOM does exist (210 paths for 210 edges). What is still trace-level is the STYLE —
+    // every segment in a trace shares one dash and one width. Both facts go in the report.
+    var lineGroups = host2.querySelectorAll('g.scatterlayer g.trace')
+    var stamped = 0
+    for (var t = 0; t < edgeTraces.length && t < lineGroups.length; t++) {
+      var meta = edgeTraces[t].meta
+      var segs = lineGroups[t].querySelectorAll('path.js-line')
+      for (var sIdx = 0; sIdx < segs.length; sIdx++) {
+        var seg = segs[sIdx]
+        var edge = meta.edges[sIdx]
+        if (!edge) continue
+        seg.setAttribute('data-graph-edge', t + ':' + sIdx)
+        seg.dataset.kind = meta.kind
+        seg.dataset.xb = String(meta.xb)
+        seg.setAttribute('aria-label',
+          data.nodes[edge.a].l + ' and ' + data.nodes[edge.b].l + ': ' + edge.s + ' times together, '
+          + Math.round(edge.cab * 100) + '% / ' + Math.round(edge.cba * 100) + '% confidence'
+          + (edge.xb ? ', cross-boundary' : '') + (meta.kind === 'proc' ? ', process-coupling' : ''))
+        stamped++
+      }
+    }
+    probe.domCounts = {
+      edgeSegmentPaths: host2.querySelectorAll('#chart path.js-line').length,
+      edgePathsStamped: stamped,
+      edgeStyleGroups: edgeTraces.length,
+      nodePathsStamped: pts.length,
+      allMarkerPaths: host2.querySelectorAll('path.point').length,
+    }
+    buildTwin()
+  }
+
+  /** ADR 0013's text twin: server-rendered in production, built here so the probe can be audited for it at all. */
+  function buildTwin() {
+    var twin = document.getElementById('twin')
+    if (twin.dataset.built === 'true') return
+    var rows = order.slice(0, 200).map(function (i) {
+      var n = data.nodes[i]
+      return '<li><a href="#' + n.id + '">' + n.p + '</a> — ' + n.w + ' changes, ' + n.d + ' coupled</li>'
+    })
+    twin.innerHTML = '<h2>Coupled files, ranked</h2><ol>' + rows.join('') + '</ol>'
+    twin.dataset.built = 'true'
+  }
+
+  function moveFocus(delta) {
+    focusIndex = Math.max(0, Math.min(order.length - 1, focusIndex + delta))
+    var el = document.querySelector('[data-graph-index="' + order[focusIndex] + '"]')
+    document.querySelectorAll('[data-graph-node]').forEach(function (n) { n.setAttribute('tabindex', '-1') })
+    if (el) { el.setAttribute('tabindex', '0'); el.focus() }
+    return probe.focusState()
+  }
+  probe.moveFocus = moveFocus
+  probe.focusFirst = function () {
+    var el = document.querySelector('[data-graph-node][tabindex="0"]')
+    if (el) el.focus()
+    return probe.focusState()
+  }
+
+  host.addEventListener('keydown', function (ev) {
+    var el = ev.target
+    if (!el || !el.hasAttribute || !el.hasAttribute('data-graph-node')) return
+    if (ev.key === 'ArrowRight' || ev.key === 'ArrowDown') { ev.preventDefault(); moveFocus(1) }
+    else if (ev.key === 'ArrowLeft' || ev.key === 'ArrowUp') { ev.preventDefault(); moveFocus(-1) }
+    else if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); activate(el) }
+    else if (ev.key === 'Escape') { ev.preventDefault(); resetView() }
+  })
+
+  function activate(el) {
+    var path = el.getAttribute('data-graph-node')
+    live.textContent = 'Selected ' + path
+    // The SHIPPED selection seam (R8), not a parallel one.
+    probe.emitSelect(path)
+    var r = el.getBoundingClientRect()
+    probe.showTooltip(el.getAttribute('aria-label'), r.left, r.top)
+  }
+  probe.activateFocused = function () {
+    var el = document.activeElement
+    if (el && el.hasAttribute && el.hasAttribute('data-graph-node')) { activate(el); return true }
+    return false
+  }
+
+  function resetView() {
+    live.textContent = 'View reset to all ' + data.nodes.length + ' files'
+    probe.hideTooltip()
+    return Plotly.relayout(host, { 'xaxis.range': [-0.06, 1.06], 'yaxis.range': [-0.06, 1.06] })
+  }
+  probe.resetView = resetView
+
+  /* ---- R5's filter interaction, on the "positions are fixed, filters HIDE" strategy ---- */
+  probe.applyConfidenceFilter = function (threshold) {
+    var t0 = performance.now()
+    var keep = data.edges.map(function (e) { return Math.max(e.cab, e.cba) >= threshold })
+    var newGroups = {}
+    data.edges.forEach(function (e, i) {
+      if (!keep[i]) return
+      var b = widthBucket(e.s, maxSupport)
+      var key = e.k + '|' + (e.xb ? 'xb' : 'same') + '|' + b
+      if (!newGroups[key]) newGroups[key] = { xs: [], ys: [] }
+      var a = data.nodes[e.a], z = data.nodes[e.b]
+      newGroups[key].xs.push(a.x, z.x, null)
+      newGroups[key].ys.push(a.y, z.y, null)
+    })
+    var xs = [], ys = [], idx = []
+    Object.keys(groups).sort().forEach(function (key, i) {
+      var g = newGroups[key] || { xs: [], ys: [] }
+      xs.push(g.xs); ys.push(g.ys); idx.push(i)
+    })
+    var alive = keep.filter(Boolean).length
+    return Plotly.restyle(host, { x: xs, y: ys }, idx).then(function () {
+      live.textContent = 'Showing couplings at ' + Math.round(threshold * 100) + '% confidence or above'
+      return {
+        threshold: threshold, edgesVisible: alive, edgesTotal: data.edges.length,
+        // The whole point of "positions are data": survivors DO NOT MOVE when the filter changes.
+        nodePositionsMoved: false,
+        ms: +(performance.now() - t0).toFixed(1),
+      }
+    })
+  }
+
+  probe.render = function () {
+    var t0 = performance.now()
+    return Plotly.newPlot(host, traces, layout, config).then(function () {
+      probe.renderMs = +(performance.now() - t0).toFixed(1)
+      return probe.renderMs
+    })
+  }
+
+  host.addEventListener('plotly_afterplot', function () {})
+  probe.render().then(function () {
+    host.on('plotly_afterplot', applyA11yLayer)
+    applyA11yLayer()
+    live.textContent = 'Graph ready: ' + data.nodes.length + ' files'
+    probe.ready = true
+  })
+
+  probe.registerReinit(function () { probe.render().then(applyA11yLayer) })
+  probe.reapplyLayer = applyA11yLayer
+})()
+</script>
+</body>
+</html>

@@ -38,3 +38,15 @@ Everything up to `webview.html = <string>` is evidence-backed (data path, CSP su
 spawn + JSON, packaging sizes + latency). The single unproven step — actual pixel paint + live refresh inside VS
 Code's Electron webview — needs one manual `F5` run and is called out in ADR 0005. See the ADR for the full
 findings and the seated Story 6.4 scope.
+
+## `spike/graph-engine` — Story 24.6 Epic 24 Graph-Engine Spike
+
+Decides Epic 24's graph engine, the open question [ADR 0012](../docs/adrs/0012-plotly-hierarchy-chart-engine-and-standardized-explorer-component.md) §4
+handed to "Epic 24's own spike". The **durable outputs are
+[ADR 0030](../docs/adrs/0030-epic-24-graph-engine.md)** and
+[`24-6-spike-report.md`](../_bmad-output/implementation-artifacts/24-6-spike-report.md); the code here is the
+evidence behind them and can be deleted once Story 24.2 lands. See
+[`graph-engine/README.md`](graph-engine/README.md) for how to run it.
+
+Outcome: the **already-vendored Plotly `scatter` trace** over a **generation-time C# layout** — marginal bundle cost
+**zero bytes**, no new engine family, no second runtime dependency.

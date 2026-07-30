@@ -298,6 +298,65 @@ Attribute selectors deliberately do **not** bound the extraction. Nearly every o
 (`[data-ss-hierarchy-boot]`, `[data-hierarchy-ready]`, `[open]`) that is absent from server-rendered markup,
 so requiring them drops the Hierarchy Explorer's anti-flash CSS — silently, with the page still rendering.
 
+### The `.ir-content` scope cannot reach YOUR component — and when you need it to, see §10a
+
+`.ir-content .pill` matches injected markup only. If a C# primitive emits a shared class that **your**
+template also needs, §10a is the channel. Do not re-type the declarations.
+
+---
+
+## 10a. Shared primitive classes: the UNSCOPED `shared-primitives.css` layer
+
+Ratified shape: [ADR 0029](../docs/adrs/0029-unscoped-shared-primitive-layer.md) (Proposed), which **amends
+ADR 0018's scoping property**.
+
+Some classes are **shared vocabulary** rather than injected content. `ListRow.Chip` (`src/SpecScribe/ListRow.cs`)
+emits `class="list-row-chip pill"`, and every visual property of that chip — Courier, `0.03em` tracking,
+`0.2rem 0.7rem`, the `999px` radius, `--warm-white`, `--ink-faded` — belongs to `.pill`. `ListRow.vue` is
+template-authored, so §10's scoped layer can never reach it.
+
+**What used to happen, and must not happen again.** `ListRow.vue` hand-retyped `.pill`'s declarations. It
+drifted: serif instead of Courier, no letter-spacing, `0.1rem 0.55rem`, `--parchment`/`--ink-light`. Story
+23.2's re-review corrected the values and found it could not remove the copy — deleting the properties left an
+unstyled chip, because no channel existed. This layer is that channel, and the copy is now deleted.
+
+```bash
+npm run extract:ir-content   # writes BOTH ir-content.css and shared-primitives.css
+npm run check:ir-content     # gates BOTH, and names which one drifted
+```
+
+**The allowlist is the boundary.** `SHARED_PRIMITIVES` in `scripts/ir-content-lib.mjs` — one entry today,
+`pill`. A rule is carried only when **every** class its selector names is on the list, so `.pill.status-draft`
+and `.pill.pill-link` stay scoped. A shared rule is **removed** from `ir-content.css`, never duplicated into
+both: an unscoped rule still matches inside `.ir-content`, so the app has exactly one definition.
+
+**Adding to the list is an architectural decision.** The admission test, both halves required:
+
+1. a C# primitive emits the class, **and**
+2. a template-authored Vue component consumes it.
+
+A class that appears only in injected markup is §10's, not this. If you are reaching for this list to avoid
+writing a component's own styles, you want `<style scoped>` (§2) instead.
+
+**Using it in a component.** Put the shared class on the element and write **none** of its look:
+
+```vue
+<span class="list-row-chip pill">{{ chip }}</span>
+
+<style scoped>
+/* Layout only. `.pill` supplies every visual property from the shared layer. */
+.list-row-chip { flex-shrink: 0; }
+</style>
+```
+
+Your scoped rule (`.list-row-chip[data-v-…]`, specificity `(0,2,0)`) outranks the unscoped `.pill` `(0,1,0)`,
+so you can still override deliberately — but adding a *look* property back re-opens the drift. Change
+`specscribe.css` and re-extract instead.
+
+⚠️ **Known limit:** a variant of a shared class is not in this layer. `class="pill pill-link"` gets `.pill`'s
+base look and **not** the link treatment, because `pill-link` is not on the allowlist. That is the
+all-or-nothing rule behaving conservatively; fix it by adding `pill-link` deliberately, not by re-typing it.
+
 ---
 
 ## 11. Runtime assets are COPIED. Never forked, never reimplemented.

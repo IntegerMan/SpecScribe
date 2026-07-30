@@ -1184,9 +1184,16 @@
         var n = NODES[v.files[i]];
         if (!n) continue;
         var parentNode = v.scaffold[v.parent[i]];
+        // [Review][Patch] Skip, exactly as the `!n` arm above does. A missing parent used to fall through to
+        // `parentId: null`, which does not degrade — it mints a SECOND parentless node, and a treemap/sunburst
+        // under `branchvalues: "total"` rejects two roots outright and draws nothing but a console message. It also
+        // dropped that file's lines from every ancestor total in `rollUpChildrenWin`. Only reachable from a
+        // truncated or hand-edited island (the emitter keeps `files`/`parent` parallel and in range), but the whole
+        // point of the integer encoding replacing self-describing path strings is that an index can be wrong.
+        if (!parentNode) continue;
         var copy = {};
         for (var k in n) { if (Object.prototype.hasOwnProperty.call(n, k)) copy[k] = n[k]; }
-        copy.parentId = parentNode ? parentNode.id : null;
+        copy.parentId = parentNode.id;
         out.push(copy);
       }
       return out;
@@ -1369,9 +1376,14 @@
     }
     /// The alphabetical UNION of every node's own bounded contributor list — never the panel-wide top-N palette,
     /// and never sorted by volume. FR-10 / ADR 0010 §4: attribution, never a ranking.
+    // [Review][Patch] Scans the ACTIVE VIEW, not the whole shared bag — the third scan in this family, and the one
+    // F3's fix missed. The two below it were re-scoped to `currentRawNodes` precisely because a whole-payload scan
+    // silently becomes the rejected "one scale across all views" design; a roster built from the union across all
+    // four views would offer contributor entries whose files the active view excluded. Not reachable today (Code Map
+    // declares no roster dimension) — fixed because the first views surface that declares one would inherit it.
     function dimRoster(d) {
       var seenNames = Object.create(null), out = [];
-      NODES.forEach(function (n) {
+      currentRawNodes.forEach(function (n) {
         tupleList(n, d.metric).forEach(function (entry) {
           if (entry && typeof entry[0] === "string" && !seenNames[entry[0]]) { seenNames[entry[0]] = true; out.push(entry[0]); }
         });
@@ -1620,25 +1632,33 @@
     }
 
     function visibleNodes() {
-      // Story 20.10: a view-bearing instance rolls up its OWN scaffold+files set — `currentRawNodes`, kept in
+      // Story 20.10: a view-bearing instance projects its OWN scaffold+files set — `currentRawNodes`, kept in
       // step by `reindex()` on every view switch (Task 2.1 — extending this seam, not minting a second one).
-      if (VIEWS) return rollUpChildrenWin(currentRawNodes);
-
-      if (!cfg.filterable || !filterState) return NODES;
+      //
+      // [Review][Patch] The two mechanisms COMPOSE rather than short-circuiting. This used to `return` on `VIEWS`
+      // before the `filterable` check, so an instance that was both view-bearing and filterable silently ignored
+      // its own filter AND lost the `kept.length <= 1` empty guard below. Not reachable for Code Map (not
+      // filterable), but the shared-payload contract is generic now (ADR 0012 Ratified decision #8) and a config
+      // pair that renders one of two declared behaviours is exactly the drift this component exists to end.
+      var base = VIEWS ? currentRawNodes : NODES;
+      // A view's raw nodes carry no rolled-up parent values (the server ships directory values as 0 — the roll-up
+      // is the client's job for a shared payload); the un-viewed path is already rolled up server-side.
+      if (!cfg.filterable || !filterState) return VIEWS ? rollUpChildrenWin(base) : base;
 
       var keep = Object.create(null);
       // Keep the root itself, the selected root children, and every descendant of those.
       if (ROOT_ID) keep[ROOT_ID] = true;
-      NODES.forEach(function (n) {
+      base.forEach(function (n) {
         if (n.parentId === ROOT_ID && filterState[n.id]) keep[n.id] = true;
       });
-      // NODES is emitted parent-before-child, so one forward pass propagates. A node whose parent is absent from
-      // `keep` is simply dropped, which also drops anything under it.
-      NODES.forEach(function (n) {
+      // The list is parent-before-child (both `NODES` as emitted and a view's scaffold-then-files order), so one
+      // forward pass propagates. A node whose parent is absent from `keep` is simply dropped, which also drops
+      // anything under it.
+      base.forEach(function (n) {
         if (n.parentId && keep[n.parentId] && n.parentId !== ROOT_ID) keep[n.id] = true;
       });
 
-      var kept = NODES.filter(function (n) { return keep[n.id]; });
+      var kept = base.filter(function (n) { return keep[n.id]; });
       // Nothing selected leaves only the synthesized root. Draw NOTHING rather than a lone zero-value root, which
       // Plotly renders as an empty frame with a stale-looking centre label. The live region says what happened.
       if (kept.length <= 1) return [];
@@ -1984,6 +2004,15 @@
     /* --- Breadcrumb ---------------------------------------------------------------------------------------- */
     function renderCrumbs() {
       if (!crumbList) return;
+      // [Review][Patch] An empty node set has no root to name, and the `"All epics"` fallback below is the work
+      // graph's wording — on a views-bearing surface whose active view filtered everything out, this revealed a
+      // breadcrumb reading "All epics" on the Code Map page. There is no scope to show, so show no scope bar; the
+      // empty-state notice `paintViewChrome` reveals is what answers the reader here.
+      if (!ROOT_ID || !byId[ROOT_ID]) {
+        while (crumbList.firstChild) crumbList.removeChild(crumbList.firstChild);
+        if (drillBar) drillBar.hidden = true;
+        return;
+      }
       var chain = [];
       // Stops at ROOT_ID: the synthesized root is already the "top" crumb built below, so walking through it would
       // render the project name twice in a row.
@@ -2297,78 +2326,6 @@
         applyDimension(false);
       }
 
-      // --- View switch (Story 20.10 Task 2.3). Declarative, exactly like `data-hierarchy-filter` below: the
-      // checkboxes now live OUTSIDE this panel (D2 collapsed four panels into one), so this reads them from the
-      // WHOLE DOCUMENT via a generic marker rather than a surface-specific id, matching each checkbox's own id +
-      // checked state against a view's `when` string. Nothing here learns what "cm-exclude-spec" means.
-      if (VIEWS) {
-        var viewToggles = Array.prototype.slice.call(document.querySelectorAll("[data-hierarchy-view-toggle]"));
-        var titleEl = panel.querySelector(".chart-frame-head h3");
-        var windowEl = panel.querySelector(".chart-frame-window");
-
-        function viewToggleState() {
-          return viewToggles.map(function (box) { return box.id + "=" + (box.checked ? "1" : "0"); }).join(";");
-        }
-        function viewIndexForState(want) {
-          for (var i = 0; i < VIEWS.length; i++) { if (VIEWS[i].when === want) return i; }
-          return -1;
-        }
-
-        // The framed title and analysis window track the active view (F4) — the ONLY two visible facts a JS-off
-        // reader would have gotten from a per-panel heading; everything else the view switch changes is inside
-        // the chart itself. Task 2.4: a drilled scope the new view does not contain is reset to the top rather
-        // than left pointing at a level that no longer exists — the same precedent `applyFilter` sets below.
-        function applyView(pushHash, announceIt) {
-          var v = activeView();
-          if (titleEl && v.title) titleEl.textContent = v.title;
-          if (windowEl) windowEl.textContent = v.window || "";
-          reindex(activeViewRawNodes());
-          if (state.level && !byId[state.level]) state.level = null;
-          state.selected = null;
-          // Task 2.5: re-run dimension resolution (the ramp re-scales to the ACTIVE view, F3) on every view
-          // change, not only a dimension change — nothing was both dimension-bearing and filterable before Code
-          // Map's shared payload existed.
-          if (DIMS) { applyDimension(false); } else { redraw(); }
-          applyState(pushHash);
-          if (announceIt && v.title) announce("Showing " + v.title);
-        }
-
-        if (viewToggles.length) {
-          // Task 2.7 / F4: a deep link naming a view (`{hashKey}-view=`) checks the boxes that view declares it
-          // needs BEFORE reading their state back — the checkbox state IS the reader-visible "which filter is
-          // active" affordance, so the chart's view and what the page visibly shows must agree, never diverge.
-          var hashView = viewKeyFromHash();
-          if (hashView) {
-            var named = null;
-            for (var hv = 0; hv < VIEWS.length; hv++) { if (VIEWS[hv].key === hashView) { named = VIEWS[hv]; break; } }
-            if (named && named.when) {
-              named.when.split(";").forEach(function (pair) {
-                var eq = pair.indexOf("=");
-                if (eq < 1) return;
-                var wantId = pair.slice(0, eq), wantOn = pair.slice(eq + 1) === "1";
-                for (var vb = 0; vb < viewToggles.length; vb++) {
-                  if (viewToggles[vb].id === wantId) { viewToggles[vb].checked = wantOn; break; }
-                }
-              });
-            }
-          }
-
-          viewToggles.forEach(function (box) {
-            box.addEventListener("change", function () {
-              var idx = viewIndexForState(viewToggleState());
-              if (idx < 0 || idx === viewIndex) return;
-              viewIndex = idx;
-              applyView(true, true);
-            });
-          });
-          // Sync once at init — same precedent as the dimension select above: a bfcache/back-navigation restore
-          // or a hash-driven check above must not leave the chart on the default view while the visible checkboxes
-          // (or the shared link) disagree.
-          var initialIdx = viewIndexForState(viewToggleState());
-          if (initialIdx >= 0 && initialIdx !== viewIndex) { viewIndex = initialIdx; applyView(false, false); }
-        }
-      }
-
       // --- Root-subtree filter (config-gated). Same reveal, same bar: a surface's own controls inherit the
       // handshake rather than re-inventing it. The control's `value` IS a root child's node id — that pairing is
       // the entire contract, and nothing here knows what those ids mean.
@@ -2406,10 +2363,163 @@
       }
     }
 
+    // --- View switch (Story 20.10 Task 2.3). Declarative, exactly like `data-hierarchy-filter` above: the
+    // checkboxes live OUTSIDE this panel (D2 collapsed four panels into one), so this reads them from the WHOLE
+    // DOCUMENT via a generic marker rather than a surface-specific id, matching each checkbox's own id + checked
+    // state against a view's `when` string. Nothing here learns what "cm-exclude-spec" means.
+    //
+    // [Review][Patch] NOT nested inside `if (controls)` any more. It was, and nothing in it uses `controls` — so a
+    // views-bearing surface shipping no `.ss-hierarchy-controls` bar mounted fine, serialized all its views and was
+    // then permanently pinned to VIEWS[0] with no error, while its `when`-declaring checkboxes still APPEARED to
+    // work because their pure-CSS half kept filtering the text twin. Two independent config options must not be
+    // coupled by where a block happens to sit. It still runs AFTER the controls block so the dimension select's own
+    // init sync lands first, exactly as before.
+    var syncViewFromHash = null;
+    if (VIEWS) {
+      var viewToggles = Array.prototype.slice.call(document.querySelectorAll("[data-hierarchy-view-toggle]"));
+      var titleEl = panel.querySelector(".chart-frame-head h3");
+      var windowEl = panel.querySelector(".chart-frame-window");
+      var viewEmptyMsg = panel.querySelector(".ss-hierarchy-filter-empty");
+
+      // [Review][Patch] Matches only the checkboxes a view actually NAMES, by id, in any order. The previous form
+      // joined every `[data-hierarchy-view-toggle]` in the document positionally and compared the whole string to
+      // `when`, so one extra toggle anywhere on the page — or a second view-bearing instance — made every state
+      // match nothing: the chart froze on the default view forever while the table's pure-CSS filter kept
+      // responding, with no thrown error and no live-region announcement. Chart and declared twin disagreeing
+      // silently is the one failure mode this surface cannot have.
+      function viewMatchesToggles(v) {
+        if (!v.when) return false;
+        var pairs = v.when.split(";");
+        for (var i = 0; i < pairs.length; i++) {
+          var eq = pairs[i].indexOf("=");
+          if (eq < 1) continue;
+          var box = document.getElementById(pairs[i].slice(0, eq));
+          if (!box) return false;
+          if (!!box.checked !== (pairs[i].slice(eq + 1) === "1")) return false;
+        }
+        return true;
+      }
+      function viewIndexFromToggles() {
+        for (var i = 0; i < VIEWS.length; i++) { if (viewMatchesToggles(VIEWS[i])) return i; }
+        return -1;
+      }
+
+      // The chrome that tracks the active view, in one place so the init path and every switch paint it identically.
+      // [Review][Patch] The analysis window ships `hidden` from the server now (`Charts.FrameWindowSlot`'s
+      // `hiddenUntilMount`): its counts are a per-VIEW fact, so a baked value read "every file · 1,220 files" above
+      // a table the pure-CSS filter had already cut to 461 rows. Revealed here, with the active view's own string.
+      // The empty-view notice is the chart's half of NFR8 — the file table says "No files match this filter." with
+      // JS off, and before this the chart said nothing at all.
+      function paintViewChrome() {
+        var v = activeView();
+        if (!v) return;
+        if (titleEl && v.title) titleEl.textContent = v.title;
+        if (windowEl) {
+          windowEl.textContent = v.window || "";
+          windowEl.hidden = !v.window;
+        }
+        if (viewEmptyMsg) viewEmptyMsg.hidden = currentRawNodes.length > 0;
+      }
+
+      // Task 2.4: a drilled scope the new view does not contain is reset to the top rather than left pointing at a
+      // level that no longer exists — the same precedent `applyFilter` sets above.
+      function applyView(pushHash, announceIt) {
+        var v = activeView();
+        reindex(activeViewRawNodes());
+        if (state.level && !byId[state.level]) state.level = null;
+        state.selected = null;
+        paintViewChrome();
+        // Task 2.5: re-run dimension resolution (the ramp re-scales to the ACTIVE view, F3) on every view change,
+        // not only a dimension change — nothing was both dimension-bearing and filterable before Code Map's
+        // shared payload existed.
+        if (DIMS) { applyDimension(false); } else { redraw(); }
+        applyState(pushHash);
+        // An empty view needs saying out loud too: "Showing … excluding tests" over a blank frame is not an answer.
+        if (announceIt && v.title) {
+          announce(currentRawNodes.length ? "Showing " + v.title : "Showing " + v.title + " — no items match this filter");
+        }
+      }
+
+      // Set while THIS block is driving the checkboxes itself (deep-link init, or a Back/Forward restore). The
+      // dispatched `change` below must still reach other consumers — the file-table pager needs it — but must not
+      // re-enter the switch, which would push a fresh history entry in the middle of handling a popstate.
+      var syncingFromHash = false;
+
+      if (viewToggles.length) {
+        // Task 2.7 / F4: a deep link naming a view (`{hashKey}-view=`) checks the boxes that view declares it needs
+        // BEFORE reading their state back — the checkbox state IS the reader-visible "which filter is active"
+        // affordance, so the chart's view and what the page visibly shows must agree, never diverge.
+        //
+        // [Review][Patch] Setting `.checked` in script fires NO `change` event, and other page enhancements listen
+        // for exactly that: the Code Map file-table pager re-pages on `change` because the pure-CSS row filter
+        // changes how many rows the reader can see. Without this dispatch a shared `#cm-view=no-tests` link paged
+        // the UNFILTERED 1,220 rows — "Page 1 of 41" over short, half-empty and partly blank pages, the very
+        // failure Task 4.5 was written to prevent, surviving on the deep-link path. Dispatched BEFORE this block
+        // attaches its own listeners below, so it reaches those other consumers and never re-enters the switch.
+        var applyViewFromHash = function () {
+          var hashView = viewKeyFromHash();
+          if (!hashView) return;
+          var named = null;
+          for (var hv = 0; hv < VIEWS.length; hv++) { if (VIEWS[hv].key === hashView) { named = VIEWS[hv]; break; } }
+          if (!named || !named.when) return;
+          named.when.split(";").forEach(function (pair) {
+            var eq = pair.indexOf("=");
+            if (eq < 1) return;
+            var wantId = pair.slice(0, eq), wantOn = pair.slice(eq + 1) === "1";
+            var box = document.getElementById(wantId);
+            if (!box || !box.hasAttribute("data-hierarchy-view-toggle")) return;
+            if (!!box.checked === wantOn) return;
+            box.checked = wantOn;
+            try { box.dispatchEvent(new Event("change", { bubbles: true })); } catch (e) { /* pre-Event-ctor host */ }
+          });
+        };
+        applyViewFromHash();
+
+        viewToggles.forEach(function (box) {
+          box.addEventListener("change", function () {
+            if (syncingFromHash) return;
+            var idx = viewIndexFromToggles();
+            if (idx < 0 || idx === viewIndex) return;
+            viewIndex = idx;
+            applyView(true, true);
+          });
+        });
+
+        // [Review][Patch] Back/Forward across a view switch used to restore the HASH and nothing else: the history
+        // listener read the drilled scope alone, so the URL reverted to `#cm-view=full` while `viewIndex`, the
+        // checkbox and the chart all stayed on `no-tests` — and every switch left an entry that could not be undone.
+        // Re-checking the boxes from the hash and re-deriving the index puts all three back in agreement; returning
+        // true tells `onHistoryScope` the view already redrew, so it does not also redraw for the scope.
+        syncViewFromHash = function () {
+          syncingFromHash = true;
+          try { applyViewFromHash(); } finally { syncingFromHash = false; }
+          var idx = viewIndexFromToggles();
+          if (idx < 0 || idx === viewIndex) return false;
+          viewIndex = idx;
+          applyView(false, false);
+          return true;
+        };
+
+        // Sync once at init — same precedent as the dimension select above: a bfcache/back-navigation restore or a
+        // hash-driven check above must not leave the chart on the default view while the visible checkboxes (or the
+        // shared link) disagree.
+        var initialIdx = viewIndexFromToggles();
+        if (initialIdx >= 0 && initialIdx !== viewIndex) { viewIndex = initialIdx; applyView(false, false); }
+      }
+      // Unconditional: the default view still owes the reader its window text and its empty-state answer, and
+      // `applyView` above only runs when the initial view is NOT the default one.
+      paintViewChrome();
+    }
+
     // Both listeners are on `window`, so an SPA swap that detaches this host leaves them behind; without the
     // containment check they would call Plotly.react on a node that is no longer in the document.
     function onHistoryScope() {
       if (!document.contains(root)) return;
+      // The active view is part of the history entry too (Story 20.10's `{hashKey}-view=`), and it has to be
+      // restored BEFORE the scope is validated — `scopeFromHash` checks the id against `byId`, which the view
+      // switch rebuilds. [Review][Patch]
+      // `syncViewFromHash` already re-applied the view and its own `applyState`, so only the scope is left to check.
+      if (syncViewFromHash) syncViewFromHash();
       var next = scopeFromHash();
       if ((next || null) !== state.level) { state.level = next; redraw(); applyState(false); }
     }

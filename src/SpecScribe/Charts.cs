@@ -138,8 +138,15 @@ public static partial class Charts
 
     /// <summary>Window slot markup — the ONE place a numeric analysis window is rendered. Empty/null → omit.
     /// [Story 10.2]</summary>
-    public static string FrameWindowSlot(string? window) =>
-        string.IsNullOrEmpty(window) ? string.Empty : $"<span class=\"chart-frame-window\">{Html(window)}</span>";
+    /// <param name="hiddenUntilMount">Emits the span <c>hidden</c> so a client can reveal it on mount. Added by
+    /// Story 20.10's review for the one case where the server CANNOT bake an honest value: a shared-payload
+    /// hierarchy instance whose window is a per-VIEW fact, resolved only once the component picks the active view.
+    /// A stale window is worse than none — it read "every file · 1,220 files" above a table the pure-CSS filter had
+    /// already cut to 461 rows. Defaults to false, so every other caller's bytes are unchanged.</param>
+    public static string FrameWindowSlot(string? window, bool hiddenUntilMount = false) =>
+        string.IsNullOrEmpty(window)
+            ? string.Empty
+            : $"<span class=\"chart-frame-window\"{(hiddenUntilMount ? " hidden" : string.Empty)}>{Html(window)}</span>";
 
     /// <summary>Ranking slot markup — the ONE place a ranked-list metric caption is rendered. [Story 10.2]</summary>
     public static string FrameRankingSlot(string? ranking) =>
@@ -162,13 +169,15 @@ public static partial class Charts
     /// dashboard's chart panel, and that panel carries the opt-in hooks the client blocks key on — so the
     /// alternative was a call site hand-writing the frame, which is the thing this helper exists to prevent.
     /// Defaults to nothing, so every existing caller's bytes are unchanged.</param>
-    public static string Framed(ChartMeta meta, string body, string panelClass = "chart-panel", string panelAttributes = "")
+    /// <param name="windowHiddenUntilMount">Forwarded to <see cref="FrameWindowSlot"/> — see its remarks. Only a
+    /// shared-payload hierarchy instance sets it; defaults to false so no existing caller's bytes move.</param>
+    public static string Framed(ChartMeta meta, string body, string panelClass = "chart-panel", string panelAttributes = "", bool windowHiddenUntilMount = false)
     {
         var sb = new StringBuilder();
         sb.Append($"<div class=\"{Html(panelClass)}\"{panelAttributes}>\n");
         sb.Append("  <div class=\"chart-frame-head\">\n");
         sb.Append($"    <h3>{Html(meta.Title)}</h3>\n");
-        var window = FrameWindowSlot(meta.Window);
+        var window = FrameWindowSlot(meta.Window, windowHiddenUntilMount);
         if (window.Length > 0) sb.Append($"    {window}\n");
         sb.Append("  </div>\n");
         sb.Append(FrameRankingSlot(meta.Ranking));

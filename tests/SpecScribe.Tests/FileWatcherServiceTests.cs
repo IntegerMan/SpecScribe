@@ -99,6 +99,35 @@ public class FileWatcherServiceTests : IDisposable
         lock (_eventsLock) { return _events.ToArray(); }
     }
 
+    /// <summary>Waits until the observed-event count stops changing, so a test can COUNT events rather than merely
+    /// wait for one to appear. The distinction matters whenever the regression under guard is "too many events": a
+    /// wait that returns on the first arrival lets the assertion sample mid-burst and pass. Requires the count to hold
+    /// still across consecutive polls spanning more than one <see cref="ForgeOptions.DebounceInterval"/>, so a
+    /// still-pending debounce timer cannot be mistaken for quiet. [code review 2026-07-29]</summary>
+    private bool WaitForQuiet()
+    {
+        var quietFor = ForgeOptions.DebounceInterval + TimeSpan.FromMilliseconds(250);
+        var deadline = DateTime.UtcNow + SettleTimeout;
+        var lastCount = -1;
+        var stableSince = DateTime.UtcNow;
+
+        while (DateTime.UtcNow < deadline)
+        {
+            var count = Observed().Length;
+            if (count != lastCount)
+            {
+                lastCount = count;
+                stableSince = DateTime.UtcNow;
+            }
+            else if (DateTime.UtcNow - stableSince >= quietFor)
+            {
+                return true;
+            }
+            Thread.Sleep(25);
+        }
+        return false;
+    }
+
     /// <summary>Polls until <paramref name="condition"/> holds or the bound elapses, then returns whether it held.
     /// Polling the real outcome (not sleeping a fixed interval) is what keeps these tests honest AND fast: a
     /// machine that delivers the event in 450ms doesn't pay for the worst case.</summary>
@@ -289,13 +318,18 @@ public class FileWatcherServiceTests : IDisposable
         // Wait for the EVENT, not just the page. The page is written partway through GenerateOne, and the event is
         // only published once the whole route returns — so "bulk-0.html says REPLACED" does not imply "its event has
         // been observed". That gap has always existed; Story 22.5 widened it by giving the route real work to do
-        // after the page write (the code-surface refresh + source-inventory rewalk), which is what turned a latent
-        // race into a reproducible failure. Waiting on the observable the assertion is actually about removes it
-        // without weakening the assertion: it still has to be exactly ONE, and a per-notification regression would
-        // overshoot to five and fail.
+        // after the page write (the code-surface refresh), which is what turned a latent race into a reproducible
+        // failure.
+        //
+        // ⚠ Waiting on "at least one event for bulk-0" is NOT enough, and the first repair of this test did exactly
+        // that (code review 2026-07-29). The regression being guarded — one regeneration per raw FS notification —
+        // produces a BURST of events for this path, so a wait that returns on the first one, followed immediately by
+        // a count assertion, can sample between event 1 and event 2 and pass while the defect is present. The wait has
+        // to be for the stream to go QUIET, which is the actual precondition for counting.
         var bulk0Relative = Path.Combine("notes", "bulk-0.md");
         Assert.True(WaitFor(() => Observed().Any(e => e.RelativePath == bulk0Relative)),
             "bulk-0.md's own regeneration event should be observed");
+        Assert.True(WaitForQuiet(), "the event stream should settle before the coalescing count is sampled");
         Assert.Equal(1, Observed().Count(e => e.RelativePath == bulk0Relative));
     }
 

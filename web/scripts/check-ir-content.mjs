@@ -10,7 +10,7 @@
 // RED on a hand-edited rule, not only green. A gate only ever seen passing is not a gate.
 
 import { buildIrContentCss } from './ir-content-build.mjs'
-import { OUT_CSS, OUT_MANIFEST, readCommitted, SOURCE_LABEL } from './ir-content-lib.mjs'
+import { OUT_CSS, OUT_MANIFEST, OUT_SHARED_CSS, readCommitted, SOURCE_LABEL } from './ir-content-lib.mjs'
 
 let expected
 try {
@@ -23,21 +23,32 @@ try {
 
 const actualCss = readCommitted(OUT_CSS)
 const actualManifest = readCommitted(OUT_MANIFEST)
+// The unscoped sibling is gated by the SAME run, not a second script: a shared primitive that drifted while
+// only the scoped layer was checked would be invisible, and it is the layer template-authored components
+// actually bind to. [ADR 0029]
+const actualSharedCss = readCommitted(OUT_SHARED_CSS)
 
-if (actualCss === null || actualManifest === null) {
+if (actualCss === null || actualManifest === null || actualSharedCss === null) {
+  const missing = [
+    actualCss === null ? 'web/assets/ir-content.css' : null,
+    actualSharedCss === null ? 'web/assets/shared-primitives.css' : null,
+    actualManifest === null ? 'web/assets/ir-content.manifest.json' : null,
+  ].filter(Boolean)
   console.error('check:ir-content FAILED — the generated layer does not exist.')
-  console.error(`  missing: ${actualCss === null ? 'web/assets/ir-content.css' : ''} ${actualManifest === null ? 'web/assets/ir-content.manifest.json' : ''}`.trimEnd())
+  console.error(`  missing: ${missing.join(', ')}`)
   console.error('  Run `npm run extract:ir-content` to generate it.')
   process.exit(1)
 }
 
 const expectedCss = expected.css.replace(/\r\n/g, '\n')
+const expectedSharedCss = expected.sharedCss.replace(/\r\n/g, '\n')
 const expectedManifest = `${JSON.stringify(expected.manifest, null, 2)}\n`.replace(/\r\n/g, '\n')
 
-if (actualCss === expectedCss && actualManifest === expectedManifest) {
+if (actualCss === expectedCss && actualSharedCss === expectedSharedCss && actualManifest === expectedManifest) {
   console.log(
     `check:ir-content OK — ${expected.stats.carriedRules} rules + ${expected.stats.carriedKeyframes} ` +
-      `keyframes in sync with ${SOURCE_LABEL}`,
+      `keyframes scoped, ${expected.stats.sharedRules} shared primitive rule(s) unscoped, in sync with ` +
+      SOURCE_LABEL,
   )
   process.exit(0)
 }
@@ -46,15 +57,20 @@ if (actualCss === expectedCss && actualManifest === expectedManifest) {
 // and the first line of a failing log should already say which happened.
 console.error(`check:ir-content FAILED — the generated layer has drifted from ${SOURCE_LABEL}.`)
 
-if (actualCss !== expectedCss) {
-  const actualRules = ruleMap(actualCss)
-  const expectedRules = ruleMap(expectedCss)
+reportSheet('ir-content.css', actualCss, expectedCss)
+reportSheet('shared-primitives.css', actualSharedCss, expectedSharedCss)
+
+/** Rule-granularity diff for one generated sheet. Silent when that sheet is in sync. */
+function reportSheet(label, actual, expectedText) {
+  if (actual === expectedText) return
+  const actualRules = ruleMap(actual)
+  const expectedRules = ruleMap(expectedText)
   const added = [...expectedRules.keys()].filter((k) => !actualRules.has(k))
   const removed = [...actualRules.keys()].filter((k) => !expectedRules.has(k))
   const changed = [...expectedRules.keys()].filter(
     (k) => actualRules.has(k) && actualRules.get(k) !== expectedRules.get(k),
   )
-  console.error(`  ir-content.css: +${added.length} rule(s), -${removed.length}, ~${changed.length} changed`)
+  console.error(`  ${label}: +${added.length} rule(s), -${removed.length}, ~${changed.length} changed`)
   for (const s of added.slice(0, 8)) console.error(`    + ${s}`)
   for (const s of removed.slice(0, 8)) console.error(`    - ${s}`)
   for (const s of changed.slice(0, 8)) console.error(`    ~ ${s}`)

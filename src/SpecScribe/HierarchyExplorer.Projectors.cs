@@ -498,6 +498,10 @@ public static partial class HierarchyExplorer
         Func<string, string?>? fileHref = null,
         string prefix = "")
     {
+        // [Review][Patch] An empty variant list returned an ArgumentOutOfRangeException from `variants[0]` one line
+        // before the code written to produce an empty model. This is a public entry point; answer it the same way
+        // the empty-map case immediately below does.
+        if (variants.Count == 0) return new HierarchyExplorerModel(config, Array.Empty<HierarchyNode>());
         var full = variants.FirstOrDefault(v => v.Key == "full") ?? variants[0];
         if (full.Map.IsEmpty) return new HierarchyExplorerModel(config, Array.Empty<HierarchyNode>());
 
@@ -510,6 +514,10 @@ public static partial class HierarchyExplorer
         var fileIndexByPath = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var f in allFiles)
         {
+            // [Review][Patch] `ProjectCodeMap` guards its walk with `seen.Add(node.Id)`; this loop dropped that
+            // guard, and the asymmetry was silent: the dictionary assignment below OVERWRITES while `sharedNodes.Add`
+            // appends, so a colliding path would leave an orphaned duplicate in the payload that no view indexes.
+            if (fileIndexByPath.ContainsKey(f.RepoRelativePath)) continue;
             fileIndexByPath[f.RepoRelativePath] = sharedNodes.Count;
             // ParentId is meaningless on the shared copy (parent is a property of (file, view) — F2); left null
             // rather than any one view's answer, so nothing accidentally reads it as authoritative.
@@ -600,6 +608,15 @@ public static partial class HierarchyExplorer
         {
             if (node.IsDirectory)
             {
+                // [Review][Patch] The same duplicate-id guard `ProjectCodeMap`'s walk carries (`seen.Add`). Without
+                // it, a directory whose path collides with an id already in the scaffold — including the
+                // synthesized `ProjectRootId` — emitted a second node AND repointed `scaffoldIndexById` away from
+                // the first, producing a self-parented root Plotly rejects outright.
+                if (scaffoldIndexById.ContainsKey(node.RepoRelativePath))
+                {
+                    WalkForScaffold(node.Children, node.RepoRelativePath, scaffold, scaffoldIndexById, parentPathOf);
+                    continue;
+                }
                 scaffoldIndexById[node.RepoRelativePath] = scaffold.Count;
                 scaffold.Add(CodeMapDirNode(node, parentId));
                 WalkForScaffold(node.Children, node.RepoRelativePath, scaffold, scaffoldIndexById, parentPathOf);

@@ -374,6 +374,75 @@
         "SpecScribeOutput"
       ],
       "port": 8125
+    },
+    {
+      "name": "graph-24-6-csp",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "spike/graph-engine/scripts/csp-probe.mjs",
+        "8131",
+        "webview",
+        "header"
+      ],
+      "port": 8131
+    },
+    {
+      "name": "graph-24-6-meta",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "spike/graph-engine/scripts/csp-probe.mjs",
+        "8132",
+        "webview",
+        "meta"
+      ],
+      "port": 8132
+    },
+    {
+      "name": "graph-24-6-nocsp",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "spike/graph-engine/scripts/csp-probe.mjs",
+        "8133",
+        "off",
+        "header"
+      ],
+      "port": 8133
+    },
+    {
+      "name": "graph-24-6-wrongnonce",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "spike/graph-engine/scripts/csp-probe.mjs",
+        "8134",
+        "wrong-nonce",
+        "header"
+      ],
+      "port": 8134
+    },
+    {
+      "name": "graph-24-6-nostyle",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "spike/graph-engine/scripts/csp-probe.mjs",
+        "8135",
+        "no-style-inline",
+        "header"
+      ],
+      "port": 8135
+    },
+    {
+      "name": "codemap-20-10-review",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "--yes",
+        "http-server",
+        "SpecScribeOutput",
+        "-p",
+        "8136",
+        "-c-1",
+        "--silent"
+      ],
+      "port": 8136
     }
   ]
 }

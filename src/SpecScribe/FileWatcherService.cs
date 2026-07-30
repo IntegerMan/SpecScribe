@@ -380,17 +380,23 @@ public sealed class FileWatcherService : IDisposable
     /// same reason. [Story 5.3 follow-up]</para></summary>
     internal void RunDebouncedPass(string fullPath)
     {
-        // A topology escalation rebuilds the WHOLE site, so attributing its delta to the one path that happened to
-        // fire would be a lie. Relabel to the SHARED constant RegenerateTopology and the watch log already report,
-        // rather than inventing a third spelling.
+        // A topology escalation rebuilds the WHOLE site, so attributing its DELTA to the one path that happened to
+        // fire would be a lie. The sidecar trigger is therefore relabelled to the SHARED constant RegenerateTopology
+        // and the watch log already report, rather than inventing a third spelling.
         // <para>LABEL ONLY. The sidecar's degrade-to-full for this pass is decided by a flag RegenerateTopology
         // sets on itself, NOT by this string — Story 22.6's live verification caught a concurrent save overwriting
         // this label between the set and the emit, which would have silently defeated the guard had correctness
         // depended on it. [Story 22.6 AC #7, Trap 5]</para>
-        GenerationEvent RunTopology()
+        // <para>The EVENT label is a separate question, and the two are deliberately different (code review
+        // 2026-07-29). Story 22.5 routed file-level adds/renames/deletes here, and reporting those under
+        // &lt;directory change&gt; inverted that constant's own contract — it exists to say "a directory changed, so do
+        // not attribute this to some arbitrary contained file", which is exactly backwards when a named file IS the
+        // whole event. A directory pass still has no single honest path and keeps the sentinel; a file pass reports
+        // the path that fired. One event either way, as AC #7 requires.</para>
+        GenerationEvent RunTopology(string? eventLabel)
         {
             _generator.SetWatchTrigger(TopologyEventLabel);
-            return _generator.RegenerateTopology();
+            return _generator.RegenerateTopology(eventLabel);
         }
 
         GenerationEvent ev;
@@ -413,7 +419,7 @@ public sealed class FileWatcherService : IDisposable
                 // wrap it in one either. IsDataSource stays FIRST and unchanged — sprint-status.yaml already
                 // escalates through its own route, and its precedence over IsEpicsRelated is load-bearing.
                 : _generator.ClassifyRebuildScope(fullPath) == RebuildScope.Full
-                ? RunTopology()
+                ? RunTopology(relative)
                 : _generator.IsAdr(fullPath)
                 ? _generator.RegenerateAdrs()
                 : _generator.IsEpicsRelated(fullPath)

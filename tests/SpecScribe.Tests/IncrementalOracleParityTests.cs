@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using SpecScribe;
 
 namespace SpecScribe.Tests;
@@ -223,17 +224,25 @@ public class IncrementalOracleParityTests : IDisposable
         catch (UnauthorizedAccessException) { }
     }
 
-    private ForgeOptions Options(string output) => ForgeOptions.Resolve(
-        source: Source, adrs: Adrs, output: output, projectName: "SpecScribe", includeReadme: false);
+    private ForgeOptions Options(string output, bool emitSpa = false) => ForgeOptions.Resolve(
+        source: Source, adrs: Adrs, output: output, projectName: "SpecScribe", includeReadme: false,
+        emitSpa: emitSpa);
+
+    /// <summary>Floor on the oracle's file count, below which a "clean" diff means the harness produced nothing
+    /// rather than that the routes agreed. Without it every assertion here passes vacuously the moment a fixture or
+    /// option change stops the generator emitting — the failure mode Story 22.4's equivalent test guards with its own
+    /// VACUOUS assertion and this file originally shipped without. The fixture emits ~40 files. [code review
+    /// 2026-07-29]</summary>
+    private const int OracleFileFloor = 20;
 
     // ── the harness ─────────────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>One change class, end to end. Builds the PRE-change tree with a live generator (as watch mode
     /// does), applies <paramref name="mutate"/>, drives the SHIPPED watch dispatch over the paths it reports, then
     /// full-generates the identical POST-change tree into a second output root and diffs the two byte-for-byte.</summary>
-    private OracleDiff RunClass(Func<IReadOnlyList<string>> mutate)
+    private OracleDiff RunClass(Func<IReadOnlyList<string>> mutate, bool emitSpa = false)
     {
-        var incrementalOptions = Options(OutIncremental);
+        var incrementalOptions = Options(OutIncremental, emitSpa);
         var generator = new SiteGenerator(incrementalOptions);
         Assert.DoesNotContain(generator.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
@@ -244,7 +253,15 @@ public class IncrementalOracleParityTests : IDisposable
         using var watcher = new FileWatcherService(incrementalOptions, generator, e => { lock (_events) _events.Add(e); });
         foreach (var path in mutate()) watcher.RunDebouncedPass(path);
 
-        var oracle = new SiteGenerator(Options(OutOracle));
+        // A route that ERRORED could still leave two trees that happen to agree — most obviously when the failure was
+        // in a refresh step whose output the fixture does not exercise. Byte parity over a broken pass is not parity;
+        // the pass has to have succeeded for the comparison to mean anything. [code review 2026-07-29]
+        lock (_events)
+        {
+            Assert.DoesNotContain(_events, e => e.Outcome == GenerationOutcome.Error);
+        }
+
+        var oracle = new SiteGenerator(Options(OutOracle, emitSpa));
         Assert.DoesNotContain(oracle.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
         return Diff(OutIncremental, OutOracle) with { DispatchedEvents = DescribeEvents() };
@@ -269,6 +286,11 @@ public class IncrementalOracleParityTests : IDisposable
         var incremental = Snapshot(incrementalRoot);
         var oracle = Snapshot(oracleRoot);
 
+        Assert.True(
+            oracle.Count >= OracleFileFloor,
+            $"VACUOUS: the oracle produced only {oracle.Count} files (floor {OracleFileFloor}), so a clean diff "
+            + "would prove nothing. The fixture or the generate options stopped producing output.");
+
         var stale = new List<string>();
         var missing = new List<string>();
         var orphaned = new List<string>();
@@ -281,6 +303,15 @@ public class IncrementalOracleParityTests : IDisposable
         foreach (var relative in incremental.Keys)
         {
             if (!oracle.ContainsKey(relative)) orphaned.Add(relative);
+        }
+
+        // Directories as well as files: a narrow route that deletes the last page in a subtree leaves the now-empty
+        // directory behind, where the oracle's output-root wipe never creates it. A file-only comparison reports that
+        // as clean. [code review 2026-07-29]
+        var oracleDirs = RelativeDirectories(oracleRoot);
+        foreach (var relative in RelativeDirectories(incrementalRoot))
+        {
+            if (!oracleDirs.Contains(relative)) orphaned.Add(relative + "/ (empty directory)");
         }
 
         var ordered = stale.OrderBy(p => p, StringComparer.Ordinal).ToList();
@@ -336,10 +367,42 @@ public class IncrementalOracleParityTests : IDisposable
         foreach (var path in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
         {
             var relative = GoldenNormalization.FoldToday(PathUtil.NormalizeSlashes(Path.GetRelativePath(root, path)));
-            snapshot[relative] = GoldenNormalization.NormalizeVolatile(
+            var content = GoldenNormalization.NormalizeVolatile(
                 File.ReadAllText(path), OutIncremental, OutOracle, RepoRoot);
+            snapshot[relative] = relative == "spa/manifest.json" ? FoldOutputPathDependentHash(content) : content;
         }
         return snapshot;
+    }
+
+    /// <summary>Trap 5, resurfacing one level down. <c>diagnostics.html</c> echoes the configured OUTPUT ROOT inside
+    /// its own region, and this harness generates the two trees into two different directories — handled for PAGE bytes
+    /// by folding every root to one placeholder. The manifest cannot be handled that way: its per-page
+    /// <c>contentHash</c> and <c>bytes</c> are computed over the page's RAW, unfolded content, so they differ by
+    /// construction (measured: exactly the 5-character difference between the two output directory names) even though
+    /// the page itself compares equal. Folding those two FIELDS for that ONE page keeps every other page's hash and
+    /// byte count fully under the gate, which is the whole value of comparing the manifest at all.
+    /// <para>Deliberately local to this harness rather than added to the shared <see cref="GoldenNormalization"/>: the
+    /// golden fingerprint gate compares one tree against a stored constant, never two trees in two directories, so it
+    /// has no such artifact — and widening the shared fold to cover a problem only this file has would blunt that gate
+    /// for no reason. [code review 2026-07-29]</para></summary>
+    private static string FoldOutputPathDependentHash(string manifestJson) =>
+        Regex.Replace(
+            manifestJson,
+            @"(""diagnostics\.html"":\{.*?""contentHash"":"")[0-9a-f]+("",""bytes"":)\d+",
+            "$1<output-path-dependent>$2-1",
+            RegexOptions.Singleline | RegexOptions.CultureInvariant);
+
+    /// <summary>Every directory under <paramref name="root"/>, date-folded the same way <see cref="Snapshot"/> folds
+    /// file paths so a date-named subtree does not read as an orphan. [code review 2026-07-29]</summary>
+    private static HashSet<string> RelativeDirectories(string root)
+    {
+        var dirs = new HashSet<string>(StringComparer.Ordinal);
+        if (!Directory.Exists(root)) return dirs;
+        foreach (var path in Directory.EnumerateDirectories(root, "*", SearchOption.AllDirectories))
+        {
+            dirs.Add(GoldenNormalization.FoldToday(PathUtil.NormalizeSlashes(Path.GetRelativePath(root, path))));
+        }
+        return dirs;
     }
 
     private sealed record OracleDiff(
@@ -367,8 +430,6 @@ public class IncrementalOracleParityTests : IDisposable
 
     // ── mutators, one per change class ──────────────────────────────────────────────────────────────────────
 
-    private IReadOnlyList<string> NoChange() => Array.Empty<string>();
-
     private IReadOnlyList<string> ContentEditGenericDoc()
     {
         var path = Path.Combine(PlanningDir, "architecture.md");
@@ -381,6 +442,37 @@ public class IncrementalOracleParityTests : IDisposable
         var path = Path.Combine(ImplDir, "1-1-foundation.md");
         File.AppendAllText(path, "\n\nA content-only paragraph.\n");
         return new[] { path };
+    }
+
+    /// <summary>Content edit to an ADR — the <see cref="SiteGenerator.RegenerateAdrs"/> narrow class. The class→scope
+    /// table claimed this was proven byte-identical when no case in the harness or the repo-scale matrix ever edited an
+    /// ADR's content; the only ADR coverage was a no-change control and a delete. [code review 2026-07-29]</summary>
+    private IReadOnlyList<string> ContentEditAdr()
+    {
+        var path = Path.Combine(Adrs, "0002-second.md");
+        File.AppendAllText(path, "\n\nA content-only paragraph.\n");
+        return new[] { path };
+    }
+
+    /// <summary>Content edit to <c>epics.md</c> itself — distinct from a story-artifact edit, since it re-parses the
+    /// epic set rather than one artifact's fragments, and distinct from its DELETION, which escalates (Trap 4). Also
+    /// claimed proven with no case behind it. [code review 2026-07-29]</summary>
+    private IReadOnlyList<string> ContentEditEpicsFile()
+    {
+        var path = Path.Combine(PlanningDir, "epics.md");
+        File.AppendAllText(path, "\n\nA trailing note that adds no epic.\n");
+        return new[] { path };
+    }
+
+    /// <summary>The same rename, dispatched new-path-first. Production arms one debounce timer per changed path on its
+    /// own thread-pool thread, so the delete and the create can settle in EITHER order — the single order the original
+    /// case pinned was an assumption, not a guarantee. [code review 2026-07-29]</summary>
+    private IReadOnlyList<string> RenameGenericDocReversedOrder()
+    {
+        var from = Path.Combine(PlanningDir, "architecture.md");
+        var to = Path.Combine(PlanningDir, "architecture-renamed.md");
+        File.Move(from, to);
+        return new[] { to, from };
     }
 
     private IReadOnlyList<string> AddGenericDoc()
@@ -455,6 +547,65 @@ public class IncrementalOracleParityTests : IDisposable
         Assert.True(diff.IsClean, diff.Describe(label));
     }
 
+    /// <summary>AC #2's third clause, stated as its own assertion rather than left implicit in the whole-tree byte
+    /// diff: <b>per-epic work-graph NODE and EDGE counts must be equal between the narrow route and a full
+    /// rebuild.</b> The Story 22.1 spike asked for exactly this — <i>"22.5's parity fix should add a node/edge
+    /// assertion to the harness so this becomes a measured, regression-guarded number"</i> — because the defect it
+    /// found was numeric and per-epic (Epic 1: 16 items / 20 links from <c>RegenerateEpics</c> against 13 / 12 from
+    /// <c>GenerateAll</c>, across 56 pages), and a byte diff reports "some page differs" where the number is the
+    /// diagnosis. Added in code review 2026-07-29: the story checked this subtask off, but no such assertion existed
+    /// anywhere in the suite — the only node/edge comparison was Story 22.4's static-page-versus-IR test, a different
+    /// pair of paths entirely.
+    /// <para>The counts are read from the shipped ADR 0013 text twin (<c>Charts.cs</c>'s "Work graph for X: N work
+    /// items and M provenance links"), so this asserts on what a reader actually gets rather than on a private field —
+    /// and it fails LOUDLY if the fixture stops rendering any work-graph summary at all, which is the vacuity trap
+    /// that would otherwise make this assertion decorative.</para></summary>
+    [Fact]
+    public void RegenerateEpics_ProducesTheSamePerEpicWorkGraphCountsAsAFullRebuild()
+    {
+        var generator = new SiteGenerator(Options(OutIncremental));
+        Assert.DoesNotContain(generator.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+        generator.RegenerateEpics();
+
+        var oracle = new SiteGenerator(Options(OutOracle));
+        Assert.DoesNotContain(oracle.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+
+        var narrow = WorkGraphCounts(OutIncremental);
+        var full = WorkGraphCounts(OutOracle);
+
+        Assert.True(
+            full.Count > 0,
+            "VACUOUS: no work-graph summary was rendered anywhere in the oracle output, so this assertion compared "
+            + "two empty sets. The node/edge counts AC #2 requires would be unguarded.");
+
+        Assert.Equal(full, narrow);
+    }
+
+    /// <summary>Every rendered work-graph bucket's node/edge counts, keyed by bucket name, across the whole output
+    /// tree. Matches the ADR 0013 text twin emitted by <c>Charts.WorkGraph</c>. [code review 2026-07-29]</summary>
+    private static SortedDictionary<string, string> WorkGraphCounts(string root)
+    {
+        var counts = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        if (!Directory.Exists(root)) return counts;
+
+        var pattern = new Regex(
+            @"Work graph for (?<epic>[^:<]+): (?<nodes>\d+) work items and (?<edges>\d+) provenance links",
+            RegexOptions.CultureInvariant);
+
+        foreach (var path in Directory.EnumerateFiles(root, "*.html", SearchOption.AllDirectories))
+        {
+            var relative = PathUtil.NormalizeSlashes(Path.GetRelativePath(root, path));
+            foreach (var match in pattern.Matches(File.ReadAllText(path)).Cast<Match>())
+            {
+                // Keyed by page AND bucket: the same epic's graph can appear on more than one surface, and a route
+                // that refreshed one of them but not another is precisely the divergence class being guarded.
+                counts[$"{relative}::{match.Groups["epic"].Value.Trim()}"] =
+                    $"{match.Groups["nodes"].Value} nodes / {match.Groups["edges"].Value} edges";
+            }
+        }
+        return counts;
+    }
+
     [Fact]
     public void ContentEditToGenericDoc_MatchesOracle()
     {
@@ -470,6 +621,38 @@ public class IncrementalOracleParityTests : IDisposable
     }
 
     [Fact]
+    public void ContentEditToAdr_MatchesOracle()
+    {
+        var diff = RunClass(ContentEditAdr);
+        Assert.True(diff.IsClean, diff.Describe("content-adr"));
+    }
+
+    [Fact]
+    public void ContentEditToEpicsFile_MatchesOracle()
+    {
+        var diff = RunClass(ContentEditEpicsFile);
+        Assert.True(diff.IsClean, diff.Describe("content-epics"));
+    }
+
+    /// <summary>The narrow content classes again with the opt-in IR form ON. Trap 3's whole argument for fixing the
+    /// recompute rather than the emit is that <c>EmitSpaSite</c> rewrites the entire manifest from current state, so
+    /// "the IR inherits every recompute defect verbatim" — but the gate ran with <c>emitSpa: false</c>, which means no
+    /// <c>spa/</c> file was ever compared and that inheritance was asserted rather than measured. [code review
+    /// 2026-07-29]</summary>
+    [Theory]
+    [InlineData("content-doc")]
+    [InlineData("content-story")]
+    public void NarrowContentClasses_MatchOracle_WithTheIrEmitted(string label)
+    {
+        var diff = RunClass(label == "content-doc" ? ContentEditGenericDoc : ContentEditStory, emitSpa: true);
+        Assert.True(diff.IsClean, diff.Describe($"{label} (--spa)"));
+
+        // The IR really was emitted, so the row above is not silently the non-SPA case again.
+        Assert.Contains(Directory.EnumerateFiles(OutIncremental, "*", SearchOption.AllDirectories),
+            p => PathUtil.NormalizeSlashes(Path.GetRelativePath(OutIncremental, p)).StartsWith("spa/", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void AddedGenericDoc_MatchesOracle()
     {
         var diff = RunClass(AddGenericDoc);
@@ -481,6 +664,13 @@ public class IncrementalOracleParityTests : IDisposable
     {
         var diff = RunClass(RenameGenericDoc);
         Assert.True(diff.IsClean, diff.Describe("rename-doc"));
+    }
+
+    [Fact]
+    public void RenamedGenericDoc_MatchesOracle_WhenTheNewPathSettlesFirst()
+    {
+        var diff = RunClass(RenameGenericDocReversedOrder);
+        Assert.True(diff.IsClean, diff.Describe("rename-doc (new path first)"));
     }
 
     [Fact]
@@ -503,18 +693,26 @@ public class IncrementalOracleParityTests : IDisposable
     /// them as ordinary docs — three pages the teardown has no way to produce (it deletes the epics family; it does
     /// not re-render what fell out of it). Exempting the branch first and diffing it is what surfaced that; the
     /// exemption cost 16 stale + 3 missing pages.
-    /// <para>The trade is the watch log: the pass now reports <c>&lt;directory change&gt;</c> rather than
-    /// "epics.md removed; N stale page(s) deleted". <see cref="SiteGenerator.ClearEpicsFamilyOutputs"/> and its 8
-    /// tests are untouched and still reachable through <see cref="SiteGenerator.RegenerateEpics"/> directly, which
-    /// is how <c>SiteGeneratorEpicsRemovalTests</c> drives them.</para></summary>
+    /// <para>The trade is the watch log: the pass reports one escalated <c>full rebuild</c> event labelled with the
+    /// deleted path, rather than "epics.md removed; N stale page(s) deleted" with its page count.
+    /// <see cref="SiteGenerator.ClearEpicsFamilyOutputs"/> and its 8 tests are untouched and still reachable through
+    /// <see cref="SiteGenerator.RegenerateEpics"/> directly, which is how <c>SiteGeneratorEpicsRemovalTests</c> drives
+    /// them — but note that is TEST reachability, not production reachability: the watch dispatch no longer selects
+    /// that branch for any input. Owner decision (code review 2026-07-29) accepted that, on the measured ground that
+    /// escalation is strictly more correct; ADR 0027 records it so the 8 green tests are not misread as proof the
+    /// dispatch still covers the teardown.</para></summary>
     [Fact]
     public void DeletedEpicsFile_EscalatesAndMatchesOracle()
     {
         var diff = RunClass(DeleteEpics);
         Assert.True(diff.IsClean, diff.Describe("delete-epics"));
 
+        // ONE event, labelled with the file that fired — not the <directory change> sentinel, which means "a directory
+        // changed, so do not attribute this to some arbitrary contained file" and is therefore the wrong label when a
+        // named file IS the whole event. [code review 2026-07-29]
         var escalation = Assert.Single(_events);
-        Assert.Equal("<directory change>", escalation.RelativePath);
+        Assert.Equal("_bmad-output/planning-artifacts/epics.md", escalation.RelativePath);
+        Assert.Equal("full rebuild", escalation.Message);
     }
 
     /// <summary>The classifier's own rule, stated directly: existence at fire time versus what the last completed
@@ -550,8 +748,31 @@ public class IncrementalOracleParityTests : IDisposable
 
         // Never escalates on something that would never have become a page — a non-markdown file, or an ignored
         // editor temp file. Without these guards a lock file appearing beside an artifact rebuilds the whole site.
-        Assert.Equal(RebuildScope.Narrow, generator.ClassifyRebuildScope(Path.Combine(PlanningDir, "notes.txt")));
-        Assert.Equal(RebuildScope.Narrow, generator.ClassifyRebuildScope(Path.Combine(PlanningDir, ".hidden.md")));
+        //
+        // These files are CREATED first, deliberately (code review 2026-07-29). Asserted against paths that do not
+        // exist, both assertions passed for the wrong reason: exists=false and wasRendered=false agree, so the rule
+        // itself returns Narrow and the `.md`/IsIgnored guards could both be deleted with the test still green. Only a
+        // file that exists on disk while being absent from the inventory actually exercises them.
+        var notMarkdown = Path.Combine(PlanningDir, "notes.txt");
+        var ignoredMarkdown = Path.Combine(PlanningDir, ".hidden.md");
+        File.WriteAllText(notMarkdown, "not markdown\n");
+        File.WriteAllText(ignoredMarkdown, "# ignored\n");
+        Assert.Equal(RebuildScope.Narrow, generator.ClassifyRebuildScope(notMarkdown));
+        Assert.Equal(RebuildScope.Narrow, generator.ClassifyRebuildScope(ignoredMarkdown));
+
+        // A null or relative path answers Narrow rather than throwing out of the dispatch or resolving against the
+        // process working directory. [code review 2026-07-29]
+        Assert.Equal(RebuildScope.Narrow, generator.ClassifyRebuildScope(null!));
+        Assert.Equal(RebuildScope.Narrow, generator.ClassifyRebuildScope(""));
+
+        // An ADR nested DEEPER than EnumerateAdrFiles walks (root + one level) can never enter the inventory, so a
+        // naive existence comparison would answer Full on every save forever — a non-convergent full-rebuild loop.
+        // [code review 2026-07-29]
+        var deepAdrDir = Path.Combine(Adrs, "decisions", "2026");
+        Directory.CreateDirectory(deepAdrDir);
+        var deepAdr = Path.Combine(deepAdrDir, "0009-nested.md");
+        File.WriteAllText(deepAdr, "# 9. Nested\n\nStatus: Accepted\n");
+        Assert.Equal(RebuildScope.Narrow, generator.ClassifyRebuildScope(deepAdr));
 
         // epics.md gets NO special case: edited it is content, deleted it is topology (Trap 4 — see
         // DeletedEpicsFile_EscalatesAndMatchesOracle for why the exemption was measured and dropped).
@@ -579,7 +800,9 @@ public class IncrementalOracleParityTests : IDisposable
 
         var escalation = Assert.Single(_events);
         Assert.Equal(GenerationOutcome.Updated, escalation.Outcome);
-        Assert.Equal("<directory change>", escalation.RelativePath);
+        // The triggering path, not the <directory change> sentinel — see DeletedEpicsFile_EscalatesAndMatchesOracle.
+        // A DIRECTORY-level pass (RunTopologyPass) still reports the sentinel, since it has no single honest path.
+        Assert.Equal("_bmad-output/planning-artifacts/brand-new.md", escalation.RelativePath);
         Assert.Equal("full rebuild", escalation.Message);
     }
 }

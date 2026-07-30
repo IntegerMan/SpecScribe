@@ -43,6 +43,29 @@ public static class DesignSystemTemplater
         ("--motion-stagger", "The delay between items when a group enters one after another."),
     ];
 
+    /// <summary>Stage → the paired FILL token, for the stages that have one.
+    ///
+    /// <para>Each <c>--status-*</c> token is a stage's ACCENT (border + text). Four stages also sit on a pale
+    /// fill, and until Story 23.2's re-review those fills were inline hexes on
+    /// <c>.status-badge.&lt;stage&gt;</c> — invisible to the token bridge, so the Vue counterpart substituted
+    /// one flat parchment for all four and the two design systems disagreed about the colours they both exist
+    /// to document. Naming the fill here is what makes the pair discoverable to a component author.</para>
+    ///
+    /// <para><c>ready</c> and <c>drafted</c> deliberately map to the SAME fill, exactly as the stylesheet
+    /// pairs them: one visual tier, separated by word and glyph. Internal rather than private for the same
+    /// reason as <see cref="MotionTokens"/> — a test asserts against THIS map, never a re-typed copy. Stages
+    /// absent from it have no fill of their own and the page says nothing about one.
+    /// [Story 23.2 re-review 2026-07-28]</para></summary>
+    internal static readonly IReadOnlyDictionary<string, string> StageFillTokens =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["done"] = "--status-done-bg",
+            ["active"] = "--status-active-bg",
+            ["review"] = "--status-review-bg",
+            ["ready"] = "--status-ready-bg",
+            ["drafted"] = "--status-ready-bg",
+        };
+
     public static string RenderPage(SiteNav nav) =>
         HtmlRenderAdapter.Shared.Render(BuildPage(nav)).Content;
 
@@ -166,6 +189,15 @@ public static class DesignSystemTemplater
                 "retired" => ("deferred", "shares <code>--status-deferred</code>"),
                 _ => (stage, $"<code>--status-{stage}</code>"),
             };
+
+            // The accent above is half the pair. Four stages also sit on a pale fill, and a component author
+            // binding only the accent gets a badge with the right border on the wrong background — which is
+            // precisely what happened to StatusBadge.vue. Named, never valued. [Story 23.2 re-review]
+            if (StageFillTokens.TryGetValue(stage, out var fill))
+            {
+                var shared = stage is "ready" or "drafted" ? ", shared with ready/drafted" : string.Empty;
+                tokenNote += $" on <code>{fill}</code>{shared}";
+            }
 
             sb.Append("  <li class=\"status-legend-key-row\">\n");
             sb.Append($"    <span class=\"status-legend-key-swatch {swatchClass}\" aria-hidden=\"true\"></span>\n");

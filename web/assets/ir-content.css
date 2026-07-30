@@ -651,7 +651,7 @@
 }
 
 .ir-content .status-badge.evidence-pill.tests-pass {
-  background: #e8f0e4;
+  background: var(--status-done-bg);
   color: var(--moss);
   border-color: var(--moss-light);
 }
@@ -873,17 +873,6 @@
 
 @media (max-width: 640px) {
 .ir-content .change-surface-files { grid-template-columns: 1fr; }
-}
-
-.ir-content .pill {
-  font-family: 'Courier New', monospace;
-  font-size: 0.72rem;
-  letter-spacing: 0.03em;
-  padding: 0.2rem 0.7rem;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--warm-white);
-  color: var(--ink-faded);
 }
 
 .ir-content .page-shell {
@@ -1448,14 +1437,14 @@
   font-family: 'Courier New', monospace;
 }
 
-.ir-content .epic-status.done { background: #e8f0e4; color: var(--moss); border: 1px solid var(--moss-light); }
+.ir-content .epic-status.done { background: var(--status-done-bg); color: var(--moss); border: 1px solid var(--moss-light); }
 
-.ir-content .epic-status.review { background: #d9e6ea; color: var(--teal-deep); border: 1px solid var(--teal-deep); }
+.ir-content .epic-status.review { background: var(--status-review-bg); color: var(--teal-deep); border: 1px solid var(--teal-deep); }
 
-.ir-content .epic-status.active { background: #e0ecea; color: var(--teal); border: 1px solid var(--teal); }
+.ir-content .epic-status.active { background: var(--status-active-bg); color: var(--teal); border: 1px solid var(--teal); }
 
 .ir-content .epic-status.ready,
-.ir-content .epic-status.drafted { background: #f5ecd4; color: var(--gold); border: 1px solid var(--gold-light); }
+.ir-content .epic-status.drafted { background: var(--status-ready-bg); color: var(--gold); border: 1px solid var(--gold-light); }
 
 .ir-content .epic-status.pending { background: var(--parchment-dark); color: var(--ink-light); border: 1px solid var(--border); }
 
@@ -1668,14 +1657,14 @@
   border: 1px solid var(--border);
 }
 
-.ir-content .status-badge.done { background: #e8f0e4; color: var(--moss); border-color: var(--moss-light); }
+.ir-content .status-badge.done { background: var(--status-done-bg); color: var(--moss); border-color: var(--moss-light); }
 
-.ir-content .status-badge.active { background: #e0ecea; color: var(--teal); border-color: var(--teal); }
+.ir-content .status-badge.active { background: var(--status-active-bg); color: var(--teal); border-color: var(--teal); }
 
-.ir-content .status-badge.review { background: #d9e6ea; color: var(--teal-deep); border-color: var(--teal-deep); }
+.ir-content .status-badge.review { background: var(--status-review-bg); color: var(--teal-deep); border-color: var(--teal-deep); }
 
 .ir-content .status-badge.ready,
-.ir-content .status-badge.drafted { background: #f5ecd4; color: var(--gold); border-color: var(--gold-light); }
+.ir-content .status-badge.drafted { background: var(--status-ready-bg); color: var(--gold); border-color: var(--gold-light); }
 
 .ir-content .status-badge.pending { background: var(--parchment-dark); color: var(--ink-light); border-color: var(--border); }
 

@@ -62,6 +62,24 @@
   /* Alternate hatch stripe for unrecognized chrome — token so dark/webview remaps can retune it. */
   --status-unrecognized-hatch: #e8ecf0;
 
+  /* ---- Stage FILL tints, paired with the --status-* accents above ----
+     The --status-* tokens above are the stage's ACCENT (border + text). These four are the pale FILL the
+     badge sits on. They were inline literals on `.status-badge.<stage>` until Story 23.2's re-review: the
+     Vue counterpart could not bind a value that was not a token, so `StatusBadge.vue` substituted
+     --parchment for all four and the two design systems rendered visibly different badges — the exact drift
+     Epic 23 exists to prevent, on the surface whose subject IS the colour vocabulary.
+
+     Each is consumed in TWO places, and that is the point: `.status-badge.<stage>` and the `.epic-status`
+     rules that already described themselves in a comment as "mirrors .status-badge.review". A self-declared
+     mirror held as a second literal is a drift waiting to happen; one token, two consumers, no drift.
+
+     `ready` and `drafted` deliberately SHARE one fill (they share the gold accent too) — a story with a plan
+     and a story merely drafted are one visual tier, separated by word and glyph. [Story 23.2 re-review] */
+  --status-done-bg: #e8f0e4;    /* pale moss  — .status-badge.done, .epic-status.done */
+  --status-active-bg: #e0ecea;  /* pale teal  — .status-badge.active, .epic-status.active */
+  --status-review-bg: #d9e6ea;  /* pale deep-teal — .status-badge.review, .epic-status.review */
+  --status-ready-bg: #f5ecd4;   /* pale gold  — .status-badge.ready AND .drafted */
+
   /* Diagnostics severity background (Story 4.8) — a pale rust tint pairing with --rust, deliberately outside
      the six-stage --status-* vocabulary (a run notice isn't a delivery stage) but still a named token rather
      than an inline literal, per the project's variable-only palette convention. [Review][Patch] */
@@ -967,9 +985,10 @@ body {
   letter-spacing: 0.02em;
 }
 
-/* Populated tests pill — moss/done channel so a green tally reads as "passing" without a 7th status token. */
+/* Populated tests pill — moss/done channel so a green tally reads as "passing" without a 7th status token.
+   Uses the done FILL token rather than a third copy of its hex. [Story 23.2 re-review] */
 .status-badge.evidence-pill.tests-pass {
-  background: #e8f0e4;
+  background: var(--status-done-bg);
   color: var(--moss);
   border-color: var(--moss-light);
 }
@@ -2911,12 +2930,14 @@ a.work-node:focus-visible {
   font-family: 'Courier New', monospace;
 }
 
-.epic-status.done { background: #e8f0e4; color: var(--moss); border: 1px solid var(--moss-light); }
+/* These four FILLS are the same tokens `.status-badge.<stage>` uses, not a second set of literals — the
+   "mirrors" claim below used to be enforced by nothing but two matching hexes. [Story 23.2 re-review] */
+.epic-status.done { background: var(--status-done-bg); color: var(--moss); border: 1px solid var(--moss-light); }
 /* Retro-gated "In review" tier — mirrors .status-badge.review's deep-teal. [spec-sunburst-retro] */
-.epic-status.review { background: #d9e6ea; color: var(--teal-deep); border: 1px solid var(--teal-deep); }
-.epic-status.active { background: #e0ecea; color: var(--teal); border: 1px solid var(--teal); }
+.epic-status.review { background: var(--status-review-bg); color: var(--teal-deep); border: 1px solid var(--teal-deep); }
+.epic-status.active { background: var(--status-active-bg); color: var(--teal); border: 1px solid var(--teal); }
 .epic-status.ready,
-.epic-status.drafted { background: #f5ecd4; color: var(--gold); border: 1px solid var(--gold-light); }
+.epic-status.drafted { background: var(--status-ready-bg); color: var(--gold); border: 1px solid var(--gold-light); }
 .epic-status.pending { background: var(--parchment-dark); color: var(--ink-light); border: 1px solid var(--border); }
 .epic-status.unrecognized {
   background: repeating-linear-gradient(
@@ -3176,11 +3197,11 @@ a.work-node:focus-visible {
   border: 1px solid var(--border);
 }
 
-.status-badge.done { background: #e8f0e4; color: var(--moss); border-color: var(--moss-light); }
-.status-badge.active { background: #e0ecea; color: var(--teal); border-color: var(--teal); }
-.status-badge.review { background: #d9e6ea; color: var(--teal-deep); border-color: var(--teal-deep); }
+.status-badge.done { background: var(--status-done-bg); color: var(--moss); border-color: var(--moss-light); }
+.status-badge.active { background: var(--status-active-bg); color: var(--teal); border-color: var(--teal); }
+.status-badge.review { background: var(--status-review-bg); color: var(--teal-deep); border-color: var(--teal-deep); }
 .status-badge.ready,
-.status-badge.drafted { background: #f5ecd4; color: var(--gold); border-color: var(--gold-light); }
+.status-badge.drafted { background: var(--status-ready-bg); color: var(--gold); border-color: var(--gold-light); }
 /* backlog/pending rows (sprint tracking) read on-brand — mirrors .status-badge.deferred (parchment/grey).
    The base .status-badge already carries these values; the explicit rule documents the mapping and pins it
    against future base changes. [Story 2.3 Task 2] */
@@ -4331,9 +4352,10 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 }
 .codemap-dim-select:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
 
-/* The two exclude-filter checkboxes (round 2) — PURE CSS, no script required; see the .codemap-view rules below.
-   Plain, unwrapped <input>+<label> siblings (not nested in a fieldset) since the sibling-combinator panel toggle
-   needs them at the same nesting level as the .codemap-view panels they control. */
+/* The two exclude-filter checkboxes (round 2) — PURE CSS, no script required; see the [data-codemap-view] and
+   .codemap-table-row rules below. Plain, unwrapped <input>+<label> siblings (not nested in a fieldset) since the
+   sibling-combinator toggle needs them at the same nesting level as the .codemap-table-section they control.
+   [Story 20.10 review: the retired `.codemap-view` panels this comment used to point at no longer exist.] */
 .codemap-filter-checkbox { margin: 0.5rem 0 0 0.1rem; vertical-align: middle; cursor: pointer; accent-color: var(--rust); }
 .codemap-filter-checkbox:first-of-type { margin-left: 0; }
 .codemap-filter-label {
@@ -4360,6 +4382,20 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 #cm-exclude-spec:not(:checked) ~ #cm-exclude-tests:checked ~ .codemap-table-section [data-codemap-view="no-tests"],
 #cm-exclude-spec:checked ~ #cm-exclude-tests:checked ~ .codemap-table-section [data-codemap-view="no-spec-no-tests"] {
   display: block;
+}
+
+/* Same four-combination toggle, but for the per-view TRUNCATION ROW — a <tr>, which `display: block` above would
+   collapse into a single unstyled band with its cells stacked. One extra element selector outranks the generic
+   rules (0,1,1 vs 0,1,0) and these follow them in source order, so the <tr> case wins in both directions.
+   [Story 20.10 review: the row used to be a single un-markered <tr> carrying the DISTINCT-set count, so it showed
+   in every combination — including under "No files match this filter." — and reported a number that was not the
+   active view's.] */
+.codemap-table-section tr[data-codemap-view] { display: none; }
+#cm-exclude-spec:not(:checked) ~ #cm-exclude-tests:not(:checked) ~ .codemap-table-section tr[data-codemap-view="full"],
+#cm-exclude-spec:checked ~ #cm-exclude-tests:not(:checked) ~ .codemap-table-section tr[data-codemap-view="no-spec"],
+#cm-exclude-spec:not(:checked) ~ #cm-exclude-tests:checked ~ .codemap-table-section tr[data-codemap-view="no-tests"],
+#cm-exclude-spec:checked ~ #cm-exclude-tests:checked ~ .codemap-table-section tr[data-codemap-view="no-spec-no-tests"] {
+  display: table-row;
 }
 
 /* 2. Per-ROW hiding (Task 4.3): the SAME `#cm-exclude-*:checked ~ …` idiom, but as two INDEPENDENT rules rather
@@ -7053,7 +7089,9 @@ a.cmd-menu-toggle:hover { color: var(--rust); border-color: var(--gold-light); }
   display: inline-flex; align-items: center; gap: 0.3rem;
   font-size: 0.78rem; font-family: 'Courier New', monospace;
   padding: 0.3rem 0.6rem; border-radius: 6px; text-decoration: none;
-  color: var(--teal-deep); background: #d9e6ea; border: 1px solid var(--status-review);
+  /* Genuinely on the review channel — it already bound --status-review for the border, so the fill was the
+     one half still held as a literal. [Story 23.2 re-review] */
+  color: var(--teal-deep); background: var(--status-review-bg); border: 1px solid var(--status-review);
 }
 .sprint-flag:hover { color: var(--rust); border-color: var(--gold-light); }
 

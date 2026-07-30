@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en" data-probe-meta="__PROBE_META__" data-tab-order="confidence-desc, matching the text twin">
+<head>
+<meta charset="utf-8" />
+<!--CSP-META-->
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>24.6 candidate (a) — Plotly scatter + generation-time C# layout</title>
+<link rel="stylesheet" href="./vendor/specscribe.css" />
+<style>
+  /* Probe chrome only. The CHART's colours come from the shipped tokens, resolved through the real cascade —
+     nothing here paints a graph element. The two edge classes mirror the SHIPPED Charts.CouplingGraph precedent
+     (`coupling-edge` / `coupling-edge process-edge`): a dashed stroke plus title text, never a hue change. */
+  body { margin: 0; padding: 1rem 1.25rem 4rem; }
+  .probe-head { display:flex; gap:1rem; align-items:baseline; flex-wrap:wrap; margin-bottom:.75rem; }
+  .probe-head h1 { font-size:1.05rem; margin:0; }
+  .probe-note { font-size:.8rem; opacity:.75; }
+  #chart { width:100%; max-width:1100px; height:640px; }
+  .chart-panel { overflow:hidden; border:1px solid var(--border); border-radius:10px; padding:.5rem; }
+  .ss-tooltip { position:fixed; z-index:9999; max-width:22rem; padding:.4rem .55rem; font-size:.8rem;
+    background:var(--surface-2, #222); color:var(--ink, #eee); border:1px solid var(--border, #555);
+    border-radius:6px; pointer-events:none; opacity:0; }
+  .ss-tooltip[data-shown="true"] { opacity:1; }
+  .sr-only { position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden;
+    clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+  [data-graph-node]:focus { outline:3px solid var(--focus, #6cf); outline-offset:2px; }
+</style>
+</head>
+<body>
+<div class="probe-head">
+  <h1>Candidate (a) — Plotly <code>scatter</code> + generation-time C# layout</h1>
+  <span class="probe-note">marginal bundle cost: <strong>0 B</strong> (already vendored &amp; embedded)</span>
+</div>
+<div class="chart-panel"><div id="chart"></div></div>
+<div data-graph-live aria-live="polite" class="sr-only"></div>
+<div id="twin" class="sr-only"></div>
+
+<script type="application/json" id="graph-data">{"title":"ego _bmad-output/implementation-artifacts/sprint-status.yaml, top-20 by confidence","hub":"_bmad-output/implementation-artifacts/sprint-status.yaml","nodes":[{"id":"f0","p":"_bmad-output/implementation-artifacts/deferred-work.md","l":"deferred-work.md","x":0.7468,"y":0.2808,"w":118,"d":20,"b":"_bmad-output"},{"id":"f1","p":"_bmad-output/implementation-artifacts/sprint-status.yaml","l":"sprint-status.yaml","x":0.5423,"y":0.6871,"w":179,"d":20,"b":"_bmad-output"},{"id":"f2","p":"_bmad-output/planning-artifacts/epics.md","l":"epics.md","x":0.9687,"y":0.7879,"w":53,"d":20,"b":"_bmad-output"},{"id":"f3","p":"src/SpecScribe/Charts.cs","l":"Charts.cs","x":0.7393,"y":0.7712,"w":92,"d":20,"b":"src"},{"id":"f4","p":"src/SpecScribe/DashboardViewBuilder.cs","l":"DashboardViewBuilder.cs","x":0.4727,"y":0.9755,"w":32,"d":20,"b":"src"},{"id":"f5","p":"src/SpecScribe/EpicsTemplater.cs","l":"EpicsTemplater.cs","x":0.2271,"y":0.9305,"w":22,"d":20,"b":"src"},{"id":"f6","p":"src/SpecScribe/EpicsViewBuilder.cs","l":"EpicsViewBuilder.cs","x":0.6988,"y":1,"w":26,"d":20,"b":"src"},{"id":"f7","p":"src/SpecScribe/HtmlRenderAdapter.Dashboard.cs","l":"HtmlRenderAdapter.Dashboard.cs","x":0.308,"y":0.7289,"w":52,"d":20,"b":"src"},{"id":"f8","p":"src/SpecScribe/HtmlRenderAdapter.Epics.cs","l":"HtmlRenderAdapter.Epics.cs","x":0.22,"y":0.1563,"w":35,"d":20,"b":"src"},{"id":"f9","p":"src/SpecScribe/HtmlRenderAdapter.cs","l":"HtmlRenderAdapter.cs","x":0,"y":0.4382,"w":24,"d":20,"b":"src"},{"id":"f10","p":"src/SpecScribe/HtmlTemplater.cs","l":"HtmlTemplater.cs","x":0.1776,"y":0.3606,"w":36,"d":20,"b":"src"},{"id":"f11","p":"src/SpecScribe/Icons.cs","l":"Icons.cs","x":0.0672,"y":0.6797,"w":28,"d":20,"b":"src"},{"id":"f12","p":"src/SpecScribe/SiteGenerator.cs","l":"SiteGenerator.cs","x":0.4422,"y":0.2995,"w":114,"d":20,"b":"src"},{"id":"f13","p":"src/SpecScribe/SiteNav.cs","l":"SiteNav.cs","x":0.3925,"y":0,"w":30,"d":20,"b":"src"},{"id":"f14","p":"src/SpecScribe/assets/specscribe.css","l":"specscribe.css","x":0.3799,"y":0.5143,"w":141,"d":20,"b":"src"},{"id":"f15","p":"src/SpecScribe/assets/specscribe.js","l":"specscribe.js","x":0.822,"y":0.062,"w":44,"d":20,"b":"src"},{"id":"f16","p":"tests/SpecScribe.Tests/ChartsTests.cs","l":"ChartsTests.cs","x":0.9564,"y":0.3,"w":67,"d":20,"b":"tests"},{"id":"f17","p":"tests/SpecScribe.Tests/HtmlRenderAdapterTests.cs","l":"HtmlRenderAdapterTests.cs","x":0.5824,"y":0.1043,"w":47,"d":20,"b":"tests"},{"id":"f18","p":"tests/SpecScribe.Tests/HtmlTemplaterTests.cs","l":"HtmlTemplaterTests.cs","x":0.8358,"y":0.569,"w":39,"d":20,"b":"tests"},{"id":"f19","p":"tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs","l":"SiteGeneratorAdapterTests.cs","x":0.6103,"y":0.4606,"w":156,"d":20,"b":"tests"},{"id":"f20","p":"tests/SpecScribe.Tests/StylesheetTests.cs","l":"StylesheetTests.cs","x":1,"y":0.5184,"w":71,"d":20,"b":"tests"}],"edges":[{"a":0,"b":1,"s":71,"cab":0.6017,"cba":0.3966,"lift":1.0084,"xb":false,"k":"proc"},{"a":0,"b":2,"s":20,"cab":0.1695,"cba":0.3774,"lift":0.9594,"xb":false,"k":"proc"},{"a":0,"b":3,"s":41,"cab":0.3475,"cba":0.4457,"lift":1.133,"xb":true,"k":"proc"},{"a":0,"b":4,"s":12,"cab":0.1017,"cba":0.375,"lift":0.9534,"xb":true,"k":"proc"},{"a":0,"b":5,"s":9,"cab":0.0763,"cba":0.4091,"lift":1.0401,"xb":true,"k":"proc"},{"a":0,"b":6,"s":10,"cab":0.0847,"cba":0.3846,"lift":0.9778,"xb":true,"k":"proc"},{"a":0,"b":7,"s":18,"cab":0.1525,"cba":0.3462,"lift":0.8801,"xb":true,"k":"proc"},{"a":0,"b":8,"s":9,"cab":0.0763,"cba":0.2571,"lift":0.6538,"xb":true,"k":"proc"},{"a":0,"b":9,"s":10,"cab":0.0847,"cba":0.4167,"lift":1.0593,"xb":true,"k":"proc"},{"a":0,"b":10,"s":14,"cab":0.1186,"cba":0.3889,"lift":0.9887,"xb":true,"k":"proc"},{"a":0,"b":11,"s":10,"cab":0.0847,"cba":0.3571,"lift":0.908,"xb":true,"k":"proc"},{"a":0,"b":12,"s":53,"cab":0.4492,"cba":0.4649,"lift":1.182,"xb":true,"k":"proc"},{"a":0,"b":13,"s":9,"cab":0.0763,"cba":0.3,"lift":0.7627,"xb":true,"k":"proc"},{"a":0,"b":14,"s":50,"cab":0.4237,"cba":0.3546,"lift":0.9016,"xb":true,"k":"proc"},{"a":0,"b":15,"s":24,"cab":0.2034,"cba":0.5455,"lift":1.3867,"xb":true,"k":"proc"},{"a":0,"b":16,"s":28,"cab":0.2373,"cba":0.4179,"lift":1.0625,"xb":true,"k":"proc"},{"a":0,"b":17,"s":16,"cab":0.1356,"cba":0.3404,"lift":0.8655,"xb":true,"k":"proc"},{"a":0,"b":18,"s":14,"cab":0.1186,"cba":0.359,"lift":0.9126,"xb":true,"k":"proc"},{"a":0,"b":19,"s":63,"cab":0.5339,"cba":0.4038,"lift":1.0267,"xb":true,"k":"proc"},{"a":0,"b":20,"s":26,"cab":0.2203,"cba":0.3662,"lift":0.931,"xb":true,"k":"proc"},{"a":1,"b":2,"s":46,"cab":0.257,"cba":0.8679,"lift":1.4546,"xb":false,"k":"proc"},{"a":1,"b":3,"s":65,"cab":0.3631,"cba":0.7065,"lift":1.1841,"xb":true,"k":"proc"},{"a":1,"b":4,"s":24,"cab":0.1341,"cba":0.75,"lift":1.257,"xb":true,"k":"proc"},{"a":1,"b":5,"s":20,"cab":0.1117,"cba":0.9091,"lift":1.5236,"xb":true,"k":"proc"},{"a":1,"b":6,"s":22,"cab":0.1229,"cba":0.8462,"lift":1.4181,"xb":true,"k":"proc"},{"a":1,"b":7,"s":35,"cab":0.1955,"cba":0.6731,"lift":1.1281,"xb":true,"k":"proc"},{"a":1,"b":8,"s":27,"cab":0.1508,"cba":0.7714,"lift":1.2929,"xb":true,"k":"proc"},{"a":1,"b":9,"s":19,"cab":0.1061,"cba":0.7917,"lift":1.3268,"xb":true,"k":"proc"},{"a":1,"b":10,"s":30,"cab":0.1676,"cba":0.8333,"lift":1.3966,"xb":true,"k":"proc"},{"a":1,"b":11,"s":19,"cab":0.1061,"cba":0.6786,"lift":1.1373,"xb":true,"k":"proc"},{"a":1,"b":12,"s":81,"cab":0.4525,"cba":0.7105,"lift":1.1908,"xb":true,"k":"proc"},{"a":1,"b":13,"s":26,"cab":0.1453,"cba":0.8667,"lift":1.4525,"xb":true,"k":"proc"},{"a":1,"b":14,"s":104,"cab":0.581,"cba":0.7376,"lift":1.2362,"xb":true,"k":"proc"},{"a":1,"b":15,"s":30,"cab":0.1676,"cba":0.6818,"lift":1.1427,"xb":true,"k":"proc"},{"a":1,"b":16,"s":46,"cab":0.257,"cba":0.6866,"lift":1.1507,"xb":true,"k":"proc"},{"a":1,"b":17,"s":33,"cab":0.1844,"cba":0.7021,"lift":1.1768,"xb":true,"k":"proc"},{"a":1,"b":18,"s":29,"cab":0.162,"cba":0.7436,"lift":1.2462,"xb":true,"k":"proc"},{"a":1,"b":19,"s":111,"cab":0.6201,"cba":0.7115,"lift":1.1925,"xb":true,"k":"proc"},{"a":1,"b":20,"s":57,"cab":0.3184,"cba":0.8028,"lift":1.3455,"xb":true,"k":"proc"},{"a":2,"b":3,"s":16,"cab":0.3019,"cba":0.1739,"lift":0.9844,"xb":true,"k":"proc"},{"a":2,"b":4,"s":8,"cab":0.1509,"cba":0.25,"lift":1.4151,"xb":true,"k":"proc"},{"a":2,"b":5,"s":7,"cab":0.1321,"cba":0.3182,"lift":1.801,"xb":true,"k":"proc"},{"a":2,"b":6,"s":2,"cab":0.0377,"cba":0.0769,"lift":0.4354,"xb":true,"k":"proc"},{"a":2,"b":7,"s":11,"cab":0.2075,"cba":0.2115,"lift":1.1974,"xb":true,"k":"proc"},{"a":2,"b":8,"s":4,"cab":0.0755,"cba":0.1143,"lift":0.6469,"xb":true,"k":"proc"},{"a":2,"b":9,"s":4,"cab":0.0755,"cba":0.1667,"lift":0.9434,"xb":true,"k":"proc"},{"a":2,"b":10,"s":12,"cab":0.2264,"cba":0.3333,"lift":1.8868,"xb":true,"k":"proc"},{"a":2,"b":11,"s":3,"cab":0.0566,"cba":0.1071,"lift":0.6065,"xb":true,"k":"proc"},{"a":2,"b":12,"s":25,"cab":0.4717,"cba":0.2193,"lift":1.2413,"xb":true,"k":"proc"},{"a":2,"b":13,"s":11,"cab":0.2075,"cba":0.3667,"lift":2.0755,"xb":true,"k":"proc"},{"a":2,"b":14,"s":30,"cab":0.566,"cba":0.2128,"lift":1.2043,"xb":true,"k":"proc"},{"a":2,"b":15,"s":11,"cab":0.2075,"cba":0.25,"lift":1.4151,"xb":true,"k":"proc"},{"a":2,"b":16,"s":12,"cab":0.2264,"cba":0.1791,"lift":1.0138,"xb":true,"k":"proc"},{"a":2,"b":17,"s":6,"cab":0.1132,"cba":0.1277,"lift":0.7226,"xb":true,"k":"proc"},{"a":2,"b":18,"s":6,"cab":0.1132,"cba":0.1538,"lift":0.8708,"xb":true,"k":"proc"},{"a":2,"b":19,"s":30,"cab":0.566,"cba":0.1923,"lift":1.0885,"xb":true,"k":"proc"},{"a":2,"b":20,"s":13,"cab":0.2453,"cba":0.1831,"lift":1.0364,"xb":true,"k":"proc"},{"a":3,"b":4,"s":13,"cab":0.1413,"cba":0.4063,"lift":1.3247,"xb":false,"k":"code"},{"a":3,"b":5,"s":8,"cab":0.087,"cba":0.3636,"lift":1.1858,"xb":false,"k":"code"},{"a":3,"b":6,"s":10,"cab":0.1087,"cba":0.3846,"lift":1.2542,"xb":false,"k":"code"},{"a":3,"b":7,"s":27,"cab":0.2935,"cba":0.5192,"lift":1.6931,"xb":false,"k":"code"},{"a":3,"b":8,"s":14,"cab":0.1522,"cba":0.4,"lift":1.3043,"xb":false,"k":"code"},{"a":3,"b":9,"s":5,"cab":0.0543,"cba":0.2083,"lift":0.6793,"xb":false,"k":"code"},{"a":3,"b":10,"s":15,"cab":0.163,"cba":0.4167,"lift":1.3587,"xb":false,"k":"code"},{"a":3,"b":11,"s":10,"cab":0.1087,"cba":0.3571,"lift":1.1646,"xb":false,"k":"code"},{"a":3,"b":12,"s":42,"cab":0.4565,"cba":0.3684,"lift":1.2014,"xb":false,"k":"code"},{"a":3,"b":13,"s":12,"cab":0.1304,"cba":0.4,"lift":1.3043,"xb":false,"k":"code"},{"a":3,"b":14,"s":68,"cab":0.7391,"cba":0.4823,"lift":1.5726,"xb":false,"k":"proc"},{"a":3,"b":15,"s":24,"cab":0.2609,"cba":0.5455,"lift":1.7787,"xb":false,"k":"code"},{"a":3,"b":16,"s":62,"cab":0.6739,"cba":0.9254,"lift":3.0175,"xb":true,"k":"code"},{"a":3,"b":17,"s":16,"cab":0.1739,"cba":0.3404,"lift":1.1101,"xb":true,"k":"code"},{"a":3,"b":18,"s":20,"cab":0.2174,"cba":0.5128,"lift":1.6722,"xb":true,"k":"code"},{"a":3,"b":19,"s":66,"cab":0.7174,"cba":0.4231,"lift":1.3796,"xb":true,"k":"code"},{"a":3,"b":20,"s":34,"cab":0.3696,"cba":0.4789,"lift":1.5615,"xb":true,"k":"code"},{"a":4,"b":5,"s":5,"cab":0.1563,"cba":0.2273,"lift":2.1307,"xb":false,"k":"code"},{"a":4,"b":6,"s":9,"cab":0.2813,"cba":0.3462,"lift":3.2452,"xb":false,"k":"code"},{"a":4,"b":7,"s":22,"cab":0.6875,"cba":0.4231,"lift":3.9663,"xb":false,"k":"code"},{"a":4,"b":8,"s":8,"cab":0.25,"cba":0.2286,"lift":2.1429,"xb":false,"k":"code"},{"a":4,"b":9,"s":5,"cab":0.1563,"cba":0.2083,"lift":1.9531,"xb":false,"k":"code"},{"a":4,"b":10,"s":11,"cab":0.3438,"cba":0.3056,"lift":2.8646,"xb":false,"k":"code"},{"a":4,"b":11,"s":5,"cab":0.1563,"cba":0.1786,"lift":1.6741,"xb":false,"k":"code"},{"a":4,"b":12,"s":18,"cab":0.5625,"cba":0.1579,"lift":1.4803,"xb":false,"k":"code"},{"a":4,"b":13,"s":6,"cab":0.1875,"cba":0.2,"lift":1.875,"xb":false,"k":"code"},{"a":4,"b":14,"s":22,"cab":0.6875,"cba":0.156,"lift":1.4628,"xb":false,"k":"proc"},{"a":4,"b":15,"s":6,"cab":0.1875,"cba":0.1364,"lift":1.2784,"xb":false,"k":"code"},{"a":4,"b":16,"s":9,"cab":0.2813,"cba":0.1343,"lift":1.2593,"xb":true,"k":"code"},{"a":4,"b":17,"s":13,"cab":0.4063,"cba":0.2766,"lift":2.5931,"xb":true,"k":"code"},{"a":4,"b":18,"s":9,"cab":0.2813,"cba":0.2308,"lift":2.1635,"xb":true,"k":"code"},{"a":4,"b":19,"s":27,"cab":0.8438,"cba":0.1731,"lift":1.6226,"xb":true,"k":"code"},{"a":4,"b":20,"s":11,"cab":0.3438,"cba":0.1549,"lift":1.4525,"xb":true,"k":"code"},{"a":5,"b":6,"s":14,"cab":0.6364,"cba":0.5385,"lift":7.3427,"xb":false,"k":"code"},{"a":5,"b":7,"s":7,"cab":0.3182,"cba":0.1346,"lift":1.8357,"xb":false,"k":"code"},{"a":5,"b":8,"s":13,"cab":0.5909,"cba":0.3714,"lift":5.0649,"xb":false,"k":"code"},{"a":5,"b":9,"s":7,"cab":0.3182,"cba":0.2917,"lift":3.9773,"xb":false,"k":"code"},{"a":5,"b":10,"s":11,"cab":0.5,"cba":0.3056,"lift":4.1667,"xb":false,"k":"code"},{"a":5,"b":11,"s":3,"cab":0.1364,"cba":0.1071,"lift":1.461,"xb":false,"k":"code"},{"a":5,"b":12,"s":17,"cab":0.7727,"cba":0.1491,"lift":2.0335,"xb":false,"k":"code"},{"a":5,"b":13,"s":7,"cab":0.3182,"cba":0.2333,"lift":3.1818,"xb":false,"k":"code"},{"a":5,"b":14,"s":16,"cab":0.7273,"cba":0.1135,"lift":1.5474,"xb":false,"k":"proc"},{"a":5,"b":15,"s":4,"cab":0.1818,"cba":0.0909,"lift":1.2397,"xb":false,"k":"code"},{"a":5,"b":16,"s":7,"cab":0.3182,"cba":0.1045,"lift":1.4247,"xb":true,"k":"code"},{"a":5,"b":17,"s":8,"cab":0.3636,"cba":0.1702,"lift":2.3211,"xb":true,"k":"code"},{"a":5,"b":18,"s":6,"cab":0.2727,"cba":0.1538,"lift":2.0979,"xb":true,"k":"code"},{"a":5,"b":19,"s":18,"cab":0.8182,"cba":0.1154,"lift":1.5734,"xb":true,"k":"code"},{"a":5,"b":20,"s":7,"cab":0.3182,"cba":0.0986,"lift":1.3444,"xb":true,"k":"code"},{"a":6,"b":7,"s":11,"cab":0.4231,"cba":0.2115,"lift":2.4408,"xb":false,"k":"code"},{"a":6,"b":8,"s":18,"cab":0.6923,"cba":0.5143,"lift":5.9341,"xb":false,"k":"code"},{"a":6,"b":9,"s":5,"cab":0.1923,"cba":0.2083,"lift":2.4038,"xb":false,"k":"code"},{"a":6,"b":10,"s":7,"cab":0.2692,"cba":0.1944,"lift":2.2436,"xb":false,"k":"code"},{"a":6,"b":11,"s":3,"cab":0.1154,"cba":0.1071,"lift":1.2363,"xb":false,"k":"code"},{"a":6,"b":12,"s":18,"cab":0.6923,"cba":0.1579,"lift":1.8219,"xb":false,"k":"code"},{"a":6,"b":13,"s":3,"cab":0.1154,"cba":0.1,"lift":1.1538,"xb":false,"k":"code"},{"a":6,"b":14,"s":18,"cab":0.6923,"cba":0.1277,"lift":1.473,"xb":false,"k":"proc"},{"a":6,"b":15,"s":4,"cab":0.1538,"cba":0.0909,"lift":1.049,"xb":false,"k":"code"},{"a":6,"b":16,"s":9,"cab":0.3462,"cba":0.1343,"lift":1.5499,"xb":true,"k":"code"},{"a":6,"b":17,"s":14,"cab":0.5385,"cba":0.2979,"lift":3.437,"xb":true,"k":"code"},{"a":6,"b":18,"s":8,"cab":0.3077,"cba":0.2051,"lift":2.3669,"xb":true,"k":"code"},{"a":6,"b":19,"s":22,"cab":0.8462,"cba":0.141,"lift":1.6272,"xb":true,"k":"code"},{"a":6,"b":20,"s":9,"cab":0.3462,"cba":0.1268,"lift":1.4626,"xb":true,"k":"code"},{"a":7,"b":8,"s":16,"cab":0.3077,"cba":0.4571,"lift":2.6374,"xb":false,"k":"code"},{"a":7,"b":9,"s":12,"cab":0.2308,"cba":0.5,"lift":2.8846,"xb":false,"k":"code"},{"a":7,"b":10,"s":14,"cab":0.2692,"cba":0.3889,"lift":2.2436,"xb":false,"k":"code"},{"a":7,"b":11,"s":13,"cab":0.25,"cba":0.4643,"lift":2.6786,"xb":false,"k":"code"},{"a":7,"b":12,"s":25,"cab":0.4808,"cba":0.2193,"lift":1.2652,"xb":false,"k":"code"},{"a":7,"b":13,"s":10,"cab":0.1923,"cba":0.3333,"lift":1.9231,"xb":false,"k":"code"},{"a":7,"b":14,"s":40,"cab":0.7692,"cba":0.2837,"lift":1.6367,"xb":false,"k":"proc"},{"a":7,"b":15,"s":13,"cab":0.25,"cba":0.2955,"lift":1.7045,"xb":false,"k":"code"},{"a":7,"b":16,"s":17,"cab":0.3269,"cba":0.2537,"lift":1.4638,"xb":true,"k":"code"},{"a":7,"b":17,"s":21,"cab":0.4038,"cba":0.4468,"lift":2.5777,"xb":true,"k":"code"},{"a":7,"b":18,"s":14,"cab":0.2692,"cba":0.359,"lift":2.071,"xb":true,"k":"code"},{"a":7,"b":19,"s":44,"cab":0.8462,"cba":0.2821,"lift":1.6272,"xb":true,"k":"code"},{"a":7,"b":20,"s":17,"cab":0.3269,"cba":0.2394,"lift":1.3814,"xb":true,"k":"code"},{"a":8,"b":9,"s":4,"cab":0.1143,"cba":0.1667,"lift":1.4286,"xb":false,"k":"code"},{"a":8,"b":10,"s":10,"cab":0.2857,"cba":0.2778,"lift":2.381,"xb":false,"k":"code"},{"a":8,"b":11,"s":5,"cab":0.1429,"cba":0.1786,"lift":1.5306,"xb":false,"k":"code"},{"a":8,"b":12,"s":20,"cab":0.5714,"cba":0.1754,"lift":1.5038,"xb":false,"k":"code"},{"a":8,"b":13,"s":5,"cab":0.1429,"cba":0.1667,"lift":1.4286,"xb":false,"k":"code"},{"a":8,"b":14,"s":27,"cab":0.7714,"cba":0.1915,"lift":1.6413,"xb":false,"k":"proc"},{"a":8,"b":15,"s":5,"cab":0.1429,"cba":0.1136,"lift":0.974,"xb":false,"k":"code"},{"a":8,"b":16,"s":13,"cab":0.3714,"cba":0.194,"lift":1.6631,"xb":true,"k":"code"},{"a":8,"b":17,"s":21,"cab":0.6,"cba":0.4468,"lift":3.8298,"xb":true,"k":"code"},{"a":8,"b":18,"s":8,"cab":0.2286,"cba":0.2051,"lift":1.7582,"xb":true,"k":"code"},{"a":8,"b":19,"s":30,"cab":0.8571,"cba":0.1923,"lift":1.6484,"xb":true,"k":"code"},{"a":8,"b":20,"s":15,"cab":0.4286,"cba":0.2113,"lift":1.8109,"xb":true,"k":"code"},{"a":9,"b":10,"s":7,"cab":0.2917,"cba":0.1944,"lift":2.4306,"xb":false,"k":"code"},{"a":9,"b":11,"s":8,"cab":0.3333,"cba":0.2857,"lift":3.5714,"xb":false,"k":"code"},{"a":9,"b":12,"s":9,"cab":0.375,"cba":0.0789,"lift":0.9868,"xb":false,"k":"code"},{"a":9,"b":13,"s":8,"cab":0.3333,"cba":0.2667,"lift":3.3333,"xb":false,"k":"code"},{"a":9,"b":14,"s":18,"cab":0.75,"cba":0.1277,"lift":1.5957,"xb":false,"k":"proc"},{"a":9,"b":15,"s":6,"cab":0.25,"cba":0.1364,"lift":1.7045,"xb":false,"k":"code"},{"a":9,"b":16,"s":5,"cab":0.2083,"cba":0.0746,"lift":0.9328,"xb":true,"k":"code"},{"a":9,"b":17,"s":12,"cab":0.5,"cba":0.2553,"lift":3.1915,"xb":true,"k":"code"},{"a":9,"b":18,"s":7,"cab":0.2917,"cba":0.1795,"lift":2.2436,"xb":true,"k":"code"},{"a":9,"b":19,"s":20,"cab":0.8333,"cba":0.1282,"lift":1.6026,"xb":true,"k":"code"},{"a":9,"b":20,"s":7,"cab":0.2917,"cba":0.0986,"lift":1.2324,"xb":true,"k":"code"},{"a":10,"b":11,"s":3,"cab":0.0833,"cba":0.1071,"lift":0.8929,"xb":false,"k":"code"},{"a":10,"b":12,"s":25,"cab":0.6944,"cba":0.2193,"lift":1.8275,"xb":false,"k":"code"},{"a":10,"b":13,"s":12,"cab":0.3333,"cba":0.4,"lift":3.3333,"xb":false,"k":"code"},{"a":10,"b":14,"s":25,"cab":0.6944,"cba":0.1773,"lift":1.4775,"xb":false,"k":"proc"},{"a":10,"b":15,"s":5,"cab":0.1389,"cba":0.1136,"lift":0.947,"xb":false,"k":"code"},{"a":10,"b":16,"s":12,"cab":0.3333,"cba":0.1791,"lift":1.4925,"xb":true,"k":"code"},{"a":10,"b":17,"s":8,"cab":0.2222,"cba":0.1702,"lift":1.4184,"xb":true,"k":"code"},{"a":10,"b":18,"s":15,"cab":0.4167,"cba":0.3846,"lift":3.2051,"xb":true,"k":"code"},{"a":10,"b":19,"s":19,"cab":0.5278,"cba":0.1218,"lift":1.015,"xb":true,"k":"code"},{"a":10,"b":20,"s":9,"cab":0.25,"cba":0.1268,"lift":1.0563,"xb":true,"k":"code"},{"a":11,"b":12,"s":19,"cab":0.6786,"cba":0.1667,"lift":1.7857,"xb":false,"k":"code"},{"a":11,"b":13,"s":12,"cab":0.4286,"cba":0.4,"lift":4.2857,"xb":false,"k":"code"},{"a":11,"b":14,"s":25,"cab":0.8929,"cba":0.1773,"lift":1.8997,"xb":false,"k":"proc"},{"a":11,"b":15,"s":5,"cab":0.1786,"cba":0.1136,"lift":1.2175,"xb":false,"k":"code"},{"a":11,"b":16,"s":7,"cab":0.25,"cba":0.1045,"lift":1.1194,"xb":true,"k":"code"},{"a":11,"b":17,"s":9,"cab":0.3214,"cba":0.1915,"lift":2.0517,"xb":true,"k":"code"},{"a":11,"b":18,"s":7,"cab":0.25,"cba":0.1795,"lift":1.9231,"xb":true,"k":"code"},{"a":11,"b":19,"s":24,"cab":0.8571,"cba":0.1538,"lift":1.6484,"xb":true,"k":"code"},{"a":11,"b":20,"s":13,"cab":0.4643,"cba":0.1831,"lift":1.9618,"xb":true,"k":"code"},{"a":12,"b":13,"s":23,"cab":0.2018,"cba":0.7667,"lift":2.0175,"xb":false,"k":"code"},{"a":12,"b":14,"s":71,"cab":0.6228,"cba":0.5035,"lift":1.3251,"xb":false,"k":"proc"},{"a":12,"b":15,"s":21,"cab":0.1842,"cba":0.4773,"lift":1.256,"xb":false,"k":"code"},{"a":12,"b":16,"s":31,"cab":0.2719,"cba":0.4627,"lift":1.2176,"xb":true,"k":"code"},{"a":12,"b":17,"s":21,"cab":0.1842,"cba":0.4468,"lift":1.1758,"xb":true,"k":"code"},{"a":12,"b":18,"s":19,"cab":0.1667,"cba":0.4872,"lift":1.2821,"xb":true,"k":"code"},{"a":12,"b":19,"s":78,"cab":0.6842,"cba":0.5,"lift":1.3158,"xb":true,"k":"code"},{"a":12,"b":20,"s":33,"cab":0.2895,"cba":0.4648,"lift":1.2231,"xb":true,"k":"code"},{"a":13,"b":14,"s":26,"cab":0.8667,"cba":0.1844,"lift":1.844,"xb":false,"k":"proc"},{"a":13,"b":15,"s":5,"cab":0.1667,"cba":0.1136,"lift":1.1364,"xb":false,"k":"code"},{"a":13,"b":16,"s":7,"cab":0.2333,"cba":0.1045,"lift":1.0448,"xb":true,"k":"code"},{"a":13,"b":17,"s":6,"cab":0.2,"cba":0.1277,"lift":1.2766,"xb":true,"k":"code"},{"a":13,"b":18,"s":5,"cab":0.1667,"cba":0.1282,"lift":1.2821,"xb":true,"k":"code"},{"a":13,"b":19,"s":23,"cab":0.7667,"cba":0.1474,"lift":1.4744,"xb":true,"k":"code"},{"a":13,"b":20,"s":7,"cab":0.2333,"cba":0.0986,"lift":0.9859,"xb":true,"k":"code"},{"a":14,"b":15,"s":38,"cab":0.2695,"cba":0.8636,"lift":1.8375,"xb":false,"k":"proc"},{"a":14,"b":16,"s":50,"cab":0.3546,"cba":0.7463,"lift":1.5878,"xb":true,"k":"proc"},{"a":14,"b":17,"s":38,"cab":0.2695,"cba":0.8085,"lift":1.7202,"xb":true,"k":"proc"},{"a":14,"b":18,"s":33,"cab":0.234,"cba":0.8462,"lift":1.8003,"xb":true,"k":"proc"},{"a":14,"b":19,"s":116,"cab":0.8227,"cba":0.7436,"lift":1.5821,"xb":true,"k":"proc"},{"a":14,"b":20,"s":65,"cab":0.461,"cba":0.9155,"lift":1.9479,"xb":true,"k":"proc"},{"a":15,"b":16,"s":18,"cab":0.4091,"cba":0.2687,"lift":1.8318,"xb":true,"k":"code"},{"a":15,"b":17,"s":5,"cab":0.1136,"cba":0.1064,"lift":0.7253,"xb":true,"k":"code"},{"a":15,"b":18,"s":9,"cab":0.2045,"cba":0.2308,"lift":1.5734,"xb":true,"k":"code"},{"a":15,"b":19,"s":35,"cab":0.7955,"cba":0.2244,"lift":1.5297,"xb":true,"k":"code"},{"a":15,"b":20,"s":17,"cab":0.3864,"cba":0.2394,"lift":1.6325,"xb":true,"k":"code"},{"a":16,"b":17,"s":15,"cab":0.2239,"cba":0.3191,"lift":1.429,"xb":false,"k":"code"},{"a":16,"b":18,"s":17,"cab":0.2537,"cba":0.4359,"lift":1.9518,"xb":false,"k":"code"},{"a":16,"b":19,"s":48,"cab":0.7164,"cba":0.3077,"lift":1.3777,"xb":false,"k":"code"},{"a":16,"b":20,"s":26,"cab":0.3881,"cba":0.3662,"lift":1.6397,"xb":false,"k":"code"},{"a":17,"b":18,"s":15,"cab":0.3191,"cba":0.3846,"lift":2.455,"xb":false,"k":"code"},{"a":17,"b":19,"s":43,"cab":0.9149,"cba":0.2756,"lift":1.7594,"xb":false,"k":"code"},{"a":17,"b":20,"s":25,"cab":0.5319,"cba":0.3521,"lift":2.2475,"xb":false,"k":"code"},{"a":18,"b":19,"s":26,"cab":0.6667,"cba":0.1667,"lift":1.2821,"xb":false,"k":"code"},{"a":18,"b":20,"s":25,"cab":0.641,"cba":0.3521,"lift":2.7086,"xb":false,"k":"code"},{"a":19,"b":20,"s":55,"cab":0.3526,"cba":0.7746,"lift":1.4897,"xb":false,"k":"code"}]}</script>
+<script nonce="__NONCE__" src="./vendor/plotly-hierarchy.min.js"></script>
+<script nonce="__NONCE__" src="./harness.js"></script>
+<script nonce="__NONCE__">
+(function () {
+  'use strict'
+  var probe = window.__probe
+  var data = JSON.parse(document.getElementById('graph-data').textContent)
+  var host = document.getElementById('chart')
+  var live = document.querySelector('[data-graph-live]')
+
+  // Candidate (a) declares its DOM model up front so the comparison against ECharts is honest rather than
+  // implied: Plotly's `scatter` line style is a TRACE-level attribute, so per-edge dash/width is only reachable
+  // by grouping edges into one trace per style combination. There is no per-edge DOM node.
+  probe.engine = {
+    name: 'plotly-scatter',
+    version: (window.Plotly && Plotly.version) || 'unknown',
+    edgeModel: 'per-style-group-dom',
+    renderer: 'svg',
+    layoutSource: 'generation-time C# (Fruchterman-Reingold, seeded)',
+  }
+
+  /* ---- token-driven palette, resolved from the real cascade; no value is typed here ---- */
+  function tok(n, fallback) { var v = probe.token(n); return v || fallback }
+  var palette = {
+    code:    tok('--status-done',   '#4a8'),
+    proc:    tok('--status-review', '#a84'),
+    node:    tok('--status-active', '#48a'),
+    hub:     tok('--status-ready',  '#84a'),
+    ink:     tok('--ink',           '#eee'),
+    border:  tok('--border',        '#555'),
+  }
+
+  /* ---- edges, grouped into style classes. THIS IS THE PLOTLY CONSTRAINT, MADE VISIBLE ----
+     4 semantic classes (code|proc x cross-boundary|same-boundary) x 3 width buckets = up to 12 traces.
+     Within a trace, segments are separated by a null vertex so one trace draws many disjoint lines. */
+  var WIDTH_BUCKETS = 3
+  function widthBucket(support, maxSupport) {
+    var t = maxSupport > 1 ? (support - 1) / (maxSupport - 1) : 0
+    return Math.min(WIDTH_BUCKETS - 1, Math.floor(t * WIDTH_BUCKETS))
+  }
+  var maxSupport = data.edges.reduce(function (m, e) { return Math.max(m, e.s) }, 1)
+
+  var groups = {}
+  data.edges.forEach(function (e) {
+    var b = widthBucket(e.s, maxSupport)
+    var key = e.k + '|' + (e.xb ? 'xb' : 'same') + '|' + b
+    if (!groups[key]) groups[key] = { kind: e.k, xb: e.xb, bucket: b, xs: [], ys: [], count: 0, edges: [] }
+    var g = groups[key]
+    var a = data.nodes[e.a], z = data.nodes[e.b]
+    g.xs.push(a.x, z.x, null)
+    g.ys.push(a.y, z.y, null)
+    g.edges.push(e)
+    g.count++
+  })
+
+  var edgeTraces = Object.keys(groups).sort().map(function (key) {
+    var g = groups[key]
+    return {
+      type: 'scatter', mode: 'lines', x: g.xs, y: g.ys,
+      hoverinfo: 'skip', showlegend: false,
+      // NON-COLOUR CHANNELS, per R7 and the shipped CouplingGraph precedent:
+      //   process coupling  -> dashed        (never a hue change)
+      //   cross-boundary    -> heavier width + a longer dash signature
+      line: {
+        color: g.kind === 'proc' ? palette.proc : palette.code,
+        width: 0.6 + g.bucket * 0.9 + (g.xb ? 0.8 : 0),
+        dash: g.kind === 'proc' ? (g.xb ? 'longdash' : 'dot') : (g.xb ? 'dashdot' : 'solid'),
+      },
+      name: key,
+      meta: { probeEdgeGroup: key, edgeCount: g.count, kind: g.kind, xb: g.xb, edges: g.edges },
+    }
+  })
+
+  /* ---- per-edge hover needs its own invisible midpoint trace: a lines trace hovers on vertices, not segments.
+          Recorded as a finding, not hidden behind a working tooltip. ---- */
+  var midX = [], midY = [], midText = []
+  data.edges.forEach(function (e) {
+    var a = data.nodes[e.a], z = data.nodes[e.b]
+    midX.push((a.x + z.x) / 2)
+    midY.push((a.y + z.y) / 2)
+    midText.push(
+      a.l + ' ↔ ' + z.l + ': ' + e.s + '× together'
+      + ' — ' + Math.round(e.cab * 100) + '% / ' + Math.round(e.cba * 100) + '% confidence'
+      + (e.xb ? ' (cross-boundary)' : '') + (e.k === 'proc' ? ' (process-coupling)' : ''))
+  })
+  var midTrace = {
+    type: 'scatter', mode: 'markers', x: midX, y: midY,
+    marker: { size: 6, opacity: 0.001, color: palette.ink },
+    hoverinfo: 'skip', showlegend: false, name: 'edge-midpoints',
+    customdata: midText,
+  }
+
+  /* ---- nodes: ONE trace, per-point size / colour / SYMBOL. `marker.symbol` accepts an array, which is the
+          non-colour channel available for nodes. ---- */
+  var maxW = data.nodes.reduce(function (m, n) { return Math.max(m, n.w) }, 1)
+  var hubPath = data.hub
+  var nodeTrace = {
+    type: 'scatter', mode: 'markers', x: [], y: [],
+    marker: { size: [], color: [], symbol: [], line: { width: 1, color: palette.border } },
+    hoverinfo: 'skip', showlegend: false, name: 'nodes', customdata: [],
+  }
+  data.nodes.forEach(function (n) {
+    nodeTrace.x.push(n.x)
+    nodeTrace.y.push(n.y)
+    nodeTrace.marker.size.push(8 + 22 * Math.sqrt(n.w / maxW))
+    nodeTrace.marker.color.push(n.p === hubPath ? palette.hub : palette.node)
+    // shape carries "is this the focal file" without relying on hue
+    nodeTrace.marker.symbol.push(n.p === hubPath ? 'diamond' : 'circle')
+    nodeTrace.customdata.push(n.p + ' — ' + n.w + ' changes, ' + n.d + ' coupled files')
+  })
+
+  var layout = {
+    margin: { l: 8, r: 8, t: 8, b: 8 },
+    xaxis: { visible: false, range: [-0.06, 1.06], fixedrange: false },
+    yaxis: { visible: false, range: [-0.06, 1.06], scaleanchor: 'x' },
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { color: palette.ink },
+    showlegend: false,
+    hovermode: 'closest',
+    dragmode: 'pan',
+  }
+  var config = { displaylogo: false, responsive: true, displayModeBar: false, scrollZoom: true }
+
+  var traces = edgeTraces.concat([midTrace, nodeTrace])
+  probe.traceCount = { total: traces.length, edgeStyleGroups: edgeTraces.length, edges: data.edges.length }
+
+  /* ---- the a11y layer, applied ONLY through plotly_afterplot (Plotly's public post-render event) over its
+          emitted DOM. No Plotly internal is patched. This is what makes any verdict "configured around" rather
+          than a fork — Story 20.4's decision rule, verbatim. ---- */
+  var focusIndex = 0
+  // Tab order recommendation: confidence-descending, matching the text twin's order (Story 24.1 Q4), NOT the
+  // DOM order Plotly happens to emit. Computed once from the data.
+  var order = data.nodes.map(function (n, i) { return i }).sort(function (i, j) {
+    var a = data.nodes[i], b = data.nodes[j]
+    return (b.d - a.d) || (b.w - a.w) || (a.p < b.p ? -1 : a.p > b.p ? 1 : 0)
+  })
+
+  function applyA11yLayer() {
+    var host2 = document.getElementById('chart')
+    var svg = host2 && host2.querySelector('svg.main-svg')
+    if (!svg) return
+    svg.setAttribute('role', 'graphics-document')
+    svg.setAttribute('aria-label',
+      'File change-coupling graph — ' + data.nodes.length + ' files, ' + data.edges.length + ' couplings')
+
+    // Node <path> elements of the LAST scatter trace are the nodes.
+    var groupsEls = host2.querySelectorAll('g.scatterlayer g.trace')
+    var nodeGroup = groupsEls[groupsEls.length - 1]
+    if (!nodeGroup) return
+    // The node trace is emitted last (edge traces, then the invisible midpoint trace, then nodes), so its own
+    // point paths are exactly the nodes. Asserted by count rather than trusted, because relying on emission
+    // order is precisely the brittleness a spike is supposed to surface.
+    var pts = nodeGroup.querySelectorAll('path.point')
+    probe.nodeGroupMatchesFixture = pts.length === data.nodes.length
+    for (var i = 0; i < pts.length; i++) {
+      var el = pts[i]
+      var n = data.nodes[i]
+      if (!n) continue
+      el.setAttribute('data-graph-node', n.p)
+      el.setAttribute('role', 'button')
+      el.setAttribute('aria-label',
+        n.p + ' — ' + n.w + ' changes, coupled to ' + n.d + ' file' + (n.d === 1 ? '' : 's')
+        + (n.p === hubPath ? ' (focal file)' : ''))
+      el.setAttribute('tabindex', '-1')
+      el.dataset.graphIndex = String(i)
+    }
+    // Roving tabindex. CLAMPED on every reapply — Story 20.4 §7's sixth finding was an unclamped roving index
+    // making the chart Tab-unreachable after the node count shrank. Fixed here by construction.
+    if (order.length) {
+      if (focusIndex >= order.length) focusIndex = order.length - 1
+      if (focusIndex < 0) focusIndex = 0
+      var first = nodeGroup.querySelector('[data-graph-index="' + order[focusIndex] + '"]')
+      if (first) first.setAttribute('tabindex', '0')
+    }
+    // Edge paths, stamped so the R7 audit reads REAL computed dash/width off REAL elements.
+    //
+    // MEASURED CORRECTION to this probe's first assumption: Plotly emits one `path.js-line` PER null-separated
+    // SEGMENT, so per-edge DOM does exist (210 paths for 210 edges). What is still trace-level is the STYLE —
+    // every segment in a trace shares one dash and one width. Both facts go in the report.
+    var lineGroups = host2.querySelectorAll('g.scatterlayer g.trace')
+    var stamped = 0
+    for (var t = 0; t < edgeTraces.length && t < lineGroups.length; t++) {
+      var meta = edgeTraces[t].meta
+      var segs = lineGroups[t].querySelectorAll('path.js-line')
+      for (var sIdx = 0; sIdx < segs.length; sIdx++) {
+        var seg = segs[sIdx]
+        var edge = meta.edges[sIdx]
+        if (!edge) continue
+        seg.setAttribute('data-graph-edge', t + ':' + sIdx)
+        seg.dataset.kind = meta.kind
+        seg.dataset.xb = String(meta.xb)
+        seg.setAttribute('aria-label',
+          data.nodes[edge.a].l + ' and ' + data.nodes[edge.b].l + ': ' + edge.s + ' times together, '
+          + Math.round(edge.cab * 100) + '% / ' + Math.round(edge.cba * 100) + '% confidence'
+          + (edge.xb ? ', cross-boundary' : '') + (meta.kind === 'proc' ? ', process-coupling' : ''))
+        stamped++
+      }
+    }
+    probe.domCounts = {
+      edgeSegmentPaths: host2.querySelectorAll('#chart path.js-line').length,
+      edgePathsStamped: stamped,
+      edgeStyleGroups: edgeTraces.length,
+      nodePathsStamped: pts.length,
+      allMarkerPaths: host2.querySelectorAll('path.point').length,
+    }
+    buildTwin()
+  }
+
+  /** ADR 0013's text twin: server-rendered in production, built here so the probe can be audited for it at all. */
+  function buildTwin() {
+    var twin = document.getElementById('twin')
+    if (twin.dataset.built === 'true') return
+    var rows = order.slice(0, 200).map(function (i) {
+      var n = data.nodes[i]
+      return '<li><a href="#' + n.id + '">' + n.p + '</a> — ' + n.w + ' changes, ' + n.d + ' coupled</li>'
+    })
+    twin.innerHTML = '<h2>Coupled files, ranked</h2><ol>' + rows.join('') + '</ol>'
+    twin.dataset.built = 'true'
+  }
+
+  function moveFocus(delta) {
+    focusIndex = Math.max(0, Math.min(order.length - 1, focusIndex + delta))
+    var el = document.querySelector('[data-graph-index="' + order[focusIndex] + '"]')
+    document.querySelectorAll('[data-graph-node]').forEach(function (n) { n.setAttribute('tabindex', '-1') })
+    if (el) { el.setAttribute('tabindex', '0'); el.focus() }
+    return probe.focusState()
+  }
+  probe.moveFocus = moveFocus
+  probe.focusFirst = function () {
+    var el = document.querySelector('[data-graph-node][tabindex="0"]')
+    if (el) el.focus()
+    return probe.focusState()
+  }
+
+  host.addEventListener('keydown', function (ev) {
+    var el = ev.target
+    if (!el || !el.hasAttribute || !el.hasAttribute('data-graph-node')) return
+    if (ev.key === 'ArrowRight' || ev.key === 'ArrowDown') { ev.preventDefault(); moveFocus(1) }
+    else if (ev.key === 'ArrowLeft' || ev.key === 'ArrowUp') { ev.preventDefault(); moveFocus(-1) }
+    else if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); activate(el) }
+    else if (ev.key === 'Escape') { ev.preventDefault(); resetView() }
+  })
+
+  function activate(el) {
+    var path = el.getAttribute('data-graph-node')
+    live.textContent = 'Selected ' + path
+    // The SHIPPED selection seam (R8), not a parallel one.
+    probe.emitSelect(path)
+    var r = el.getBoundingClientRect()
+    probe.showTooltip(el.getAttribute('aria-label'), r.left, r.top)
+  }
+  probe.activateFocused = function () {
+    var el = document.activeElement
+    if (el && el.hasAttribute && el.hasAttribute('data-graph-node')) { activate(el); return true }
+    return false
+  }
+
+  function resetView() {
+    live.textContent = 'View reset to all ' + data.nodes.length + ' files'
+    probe.hideTooltip()
+    return Plotly.relayout(host, { 'xaxis.range': [-0.06, 1.06], 'yaxis.range': [-0.06, 1.06] })
+  }
+  probe.resetView = resetView
+
+  /* ---- R5's filter interaction, on the "positions are fixed, filters HIDE" strategy ---- */
+  probe.applyConfidenceFilter = function (threshold) {
+    var t0 = performance.now()
+    var keep = data.edges.map(function (e) { return Math.max(e.cab, e.cba) >= threshold })
+    var newGroups = {}
+    data.edges.forEach(function (e, i) {
+      if (!keep[i]) return
+      var b = widthBucket(e.s, maxSupport)
+      var key = e.k + '|' + (e.xb ? 'xb' : 'same') + '|' + b
+      if (!newGroups[key]) newGroups[key] = { xs: [], ys: [] }
+      var a = data.nodes[e.a], z = data.nodes[e.b]
+      newGroups[key].xs.push(a.x, z.x, null)
+      newGroups[key].ys.push(a.y, z.y, null)
+    })
+    var xs = [], ys = [], idx = []
+    Object.keys(groups).sort().forEach(function (key, i) {
+      var g = newGroups[key] || { xs: [], ys: [] }
+      xs.push(g.xs); ys.push(g.ys); idx.push(i)
+    })
+    var alive = keep.filter(Boolean).length
+    return Plotly.restyle(host, { x: xs, y: ys }, idx).then(function () {
+      live.textContent = 'Showing couplings at ' + Math.round(threshold * 100) + '% confidence or above'
+      return {
+        threshold: threshold, edgesVisible: alive, edgesTotal: data.edges.length,
+        // The whole point of "positions are data": survivors DO NOT MOVE when the filter changes.
+        nodePositionsMoved: false,
+        ms: +(performance.now() - t0).toFixed(1),
+      }
+    })
+  }
+
+  probe.render = function () {
+    var t0 = performance.now()
+    return Plotly.newPlot(host, traces, layout, config).then(function () {
+      probe.renderMs = +(performance.now() - t0).toFixed(1)
+      return probe.renderMs
+    })
+  }
+
+  host.addEventListener('plotly_afterplot', function () {})
+  probe.render().then(function () {
+    host.on('plotly_afterplot', applyA11yLayer)
+    applyA11yLayer()
+    live.textContent = 'Graph ready: ' + data.nodes.length + ' files'
+    probe.ready = true
+  })
+
+  probe.registerReinit(function () { probe.render().then(applyA11yLayer) })
+  probe.reapplyLayer = applyA11yLayer
+})()
+</script>
+</body>
+</html>
