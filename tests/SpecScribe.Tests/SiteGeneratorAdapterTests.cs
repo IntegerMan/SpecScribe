@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using SpecScribe;
 
 namespace SpecScribe.Tests;
@@ -1650,116 +1649,32 @@ public class SiteGeneratorAdapterTests : IDisposable
     // one and not the other is a hole in whichever gate lacks it. The fold set is byte-for-byte what this file
     // carried before the extraction — the constant below did not move.
 
-    /// <summary>SHA-256 over every output file's normalized content (path-prefixed, ordinal-sorted), so ANY
-    /// rendered-byte change flips one hash. Normalizes only per-run/per-build/per-machine noise, never artifact
-    /// content — so the constant is portable across machines and CI, not pinned to this box.</summary>
-    /// <summary>Story 23.4 AC #5's REPLACEMENT content-drift gate: a fingerprint over the IR itself.
-    /// <para><b>Why this has to exist before the C# writer is deleted, not after.</b>
-    /// <see cref="GenerateAll_GoldenContentFingerprint_IsStableAfterNormalizingVolatileTokens"/> hashes every
-    /// output FILE, so it is a gate on the `.html` SpecScribe writes. Story 23.4 moves page-writing to the Nuxt
-    /// projection; the moment no C# code path emits a content `.html`, that fingerprint stops covering anything
-    /// this project renders and has to be retired. AC #5 names the successor — "a fingerprint over the IR is the
-    /// obvious candidate and does not exist yet" — and this is it. Landing it in the same story that switched the
-    /// IR's producer means the drift gate never lapses: there is no window in which content can move silently.</para>
-    /// <para><b>What it pins that nothing else does.</b> The C# fingerprint hashes rendered documents; this hashes
-    /// the <c>spa/</c> manifest and its content chunks — the composed regions, their titles, breadcrumbs and meta
-    /// descriptions. After Story 23.4 those come from each page's own <see cref="PageView"/> rather than from
-    /// regexes run over finished HTML, so this is the gate on the seam that actually feeds every downstream
-    /// surface: the Nuxt site, the SPA and the webview. `measure:parity`'s committed per-page hashes cover the
-    /// `&lt;main&gt;` region only; this covers the whole IR payload including the region's post-`&lt;/main&gt;`
-    /// content, which is precisely where a real defect hid this story.</para>
-    /// <para>⚠️ Uses the SAME <c>FingerprintTree</c> normalization, so the same rules apply: rebuild
-    /// non-incrementally before trusting a moved hash (an embedded asset is not re-embedded by an incremental
-    /// build), and confirm any regeneration across two consecutive runs. Continue the log below rather than
-    /// replacing it. [Story 23.4 AC #5]</para></summary>
-    [Fact]
-    public void GenerateAll_GoldenIrFingerprint_IsStableAfterNormalizingVolatileTokens()
-    {
-        var options = ForgeOptions.Resolve(
-            source: Source, adrs: Adrs, output: Site, projectName: "SpecScribe", includeReadme: false,
-            emitSpa: true);
-        var gen = new SiteGenerator(options);
-        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
-
-        // The IR only — not the `.html` beside it. That separation is the whole point: this hash must survive the
-        // deletion of the page writer, so it must not depend on a single generated document.
-        var irRoot = Path.Combine(Site, "spa");
-        Assert.True(Directory.Exists(irRoot), "No spa/ directory — the --spa emit did not run.");
-
-        var fingerprint = FingerprintIr(irRoot);
-
-        // ── REGENERATION LOG (continue this; do not replace it) ───────────────────────────────────────────────
-        // 2026-07-29 — Story 23.4, INITIAL CAPTURE. Taken in the same session that switched the IR's producer
-        // from `SpaDelivery.ExtractContentRegion` (slice a rendered document) to a region COMPOSED from each
-        // page's own PageView at the write seam. Captured AFTER that switch deliberately: capturing before it
-        // would have pinned the slice this story replaces. Confirmed byte-identical across two consecutive runs,
-        // and `GoldenContentFingerprint` was verified STATIONARY in the same session — so the page render did not
-        // move while this was taken, which is what makes the two hashes independently meaningful.
-        // PROVENANCE (shared main): a concurrent session had README.md, epics.md, docs/SonarCloudSetup.md,
-        // docs/adrs/README.md, the 25-6 story file and three untracked files (24-2, an Epic 20 retro, ADR 0031)
-        // uncommitted. None can reach this fixture's IR. Nothing was reset, checked out or cleaned.
-        // Confirmed byte-identical across THREE consecutive runs after folding the manifest's derived
-        // contentHash values (see FingerprintIr — the two-run rule caught this moving between the first two
-        // captures, and the cause was a hash-of-an-unfolded-path, not a rendering change).
-        //
-        // ── Regenerated 2026-07-30 — a REAL cross-platform portability bug, not a rendering change ──
-        //
-        // ROOT CAUSE, established before touching this constant (CLAUDE.md's rule): CI's `portability-probe`
-        // job started failing with a DIFFERENT actual hash than the `build-test-analyze` (Windows) job, on the
-        // SAME commit — the one signature that rules out "just needs regeneration" and points at genuine
-        // non-determinism. Traced to `SiteGenerator.FallbackCodeWalk` (the non-git code-map source this fixture
-        // exercises): it fed `Directory.GetFileSystemEntries`'s result straight into a stack-based walk with
-        // NO sort. `GetFileSystemEntries` makes no ordering guarantee, and NTFS enumerates a directory
-        // differently than ext4/APFS in practice — so `code-map.html`'s file listing (and therefore this IR
-        // fingerprint, which hashes it) was stable on any ONE OS but not PORTABLE across them. Fixed by sorting
-        // entries ordinally before each directory's files are added and its subdirectories are pushed (see
-        // `FallbackCodeWalk`'s own comment) — the walk is now deterministic regardless of filesystem.
-        // New regression coverage: `SiteGeneratorSpaTests.CodeMapFallbackWalk_ListsFiles_InDeterministicSortedOrder_NotFilesystemEnumerationOrder`.
-        //
-        // WHY THIS CONSTANT MOVED AND `GoldenContentFingerprint` DID NOT: that gate's fixture
-        // (`SiteGeneratorAdapterTests.Options()`, no `--spa`) is documented as "not a git repo and cites no real
-        // files, so no code page... renders here" for the cases the sort fix touches — so `FallbackCodeWalk`'s
-        // walk order was never part of ITS hash. This fixture explicitly DOES render `code-map.html` from a
-        // real fallback walk, which is exactly why it is the gate that caught the bug.
-        // VERIFICATION: `4e15c41e…` confirmed byte-identical across two consecutive runs on this machine, EACH
-        // preceded by an explicit `dotnet build --no-incremental`. Cross-platform agreement (the actual claim
-        // being fixed) could not be verified locally — no Linux .NET runtime was available in this environment
-        // (Docker Desktop's daemon was not running; its WSL VM carries no `dotnet`) — so CI's next run, where
-        // `build-test-analyze` (Windows) and `portability-probe` (Ubuntu) must now agree with EACH OTHER as
-        // well as with this constant, is the real proof.
-        Assert.Equal("4e15c41ea020c600814a4c4c292589974498427ab1ac7d1ac06a73b18297fcf8", fingerprint);
-    }
-
-    /// <summary>The IR fingerprint's own normalization — <see cref="FingerprintTree"/> plus ONE extra fold, and
-    /// the extra fold has a precise justification rather than being a convenience.
-    /// <para><b>Why a hash has to be folded.</b> <c>manifest.json</c> records a <c>contentHash</c> per page,
-    /// computed by the GENERATOR from unnormalized content. Exactly one page — <c>diagnostics.html</c> — prints
-    /// the configured output root and repo root verbatim, so its bytes are machine- and output-path dependent.
-    /// <see cref="GoldenNormalization.NormalizeVolatile"/> already folds those roots to <c>&lt;root&gt;</c>,
-    /// which is what keeps <see cref="GenerateAll_GoldenContentFingerprint_IsStableAfterNormalizingVolatientTokens"/>
-    /// portable — but it cannot fold a HASH OF the unfolded text. Each test run gets a fresh
-    /// <c>CreateTempSubdirectory</c> path, so that one hash changes every run and the IR fingerprint moved
-    /// between two consecutive runs with no code change behind it. Caught by the two-run rule
-    /// (<c>golden-diff-normalization-gotchas</c>), which is exactly the trap that rule exists for.</para>
-    /// <para><b>Why folding it loses no coverage.</b> A <c>contentHash</c> is DERIVED from chunk content that this
-    /// same fingerprint already hashes directly, byte for byte. Folding the derived value removes the one
-    /// machine-dependent input while the thing it summarizes stays fully covered — so a real content drift still
-    /// moves this hash, via the chunk. Folding the CHUNKS would be the mistake; folding a redundant digest is not.
-    /// </para></summary>
-    private string FingerprintIr(string irRoot) =>
-        FingerprintTree(irRoot, IrContentHash.Replace);
-
-    /// <summary>Matches the manifest's derived per-page digests. Deliberately anchored to the JSON key so it
-    /// cannot touch a hash-shaped string that happens to appear inside rendered content.</summary>
-    private static readonly (Regex Rx, string To) IrContentHashPattern =
-        (new Regex("(\"contentHash\"\\s*:\\s*\")[0-9a-fA-F]+(\")", RegexOptions.Compiled), "$1<hash>$2");
-
-    private static class IrContentHash
-    {
-        public static string Replace(string s) =>
-            IrContentHashPattern.Rx.Replace(s, IrContentHashPattern.To);
-    }
-
+    // ── GenerateAll_GoldenIrFingerprint_IsStableAfterNormalizingVolatileTokens — REMOVED 2026-07-30 ──
+    //
+    // This was Story 23.4 AC #5's IR-level content-drift gate (a SHA-256 over spa/manifest.json + its content
+    // chunks, folding the manifest's per-page contentHash values so a fresh temp fixture path never moved it).
+    // Removed by owner decision during Story 22.6's code-review follow-up, after the gate proved
+    // non-deterministic in a way that stopped being economical to keep chasing:
+    //
+    //   - CI's `portability-probe` (Ubuntu) and `build-test-analyze` (Windows) jobs produced DIFFERENT actual
+    //     hashes for the SAME commit — the signature that first proved this wasn't "just needs regeneration."
+    //   - One real cause WAS found and fixed: `SiteGenerator.FallbackCodeWalk` (the non-git code-map source
+    //     walk this fixture exercised) fed an unsorted `Directory.GetFileSystemEntries` result into a
+    //     stack-based walk — genuinely non-portable (NTFS vs. ext4/APFS enumerate a directory differently).
+    //     That fix is KEPT (see `FallbackCodeWalk`'s own comment) and is pinned by
+    //     `SiteGeneratorSpaTests.CodeMapFallbackWalk_ListsFiles_InDeterministicSortedOrder_NotFilesystemEnumerationOrder`.
+    //   - After that fix, THREE different environments (this repo's dev machine, CI Windows, CI Ubuntu) still
+    //     produced THREE different hashes on the identical commit — proving a SECOND, unidentified source of
+    //     non-determinism (not merely an OS-pair difference, since even two Windows environments disagreed).
+    //     Not root-caused before this decision; a real gap in this project's build determinism, not a false
+    //     alarm dismissed without investigation.
+    //
+    // `GenerateAll_GoldenContentFingerprint_IsStableAfterNormalizingVolatileTokens` (above) is UNAFFECTED — its
+    // fixture never exercises `--spa`/the IR path, so it never depended on any of this. Story 23.4's own AC #5
+    // intent (a content-drift gate that survives the eventual C# page-writer deletion) is left uncovered by
+    // this removal; whoever next touches Story 23.4 / the IR pipeline should either rebuild this gate on
+    // genuinely deterministic normalization or accept `measure:parity`'s committed per-page hashes (main-region
+    // only) as the interim substitute. Recorded in `_bmad-output/implementation-artifacts/deferred-work.md`.
     private string FingerprintTree(string root) => FingerprintTree(root, static s => s);
 
     private string FingerprintTree(string root, Func<string, string> extraFold)

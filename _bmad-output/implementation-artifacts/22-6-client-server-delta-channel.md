@@ -610,15 +610,23 @@ this story's CI run, so it's fixed here rather than left blocking indefinitely.
 - **New regression test**: `SiteGeneratorSpaTests.CodeMapFallbackWalk_ListsFiles_InDeterministicSortedOrder_NotFilesystemEnumerationOrder`
   — creates probe files in deliberately descending name order and asserts `code-map.html` still lists them
   ascending.
-- **`GenerateAll_GoldenIrFingerprint`** regenerated `3acee6c2…` → `4e15c41e…` at
-  [`SiteGeneratorAdapterTests.cs`](../../tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs) with a full
-  regeneration-log entry recording the root cause. Confirmed stable across two `dotnet build --no-incremental`
-  runs **on this machine**; true cross-platform agreement could not be verified locally (no Linux .NET runtime
-  available — Docker Desktop's daemon was not running, and its WSL VM carries no `dotnet`), so CI's next run —
-  where `build-test-analyze` (Windows) and `portability-probe` (Ubuntu) must now agree with each other, not just
-  with the constant — is the actual proof.
-- `web/` (`npm test`, `npm run check`) and `extension/` (`npm run typecheck`) all re-verified clean after this
-  fix; full C# suite re-run green (2836 passed / 0 failed / 3 skipped) with the fix in place.
+- **`GenerateAll_GoldenIrFingerprint` regenerated once (`3acee6c2…` → `4e15c41e…`), pushed, and STILL failed
+  CI** — with a THIRD distinct hash (CI Windows `8f7139af…`, CI Ubuntu `df081475…`, both different from the
+  locally-verified `4e15c41e…`). Three different environments, three different hashes, on the identical commit:
+  the `FallbackCodeWalk` fix was real and necessary but not sufficient — a second, unidentified source of
+  non-determinism remained. Investigated further (unordered `HashSet<string>` enumeration feeding rendered
+  output, `Parallel`/`AsParallel` usage, `Environment.NewLine` leaking into JSON) with no quick find.
+- **Owner decision (2026-07-30): remove the gate rather than keep spending CI round-trips chasing an
+  unidentified second cause.** `GenerateAll_GoldenIrFingerprint_IsStableAfterNormalizingVolatileTokens` deleted
+  from `SiteGeneratorAdapterTests.cs`, replaced with a block comment recording the investigation and why (kept
+  discoverable rather than silently lost — CLAUDE.md's decision-records rule). The `FallbackCodeWalk` sort fix
+  and its regression test are KEPT (a real, confirmed, still-valuable fix). `GenerateAll_GoldenContentFingerprint`
+  (the sibling, non-`--spa` gate) is unaffected and remains in place. Full account, including a pointer for
+  whoever next touches Story 23.4's IR pipeline, recorded in
+  [deferred-work.md](deferred-work.md#deferred-from-ci-unblocking-work-during-22-6-client-server-delta-channels-code-review-2026-07-30).
+- `web/` (`npm test`, `npm run check`) and `extension/` (`npm run typecheck`) all re-verified clean after the
+  removal; full C# suite re-run green (2835 passed / 0 failed / 3 skipped, one fewer total test than before —
+  the removed one).
 - [x] [Review][Defer] `sequence` has no cross-process guard — two SpecScribe processes (e.g. `watch` +
   `webview --serve --serve-delta`) targeting the same output root would each run an independent, unsynchronized
   `_deltaSequence` while atomically overwriting the same `spa/delta.json`. [src/SpecScribe/SiteGenerator.cs] —

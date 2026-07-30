@@ -2,6 +2,34 @@
 
 Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit when the related area is next touched.
 
+## Deferred from: CI-unblocking work during 22-6-client-server-delta-channel's code review (2026-07-30)
+
+- source_spec: `23-4-migrate-remaining-surfaces-retire-c-sharp-html-adapter.md` (the story that owns this gate, NOT
+  22.6 — recorded here because 22.6's CI run is where the removal happened)
+  summary: `SiteGeneratorAdapterTests.GenerateAll_GoldenIrFingerprint_IsStableAfterNormalizingVolatileTokens`
+  (Story 23.4 AC #5's IR-level content-drift gate) was **removed** rather than fixed. CI's `portability-probe`
+  (Ubuntu) and `build-test-analyze` (Windows) jobs produced different actual hashes for the identical commit.
+  One real cause was found and fixed and IS KEPT: `SiteGenerator.FallbackCodeWalk` fed an unsorted
+  `Directory.GetFileSystemEntries` result into a stack-based walk — genuinely non-portable across filesystems
+  (NTFS vs. ext4/APFS enumerate a directory differently), pinned by the new
+  `SiteGeneratorSpaTests.CodeMapFallbackWalk_ListsFiles_InDeterministicSortedOrder_NotFilesystemEnumerationOrder`
+  regression test. After that fix, three separate environments (a local dev machine, CI Windows, CI Ubuntu)
+  STILL produced three different hashes for the same commit, proving a second, unidentified source of
+  non-determinism — not merely an OS-pair difference, since two different Windows environments disagreed too.
+  evidence: Direct CI investigation (this is not a subagent-review finding). Root cause not found before the
+  owner decided to remove the gate rather than keep spending CI round-trips chasing it. `GoldenContentFingerprint`
+  (the sibling, non-`--spa` gate) is unaffected and remains in place.
+  action for whoever next touches Story 23.4 or the IR/`--spa` pipeline: either rebuild an IR-level content-drift
+  gate on normalization that's actually been proven deterministic across OSes, or treat `measure:parity`'s
+  committed per-page hashes (`<main>` region only, in `web/measurements/parity.json`) as the interim substitute
+  for AC #5's intent. The removed test's full investigation notes (what was ruled out: unsorted directory walks
+  now fixed; considered and NOT confirmed: process-level string-hash-seed randomization affecting `HashSet`
+  enumeration order, `Parallel`/`AsParallel` usage — none found in the render path;
+  `Environment.NewLine` leaking into JSON — none found) are preserved in the git history of
+  `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` at the point of removal, and as a block comment left in
+  that file where the test used to live. [`tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs`,
+  `src/SpecScribe/SiteGenerator.cs`]
+
 ## Deferred from: code review of 22-6-client-server-delta-channel (2026-07-30)
 
 - source_spec: `22-6-client-server-delta-channel.md`
