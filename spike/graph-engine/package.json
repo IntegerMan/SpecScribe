@@ -12,6 +12,6 @@
   "devDependencies": {
     "cytoscape": "^3.30.0",
     "echarts": "^6.0.0",
-    "esbuild": "^0.24.0"
+    "esbuild": "^0.28.1"
   }
 }
