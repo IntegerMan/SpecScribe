@@ -1329,29 +1329,6 @@
   background: var(--parchment);
 }
 
-.ir-content .code-relationships > h2 {
-  margin: 0 0 0.3rem;
-  font-size: 0.9rem;
-  color: var(--ink-light);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.ir-content .code-relationships-note {
-  margin: 0 0 0.6rem;
-  font-size: 0.8rem;
-  color: var(--ink-light);
-}
-
-.ir-content .ref-graph-wrap {
-  text-align: center;
-}
-
-.ir-content .ref-graph {
-  max-width: 100%;
-  height: auto;
-}
-
 .ir-content .sr-only {
   position: absolute;
   width: 1px;
@@ -1364,95 +1341,98 @@
   border: 0;
 }
 
-.ir-content .ref-edge {
-  stroke: var(--border);
-  stroke-width: 1.5;
-  stroke-opacity: 0.85;
+.ir-content .ss-relgraph { display: none; }
+
+.ir-content .ss-relgraph[data-relgraph-ready] { display: block; margin: 0 auto; max-width: 100%; }
+
+.ir-content .ss-relgraph-booting { display: none; }
+
+:root[data-ss-relgraph-boot] .ir-content .chart-panel:has(.ss-relgraph) .ss-relgraph-booting {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-faded);
+  font-size: 0.8rem;
+  font-style: italic;
 }
 
-.ir-content .ref-center-box {
-  fill: var(--ink);
-  stroke: var(--gold);
-  stroke-width: 1.5;
+:root[data-ss-relgraph-boot] .ir-content .chart-panel[data-relgraph-mounted] .ss-relgraph-booting,
+:root[data-ss-relgraph-boot] .ir-content .chart-panel[data-relgraph-failed] .ss-relgraph-booting { display: none; }
+
+.ir-content .ss-relgraph-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.4rem;
+  margin: 0 0 0.6rem;
 }
 
-.ir-content .ref-center-label {
-  fill: var(--parchment);
-  font-weight: 600;
-  font-family: system-ui, sans-serif;
-}
+.ir-content .ss-relgraph-controls[hidden] { display: none; }
 
-.ir-content .ref-node {
+.ir-content .ss-relgraph-filter { margin: 0; vertical-align: middle; cursor: pointer; }
+
+.ir-content .ss-relgraph-filter-label {
+  font-size: 0.8rem;
+  color: var(--ink-light);
+  margin-right: 1rem;
   cursor: pointer;
 }
 
-.ir-content .ref-dot {
-  fill: var(--gold);
-  stroke: var(--parchment);
-  stroke-width: 1.5;
-  transition: r 0.12s ease, fill 0.12s ease;
+.ir-content .ss-relgraph-legend {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
-.ir-content .ref-label {
-  fill: var(--ink);
-  font-family: system-ui, sans-serif;
+.ir-content .ss-relgraph-legend[hidden] { display: none; }
+
+.ir-content .ss-relgraph-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.75rem;
+  color: var(--ink-light);
 }
 
-.ir-content .ref-node:hover .ref-dot,
-.ir-content .ref-node:focus-visible .ref-dot {
-  fill: var(--ink);
-  r: 9;
+.ir-content .ss-relgraph-swatch {
+  flex: 0 0 auto;
+  width: 1.4rem;
+  height: 0.75rem;
+  border-bottom: 1.5px solid var(--ink-light);
 }
 
-.ir-content .ref-node:hover .ref-label,
-.ir-content .ref-node:focus-visible .ref-label {
-  fill: var(--gold-dark, var(--gold));
-  text-decoration: underline;
+.ir-content .ss-relgraph-swatch-focal {
+  width: 0.7rem;
+  height: 0.7rem;
+  border: 1.5px solid var(--gold);
+  background: var(--gold);
+  border-bottom-width: 1.5px;
 }
 
-.ir-content .ref-node:focus-visible {
-  outline: 2px solid var(--gold);
-  outline-offset: 2px;
+.ir-content .ss-relgraph-swatch-artifact {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--gold);
+  background: var(--gold);
+  border-bottom-width: 1.5px;
 }
 
-.ir-content .ref-overflow {
-  fill: var(--ink-light);
-  font-style: italic;
-  font-family: system-ui, sans-serif;
+.ir-content .ss-relgraph-swatch-epic {
+  width: 0.7rem;
+  height: 0.7rem;
+  border: 1.5px solid var(--ink);
+  background: transparent;
+  border-bottom-width: 1.5px;
 }
 
-.ir-content .refgraph-toggle { margin: 0 0 0 0.1rem; vertical-align: middle; cursor: pointer; }
-
-.ir-content .refgraph-toggle:first-of-type { margin-left: 0; }
-
-.ir-content .refgraph-toggle-label { font-size: 0.8rem; color: var(--ink-light); margin-right: 1.25rem; cursor: pointer; }
-
-.ir-content .ref-graph-view { display: none; }
-
-.ir-content .refgraph-toggle-epic:not(:checked) ~ .refgraph-toggle-rel:not(:checked) ~ .ref-graph-view[data-view="flat-flat"],
-.ir-content .refgraph-toggle-epic:checked ~ .refgraph-toggle-rel:not(:checked) ~ .ref-graph-view[data-view="epic-flat"],
-.ir-content .refgraph-toggle-epic:not(:checked) ~ .refgraph-toggle-rel:checked ~ .ref-graph-view[data-view="flat-rel"],
-.ir-content .refgraph-toggle-epic:checked ~ .refgraph-toggle-rel:checked ~ .ref-graph-view[data-view="epic-rel"] {
-  display: block;
-}
-
-.ir-content .ref-epic-hub-box {
-  fill: var(--parchment);
-  stroke: var(--ink);
-  stroke-width: 1.5;
-}
-
-.ir-content .ref-epic-hub-label {
-  fill: var(--ink);
-  font-weight: 600;
-  font-family: system-ui, sans-serif;
-}
-
-.ir-content .ref-hub-spoke {
-  stroke: var(--ink-light);
-  stroke-width: 1.2;
-  stroke-opacity: 0.75;
-  stroke-dasharray: 1.5 2.5;
+.ir-content .ss-relgraph-legend-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.72rem;
+  color: var(--ink-faded);
 }
 
 .ir-content .ss-tabs { margin-top: 1.5rem; }
@@ -3138,11 +3118,6 @@
 .ir-content .donut-center-text { font-size: 1.4rem; font-weight: bold; fill: var(--ink); font-family: 'Courier New', monospace; }
 
 .ir-content .donut-center-text.donut-center-fraction { font-size: 1.05rem; }
-
-.ir-content .mini-donut { vertical-align: middle; }
-
-.ir-content .mini-donut .donut-track,
-.ir-content .mini-donut .donut-seg { stroke-width: 4; }
 
 .ir-content .chart-empty { font-size: 0.82rem; color: var(--ink-light); font-style: italic; }
 
