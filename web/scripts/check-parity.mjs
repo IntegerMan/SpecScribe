@@ -45,7 +45,7 @@
 import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { mainRegion, normalizeVolatile, pad, readOrNull } from './harness-lib.mjs'
-import { assessRun, classifyRoute, parityDigest, ParityOracleError, validateOracle } from './parity-lib.mjs'
+import { assessRun, classifyRoute, foldBuildAssets, parityDigest, ParityOracleError, validateOracle } from './parity-lib.mjs'
 import { withRenderer } from './render-lib.mjs'
 
 const CORPUS = resolve(process.cwd(), 'fixtures', 'parity-corpus')
@@ -105,7 +105,7 @@ try {
       out.push(
         classifyRoute(route, {
           mainSha: parityDigest(normalizeVolatile(main)),
-          pageSha: parityDigest(normalizeVolatile(html)),
+          pageSha: parityDigest(foldBuildAssets(normalizeVolatile(html))),
         }),
       )
     }

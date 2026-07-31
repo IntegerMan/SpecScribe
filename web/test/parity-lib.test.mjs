@@ -10,6 +10,7 @@ import {
   assessRun,
   classifyRoute,
   composeIrMain,
+  foldBuildAssets,
   parityDigest,
   ParityOracleError,
   validateOracle,
@@ -44,6 +45,46 @@ describe('composeIrMain', () => {
       s.replace(/\r\n/g, '\n'),
     )
     expect(out).toBe('<main id="main-content" class="doc"><p>hi</p></main>')
+  })
+})
+
+describe('foldBuildAssets — the build-token fold that keeps pageSha portable', () => {
+  it('folds Nuxt content-hashed chunk names, which are a property of the BUILD not the page', () => {
+    const html = '<link rel="stylesheet" href="./_nuxt/PageShell.Ys9LGDmo.css"><script src="./_nuxt/B1mWaxmE.js">'
+    expect(foldBuildAssets(html)).toBe(
+      '<link rel="stylesheet" href="./_nuxt/PageShell.<HASH>.css"><script src="./_nuxt/B1mWaxmE.js">',
+    )
+  })
+
+  it('makes two builds of the SAME page agree — the whole reason it exists', () => {
+    // Without this the gate reports CHROME DRIFT on every route whenever the artefact is rebuilt elsewhere,
+    // which is a failure unrelated to the change under test and exactly what ADR 0033 §Decision 2 forbids.
+    const a = '<link href="./_nuxt/entry.DRLacYXT.css"><link href="./_nuxt/ChartPanel.6vcVUsK8.css">'
+    const b = '<link href="./_nuxt/entry.aB3dEfG7.css"><link href="./_nuxt/ChartPanel.zZ9yX8w7.css">'
+    expect(foldBuildAssets(a)).toBe(foldBuildAssets(b))
+  })
+
+  it('still catches a chunk being RENAMED, ADDED or DROPPED — the fold is narrow on purpose', () => {
+    const base = '<link href="./_nuxt/PageShell.Ys9LGDmo.css">'
+    // stem changed
+    expect(foldBuildAssets(base)).not.toBe(foldBuildAssets('<link href="./_nuxt/PageShim.Ys9LGDmo.css">'))
+    // extension changed
+    expect(foldBuildAssets(base)).not.toBe(foldBuildAssets('<link href="./_nuxt/PageShell.Ys9LGDmo.js">'))
+    // an extra chunk appearing
+    expect(foldBuildAssets(base)).not.toBe(foldBuildAssets(`${base}<link href="./_nuxt/Extra.Ys9LGDmo.css">`))
+    // a chunk disappearing
+    expect(foldBuildAssets(base)).not.toBe(foldBuildAssets(''))
+  })
+
+  it('leaves non-_nuxt assets alone — C# owns those four and their names are stable', () => {
+    // specscribe.css / specscribe.js / prism.js / plotly-hierarchy.min.js are emitted by C# with fixed names.
+    // Folding them would blind the gate to a real asset change.
+    const html = '<link href="./specscribe.css"><script src="./plotly-hierarchy.min.js">'
+    expect(foldBuildAssets(html)).toBe(html)
+  })
+
+  it('does not swallow a multi-segment stem', () => {
+    expect(foldBuildAssets('./_nuxt/some.long.name.Ys9LGDmo.css')).toBe('./_nuxt/some.long.name.<HASH>.css')
   })
 })
 

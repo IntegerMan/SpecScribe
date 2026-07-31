@@ -40,7 +40,7 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { MEASUREMENTS_DIR, mainRegion, normalizeVolatile, pad, readOrNull } from './harness-lib.mjs'
-import { composeIrMain, parityDigest } from './parity-lib.mjs'
+import { composeIrMain, foldBuildAssets, parityDigest } from './parity-lib.mjs'
 import { withRenderer } from './render-lib.mjs'
 import { resolveFamily } from '../ir/families.ts'
 
@@ -169,9 +169,9 @@ const captured = await withRenderer({ outputDir: ARTEFACT, irDir: CORPUS, port: 
       path,
       family,
       mainSha: parityDigest(normalizeVolatile(main)),
-      pageSha: parityDigest(normalizeVolatile(html)),
+      pageSha: parityDigest(foldBuildAssets(normalizeVolatile(html))),
       mainBytes: normalizeVolatile(main).length,
-      pageBytes: normalizeVolatile(html).length,
+      pageBytes: foldBuildAssets(normalizeVolatile(html)).length,
     })
   }
   return out

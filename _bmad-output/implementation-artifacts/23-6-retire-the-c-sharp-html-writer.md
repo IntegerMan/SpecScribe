@@ -548,6 +548,41 @@ offered options was taken** — the first (rebuild a gate), with the second expl
    (`SpecScribeOutput/`, 1,188 pages, `data-ir-family` present, `_nuxt/` assets copied), so this is doable now.
 4. **Read the `portability-probe` CI run** to discharge ADR 0033 §Decision 4 for `check:parity` on Ubuntu.
 
+### ⚠️ CI failed on the first push, and BOTH causes are recorded here
+
+**Cause 1 — an ordering inversion I introduced (the gating job's hard failure).**
+
+`build-test-analyze` ran `Generate the IR` **before** `npm ci` and before the artefact build. Task 3 made
+`specscribe generate` *drive the prerender*, so the generate now needs the artefact — which needs `npm ci`,
+which (per the step's own long-standing comment) needed the IR the generate produces. **A cycle.** With no
+artefact present every route errored, `errors=1`, non-zero exit, and the step failed hard.
+
+I had actually written *"could equally run before the generate above"* in that step's comment — I noticed the
+ordering was flexible and did not notice it had just become **required**. The lesson is narrow and worth
+keeping: when a step acquires a new dependency, re-read the steps *before* it, not only the ones after.
+
+**Fix:** `npm ci` → `sync:assets` → `build:package` → `generate`, with `SPECSCRIBE_PACKAGE_BUILD=1` on the
+install. That flag stubs the manifest empty (its whole purpose), which breaks the cycle at the point it was
+always breakable. The same fix was applied to `portability-probe`, whose `npm ci` would have failed too — that
+job runs no generate at all, so it never has an IR. Verified locally by running the corrected sequence end to
+end: `generate` → 1,197 routes prerendered, `errors=0`.
+
+**Cause 2 — `check:ir-content` was red, and it is the DATA-dependence drift, not a CSS change.**
+
+Two `.mini-donut` rules were missing from the generated layer. `specscribe.css` has carried that class since
+`af1b5436` and I never touched it — but the extractor derives the layer from the C# stylesheet **and the
+emitted IR**, and the IR's epics/story pages are rendered from `sprint-status.yaml` and the story files. **My
+own story bookkeeping** (moving 23.6 to `in-progress`) changed those pages and pulled the class into the IR.
+Regenerated with `npm run extract:ir-content`; the fresh derivation was `+2 / -0 / ~0`, so nothing was narrowed.
+
+**Cause 3 — one I found while investigating, before CI could.** `pageSha` hashed Nuxt's content-hashed chunk
+names (`_nuxt/PageShell.Ys9LGDmo.css`). Those are a property of the BUILD, so an artefact rebuilt on a
+different machine would have reported CHROME DRIFT on every route — a failure unrelated to the change under
+test, which is exactly what ADR 0033 §Decision 2 forbids, and it would have surfaced as a mystery on
+CI-Ubuntu. New `foldBuildAssets` folds the digest only: the asset's directory, stem and extension all survive,
+so a chunk being renamed, added, dropped or moved between `<link>` and `<script>` is still caught. Oracle
+re-pinned (lineage re-verified 24/24), 5 new unit tests.
+
 ### Debug Log References
 
 - Suite at hand-off: **2,883 passed / 3 skipped**, plus rotating git-dependent failures that are the **documented
@@ -596,3 +631,4 @@ offered options was taken** — the first (rebuild a gate), with the second expl
 | 2026-07-31 | Task 5: all six dependents closed; row 6's re-point corrected after a test caught a silent surface-set expansion. |
 | 2026-07-31 | Task 4 (partial): 268 templater call sites + 21 chrome assertions re-pointed; ~206 disk reads outstanding. |
 | 2026-07-31 | Task 7: ADR 0034 authored; ADR 0022/0033 ratification proposed; `deferred-work.md` action cleared. |
+| 2026-07-31 | **CI fix**: workflow step order inverted (install+artefact BEFORE generate) with `SPECSCRIBE_PACKAGE_BUILD=1` breaking the install/IR cycle; `ir-content.css` regenerated; `foldBuildAssets` added so `pageSha` survives a rebuild on another machine. |

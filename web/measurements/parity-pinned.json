@@ -7,193 +7,193 @@
       "path": "code/spike/nuxt-ir/app.vue.html",
       "family": "code-file",
       "mainSha": "c5251bc76e4012f0",
-      "pageSha": "f87f186864cd452a",
+      "pageSha": "674aa538bfe167d9",
       "mainBytes": 4803,
-      "pageBytes": 20094
+      "pageBytes": 20088
     },
     {
       "path": "code/src/SpecScribe/MarkdownConverter.cs.html",
       "family": "code-file",
       "mainSha": "8776dadc61281fce",
-      "pageSha": "a5615a8b47ebc50e",
+      "pageSha": "708d795dc663e5bb",
       "mainBytes": 52796,
-      "pageBytes": 80308
+      "pageBytes": 80302
     },
     {
       "path": "commits/2026-07-04.html",
       "family": "commit-day",
       "mainSha": "72cc913f92286ff7",
-      "pageSha": "dc863489f167bf98",
+      "pageSha": "4e668d4e7f75e6d3",
       "mainBytes": 894,
-      "pageBytes": 18362
+      "pageBytes": 18356
     },
     {
       "path": "commits/2026-07-17.html",
       "family": "commit-day",
       "mainSha": "cb5b2342fb49fa02",
-      "pageSha": "7048e675fb738cc1",
+      "pageSha": "fddb427d53a0e4e7",
       "mainBytes": 8903,
-      "pageBytes": 26442
+      "pageBytes": 26436
     },
     {
       "path": "commit/7d8882e.html",
       "family": "commit-detail",
       "mainSha": "9273103e53934cbe",
-      "pageSha": "8f22e264b4e2cd29",
+      "pageSha": "6208876f6d7139fe",
       "mainBytes": 603,
-      "pageBytes": 53887
+      "pageBytes": 53881
     },
     {
       "path": "commit/1210a41.html",
       "family": "commit-detail",
       "mainSha": "dcf21887b0c96591",
-      "pageSha": "3d106832d03c3dcd",
+      "pageSha": "0431701a4d9c575a",
       "mainBytes": 3811,
-      "pageBytes": 57315
+      "pageBytes": 57309
     },
     {
       "path": "index.html",
       "family": "dashboard",
-      "mainSha": "eec166a332142daa",
-      "pageSha": "acae12f70d06e224",
-      "mainBytes": 1202606,
+      "mainSha": "0df7d30622cce182",
+      "pageSha": "138482c413353e49",
+      "mainBytes": 1202612,
       "pageBytes": 1219251
     },
     {
       "path": "adrs/0004-cross-surface-interaction-and-theme-contract.html",
       "family": "doc-prose",
       "mainSha": "a06de9674859f25d",
-      "pageSha": "b2410c5600ace815",
+      "pageSha": "06a4cae8ae6506c5",
       "mainBytes": 3394,
-      "pageBytes": 27170
+      "pageBytes": 27164
     },
     {
       "path": "implementation-artifacts/spec-address-deferred-next-steps.html",
       "family": "doc-prose",
       "mainSha": "5a9b1f6102ea555c",
-      "pageSha": "085594cd56b2b82a",
+      "pageSha": "4d9cce3e115f8295",
       "mainBytes": 13430,
-      "pageBytes": 41347
+      "pageBytes": 41341
     },
     {
       "path": "epics/epic-14.html",
       "family": "epic-detail",
       "mainSha": "e0047319be240359",
-      "pageSha": "7e81fde5a47f9721",
+      "pageSha": "c3741ae52b98e29c",
       "mainBytes": 21670,
-      "pageBytes": 36659
+      "pageBytes": 36653
     },
     {
       "path": "epics/epic-26.html",
       "family": "epic-detail",
       "mainSha": "fe39c3795e11534e",
-      "pageSha": "27b337f2469ffce8",
+      "pageSha": "175fe49608dc1aa5",
       "mainBytes": 59333,
-      "pageBytes": 75190
+      "pageBytes": 75184
     },
     {
       "path": "epics.html",
       "family": "epics-index",
-      "mainSha": "29611cc5634c73f1",
-      "pageSha": "6a8f605ed584e1c7",
+      "mainSha": "caceef9826e92b96",
+      "pageSha": "cf60b6f7ebc90e4c",
       "mainBytes": 265992,
-      "pageBytes": 282253
+      "pageBytes": 282247
     },
     {
       "path": "follow-ups/action-schedule-a-story-spec-to-fix-htmltemplater-knownindexgroups.html",
       "family": "follow-up",
       "mainSha": "38bc6c03e8590383",
-      "pageSha": "e485578349475041",
+      "pageSha": "a0e81700804f97c6",
       "mainBytes": 7719,
-      "pageBytes": 23698
+      "pageBytes": 23692
     },
     {
       "path": "follow-ups/deferred-epic-angular-weight-on-project-glance-is-max.html",
       "family": "follow-up",
       "mainSha": "68f573aba7662fbe",
-      "pageSha": "1faad2d9b941e1c6",
+      "pageSha": "b81fe0cea148c9b4",
       "mainBytes": 8249,
-      "pageBytes": 33603
+      "pageBytes": 33597
     },
     {
       "path": "deep-analytics.html",
       "family": "insight",
       "mainSha": "77ed4339d19513b4",
-      "pageSha": "e95ad8a9c520863f",
+      "pageSha": "ee4e7fd36a233d5b",
       "mainBytes": 19292,
-      "pageBytes": 40608
+      "pageBytes": 40602
     },
     {
       "path": "impact-map.html",
       "family": "insight",
       "mainSha": "68cf25554c47c71f",
-      "pageSha": "37fedb78ec6c32be",
+      "pageSha": "1038c7e2297c6311",
       "mainBytes": 899313,
-      "pageBytes": 915836
+      "pageBytes": 915830
     },
     {
       "path": "about-sdd-gsd.html",
       "family": "portal-meta",
       "mainSha": "28f42d3d35dede98",
-      "pageSha": "54ee12068da9c9b0",
+      "pageSha": "2df1ed739052dcce",
       "mainBytes": 1158,
-      "pageBytes": 16566
+      "pageBytes": 16560
     },
     {
       "path": "about-sdd.html",
       "family": "portal-meta",
       "mainSha": "586f9ccfd9677691",
-      "pageSha": "c6a5f44b5131eeb4",
+      "pageSha": "227041d4a305a995",
       "mainBytes": 4766,
-      "pageBytes": 20205
+      "pageBytes": 20199
     },
     {
       "path": "requirements/nfr3.html",
       "family": "requirement",
       "mainSha": "83f4d21cf2ff6f54",
-      "pageSha": "b5678e4b9d72a29d",
+      "pageSha": "0b4fb693effb3e22",
       "mainBytes": 7279,
-      "pageBytes": 22886
+      "pageBytes": 22880
     },
     {
       "path": "requirements/ux-dr23.html",
       "family": "requirement",
       "mainSha": "4466b3265d37ab92",
-      "pageSha": "83421bef9b6b7731",
+      "pageSha": "acb990f3e1edad2d",
       "mainBytes": 17397,
-      "pageBytes": 34485
+      "pageBytes": 34479
     },
     {
       "path": "retros.html",
       "family": "retro",
       "mainSha": "e6fbd468f23d4d9c",
-      "pageSha": "7bbd016500c19369",
+      "pageSha": "25d7a89853d8a879",
       "mainBytes": 4372,
-      "pageBytes": 31938
+      "pageBytes": 31932
     },
     {
       "path": "sprint.html",
       "family": "sprint",
-      "mainSha": "68edaa3ff3cfb73e",
-      "pageSha": "407cd1ee04d2fd87",
-      "mainBytes": 364486,
-      "pageBytes": 380826
+      "mainSha": "f5ef4acc7bdf01c7",
+      "pageSha": "9ca78c48a1e5bbf9",
+      "mainBytes": 364494,
+      "pageBytes": 380828
     },
     {
       "path": "epics/story-11-2.html",
       "family": "story-detail",
       "mainSha": "e671a7e6a5c55b24",
-      "pageSha": "ec249c5d3ff009e9",
+      "pageSha": "3b01d6c5eb5404f8",
       "mainBytes": 9350,
-      "pageBytes": 24555
+      "pageBytes": 24549
     },
     {
       "path": "epics/story-10-1.html",
       "family": "story-detail",
       "mainSha": "8b1db76173f535fb",
-      "pageSha": "e6ed88ba64a575e2",
+      "pageSha": "770a72f00964b1d0",
       "mainBytes": 112695,
-      "pageBytes": 129162
+      "pageBytes": 129156
     }
   ]
 }

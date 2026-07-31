@@ -275,8 +275,8 @@
           "kind": "data"
         }
       ],
-      "contentHash": "84ce7e987e02a985",
-      "bytes": 1719177
+      "contentHash": "d8901931d607041a",
+      "bytes": 1719183
     },
     "adrs/0004-cross-surface-interaction-and-theme-contract.html": {
       "title": "ADR 0004: Preserve Cross-Surface Interaction Semantics and Host-Aware Theme Boundaries — SpecScribe",
@@ -416,7 +416,7 @@
           "kind": "data"
         }
       ],
-      "contentHash": "6e1776d33e601f95",
+      "contentHash": "ae1539ff517d9d67",
       "bytes": 421620
     },
     "follow-ups/action-schedule-a-story-spec-to-fix-htmltemplater-knownindexgroups.html": {
@@ -673,8 +673,8 @@
         "description": "Sprint delivery status for SpecScribe — a board of every epic and story by lifecycle stage."
       },
       "scriptIslands": [],
-      "contentHash": "111705f3cf90526f",
-      "bytes": 530105
+      "contentHash": "ebf1dfb477a4d3ce",
+      "bytes": 530113
     },
     "epics/story-11-2.html": {
       "title": "Story 11.2: Spec Kit Baseline Adapter Coverage — SpecScribe",

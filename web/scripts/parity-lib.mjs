@@ -61,6 +61,27 @@ export function composeIrMain(region, normalize) {
   return normalize(`<main id="main-content"${region.mainAttributes}>${region.mainInnerHtml}</main>`)
 }
 
+/**
+ * Folds BUILD-derived asset digests out of a whole-page string, on top of `normalizeVolatile`.
+ *
+ * ⚠️ Only needed for `pageSha`, never for `mainSha`: the `<main>` region carries no `_nuxt/` reference at all.
+ *
+ * Nuxt content-hashes its emitted chunks — `_nuxt/PageShell.Ys9LGDmo.css`, `_nuxt/entry.DRLacYXT.css`. Those
+ * digests are a property of the BUILD, not of the page, and they are exactly the same class of token
+ * `normalizeVolatile` already folds for `?v=<ModuleVersionId>` and `SpecScribe v<VERSION>`. Leaving them in
+ * would make the gate report CHROME DRIFT on every route whenever the artefact is rebuilt on a different
+ * machine — a failure unrelated to the change under test, which is precisely what ADR 0033 §Decision 2
+ * forbids, and which would have been discovered on CI-Ubuntu rather than here.
+ *
+ * The fold is deliberately narrow. The asset's DIRECTORY, STEM and EXTENSION all survive, so the gate still
+ * catches a chunk being renamed, added, dropped, or moved between `<link>` and `<script>` — only the opaque
+ * digest is neutralized. `[A-Za-z0-9_-]{8}` matches Vite/Rolldown's fixed-width base64url hash and will not
+ * swallow a multi-segment stem.
+ */
+export function foldBuildAssets(s) {
+  return s.replace(/(_nuxt\/[^"'\s/]+?)\.[A-Za-z0-9_-]{8}\.(css|js|mjs)/g, '$1.<HASH>.$2')
+}
+
 /** Thrown when the oracle cannot be trusted at all. Loud, never a silent skip (ADR 0033 §Decision 5). */
 export class ParityOracleError extends Error {}
 

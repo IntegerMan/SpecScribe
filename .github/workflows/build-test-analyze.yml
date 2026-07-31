@@ -217,21 +217,32 @@ jobs:
       # an artifact of this workflow.
       # ---------------------------------------------------------------------
 
-      - name: Generate the IR
-        # `--spa` emits spa/manifest.json + spa/pages-*.json, which IS the canonical IR (ADR 0016) and the
-        # input both the drift gate below and the Nuxt build read. --no-build reuses the Build step's output.
-        #
-        # MUST run BEFORE `npm ci`. web/package.json declares `"postinstall": "nuxt prepare"`, and `npm ci`
-        # runs lifecycle scripts — so the install itself loads web/nuxt.config.ts, which calls
-        # loadManifest() in web/ir/adapter.ts and HARD-FAILS with "IR not found at
-        # SpecScribeOutput/spa/manifest.json" when the IR is absent. On a fresh CI checkout it always is:
-        # SpecScribeOutput/ is gitignored. Reproduced locally, then verified fixed by this ordering.
-        run: dotnet run --project src/SpecScribe --no-build -- generate --spa
+      # ⚠️ THE ORDER OF THE NEXT FOUR STEPS IS LOAD-BEARING, AND IT INVERTED IN STORY 23.6.
+      #
+      # It used to be: generate -> npm ci -> sync -> (no artefact step). The generate had to come FIRST
+      # because `postinstall: nuxt prepare` loads web/nuxt.config.ts, which calls loadManifest() and HARD-FAILS
+      # with "IR not found at SpecScribeOutput/spa/manifest.json" when the IR is absent — and on a fresh CI
+      # checkout it always is, since SpecScribeOutput/ is gitignored.
+      #
+      # Story 23.6 made `specscribe generate` DRIVE THE PRERENDER (ADR 0022 §Decision 3): it now boots the
+      # prebuilt Nitro artefact and issues one request per manifest route. So the generate needs the artefact,
+      # the artefact needs `npm ci`, and `npm ci` needed the IR the generate produces — a cycle. The first CI
+      # run after 23.6 failed exactly here: no artefact, so every route errored, `errors=1`, non-zero exit.
+      #
+      # SPECSCRIBE_PACKAGE_BUILD=1 breaks the cycle at the point it was always breakable: that flag stubs the
+      # manifest EMPTY (ir/adapter.ts), which is precisely what it exists for, so `npm ci`'s postinstall no
+      # longer needs an IR to be present. Install and build the renderer first, then generate.
+      #
+      # Do NOT reorder these back. A generate with no artefact is a hard failure by design (AC #4) — the whole
+      # point is that a missing renderer can never be a silently empty output root.
 
       - name: Install web dependencies
         working-directory: web
-        # `npm ci`, not `npm install`: the lockfile is the pin, and a lockfile-
-        # drifting install in CI would make the build unreproducible.
+        # `npm ci`, not `npm install`: the lockfile is the pin, and a lockfile-drifting install in CI would
+        # make the build unreproducible.
+        env:
+          # See the ordering note above — this is what lets the install run before any IR exists.
+          SPECSCRIBE_PACKAGE_BUILD: "1"
         run: npm ci
 
       - name: Sync runtime assets into web/public
@@ -241,14 +252,15 @@ jobs:
         # and `check:assets` fails with "missing: prism.css / missing: prism.js". Populating it here is not
         # a workaround — it is the same thing `npm run dev`, `npm run build`, and `npm run generate` each do
         # via their own `sync-runtime-assets.mjs` prefix. Reproduced locally by deleting web/public/.
+        #
+        # It must precede the artefact build below: `build:package` bakes web/public/ into .output/public.
         run: npm run sync:assets
 
       - name: Build the project-independent renderer artefact
         working-directory: web
-        # Story 23.6. `check:parity` (part of `npm run check` below) RENDERS a pinned IR corpus through the
-        # shipped artefact, so the artefact has to exist first. `build:package` sets SPECSCRIBE_PACKAGE_BUILD=1,
-        # which stubs the manifest empty — so this step does NOT need an IR and could equally run before the
-        # generate above.
+        # Story 23.6. BOTH the generate below and `check:parity` (part of `npm run check`) render through this
+        # artefact, so it has to exist before either. `build:package` sets SPECSCRIBE_PACKAGE_BUILD=1 itself,
+        # so it needs no IR.
         #
         # It MUST be `build:package`, never `build`. A plain `nuxt build` bakes the building project's pages
         # into .output/public, and Nitro serves public/ AHEAD of the SSR route — a package artefact pointed at
@@ -256,6 +268,15 @@ jobs:
         # (Story 23.5 hit exactly that). `render-lib.mjs` asserts the artefact carries no prerendered HTML
         # rather than trusting this step.
         run: npm run build:package
+
+      - name: Generate the IR and prerender the site
+        # `--spa` is a deprecated no-op since Story 23.6 (the IR is emitted unconditionally) and is dropped
+        # here rather than left to print a deprecation notice on every CI run.
+        #
+        # This step now does TWO things: it emits spa/manifest.json + spa/pages-*.json (the canonical IR,
+        # ADR 0016) and then boots the artefact above to render one .html per manifest route. --no-build
+        # reuses the Build step's output.
+        run: dotnet run --project src/SpecScribe --no-build -- generate
 
       - name: Check web drift gates
         working-directory: web
@@ -372,6 +393,12 @@ jobs:
 
       - name: Install web dependencies
         working-directory: web
+        env:
+          # This job runs NO dotnet generate, so there is no IR anywhere on disk — and `postinstall:
+          # nuxt prepare` loads nuxt.config.ts, which hard-fails without one. The flag stubs the manifest
+          # empty, which is exactly what it is for. (Same reason as the gating job above; there the cycle is
+          # subtler, here the IR is simply never produced.)
+          SPECSCRIBE_PACKAGE_BUILD: "1"
         run: npm ci
 
       - name: Build the project-independent renderer artefact

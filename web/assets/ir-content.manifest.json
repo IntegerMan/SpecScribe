@@ -10,11 +10,11 @@
     "epics/story-{id}.html"
   ],
   "stats": {
-    "carriedRules": 1235,
-    "carriedSelectors": 1390,
+    "carriedRules": 1237,
+    "carriedSelectors": 1393,
     "carriedKeyframes": 4,
     "droppedRoot": 4,
-    "generatedBytes": 153578,
+    "generatedBytes": 153726,
     "sharedRules": 1
   },
   "rules": [
@@ -2749,6 +2749,14 @@
     },
     {
       "selector": ".donut-center-text.donut-center-fraction",
+      "carried": true
+    },
+    {
+      "selector": ".mini-donut",
+      "carried": true
+    },
+    {
+      "selector": ".mini-donut .donut-track, .mini-donut .donut-seg",
       "carried": true
     },
     {
