@@ -132,19 +132,20 @@ public class CodeFileTemplaterTests
     {
         var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs);
 
-        // The relationships block (graph + accessible list) is present and is the hero — it precedes the source.
-        Assert.Contains("<section class=\"code-relationships\">", html);
-        Assert.Contains("class=\"ref-graph\"", html);
+        // The relationships block (graph component + accessible list) is present and is the hero — it precedes the
+        // source. Story 24.2: the card is now the component's FRAMED panel, not a hand-written <section>.
+        Assert.Contains("class=\"chart-panel code-relationships\"", html);
+        Assert.Contains("data-relgraph", html);
         Assert.Contains("<section class=\"code-source-section\"", html);
         var relIndex = html.IndexOf("code-relationships", StringComparison.Ordinal);
         var srcIndex = html.IndexOf("code-source-section", StringComparison.Ordinal);
         Assert.True(relIndex >= 0 && relIndex < srcIndex, "relationships must lead the page, source is secondary");
 
-        // Each citing artifact is a real graph node link carrying its full title, with a compact ring label.
-        Assert.Contains("class=\"ref-node\" href=\"", html);
-        Assert.Contains("epics/story-7-1.html", html);
-        Assert.Contains("<title>Story 7.1: In-Portal Code File Browsing</title>", html);
-        Assert.Contains(">Story 7.1</text>", html);   // compact ring label (identifier before the colon)
+        // Each citing artifact is a graph node in the island, carrying its full title, its compact ring label and a
+        // real href to its own page.
+        Assert.Contains("\"l\":\"Story 7.1\"", html);
+        Assert.Contains("\"p\":\"Story 7.1: In-Portal Code File Browsing\"", html);
+        Assert.Contains("\"h\":\"../../../epics/story-7-1.html\"", html);
 
         // The always-present accessible list carries the FULL titles and meaningful link text — visually hidden
         // (sr-only) so the visible surface is just the graph, but present in the DOM for assistive tech.
@@ -155,6 +156,198 @@ public class CodeFileTemplaterTests
         // The locked line anchors survive the redesign (source is de-emphasized, never removed).
         Assert.Contains("id=\"L1\"", html);
         Assert.Contains("data-code-path=\"src/SpecScribe/Sample.cs\"", html);
+    }
+
+    // ---- Story 24.2: the interactive ego graph replaces the pure-SVG reference graph ----
+
+    [Fact]
+    public void RenderPage_Cited_EmitsGraphHostIslandAndEngineButNoRetiredSvg()
+    {
+        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs);
+
+        // Host, island and boot handshake — the three halves of the component's contract.
+        Assert.Contains("data-relgraph></div>", html);
+        Assert.Contains("<script type=\"application/json\" id=\"relgraph-", html);
+        Assert.Contains("data-ss-relgraph-boot", html);
+        // The engine is pulled ONLY because the rendered body carries a host (the flag is derived, never hand-set).
+        Assert.Contains("plotly-hierarchy.min.js", html);
+        // Nothing of the retired SVG survives — this is the ADR 0013 §1/§4 retirement, not a coexistence.
+        Assert.DoesNotContain("ref-graph", html);
+        Assert.DoesNotContain("ref-edge", html);
+        Assert.DoesNotContain("ref-dot", html);
+        Assert.DoesNotContain("refgraph-toggle", html);
+        Assert.DoesNotContain("data-view=\"flat-flat\"", html);
+    }
+
+    [Fact]
+    public void RenderPage_Uncited_NoGraph_DoesNotPullTheEngineOrTheBootScript()
+    {
+        // The engine flag is derived from the rendered body, so a page with no graph must stay clean of a 1.2 MB
+        // bundle it cannot use — and of the boot marker that would otherwise show "Initializing…" over nothing.
+        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav());
+
+        Assert.DoesNotContain("data-relgraph", html);
+        Assert.DoesNotContain("plotly-hierarchy.min.js", html);
+        Assert.DoesNotContain("data-ss-relgraph-boot", html);
+    }
+
+    [Fact]
+    public void RenderPage_TabRadios_CarryTheRevealMarkerOnlyWhenAGraphIsHosted()
+    {
+        // ⚠ THE ZERO-WIDTH MOUNT TRAP. The Relationships panel is display:none at mount whenever an Insights panel
+        // exists, and Plotly draws a WRONG-SIZED chart rather than complaining. The marker is what routes the tab
+        // radios into the deferred-mount handshake, so its absence is a silent rendering defect — pinned here
+        // because no rendering assertion can see it.
+        var withGraph = CodeFileTemplater.RenderPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight());
+        Assert.Contains("data-relgraph-reveal", withGraph);
+        // One per tab radio, so whichever tab the reader arrives on flushes the pending mount.
+        Assert.Equal(4, CountOccurrences(withGraph, "data-relgraph-reveal"));
+
+        // A tabbed page with NO graph (deep-git insight but no citers and no coupling) must not carry it.
+        var noGraph = CodeFileTemplater.RenderPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(),
+            insight: new FileInsight(3, new[] { ("Alice", 3) }, Array.Empty<CoupledFile>(), Array.Empty<CommitTouch>(), 1));
+        Assert.DoesNotContain("data-relgraph-reveal", noGraph);
+    }
+
+    [Fact]
+    public void RenderPage_Graph_CarriesTheStory102FramingFromTheSharedSource()
+    {
+        var html = CodeFileTemplater.RenderPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight());
+
+        Assert.Contains("<h3>Relationships</h3>", html);
+        // The framing sentence comes from Charts.WhyText, never hand-rolled at the call site.
+        Assert.Contains(Charts.WhyText(Charts.ChartMetric.ChangeCoupling), html);
+        Assert.Contains("class=\"chart-frame-ranking\"", html);
+    }
+
+    [Fact]
+    public void RenderPage_CitationsOnly_OmitsTheCouplingFramingItCannotDraw()
+    {
+        // A citations-only card (no --deep-git) must not carry a sentence about change coupling: a frame that
+        // describes a metric the chart does not draw is the misdescribing-frame class Story 10.2 exists to prevent.
+        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs);
+
+        Assert.DoesNotContain(Charts.WhyText(Charts.ChartMetric.ChangeCoupling), html);
+        Assert.DoesNotContain("chart-frame-why", html);
+    }
+
+    [Fact]
+    public void RenderPage_Legend_DisclosesTheWidthBandingAndNamesNonColourChannels()
+    {
+        var html = CodeFileTemplater.RenderPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight());
+
+        // ADR 0030 §5: Plotly's line style is trace-level, so stroke width is QUANTISED. A legend claiming a
+        // continuous scale beside a banded chart is the misdescribing-entry class 10.7 and 21.1 each closed.
+        Assert.Contains("banded into 3 steps", html);
+        Assert.Contains("not a continuous scale", html);
+        // Every channel is named in prose, so the reading survives colour removal (UX-DR17).
+        Assert.Contains("gold circle on a solid spoke", html);
+        Assert.Contains("neutral diamond on a dashed spoke", html);
+        Assert.Contains("Longer dashes mark a pair that crosses a directory boundary", html);
+        // …and confidence is explicitly NOT claimed to be readable from the drawn width.
+        Assert.Contains("the drawn thickness is a band, not a reading", html);
+    }
+
+    [Fact]
+    public void RenderPage_Legend_OmitsEntriesForChannelsThisInstanceDoesNotDraw()
+    {
+        // A legend row must never point at zero edges. Citations-only: no coupling, no boundary, no process, no
+        // cross entries.
+        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs);
+
+        Assert.Contains("gold circle on a solid spoke", html);
+        Assert.DoesNotContain("neutral diamond on a dashed spoke", html);
+        Assert.DoesNotContain("banded into 3 steps", html);
+        Assert.DoesNotContain("Dotted spokes are process coupling", html);
+        Assert.DoesNotContain("Dash-dot edges relate", html);
+    }
+
+    [Fact]
+    public void RenderPage_Filters_AreEmittedHiddenAndOnlyWhenTheirEdgesExist()
+    {
+        // Owner decision D3: both toggles survive as CLIENT edge filters, inside the component's hidden control bar
+        // so a JS-off reader never sees an inert checkbox — and only when they govern something. The retired card
+        // shipped both unconditionally, which meant a checkbox that toggled nothing.
+        var both = CodeFileTemplater.RenderPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), RefsWithEpics, insight: SampleInsight(),
+            storyRelatedEdges: new[] { (0, 0) });
+        Assert.Contains("<div class=\"ss-relgraph-controls\" hidden>", both);
+        Assert.Contains("data-relgraph-filter=\"epic\"", both);
+        Assert.Contains("data-relgraph-filter=\"cross\"", both);
+
+        // No epic membership and no cross edges → no control bar at all.
+        var neither = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs);
+        Assert.DoesNotContain("ss-relgraph-controls", neither);
+        Assert.DoesNotContain("data-relgraph-filter", neither);
+    }
+
+    [Fact]
+    public void RenderPage_Island_CarriesEveryEdgeWithItsGoverningFilterAndServerResolvedStyle()
+    {
+        var html = CodeFileTemplater.RenderPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), RefsWithEpics, insight: SampleInsight(),
+            storyRelatedEdges: new[] { (0, 0) }, relatedRelatedEdges: new[] { (0, 1) });
+
+        // Style classes are resolved SERVER-side and shipped, so legend, payload and drawn chart cannot disagree.
+        Assert.Contains("\"styles\":[", html);
+        Assert.Contains("\"k\":\"cite\",\"dash\":\"solid\"", html);
+        Assert.Contains("\"k\":\"cross\",\"dash\":\"5px,2px,1px,2px\"", html);
+        // Cross-boundary takes a LONGER dash and process coupling a DOT pattern — never a hue change (UX-DR17).
+        Assert.Contains("\"dash\":\"9px,4px\"", html);
+        // Each edge names its KIND; the filter that governs a kind and the phrase describing it live in ONE
+        // config row per kind rather than on every edge (measured: the per-edge form was 56% repetition).
+        Assert.Contains("\"kinds\":[", html);
+        Assert.Contains("{\"k\":\"epic\",\"f\":\"epic\"", html);
+        Assert.Contains("{\"k\":\"xcite\",\"f\":\"cross\"", html);
+        Assert.Contains("{\"k\":\"cite\",\"phrase\":", html);
+        Assert.Contains("\"e\":\"epic\"", html);
+        Assert.Contains("\"e\":\"xcite\"", html);
+        // No float artifact reaches the payload.
+        Assert.DoesNotContain("999999", html);
+    }
+
+    [Fact]
+    public void RenderPage_Island_PinsTheFocalNodeDeadCentre()
+    {
+        // Owner decision D1: the focal file is pinned at the canvas centre and excluded from the relaxation, so the
+        // hub-and-spoke read cannot drift. Asserted on the emitted GEOMETRY, not on a configuration flag.
+        var html = CodeFileTemplater.RenderPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight());
+
+        Assert.Contains("\"id\":\"focal\",\"l\":\"Sample.cs\",\"p\":\"src/SpecScribe/Sample.cs\",\"x\":\"0.5\",\"y\":\"0.5\"", html);
+    }
+
+    [Fact]
+    public void RenderPage_Island_IsIdenticalAcrossRepeatedRenders()
+    {
+        // Node position is DATA (ADR 0030 §2), so the same input must produce the same coordinates. In-process
+        // repetition cannot see string-hash randomization across processes — that is verified separately in
+        // CouplingLayoutTests — but it does catch an accumulator whose order depends on a dictionary walk.
+        var a = CodeFileTemplater.RenderPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), RefsWithEpics, insight: SampleInsight(),
+            storyRelatedEdges: new[] { (0, 0) }, relatedRelatedEdges: new[] { (0, 1) });
+        var b = CodeFileTemplater.RenderPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), RefsWithEpics, insight: SampleInsight(),
+            storyRelatedEdges: new[] { (0, 0) }, relatedRelatedEdges: new[] { (0, 1) });
+
+        Assert.Equal(a, b);
+    }
+
+    [Fact]
+    public void PlaceholderPage_WithCiters_RendersTabsNotAnAsideGraph()
+    {
+        // Pins the reachability fact Story 24.2 acted on: `BuildAside`'s citing-artifact graph — the SECOND
+        // Charts.ReferenceGraph call site — could never draw, because a page with citers always has a
+        // relationships panel and therefore always takes the TABBED branch. Recorded as a test rather than left as
+        // a reasoning claim, since the whole decision to delete that branch rests on it.
+        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs);
+
+        Assert.Contains("code-tab--relationships", html);
+        Assert.DoesNotContain("<aside class=\"code-aside\">", html);
     }
 
     [Fact]
@@ -235,7 +428,12 @@ public class CodeFileTemplaterTests
         // Contributors — "N commits" attribution wording, no ranking language.
         Assert.Contains(">Alice</span> <span class=\"contributor-count\">5 commits</span>", html);
         Assert.Contains(">Bob</span> <span class=\"contributor-count\">2 commits</span>", html);
-        Assert.DoesNotContain("rank", html.ToLowerInvariant());
+        // Scoped to the INSIGHTS panel. The prohibition is on ranking PEOPLE — a contributor leaderboard is the
+        // thing Story 7.4 refused to build. Story 24.2's relationship card legitimately says "ranked by" of
+        // CO-CHANGED FILES in its Story 10.2 ranking slot, and a whole-document substring search cannot tell the
+        // two apart, so it was quietly forbidding a different thing than it meant to.
+        var insightsPanel = Between(html, "code-tabpanel--insights", "code-tabpanel--relationships");
+        Assert.DoesNotContain("rank", insightsPanel.ToLowerInvariant());
         Assert.DoesNotContain("leaderboard", html.ToLowerInvariant());
         Assert.DoesNotContain("top developer", html.ToLowerInvariant());
         // Story 7.8 (AC #2): coupled files are NO LONGER a visible list in the coverage section — the graph owns that
@@ -260,16 +458,17 @@ public class CodeFileTemplaterTests
         var html = CodeFileTemplater.RenderPage(
             RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight());
 
-        // The co-changed files render as the graph's second node population (neutral diamonds + dashed edges) …
-        Assert.Contains("class=\"ref-edge-file\"", html);
-        Assert.Contains("class=\"ref-file-dot\"", html);
-        Assert.Contains("class=\"ref-file-label\"", html);
-        // … each with a rich tooltip carrying the full path + co-change strength. The graph itself still speaks in
-        // shared-commit counts — upgrading it to confidence-weighted edges is 24.2's job, not 24.1's.
-        Assert.Contains("<title>src/SpecScribe/Other.cs — changed together 4 times</title>", html);
-        Assert.Contains("<title>docs/notes.md — changed together 2 times</title>", html);
-        // The relationships note now frames both populations (solid citations + dashed co-changes).
-        Assert.Contains("changes alongside (dashed)", html);
+        // The co-changed files render as the graph's second node population (Story 24.2: neutral diamonds in the
+        // island's node array, on dashed coupling spokes) …
+        Assert.Contains("\"p\":\"src/SpecScribe/Other.cs\"", html);
+        Assert.Contains("\"k\":\"coupled\"", html);
+        Assert.Contains("\"dash\":\"4px,3px\"", html);
+        // … each carrying the full path + the directional metric in ONE server-composed sentence, which is the
+        // node's tooltip AND its accessible name AND its spoke's hover text, so they cannot disagree.
+        Assert.Contains("src/SpecScribe/Other.cs \\u2014 changed together 4 times, confidence 57%, lift 1.4\\u00D7.", html);
+        Assert.Contains("docs/notes.md \\u2014 changed together 2 times, confidence 29%, cross-boundary.", html);
+        // The ranking caption frames the coupled population and states how it is ranked.
+        Assert.Contains("Co-changed files are ranked by", html);
         // The sr-only list carries the related files as a labelled text equivalent (path + co-change count).
         Assert.Contains("Files changed alongside this one:", html);
         Assert.Contains("src/SpecScribe/Other.cs &#8212; changed together 4 times", html);
@@ -318,34 +517,33 @@ public class CodeFileTemplaterTests
     [Fact]
     public void RenderPage_NullInsight_GraphIsCitationsOnly_ByteIdenticalToBaseline()
     {
-        // With no insight there are no related-file nodes: the relationships card (note, graph, list) must be exactly
-        // the Story 7.1 citations-only card. Byte-identity proves the additive overload and the degradation path.
+        // With no insight there are no related-file nodes: the relationships card must be exactly the citations-only
+        // card. Byte-identity proves the additive overload and the no-deep-git degradation path.
         var baseline = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs);
         var withNull = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: null);
 
         Assert.Equal(baseline, withNull);
-        Assert.DoesNotContain("ref-edge-file", baseline);
-        Assert.DoesNotContain("ref-file-dot", baseline);
+        Assert.DoesNotContain("\"k\":\"coupled\"", baseline);
         Assert.DoesNotContain("Files changed alongside this one:", baseline);
-        // Baseline note is the unchanged Story 7.1 citations-only framing.
-        Assert.Contains("References run artifact&#8594;file", baseline);
-        Assert.DoesNotContain("changes alongside (dashed)", baseline);
+        // No coupling edges, so no coupling framing and no dashed-spoke legend entry.
+        Assert.DoesNotContain("Co-changed files are ranked by", baseline);
+        Assert.DoesNotContain("neutral diamond on a dashed spoke", baseline);
     }
 
     [Fact]
     public void RenderPage_RelatedFileLink_GuardedOnCodePageExistence()
     {
-        // Only src/SpecScribe/Other.cs has a code page; docs/notes.md does not → non-link chip, never a dead link.
+        // Only src/SpecScribe/Other.cs has a code page; docs/notes.md does not → non-link node, never a dead link.
         string? Resolve(string path) => path == "src/SpecScribe/Other.cs" ? "code/src/SpecScribe/Other.cs.html" : null;
 
         var html = CodeFileTemplater.RenderPage(
             RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs, insight: SampleInsight(), coupledFileHref: Resolve);
 
         // Resolved coupled file → a linked graph node + a linked sr-only entry (prefixed to the code page's depth).
-        Assert.Contains("<a class=\"ref-file-node\" href=\"../../../code/src/SpecScribe/Other.cs.html\"", html);
+        Assert.Contains("\"h\":\"../../../code/src/SpecScribe/Other.cs.html\"", html);
         Assert.Contains("<a href=\"../../../code/src/SpecScribe/Other.cs.html\">src/SpecScribe/Other.cs</a>", html);
-        // Unresolved coupled file → a non-link chip node + plain sr-only text, never a dead link.
-        Assert.Contains("class=\"ref-file-node ref-file-node--chip\"", html);
+        // Unresolved coupled file → a null href (the client renders it non-activatable) + plain sr-only text.
+        Assert.Contains("\"p\":\"docs/notes.md\",\"x\":", html);
         Assert.DoesNotContain("href=\"../../../code/docs/notes.md", html);
         Assert.DoesNotContain("<a href=\"../../../docs/notes.md", html);
     }
@@ -470,8 +668,7 @@ public class CodeFileTemplaterTests
             Assert.Contains($"<span>{label}</span>", html);
         }
 
-        // Each tab carries a decorative icon before its label — count within the tablist only (the reference graph
-        // renders its own node icons elsewhere in the page).
+        // Each tab carries a decorative icon before its label — count within the tablist only.
         var tablist = Between(html, "code-tablist", "</fieldset>");
         Assert.Equal(4, CountOccurrences(tablist, "class=\"ss-icon\""));
 
@@ -493,14 +690,16 @@ public class CodeFileTemplaterTests
         var html = CodeFileTemplater.RenderPage(
             RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight());
 
-        // The reference graph section renders exactly once, inside the relationships panel.
-        Assert.Equal(1, CountOccurrences(html, "<section class=\"code-relationships\">"));
+        // The relationship graph renders exactly once, inside the relationships panel. Exactly-once matters more
+        // than it used to: a second host would mean a second island id, and the client resolves its payload BY id.
+        Assert.Equal(1, CountOccurrences(html, "class=\"chart-panel code-relationships\""));
+        Assert.Equal(1, CountOccurrences(html, "data-relgraph></div>"));
         var insightsPanel = Between(html, "code-tabpanel--insights", "code-tabpanel--relationships");
         var relPanel = Between(html, "code-tabpanel--relationships", "code-tabpanel--history");
         Assert.DoesNotContain("code-relationships", insightsPanel);
-        Assert.DoesNotContain("ref-graph", insightsPanel);
+        Assert.DoesNotContain("data-relgraph", insightsPanel);
         Assert.Contains("code-relationships", relPanel);
-        Assert.Contains("ref-graph", relPanel);
+        Assert.Contains("data-relgraph", relPanel);
     }
 
     [Fact]
@@ -558,89 +757,87 @@ public class CodeFileTemplaterTests
     };
 
     [Fact]
-    public void RenderPage_Cited_AlwaysRendersBothToggleCheckboxesAndFourVariants()
-    {
-        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs);
-
-        Assert.Contains("class=\"refgraph-toggle refgraph-toggle-epic\"", html);
-        Assert.Contains("class=\"refgraph-toggle refgraph-toggle-rel\"", html);
-        Assert.Contains(">Group by epic</label>", html);
-        Assert.Contains(">Show relationships</label>", html);
-        foreach (var view in new[] { "flat-flat", "epic-flat", "flat-rel", "epic-rel" })
-        {
-            Assert.Contains($"data-view=\"{view}\"", html);
-        }
-        Assert.Equal(4, CountOccurrences(html, "class=\"ref-graph-wrap ref-graph-view\""));
-    }
-
-    [Fact]
-    public void RenderPage_EpicGrouping_NestsCitingStoryUnderEpicHubInGroupedVariants()
+    public void RenderPage_EpicGrouping_EmitsAnEpicHubNodeAndAFilteredMembershipEdge()
     {
         var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), RefsWithEpics);
 
-        var flatFlat = Between(html, "data-view=\"flat-flat\"", "data-view=\"epic-flat\"");
-        var epicFlat = Between(html, "data-view=\"epic-flat\"", "data-view=\"flat-rel\"");
-        // The flat variant never shows an epic hub; the grouped variant does, for the story that resolved an epic.
-        Assert.DoesNotContain("ref-epic-hub", flatFlat);
-        Assert.Contains("ref-epic-hub", epicFlat);
-        Assert.Contains(">Epic 7</text>", epicFlat);
-        // The non-story citer (Epic 8 page, no resolved Epic) still renders as an ordinary top-level node.
-        Assert.Contains(">Epic 8</text>", epicFlat);
+        // Story 24.2 D3: "Group by epic" is no longer a pre-rendered variant. ONE layout is solved, the epic hub is
+        // in it, and the filter governs whether its membership edge (and therefore the hub) is drawn.
+        Assert.Contains("\"id\":\"epic7\"", html);
+        Assert.Contains("\"k\":\"epic\"", html);
+        Assert.Contains("Epic 7: Code Insights \\u2014 1 citing story.", html);
+        Assert.Contains("\"e\":\"epic\",\"s\":\"epic\"", html);
+        // The non-story citer (Epic 8 page, no resolved Epic) stays an ordinary artifact node with no hub.
+        Assert.Contains("\"p\":\"Epic 8: Dashboard Command Center\"", html);
+        Assert.DoesNotContain("\"id\":\"epic8\"", html);
 
-        // The sr-only list always discloses epic membership, regardless of which panel is visible.
+        // The sr-only twin always discloses epic membership, regardless of the filter's state — that is what makes
+        // it "complete" under ADR 0013 §2 when the drawn chart can hide the hub.
         Assert.Contains("(Epic 7: Code Insights)", html);
     }
 
     [Fact]
-    public void RenderPage_ShowRelationships_StoryRelatedEdgeAppearsOnlyInRelVariants()
+    public void RenderPage_ShowRelationships_StoryRelatedEdgeIsAFilteredCrossEdgeAndAlwaysInTheTwin()
     {
         var related = new[] { (0, 0) }; // story index 0 also cites related-file index 0
         var html = CodeFileTemplater.RenderPage(
             RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight(),
             storyRelatedEdges: related);
 
-        var flatFlat = Between(html, "data-view=\"flat-flat\"", "data-view=\"epic-flat\"");
-        var flatRel = Between(html, "data-view=\"flat-rel\"", "data-view=\"epic-rel\"");
-        Assert.DoesNotContain("ref-edge-cross", flatFlat);
-        Assert.Contains("ref-edge-cross", flatRel);
-
-        // The sr-only equivalent enumerates the cross edge unconditionally.
+        Assert.Contains("\"e\":\"xcite\",\"s\":\"cross\"", html);
+        // The sentence itself is authored ONCE, as the kind's phrase, instead of on every edge.
+        Assert.Contains("{\"k\":\"xcite\",\"f\":\"cross\",\"phrase\":\"{a} also cites {b}.\"}", html);
+        // The sr-only equivalent enumerates the cross edge unconditionally — the filter cannot hide a fact.
         Assert.Contains("also cites src/SpecScribe/Other.cs", html);
     }
 
     [Fact]
-    public void RenderPage_ShowRelationships_RelatedToRelatedEdgeAppearsOnlyInRelVariants()
+    public void RenderPage_ShowRelationships_RelatedToRelatedEdgeIsAFilteredCrossEdge()
     {
         var pairEdges = new[] { (0, 1) }; // related-file index 0 <-> related-file index 1
         var html = CodeFileTemplater.RenderPage(
             RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight(),
             relatedRelatedEdges: pairEdges);
 
-        var flatFlat = Between(html, "data-view=\"flat-flat\"", "data-view=\"epic-flat\"");
-        var flatRel = Between(html, "data-view=\"flat-rel\"", "data-view=\"epic-rel\"");
-        Assert.DoesNotContain("ref-edge-cross", flatFlat);
-        Assert.Contains("ref-edge-cross", flatRel);
-
+        Assert.Contains("\"e\":\"xcouple\",\"s\":\"cross\"", html);
+        Assert.Contains("{a} and {b} are themselves frequently co-changed.", html);
         Assert.Contains("also co-changed with", html);
     }
 
     [Fact]
-    public void RenderPage_NoDeepGitInsight_TogglesRenderButProduceNoVisualDifference()
+    public void RenderPage_NoDeepGitInsight_EmitsNoFilterableEdgesAndThereforeNoControls()
     {
-        // "--deep-git off / no FileInsight" degradation: no insight → no related population, no epic data, no
-        // cross-edge data. Checkboxes still appear (control surface never disappears) but the four variants are
-        // visually identical (the underlying graph has nothing to group/relate).
+        // "--deep-git off / no FileInsight" degradation: no coupled population, no epic data, no cross edges. The
+        // control bar disappears entirely rather than shipping two checkboxes that toggle nothing — the correction
+        // to the retired card, which rendered both unconditionally.
         var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs);
 
-        Assert.Contains("refgraph-toggle-epic", html);
-        Assert.Contains("refgraph-toggle-rel", html);
+        Assert.DoesNotContain("ss-relgraph-controls", html);
+        Assert.DoesNotContain("\"e\":\"epic\"", html);
+        Assert.DoesNotContain("\"e\":\"xcite\"", html);
+        Assert.DoesNotContain("\"e\":\"xcouple\"", html);
+        Assert.DoesNotContain("\"k\":\"epic\",\"h\"", html);
+        // The graph itself still renders — citations alone are a perfectly good ego graph.
+        Assert.Contains("data-relgraph></div>", html);
+    }
 
-        var flatFlat = Between(html, "data-view=\"flat-flat\"", "data-view=\"epic-flat\"");
-        var epicRel = Between(html, "data-view=\"epic-rel\"", "</ul>");
-        Assert.DoesNotContain("ref-epic-hub", flatFlat);
-        Assert.DoesNotContain("ref-epic-hub", epicRel);
-        Assert.DoesNotContain("ref-edge-cross", flatFlat);
-        Assert.DoesNotContain("ref-edge-cross", epicRel);
+    [Fact]
+    public void RenderPage_CrossEdges_OutOfRangeIndicesAreDroppedNotDrawnAgainstTheWrongNode()
+    {
+        // The two cross-edge builders are INDEX-ALIGNED with the citer list and the coupled list, and Story 24.2
+        // widened the coupled cap — so an index that no longer resolves must be dropped, never silently rebound to
+        // whatever node happens to sit at that ordinal.
+        var ex = Record.Exception(() => CodeFileTemplater.RenderPage(
+            RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs, insight: SampleInsight(),
+            storyRelatedEdges: new[] { (99, 0), (0, 99), (-1, -1) },
+            relatedRelatedEdges: new[] { (0, 99), (5, 5), (-2, 0) }));
+        Assert.Null(ex);
+
+        var html = CodeFileTemplater.RenderPage(
+            RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs, insight: SampleInsight(),
+            storyRelatedEdges: new[] { (99, 0), (0, 99) },
+            relatedRelatedEdges: new[] { (0, 99), (5, 5) });
+        Assert.DoesNotContain("\"s\":\"cross\"", html);
     }
 
     [Fact]

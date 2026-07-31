@@ -241,17 +241,29 @@ public class StylesheetTests
     [Fact]
     public void Stylesheet_HasReferencedByStyles()
     {
-        // Story 7.1 (rework) relationships block + reference graph on code pages — neutral tokens only, no --status-*.
+        // Story 24.2: the relationships card is now the RelationshipGraph component's framed panel. The pure-SVG
+        // reference graph and its four pre-rendered `.ref-graph-view` panels are RETIRED (ADR 0013 §1/§4 make the
+        // text twin the no-JS contract, so keeping both was the dual-renderer option ADR 0013 rejected).
         var css = ReadStylesheet();
         Assert.Contains(".code-relationships", css);
-        Assert.Contains(".ref-graph", css);
-        // Story 7.8 — the related-file node population is distinguished by shape (diamond) AND edge (dashed), never
-        // colour alone: the dedicated classes must be present and the dashed edge must carry a dash pattern.
-        Assert.Contains(".ref-edge-file", css);
-        Assert.Contains(".ref-file-dot", css);
-        // [Review][Patch] scoped to the .ref-edge-file rule block itself — stroke-dasharray also appears in
-        // unrelated pre-existing rules, so a bare Assert.Contains would pass even if this rule lost its dash pattern.
-        Assert.Matches(new Regex(@"\.ref-edge-file\s*\{[^}]*stroke-dasharray"), css);
+        Assert.Contains(".ss-relgraph", css);
+        Assert.Contains(".ss-relgraph-booting", css);
+        Assert.Contains(".ss-relgraph-legend", css);
+
+        // The host is display:none until the component reveals it — a chart-sized blank box for a chart that is
+        // never coming is worse than no box at all.
+        Assert.Matches(new Regex(@"\.ss-relgraph\s*\{[^}]*display:\s*none"), css);
+        // The control bar's `[hidden]` override. `[hidden]`'s UA rule TIES with an author `display: flex` on
+        // specificity and author CSS wins, so without this the two filters render live for every JS-off, webview,
+        // SPA and engine-blocked reader as checkboxes that do nothing.
+        Assert.Matches(new Regex(@"\.ss-relgraph-controls\[hidden\]\s*\{[^}]*display:\s*none"), css);
+
+        // The retired SVG's rules are gone, not merely unused — a stale rule set is what lets a deleted renderer
+        // look alive to the next reader.
+        Assert.DoesNotContain(".ref-graph", css);
+        Assert.DoesNotContain(".ref-edge-file", css);
+        Assert.DoesNotContain(".ref-file-dot", css);
+        Assert.DoesNotContain(".refgraph-toggle", css);
     }
 
     [Fact]

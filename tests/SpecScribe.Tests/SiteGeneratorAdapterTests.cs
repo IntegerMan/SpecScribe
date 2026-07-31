@@ -1636,7 +1636,56 @@ public class SiteGeneratorAdapterTests : IDisposable
         //
         // VERIFICATION: `dbfa172b…` confirmed byte-identical across two consecutive runs, EACH preceded by an
         // explicit `dotnet build --no-incremental`.
-        const string expected = "dbfa172b30abdda0a7ca3dbf828ff255d33d3665b4b88b33ca5a50c68fbb6b0f";
+        //
+        // ── Regenerated 2026-07-30 by Story 24.2, the ego coupling graph: dbfa172b… -> 142a2132… ──
+        //
+        // CAUSALITY FIRST, per CLAUDE.md: this change DOES touch rendering, so the normalizer was not the suspect
+        // and `GoldenNormalization` was not modified. Three intentional causes, all this story's:
+        //   1. `specscribe.css` — the retired reference graph's rule family (`.ref-*`, the `.refgraph-toggle*`
+        //      sibling-combinator show/hide, `.code-relationships > h2`, `.code-relationships-note`) DELETED, and
+        //      the new `.ss-relgraph*` family added. The stylesheet is an embedded asset, so it reaches the hash on
+        //      every page whether or not that page draws a graph.
+        //   2. `specscribe.js` — the relationship-graph client block added and `.ss-relgraph-node`/`-edge` joined
+        //      the shared tooltip's `SEG` family. Also an embedded asset.
+        //   3. `CodeFileTemplater` — the code page's relationships card is now the component's framed panel plus a
+        //      payload island, replacing four pre-rendered SVG variants. The fixture's code pages are CITATIONS
+        //      ONLY (the fixture is not a git repo, so no FileInsight and no coupled population reaches it), which
+        //      is exactly the byte-identical-without-deep-git path this story preserves — but the card's markup
+        //      itself changed, so those pages move.
+        //
+        // PROVENANCE (shared main): at regeneration time `git status` showed EVERY modified `src/SpecScribe/*` file
+        // as this story's own (`AssetManifest.cs`, `Charts.cs`, `CodeFileTemplater.cs`, `EpicsViewBuilder.cs`,
+        // `GitMetrics.cs`, `HtmlRenderAdapter.cs`, `SiteGenerator.cs`, and the two assets) plus two new files
+        // (`CouplingLayout.cs`, `RelationshipGraph.cs`). A concurrent session's work WAS in the tree —
+        // `docs/adrs/README.md`, `docs/adrs/0033-…md`, `epics.md`, and two story files — but it is entirely
+        // planning/documentation outside the fixture's source tree and renders nothing through this gate. Nothing
+        // was reset, reverted or cleaned.
+        //
+        // VERIFICATION: `142a2132…` confirmed byte-identical across two consecutive runs, the pair preceded by an
+        // explicit `dotnet build --no-incremental` — mandatory here because this change touches BOTH embedded
+        // assets, which an incremental build reuses from the cached assembly without re-embedding.
+        //
+        // ── Re-regenerated 2026-07-30, same story, after its LIVE-BROWSER pass: 142a2132… -> 70070c39… ──
+        //
+        // `142a2132…` was measured before the live verification round, which found four rendered defects the suite
+        // structurally could not see. Fixing them moved the hash again, and all four causes are this story's:
+        //   1. The filter bar and the LEGEND now ship `hidden` and are revealed on mount — the JS-off audit found
+        //      eight legend rows explaining gold circles and dash patterns above a `display:none` chart host.
+        //   2. The ranking caption dropped "— the strongest are drawn nearest the centre", which misdescribed a
+        //      page where nothing is drawn; that reading moved into the legend entry that is now mount-gated.
+        //   3. `specscribe.css` gained `.ss-relgraph-legend[hidden]`, the same `[hidden]`-vs-author-`display`
+        //      specificity override the control bar already needed.
+        //   4. The layout solver's ring geometry changed (bounded angular drift, degree-normalised attraction, a
+        //      wider radius band) and the reserved host height went 420 -> 520, after the live page measured 20
+        //      overlapping marker pairs. Coordinates are DATA and ride the island, so a solver change moves bytes.
+        //
+        // PROVENANCE (shared main): unchanged from the entry above — every modified `src/SpecScribe/*` file is this
+        // story's, and the concurrent session's work in the tree is planning/documentation that renders nothing
+        // through this fixture. Nothing was reset, reverted or cleaned.
+        //
+        // VERIFICATION: `70070c39…` confirmed byte-identical across two consecutive runs, the pair preceded by an
+        // explicit `dotnet build --no-incremental`.
+        const string expected = "70070c3906efdd521babd84a4cdf01266a6886d71ea9f9aa8d73d83ef68b05d6";
         Assert.True(
             expected == fingerprint,
             $"Rendered output content changed. If this was an intentional rendering change, update the constant "

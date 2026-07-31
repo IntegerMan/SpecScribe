@@ -369,7 +369,7 @@ public static class EpicsViewBuilder
 
     /// <summary>The cap on the epic/story "Code areas touched" widget's linked file list — over it, the honest
     /// "+N more" chip surfaces the overflow and the "See the full impact map" link carries the visitor to the
-    /// complete per-epic listing. Mirrors <see cref="Charts.RefGraphArtifactNodeCap"/>'s honest-truncation
+    /// complete per-epic listing. Mirrors <see cref="RelationshipGraph.ArtifactNodeCap"/>'s honest-truncation
     /// precedent (a widget is a teaser, the dedicated page is the whole set). [Story 21.3]</summary>
     private const int CodeAreasWidgetCap = 8;
 

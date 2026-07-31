@@ -4294,6 +4294,7 @@ Replace SpecScribe's C# presentation/templating layer (~4,691 LOC templaters) wi
 - **Story 23.2 — Component library + design-token bridge.** Port the shared presentation tokens (status/motion families, AD-7) into scoped Vue components; establish the CSS module conventions.
 - **Story 23.3 — Migrate baseline surfaces (dashboard, epics) to Vue/Nuxt over the IR**, proving parity with the golden output.
 - **Story 23.5 — Packaging reconciliation** — Node build step in distribution (Epic 16 touchpoint); resolve the self-contained-binary vs. Node-toolchain story. **⚠️ RESEQUENCED AHEAD OF 23.4** by the Story 23.1 spike gate — see the note below.
+- **Story 23.6 — Retire the C# HTML writer** — ⛔ **ADDED 2026-07-30** (owner decision **D7** at Story 23.4's dev-story session 4). The deletion of `HtmlRenderAdapter.Render`'s page composition and `WriteOutput`'s `.html` writes, **carved out of Story 23.4** so that story could close on the work it actually finished. Gated on the owner's verify-and-iterate pass over 23.4's 1,276 migrated pages, and on a replacement content-drift gate satisfying [ADR 0033](../../docs/adrs/0033-content-drift-gates-are-targeted-and-regenerable.md) — because `GoldenIrFingerprint` was removed on 2026-07-30 and `GoldenContentFingerprint` is voided by this deletion.
 - **Story 23.4 — Migrate remaining surfaces + retire the C# `HtmlRenderAdapter` for content** (charts remain C#-SVG in the IR). ~~**Blocked until 23.5 lands.**~~ **UNBLOCKED 2026-07-27** — Story 23.5 is complete and [ADR 0022](../../docs/adrs/0022-node-is-a-build-toolchain-and-a-generate-time-runtime.md) settles packaging: the Node toolchain is build/CI-time only, the shipped artefact is a project-independent 3.78 MB prebuilt `.output/` that renders any project's IR at server runtime, and the standalone binary takes a documented Node prerequisite. The 23.1 gate's binary ("client-rendered SPA *or* Node at run time") was **false** — see the [packaging strategy report](../implementation-artifacts/23-5-packaging-strategy-report.md).
 
 <!-- 2026-07-23 (Story 23.1 spike gate, owner-confirmed in code review): EXECUTION ORDER IS 23.2 → 23.3 → 23.5 → 23.4.
@@ -4487,12 +4488,110 @@ So that SpecScribe has a single renderer and no drift hazard between two templat
 >    `noScripts: true` removed 23.1's hydration premise (0 Nuxt scripts, 0 `_payload.json` across 1,469 routes)
 >    and the webview is not a Nuxt consumer anyway. It restates ADR 0005 §4's "the body carries no scripts of
 >    its own" as an enforced claim about the **region** (0 executable, 163 inert data islands).
-> 7. **Epic 22's `22-5`/`22-6` premises: intact, and now better supported.** Both stories have already landed
+> 7. **⛔ THE DELETION IS RE-HOMED — owner decision D7, 2026-07-30 (dev-story session 4). Story 23.4 closes at
+>    `review` WITHOUT it.** Item 4 above deferred "C# stops writing `.html`" pending owner verification; the owner
+>    has now **descoped** it into **[Story 23.6](#story-236-retire-the-c-html-writer)**. Two findings drove it, both
+>    measured in session 4:
+>    - **AC #5's answer changed under the story after it was written.** The successor gate item 3 records —
+>      **`GoldenIrFingerprint`** — was **removed** on 2026-07-30 (`70b72ab`): three different hashes across the
+>      local box, CI-Windows and CI-Ubuntu for one identical commit. `GoldenContentFingerprint` is unaffected but
+>      hashes **output `.html`**, so the deletion voids it too ⇒ **no content-drift gate on either side**. AC #5 is
+>      satisfied in the record and **not** in the tree; 23.6 inherits the hole.
+>    - **The blast radius is a story's worth of work.** The written document is the oracle for **four** gates: it
+>      backs `_spaCapture`, without which `RegionCompositionDeltas()` — and therefore **both** proof gates 23.4
+>      landed — goes **vacuous rather than red**; plus `GoldenContentFingerprint`, `GoldenOutputInventory`, and
+>      `EnsureHierarchyEngine`'s host-marker scan. The good news traced in the same pass: `WritePage` composes the
+>      region from the `PageView` *independently* of the page render, so the region path itself needs nothing.
+>    - **The gate constraint is now a ratified-pending contract, not a story note:**
+>      **[ADR 0033](../../docs/adrs/0033-content-drift-gates-are-targeted-and-regenerable.md)** (Proposed) — content-drift
+>      gates must be targeted and regenerable; a whole-tree hash is not an acceptable shape for a new gate.
+>
+> 8. **Epic 22's `22-5`/`22-6` premises: intact, and now better supported.** Both stories have already landed
 >    (`done` / `review`), and neither depended on C# writing `.html` — 22.5's incremental engine keys on the
 >    classifier and 22.6's delta channel on the IR. Switching the IR's producer to a composed region *helps*
 >    both: page title, breadcrumb and meta description now come from the view model instead of being regex-scraped
 >    back out of finished HTML, so an incremental recompute no longer depends on re-parsing its own output. What
 >    Epic 22 newly **owes** is item 2's view-model ask.
+
+### Story 23.6: Retire the C# HTML Writer
+
+> **⛔ Seeded 2026-07-30 by owner decision D7 at Story 23.4's dev-story session 4 — the deletion carved out of
+> [Story 23.4](#story-234-migrate-remaining-surfaces--retire-the-c-htmlrenderadapter-for-content) rather than left
+> as an open checkbox on a story that is otherwise complete. Status `backlog`. ⚠️ Not yet through `create-story` —
+> run it before dev, and elicit the gate decision up front (see the blocker below).**
+
+As a maintainer finishing owner decision D2,
+I want `HtmlRenderAdapter.Render`'s full-page composition and `WriteOutput`'s `.html` writes deleted, with every
+gate that depended on the written document re-pointed or retired with a stated reason,
+So that Nuxt is the single writer of SpecScribe's HTML and no C# code path emits a content page.
+
+**What 23.4 already did, so this story does not redo it:** all 25 templaters are on `PageView`; the IR is built
+from a region **composed** from each page's own view model at the `WritePage` seam, proven byte-equal to the old
+`ExtractContentRegion` slice across **1,469 pages with 0 unexpected deltas**; all 1,276 remaining pages are
+migrated to 10 Vue family components with **0 pass-through**; the parity oracle is **captured and committed** as
+per-page sha256 in `web/measurements/parity.json`. **The deletion is what remains, and only the deletion.**
+
+**⚠️ The blocker to settle at create-story, not during dev.** 23.4's AC #5 successor gate `GoldenIrFingerprint`
+was **removed** 2026-07-30 (`70b72ab`) for cross-platform nondeterminism, so **there is no content-drift gate over
+the IR today**, and `GoldenContentFingerprint` — which covers the rendered `.html` — is voided by this story's own
+deletion. Decide the replacement **before** deleting. It must satisfy
+**[ADR 0033](../../docs/adrs/0033-content-drift-gates-are-targeted-and-regenerable.md)**: targeted, regenerable by
+command, deterministic across CI operating systems, and loud rather than vacuous when its oracle vanishes. The
+committed per-page `parity.json` oracle is the reference shape; wiring `measure:parity` into CI is this story's to
+scope. `deferred-work.md:22` carries the same action.
+
+**⚠️ The blast radius, traced in 23.4 session 4 — four gates hang off the written document, not one.**
+
+| dies with the writer | what this story owes it |
+| --- | --- |
+| `_spaCapture` (the slice oracle) | `RegionCompositionDeltas()` loses its comparison basis ⇒ `RegionCompositionParityTests` **and** `RegionCompositionCorpusProof` go **vacuous, not red** — the worst failure mode. Re-point at the committed sha256 oracle or retire with a stated reason. |
+| `GoldenContentFingerprint` | subject gone. This is AC #5's long-promised inversion; retire it, do not re-point it at the IR as another whole-tree hash (ADR 0033). |
+| `GoldenOutputInventory` | pins the output file set; changes wholesale. Same treatment. |
+| `EnsureHierarchyEngine`'s host-marker scan | reads `WritePage`'s returned document; re-derive from the view model. |
+
+**The good news, also traced:** `WritePage` ([SiteGenerator.cs:3970](../../src/SpecScribe/SiteGenerator.cs:3970))
+renders the document via `HtmlRenderAdapter.Shared.Render(page)` and composes the region **separately** from the
+same `PageView`. The region path therefore needs nothing from the page render — the circularity that shaped all of
+23.4 is already broken.
+
+**Acceptance Criteria:**
+
+1.
+**Given** owner decision D2 — C# stops WRITING `.html` while still composing regions for the IR
+**When** the retirement lands
+**Then** `HtmlRenderAdapter.Render`'s full-page composition and `WriteOutput`'s content-HTML writes are gone and no
+C# code path writes a content `.html`, **while** `RenderNavMarkup`, `RenderBreadcrumb`, `RenderWayfinding`,
+`RenderDashboardBody` and `RenderEpicsBody` survive and continue to feed the region — and the webview and SPA keep
+working through that same region path per [ADR 0024](../../docs/adrs/0024-spa-and-webview-are-filtered-projections-of-one-region-seam.md).
+
+2.
+**Given** four gates depend on the written document
+**When** the writer is deleted
+**Then** each is **re-pointed or retired with a stated reason** — never left asserting against a vanished oracle. A
+gate that silently passes because its basis is empty is a failure of this AC, not a pass; the enumeration above is
+the checklist.
+
+3.
+**Given** [ADR 0033](../../docs/adrs/0033-content-drift-gates-are-targeted-and-regenerable.md)
+**When** the replacement content-drift gate lands
+**Then** it is **targeted** (a failure names the artifact), **regenerable by command** rather than constant-bump,
+**proven deterministic across the CI operating systems** and not merely across two local runs, and **fails loudly
+when its oracle is absent**. It lands **before or with** the deletion, so the drift gate never lapses.
+
+4.
+**Given** [ADR 0022](../../docs/adrs/0022-node-is-a-build-toolchain-and-a-generate-time-runtime.md) makes Node a
+generate-time runtime
+**When** C# can no longer produce HTML at all
+**Then** the documented Node prerequisite is verified to actually fire — a user without Node gets the actionable
+startup error, not a silent empty output — and the consequence 23.5 stated plainly (**a user without Node cannot
+generate at all**) is re-confirmed as still the accepted trade-off. Node detection itself remains Story 16.3's.
+
+5.
+**Given** the owner's verify-and-iterate pass is the design gate (CLAUDE.md § Story lifecycle)
+**When** this story starts
+**Then** it confirms the owner has finished verifying Story 23.4's 1,276 migrated pages first — because after the
+deletion there is **no golden side left to generate**, and re-measuring anything they ask for stops being possible.
+This is the reason 23.4 deferred the deletion twice; it is an ordering constraint, not a courtesy.
 
 ### Story 23.5: Packaging Reconciliation
 

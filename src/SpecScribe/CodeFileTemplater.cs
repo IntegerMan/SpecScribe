@@ -166,6 +166,16 @@ public static class CodeFileTemplater
     private static void AppendTabs(StringBuilder sb, string outputRelativePath, IReadOnlyList<CodeTab> tabs)
     {
         var group = PathUtil.Html(TabGroupName(outputRelativePath));
+        // ⚠ THE ZERO-WIDTH MOUNT TRAP (Story 24.2). These tabs are pure-CSS radios, so whenever an Insights panel
+        // exists it is the default-checked tab and the Relationships panel is `display:none` — zero width — at the
+        // moment the client first reaches the graph host. Plotly CANNOT lay out in a zero-width container and it
+        // does NOT complain: it draws a chart of the wrong size. Marking the radios opts them into the same
+        // deferred-mount/flush handshake `data-hierarchy-reveal` already implements, so the first mount happens on
+        // the reveal instead of never. Emitted only when this page actually hosts a graph, so a page without one
+        // keeps byte-identical tab markup.
+        var reveal = tabs.Any(t => RelationshipGraph.ContainsHost(t.Panel))
+            ? " " + RelationshipGraph.RevealMarker
+            : "";
         sb.Append("<div class=\"code-tabs\">\n");
         sb.Append("  <fieldset class=\"code-tablist\">\n");
         sb.Append("    <legend class=\"sr-only\">Choose a view for this file</legend>\n");
@@ -174,7 +184,9 @@ public static class CodeFileTemplater
             var tab = tabs[i];
             var check = i == 0 ? " checked" : "";
             sb.Append(
-                $"    <label class=\"code-tab code-tab--{tab.Mod}\"><input type=\"radio\" class=\"code-tab-input\" name=\"{group}\"{check}>" +
+                // `checked` stays LAST so the structural "exactly one radio is checked" assertions can keep keying
+                // on ` checked>` rather than on a looser match that a file path could satisfy by accident.
+                $"    <label class=\"code-tab code-tab--{tab.Mod}\"><input type=\"radio\" class=\"code-tab-input\" name=\"{group}\"{reveal}{check}>" +
                 $"{Icons.ForCodeTab(tab.Label)}<span>{tab.Label}</span></label>\n");
         }
         sb.Append("  </fieldset>\n");
@@ -283,11 +295,21 @@ public static class CodeFileTemplater
     /// path rides the tooltip/list text; the basename is the on-graph label. A null insight or empty coupling yields an
     /// empty list, so the graph stays citations-only (byte-identical to a run without deep-git).</summary>
     /// <summary>One resolved related-file node: the link/label triple the graph draws, plus the Story 24.1
-    /// directional metrics the sr-only text twin reports. Kept as a named type rather than widening the tuple
-    /// <see cref="Charts.ReferenceGraph"/> accepts — the graph reads only the first four members and stays a 24.2
-    /// concern, so its signature deliberately does not drift here.</summary>
+    /// directional metrics the sr-only text twin reports.
+    ///
+    /// <para><b>Story 24.2 owns this record and the former <c>ToGraphNodes</c>, by explicit handoff.</b> Both sat in
+    /// Story 24.1's File List, but 24.1's own doc comment attributed them forward to the graph story; the handoff is
+    /// recorded here and in 24.2's story record so the two reviews cannot each treat them as the other's
+    /// (CLAUDE.md § Scoping a code review). <c>ToGraphNodes</c> existed only to project this record down to the
+    /// 4-tuple the retired <c>Charts.ReferenceGraph</c> consumed, so it went with the SVG — which also resolved the
+    /// <c>external_roslyn:CA1859</c> Sonar finding against it.</para>
+    ///
+    /// <para><paramref name="ProcessCoupling"/> is new in 24.2 and is a TWIN-COMPLETENESS fix, not a graph feature:
+    /// the graph draws process coupling as a dotted spoke, and ADR 0013 §2 forbids a fact existing only inside the
+    /// chart — so the twin has to be able to say it in words. Surfaced by this story's Task 6 audit.</para></summary>
     private sealed record RelatedNode(
-        string? Href, string Title, string Short, int Support, double Confidence, double? Lift, bool CrossBoundary);
+        string? Href, string Title, string Short, int Support, double Confidence, double? Lift, bool CrossBoundary,
+        bool ProcessCoupling);
 
     private static IReadOnlyList<RelatedNode> BuildRelatedNodes(
         string prefix, FileInsight? insight, Func<string, string?>? coupledFileHref)
@@ -305,16 +327,11 @@ public static class CodeFileTemplater
             var href = target is { Length: > 0 } ? prefix + PathUtil.NormalizeSlashes(target) : null;
             list.Add(new RelatedNode(
                 href, norm, BaseName(coupled.Path),
-                coupled.Support, coupled.Confidence, coupled.Lift, coupled.CrossBoundary));
+                coupled.Support, coupled.Confidence, coupled.Lift, coupled.CrossBoundary,
+                coupled.Kind == GitMetrics.CouplingKind.Process));
         }
         return list;
     }
-
-    /// <summary>The related-file population as the 4-tuple <see cref="Charts.ReferenceGraph"/> consumes — the
-    /// projection seam that lets the node model carry Story 24.1's metrics without changing the chart's contract.</summary>
-    private static IReadOnlyList<(string? Href, string Title, string Short, int CoChanges)> ToGraphNodes(
-        IReadOnlyList<RelatedNode> related) =>
-        related.Select(r => (r.Href, r.Title, r.Short, r.Support)).ToList();
 
     /// <summary>Builds the <em>History</em> panel: the bounded, newest-first change-history table (Story 7.4) — each
     /// row's hash a guarded link to its per-commit page (null → plain <c>&lt;code&gt;</c>), and its date a guarded
@@ -384,86 +401,50 @@ public static class CodeFileTemplater
         sb.Append("<div class=\"code-layout\">\n").Append(aside).Append(body).Append("</div>\n\n");
     }
 
-    /// <summary>Builds the left sidebar: the reference graph (Story 7.1 rework) — a pure-SVG node-link graph of the
-    /// artifacts that cite this file, the hero of a code page — followed by the additive "view source online" action
-    /// (Story 7.7). Returns empty when there is neither, so <see cref="AppendBody"/> renders the source full-width.
-    /// A visually-hidden but present <c>&lt;ul&gt;</c> mirrors the graph's links for assistive tech (the <c>&lt;svg
-    /// role="img"&gt;</c> exposes only its summary label, so this is the accessible, keyboard-reachable equivalent —
-    /// meaningful link text, never "click here", NFR6/UX-DR16), while the visible surface stays just the graph.</summary>
-    private static string BuildAside(
-        string prefix, string repoRelativePath,
-        IReadOnlyList<(string OutputUrl, string Title, (int Number, string Title)? Epic)>? referencedBy, string? externalSourceUrl)
+    /// <summary>Builds the placeholder page's left sidebar: the additive "view source online" action (Story 7.7).
+    /// Returns empty when there is none, so <see cref="AppendBody"/> renders the body full-width.
+    ///
+    /// <para><b>Story 24.2 removed this method's citing-artifact graph, and the reason is worth recording because
+    /// the story expected a decision here.</b> <c>Charts.ReferenceGraph</c> had two call sites, and this was the
+    /// second — but it was UNREACHABLE. Its only caller is <see cref="BuildPlaceholderPage"/>, and only on the
+    /// <c>!hasExtraTabs</c> branch; <c>hasExtraTabs</c> is false only when the relationships panel is empty, and
+    /// that panel is empty only when there are NO citing artifacts and no coupled files. So this method could never
+    /// be reached with a non-empty <paramref name="referencedBy"/>, and the graph it held could never draw. Pinned
+    /// by <c>CodeFileTemplaterTests.PlaceholderPage_WithCiters_RendersTabsNotAnAsideGraph</c> rather than left as a
+    /// reasoning claim.</para>
+    ///
+    /// <para>So the answer to the story's open question — keep the SVG for this path, or give it the component with
+    /// an empty coupled population? — is neither: there was no live second renderer to decide about, and after this
+    /// story exactly ONE relationship renderer exists.</para></summary>
+    private static string BuildAside(string? externalSourceUrl)
     {
-        var hasRefs = referencedBy is { Count: > 0 };
         var external = externalSourceUrl is { Length: > 0 } u ? ExternalSourceAnchor(u) : "";
-        if (!hasRefs && external.Length == 0) return "";
+        if (external.Length == 0) return "";
 
         var sb = new StringBuilder();
         sb.Append("<aside class=\"code-aside\">\n");
-
-        if (hasRefs)
-        {
-            // Resolve each citing artifact once to (href, full title, compact label) — shared by the graph and list.
-            var nodes = new List<(string Href, string Title, string Short)>(referencedBy!.Count);
-            foreach (var (outputUrl, title, _) in referencedBy)
-            {
-                nodes.Add((prefix + PathUtil.NormalizeSlashes(outputUrl), title, ShortLabel(title)));
-            }
-
-            sb.Append("<section class=\"code-relationships\">\n");
-            sb.Append("  <h2>Referenced by</h2>\n");
-            sb.Append("  <p class=\"code-relationships-note\">The artifacts that cite this file. References run artifact&#8594;file, so this shows what refers to the file — not code dependencies.</p>\n");
-            sb.Append("  <div class=\"ref-graph-wrap\">\n");
-            sb.Append(Charts.ReferenceGraph(BaseName(repoRelativePath), nodes));
-            sb.Append("  </div>\n");
-            sb.Append("  <ul class=\"ref-list sr-only\">\n");
-            foreach (var (href, title, _) in nodes)
-            {
-                sb.Append($"    <li><a href=\"{PathUtil.Html(href)}\">{PathUtil.Html(title)}</a></li>\n");
-            }
-            sb.Append("  </ul>\n");
-            sb.Append("</section>\n");
-        }
-
-        if (external.Length > 0)
-        {
-            sb.Append($"<div class=\"code-actions\">{external}</div>\n");
-        }
-
+        sb.Append($"<div class=\"code-actions\">{external}</div>\n");
         sb.Append("</aside>\n");
         return sb.ToString();
     }
 
-    /// <summary>The four precomputed reference-graph toggle combinations (mirrors <see cref="CodeMap.BuildVariants"/>
-    /// / <see cref="CodeMapTemplater"/>'s pure-CSS multi-checkbox idiom), keyed exactly like
-    /// <c>data-view="flat-flat|epic-flat|flat-rel|epic-rel"</c> per the Design Notes: first flag = "Group by epic",
-    /// second = "Show relationships".</summary>
-    private static readonly (string Key, bool Epic, bool Rel)[] RefGraphVariants =
-    {
-        ("flat-flat", false, false),
-        ("epic-flat", true, false),
-        ("flat-rel", false, true),
-        ("epic-rel", true, true),
-    };
-
-    /// <summary>Builds the <em>Referenced by</em> relationship card: the pure-SVG reference graph plus two
-    /// independent, pure-CSS opt-in toggles — <b>"Group by epic"</b> (nests citing-story nodes under a parent epic
-    /// hub instead of a flat ring; non-story citers stay at the top level, unaffected) and <b>"Show relationships"</b>
-    /// (draws extra neutral edges: story&#8596;related-file when that story also cites the related file, and
-    /// related-file&#8596;related-file when that pair is itself frequently co-changed). All four combinations are
-    /// pre-rendered server-side (mirroring <see cref="CodeMap.BuildVariants"/>) into sibling <c>.ref-graph-view</c>
-    /// panels switched by two checkboxes via CSS <c>~</c> sibling-combinator selectors keyed on CLASS (not id — a
-    /// page-unique id still backs each checkbox's <c>for</c>/<c>id</c> pair for correct label semantics when several
-    /// code pages are consolidated into one document, but the show/hide selectors themselves only need to see the
-    /// SAME two checkbox classes repeat per <c>&lt;section&gt;</c>, so they need no per-page duplication in
-    /// specscribe.css). When both toggles are off (the default, unchecked state) the visible "flat-flat" panel is
-    /// produced by calling <see cref="Charts.ReferenceGraph"/> with no epic/edge data at all — BYTE-IDENTICAL to the
-    /// pre-existing Story 7.8 call. <paramref name="storyRelatedEdges"/>/<paramref name="relatedRelatedEdges"/> being
-    /// null/empty (no <c>--deep-git</c>, or nothing to relate) means all four variants render identically — the
-    /// checkboxes still appear (so the control surface never disappears) but toggling them is a visual no-op, the
-    /// graceful-degradation path. The sr-only list is toggle-agnostic: it always enumerates epic membership and
-    /// cross-edges (when present) regardless of which panel is currently visible, so assistive tech never has less
-    /// information than the richest sighted view.</summary>
+    /// <summary>Builds the relationship card: the Story 24.2 interactive ego graph (<see cref="RelationshipGraph"/>)
+    /// plus the canonical sr-only text twin it carries.
+    ///
+    /// <para><b>What changed in Story 24.2.</b> The four pre-rendered <c>.ref-graph-view</c> SVG panels and their
+    /// pure-CSS <c>~</c>-sibling show/hide are gone, together with <c>Charts.ReferenceGraph</c> itself: ADR 0013 §1/§4
+    /// make the text twin the no-JS contract, so retaining an SVG <em>and</em> adding the interactive graph is the
+    /// dual-renderer option ADR 0013's options table explicitly rejected. The two toggles survive (owner decision D3)
+    /// as CLIENT-side edge-visibility filters over ONE solved layout — they hide edges, they never re-lay-out
+    /// (ADR 0030 §4) — and they ride inside the component's <c>hidden</c> control bar so a JS-off reader never sees
+    /// an inert checkbox. That is why they are emitted only when their edge population is non-empty: the retired
+    /// card shipped both unconditionally, which meant a checkbox that toggled nothing.</para>
+    ///
+    /// <para><b>The sr-only list is the twin, and it is complete for BOTH populations</b> (ADR 0013 §2, audited by
+    /// this story's Task 6): every citing artifact — ALL of them, including any beyond the graph's drawn
+    /// <see cref="RelationshipGraph.ArtifactNodeCap"/> — with its epic membership and its cross-edges, and every
+    /// coupled file with support, directional confidence, cross-boundary and process-coupling as WORDS and lift on
+    /// the row title. Assistive technology therefore never has less information than the richest sighted view.</para></summary>
     private static string BuildRelationshipsCard(
         string prefix, string repoRelativePath, string outputRelativePath,
         IReadOnlyList<(string OutputUrl, string Title, (int Number, string Title)? Epic)> referencedBy,
@@ -481,40 +462,224 @@ public static class CodeFileTemplater
         }
 
         var hasRelated = related.Count > 0;
-        // The note gains the co-change population's framing ONLY when related files are present, so a baseline
-        // (no-deep-git) card stays byte-identical to Story 7.1 and never promises a dashed edge the graph won't draw.
-        var note = hasRelated
-            ? "The artifacts that cite this file (solid) and the files it most often changes alongside (dashed). These are citations and co-changes over time &#8212; not code call/dependency edges."
-            : "The artifacts that cite this file. References run artifact&#8594;file, so this shows what refers to the file — not code dependencies.";
 
-        var sb = new StringBuilder();
-        sb.Append("<section class=\"code-relationships\">\n");
-        sb.Append("  <h2>Referenced by</h2>\n");
-        sb.Append($"  <p class=\"code-relationships-note\">{note}</p>\n");
+        var twin = BuildRelationshipsTwin(nodes, refEpics, related, storyRelatedEdges, relatedRelatedEdges);
+        var model = RelationshipGraphModel(
+            repoRelativePath, outputRelativePath, nodes, refEpics, related,
+            storyRelatedEdges, relatedRelatedEdges, twin);
 
-        // Two independent pure-CSS toggles, always rendered once the card itself renders (even with no epic/edge
-        // data — AC "both checkboxes present ... no exception"). Page-unique ids only for the <label for>/<input id>
-        // pair's correctness under document consolidation (mirrors TabGroupName); the CSS toggle logic itself keys
-        // off the checkbox CLASSES, which are the same on every code page.
-        var graphNodes = ToGraphNodes(related);
-        var group = RefGraphGroupSlug(outputRelativePath);
-        sb.Append($"  <input type=\"checkbox\" id=\"refgraph-epic-{group}\" class=\"refgraph-toggle refgraph-toggle-epic\">");
-        sb.Append($"<label for=\"refgraph-epic-{group}\" class=\"refgraph-toggle-label\">Group by epic</label>\n");
-        sb.Append($"  <input type=\"checkbox\" id=\"refgraph-rel-{group}\" class=\"refgraph-toggle refgraph-toggle-rel\">");
-        sb.Append($"<label for=\"refgraph-rel-{group}\" class=\"refgraph-toggle-label\">Show relationships</label>\n");
+        return RelationshipGraph.Render(
+            model,
+            panelClass: "chart-panel code-relationships",
+            panelAttributes: " data-relgraph-panel",
+            showEpicFilter: model.Edges.Any(e => e.Kind == RelationshipGraph.EdgeKind.EpicMembership),
+            showCrossFilter: model.Edges.Any(e =>
+                e.Kind is RelationshipGraph.EdgeKind.CrossCitation or RelationshipGraph.EdgeKind.CrossCoupling));
+    }
 
-        foreach (var (key, epicOn, relOn) in RefGraphVariants)
+    /// <summary>Projects the resolved citing-artifact / coupled-file populations into the
+    /// <see cref="RelationshipGraph"/> model: the pinned focal node, the two ring populations, the epic hubs, and
+    /// the four edge kinds. Extracted from <see cref="BuildRelationshipsCard"/> rather than inlined — this file
+    /// already carries two <c>S3776</c> cognitive-complexity errors and several <c>S107</c> parameter-count
+    /// warnings, so it is at its complexity ceiling and new work extracts.
+    ///
+    /// <para>Node ORDER is load-bearing twice over: it is the ring's angular sweep (so the populations stay in
+    /// contiguous arcs and the hub-and-spoke read survives), and it is the reading order the client's roving
+    /// tabindex follows. Focal first, then citing artifacts, then epic hubs, then coupled files — the last already
+    /// confidence-desc from Story 24.1, so the ring sweeps the ranked order and the twin below it agrees.</para></summary>
+    private static RelationshipGraph.RelationshipGraphModel RelationshipGraphModel(
+        string repoRelativePath, string outputRelativePath,
+        IReadOnlyList<(string Href, string Title, string Short)> nodes,
+        IReadOnlyList<(int EpicNumber, string EpicTitle)?> refEpics,
+        IReadOnlyList<RelatedNode> related,
+        IReadOnlyList<(int RefIndex, int RelatedIndex)>? storyRelatedEdges,
+        IReadOnlyList<(int RelatedIndexA, int RelatedIndexB)>? relatedRelatedEdges,
+        string twinHtml)
+    {
+        // The artifact ring stays bounded exactly as the retired SVG's did: a heavily-cited hub file would otherwise
+        // crowd the ring into illegibility. The overflow is disclosed in the ranking caption and the twin still
+        // enumerates every citer, so the honesty of "+N more" survives the renderer change.
+        var shownRefs = Math.Min(nodes.Count, RelationshipGraph.ArtifactNodeCap);
+        var overflow = nodes.Count - shownRefs;
+
+        var graphNodes = new List<RelationshipGraph.GraphNode>(1 + shownRefs + related.Count);
+        var edges = new List<RelationshipGraph.GraphEdge>();
+
+        var focalLabel = BaseName(repoRelativePath);
+        var focalPath = PathUtil.NormalizeSlashes(repoRelativePath);
+        graphNodes.Add(new RelationshipGraph.GraphNode(
+            "focal", focalLabel, focalPath, RelationshipGraph.NodeKind.Focal, null,
+            Weight: Math.Max(1, shownRefs + related.Count), Strength: 0,
+            Detail: $"{focalPath} — this file. {nodes.Count.ToString(CultureInfo.InvariantCulture)} {Charts.Plural(nodes.Count, "citing artifact", "citing artifacts")}, {related.Count.ToString(CultureInfo.InvariantCulture)} {Charts.Plural(related.Count, "co-changed file", "co-changed files")}."));
+
+        // --- Citing artifacts. Index i in `nodes` maps to graph ordinal 1 + i for i < shownRefs.
+        for (var i = 0; i < shownRefs; i++)
         {
-            sb.Append($"  <div class=\"ref-graph-wrap ref-graph-view\" data-view=\"{key}\">\n");
-            sb.Append(Charts.ReferenceGraph(
-                BaseName(repoRelativePath), nodes, 0, graphNodes,
-                refEpics: epicOn ? refEpics : null,
-                groupByEpic: epicOn,
-                crossEdges: relOn ? storyRelatedEdges : null,
-                relatedEdges: relOn ? relatedRelatedEdges : null));
-            sb.Append("  </div>\n");
+            var (href, title, shortLabel) = nodes[i];
+            var epicSuffix = refEpics[i] is { } e ? $" (Epic {e.EpicNumber}: {e.EpicTitle})" : "";
+            graphNodes.Add(new RelationshipGraph.GraphNode(
+                $"ref{i.ToString(CultureInfo.InvariantCulture)}", shortLabel, title,
+                RelationshipGraph.NodeKind.Artifact, href,
+                // Citing artifacts carry no change-frequency signal of their own (they are documents, not tracked
+                // code files), so they all render at the base marker size. Said here rather than faked with a
+                // derived number that would read as data.
+                Weight: 1, Strength: 0,
+                Detail: $"{title}{epicSuffix} — cites this file."));
+            // Detail is null: a citation's description is derivable from its two endpoints, so the component's
+            // per-kind phrase describes it once instead of every edge re-spelling both titles.
+            edges.Add(new RelationshipGraph.GraphEdge(
+                0, 1 + i, RelationshipGraph.EdgeKind.Citation, Support: 0,
+                CrossBoundary: false, ProcessCoupling: false, Detail: null));
         }
 
+        // --- Epic hubs, one per distinct epic among the DRAWN citers, in first-appearance order. Their edges are
+        // what the "Group by epic" filter shows and hides; the hubs themselves are hidden alongside their edges so
+        // the filter never leaves a disconnected chip floating (surviving nodes still do not MOVE — ADR 0030 §4).
+        var epicOrdinal = new Dictionary<int, int>();
+        for (var i = 0; i < shownRefs; i++)
+        {
+            if (refEpics[i] is not { } epic) continue;
+            if (!epicOrdinal.TryGetValue(epic.EpicNumber, out _))
+            {
+                epicOrdinal[epic.EpicNumber] = graphNodes.Count;
+                var members = 0;
+                for (var j = 0; j < shownRefs; j++)
+                {
+                    if (refEpics[j] is { } other && other.EpicNumber == epic.EpicNumber) members++;
+                }
+                var epicTitle = $"Epic {epic.EpicNumber.ToString(CultureInfo.InvariantCulture)}: {epic.EpicTitle}";
+                graphNodes.Add(new RelationshipGraph.GraphNode(
+                    $"epic{epic.EpicNumber.ToString(CultureInfo.InvariantCulture)}",
+                    $"Epic {epic.EpicNumber.ToString(CultureInfo.InvariantCulture)}", epicTitle,
+                    RelationshipGraph.NodeKind.EpicHub, null,
+                    Weight: members, Strength: 0,
+                    Detail: $"{epicTitle} — {members.ToString(CultureInfo.InvariantCulture)} {Charts.Plural(members, "citing story", "citing stories")}."));
+            }
+            edges.Add(new RelationshipGraph.GraphEdge(
+                1 + i, epicOrdinal[epic.EpicNumber], RelationshipGraph.EdgeKind.EpicMembership,
+                Support: 0, CrossBoundary: false, ProcessCoupling: false, Detail: null));
+        }
+
+        // --- Coupled files. Ordinal = coupledBase + j, so the index-aligned cross-edge builders below can be
+        // translated without a lookup.
+        var coupledBase = graphNodes.Count;
+        for (var j = 0; j < related.Count; j++)
+        {
+            var r = related[j];
+            graphNodes.Add(new RelationshipGraph.GraphNode(
+                $"rel{j.ToString(CultureInfo.InvariantCulture)}", r.Short, r.Title,
+                RelationshipGraph.NodeKind.Coupled, r.Href,
+                Weight: r.Support,
+                // Confidence is the pull toward the hub, so a stronger couple is DRAWN NEARER — the graph's one
+                // continuous channel for it. Deliberately not stroke width: Plotly's line style is trace-level, so
+                // width can only be banded (ADR 0030 §5).
+                Strength: r.Confidence,
+                Detail: RelatedDetail(r)));
+            // A coupling spoke DOES carry its own sentence: support, confidence and lift are facts about the PAIR
+            // and cannot be recovered from either endpoint, so no template can express them.
+            edges.Add(new RelationshipGraph.GraphEdge(
+                0, coupledBase + j, RelationshipGraph.EdgeKind.Coupling,
+                Support: r.Support, CrossBoundary: r.CrossBoundary, ProcessCoupling: r.ProcessCoupling,
+                Detail: $"{focalPath} and {RelatedDetail(r)}"));
+        }
+
+        // --- Cross edges (owner decision D3's second filter). The two builders are INDEX-ALIGNED with the citer
+        // list and the coupled list respectively (SiteGenerator.BuildStoryRelatedEdges / BuildRelatedRelatedEdges).
+        // Widening the coupled cap to RelationshipGraphCoupledCap changes the coupled list's LENGTH, so both bounds
+        // are re-checked here rather than assumed — an out-of-range index is dropped, never drawn against the wrong
+        // node.
+        if (storyRelatedEdges is { Count: > 0 })
+        {
+            foreach (var (refIndex, relatedIndex) in storyRelatedEdges)
+            {
+                if (refIndex < 0 || refIndex >= shownRefs) continue;
+                if (relatedIndex < 0 || relatedIndex >= related.Count) continue;
+                edges.Add(new RelationshipGraph.GraphEdge(
+                    1 + refIndex, coupledBase + relatedIndex, RelationshipGraph.EdgeKind.CrossCitation,
+                    Support: 0, CrossBoundary: false, ProcessCoupling: false, Detail: null));
+            }
+        }
+        if (relatedRelatedEdges is { Count: > 0 })
+        {
+            foreach (var (a, b) in relatedRelatedEdges)
+            {
+                if (a == b) continue;
+                if (a < 0 || a >= related.Count || b < 0 || b >= related.Count) continue;
+                edges.Add(new RelationshipGraph.GraphEdge(
+                    coupledBase + a, coupledBase + b, RelationshipGraph.EdgeKind.CrossCoupling,
+                    Support: 0, CrossBoundary: false, ProcessCoupling: false, Detail: null));
+            }
+        }
+
+        var ranking = BuildRankingCaption(related.Count, overflow);
+        var meta = new Charts.ChartMeta(
+            Title: "Relationships",
+            Window: null,
+            Ranking: ranking,
+            // The change-coupling framing is emitted ONLY when there is coupling to frame. A citations-only card
+            // (no --deep-git, or a file with no qualifying couples) would otherwise carry a sentence about a
+            // metric it does not draw — the misdescribing-frame class Story 10.2 exists to prevent.
+            Why: related.Count > 0 ? Charts.WhyText(Charts.ChartMetric.ChangeCoupling) : null,
+            Note: related.Any(r => r.ProcessCoupling) ? Charts.ProcessCouplingNote : null);
+
+        return new RelationshipGraph.RelationshipGraphModel(
+            meta, "relgraph-" + RelGraphDomSlug(outputRelativePath), graphNodes, edges, twinHtml);
+    }
+
+    /// <summary>The ranking caption (Story 10.2's <see cref="Charts.ChartMeta.Ranking"/> slot) — and the home of the
+    /// "+N more" honesty disclosure now that there is no on-graph overflow chip. Server-rendered, so a JS-off reader
+    /// sees it too.</summary>
+    private static string BuildRankingCaption(int relatedCount, int overflow)
+    {
+        var parts = new List<string>(2);
+        if (relatedCount > 0)
+        {
+            // Describes the ORDER of the listing, which is true whether or not a chart ever draws. The earlier
+            // wording ended "— the strongest are drawn nearest the centre", which the JS-off audit caught
+            // misdescribing a page where nothing is drawn; that reading now lives in the legend entry it belongs
+            // to, which is itself revealed only on a successful mount.
+            parts.Add("Co-changed files are ranked by how often a change to this file came with a change to them.");
+        }
+        if (overflow > 0)
+        {
+            parts.Add($"{overflow.ToString(CultureInfo.InvariantCulture)} further citing {Charts.Plural(overflow, "artifact is", "artifacts are")} listed in full below but not drawn, to keep the graph legible.");
+        }
+        return parts.Count == 0 ? "" : string.Join(" ", parts);
+    }
+
+    /// <summary>The ONE composed sentence describing a coupled file — used by the graph node's tooltip, its
+    /// accessible name, and its coupling spoke. Shares its numbers with the twin's row by construction (same
+    /// <see cref="RelatedNode"/>, same <see cref="Charts.Percent"/>), so chart and text cannot disagree. Words, not
+    /// colour, for both the cross-boundary and process-coupling facts (UX-DR17/NFR8).</summary>
+    private static string RelatedDetail(RelatedNode r)
+    {
+        var sb = new StringBuilder();
+        sb.Append(r.Title)
+          .Append(" — changed together ")
+          .Append(r.Support.ToString(CultureInfo.InvariantCulture))
+          .Append(' ')
+          .Append(Charts.Plural(r.Support, "time", "times"))
+          .Append(", confidence ")
+          .Append(Charts.Percent(r.Confidence));
+        if (r.Lift is { } lift) sb.Append(", lift ").Append(lift.ToString("0.0", CultureInfo.InvariantCulture)).Append('×');
+        if (r.CrossBoundary) sb.Append(", cross-boundary");
+        if (r.ProcessCoupling) sb.Append(", process coupling");
+        sb.Append('.');
+        return sb.ToString();
+    }
+
+    /// <summary>The canonical sr-only text twin (ADR 0013 §2; Story 24.1 AC #3) — server-rendered, complete for
+    /// BOTH node populations, navigable, and carrying every metric as non-colour text. Passed to
+    /// <see cref="RelationshipGraph.Render"/>, which refuses to emit a chart without it.</summary>
+    private static string BuildRelationshipsTwin(
+        IReadOnlyList<(string Href, string Title, string Short)> nodes,
+        IReadOnlyList<(int EpicNumber, string EpicTitle)?> refEpics,
+        IReadOnlyList<RelatedNode> related,
+        IReadOnlyList<(int RefIndex, int RelatedIndex)>? storyRelatedEdges,
+        IReadOnlyList<(int RelatedIndexA, int RelatedIndexB)>? relatedRelatedEdges)
+    {
+        var hasRelated = related.Count > 0;
+        var sb = new StringBuilder();
         sb.Append("  <ul class=\"ref-list sr-only\">\n");
         for (var i = 0; i < nodes.Count; i++)
         {
@@ -545,16 +710,19 @@ public static class CodeFileTemplater
                     : pathHtml;
                 var relatedCrossSuffix = BuildRelatedCrossSuffix(j, storyRelatedEdges, relatedRelatedEdges, nodes, related);
                 var boundarySuffix = r.CrossBoundary ? " &#183; cross-boundary" : "";
+                // Story 24.2 Task 6 (the ADR 0013 §3 audit): the graph draws process coupling as a DOTTED spoke,
+                // and §2 forbids a fact existing only inside the chart — so the twin has to be able to say it. It
+                // could not before this story; the audit is what found that, and this is the fix rather than a note.
+                var processSuffix = r.ProcessCoupling ? " &#183; process coupling" : "";
                 var liftAttr = r.Lift is { } lift
                     ? $" title=\"Lift {lift.ToString("0.0", CultureInfo.InvariantCulture)}&#215; this file's usual rate\""
                     : "";
-                sb.Append($"        <li{liftAttr}>{nameCell} &#8212; changed together {r.Support.ToString(CultureInfo.InvariantCulture)} {Charts.Plural(r.Support, "time", "times")} &#183; confidence {Charts.Percent(r.Confidence)}{boundarySuffix}{relatedCrossSuffix}</li>\n");
+                sb.Append($"        <li{liftAttr}>{nameCell} &#8212; changed together {r.Support.ToString(CultureInfo.InvariantCulture)} {Charts.Plural(r.Support, "time", "times")} &#183; confidence {Charts.Percent(r.Confidence)}{boundarySuffix}{processSuffix}{relatedCrossSuffix}</li>\n");
             }
             sb.Append("      </ul>\n");
             sb.Append("    </li>\n");
         }
         sb.Append("  </ul>\n");
-        sb.Append("</section>\n");
         return sb.ToString();
     }
 
@@ -605,13 +773,17 @@ public static class CodeFileTemplater
         return parts.Count == 0 ? "" : $" &#8212; {string.Join("; ", parts)}";
     }
 
-    /// <summary>A per-page-unique slug for the reference graph's two toggle-checkbox ids — so several code pages
-    /// consolidated into one document (SPA/webview capture) never cross-wire their <c>label for</c>/<c>input id</c>
-    /// pairs. Built from the same <see cref="Slugify"/> helper <see cref="TabGroupName"/> uses (independently, not by
-    /// slicing its output), so the two stay correct even if one's prefix ever changes. The show/hide CSS itself does
-    /// not depend on this slug (it matches the shared checkbox classes instead), so this exists purely for correct
-    /// label semantics, not for the toggle mechanism.</summary>
-    private static string RefGraphGroupSlug(string outputRelativePath) => Slugify(outputRelativePath);
+    /// <summary>A per-page-unique slug for the relationship graph's DOM id — which now addresses the chart host, its
+    /// payload island (<c>{id}-data</c>) and its two filter checkboxes, so several code pages consolidated into one
+    /// document (SPA/webview capture) never cross-wire an island with the wrong host or a <c>label for</c> with the
+    /// wrong <c>input id</c>. Built from the same <see cref="Slugify"/> helper <see cref="TabGroupName"/> uses
+    /// (independently, not by slicing its output), so the two stay correct even if one's prefix ever changes.
+    ///
+    /// <para>Story 24.2 renamed this from <c>RefGraphGroupSlug</c> and it now carries MORE weight than it did: the
+    /// retired pure-CSS toggles keyed their show/hide off shared checkbox CLASSES and needed the slug only for label
+    /// semantics, whereas the component resolves its island BY id. A collision is now a mis-rendered chart, not a
+    /// mis-labelled checkbox.</para></summary>
+    private static string RelGraphDomSlug(string outputRelativePath) => Slugify(outputRelativePath);
 
     /// <summary>A per-page-unique radio-group name for the view tabs, derived from the page's output-relative path.
     /// Uniqueness matters when several code pages are captured into one document (SPA/webview consolidation): a
@@ -619,7 +791,7 @@ public static class CodeFileTemplater
     private static string TabGroupName(string outputRelativePath) => "code-view-" + Slugify(outputRelativePath);
 
     /// <summary>Collapses non-alphanumeric runs in a path to a single hyphen and lowercases it — the shared slug
-    /// primitive behind both <see cref="TabGroupName"/> and <see cref="RefGraphGroupSlug"/>. Path separators are
+    /// primitive behind both <see cref="TabGroupName"/> and <see cref="RelGraphDomSlug"/>. Path separators are
     /// encoded as the alphanumeric token <c>x2f</c> (after escaping any pre-existing <c>x2f</c> run as
     /// <c>x2fx2f</c>) so <c>a/b</c>, <c>a-b</c>, and a literal <c>ax2fb</c> segment never collide under SPA/webview
     /// document consolidation. [spec-7-1-deferred-debt-cleanup]</summary>
@@ -778,7 +950,7 @@ public static class CodeFileTemplater
 
         if (!hasExtraTabs)
         {
-            AppendBody(sb, BuildAside(prefix, repoRelativePath, referencedBy, externalSourceUrl), source);
+            AppendBody(sb, BuildAside(externalSourceUrl), source);
             return EndShell(shell);
         }
 
@@ -829,6 +1001,12 @@ public static class CodeFileTemplater
         var sb = shell.Body;
         sb.Append("</div>\n</main>\n\n");
 
+        // Story 24.2: derived from the FINISHED body, never hand-set — a flag computed from the page cannot
+        // disagree with the page. False-defaulted, so a code page with no graph (no citers, no coupling) keeps
+        // byte-identical output and never pulls the 1.2 MB bundle.
+        var body = sb.ToString();
+        var graph = RelationshipGraph.ContainsHost(body);
+
         return new PageView
         {
             Kind = PageKind.Doc,
@@ -849,10 +1027,14 @@ public static class CodeFileTemplater
                 StylesheetHref = shell.Prefix + ForgeOptions.StylesheetName,
                 ScriptHref = shell.Prefix + ForgeOptions.ScriptName,
                 MermaidNeeded = false,
+                GraphEngineNeeded = graph,
+                GraphBootInline = graph,
+                // The code page ALREADY uses ExtraHead for Prism — the graph's boot marker therefore rides the
+                // inline seam rather than clobbering it.
                 ExtraHead = shell.Highlight ? HighlightHead(shell.Prefix) : null,
             },
             Interaction = InteractionState.None,
-            BodyHtml = sb.ToString(),
+            BodyHtml = body,
         };
     }
 

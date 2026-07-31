@@ -38,6 +38,12 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
         {
             sb.Append(HierarchyExplorer.BootScript);
         }
+        // The relationship graph's own anti-flash handshake (Story 24.2), on the same chrome-level seam and for the
+        // same reason. Its own marker family, so the two components' boot state cannot be confused for each other.
+        if (page.Assets.GraphBootInline)
+        {
+            sb.Append(RelationshipGraph.BootScript);
+        }
         sb.Append(page.BodyHtml);
         // The active-section tracking script rides the SAME chrome-level seam as the Mermaid init script below —
         // appended AFTER the opaque body, never inside it — so the webview's RenderContent and the SPA family
@@ -55,7 +61,10 @@ public sealed partial class HtmlRenderAdapter : IRenderAdapter
         // deliberate: WebviewRenderAdapter strips every JSON island, and whether the webview gets the component at
         // all is Story 20.7's decision to make jointly with the ADR 0005 CSP amendment (owner D4). A local file
         // reference, never a CDN (NFR-3).
-        if (page.Assets.HierarchyEngineNeeded)
+        // Story 24.2: the relationship graph rides the SAME vendored bundle (ADR 0030 — `scatter` was already
+        // registered in it, so the marginal cost is zero bytes), so EITHER flag pulls it and a page carrying both a
+        // hierarchy and a graph still emits exactly one <script src>.
+        if (page.Assets.HierarchyEngineNeeded || page.Assets.GraphEngineNeeded)
         {
             var prefix = PathUtil.RelativePrefix(page.OutputRelativePath);
             sb.Append($"<script src=\"{prefix}{ForgeOptions.HierarchyEngineScriptName}\"></script>\n");

@@ -428,4 +428,75 @@ public class GitMetricsFileInsightsTests
         Assert.NotNull(deep.CoChangePairs);
         Assert.Empty(deep.CoChangePairs);
     }
+
+    // ---- Story 24.2: the graph-scoped coupled cap ----
+
+    /// <summary>One commit touching the focal file and <paramref name="others"/> siblings, repeated twice so every
+    /// pair clears the <see cref="GitMetrics.CouplingMinSupport"/> floor and reaches the capped list at all.</summary>
+    private static IReadOnlyList<DeepCommit> WideCoupling(int others)
+    {
+        var paths = new List<string> { "src/Focal.cs" };
+        for (var i = 0; i < others; i++) paths.Add($"src/Other{i.ToString("00", CultureInfo.InvariantCulture)}.cs");
+        return new[]
+        {
+            Commit("h2", "Alice", "2026-07-02T10:00", "s2", paths.ToArray()),
+            Commit("h1", "Alice", "2026-07-01T10:00", "s1", paths.ToArray()),
+        };
+    }
+
+    [Fact]
+    public void BuildFileInsights_CoupledCap_DefaultsToEightAndHonoursTheGraphScopedCapWhenAsked()
+    {
+        // Owner decision D2: FileInsightCoupledCap stays 8 as the const default for any caller that does not ask
+        // for more; the code page's relationship surface asks for RelationshipGraphCoupledCap. Both bounds are a
+        // Take on the SAME already-computed, already-floored, already-confidence-sorted list — never a second git
+        // call or a second commit scan.
+        var commits = WideCoupling(30);
+
+        Assert.Equal(8, GitMetrics.BuildFileInsights(commits)["src/Focal.cs"].CoupledFiles.Count);
+        Assert.Equal(
+            GitMetrics.RelationshipGraphCoupledCap,
+            GitMetrics.BuildFileInsights(commits, coupledCap: GitMetrics.RelationshipGraphCoupledCap)["src/Focal.cs"].CoupledFiles.Count);
+    }
+
+    [Fact]
+    public void BuildFileInsights_SupportFloorAndConfidenceSortAreAppliedBEFORETheCap()
+    {
+        // The ordering matters and is easy to break silently: if the cap ran first, a below-floor couple could
+        // occupy a capped slot and evict a real one. Verified rather than assumed after the cap change (Task 1).
+        var commits = new[]
+        {
+            // Focal + Strong in BOTH commits (support 2, clears the floor); Weak in only ONE (support 1, below it).
+            Commit("h2", "Alice", "2026-07-02T10:00", "s2", "src/Focal.cs", "src/Strong.cs"),
+            Commit("h1", "Alice", "2026-07-01T10:00", "s1", "src/Focal.cs", "src/Strong.cs", "src/Weak.cs"),
+        };
+
+        // A cap of ONE: if the floor were applied after the cap, "src/Weak.cs" could take the only slot.
+        var coupled = GitMetrics.BuildFileInsights(commits, coupledCap: 1)["src/Focal.cs"].CoupledFiles;
+
+        Assert.Single(coupled);
+        Assert.Equal("src/Strong.cs", coupled[0].Path);
+    }
+
+    [Fact]
+    public void ParseNumstatLog_ThreadsTheCoupledCapThroughToTheFileInsights()
+    {
+        // The whole point of threading it here rather than re-capping downstream: ONE parse feeds the per-file
+        // insights, so the wider cap must arrive at BuildFileInsights through this single path.
+        var fs = ((char)0x1f).ToString();
+        var sentinel = ((char)0x01).ToString();
+        string Rec(string hash, string date, params string[] rows)
+            => sentinel + hash + fs + "Alice" + fs + date + fs + "s" + fs + "" + fs + "\n" +
+               string.Concat(rows.Select(r => r + "\n"));
+
+        var rows = new List<string> { "1\t0\tsrc/Focal.cs" };
+        for (var i = 0; i < 30; i++) rows.Add($"1\t0\tsrc/Other{i.ToString("00", CultureInfo.InvariantCulture)}.cs");
+        var log = Rec("h1", "2026-07-01T09:00", rows.ToArray()) + Rec("h2", "2026-07-02T09:00", rows.ToArray());
+
+        Assert.Equal(8, GitMetrics.ParseNumstatLog(log).FileInsights["src/Focal.cs"].CoupledFiles.Count);
+        Assert.Equal(
+            GitMetrics.RelationshipGraphCoupledCap,
+            GitMetrics.ParseNumstatLog(log, coupledCap: GitMetrics.RelationshipGraphCoupledCap)
+                .FileInsights["src/Focal.cs"].CoupledFiles.Count);
+    }
 }

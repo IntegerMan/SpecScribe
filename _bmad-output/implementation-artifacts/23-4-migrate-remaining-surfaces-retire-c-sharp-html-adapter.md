@@ -4,7 +4,7 @@ baseline_commit: 32fd282
 
 # Story 23.4: Migrate Remaining Surfaces + Retire the C# HtmlRenderAdapter for Content
 
-Status: in-progress
+Status: review
 
 <!-- UNBLOCKED 2026-07-27 (Story 23.5 dev-story). The packaging gate this story was seeded `blocked` on is
      SETTLED by ADR 0022 (Proposed): Node is a build/CI-time toolchain AND a generate-time runtime; the shipped
@@ -187,11 +187,12 @@ retirement condition._
         single page bigger than the entire rest of its chunk. Plan for it explicitly — do not discover it
         when a harness or a prerender hangs.
 
-- [ ] **Task 2 — Stand up the C# region-composition path BEFORE removing anything** (AC: #3)
-      **Templater migration COMPLETE (25/25). Byte-equality PROVEN on the real corpus (1,408 pages, 0 unexpected
-      deltas) — finding 3 is RESOLVED and was not what it looked like. Only the deletion remains, and it is
-      correctly gated on Tasks 3/5 (Nuxt must be writing the pages, and the oracle must be committed, before the
-      C# writer can go).**
+- [x] **Task 2 — Stand up the C# region-composition path BEFORE removing anything** (AC: #3) — **DONE for
+      everything this story keeps.** Templater migration COMPLETE (25/25). Byte-equality PROVEN on the real corpus
+      (1,408 pages, 0 unexpected deltas) — finding 3 is RESOLVED and was not what it looked like. **The deletion is
+      RE-HOMED to [Story 23.6](23-6-retire-the-c-sharp-html-writer.md) by owner decision D7 (2026-07-30)** — not
+      deferred inside this story, not left as an open checkbox. See the last subtask and Completion Notes →
+      session 4.
   - [x] ↻ **Work from the retired [Story 22.3 file](22-3-static-html-rendered-from-the-ir.md), not from
         scratch.** It is the spec for this task and it is already elicited: the 25-templater inventory with
         the six axes on which they actually differ (`extraHead` used **exactly once**; **12 distinct `<main>`
@@ -239,14 +240,23 @@ retirement condition._
         pager renders while `ExtractContentRegion` slices from the *inner* breadcrumb. Confirm it landed:
         `web/ir/adapter.ts`'s `wayfindingRepaired` + `stillUnbalanced` throw should be **gone**. If they are
         still there, 22.4 did not finish and Task 2 will re-inherit the trap.
-  - [ ] ⏸ **Correctly gated on Tasks 3 + 5, not on anything unresolved.** Only then: delete
+  - [x] ⛔ **RE-HOMED to [Story 23.6](23-6-retire-the-c-sharp-html-writer.md) — owner decision D7, 2026-07-30.
+        NOT done, and deliberately carved OUT of this story rather than left as an open checkbox.** Tasks 3 and 5
+        both landed, so the gate this bullet named is open; the owner descoped it anyway, for two reasons measured
+        this session (session 4):
+        (a) **the deletion's stated safety net was withdrawn after the deferral, not before it.** Commit `70b72ab`
+        (2026-07-30, owner) **removed `GoldenIrFingerprint`** — the AC #5 successor gate this story landed — because
+        it produced three different hashes across local / CI-Windows / CI-Ubuntu for one commit. `GoldenContentFingerprint`
+        survives but hashes **output `.html` files**, so the deletion would void it too, leaving no content-drift
+        gate on either side. `deferred-work.md:22` already names rebuilding one as the action for whoever next
+        touches this pipeline.
+        (b) **the blast radius is wider than this bullet's text implies, and is its own story's worth of work.**
+        The written document is the oracle for four gates, not one — see Completion Notes → session 4.
+        **What survives here, unchanged and still shipping:** `HtmlRenderAdapter.Render`'s page composition,
+        `WriteOutput`'s HTML writes, `SpaDelivery.ExtractContentRegion` and the whole `Extract*` family. Seeded text
+        follows: Only then: delete
         `HtmlRenderAdapter.Render`'s page composition and the `WriteOutput` HTML writes. Keep `RenderNavMarkup`,
         `RenderBreadcrumb`, `RenderWayfinding`, `RenderDashboardBody`, `RenderEpicsBody` — they feed the region.
-        **Why it cannot land yet, stated so it is not mistaken for drift:** C# is still the only thing that writes
-        a `.html`, so deleting the writer before Task 3's family components exist would leave the site with no
-        producer at all; and Task 5 must **capture and commit the golden oracle first**, because after the writer
-        is gone there is no oracle left to generate. The proof above is what makes the deletion *safe*; Tasks 3/5
-        are what make it *possible*.
 
 - [x] **Task 3 — Migrate the remaining families to real components** (AC: #1, #4) — **DONE.** All **1,276**
       remaining pages migrated across **10 new family components**; emitted HTML shows 14 families and **zero
@@ -336,7 +346,16 @@ retirement condition._
         asserting **content survives** (SVG/element count), not merely that the page loads. The half-applied
         fix blanked the page.
 
-- [x] **Task 7 — Test-suite and fingerprint reconciliation** (AC: #5) — **DONE, and AC #5 is satisfied by the SUCCESSOR rather than by retirement.** `GoldenContentFingerprint` is **not retired and did not move** — deliberate, because the C# writer deliberately still ships, so the hash still covers something real; it stayed **stationary** all session, which is the correct assertion while surfaces move. What AC #5 actually asked for ("a fingerprint over the IR ... does not exist yet") now exists: **`GoldenIrFingerprint`**, landed in the *same* story that switched the IR producer so the drift gate never lapses. The 11 `HtmlRenderAdapter` test files needed **no re-aiming and none were deleted** — the adapter survives by design under D2 — so no coverage was lost as cleanup.
+- [x] **Task 7 — Test-suite and fingerprint reconciliation** (AC: #5)
+      ⚠️ **STALE AS WRITTEN — corrected 2026-07-30 (session 4). Read this before the text below.** This task's
+      answer to AC #5 was the successor gate **`GoldenIrFingerprint`**. That gate **no longer exists**: the owner
+      **removed** it on 2026-07-30 (commit `70b72ab`) after it produced three different hashes across the local
+      box, CI-Windows and CI-Ubuntu for one identical commit. `GoldenContentFingerprint` is unaffected and still
+      stationary, so everything below about it remains true. **AC #5 is therefore satisfied in this record and NOT
+      in the tree**, and [Story 23.6](23-6-retire-the-c-sharp-html-writer.md) inherits the hole together with
+      **[ADR 0033](../../docs/adrs/0033-content-drift-gates-are-targeted-and-regenerable.md)**'s constraint on what
+      may replace it. Stated here rather than left for a reviewer to find. Original text follows:
+      **DONE, and AC #5 is satisfied by the SUCCESSOR rather than by retirement.** `GoldenContentFingerprint` is **not retired and did not move** — deliberate, because the C# writer deliberately still ships, so the hash still covers something real; it stayed **stationary** all session, which is the correct assertion while surfaces move. What AC #5 actually asked for ("a fingerprint over the IR ... does not exist yet") now exists: **`GoldenIrFingerprint`**, landed in the *same* story that switched the IR producer so the drift gate never lapses. The 11 `HtmlRenderAdapter` test files needed **no re-aiming and none were deleted** — the adapter survives by design under D2 — so no coverage was lost as cleanup.
   - [x] ✅ **Triaged: ALL retained as-is, NONE re-aimed, NONE deleted — and that is the correct outcome, not an omission.** Every one of them tests the adapter's *chrome composition*, which owner decision D2 keeps alive and which this story deliberately did not delete. There was no assertion to re-aim and none to drop, so no coverage was lost as cleanup. They all pass. **11 test files reference `HtmlRenderAdapter`** and 13 touch it or the parity harnesses:
         `HtmlRenderAdapterTests`, `RenderParityTests`, `RenderSectionParityTests`, `RenderSpaParityTests`,
         `RenderViewModelTests`, `SiteGeneratorAdapterTests`, `SiteNavTests`, `WebviewRenderAdapterTests`,
@@ -1076,6 +1095,58 @@ finding 3's `ApplyReferenceLinks` decision; then ~11 Vue family components cover
 (Task 8) and live-browser verification (Task 9). D5 and D6 (below) already answered the story's own Q3 and Q5,
 so Task 4 is unblocked; **finding 3 is the one new question that is not**.
 
+**↻ SESSION 4 (2026-07-30, run at `70b72ab`) — the story CLOSES here, with the deletion carved out. Owner
+decision D7. No production code changed this session; the entire session is the descope, its justification, and
+the bookkeeping.**
+
+**D7 — the C# `.html` writer deletion is RE-HOMED to [Story 23.6](23-6-retire-the-c-sharp-html-writer.md).**
+Session 3 deferred it pending owner verification. Session 4 re-measured the deferral and the owner descoped it
+outright, on two findings:
+
+1. **⚠️ AC #5's answer changed under this story after session 3 wrote it, and the story record was stale on
+   arrival.** Task 7 records AC #5 as satisfied by the successor gate `GoldenIrFingerprint`. That gate **no longer
+   exists**: commit `70b72ab` (2026-07-30, owner) **removed it**, because it produced three different hashes across
+   the local box, CI-Windows and CI-Ubuntu for one identical commit. One real cause was found and stays fixed
+   (`FallbackCodeWalk`'s unsorted directory walk, `7510a70`); a second was never identified. `GoldenContentFingerprint`
+   is unaffected — but it hashes **output `.html` files**, so deleting the writer voids it too. The project would
+   then carry **no content-drift gate at all**, on either side. `deferred-work.md:22` already names rebuilding one
+   as the action for whoever next touches this pipeline. **AC #5 is therefore satisfied in the record but not in the
+   tree, and Story 23.6 inherits the hole** — stated here rather than left for a reviewer to discover.
+2. **The blast radius is a story's worth of work, not a checkbox.** Traced this session: the written document is
+   the oracle for **four** gates, not one. `WritePage` ([SiteGenerator.cs:3970](src/SpecScribe/SiteGenerator.cs:3970))
+   renders the document via `HtmlRenderAdapter.Shared.Render(page)` and composes the region *separately* from the
+   same `PageView` — so the region path genuinely does not need the page render, which is the good news. What does
+   hang off the written document:
+
+   | dies with the writer | consequence |
+   | --- | --- |
+   | `_spaCapture` (the slice oracle) | `RegionCompositionDeltas()` has nothing to compare against ⇒ **both** gates this story landed (`RegionCompositionParityTests`, `RegionCompositionCorpusProof`) go **vacuous**, not red — the worst failure mode |
+   | `GoldenContentFingerprint` | subject gone (expected — this is AC #5's inversion) |
+   | `GoldenOutputInventory` | pins the output file set; changes wholesale |
+   | `EnsureHierarchyEngine`'s host-marker scan | reads `WritePage`'s returned document; must be re-derived from the view model |
+
+**⚠️ Owner constraint on the replacement gate, recorded because it is cross-cutting and must not be buried here.**
+Asked how to close the gate hole, the owner ruled out the shape, not the goal: the golden fingerprint was
+"*unreliable and exceptionally brittle to how I work with multiple parallel feature development … nothing owning
+regenerating that before CI*", and the standing constraint is "*tests that catch issues, but not overly-sensitive
+ones or things that agents just never run and fail on all the time*". A whole-tree hash is exactly that shape: it
+moves when any sibling story touches any byte, so it fails constantly for reasons unrelated to the change under
+test, and it fails *late*. Proposed as **[ADR 0033](../../docs/adrs/0033-content-drift-gates-are-targeted-and-regenerable.md)**
+rather than left as an owner-locked story note, per CLAUDE.md § Decision records. The shape that already satisfies
+it and is already committed: `web/measurements/parity.json`'s **per-page sha256** — a failure names the page, and
+regeneration is an explicit `npm run`, not a constant-bump.
+
+**⚠️ Concurrency, and why this session's verification ran in an isolated tree.** `git status` was **clean** at
+session start; a **Story 24.2** session went live *during* it, leaving uncommitted `CodeFileTemplater.cs` (+313
+lines), `GitMetrics.cs`, `SiteGenerator.cs` and two new untracked files (`CouplingLayout.cs`,
+`RelationshipGraph.cs`). That work does not currently compile (`CS0103: ToGraphNodes` — the call survives, the
+definition is mid-edit), so the main tree could not be built or tested, and `--no-build` would have run the **stale
+dll** (session 2's recorded trap). **Nothing of theirs was fixed, reverted, reset or cleaned.** Verification ran
+against `git archive HEAD` in the scratchpad — all of this story's committed work, none of 24.2's in-flight edits.
+A grep for `ToGraphNodes` also returned two *different* answers 60 s apart, which is
+`shared-main-concurrent-edit-loss-verify-after-edit`'s transient mid-write read observed live for the second time
+in this story; `git diff HEAD` was the arbiter both times, not a re-read.
+
 **Nothing has been deleted yet, and that is deliberate.** `HtmlRenderAdapter.Render`'s page composition,
 `WriteOutput`'s HTML writes and `SpaDelivery.ExtractContentRegion` are all still in place and still the IR's
 producer. Per the story's own circularity note there is no version of this work where the deletion comes before
@@ -1205,6 +1276,34 @@ string-building deleted.
 - `.claude/launch.json` — `web-prerender-23-4`, `golden-23-4`, `web-prerender-23-4-jsoff`.
 - This story file.
 
+**Session 4 (2026-07-30) — the descope and its bookkeeping. NO production code changed; every file below is a
+record, a decision or a plan.**
+
+- `docs/adrs/0033-content-drift-gates-are-targeted-and-regenerable.md` — **new (Proposed).** The owner's
+  cross-cutting constraint on content-drift gates, recorded as an ADR rather than an owner-locked story note per
+  CLAUDE.md § Decision records.
+- `docs/adrs/README.md` — ADR 0033 registered. ⚠️ Shared with the concurrent Story 24.2 / create-story 24.3
+  session; attribute by **hunk**, not by file.
+- `_bmad-output/planning-artifacts/epics.md` — **Story 23.6 section added**, the epic's story list updated, and the
+  Story 23.4 dev-story outcome block gains item 7 (the D7 re-homing) with item 8 renumbered. ⚠️ Shared.
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — `23-4` → `review`; **new `23-6` key** at `backlog`;
+  `last_updated` note prepended. ⚠️ Shared — the concurrent session rewrote `last_updated` between my edit and my
+  verification, and this story's note survives in the `prior:` chain, which is the correct outcome for that line.
+  ⚠️ **These edits were then swept into that session's commit `bc7a379` ("Epic 22 retrospective: mark done, no new
+  action items") before this story could commit them** — CLAUDE.md's "expect commits to bundle sibling stories",
+  observed live. **A review of this story must scope by this File List, never by that commit message**, and the
+  `23-4`/`23-6` hunks in `sprint-status.yaml` are this story's while the `epic-22-retrospective` hunk is not.
+- This story file — Status → `review`, Task 2 and its final subtask, the Task 7 staleness correction, Completion
+  Notes → session 4, this File List and the Change Log.
+
+**↻ Not this story's, seen in the tree during session 4** (a Story 24.2 session went live *during* this session;
+`git status` was clean at its start): `src/SpecScribe/CodeFileTemplater.cs`, `src/SpecScribe/GitMetrics.cs`,
+`src/SpecScribe/SiteGenerator.cs`, and the untracked `src/SpecScribe/CouplingLayout.cs`,
+`src/SpecScribe/RelationshipGraph.cs`, `_bmad-output/implementation-artifacts/24-2-per-file-ego-coupling-graph.md`,
+`_bmad-output/implementation-artifacts/epic-22-retro-2026-07-30.md`. ⚠️ That work did **not compile** at the time
+of writing (`CS0103: ToGraphNodes`), which is why this session's verification ran against `git archive HEAD` in the
+scratchpad. **Nothing of theirs was fixed, reverted, reset or cleaned.**
+
 **↻ Not this story's, seen in the tree during session 3** (a concurrent session was live throughout — listed so a
 review scopes correctly per CLAUDE.md): `README.md`, `docs/SonarCloudSetup.md`, and the story files
 `25-6-readme-coverage-and-quality-badges.md`, `22-6-client-server-delta-channel.md`,
@@ -1225,6 +1324,7 @@ story's `BuildPage`) and `CodeFileTemplater.cs`.
 
 | Date | Change |
 | --- | --- |
+| 2026-07-30 | **dev-story session 4 (baseline `32fd282` preserved; executed at HEAD `70b72ab`). Story CLOSES at `review`. Owner decision D7: the C# `.html`-writer deletion is RE-HOMED to [Story 23.6](23-6-retire-the-c-sharp-html-writer.md), carved OUT of this story rather than left as an open checkbox on work that is otherwise complete. NO production code changed — the entire session is the descope, its justification and the bookkeeping.** Two findings drove it. **(1) AC #5's answer changed under this story after session 3 wrote it.** Task 7 records AC #5 as satisfied by the successor gate **`GoldenIrFingerprint`**; that gate was **REMOVED** on 2026-07-30 (`70b72ab`, owner) after producing **three different hashes across the local box, CI-Windows and CI-Ubuntu for one identical commit**. One cause was found and stays fixed (`FallbackCodeWalk`'s unsorted directory walk, `7510a70`); a second was never identified. `GoldenContentFingerprint` is unaffected — but it hashes **output `.html`**, so the deletion voids it too, leaving **no content-drift gate on either side**. **AC #5 is satisfied in the record and not in the tree**; Task 7 is annotated as stale rather than quietly left standing, and 23.6 inherits the hole (`deferred-work.md:22` already carries the action). **(2) The blast radius is a story's worth of work, not a checkbox.** Traced this session: the written document is the oracle for **four** gates — `_spaCapture`, without which `RegionCompositionDeltas()` and therefore **both** proof gates this story landed go **vacuous rather than red** (the worst failure mode); plus `GoldenContentFingerprint`, `GoldenOutputInventory`, and `EnsureHierarchyEngine`'s host-marker scan. The good news traced in the same pass: `WritePage` composes the region from the `PageView` **independently** of the page render, so the region path needs nothing from the writer — the circularity that shaped all of 23.4 is already broken. **New [ADR 0033](../../docs/adrs/0033-content-drift-gates-are-targeted-and-regenerable.md) (Proposed)** records the owner's cross-cutting constraint rather than burying it as a story note: content-drift gates must be **targeted** (a failure names the artifact), **regenerable by command** rather than constant-bump, proven deterministic **across the CI operating systems** and not merely two local runs (23.4's IR fingerprint passed three local runs and still differed on three platforms), and **loud rather than vacuous when its oracle vanishes**. `GoldenContentFingerprint` is **grandfathered, not blessed**. Reference shape already committed: `web/measurements/parity.json`'s per-page sha256 over 1,469 pages. **⚠️ Verification ran in an ISOLATED tree, and the reason is the finding.** `git status` was **clean** at session start; a **Story 24.2** session went live *during* it, leaving uncommitted `CodeFileTemplater.cs` (+313 lines), `GitMetrics.cs`, `SiteGenerator.cs` and two untracked files that **do not compile** (`CS0103: ToGraphNodes` — the call survives, the definition is mid-edit). So the main tree could not be built or tested, and `--no-build` would have run the **stale dll** (session 2's recorded trap — and my own first "build is green" reading this session was wrong for a related reason: the exit code came from `tail` through a pipe, not from `dotnet`). **Nothing of theirs was fixed, reverted, reset or cleaned.** Verification ran against `git archive HEAD` in the scratchpad: build **0 errors**, suite **2,835 passed / 0 failed / 3 skipped**, no contention flake. A grep for `ToGraphNodes` also returned two *different* answers 60 s apart — `shared-main-concurrent-edit-loss-verify-after-edit`'s transient mid-write read, observed live for the second time in this story; `git diff HEAD` was the arbiter both times, not a re-read. Structural changes recorded in **both** artifacts in the same change per CLAUDE.md: `epics.md` (Story 23.6 section + epic story list + outcome item 7) and `sprint-status.yaml` (`23-4` → `review`, new `23-6` key at `backlog`). **What survives unchanged and still shipping:** `HtmlRenderAdapter.Render`'s page composition, `WriteOutput`'s `.html` writes, `SpaDelivery.ExtractContentRegion` and the whole `Extract*` family. |
 | 2026-07-29 | **dev-story session 3, part 2 — Tasks 3, 4, 5, 6, 7, 8, 9, 10 COMPLETE. AC #3 LANDED: the IR is now built from a COMPOSED region, not a slice.** `CapturedRegions` reads `_spaPageViews` and composes from each page's own `PageView`; title/breadcrumb/meta-description now come from the view model instead of regexes over finished HTML; `Degraded` is computed **structurally** against `SpaDelivery.MainLandmark`, retiring the fragile `ReferenceEquals` sentinel; and a loud guard throws if a captured page has no view model rather than letting it vanish from the IR. `SpaDelivery.Extract*` is untouched and survives as the proof oracle. **Task 3:** all **1,276** remaining pages migrated across **10 new family components**, keyed to **owning templater** rather than path prefix (so `adrs`/`*-artifacts`/`specs`/`readme` share one `DocProseSurface`, and `timeline.html` groups with `commits/**`), classified by one tested table (`ir/families.ts`) with a **completeness gate that asserts the real manifest leaves `pass-through` EMPTY**, and routed through an exhaustive `Record<IrFamily, Component>` so a missing component is a type error. Emitted HTML confirms 14 families, **0 pass-through**. **Task 5:** `measure:parity` widened 193 → **1,469** pages, **1469/1469 on all four measures**, and the **oracle is committed** as per-page sha256 (stable across two runs) because after the writer dies there is no golden side left to regenerate; `check:links` **0 regressions**, `check:a11y` **0 failures**/1,474 pages, **0 `_payload.json` + 0 Nuxt scripts** across all 1,469 IR routes. **Task 6: [ADR 0032](../../docs/adrs/0032-csp-posture-after-the-projection-layer.md)** — one amendment, measured verdict **no policy-string relaxation** (23.3's `noScripts: true` removed 23.1's premise; the webview is not a Nuxt consumer), restating ADR 0005 §4's body-carries-no-scripts as an **enforced** claim about the region (0 executable, 163 inert islands). ⚠️ **The next free ADR number was 0032, not the 0023 this file quotes.** **⚠️ D3/D5 AMENDED (Task 4):** `ir-content.css` is **not retirable** and its "when it is empty" condition is unreachable as written — only **6.5 %** of rules are prose/authorable, **93.5 %** style bespoke vocabulary **injected as rendered HTML** across **651 classes**, and the 97 `chrome` rules **never empty** (D2 + ADR 0024 keep C# composing the region permanently). AC #4's **second branch** taken: per-rule residue with a **named blocker** (`npm run report:ir-content-residue`, committed), **ADR 0018 amended**, **1,420** as the owner-visible debt, remainder raised as an **Epic 22 view-model ask** — the escalation Dev Notes prescribe, not improvisation. ⚠️ **A worse defect fixed in the same area:** the extraction was still bounded to 23.3's four families, so the 1,276 newly-migrated pages had only **42 %** of their classes styled and the rest rendered **bare** (ADR 0018's rejected alternative #3, reached by omission); widening to the whole site gives **100 %** coverage while still dropping **393 of 1,814** source rules, so the layer stays bounded, scoped and gated. **⚠️ FINDING 4 — THREE LAYERS had independently dropped the same content, and only the browser saw it.** `deep-analytics.html`'s `:target` lightbox sits after `</main>`; the C# slicer, then the TS region splitter, then the CSS extractor each truncated there — so fixing the C# side changed nothing observable, and once the markup finally arrived the overlay rendered **permanently open** (a 526 px panel instead of a dialog) because `.coupling-lightbox { display: none }` had never been carried. No harness could see it: parity compares `<main>` only, `check:links` treats a same-page fragment as resolved, a11y has no opinion on a missing overlay. Fixed end to end with **`IrRegion.trailingHtml`**, pinned by four tests, and **verified live** (`display:none` → `:target` → `display:flex; position:fixed; z-index:1000` covering the viewport → closes again). **Task 7:** `GoldenContentFingerprint` **not retired and did not move** — deliberate, the C# writer still ships — and AC #5 satisfied by its **successor**, a new **`GoldenIrFingerprint`** landed in the same story that switched the producer so the drift gate never lapses. The **two-run rule caught it moving first**: `manifest.json`'s derived `contentHash` for `diagnostics.html` embeds the output path, and `NormalizeVolatile` can fold a path but not a hash *of* one; stable across **three** runs after folding the redundant digests. The 11 `HtmlRenderAdapter` test files needed no re-aiming and none were deleted. **D6 discharged and re-homed:** `DashboardSurface.vue`'s chart-less hard-throw (the one route that failed 23.5's two-IR run, CORA **32/33**) now warns while the ADR 0013 twin check stays **fatal** and is gated on a chart existing; contract extracted to `ir/contracts.ts` so it is testable without a component harness (no new npm dep, ADR 0010). **Also fixed: this story's OWN page** emitted a stray `<main>` and a premature `</body></html>` — a code span broken across a line break whose continuation began with `</body>`, which CommonMark treats as an HTML block; 1 of 1,469 pages, a11y `one-main` now 0. **Live verification** over `file://` (the Browser pane's 5-server-per-folder cap was full with other chats' servers — none was stopped): CSSOM **1,463 rules** parsed, explorer mounted, **34,149** Prism tokens with `#L1` `:target` highlighting, JS-off twin **221 items**. Two defects measured **identical on golden** and attributed as **inherited**: mobile 375 px overflow on code pages (`.code-tablist` 447 px) and the JS-off chart fallback (host `display:none`, twin sr-only — **ADR 0031/Epic 28 already owns it**). **STILL NOT DONE, deliberately: `HtmlRenderAdapter.Render`'s page composition and the `.html` writes REMAIN.** Deleting them destroys the live golden side the owner's verify-and-iterate pass needs to re-measure anything they ask for, so the deletion should **follow** owner verification, not precede it. Suite **2,826 passed / 0 failed / 3 skipped** on a clean run; one earlier run lost `FileWatcherServiceTests` to the documented rotating contention flake (green **3/3** in isolation; 5 preview servers from other chats were live, the recorded cause). `web` suite **125 passed**. |
 | 2026-07-29 | **dev-story session 3, part 1 (run at `94b8e56`, CLEAN tree; baseline `32fd282` preserved). Task 2's REGION BYTE-EQUALITY PROOF IS COMPLETE — 1,408 IR pages, 300 `commit/` pages, all three deep-git surfaces present, ZERO unexpected deltas.** Stood up the composed-region producer: a new **`WritePage`** seam renders each page from its own `PageView`, linkifies the document exactly as before, writes it, and composes + linkifies the content region **eagerly in the same breath**; ~30 call sites moved off the `WriteOutput(path, ApplyReferenceLinks(RenderPage(...), path))` idiom. Proven by two new gates: `RegionCompositionParityTests` (in-suite, fixture) and `RegionCompositionCorpusProof` (opt-in, real `--deep-git --spa` generate). **⚠️ FINDING 3'S BLOCKING PREMISE WAS WRONG, and measuring it found a different real defect.** Session 2 escalated "the region must be linkified document-scoped or region-scoped — an owner decision"; neither option was needed. All five `ApplyReferenceLinks` passes protect **`<head>`**, the only order-dependent pass is `AbbreviationExpander`, and everything between `</head>` and the region is a bare `<body>` tag or the skip-link `<a>` — both protected — so **nothing outside the region can consume an abbreviation's first use**. Region-scoped linkification was also **already the shipped convention** for the 191 family pages (`AddSpaSurface`, since Story 6.7), so this made the long tail *consistent* rather than deciding anything new. **The real hazard was WHEN you compose, not what scope you linkify:** a lazily-composed region observes **mutable** generator state — `_codePages` grows during the run, and `CodeReferenceLinkifier` both no-ops on an empty map and **strips unresolvable view-source anchors** on a populated one — so `readme.html` (written before the code pass) lost a 77-byte anchor its document kept. Caught by the corpus proof, invisible to the fixture, and fixed by composing at write time; `CapturedPageView` now carries a finished region string rather than a recipe. Two further corrections: `.TrimEnd()` on the composed region is **replication** of the slice's exact `</main>` boundary (a templater body ends `</main>\n\n`, a 2-byte delta on nearly every page) and trimming *whitespace* rather than *everything after `</main>`* is what recovers **`deep-analytics.html`'s `:target` lightbox** — the story's finding 2, now proven and pinned; and **`linkify` is a per-page axis** (nine surfaces deliberately opt out — glossary pages must not self-expand their own vocabulary, follow-up/action pages carry raw `data-copy`), so dropping it would have injected links the slice never had. The lightbox assertion needed sharpening once: both regions contain the *string* `coupling-zoom` because the "Expand" link lives inside `<main>`; only the **target element** was missing, which is the defect's precise shape. **Golden fingerprint STATIONARY throughout** (correct — AC #5 inverts only when the writer is deleted); golden inventory unchanged; **full suite 2,825 passed / 0 failed / 3 skipped**, with no deep-git flake and no contention flake this run. **Nothing deleted yet**: `HtmlRenderAdapter.Render`'s page composition, `WriteOutput`'s HTML writes and `ExtractContentRegion` all still stand, and Task 2's deletion bullet is gated on **Task 3** (Nuxt must be writing the pages) and **Task 5** (the oracle must be captured and committed while it can still be generated) — a real ordering constraint from the story's own circularity note, not unfinished analysis. |
 | 2026-07-28 | **dev-story session 2 (run at `755bd7a`; baseline `32fd282` preserved). Task 2's templater migration COMPLETE — 25/25 on `PageView`** (13 migrated this session: DeepAnalytics, GitInsights, Retro×2, AboutSdd×2, Ideas×2, TestArtifacts, CommitDay, CommitDetail, FollowUpDetail×2, FollowUpGroup, Requirements×2, HtmlTemplater's generic doc path, CodeFile×2). **Byte-identity proven** — golden fingerprint + golden inventory green in an ISOLATED clone carrying only this story's files, and **85/85** targeted tests green in the main tree (both golden gates, `CodeFileTemplaterTests`, `RenderParityTests`, `RenderSpaParityTests`, `WebviewRenderAdapterTests`). ⚠️ **Stated gap:** the golden fixture emits **no code page**, so the hash does not cover `CodeFileTemplater`'s 254 pages; that needs Task 5's generate-and-diff oracle. **⚠️ FINDING 3, new and structural: the capture switch is NOT a straight swap.** `ApplyReferenceLinks` runs over the **whole document** at every `WriteOutput` call site and the region is sliced out of the *already-linkified* page — so composing from raw `PageView.BodyHtml` would ship **1,217 pages with every FR/story/code link, reference chip and `<abbr>` expansion silently gone**. And it is not simply "linkify the body": `AbbreviationExpander` is **first-use scoped across the document**, so region-scoping it is itself a measurable byte delta. Task 2's byte-equality proof is unreachable until this is decided; **raised for the owner rather than taken silently.** Two blockers from session 1 closed instead: 22.3's `NavLocalContext` plumbing is **not needed** (`ToNavigationView` already takes one, and all 25 templaters now thread their existing context through), and AC #3's region composer **already existed** (`JsonSpaRenderAdapter.RenderContent`). **Nothing deleted yet** — `Render`'s page composition, `WriteOutput`'s HTML writes and `ExtractContentRegion` are all still in place, per the story's own circularity rule. Method note: with a sibling session live in the same tree (Stories 24.1 + 8.9, editing *inside* two of this story's files), attribution was recovered with two throwaway scratch clones — pristine HEAD vs HEAD-plus-only-this-story — and **nothing in the working tree was reset, checked out or cleaned.** Also measured: the full suite's deep-git failures are **environmental, and worse on pristine HEAD (18) than with this story applied (3)** — the 3,000 ms `GitMetrics` budget losing under parallel test load, an unstable set run-to-run. And a trap worth keeping: **`--no-build` on a tree whose test project does not compile silently runs the STALE dll** — read the build's error count before trusting it. |

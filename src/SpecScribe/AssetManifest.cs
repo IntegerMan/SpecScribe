@@ -40,6 +40,29 @@ public sealed record AssetManifest
     /// <c>IrSurface.vue</c> re-emits it from the head. [Story 23.4 AC #3; Trap 3]</para></summary>
     public bool HierarchyBootInline { get; init; }
 
+    /// <summary>Whether this page carries at least one Story 24.2 relationship graph
+    /// (<see cref="RelationshipGraph"/>) and therefore needs the vendored plotly.js bundle. Computed by the producer
+    /// from the RENDERED BODY (<see cref="RelationshipGraph.ContainsHost"/>), exactly like
+    /// <see cref="HierarchyEngineNeeded"/>.
+    ///
+    /// <para><b>A second flag rather than a widened first one, and the bundle is still emitted once.</b> The two
+    /// components share the engine (ADR 0030: <c>scatter</c> was already registered in the bundle
+    /// <see cref="HierarchyEngineNeeded"/> ships, so the marginal cost is zero bytes) but they are DIFFERENT
+    /// components with different hosts, and folding the graph into the hierarchy flag would make
+    /// <c>HierarchyExplorer.ContainsHost</c> disagree with a page that has no hierarchy on it. The adapter emits the
+    /// <c>&lt;script src&gt;</c> when EITHER flag is set, so a page carrying both still gets exactly one tag.</para>
+    /// <para>Optional with a <c>false</c> default, for the same reason as the hierarchy flag: a code page with no
+    /// graph must stay byte-identical, and 1.2 MB is not a rounding error.</para></summary>
+    public bool GraphEngineNeeded { get; init; }
+
+    /// <summary>Whether <see cref="RelationshipGraph.BootScript"/> is emitted INLINE, between the wayfinding band
+    /// and the body — the graph's anti-flash handshake, which has to run while the body is still parsing. Split from
+    /// <see cref="GraphEngineNeeded"/> for exactly the reason <see cref="HierarchyBootInline"/> is split from
+    /// <see cref="HierarchyEngineNeeded"/>: placement and need are independent facts.
+    /// <para>Chrome-level, and therefore OUTSIDE the IR content region — the webview and SPA surfaces consume
+    /// <see cref="PageView.BodyHtml"/> directly and must carry no script. [Story 24.2]</para></summary>
+    public bool GraphBootInline { get; init; }
+
     /// <summary>Page-specific <c>&lt;head&gt;</c> additions, emitted verbatim as
     /// <see cref="PathUtil.RenderHeadOpen"/>'s <c>extraHead</c>. The producer owns the exact tags. Two real users:
     /// a code page's Prism stylesheet + highlighter, and the Impact Map's head-placed hierarchy boot marker.

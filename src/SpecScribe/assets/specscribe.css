@@ -1786,6 +1786,11 @@ pre.code-file code[class*="language-"] {
   overflow-y: auto;
 }
 
+/* Story 24.2: this class now rides the COMPONENT's framed panel (`chart-panel code-relationships`) rather than a
+   hand-written <section>, so the card keeps its gold left rule and parchment field while the heading, the framing
+   sentence and the caveat come from the ONE Story 10.2 frame instead of bespoke markup. The old
+   `.code-relationships > h2` and `.code-relationships-note` rules went with the markup they styled — the frame's
+   own `.chart-frame-head h3` / `.chart-frame-why` / `.chart-frame-note` carry those now. */
 .code-relationships {
   padding: 1.1rem 1.2rem;
   border: 1px solid var(--border);
@@ -1794,31 +1799,9 @@ pre.code-file code[class*="language-"] {
   background: var(--parchment);
 }
 
-.code-relationships > h2 {
-  margin: 0 0 0.3rem;
-  font-size: 0.9rem;
-  color: var(--ink-light);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.code-relationships-note {
-  margin: 0 0 0.6rem;
-  font-size: 0.8rem;
-  color: var(--ink-light);
-}
-
-.ref-graph-wrap {
-  text-align: center;
-}
-
-.ref-graph {
-  max-width: 100%;
-  height: auto;
-}
-
-/* Visually-hidden but present for assistive tech and keyboard use (the graph <svg role="img"> exposes only its
-   summary label). The standard clip-rect technique — off-screen without display:none, so it stays in the a11y tree. */
+/* Visually-hidden but present for assistive tech and keyboard use. The standard clip-rect technique — off-screen
+   without display:none, so it stays in the a11y tree. Under ADR 0013 this is where the no-JS contract lives on the
+   chart surfaces: the text twin is `.sr-only`, never `display:none`, precisely so it remains readable. */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -1831,173 +1814,143 @@ pre.code-file code[class*="language-"] {
   border: 0;
 }
 
-.ref-edge {
-  stroke: var(--border);
-  stroke-width: 1.5;
-  stroke-opacity: 0.85;
-}
+/* ========================================================================
+   The relationship graph [Story 24.2 / ADR 0030] — a code page's ego
+   coupling graph, drawn client-side by the vendored Plotly scatter trace
+   over a generation-time C# layout.
 
-.ref-center-box {
-  fill: var(--ink);
-  stroke: var(--gold);
-  stroke-width: 1.5;
-}
+   REPLACES the Story 7.1/7.8 pure-SVG reference graph and its four
+   pre-rendered toggle-variant panels: ADR 0013 makes the TEXT TWIN the
+   no-JS contract, so keeping an SVG *and* adding this would be the
+   dual-renderer option ADR 0013 explicitly rejected. That whole rule family
+   and its sibling-combinator show/hide were deleted with the markup.
 
-.ref-center-label {
-  fill: var(--parchment);
-  font-weight: 600;
-  font-family: system-ui, sans-serif;
-}
+   With JS off NOTHING here is visible except the text twin: the chart host
+   is display:none (reserving a chart-sized blank box for a chart that is
+   never coming is worse than no box), and the filter bar ships [hidden].
+   ======================================================================== */
 
-.ref-node {
-  cursor: pointer;
-}
+/* Revealed by the component only on a SUCCESSFUL mount, which sets the height from its island's `size`. Height is
+   never a literal here or in the JS. */
+.ss-relgraph { display: none; }
+.ss-relgraph[data-relgraph-ready] { display: block; margin: 0 auto; max-width: 100%; }
 
-.ref-dot {
-  fill: var(--gold);
-  stroke: var(--parchment);
-  stroke-width: 1.5;
-  transition: r 0.12s ease, fill 0.12s ease;
-}
-
-.ref-label {
-  fill: var(--ink);
-  font-family: system-ui, sans-serif;
-}
-
-.ref-node:hover .ref-dot,
-.ref-node:focus-visible .ref-dot {
-  fill: var(--ink);
-  r: 9;
-}
-
-.ref-node:hover .ref-label,
-.ref-node:focus-visible .ref-label {
-  fill: var(--gold-dark, var(--gold));
-  text-decoration: underline;
-}
-
-.ref-node:focus-visible {
-  outline: 2px solid var(--gold);
-  outline-offset: 2px;
-}
-
-/* Story 7.8 — the SECOND reference-graph population: the files this file most often changes alongside (co-change /
-   temporal coupling, never a code dependency). Distinguished from the citing-artifact nodes by SHAPE (diamond, not
-   circle) AND edge style (dashed, not solid) — not by colour alone (NFR6/UX-DR16) — using only the neutral
-   ink/border/parchment tokens (never --gold, never --status-*). The distinction must hold in light and dark themes. */
-.ref-edge-file {
-  stroke: var(--ink-light);
-  stroke-width: 1.5;
-  stroke-opacity: 0.7;
-  stroke-dasharray: 4 3;
-}
-
-.ref-file-dot {
-  fill: var(--parchment);
-  stroke: var(--ink-light);
-  stroke-width: 1.5;
-  transition: fill 0.12s ease, stroke 0.12s ease;
-}
-
-.ref-file-label {
-  fill: var(--ink-light);
-  font-family: system-ui, sans-serif;
-}
-
-/* A related-file node is a link when the coupled file has its own code page; otherwise a non-link chip (still shown,
-   still tooltipped — the coupling is real — but not interactive). */
-.ref-file-node {
-  cursor: pointer;
-}
-
-.ref-file-node--chip {
-  cursor: default;
-}
-
-a.ref-file-node:hover .ref-file-dot,
-a.ref-file-node:focus-visible .ref-file-dot {
-  fill: var(--ink-light);
-  stroke: var(--ink);
-}
-
-a.ref-file-node:hover .ref-file-label,
-a.ref-file-node:focus-visible .ref-file-label {
-  fill: var(--ink);
-  text-decoration: underline;
-}
-
-a.ref-file-node:focus-visible {
-  outline: 2px solid var(--ink-light);
-  outline-offset: 2px;
-}
-
-/* The honest "+N more" overflow marker when a hub file's citing-artifact ring is capped (Story 7.8 AC #2). Muted so it
-   reads as a footnote to the graph, not another node; the full citer set stays in the sr-only list. */
-.ref-overflow {
-  fill: var(--ink-light);
+/* The boot placeholder — the anti-flash half of the JS handshake, gated on `[data-ss-relgraph-boot]`, which an
+   inline script sets DURING PARSING. Keyed on `:has(.ss-relgraph)` rather than on the opt-in panel hook, so a call
+   site that forgets the hook still gets correct boot suppression. */
+.ss-relgraph-booting { display: none; }
+:root[data-ss-relgraph-boot] .chart-panel:has(.ss-relgraph) .ss-relgraph-booting {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-faded);
+  font-size: 0.8rem;
   font-style: italic;
-  font-family: system-ui, sans-serif;
+}
+/* Both exits clear it. MOUNTED: the chart is up. FAILED: no engine or a throw, so it clears immediately rather
+   than making the reader wait out the boot timer — what stands behind it is the already-rendered text twin. */
+:root[data-ss-relgraph-boot] .chart-panel[data-relgraph-mounted] .ss-relgraph-booting,
+:root[data-ss-relgraph-boot] .chart-panel[data-relgraph-failed] .ss-relgraph-booting { display: none; }
+
+/* The two filters (owner decision D3). `[hidden]`'s UA rule is `[hidden] { display: none }` and an author
+   `display: flex` TIES with it on specificity — author CSS wins that tie — so without the explicit override below
+   the filter bar would render live for every JS-off, webview, SPA and engine-blocked reader: two checkboxes that
+   do nothing at all. Same override, same reason, as `.ss-hierarchy-controls[hidden]`. */
+.ss-relgraph-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.4rem;
+  margin: 0 0 0.6rem;
+}
+.ss-relgraph-controls[hidden] { display: none; }
+.ss-relgraph-filter { margin: 0; vertical-align: middle; cursor: pointer; }
+.ss-relgraph-filter-label {
+  font-size: 0.8rem;
+  color: var(--ink-light);
+  margin-right: 1rem;
+  cursor: pointer;
 }
 
-/* Reference graph: "Group by epic" + "Show relationships" toggles (epic grouping + cross-relationship edges).
-   PURE CSS, no script required — mirrors CodeMap.BuildVariants' two-checkbox idiom (specscribe.css's
-   .codemap-filter-checkbox rules; the sibling-combinator panel toggle itself moved to the row/lead-text rules
-   near .codemap-table-section once Story 20.10 collapsed Code Map's four panels into one). Plain, unwrapped
-   <input>+<label> siblings so the sibling-combinator toggle below sees them at the same nesting level as the
-   .ref-graph-view panels they control. */
-/* No top margin here: the preceding .code-relationships-note already carries margin-bottom for row spacing —
-   a top margin on this inline checkbox would shift its border-box down within the line, throwing its
-   vertical-align:middle out of alignment with its own label (the actual cause of a prior visual misalignment). */
-.refgraph-toggle { margin: 0 0 0 0.1rem; vertical-align: middle; cursor: pointer; }
-.refgraph-toggle:first-of-type { margin-left: 0; }
-.refgraph-toggle-label { font-size: 0.8rem; color: var(--ink-light); margin-right: 1.25rem; cursor: pointer; }
-
-/* Four precomputed (epic x relationships) panels: exactly one is visible at a time, picked by the two checkboxes'
-   :checked state via plain CSS sibling combinators keyed on the checkbox CLASSES (not id — ids are page-unique so
-   several code pages can be consolidated into one document without cross-wiring their <label for>/<input id>
-   pairs; the class names are the same on every code page and the sibling relationship is local to each page's own
-   <section class="code-relationships">, so class-keyed selectors need no per-page duplication here). */
-.ref-graph-view { display: none; }
-.refgraph-toggle-epic:not(:checked) ~ .refgraph-toggle-rel:not(:checked) ~ .ref-graph-view[data-view="flat-flat"],
-.refgraph-toggle-epic:checked ~ .refgraph-toggle-rel:not(:checked) ~ .ref-graph-view[data-view="epic-flat"],
-.refgraph-toggle-epic:not(:checked) ~ .refgraph-toggle-rel:checked ~ .ref-graph-view[data-view="flat-rel"],
-.refgraph-toggle-epic:checked ~ .refgraph-toggle-rel:checked ~ .ref-graph-view[data-view="epic-rel"] {
-  display: block;
+/* Focus on a marker. `outline`, NOT `stroke`: Plotly owns a point's stroke channel and rewrites it inline on every
+   redraw, so a stroke rule here is silently inert (measured on the hierarchy component, same engine). */
+.ss-relgraph-node:focus { outline: none; }
+.ss-relgraph-node:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
 }
+.ss-relgraph-node[data-relgraph-href] { cursor: pointer; }
 
-/* "Group by epic" hub node: a distinct NEUTRAL chip between the center file and its nested story nodes — never
-   gold (the citing-artifact color) and never the related-file diamond shape, so all three node kinds stay
-   distinguishable at a glance (NFR6/UX-DR16). */
-.ref-epic-hub-box {
-  fill: var(--parchment);
-  stroke: var(--ink);
-  stroke-width: 1.5;
+/* The legend. Every entry names a NON-COLOUR channel in prose (shape, dash, width band, distance), so the whole
+   reading survives with colour removed (UX-DR17) — the swatches are decorative reinforcement, which is why they
+   are aria-hidden in the markup. */
+.ss-relgraph-legend {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
-
-.ref-epic-hub-label {
-  fill: var(--ink);
-  font-weight: 600;
-  font-family: system-ui, sans-serif;
+/* The same `[hidden]` specificity trap the control bar has: the UA rule `[hidden] { display: none }` TIES with an
+   author `display: flex` and author CSS wins the tie, so without this the legend renders for every JS-off,
+   webview, SPA and engine-blocked reader — eight rows explaining gold circles and dash patterns above a chart host
+   that is `display: none`. Found in the JS-off audit, not by the suite. */
+.ss-relgraph-legend[hidden] { display: none; }
+.ss-relgraph-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.75rem;
+  color: var(--ink-light);
 }
-
-/* Hub -> story spoke: distinguishes a nested citation from a direct one (dotted, thinner than the solid file -> hub
-   spoke it extends), while both still read as "citation" edges (never mistaken for a code dependency). */
-.ref-hub-spoke {
-  stroke: var(--ink-light);
-  stroke-width: 1.2;
-  stroke-opacity: 0.75;
-  stroke-dasharray: 1.5 2.5;
+.ss-relgraph-swatch {
+  flex: 0 0 auto;
+  width: 1.4rem;
+  height: 0.75rem;
+  border-bottom: 1.5px solid var(--ink-light);
 }
-
-/* "Show relationships" cross edges (story<->related-file, related-file<->related-file): a THIRD distinct edge
-   style — lighter/thinner and dash-dot — so it never reads as either the solid gold citation spoke or the dashed
-   related-file spoke. Neutral tokens only (no --gold, no --status-*), matching the rest of this graph. */
-.ref-edge-cross {
-  stroke: var(--ink-light);
-  stroke-width: 1;
-  stroke-opacity: 0.55;
-  stroke-dasharray: 5 2 1 2;
+.ss-relgraph-swatch-focal {
+  width: 0.7rem;
+  height: 0.7rem;
+  border: 1.5px solid var(--gold);
+  background: var(--gold);
+  border-bottom-width: 1.5px;
+}
+.ss-relgraph-swatch-artifact {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--gold);
+  background: var(--gold);
+  border-bottom-width: 1.5px;
+}
+.ss-relgraph-swatch-epic {
+  width: 0.7rem;
+  height: 0.7rem;
+  border: 1.5px solid var(--ink);
+  background: transparent;
+  border-bottom-width: 1.5px;
+}
+.ss-relgraph-swatch-coupled {
+  width: 0.7rem;
+  height: 0.7rem;
+  border: 1.5px solid var(--ink-light);
+  background: var(--parchment);
+  transform: rotate(45deg);
+  border-bottom-width: 1.5px;
+}
+/* Dash signatures mirror what the chart actually draws, because the payload and this stylesheet were written from
+   the ONE server-side style table. A legend swatch that disagreed with the drawn dash is the misdescribing-entry
+   class Stories 10.7 and 21.1 each closed. */
+.ss-relgraph-swatch-band { border-bottom-width: 3px; }
+.ss-relgraph-swatch-boundary { border-bottom-style: dashed; }
+.ss-relgraph-swatch-process { border-bottom-style: dotted; }
+.ss-relgraph-swatch-cross { border-bottom-style: dashed; border-bottom-width: 1px; }
+.ss-relgraph-legend-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.72rem;
+  color: var(--ink-faded);
 }
 
 /* ========================================================================

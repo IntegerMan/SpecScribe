@@ -108,11 +108,12 @@ public class SiteGeneratorCodeInsightsTests : IDisposable
         // Contributor attribution (the known fixture author), framed as commits — not a ranking.
         Assert.Contains("Insight Tester", html);
         Assert.Contains("Change frequency", html);
-        // Story 7.8 (AC #2): the visible "Often changed with" list is GONE — the coupling now renders as a
-        // related-file node on the reference graph (neutral diamond + dashed edge) linking to the sibling's code page.
+        // Story 7.8 (AC #2): the visible "Often changed with" list is GONE — the coupling renders as a related-file
+        // node on the relationship graph (Story 24.2: a neutral diamond on a dashed coupling spoke in the island)
+        // linking to the sibling's code page.
         Assert.DoesNotContain("Often changed with", html);
-        Assert.Contains("class=\"ref-edge-file\"", html);
-        Assert.Contains("class=\"ref-file-dot\"", html);
+        Assert.Contains("\"k\":\"coupled\"", html);
+        Assert.Contains("\"dash\":\"4px,3px\"", html);
         Assert.Contains("code/src/Lib/Sibling.cs.html", html);
         // The accessible text equivalent of the related node is present with its co-change strength.
         Assert.Contains("Files changed alongside this one:", html);
@@ -148,7 +149,9 @@ public class SiteGeneratorCodeInsightsTests : IDisposable
         AssertNoErrors(events);
         var html = File.ReadAllText(ReferencedPage);
 
-        Assert.Contains("ref-file-node--chip", html);          // the uncited coupled file is a non-link chip
+        // The uncited coupled file is drawn as a node with a NULL href — the client renders it non-activatable —
+        // rather than as a link to a page that does not exist.
+        Assert.Contains("\"p\":\"src/Lib/Uncited.cs\"", html);
         Assert.Contains("src/Lib/Uncited.cs", html);           // still surfaced (tooltip + sr-only text)
         Assert.False(File.Exists(Path.Combine(Site, "code", "src", "Lib", "Uncited.cs.html")));
         Assert.DoesNotContain("code/src/Lib/Uncited.cs.html", html);   // never a link to a page that does not exist
@@ -248,10 +251,12 @@ public class SiteGeneratorCodeInsightsTests : IDisposable
         AssertNoErrors(events);
         var html = File.ReadAllText(ReferencedPage);
 
-        // Story 1.1 cites Referenced.cs and belongs to Epic 1 (per the fixture's epics.md) — the "epic-flat"/"epic-rel"
-        // variants must nest it under an "Epic 1" hub; the sr-only list must disclose the membership unconditionally.
-        Assert.Contains("class=\"ref-epic-hub", html);
-        Assert.Contains(">Epic 1</text>", html);
+        // Story 1.1 cites Referenced.cs and belongs to Epic 1 (per the fixture's epics.md) — so the graph carries an
+        // "Epic 1" hub node and a membership edge governed by the "Group by epic" filter; the sr-only twin discloses
+        // the membership unconditionally, which is what keeps it complete while the filter can hide the hub.
+        Assert.Contains("\"k\":\"epic\"", html);
+        Assert.Contains("\"l\":\"Epic 1\"", html);
+        Assert.Contains("\"e\":\"epic\",\"s\":\"epic\"", html);
         Assert.Contains("(Epic 1: Foundation)", html);
     }
 
@@ -266,8 +271,9 @@ public class SiteGeneratorCodeInsightsTests : IDisposable
         var html = File.ReadAllText(ReferencedPage);
 
         // Story 1.1's notes cite BOTH Referenced.cs (the center file) and Sibling.cs (a related/coupled file) — so
-        // "Show relationships" must draw a story<->related-file cross edge, and the sr-only text must name it.
-        Assert.Contains("class=\"ref-edge-cross\"", html);
+        // the graph carries a story<->related-file cross edge governed by "Show relationships", and the sr-only
+        // text names it whether or not that filter is on.
+        Assert.Contains("\"e\":\"xcite\",\"s\":\"cross\"", html);
         Assert.Contains("also cites src/Lib/Sibling.cs", html);
     }
 
@@ -275,18 +281,133 @@ public class SiteGeneratorCodeInsightsTests : IDisposable
     public void GenerateAll_FlagOff_ShowRelationshipsHasNoVisualEffectWithoutInsight()
     {
         // No --deep-git → no FileInsight → no related-file population and no co-change data → "Show relationships"
-        // has nothing to draw (no cross edges possible without a related population). "Group by epic" is
-        // independent of --deep-git (it only needs the already-loaded _epicsModel), so it still renders/works —
-        // but the checkboxes themselves are present either way (control surface never disappears), and nothing
-        // ever throws.
+        // has nothing to govern, so under Story 24.2 D3 its checkbox is not emitted at all: a control that toggles
+        // nothing is exactly the inert control the hidden bar exists to prevent, and the retired card's
+        // unconditional pair was the defect, not the contract. "Group by epic" is independent of --deep-git (it
+        // only needs the already-loaded _epicsModel), so it survives. Nothing throws either way.
         var events = new SiteGenerator(Options(deepGit: false)).GenerateAll();
 
         AssertNoErrors(events);
         var html = File.ReadAllText(ReferencedPage);
 
-        Assert.Contains("refgraph-toggle-epic", html);
-        Assert.Contains("refgraph-toggle-rel", html);
-        Assert.DoesNotContain("ref-edge-cross", html);
+        Assert.Contains("data-relgraph-filter=\"epic\"", html);
+        Assert.DoesNotContain("data-relgraph-filter=\"cross\"", html);
+        Assert.DoesNotContain("\"s\":\"cross\"", html);
+        // Whatever the filters do, the graph and its twin still render.
+        Assert.Contains("data-relgraph></div>", html);
+        Assert.Contains("class=\"ref-list sr-only\"", html);
+    }
+
+    // ---- Story 24.2 / ADR 0013 §6: THE GOLDEN-FINGERPRINT REPLACEMENT --------------------------------------
+    //
+    // ADR 0013 §6 requires the story that retires the first server-rendered chart SVG to land the replacement
+    // assertions in the SAME change: the fingerprint's chart coverage was SVG path geometry, and that geometry no
+    // longer exists. What replaces it is the three things that ARE still server-rendered — the embedded PAYLOAD,
+    // the component CONFIGURATION, and the TEXT TWIN — asserted here over a REAL generated site rather than over a
+    // unit fixture, because the fingerprint's value was always that it ran end to end.
+    //
+    // These are deliberately not one big assertion: a fingerprint tells you SOMETHING moved, which is exactly the
+    // property that made it chronically noisy. These say WHAT moved.
+
+    [Fact]
+    public void GoldenReplacement_Payload_CarriesEveryNodeAndEdgeTheChartWillDraw()
+    {
+        Assert.True(TryCreateGitHistory(), "git CLI unavailable on this host — cannot exercise the deep-git graph payload; install git rather than silently skipping this test");
+
+        AssertNoErrors(new SiteGenerator(Options(deepGit: true)).GenerateAll());
+        var html = File.ReadAllText(ReferencedPage);
+
+        var island = Between(html, "<script type=\"application/json\" id=\"relgraph-", "</script>");
+        Assert.NotEqual("", island);
+
+        // Every node carries the five things a marker needs: identity, a solved position, a kind, a weight and the
+        // one composed sentence that is simultaneously its tooltip and its accessible name.
+        Assert.Contains("\"id\":\"focal\"", island);
+        Assert.Contains("\"x\":\"0.5\",\"y\":\"0.5\"", island);   // the focal node is PINNED (owner decision D1)
+        Assert.Contains("\"k\":\"artifact\"", island);
+        Assert.Contains("\"k\":\"coupled\"", island);
+        Assert.Contains("\"w\":", island);
+        Assert.Contains("\"t\":", island);
+        // Every coupled node's sentence carries the metric as WORDS and numbers, never as a colour.
+        Assert.Contains("changed together", island);
+        Assert.Contains("confidence", island);
+        // No coordinate degenerated. An unguarded division upstream would reach the payload as literal text.
+        Assert.DoesNotContain("NaN", island);
+        Assert.DoesNotContain("Infinity", island);
+    }
+
+    [Fact]
+    public void GoldenReplacement_ComponentConfiguration_IsPresentAndTokenDriven()
+    {
+        Assert.True(TryCreateGitHistory(), "git CLI unavailable on this host — cannot exercise the deep-git graph payload; install git rather than silently skipping this test");
+
+        AssertNoErrors(new SiteGenerator(Options(deepGit: true)).GenerateAll());
+        var html = File.ReadAllText(ReferencedPage);
+        var island = Between(html, "<script type=\"application/json\" id=\"relgraph-", "</script>");
+
+        // The configuration half of ADR 0013 §5: the island carries what the component needs to draw itself.
+        Assert.Contains("\"config\":{", island);
+        Assert.Contains("\"domId\":\"relgraph-", island);
+        Assert.Contains("\"title\":\"Relationships\"", island);
+        Assert.Contains("\"size\":", island);
+        // Colours travel as TOKEN NAMES resolved through the real cascade (ADR 0012 §6) — never a Plotly colorway,
+        // and never a --status-* lifecycle token, which are off-limits on code surfaces.
+        Assert.Contains("\"tokens\":{", island);
+        Assert.DoesNotContain("--status-", island);
+        // The style table is resolved SERVER-side, which is what makes legend, payload and chart unable to disagree.
+        Assert.Contains("\"styles\":[", island);
+        Assert.Contains("\"dash\":", island);
+
+        // The host, the boot handshake and the engine are all present and all DERIVED from the rendered body.
+        Assert.Contains("data-relgraph></div>", html);
+        Assert.Contains("data-ss-relgraph-boot", html);
+        Assert.Contains("plotly-hierarchy.min.js", html);
+    }
+
+    [Fact]
+    public void GoldenReplacement_TextTwin_IsCompleteForBothPopulationsWithNoScriptRequired()
+    {
+        Assert.True(TryCreateGitHistory(), "git CLI unavailable on this host — cannot exercise the deep-git twin; install git rather than silently skipping this test");
+
+        AssertNoErrors(new SiteGenerator(Options(deepGit: true)).GenerateAll());
+        var html = File.ReadAllText(ReferencedPage);
+
+        // ADR 0013 §2's four properties, over the surface that just retired its SVG.
+        var twin = Between(html, "<ul class=\"ref-list sr-only\">", "</ul>\n<p class=\"chart-frame-why\"");
+        Assert.NotEqual("", twin);
+
+        // SERVER-RENDERED: it is in the file on disk, before any script runs. (That it is here at all is the
+        // assertion — the 24.6 spike measured a CLIENT-built twin contributing 0 BYTES under a blocked script.)
+        Assert.DoesNotContain("<script", twin);
+
+        // COMPLETE, population 1 — citing artifacts, with epic membership. The fixture's one citer is Story 1.1's
+        // notes, which belongs to Epic 1; membership is disclosed unconditionally, which is what keeps the twin
+        // complete while the "Group by epic" FILTER can hide the hub the chart draws for it.
+        Assert.Contains("(Epic 1: Foundation)", twin);
+        // COMPLETE, population 2 — coupled files, with support AND directional confidence.
+        Assert.Contains("Files changed alongside this one:", twin);
+        Assert.Contains("changed together", twin);
+        Assert.Contains("confidence", twin);
+
+        // NAVIGABLE: real resolving anchors, not labels.
+        Assert.Contains("<a href=", twin);
+
+        // NON-COLOUR: every distinction the chart draws with a dash, a shape or a width band is also a WORD here.
+        // This is the property the SVG's retirement puts the most weight on, and the one that a chart-shaped
+        // assertion could never have checked.
+        Assert.Contains("code/src/Lib/Sibling.cs.html", twin);
+    }
+
+    /// <summary>The HTML slice between the first occurrence of <paramref name="startMarker"/> and the next
+    /// occurrence of <paramref name="endMarker"/> — enough to scope an assertion to the payload island or the text
+    /// twin without parsing the page.</summary>
+    private static string Between(string html, string startMarker, string endMarker)
+    {
+        var start = html.IndexOf(startMarker, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"marker not found: {startMarker}");
+        var end = html.IndexOf(endMarker, start, StringComparison.Ordinal);
+        if (end < 0) end = html.Length;
+        return html[start..end];
     }
 
     /// <summary>Initializes a real git repo in the fixture root with two commits by a known author, the second

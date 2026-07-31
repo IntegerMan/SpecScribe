@@ -100,7 +100,11 @@
   // `.ss-hierarchy-sector` is the Story 20.5 component's Plotly sectors opting into this SAME tooltip rather than
   // Plotly's own hover card — one tooltip system site-wide, so the chart engine changing does not change how a
   // tooltip looks. They carry `data-tip-html` (the rich-card path the code map already uses). [Story 20.5]
-  var SEG = ".sb-seg, .heatmap-cell, .donut-seg, .ss-hierarchy-sector";
+  // `.ss-relgraph-node` / `.ss-relgraph-edge` join the same family for Story 24.2's ego coupling graph, for the same
+  // reason and via the same `data-tip-html` path. Routing through the BODY-LEVEL `.ss-tooltip` node also avoids the
+  // CSS `::after` clipping trap: the graph lives inside a chart panel with its own overflow, and a pseudo-element
+  // tooltip would be cut off by it.
+  var SEG = ".sb-seg, .heatmap-cell, .donut-seg, .ss-hierarchy-sector, .ss-relgraph-node, .ss-relgraph-edge";
   // Hover/focus/touch also fire on HTML elements that opt in with .js-tip (rich card/wheel tooltips).
   var HOVER = SEG + ", .js-tip";
 
@@ -2580,6 +2584,526 @@
   initHierarchyExplorers(document);
   document.addEventListener("specscribe:content-swapped", function (e) {
     initHierarchyExplorers(e && e.detail ? e.detail.root : document);
+  });
+
+  /* ==== The relationship graph component [Story 24.2 / ADR 0030] ==============================================
+     A code page's ego coupling graph: the focal file pinned dead-centre, its citing artifacts and most-coupled
+     files on a ring, drawn with the ALREADY-VENDORED Plotly `scatter` trace over a layout the C# side solved at
+     generation time. Marginal bundle cost: zero bytes.
+
+     Three things this block deliberately does NOT do, each an ADR 0030 clause rather than a preference:
+       1. NO client-side force simulation, no iterative solver, no physics. Node position is DATA. It arrives in
+          the island and is drawn; the client never computes one.
+       2. NO re-layout on filtering. The two filters HIDE edges (and the epic hubs those edges connect); every
+          surviving node keeps the exact coordinate it was solved with. Measured in the 24.6 spike at 44-75 ms
+          with nodePositionsMoved:false — which is also what makes a filter feel like a filter and not a redraw.
+       3. NO style derivation. The server resolved every edge to a style CLASS and shipped the table, so the
+          legend, the payload and the drawn chart are physically incapable of disagreeing.
+
+     Progressive enhancement throughout: a missing bundle, a blocked script, a zero-node payload or a throw
+     anywhere below leaves the reader with the server-rendered TEXT TWIN, which is complete, navigable, non-colour
+     and needs no script at all (ADR 0013 §2). */
+  var relGraphMounts = [];
+  var relGraphPending = [];
+
+  // The nearest ancestor that is laid out before any script runs. Same `|| parentNode` fallback the hierarchy
+  // component uses, and for the same reason: the panel hook is opt-in and a call site may omit it.
+  function relGraphPanelOf(root) {
+    return (root.closest && root.closest("[data-relgraph-panel]")) || root.parentNode || root;
+  }
+
+  function initRelationshipGraphs(scope) {
+    var host = scope && scope.querySelectorAll ? scope : document;
+    // Purge instances whose host left the document. The SPA swaps the content region via innerHTML, which detaches
+    // the graph div while `responsive: true` keeps a window listener alive — a naive re-init leaks one per swap.
+    for (var i = relGraphMounts.length - 1; i >= 0; i--) {
+      if (!document.contains(relGraphMounts[i])) {
+        try { if (window.Plotly && Plotly.purge) Plotly.purge(relGraphMounts[i]); } catch (e) { /* already gone */ }
+        var cleanup = relGraphMounts[i].__ssRelGraphCleanup;
+        if (typeof cleanup === "function") { try { cleanup(); } catch (e2) { /* best effort */ } }
+        relGraphMounts.splice(i, 1);
+      }
+    }
+    Array.prototype.forEach.call(host.querySelectorAll("[data-relgraph]"), function (root) {
+      if (root.getAttribute("data-relgraph-ready")) return;
+      // ⚠ THE ZERO-WIDTH MOUNT TRAP. The code page's tabs are pure-CSS radios, so whenever an Insights panel exists
+      // the Relationships panel is `display:none` — zero width — right now. Plotly cannot lay out in a zero-width
+      // container and does not complain: it draws a chart of the wrong size, which looks fine until someone reveals
+      // the panel. MEASURED on the panel, never on the host: the host's own `.ss-relgraph` rule is `display:none`
+      // until this block reveals it, so `root.clientWidth` is zero for every instance at this point.
+      if (!relGraphPanelOf(root).clientWidth) {
+        if (relGraphPending.indexOf(root) === -1) relGraphPending.push(root);
+        return;
+      }
+      try {
+        if (initRelationshipGraph(root)) {
+          root.setAttribute("data-relgraph-ready", "1");
+          relGraphMounts.push(root);
+        } else {
+          // Declined rather than threw (no engine, no island, empty payload) — same outcome for the reader, so
+          // release the boot placeholder now instead of leaving it until the inline script's expiry, and let the
+          // already-rendered text twin be the page.
+          var declined = relGraphPanelOf(root);
+          if (declined && declined.setAttribute) declined.setAttribute("data-relgraph-failed", "1");
+        }
+      } catch (err) {
+        // A throw can land here AFTER Plotly.newPlot already succeeded — the ready flag is set before plotting and
+        // the control wiring runs after it. Marking the panel failed and stopping would leave the instance mounted
+        // but absent from the purge registry (never cleaned on a later swap) with the ready flag still set (re-init
+        // skips this root forever). Unwind properly instead. [the Story 20.5 failure-unwind finding, inherited]
+        unwindRelGraph(root);
+      }
+    });
+    flushRelGraphReveals();
+  }
+
+  function unwindRelGraph(root) {
+    try { if (window.Plotly && Plotly.purge) Plotly.purge(root); } catch (e) { /* nothing plotted */ }
+    root.removeAttribute("data-relgraph-ready");
+    root.style.height = "";
+    var cleanup = root.__ssRelGraphCleanup;
+    if (typeof cleanup === "function") { try { cleanup(); } catch (e) { /* best effort */ } }
+    var panel = relGraphPanelOf(root);
+    if (panel && panel.setAttribute) {
+      panel.removeAttribute("data-relgraph-mounted");
+      panel.setAttribute("data-relgraph-failed", "1");
+    }
+  }
+
+  /* Deferred mounts: hosts that were zero-width when we first reached them. Two things happen on a reveal and only
+     one is a mount — a host never plotted gets its FIRST mount, and a host plotted while visible and since resized
+     gets `Plotly.Plots.resize`, the documented way to re-lay-out a plot whose container changed without a window
+     event. The trigger is ONE delegated listener, never one per pending host: the SPA replaces the content region
+     wholesale and a per-host listener would retain a detached node on every swap. */
+  function flushRelGraphReveals() {
+    var still = [];
+    for (var i = 0; i < relGraphPending.length; i++) {
+      var root = relGraphPending[i];
+      if (!document.contains(root)) continue;              // dropped by an SPA swap — forget it
+      if (root.getAttribute("data-relgraph-ready")) continue;
+      if (!relGraphPanelOf(root).clientWidth) { still.push(root); continue; }
+      try {
+        if (initRelationshipGraph(root)) {
+          root.setAttribute("data-relgraph-ready", "1");
+          relGraphMounts.push(root);
+        }
+      } catch (err) { /* one bad instance must not down the others; the text twin stands */ }
+    }
+    relGraphPending = still;
+
+    for (var j = 0; j < relGraphMounts.length; j++) {
+      var m = relGraphMounts[j];
+      if (!document.contains(m) || !m.clientWidth) continue;
+      try { if (window.Plotly && Plotly.Plots) Plotly.Plots.resize(m); } catch (e) { /* purged */ }
+    }
+  }
+  document.addEventListener("change", function (e) {
+    var t = e && e.target;
+    if (t && t.getAttribute && t.getAttribute("data-relgraph-reveal") !== null) flushRelGraphReveals();
+  });
+
+  function initRelationshipGraph(root) {
+    // No engine, no takeover. Checked first so a blocked or absent bundle costs nothing and changes nothing.
+    if (typeof Plotly === "undefined" || !Plotly.newPlot || !Plotly.restyle) return false;
+
+    var dataEl = document.getElementById(root.id + "-data");
+    if (!dataEl) return false;
+    var payload;
+    try { payload = JSON.parse(dataEl.textContent); } catch (e) { return false; }
+    var cfg = payload && payload.config;
+    var NODES = (payload && payload.nodes) || [];
+    var EDGES = (payload && payload.edges) || [];
+    var STYLES = (payload && payload.styles) || [];
+    if (!cfg || !NODES.length) return false;
+
+    var panel = relGraphPanelOf(root);
+    var live = panel.querySelector(".ss-relgraph-live");
+    var controls = panel.querySelector(".ss-relgraph-controls");
+
+    /* --- Presentation comes from SpecScribe's TOKENS, resolved through the real cascade — never a Plotly colorway
+           (ADR 0012 §6). The payload ships token NAMES; nothing here types a colour, so a theme switch is free and
+           the `--status-*` lifecycle tokens (off-limits on code surfaces) cannot leak in. */
+    function token(name, fallback) {
+      var v = "";
+      try { v = getComputedStyle(root).getPropertyValue(name); } catch (e) { v = ""; }
+      v = (v || "").trim();
+      return v || fallback;
+    }
+    var ink = token(cfg.tokens.ink, "#333");
+    var palette = {
+      focal: token(cfg.tokens.focal, "#b8860b"),
+      artifact: token(cfg.tokens.artifact, "#b8860b"),
+      epic: token(cfg.tokens.epic, "#333"),
+      coupled: token(cfg.tokens.coupled, "#777"),
+      surface: token(cfg.tokens.surface, "#fff"),
+      border: token(cfg.tokens.border, "#ccc")
+    };
+
+    // Shape carries node kind, never hue alone (UX-DR17) — and it is the same vocabulary the retired SVG used, so
+    // a returning reader is not re-taught the graph (owner decision D1).
+    var SYMBOL = { focal: "square", artifact: "circle", epic: "square-open", coupled: "diamond" };
+    var FILL = { focal: palette.focal, artifact: palette.artifact, epic: palette.epic, coupled: palette.coupled };
+
+    /* --- The per-KIND table: which filter governs an edge of each kind, and the phrase describing it. Both are
+           properties of the kind, so the server ships one row per kind instead of two fields on every edge —
+           measured, not guessed: the fully-composed form put one real code page's island at 55,012 B, 56% of it
+           cross-edge sentences re-spelling paths already in the node array. */
+    var KINDS = {};
+    ((cfg.kinds) || []).forEach(function (k) { KINDS[k.k] = k; });
+
+    // The wording is entirely SERVER-authored; this substitutes two values it already holds into it. That is a
+    // different thing from the client inventing prose, and it is what keeps one phrase in one language.
+    function edgeText(e) {
+        if (e.t) return e.t;
+        var k = KINDS[e.e];
+        if (!k || !k.phrase) return "";
+        var a = NODES[e.a], b = NODES[e.b];
+        if (!a || !b) return "";
+        return k.phrase.replace("{a}", a.p).replace("{b}", b.p);
+    }
+
+    /* --- Filter state. Owner decision D3: BOTH toggles survive as edge-visibility filters over the ONE solved
+           layout. Unchecked by default, matching the retired pure-CSS toggles' default. */
+    var filters = { epic: false, cross: false };
+
+    function edgeFilter(e) { var k = KINDS[e.e]; return k ? k.f : null; }
+    function edgeVisible(e) { var f = edgeFilter(e); return !f || filters[f] === true; }
+    // An epic hub is drawn only while its own filter is on: hiding its edges but keeping the chip would leave a
+    // disconnected node floating with nothing to say. Hiding a node is not re-laying-out — every node that DOES
+    // survive keeps its solved coordinate, which is the ADR 0030 §4 invariant.
+    function nodeVisible(n) { return n.k !== "epic" || filters.epic === true; }
+
+    /* --- Edge traces, grouped by the server's style class. THIS IS THE PLOTLY CONSTRAINT, MADE VISIBLE: `line` is
+           a TRACE-level attribute, so per-edge dash/width is only reachable by one trace per style class — which is
+           exactly why stroke width is BANDED and why the legend says so (ADR 0030 §5). Within a trace, segments are
+           separated by a null vertex so one trace draws many disjoint lines. */
+    var styleIndex = {};
+    STYLES.forEach(function (s, i) { styleIndex[s.k] = i; });
+
+    function edgeCoords() {
+      var xs = [], ys = [], members = [];
+      for (var i = 0; i < STYLES.length; i++) { xs.push([]); ys.push([]); members.push([]); }
+      for (var e = 0; e < EDGES.length; e++) {
+        var edge = EDGES[e];
+        if (!edgeVisible(edge)) continue;
+        var a = NODES[edge.a], b = NODES[edge.b];
+        if (!a || !b || !nodeVisible(a) || !nodeVisible(b)) continue;
+        var t = styleIndex[edge.s];
+        if (t === undefined) continue;
+        xs[t].push(+a.x, +b.x, null);
+        ys[t].push(+a.y, +b.y, null);
+        members[t].push(e);
+      }
+      return { xs: xs, ys: ys, members: members };
+    }
+
+    var edgeGeom = edgeCoords();
+    var edgeTraces = STYLES.map(function (s, i) {
+      return {
+        type: "scatter", mode: "lines", x: edgeGeom.xs[i], y: edgeGeom.ys[i],
+        hoverinfo: "skip", showlegend: false, name: s.k,
+        line: { color: token(s.tok, palette.coupled), width: s.w, dash: s.dash }
+      };
+    });
+
+    /* --- Per-edge hover needs its own invisible midpoint trace: a `lines` trace hovers on VERTICES, not segments.
+           Recorded in ADR 0030 as a real cost of this engine choice rather than hidden behind a working tooltip. */
+    function midpoints() {
+      var x = [], y = [], members = [];
+      for (var e = 0; e < EDGES.length; e++) {
+        var edge = EDGES[e];
+        if (!edgeVisible(edge)) continue;
+        var a = NODES[edge.a], b = NODES[edge.b];
+        if (!a || !b || !nodeVisible(a) || !nodeVisible(b)) continue;
+        x.push((+a.x + +b.x) / 2);
+        y.push((+a.y + +b.y) / 2);
+        members.push(e);
+      }
+      return { x: x, y: y, members: members };
+    }
+    var midGeom = midpoints();
+    var midTrace = {
+      type: "scatter", mode: "markers", x: midGeom.x, y: midGeom.y,
+      marker: { size: 9, opacity: 0.001, color: ink },
+      hoverinfo: "skip", showlegend: false, name: "edge-midpoints"
+    };
+
+    /* --- Nodes: ONE trace, per-point size / colour / SYMBOL. `marker.symbol` accepts an array, which is the
+           non-colour channel available for a node. */
+    var maxWeight = Math.max(1, +cfg.maxWeight || 1);
+    function nodeGeom() {
+      var g = { x: [], y: [], size: [], color: [], symbol: [], members: [] };
+      for (var i = 0; i < NODES.length; i++) {
+        var n = NODES[i];
+        if (!nodeVisible(n)) continue;
+        g.x.push(+n.x);
+        g.y.push(+n.y);
+        // The hub takes a FIXED size, above the ring's whole range: it is what the graph is about, not a
+        // participant in the ranking, and the server excludes it from `maxWeight` for the same reason. Ring
+        // markers use sqrt so AREA tracks weight rather than radius — a 4x weight must not read as a 16x blob.
+        // The 9..24 px band is bounded by RING DENSITY, not by taste: at the D2 caps the innermost arc gives each
+        // coupled marker ~28 px of room, and a band topping out at 30 px overlapped its neighbours on the live
+        // page. Widening it again means widening the ring (RelationshipGraph.Size) in the same change.
+        g.size.push(n.k === "focal" ? 30 : 9 + 15 * Math.sqrt(Math.min(1, (+n.w || 1) / maxWeight)));
+        g.color.push(FILL[n.k] || palette.coupled);
+        g.symbol.push(SYMBOL[n.k] || "circle");
+        g.members.push(i);
+      }
+      return g;
+    }
+    var nGeom = nodeGeom();
+    var nodeTrace = {
+      type: "scatter", mode: "markers", x: nGeom.x, y: nGeom.y,
+      marker: { size: nGeom.size, color: nGeom.color, symbol: nGeom.symbol, line: { width: 1.5, color: palette.surface } },
+      hoverinfo: "skip", showlegend: false, name: "nodes"
+    };
+    // Which payload node each drawn point IS. Recomputed on every filter so the a11y layer never stamps a label
+    // onto the wrong marker after the epic hubs come and go.
+    var drawnNodes = nGeom.members;
+    var drawnEdges = midGeom.members;
+
+    var layout = {
+      margin: { l: 6, r: 6, t: 6, b: 6 },
+      // The aspect lock anchors X TO Y, not the other way round, and that direction is load-bearing. The panel is
+      // wide and short (measured 886x420), so anchoring y to x makes Plotly SHRINK the y range to match x's
+      // px-per-unit — 1.16 units over 886px is 764 px/unit, which leaves y showing only 0.55 units, and every node
+      // outside 0.225..0.775 is drawn beyond the visible box. Observed live as a 618px vertical spread inside a
+      // 420px host. Anchoring x to y keeps the SHORT axis whole and widens x instead, so the whole unit square is
+      // visible and the ring stays a circle rather than an ellipse.
+      xaxis: { visible: false, range: [-0.08, 1.08], scaleanchor: "y", fixedrange: true },
+      yaxis: { visible: false, range: [-0.08, 1.08], fixedrange: true },
+      paper_bgcolor: "rgba(0,0,0,0)",
+      plot_bgcolor: "rgba(0,0,0,0)",
+      font: { color: ink },
+      showlegend: false,
+      hovermode: false,
+      dragmode: false
+    };
+    var CONFIG = { displaylogo: false, displayModeBar: false, responsive: true, scrollZoom: false, doubleClick: false };
+
+    /* --- Reading order. The story's spike recommended degree-desc for a WHOLE-REPO graph; here the requirement it
+           serves — "twin and graph must agree" — is met more exactly by the server's own emission order, because
+           that order IS the twin's: citing artifacts in the twin's first section, then the coupled files in the
+           twin's confidence-desc sub-list (Story 24.1 Q4). Deriving a degree ranking client-side would put a
+           high-degree coupled file ahead of the citers and DISAGREE with the listing directly underneath it. So the
+           rove order is the payload order, filtered to what is drawn — never the DOM order Plotly happens to emit. */
+    var focusIndex = 0;
+
+    function announce(msg) { if (live) live.textContent = msg; }
+
+    function nodePaths() {
+      var traces = root.querySelectorAll("g.scatterlayer g.trace");
+      var group = traces[traces.length - 1];
+      return group ? group.querySelectorAll("path.point") : [];
+    }
+
+    function applyA11yLayer() {
+      var svg = root.querySelector("svg.main-svg");
+      if (svg) {
+        Array.prototype.forEach.call(root.querySelectorAll("svg"), function (s) {
+          s.setAttribute("role", "presentation");
+        });
+      }
+      // The graphics role lives on the HOST, not on Plotly's <svg>: the markers are nested inside presentational
+      // <g> wrappers, so a role on the <svg> would put wrappers between the document and its items.
+      root.setAttribute("role", "application");
+      root.setAttribute("aria-roledescription", "relationship graph");
+      root.setAttribute("aria-label",
+        (cfg.title || "Relationships") + " — " + drawnNodes.length + " items, " + drawnEdges.length + " connections");
+
+      var pts = nodePaths();
+      // Clamp the roving index on EVERY reapply. Story 20.4's sixth finding was an unclamped roving index leaving
+      // the chart Tab-unreachable after the node count shrank — and this component SHRINKS its node count every
+      // time the epic filter is switched off, so the failure is reachable here, not hypothetical.
+      if (focusIndex >= drawnNodes.length) focusIndex = drawnNodes.length ? drawnNodes.length - 1 : 0;
+      if (focusIndex < 0) focusIndex = 0;
+
+      for (var i = 0; i < pts.length; i++) {
+        var el = pts[i];
+        var n = NODES[drawnNodes[i]];
+        if (!n) continue;
+        el.setAttribute("role", n.h ? "link" : "img");
+        el.setAttribute("tabindex", i === focusIndex ? "0" : "-1");
+        // Prose composed SERVER-side, so the accessible name, the tooltip and the twin's row are one string in one
+        // language and cannot drift apart.
+        el.setAttribute("aria-label", n.t);
+        el.setAttribute("data-tip-html", escapeTip(n.t));
+        el.setAttribute("data-relgraph-index", String(i));
+        if (n.h) el.setAttribute("data-relgraph-href", n.h);
+        else el.removeAttribute("data-relgraph-href");
+        if (el.classList) el.classList.add("ss-relgraph-node");
+        if (!el.__ssRelBound) {
+          el.__ssRelBound = true;
+          el.addEventListener("keydown", onNodeKeydown);
+          el.addEventListener("click", onNodeClick);
+          el.addEventListener("focus", onNodeFocus);
+        }
+      }
+
+      // Edge midpoints carry the edge's own text. Plotly emits the midpoint trace immediately before the node
+      // trace, so it is addressed by position from the END rather than by an absolute index that would shift as
+      // style classes come and go.
+      var traces = root.querySelectorAll("g.scatterlayer g.trace");
+      var midGroup = traces.length >= 2 ? traces[traces.length - 2] : null;
+      if (midGroup) {
+        var mids = midGroup.querySelectorAll("path.point");
+        for (var m = 0; m < mids.length; m++) {
+          var edge = EDGES[drawnEdges[m]];
+          if (!edge) continue;
+          var text = edgeText(edge);
+          mids[m].setAttribute("role", "img");
+          mids[m].setAttribute("aria-label", text);
+          mids[m].setAttribute("data-tip-html", escapeTip(text));
+          if (mids[m].classList) mids[m].classList.add("ss-relgraph-edge");
+        }
+      }
+    }
+
+    // `data-tip-html` is injected as markup by the shared tooltip, and these strings carry repository paths — which
+    // are author-controlled text. Escaped here rather than trusted.
+    function escapeTip(s) {
+      return String(s == null ? "" : s)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    function onNodeFocus(ev) {
+      var idx = ev.currentTarget.getAttribute("data-relgraph-index");
+      if (idx !== null) focusIndex = +idx;
+    }
+
+    function focusAt(i) {
+      var pts = nodePaths();
+      if (!pts.length) return;
+      focusIndex = ((i % pts.length) + pts.length) % pts.length;
+      for (var j = 0; j < pts.length; j++) pts[j].setAttribute("tabindex", j === focusIndex ? "0" : "-1");
+      pts[focusIndex].focus();
+      announce(pts[focusIndex].getAttribute("aria-label") || "");
+    }
+
+    // Mode is `navigate` (ADR 0012 §3): activating a node follows its href to that file's or artifact's own page.
+    // `select` mode and a details pane are not in scope; if one is ever wanted it must ride the SHIPPED
+    // `specscribe:explorer-select` seam, never a parallel event (ADR 0030 §1).
+    function activate(el) {
+      var href = el.getAttribute("data-relgraph-href");
+      if (!href) { announce(el.getAttribute("aria-label") || ""); return; }
+      window.location.href = href;
+    }
+
+    function onNodeClick(ev) { activate(ev.currentTarget); }
+
+    function onNodeKeydown(ev) {
+      if (ev.key === "ArrowRight" || ev.key === "ArrowDown") { ev.preventDefault(); focusAt(focusIndex + 1); }
+      else if (ev.key === "ArrowLeft" || ev.key === "ArrowUp") { ev.preventDefault(); focusAt(focusIndex - 1); }
+      else if (ev.key === "Home") { ev.preventDefault(); focusAt(0); }
+      else if (ev.key === "End") { ev.preventDefault(); focusAt(-1); }
+      else if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); activate(ev.currentTarget); }
+      else if (ev.key === "Escape") { ev.preventDefault(); root.blur(); hideTip(); }
+    }
+
+    /* --- The two filters. They RESTYLE — they never re-plot and never re-lay-out. Positions are data; a filter
+           changes which of them are drawn, not what they are (ADR 0030 §4). */
+    function applyFilters() {
+      var eg = edgeCoords();
+      var mg = midpoints();
+      var ng = nodeGeom();
+      drawnNodes = ng.members;
+      drawnEdges = mg.members;
+      // The NODE trace's geometry and its marker arrays go in ONE call. Splitting them left a window in which the
+      // trace held 40 positions and 35 marker entries, and `plotly_afterplot` fires inside that window — so the
+      // a11y layer could stamp labels against a DOM that had not caught up, mapping a node's accessible name onto
+      // a different node's marker. Observed live as "20 survivors moved" on a filter toggle; the settled state was
+      // correct both before and after, which is exactly why only a live pass could see it.
+      Plotly.restyle(root, {
+        x: [ng.x], y: [ng.y],
+        "marker.size": [ng.size], "marker.color": [ng.color], "marker.symbol": [ng.symbol]
+      }, [STYLES.length + 1]);
+
+      var xs = [], ys = [], idx = [];
+      for (var i = 0; i < STYLES.length; i++) { xs.push(eg.xs[i]); ys.push(eg.ys[i]); idx.push(i); }
+      xs.push(mg.x); ys.push(mg.y); idx.push(STYLES.length);
+      Plotly.restyle(root, { x: xs, y: ys }, idx);
+      announce(drawnNodes.length + " items and " + drawnEdges.length + " connections shown");
+    }
+
+    if (controls) {
+      // Revealed only NOW, because both filters need script: the server ships the bar [hidden] precisely so a
+      // JS-off, webview, SPA or engine-blocked reader never sees two checkboxes that do nothing. Caught in the live
+      // pass — the bar stayed hidden after a successful mount, which is the mirror-image failure and just as
+      // invisible to the suite: every assertion about the `hidden` attribute passed, because emitting it hidden was
+      // never the half that was missing.
+      controls.hidden = false;
+      Array.prototype.forEach.call(controls.querySelectorAll("[data-relgraph-filter]"), function (input) {
+        var key = input.getAttribute("data-relgraph-filter");
+        filters[key] = !!input.checked;
+        input.addEventListener("change", function () {
+          filters[key] = !!input.checked;
+          applyFilters();
+          // `plotly_afterplot` fires for the restyle, so the a11y layer re-applies itself and the roving index is
+          // re-clamped against the new count. Nothing here calls applyA11yLayer directly.
+        });
+      });
+    }
+
+    root.style.height = (+cfg.size || 420) + "px";
+
+    /* `Plotly.newPlot` returns a promise. A SYNCHRONOUS throw lands in the catch below; an ASYNCHRONOUS rejection
+       would sail straight past it, leaving the component reporting a successful mount over an empty panel. Both
+       routes must reach the same failure exit. [inherited from the Story 20.5 review] */
+    try {
+      var plotted = Plotly.newPlot(root, edgeTraces.concat([midTrace, nodeTrace]), layout, CONFIG);
+      if (plotted && typeof plotted.catch === "function") plotted.catch(function () { unwindRelGraph(root); });
+    } catch (e) {
+      root.style.height = "";
+      return false;
+    }
+
+    /* The a11y layer is applied ONLY through `plotly_afterplot`, Plotly's public post-render event, over its
+       emitted DOM. No Plotly internal is patched. Two reasons for that hook and not the promise `newPlot` returns:
+         1. it is the only hook that ALSO fires for re-renders this component did not initiate (a responsive resize,
+            a host-driven relayout, a bare `Plotly.react`) — which is what "the layer survives" has to mean;
+         2. Plotly resolves its own promises off an animation frame, so awaiting one never settles in a
+            non-compositing tab. Measured in the 24.6 spike, not assumed. */
+    if (root.on) root.on("plotly_afterplot", function () { applyA11yLayer(); });
+    applyA11yLayer();
+
+    // Already-mounted hosts whose container later changes size. `responsive: true` refits on a WINDOW resize only,
+    // so a CSS-only reveal (switching tabs) leaves the plot at whatever width it was drawn with.
+    var sizeTimer = null;
+    function onViewportResize() {
+      if (sizeTimer) clearTimeout(sizeTimer);
+      sizeTimer = setTimeout(function () {
+        if (!document.contains(root)) return;
+        try { Plotly.Plots.resize(root); } catch (e) { /* purged */ }
+      }, 150);
+    }
+    window.addEventListener("resize", onViewportResize);
+
+    // Everything this instance attached OUTSIDE its own subtree, in one place. The purge loop calls it when the SPA
+    // detaches the host: `Plotly.purge` releases Plotly's OWN listener, but this one is ours and it closes over the
+    // whole payload.
+    root.__ssRelGraphCleanup = function () {
+      window.removeEventListener("resize", onViewportResize);
+      if (sizeTimer) clearTimeout(sizeTimer);
+    };
+
+    // The legend is revealed on the SAME successful mount, and outside the `if (controls)` block above because an
+    // instance can have a legend and no filters at all (a citations-only card). It ships `hidden` because a legend
+    // describes a CHART: with JS off the text twin carries the information, and a key to a picture nobody can see
+    // is chrome for nothing. Same convention the hierarchy component's legend bar already follows.
+    var legend = panel.querySelector(".ss-relgraph-legend");
+    if (legend) legend.hidden = false;
+    var legendNote = panel.querySelector(".ss-relgraph-legend-note");
+    if (legendNote) legendNote.hidden = false;
+
+    // Ends the boot placeholder and disarms the inline script's expiry timer.
+    panel.setAttribute("data-relgraph-mounted", "1");
+    announce("Relationship graph ready: " + drawnNodes.length + " items");
+    return true;
+  }
+
+  initRelationshipGraphs(document);
+  document.addEventListener("specscribe:content-swapped", function (e) {
+    initRelationshipGraphs(e && e.detail ? e.detail.root : document);
   });
 
   // ---- Remaining-work sunburst explorer [Story 20.2] -> RETIRED by Story 20.7 ----------------

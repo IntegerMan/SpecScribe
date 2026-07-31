@@ -87,9 +87,9 @@ public class SiteGeneratorCodeCitationTests : IDisposable
         Generate();
 
         var html = File.ReadAllText(CodePage);
-        // The relationships block (graph + accessible list) is the hero of the code page.
+        // The relationships block (graph component + accessible list) is the hero of the code page.
         Assert.Contains("code-relationships", html);
-        Assert.Contains("class=\"ref-graph\"", html);
+        Assert.Contains("data-relgraph", html);
         // Both citing docs are listed with meaningful (title) link text back to their pages.
         Assert.Contains("Engineering Notes", html);
         Assert.Contains("Other Doc", html);

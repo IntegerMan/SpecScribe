@@ -565,7 +565,10 @@ public static class GitMetrics
     /// the two bounds are independent and may drift; that's expected, not a bug), which stays on its own
     /// bounded window regardless of <c>--deep-git</c> so the FR-10 performance gate never depends on this
     /// heavier fetch. [Story 3.2]</summary>
-    public static DeepGitPulse? TryComputeDeep(string repoRoot)
+    /// <param name="coupledCap">Forwarded to <see cref="ParseNumstatLog"/> — see its remarks. The site generator
+    /// passes <see cref="RelationshipGraphCoupledCap"/> because the code page's relationship surface is this
+    /// list's richest consumer; the default keeps every other caller unchanged. [Story 24.2]</param>
+    public static DeepGitPulse? TryComputeDeep(string repoRoot, int coupledCap = FileInsightCoupledCap)
     {
         try
         {
@@ -582,7 +585,7 @@ public static class GitMetrics
                 "log --numstat --date=format:%Y-%m-%dT%H:%M --pretty=format:%x01%H%x1f%an%x1f%ad%x1f%s%x1f%b%x1f -n 300");
             if (logText is null) return null;
 
-            return ParseNumstatLog(logText);
+            return ParseNumstatLog(logText, coupledCap: coupledCap);
         }
         catch
         {
@@ -601,8 +604,13 @@ public static class GitMetrics
     /// (<see cref="DeepGitPulse.Insights"/>) computed from the same parsed records. [Story 3.8]</para>
     /// Pure and repo-free (mirrors <see cref="ParseLog"/>) so the format contract is unit-testable; malformed
     /// lines are skipped rather than throwing.</summary>
+    /// <param name="coupledCap">How many coupled files each <see cref="FileInsight.CoupledFiles"/> list keeps.
+    /// Threaded here exactly as Story 24.1 threaded <paramref name="minSupport"/> — one optional parameter with a
+    /// default, no new CLI flag — so the code page's relationship surface can ask for
+    /// <see cref="RelationshipGraphCoupledCap"/> without a second git call or a second commit scan. [Story 24.2]</param>
     public static DeepGitPulse ParseNumstatLog(
-        string logText, int topHotspots = 10, int topCoupling = 10, int minSupport = CouplingMinSupport)
+        string logText, int topHotspots = 10, int topCoupling = 10, int minSupport = CouplingMinSupport,
+        int coupledCap = FileInsightCoupledCap)
     {
         var changeCounts = new Dictionary<string, int>();
         // Canonicalized (ordinal-ordered) file pair -> number of commits changing both together.
@@ -657,7 +665,7 @@ public static class GitMetrics
             .Select(kv => (kv.Key.Item1, kv.Key.Item2, kv.Value))
             .ToList();
 
-        var fileInsights = BuildFileInsights(commits, out var coChangePairs, minSupport: minSupport);
+        var fileInsights = BuildFileInsights(commits, out var coChangePairs, coupledCap: coupledCap, minSupport: minSupport);
         return new DeepGitPulse(hotspots, coupling, AnalyzedCommits: commits.Count)
         {
             Insights = BuildInsights(commits),
@@ -922,8 +930,24 @@ public static class GitMetrics
     private const int FileInsightContributorCap = 8;
 
     /// <summary>Coupled files shown per file (the files it most often changes alongside). Bounded for the same
-    /// reason the hub's coupling is capped — a scannable "changes with" list, not every co-change ever. [Story 7.4]</summary>
+    /// reason the hub's coupling is capped — a scannable "changes with" list, not every co-change ever. [Story 7.4]
+    /// <para>Left at 8 by Story 24.2 (owner decision D2): it stays the default for any caller that does not ask for
+    /// more. The code page's relationship surface asks, via <see cref="RelationshipGraphCoupledCap"/>.</para></summary>
     private const int FileInsightCoupledCap = 8;
+
+    /// <summary>Coupled files carried to the code page's <em>relationship surface</em> — the Story 24.2 ego graph,
+    /// its sr-only text twin, and the two index-aligned cross-edge builders, which are three consumers of ONE
+    /// population and must move together (ADR 0013 §2: no fact may exist only inside the chart).
+    ///
+    /// <para><b>Why 20 and not "all".</b> The uncapped one-hop ego neighbourhood on this repository measures 360
+    /// nodes / 4,782 edges / 449,346 B — never shippable per code page. Story 24.6 measured top-20 at 21 nodes /
+    /// 210 edges / <b>20,253 B</b>, which is what Story 23.1's already-accepted sunburst island costs (20,915 B).
+    /// Owner decision D2 took that number.</para>
+    ///
+    /// <para>This is a <c>Take</c> bound on the already-computed, already-support-floored, already-confidence-sorted
+    /// list <see cref="BuildFileInsights"/> produces — never a second git call or a second commit scan.</para>
+    /// [Story 24.2 D2]</summary>
+    public const int RelationshipGraphCoupledCap = 20;
 
     /// <summary>Display abbreviation length for a commit's <c>%H</c> hash in a file's change history (git's default
     /// floor). The per-commit page guard (Story 7.5) matches this prefix against the full-hash page map. [Story 7.4]</summary>

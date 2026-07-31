@@ -4408,7 +4408,13 @@ public sealed class SiteGenerator
         // Deep git analytics are strictly opt-in: when the flag is off this ternary short-circuits so
         // TryComputeDeep — and its extra git process — never runs, and baseline generation timing cannot
         // regress. That gate IS the FR-10 performance guarantee (AC #1). [Story 3.2]
-        var deepGit = _options.DeepGitAnalytics ? GitMetrics.TryComputeDeep(_options.RepoRoot) : null;
+        // coupledCap: the per-file coupled list feeds the code page's relationship surface — graph, sr-only text
+        // twin and both index-aligned cross-edge builders — and ADR 0013 §2 requires the twin to be COMPLETE, so
+        // all three move together at the graph's cap rather than the graph outrunning its own text equivalent.
+        // Still ONE git call and ONE commit scan: this is a Take bound on an already-computed list. [Story 24.2 D2]
+        var deepGit = _options.DeepGitAnalytics
+            ? GitMetrics.TryComputeDeep(_options.RepoRoot, GitMetrics.RelationshipGraphCoupledCap)
+            : null;
         return ProgressCalculator.Compute(model, artifactsById, gitPulse, deepGit);
     }
 
