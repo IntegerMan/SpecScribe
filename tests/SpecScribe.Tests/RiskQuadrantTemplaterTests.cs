@@ -29,7 +29,7 @@ public class RiskQuadrantTemplaterTests
     [Fact]
     public void RenderPage_AboveThreshold_HasShellChartAndTheElevatedGrid()
     {
-        var html = RiskQuadrantTemplater.RenderPage(MapAboveThreshold(), Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(RiskQuadrantTemplater.BuildPage(MapAboveThreshold(), Nav()));
 
         Assert.Contains("<main id=\"main-content\"", html);
         Assert.Contains("class=\"breadcrumb\"", html);
@@ -55,7 +55,7 @@ public class RiskQuadrantTemplaterTests
                 ["src/B.cs"] = new CodeFileMetrics(2, 20, null, null),
             });
 
-        var html = RiskQuadrantTemplater.RenderPage(thin, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(RiskQuadrantTemplater.BuildPage(thin, Nav()));
 
         Assert.Contains("Refactor-Target Risk Quadrant", html);
         Assert.Contains("chart-empty", html);
@@ -81,7 +81,7 @@ public class RiskQuadrantTemplaterTests
                 ["src/F.cs"] = new CodeFileMetrics(3, 30, null, null),
             });
 
-        var html = RiskQuadrantTemplater.RenderPage(uniform, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(RiskQuadrantTemplater.BuildPage(uniform, Nav()));
 
         Assert.Contains("<svg class=\"risk-quadrant\"", html); // the chart itself is live (6 files, at threshold)
         Assert.Contains("No files currently fall in the high-churn, high-size quadrant.", html);
@@ -91,11 +91,11 @@ public class RiskQuadrantTemplaterTests
     [Fact]
     public void RenderPage_GridLinksAFileOnlyWhenTheResolverReturnsATarget()
     {
-        var linked = RiskQuadrantTemplater.RenderPage(MapAboveThreshold(), Nav(),
-            fileHref: p => p == "src/BigHot.cs" ? "code/src/BigHot.cs.html" : null);
+        var linked = JsonSpaRenderAdapter.Shared.RenderContent(RiskQuadrantTemplater.BuildPage(MapAboveThreshold(), Nav(),
+            fileHref: p => p == "src/BigHot.cs" ? "code/src/BigHot.cs.html" : null));
         Assert.Contains("<a href=\"code/src/BigHot.cs.html\">src/BigHot.cs</a>", linked);
 
-        var plain = RiskQuadrantTemplater.RenderPage(MapAboveThreshold(), Nav(), fileHref: null);
+        var plain = JsonSpaRenderAdapter.Shared.RenderContent(RiskQuadrantTemplater.BuildPage(MapAboveThreshold(), Nav(), fileHref: null));
         Assert.DoesNotContain("code/src/BigHot.cs.html", plain);
         Assert.Contains("src/BigHot.cs", plain); // still listed, just not linked
     }
@@ -104,7 +104,7 @@ public class RiskQuadrantTemplaterTests
     public void RenderPage_GridItemsCarryMetaTextButNoRankNumber()
     {
         // Review-pass owner feedback: the numeric rank isn't valuable information — dropped entirely.
-        var html = RiskQuadrantTemplater.RenderPage(MapAboveThreshold(), Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(RiskQuadrantTemplater.BuildPage(MapAboveThreshold(), Nav()));
 
         Assert.DoesNotContain("risk-grid-rank", html);
         Assert.Contains("5,000 lines", html);
@@ -118,7 +118,7 @@ public class RiskQuadrantTemplaterTests
         // Review-pass owner feedback: pager controls belong at the bottom of the list they page, not floating
         // above it. specscribe.js's initRiskGridPager locates the pager via grid.nextElementSibling, so document
         // order is load-bearing, not just cosmetic.
-        var html = RiskQuadrantTemplater.RenderPage(MapAboveThreshold(), Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(RiskQuadrantTemplater.BuildPage(MapAboveThreshold(), Nav()));
 
         var gridIndex = html.IndexOf("class=\"risk-grid\"", StringComparison.Ordinal);
         var pagerIndex = html.IndexOf("class=\"risk-pager\"", StringComparison.Ordinal);

@@ -823,15 +823,24 @@ public class SiteGeneratorSpaTests : IDisposable
         Assert.DoesNotContain(gen.RenderSpaBundle().Pages, p => p.OutputRelativePath == "adrs/index.html");
     }
 
+    /// <summary>⚠️ INVERTED by Story 23.6 AC #6, and the inversion is the point.
+    /// <para>This test used to be <c>WithoutSpa_EmitsNoSpaFilesAtAll</c> and asserted the opposite: with
+    /// <c>--spa</c> off, not one IR artifact was written. That was correct while C# also wrote a <c>.html</c>
+    /// per page. It no longer does — the IR is the canonical output (ADR 0016) and the static pages are
+    /// rendered FROM it (ADR 0022 §Decision 3) — so a run that emitted no IR would emit nothing at all.</para>
+    /// <para>Kept rather than deleted, and kept as an ASSERTION rather than a comment, because "the IR is
+    /// always there" is now the load-bearing guarantee between the user and an empty output root. The
+    /// <c>spa: false</c> argument is passed deliberately: it proves the retired flag cannot suppress the IR
+    /// even when a caller still sets it.</para></summary>
     [Fact]
-    public void WithoutSpa_EmitsNoSpaFilesAtAll()
+    public void TheIrIsEmittedUnconditionally_EvenWhenTheRetiredSpaFlagIsOff()
     {
         GeneratedSite(spa: false);
 
-        // AC #3: opt-in. With the flag off, not one SPA artifact is written — the default generation is untouched.
-        Assert.False(File.Exists(Path.Combine(Site, SpaDelivery.EntryFileName)));
-        Assert.False(File.Exists(Path.Combine(Site, SpaDelivery.ScriptName)));
-        Assert.False(Directory.Exists(Path.Combine(Site, SpaDelivery.ChunkDir)));
+        Assert.True(File.Exists(Path.Combine(Site, SpaDelivery.EntryFileName)));
+        Assert.True(File.Exists(Path.Combine(Site, SpaDelivery.ScriptName)));
+        Assert.True(Directory.Exists(Path.Combine(Site, SpaDelivery.ChunkDir)));
+        Assert.True(File.Exists(Path.Combine(Site, SpaDelivery.ManifestPath)));
     }
 
     [Fact]
@@ -1083,15 +1092,27 @@ public class SiteGeneratorSpaTests : IDisposable
                 .Select(p => PathUtil.NormalizeSlashes(Path.GetRelativePath(Site, p))));
     }
 
-    /// <summary>The gate is the SIDECAR SWITCH, not <c>--spa</c>: a generator with the switch on but no
-    /// <c>--spa</c> emits no IR at all, so there is nothing to diff and nothing to write.</summary>
+    /// <summary>The gate is the SIDECAR SWITCH and nothing else — re-pointed by Story 23.6 AC #6.
+    /// <para>This asserted that a generator with the switch ON but <c>--spa</c> off wrote no delta, on the
+    /// grounds that it "emits no IR at all, so there is nothing to diff". That reasoning is void: the IR is now
+    /// emitted unconditionally, so there IS something to diff on every run. The assertion that still matters —
+    /// and the one NFR9 depends on — is the converse: <c>--spa</c> being off must not be what keeps the delta
+    /// out, because a one-shot <c>generate</c> has to stay byte-reproducible and the delta carries a wall
+    /// clock. So this now pins the switch as the ONLY gate, in both directions.</para></summary>
     [Fact]
-    public void DeltaSidecar_WritesNothing_WhenSpaIsOff()
+    public void DeltaSidecar_IsGatedOnTheSwitchAlone_NotOnTheRetiredSpaFlag()
     {
-        var gen = new SiteGenerator(Options(spa: false)) { EmitDeltaSidecar = true };
-        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+        // Switch OFF, retired flag off: no delta, because the SWITCH is off.
+        var oneShot = new SiteGenerator(Options(spa: false));
+        Assert.DoesNotContain(oneShot.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+        Assert.False(File.Exists(DeltaFile), "a one-shot generate must write no delta — NFR9 byte-reproducibility.");
 
-        Assert.False(File.Exists(DeltaFile));
+        // Switch ON, retired flag still off: the delta IS written. Before Story 23.6 this produced nothing, and
+        // the reason was the IR being absent rather than the switch — a gate that agreed with the intended
+        // behaviour for the wrong reason.
+        var watching = new SiteGenerator(Options(spa: false)) { EmitDeltaSidecar = true };
+        Assert.DoesNotContain(watching.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+        Assert.True(File.Exists(DeltaFile));
     }
 
     /// <summary>AC #7's first degrade condition, made real rather than dead code: the first emit of a watch

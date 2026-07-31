@@ -1,6 +1,16 @@
 # ADR 0033: Content-drift gates are targeted and regenerable, not whole-tree fingerprints
 
 - **Status:** Proposed
+  - ⏫ **Ratification to `Accepted` PROPOSED by [Story 23.6](../../_bmad-output/implementation-artifacts/23-6-retire-the-c-sharp-html-writer.md) (2026-07-31)**, which is its first
+    implementation: `npm run check:parity` satisfies §Decision 1 (a failure names the page), §Decision 2 (the
+    corpus is FROZEN, so a sibling story elsewhere cannot turn it red), §Decision 3 (`npm run pin:parity` is a
+    command producing a reviewable per-route diff), §Decision 4 (determinism proven across 3 local runs, with the
+    Ubuntu half wired into `portability-probe`), and §Decision 5 (three loudness gates, all negative-tested).
+    ⚠️ **One amendment is requested with it**: §Decision's "reference implementation" names
+    `web/measurements/parity.json`, and Story 23.6 measured that oracle's shape to be **vacuous** — `goldenSha`,
+    `irSha` and `nuxtSha` are IDENTICAL on all 1,469 rows, so reading the committed value back asks the same
+    question the live run already answers. The reference implementation should be re-pointed at the pinned
+    corpus. Ratification is the owner's; this line is the proposal, not the act.
 - **Date:** 2026-07-30
 - **Deciders:** Owner (Matt Eland)
 - **Context story:** [Story 23.4](../../_bmad-output/implementation-artifacts/23-4-migrate-remaining-surfaces-retire-c-sharp-html-adapter.md)

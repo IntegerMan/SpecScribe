@@ -221,7 +221,8 @@ public class RetroTests : IDisposable
         };
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
 
-        var html = RetroTemplater.RenderPage(retro, epics, nav);
+        var page = RetroTemplater.BuildPage(retro, epics, nav);
+        var html = RegionAssert.Of(page);
 
         Assert.Contains("class=\"story-kicker\">Epic 1 Retrospective</div>", html);
         // The h1 drops the redundant "Epic 1 Retrospective:" prefix (the kicker above already carries it).
@@ -235,8 +236,10 @@ public class RetroTests : IDisposable
         Assert.DoesNotContain(">Personas<", html);
         // Epic link resolves at the retro page's depth-1 prefix.
         Assert.Contains("href=\"../epics/epic-1.html\">Epic 1 &rarr;</a>", html);
-        Assert.Contains("<a class=\"skip-link\" href=\"#main-content\">Skip to content</a>", html);
-        Assert.Equal(1, CountOccurrences(html, "id=\"main-content\""));
+        // [Story 23.6 AC #8] The skip-link assertion lived here and is NOT lost — it is head-emitted chrome,
+        // and the region carries no head. `npm run check:a11y` owns `skip-link` over every EMITTED page,
+        // which is the only place it can be asserted honestly now that no C# path composes a whole page.
+        RegionAssert.HasSingleMainLandmark(html);
     }
 
     [Fact]
@@ -263,7 +266,7 @@ public class RetroTests : IDisposable
         };
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
 
-        var html = RetroTemplater.RenderPage(retro, epics, nav);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(RetroTemplater.BuildPage(retro, epics, nav));
 
         Assert.Contains("<section class=\"retro-stories\" id=\"retro-stories\">", html);
         Assert.Contains("Stories in this Epic", html);
@@ -321,7 +324,7 @@ public class RetroTests : IDisposable
         };
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
 
-        var html = RetroTemplater.RenderPage(retro, epics, nav);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(RetroTemplater.BuildPage(retro, epics, nav));
 
         // Kicker names both epics (ampersand HTML-escaped exactly once, not double-encoded).
         Assert.Contains("<div class=\"story-kicker\">Epics 19 &amp; 21 Retrospective</div>", html);
@@ -368,7 +371,7 @@ public class RetroTests : IDisposable
         };
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
 
-        var html = RetroTemplater.RenderPage(retro, epics, nav);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(RetroTemplater.BuildPage(retro, epics, nav));
 
         Assert.Contains("href=\"../epics/epic-19.html\">Epic 19 &rarr;</a>", html);
         Assert.DoesNotContain("epics/epic-99.html", html);
@@ -510,7 +513,7 @@ public class RetroTests : IDisposable
         };
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
 
-        var html = RetroTemplater.RenderIndex(retros, nav);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(RetroTemplater.BuildIndexPage(retros, nav));
 
         Assert.Contains("<h1>Retrospectives</h1>", html);
         Assert.Contains("href=\"implementation-artifacts/epic-1-retro-2026-07-07.html\"", html);
@@ -531,7 +534,7 @@ public class RetroTests : IDisposable
         var commands = new CommandCatalog("BMad", new Dictionary<string, string> { ["quick-dev"] = "/bmad-quick-dev" });
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
 
-        var html = ActionItemsTemplater.RenderPage(open, map, commands, nav);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(ActionItemsTemplater.BuildPage(open, map, commands, nav));
 
         Assert.Contains("<h1>Open Action Items", html);
         Assert.Contains("class=\"status-legend\"", html);
@@ -551,7 +554,7 @@ public class RetroTests : IDisposable
         Assert.Equal(1, CountOccurrences(html, "id=\"main-content\""));
 
         // No quick-dev command exposed → still no resolve chrome on the list.
-        var noCmd = ActionItemsTemplater.RenderPage(open, map, CommandCatalog.Empty, nav);
+        var noCmd = JsonSpaRenderAdapter.Shared.RenderContent(ActionItemsTemplater.BuildPage(open, map, CommandCatalog.Empty, nav));
         Assert.DoesNotContain("Resolve with AI", noCmd);
     }
 
@@ -566,7 +569,7 @@ public class RetroTests : IDisposable
         var map = new Dictionary<int, string> { [1] = "implementation-artifacts/epic-1-retro-2026-07-07.html" };
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
 
-        var html = ActionItemsTemplater.RenderPage(open, map, CommandCatalog.Empty, nav, deferredWorkHref: "deferred-work.html");
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(ActionItemsTemplater.BuildPage(open, map, CommandCatalog.Empty, nav, deferredWorkHref: "deferred-work.html"));
 
         // Wider layout wrapper (not the 860 doc column).
         Assert.Contains("class=\"action-items-wrap\"", html);
@@ -576,7 +579,7 @@ public class RetroTests : IDisposable
         Assert.DoesNotContain("followup-row-detail", html);
 
         // No deferred href → still no deferred chrome on the list (detail path owns it).
-        var noHref = ActionItemsTemplater.RenderPage(open, map, CommandCatalog.Empty, nav);
+        var noHref = JsonSpaRenderAdapter.Shared.RenderContent(ActionItemsTemplater.BuildPage(open, map, CommandCatalog.Empty, nav));
         Assert.DoesNotContain("action-item-deferred", noHref);
     }
 
@@ -618,7 +621,7 @@ public class RetroTests : IDisposable
             ],
         };
 
-        var html = ActionItemsTemplater.RenderPage(open, map, commands, nav, epicsModel: epics);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(ActionItemsTemplater.BuildPage(open, map, commands, nav, epicsModel: epics));
 
         // Summary line still linkifies Story N.M mentions.
         Assert.Contains("class=\"story-ref\"", html);
@@ -631,8 +634,8 @@ public class RetroTests : IDisposable
         Assert.Contains("data-copy=", html);
         Assert.Contains("class=\"chart-panel next-steps list-batch-actions\"", html);
 
-        var detail = FollowUpDetailTemplater.RenderActionPage(
-            open[0], FollowUpSlug.AssignActionSlugs(open)[open[0]], nav, commands, map, epicsModel: epics);
+        var detail = JsonSpaRenderAdapter.Shared.RenderContent(FollowUpDetailTemplater.BuildActionPage(
+            open[0], FollowUpSlug.AssignActionSlugs(open)[open[0]], nav, commands, map, epicsModel: epics));
         Assert.Contains("class=\"chart-panel next-steps\"", detail);
         Assert.Contains("data-copy=\"/bmad-quick-dev Resolve this retrospective action item (Epic 1): Fix Story 1.1 heatmap debt before Epic 2\"", detail);
         Assert.DoesNotContain("data-copy=\"/bmad-quick-dev Resolve this retrospective action item (Epic 1): Fix <a", detail);
@@ -652,7 +655,7 @@ public class RetroTests : IDisposable
             new PagerLink("epic-1-retro.html", "Epic 1 retro"),
             new PagerLink("epic-3-retro.html", "Epic 3 retro"));
 
-        var html = RetroTemplater.RenderPage(retro, null, nav, pager);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(RetroTemplater.BuildPage(retro, null, nav, pager));
 
         Assert.Contains("<div class=\"page-wayfinding\">", html);
         var wrapperIdx = html.IndexOf("page-wayfinding", StringComparison.Ordinal);

@@ -35,6 +35,12 @@ export default defineConfig({
         'scripts/check-a11y.mjs',
         'scripts/measure-parity.mjs',
         'scripts/measure-payload.mjs',
+        // Story 23.6's drift-gate drivers: they boot a Nitro artefact and drive routes through it. The pure
+        // decision logic they share lives in `scripts/parity-lib.mjs`, which is deliberately NOT excluded and
+        // is covered by `test/parity-lib.test.mjs`.
+        'scripts/check-parity.mjs',
+        'scripts/pin-parity.mjs',
+        'scripts/render-lib.mjs',
         'scripts/experiment-two-ir.mjs',
         'scripts/build-package.mjs',
         'scripts/sync-runtime-assets.mjs',

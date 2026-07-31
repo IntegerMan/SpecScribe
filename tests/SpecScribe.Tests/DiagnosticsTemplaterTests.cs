@@ -42,7 +42,7 @@ public class DiagnosticsTemplaterTests
             new DiagnosticNotice("Skipped", "impl/foo.md", null, DiagnosticSeverity.Warning),
         };
 
-        var html = DiagnosticsTemplater.RenderPage(notices, Config(), Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(DiagnosticsTemplater.BuildPage(notices, Config(), Nav()));
 
         Assert.Contains("diagnostics-table", html);
         // The fine category word survives as text on every row (never color-only, UX-DR17/NFR6).
@@ -74,7 +74,7 @@ public class DiagnosticsTemplaterTests
             new DiagnosticNotice("Informational", "design-notes/", "unrecognized top-level folder", DiagnosticSeverity.Info),
         };
 
-        var html = DiagnosticsTemplater.RenderPage(notices, Config(), Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(DiagnosticsTemplater.BuildPage(notices, Config(), Nav()));
 
         Assert.Contains(">Informational</span>", html);
         Assert.Contains("status-badge diag-info", html);
@@ -84,7 +84,7 @@ public class DiagnosticsTemplaterTests
     [Fact]
     public void RenderPage_EmptyNoticeList_RendersAllClearStateNotAnEmptyTable()
     {
-        var html = DiagnosticsTemplater.RenderPage(Array.Empty<DiagnosticNotice>(), Config(), Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(DiagnosticsTemplater.BuildPage(Array.Empty<DiagnosticNotice>(), Config(), Nav()));
 
         Assert.Contains("diagnostics-clear", html);
         Assert.Contains("No notices", html);
@@ -97,7 +97,7 @@ public class DiagnosticsTemplaterTests
     [Fact]
     public void RenderPage_ConfigDetails_CarryEveryEffectiveConfigField()
     {
-        var html = DiagnosticsTemplater.RenderPage(Array.Empty<DiagnosticNotice>(), Config(deepGit: true), Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(DiagnosticsTemplater.BuildPage(Array.Empty<DiagnosticNotice>(), Config(deepGit: true), Nav()));
 
         Assert.Contains("<dt>Detected framework</dt><dd>BMad Method</dd>", html);
         Assert.Contains("<dt>Source root</dt><dd>_bmad-output</dd>", html);
@@ -115,8 +115,8 @@ public class DiagnosticsTemplaterTests
     {
         // A non-default policy states the flag that produced it, mirroring "on (--deep-git)" / ADR "explicit
         // (--adrs)" provenance — so a reader can tell an override from the default at a glance. [Story 5.5]
-        var html = DiagnosticsTemplater.RenderPage(
-            Array.Empty<DiagnosticNotice>(), Config(dateCutoff: new DateCutoff(policy, null)), Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(DiagnosticsTemplater.BuildPage(
+            Array.Empty<DiagnosticNotice>(), Config(dateCutoff: new DateCutoff(policy, null)), Nav()));
         Assert.Contains($"<dt>Date-page &quot;today&quot; policy</dt><dd>{expected}</dd>", html);
     }
 
@@ -126,10 +126,10 @@ public class DiagnosticsTemplaterTests
         // The pinned date is part of the effective configuration, so the row must SHOW it — and it names --as-of,
         // the documented surface, rather than the composite --today-policy token it collapses onto internally.
         // Plain text in a <dl>: the state is never signalled by color alone. [Story 5.7 Task 5 / AC #2]
-        var html = DiagnosticsTemplater.RenderPage(
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(DiagnosticsTemplater.BuildPage(
             Array.Empty<DiagnosticNotice>(),
             Config(dateCutoff: new DateCutoff(DatePolicy.AsOf, new DateOnly(2026, 7, 27))),
-            Nav());
+            Nav()));
 
         Assert.Contains(
             "<dt>Date-page &quot;today&quot; policy</dt><dd>fixed date 2026-07-27 (--as-of 2026-07-27)</dd>",
@@ -140,7 +140,7 @@ public class DiagnosticsTemplaterTests
     [Fact]
     public void RenderPage_ExplicitAdrSource_IsMarkedExplicit()
     {
-        var html = DiagnosticsTemplater.RenderPage(Array.Empty<DiagnosticNotice>(), Config(adrExplicit: true), Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(DiagnosticsTemplater.BuildPage(Array.Empty<DiagnosticNotice>(), Config(adrExplicit: true), Nav()));
         Assert.Contains("<dt>ADR location</dt><dd>docs/adrs (explicit (--adrs))</dd>", html);
     }
 

@@ -53,7 +53,7 @@ public class CodeMapTemplaterTests
     [Fact]
     public void RenderPage_WithMetrics_HasShellLegendHiddenControlsAndOrderedTable()
     {
-        var html = CodeMapTemplater.RenderPage(VariantsWithMetrics(), Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(VariantsWithMetrics(), Nav()));
 
         // Standard standalone-page shell.
         Assert.Contains("<main id=\"main-content\"", html);
@@ -116,7 +116,7 @@ public class CodeMapTemplaterTests
     [Fact]
     public void RenderPage_WithoutMetrics_ShowsSecondaryNoticeButKeepsAWorkingFileTypeDimension()
     {
-        var html = CodeMapTemplater.RenderPage(VariantsWithoutMetrics(("src/A.cs", 10L)), Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(VariantsWithoutMetrics(("src/A.cs", 10L)), Nav()));
 
         Assert.Contains("Git change data is unavailable", html);
         Assert.Contains("codemap-notice-secondary", html);
@@ -142,11 +142,11 @@ public class CodeMapTemplaterTests
     {
         var variants = VariantsWithoutMetrics(("src/A.cs", 10L));
 
-        var linked = CodeMapTemplater.RenderPage(variants, Nav(),
-            fileHref: p => p == "src/A.cs" ? "code/src/A.cs.html" : null);
+        var linked = JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(variants, Nav(),
+            fileHref: p => p == "src/A.cs" ? "code/src/A.cs.html" : null));
         Assert.Contains("<a href=\"code/src/A.cs.html\">src/A.cs</a>", linked);
 
-        var plain = CodeMapTemplater.RenderPage(variants, Nav(), fileHref: null);
+        var plain = JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(variants, Nav(), fileHref: null));
         Assert.DoesNotContain("code/src/A.cs.html", plain);
     }
 
@@ -154,7 +154,7 @@ public class CodeMapTemplaterTests
     public void RenderPage_FileTableIsASetMatchAgainstTheChartPayload_NotJustACountMatch()
     {
         // Every path the "full" view's chart draws must have a resolving row in the (now shared) table.
-        var html = CodeMapTemplater.RenderPage(VariantsWithMetrics(), Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(VariantsWithMetrics(), Nav()));
 
         var charted = Regex.Matches(Island(html), "\"path\":\"(?<p>[^\"]+)\"");
         Assert.True(charted.Count > 0, "fixture must chart at least one file");
@@ -170,7 +170,7 @@ public class CodeMapTemplaterTests
     {
         // AC#1's central assertion. src/A.cs appears in all four variants (it is neither spec-dev nor a test
         // path); its path, metric bag and table row must each appear EXACTLY ONCE in the rendered page.
-        var html = CodeMapTemplater.RenderPage(VariantsWithMetrics(), Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(VariantsWithMetrics(), Nav()));
 
         Assert.Single(Regex.Matches(html, Regex.Escape("\"path\":\"src/A.cs\"")));
         Assert.Single(Regex.Matches(html, Regex.Escape("\"changes\":\"8\"")));
@@ -188,7 +188,7 @@ public class CodeMapTemplaterTests
             ("tests/SpecScribe.Tests/GitMetricsTests.cs", 20L),
             ("src/SpecScribe/GitMetrics.cs", 30L));
 
-        var html = CodeMapTemplater.RenderPage(variants, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(variants, Nav()));
 
         // The two checkboxes drive BOTH the (pure CSS) table row filter and the (JS) view switch — Story 20.10
         // Task 2.3's data-hierarchy-view-toggle, alongside the still-live data-hierarchy-reveal deferred-mount hook.
@@ -220,7 +220,7 @@ public class CodeMapTemplaterTests
     {
         var variants = VariantsWithoutMetrics(("tests/OnlyTests/FooTests.cs", 10L));
 
-        var html = CodeMapTemplater.RenderPage(variants, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(variants, Nav()));
 
         // JS-off: the table's per-view lead line says so for the "no-tests"/"no-spec-no-tests" views.
         Assert.Contains("No files match this filter.", html);
@@ -233,7 +233,7 @@ public class CodeMapTemplaterTests
     {
         // Story 20.10 D2: four instances (Story 20.9's shape) become ONE, with four server-declared views over
         // its shared payload instead of four independently-serialized ones.
-        var html = CodeMapTemplater.RenderPage(VariantsWithMetrics(), Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(VariantsWithMetrics(), Nav()));
 
         Assert.Single(Regex.Matches(html, Regex.Escape(HierarchyExplorer.HostMarker + "></div>")));
         Assert.Single(Regex.Matches(html, "ss-hierarchy-data"));
@@ -272,7 +272,7 @@ public class CodeMapTemplaterTests
         var variants = CodeMap.BuildVariants(
             new[] { ("tests/OnlyTests/FooTests.cs", 10L), ("src/A.cs", 20L) }, NoMetrics);
 
-        var html = CodeMapTemplater.RenderPage(variants, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(variants, Nav()));
 
         // The shared payload carries 2 distinct file nodes total (never duplicated per view — AC#1); the two
         // VIEWS declare different SUBSETS of them via their own `files` index list.
@@ -300,7 +300,7 @@ public class CodeMapTemplaterTests
                 (".github/workflows/build.yml", 5L),
             }, NoMetrics);
 
-        var html = CodeMapTemplater.RenderPage(variants, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(variants, Nav()));
         using var doc = JsonDocument.Parse(Island(html));
 
         var fullIds = ViewOf(doc, "full").GetProperty("scaffold").EnumerateArray().Select(n => n.GetProperty("id").GetString()).ToList();
@@ -356,7 +356,7 @@ public class CodeMapTemplaterTests
         // The four Story 20.4 payload invariants, asserted per view (Task 1.6/8.3): exactly one root, no null in
         // any file's value, parent == sum of children, and the emitted branchvalues matches the constant.
         var variants = VariantsWithMetrics();
-        var html = CodeMapTemplater.RenderPage(variants, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(variants, Nav()));
         using var doc = JsonDocument.Parse(Island(html));
 
         Assert.Equal(HierarchyExplorer.BranchValues, doc.RootElement.GetProperty("config").GetProperty("branchvalues").GetString());
@@ -477,7 +477,7 @@ public class CodeMapTemplaterTests
         // table — a set match, not merely a count match, retargeted at "no-tests" rather than only "full".
         var variants = CodeMap.BuildVariants(
             new[] { ("tests/OnlyTests/FooTests.cs", 10L), ("src/A.cs", 20L), ("src/B.cs", 5L) }, NoMetrics);
-        var html = CodeMapTemplater.RenderPage(variants, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(variants, Nav()));
         using var doc = JsonDocument.Parse(Island(html));
 
         var view = ViewOf(doc, "no-tests");
@@ -499,22 +499,22 @@ public class CodeMapTemplaterTests
     {
         // Story 7.1's link guard, unchanged by the conversion: a resolver returning null leaves a plain, focusable
         // node - never a broken link.
-        var linked = CodeMapTemplater.RenderPage(VariantsWithMetrics(), Nav(),
-            fileHref: p => p == "src/A.cs" ? "code/src/A.cs.html" : null);
+        var linked = JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(VariantsWithMetrics(), Nav(),
+            fileHref: p => p == "src/A.cs" ? "code/src/A.cs.html" : null));
         var linkedIsland = Island(linked);
         Assert.Contains("\"href\":\"code/src/A.cs.html\"", linkedIsland);
         // src/B.cs resolves to nothing, so it carries no href at all rather than a dead one.
         Assert.Contains("\"path\":\"src/B.cs\"", linkedIsland);
         Assert.Single(Regex.Matches(linkedIsland, "\"href\":"));
 
-        var plain = Island(CodeMapTemplater.RenderPage(VariantsWithMetrics(), Nav(), fileHref: null));
+        var plain = Island(JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(VariantsWithMetrics(), Nav(), fileHref: null)));
         Assert.DoesNotContain("\"href\":", plain);
     }
 
     [Fact]
     public void RenderPage_WithoutMetrics_ColorizesByFileTypeFromOnePayload()
     {
-        var html = CodeMapTemplater.RenderPage(VariantsWithoutMetrics(("src/A.cs", 10L)), Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(VariantsWithoutMetrics(("src/A.cs", 10L)), Nav()));
         var island = Island(html);
 
         Assert.Contains("\"colorClass\":\"codemap-cell\"", island);
@@ -536,7 +536,7 @@ public class CodeMapTemplaterTests
         var map = CodeMap.Build(files, NoMetrics);
         var variant = new CodeMapVariant("full", ExcludesSpecDev: false, ExcludesTests: false, map);
 
-        var html = CodeMapTemplater.RenderPage(new[] { variant }, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(new[] { variant }, Nav()));
 
         Assert.Contains($"The {cap:N0} most significant files in the treemap", html);
         Assert.Contains("+7 more files not shown in this table", html);
@@ -574,7 +574,7 @@ public class CodeMapTemplaterTests
             new CodeMapVariant("no-tests", ExcludesSpecDev: false, ExcludesTests: true, noTestsMap),
         };
 
-        var html = CodeMapTemplater.RenderPage(variants, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(variants, Nav()));
 
         // `full` genuinely lost its 40 smallest, and says so with ITS own number.
         Assert.Contains($"data-codemap-view=\"full\"><td colspan=\"3\">+40 more files not shown", html);
@@ -611,7 +611,7 @@ public class CodeMapTemplaterTests
             new CodeMapVariant("no-tests", ExcludesSpecDev: false, ExcludesTests: true, noTestsMap),
         };
 
-        var html = CodeMapTemplater.RenderPage(variants, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(variants, Nav()));
 
         // The no-tests view holds 30 files and EVERY ONE was cut by the distinct-set cap.
         Assert.Contains("data-codemap-view=\"no-tests\"><td colspan=\"3\">+30 more files not shown", html);
@@ -625,7 +625,7 @@ public class CodeMapTemplaterTests
     [Fact]
     public void RenderPage_FileTableCarriesAPageSizeAndAHiddenPagerControlForClientSidePagination()
     {
-        var html = CodeMapTemplater.RenderPage(VariantsWithMetrics(), Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(VariantsWithMetrics(), Nav()));
 
         Assert.Contains($"<table class=\"codemap-table\" data-page-size=\"{Reflect_CodeMapTablePageSize()}\">", html);
         Assert.Contains("class=\"codemap-table-row\"", html);

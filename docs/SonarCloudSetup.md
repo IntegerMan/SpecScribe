@@ -481,11 +481,15 @@ decision, not an omission, and the reason is worth keeping:
 
 | Rule(s) | Count (2026-07-27) | Decision |
 |---|---|---|
-| `csharpsquid:S6444` — regex without timeout | 156 | **Scheduled → Story 17.2.** Not noise despite MINOR severity: SpecScribe parses markdown from arbitrary third-party repositories, so catastrophic backtracking is a real input-driven surface. Drives security rating **C** and keeps `new_security_rating` at **B**. Not suppressed. |
+| `csharpsquid:S6444` — regex without timeout | 156 | **Scheduled → Story 17.2.** Not noise despite MINOR severity: SpecScribe parses markdown from arbitrary third-party repositories, so catastrophic backtracking is a real input-driven surface. Drives project-level security rating **C**; its effect on `new_security_rating` moves with the sliding new-code window — see § *What would make the gate blocking* for the current measured value rather than trusting a fixed letter here. Not suppressed. |
 | `csharpsquid:S4036` — OS command search in PATH | 1 | **Scheduled → Story 17.2**, with S6444. |
-| `githubactions:S8233` / `S8264` | 3 | **Fixed by Story 25.2** — permissions moved to job level in `publish-docs-live-pages.yml`. |
+| `githubactions:S8233` / `S8264` | 3 | **Fixed by Story 25.2** — permissions moved to job level in `publish-docs-live-pages.yml`. `build-test-analyze.yml` (Story 25.1's own workflow) carries **zero** `githubactions:*` findings, which is worth keeping as evidence the gate is already clean on our own CI. |
 | `external_roslyn:*` INFO band | 771 | **Accepted for now, not suppressed.** Revisit at Story 17.3 (the performance rules: `CA1861`, `CA1859`, `CA1822`) and as a bulk disposition for the rest. |
 | Everything else above the bar | — | Routed to Stories 17.1 / 17.3 / 17.5 — see the `25-2-quality-gate-and-findings-triage` group in `deferred-work.md`. |
+
+See [ADR 0035](adrs/0035-sonarcloud-quality-gate-and-rule-decision-policy.md) for the standing policy this table
+implements — gate identity, the coverage/new-code-period/`qualitygate.wait` decisions, and why this table is the
+one home for a rule-level exception.
 
 ## The agent-facing digest (Story 25.4)
 

@@ -45,10 +45,13 @@ public class DeepAnalyticsTemplaterTests
     [Fact]
     public void RenderPage_HasSiteChromeAndBothSections()
     {
-        var html = DeepAnalyticsTemplater.RenderPage(SampleDeep(), Nav());
+        var page = DeepAnalyticsTemplater.BuildPage(SampleDeep(), Nav());
+        var html = RegionAssert.Of(page);
 
         // Full page shell: skip link + single main landmark + breadcrumb, like the other synthesized pages.
-        Assert.Contains("<a class=\"skip-link\" href=\"#main-content\">Skip to content</a>", html);
+        // [Story 23.6 AC #8] The skip-link assertion lived here and is NOT lost — it is head-emitted chrome,
+        // and the region carries no head. `npm run check:a11y` owns `skip-link` over every EMITTED page,
+        // which is the only place it can be asserted honestly now that no C# path composes a whole page.
         Assert.Contains("<main id=\"main-content\" class=\"deep-page\">", html);
         Assert.Contains("Deep Git Analytics", html);        // h1
         Assert.Contains(">Change Coupling</h3>", html);     // framed panel title (Story 10.2)
@@ -80,7 +83,7 @@ public class DeepAnalyticsTemplaterTests
             DirectedCoupling = DirectedFrom(("src/A.cs", "src/B.cs", 5)),
         };
 
-        var html = DeepAnalyticsTemplater.RenderPage(deep, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(DeepAnalyticsTemplater.BuildPage(deep, Nav()));
 
         Assert.Contains("Last 42 commits", html);
         Assert.Contains("Top 2 of 100 files by change count", html);
@@ -97,7 +100,7 @@ public class DeepAnalyticsTemplaterTests
     [Fact]
     public void RenderPage_RendersCouplingGraphListAndHotspots()
     {
-        var html = DeepAnalyticsTemplater.RenderPage(SampleDeep(), Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(DeepAnalyticsTemplater.BuildPage(SampleDeep(), Nav()));
 
         // The graph is present...
         Assert.Contains("class=\"coupling-graph\"", html);
@@ -158,7 +161,7 @@ public class DeepAnalyticsTemplaterTests
     [Fact]
     public void RenderPage_WithFileHref_LinksResolvedFilesAndLeavesOthersPlain()
     {
-        var html = DeepAnalyticsTemplater.RenderPage(SampleDeep(), Nav(), fileHref: ChartsOnlyResolver());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(DeepAnalyticsTemplater.BuildPage(SampleDeep(), Nav(), fileHref: ChartsOnlyResolver()));
 
         // Coupling table cell, hotspot list item, and graph node for the resolvable file all become links.
         Assert.Contains("<a href=\"code/src/SpecScribe/Charts.cs.html\">src/SpecScribe/Charts.cs</a>", html); // table + hotspot
@@ -172,7 +175,7 @@ public class DeepAnalyticsTemplaterTests
     public void RenderPage_WithoutFileHref_RendersNoCodeLinks()
     {
         // The default (no resolver) path — the live behavior before this change — emits plain file text only.
-        var html = DeepAnalyticsTemplater.RenderPage(SampleDeep(), Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(DeepAnalyticsTemplater.BuildPage(SampleDeep(), Nav()));
         Assert.DoesNotContain("href=\"code/", html);
         Assert.DoesNotContain("coupling-node-link", html);
     }
@@ -220,7 +223,7 @@ public class DeepAnalyticsTemplaterTests
                 ("sprint-status.yaml", "theme.css", 4)),
         };
 
-        var html = DeepAnalyticsTemplater.RenderPage(deep, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(DeepAnalyticsTemplater.BuildPage(deep, Nav()));
 
         // The explanatory note appears once, via the shared frame's Note slot.
         Assert.Contains("chart-frame-note", html);
@@ -240,7 +243,7 @@ public class DeepAnalyticsTemplaterTests
     [Fact]
     public void RenderPage_NoProcessPairsOmitsNoteAndDashedEdges()
     {
-        var html = DeepAnalyticsTemplater.RenderPage(SampleDeep(), Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(DeepAnalyticsTemplater.BuildPage(SampleDeep(), Nav()));
 
         Assert.DoesNotContain("chart-frame-note", html);
         Assert.DoesNotContain("process-edge", html);
@@ -342,7 +345,7 @@ public class DeepAnalyticsTemplaterTests
             DirectedCoupling = new[] { Directed("src/A.cs", "src/B.cs", 3, 0.75) },
         };
 
-        var html = DeepAnalyticsTemplater.RenderPage(deep, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(DeepAnalyticsTemplater.BuildPage(deep, Nav()));
 
         Assert.Contains("directed couple", html);
         Assert.Contains("by confidence", html);

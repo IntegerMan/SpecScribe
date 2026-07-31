@@ -25,16 +25,19 @@ public class CommitDayTemplaterTests
             C("def5678", "Add the other thing"),
         };
 
-        var html = CommitDayTemplater.RenderPage(day, commits, NoArtifacts, EntityPager.None, Nav());
+        var page = CommitDayTemplater.BuildPage(day, commits, NoArtifacts, EntityPager.None, Nav());
+        var html = RegionAssert.Of(page);
 
-        Assert.Contains($"<title>Commits on {Charts.DReadable(day)} — SpecScribe</title>", html);
+        RegionAssert.HasTitle(page, $"Commits on {Charts.DReadable(day)} — SpecScribe");
         Assert.Contains($"<h1>Commits on {Charts.DReadable(day)}</h1>", html);
         Assert.Contains("<code class=\"commit-hash\">abc1234</code>", html);
         Assert.Contains("<span class=\"commit-time\">09:15</span>", html);
         Assert.Contains("<span class=\"commit-author\">Matt Eland</span>", html);
         Assert.Contains("<span class=\"commit-subject\">Fix the thing</span>", html);
         // Site a11y contract: skip-link first, single main landmark.
-        Assert.Contains("<a class=\"skip-link\" href=\"#main-content\">Skip to content</a>", html);
+        // [Story 23.6 AC #8] The skip-link assertion lived here and is NOT lost — it is head-emitted chrome,
+        // and the region carries no head. `npm run check:a11y` owns `skip-link` over every EMITTED page,
+        // which is the only place it can be asserted honestly now that no C# path composes a whole page.
         Assert.Contains("<main id=\"main-content\">", html);
     }
 
@@ -44,7 +47,7 @@ public class CommitDayTemplaterTests
         var day = new DateOnly(2026, 7, 6);
         var commits = new[] { C("abc1234", "fix <div> & \"q\"", author: "<b>Bob</b>") };
 
-        var html = CommitDayTemplater.RenderPage(day, commits, NoArtifacts, EntityPager.None, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CommitDayTemplater.BuildPage(day, commits, NoArtifacts, EntityPager.None, Nav()));
 
         Assert.Contains("fix &lt;div&gt; &amp; &quot;q&quot;", html);
         Assert.Contains("&lt;b&gt;Bob&lt;/b&gt;", html);
@@ -60,7 +63,7 @@ public class CommitDayTemplaterTests
             new PagerLink("2026-07-09.html", Charts.DReadable(new DateOnly(2026, 7, 9))),
             new PagerLink("2026-07-04.html", Charts.DReadable(new DateOnly(2026, 7, 4))));
 
-        var html = CommitDayTemplater.RenderPage(day, new[] { C("a", "x") }, NoArtifacts, pager, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CommitDayTemplater.BuildPage(day, new[] { C("a", "x") }, NoArtifacts, pager, Nav()));
 
         // Inline header pager, with sibling names as tooltips; the retired bottom nav is gone.
         Assert.Contains("<nav class=\"entity-pager\" aria-label=\"Sibling navigation\">", html);
@@ -83,7 +86,7 @@ public class CommitDayTemplaterTests
             new PagerLink("2026-07-09.html", "Jul 9"),
             new PagerLink("2026-07-04.html", "Jul 4"));
 
-        var html = CommitDayTemplater.RenderPage(day, new[] { C("a", "x") }, NoArtifacts, pager, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CommitDayTemplater.BuildPage(day, new[] { C("a", "x") }, NoArtifacts, pager, Nav()));
 
         Assert.Contains("<div class=\"page-wayfinding\">", html);
         var wrapperIdx = html.IndexOf("page-wayfinding", StringComparison.Ordinal);
@@ -97,7 +100,7 @@ public class CommitDayTemplaterTests
     {
         var day = new DateOnly(2026, 7, 6);
 
-        var html = CommitDayTemplater.RenderPage(day, new[] { C("a", "x") }, NoArtifacts, EntityPager.None, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CommitDayTemplater.BuildPage(day, new[] { C("a", "x") }, NoArtifacts, EntityPager.None, Nav()));
 
         Assert.DoesNotContain("entity-pager", html);
         Assert.DoesNotContain("commit-day-nav", html);
@@ -109,12 +112,12 @@ public class CommitDayTemplaterTests
         var day = new DateOnly(2026, 7, 6);
         var commits = new[] { C("abc1234", "x") };
 
-        var linked = CommitDayTemplater.RenderPage(
-            day, commits, NoArtifacts, EntityPager.None, Nav(), commitHref: _ => "commit/abc1234def.html");
+        var linked = JsonSpaRenderAdapter.Shared.RenderContent(CommitDayTemplater.BuildPage(
+            day, commits, NoArtifacts, EntityPager.None, Nav(), commitHref: _ => "commit/abc1234def.html"));
         // Nested page prepends its own ../ prefix; the <code> stays for styling.
         Assert.Contains("<a class=\"commit-hash-link\" href=\"../commit/abc1234def.html\"><code class=\"commit-hash\">abc1234</code></a>", linked);
 
-        var plain = CommitDayTemplater.RenderPage(day, commits, NoArtifacts, EntityPager.None, Nav(), commitHref: _ => null);
+        var plain = JsonSpaRenderAdapter.Shared.RenderContent(CommitDayTemplater.BuildPage(day, commits, NoArtifacts, EntityPager.None, Nav(), commitHref: _ => null));
         Assert.Contains("<code class=\"commit-hash\">abc1234</code>", plain);
         Assert.DoesNotContain("commit-hash-link", plain);
     }
@@ -129,7 +132,7 @@ public class CommitDayTemplaterTests
             ("PRD", "planning-artifacts/PRD.html"),
         };
 
-        var html = CommitDayTemplater.RenderPage(day, new[] { C("a", "x") }, artifacts, EntityPager.None, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CommitDayTemplater.BuildPage(day, new[] { C("a", "x") }, artifacts, EntityPager.None, Nav()));
 
         Assert.Contains("<section class=\"artifacts-updated\">", html);
         Assert.Contains("<h2>Artifacts updated</h2>", html);
@@ -150,7 +153,7 @@ public class CommitDayTemplaterTests
     {
         var day = new DateOnly(2026, 7, 6);
 
-        var html = CommitDayTemplater.RenderPage(day, new[] { C("a", "x") }, NoArtifacts, EntityPager.None, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CommitDayTemplater.BuildPage(day, new[] { C("a", "x") }, NoArtifacts, EntityPager.None, Nav()));
 
         Assert.DoesNotContain("artifacts-updated", html);
         Assert.DoesNotContain("Artifacts updated", html);
@@ -162,11 +165,12 @@ public class CommitDayTemplaterTests
         var day = new DateOnly(2026, 7, 6);
         var artifacts = new (string Label, string Href)[] { ("Architecture", "planning-artifacts/ARCHITECTURE.html") };
 
-        var html = CommitDayTemplater.RenderPage(day, Array.Empty<CommitInfo>(), artifacts, EntityPager.None, Nav());
+        var page = CommitDayTemplater.BuildPage(day, Array.Empty<CommitInfo>(), artifacts, EntityPager.None, Nav());
+        var html = RegionAssert.Of(page);
 
         // Neutral "Activity on …" heading — never claims commits it doesn't have.
         Assert.Contains($"<h1>Activity on {Charts.DReadable(day)}</h1>", html);
-        Assert.Contains($"<title>Activity on {Charts.DReadable(day)} — SpecScribe</title>", html);
+        RegionAssert.HasTitle(page, $"Activity on {Charts.DReadable(day)} — SpecScribe");
         Assert.Contains("<div class=\"story-kicker\">Activity</div>", html);
         // No commit list at all (no empty "0 commits" list).
         Assert.DoesNotContain("commit-day-list", html);

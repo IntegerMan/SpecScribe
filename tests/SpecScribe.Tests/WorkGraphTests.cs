@@ -244,7 +244,7 @@ public class WorkGraphTests
         var model = WorkGraphBuilder.Build(TwoEpicModel(), Geometry(deferred: deferred));
         var nav = SiteNav.Build(new[] { "epics.md" }, "TestProj", hasWorkGraph: true);
 
-        var html = WorkGraphTemplater.RenderPage(model, nav);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(WorkGraphTemplater.BuildPage(model, nav));
 
         Assert.Contains("more follow-up item not drawn (listed below)", html);
         // The sr-only enumeration actually lists the elided item — honors the "listed below" promise for AT users.
@@ -348,7 +348,7 @@ public class WorkGraphTests
         var model = WorkGraphBuilder.Build(ThreeEpicModel(), Geometry(actions: actions), retroMap);
         var nav = SiteNav.Build(new[] { "epics.md" }, "TestProj", hasWorkGraph: true);
 
-        var html = WorkGraphTemplater.RenderPage(model, nav);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(WorkGraphTemplater.BuildPage(model, nav));
         Assert.Contains("Ambiguous ownership", html);
     }
 
@@ -398,7 +398,7 @@ public class WorkGraphTests
         var model = WorkGraphBuilder.Build(TwoEpicModel(), Geometry(deferred: new[] { Deferred("A debt", epic: 1) }));
         var nav = SiteNav.Build(new[] { "epics.md" }, "TestProj", hasWorkGraph: true);
 
-        var html = WorkGraphTemplater.RenderPage(model, nav);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(WorkGraphTemplater.BuildPage(model, nav));
 
         Assert.Contains("<main id=\"main-content\"", html);          // SPA capture seam / parity
         Assert.Contains("work-graph-scope-select", html);             // scope-picker dropdown
@@ -466,8 +466,8 @@ public class WorkGraphTests
         var subgraph = OneDeferredEpic();
         var nav = SiteNav.Build(new[] { "epics.md" }, "T", hasWorkGraph: true);
 
-        var html = EpicsTemplater.RenderEpic(epic, EmptyProgress(1), nav, CommandCatalog.Empty,
-            workGraph: subgraph);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(EpicsTemplater.BuildEpicPage(epic, EmptyProgress(1), nav, CommandCatalog.Empty,
+            workGraph: subgraph));
 
         Assert.Contains("ss-tab--overview", html);
         Assert.Contains("ss-tab--graph", html);
@@ -484,7 +484,7 @@ public class WorkGraphTests
         // when the epic has no provenance subgraph.
         var epic = TwoEpicModel().Epics.First(e => e.Number == 1);
         var nav = SiteNav.Build(new[] { "epics.md" }, "T");
-        var html = EpicsTemplater.RenderEpic(epic, EmptyProgress(1), nav, CommandCatalog.Empty);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(EpicsTemplater.BuildEpicPage(epic, EmptyProgress(1), nav, CommandCatalog.Empty));
         Assert.Contains("ss-tab--graph", html);
         Assert.Contains("No provenance graph for this epic yet", html);
     }

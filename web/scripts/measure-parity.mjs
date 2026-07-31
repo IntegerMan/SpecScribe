@@ -13,6 +13,19 @@
 // — which is a stronger statement than equality after normalization: the IR's bytes are IN the page.
 //
 // Run `npm run generate` first; this script measures, it does not build.
+//
+// ⚠️ **SUPERSEDED BY `npm run check:parity` / `npm run pin:parity`. [Story 23.6]**
+//
+// This harness produced Story 23.4's evidence and it dies with the C# page writer. `goldenRoot` below is
+// `ir.IR_DIR` — the directory C# writes the `.html` into — so once Story 23.6 Task 6 deletes the writer,
+// `readOrNull(join(goldenRoot, path))` returns null for every page, every row takes the `NO GOLDEN` branch,
+// `measured` is EMPTY, `migrationDeltas` is empty, and this script exits **0**. It reports success while
+// measuring nothing, which is exactly the vacuous-oracle failure ADR 0033 §Decision 5 forbids.
+//
+// It is kept only until that deletion lands, as the record of how the oracle was produced. The successor is
+// a PINNED corpus, because a live content digest over this repository's own docs cannot distinguish "the
+// content moved" from "the renderer moved" — see `scripts/parity-lib.mjs`'s header for the measurement that
+// established this (`goldenSha === irSha === nuxtSha` on all 1,469 rows).
 
 import { createHash } from 'node:crypto'
 import { mkdirSync, writeFileSync } from 'node:fs'

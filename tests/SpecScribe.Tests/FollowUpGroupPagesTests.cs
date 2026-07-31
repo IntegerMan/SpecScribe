@@ -240,7 +240,7 @@ public class FollowUpGroupPagesTests
             SiteNav.ActionItemsOutputPath,
             "All open action items");
 
-        var html = FollowUpGroupTemplater.RenderPage(group, nav);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(FollowUpGroupTemplater.BuildPage(group, nav));
         Assert.Contains("main id=\"main-content\"", html);
         Assert.Contains("followup-rows-list", html);
         Assert.Contains("followup-row", html);
@@ -252,7 +252,7 @@ public class FollowUpGroupPagesTests
         Assert.DoesNotContain("#group=", html);
 
         var empty = new FollowUpGroupSpec("group-x", "X", "x", Array.Empty<FollowUpGroupMember>());
-        Assert.Throws<ArgumentException>(() => FollowUpGroupTemplater.RenderPage(empty, nav));
+        Assert.Throws<ArgumentException>(() => JsonSpaRenderAdapter.Shared.RenderContent(FollowUpGroupTemplater.BuildPage(empty, nav)));
     }
 
     // ---- List-batch Address/Close pane (spec-follow-up-list-batch-actions) ----------------------------
@@ -280,7 +280,7 @@ public class FollowUpGroupPagesTests
             .ToList();
         var group = new FollowUpGroupSpec("group-epic-1", "Epic 1 follow-ups", "Attributed follow-ups for Epic 1", members);
 
-        var html = FollowUpGroupTemplater.RenderPage(group, nav, QuickDevOnly);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(FollowUpGroupTemplater.BuildPage(group, nav, QuickDevOnly));
 
         Assert.Contains("class=\"chart-panel next-steps list-batch-actions\"", html);
         Assert.Contains(">Address all<", html);
@@ -304,7 +304,7 @@ public class FollowUpGroupPagesTests
         var members = Enumerable.Range(1, 6).Select(i => OpenMember("deferred", $"Deferred {i}")).ToList();
         var group = new FollowUpGroupSpec("group-epic-1", "Epic 1 follow-ups", "x", members);
 
-        var html = FollowUpGroupTemplater.RenderPage(group, nav, QuickDevOnly);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(FollowUpGroupTemplater.BuildPage(group, nav, QuickDevOnly));
 
         Assert.DoesNotContain("next-step-command-group", html);
         Assert.Contains("<span class=\"cmd-text\">Deferred</span>", html);
@@ -321,7 +321,7 @@ public class FollowUpGroupPagesTests
             .ToList();
         var group = new FollowUpGroupSpec("group-epic-1", "Epic 1 follow-ups", "x", members);
 
-        var html = FollowUpGroupTemplater.RenderPage(group, nav, QuickDevOnly);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(FollowUpGroupTemplater.BuildPage(group, nav, QuickDevOnly));
 
         var first5Start = html.IndexOf(">Address first 5<", StringComparison.Ordinal);
         Assert.True(first5Start >= 0);
@@ -353,7 +353,7 @@ public class FollowUpGroupPagesTests
         };
         var group = new FollowUpGroupSpec("group-unplanned", "Unplanned", "x", members);
 
-        var html = FollowUpGroupTemplater.RenderPage(group, nav, QuickDevOnly);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(FollowUpGroupTemplater.BuildPage(group, nav, QuickDevOnly));
 
         // No deferred/action open items in scope (the only member is Kind == "direct") → pane omitted
         // (NFR8), and the direct row's text never reaches a batch command payload.
@@ -369,7 +369,7 @@ public class FollowUpGroupPagesTests
         var members = new List<FollowUpGroupMember> { OpenMember("deferred", "Deferred x") };
         var group = new FollowUpGroupSpec("group-epic-1", "Epic 1 follow-ups", "x", members);
 
-        var html = FollowUpGroupTemplater.RenderPage(group, nav, CommandCatalog.Empty);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(FollowUpGroupTemplater.BuildPage(group, nav, CommandCatalog.Empty));
 
         Assert.DoesNotContain("list-batch-actions", html);
         Assert.DoesNotContain("data-copy=", html);

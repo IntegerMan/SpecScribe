@@ -15,21 +15,25 @@ public class CodeFileTemplaterTests
     [Fact]
     public void RenderPage_RendersTitleBreadcrumbAndA11yShell()
     {
-        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav());
+        var page = CodeFileTemplater.BuildPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav());
+        var html = RegionAssert.Of(page);
 
-        Assert.Contains($"<title>{RepoRelative} — SpecScribe</title>", html);
+        RegionAssert.HasTitle(page, $"{RepoRelative} — SpecScribe");
         Assert.Contains($"<h1>{RepoRelative}</h1>", html);
         Assert.Contains("<div class=\"story-kicker\">Source File</div>", html);
         // Site a11y contract: skip-link first, single main landmark.
-        Assert.Contains("<a class=\"skip-link\" href=\"#main-content\">Skip to content</a>", html);
+        // [Story 23.6 AC #8] The skip link assertion lived here and is NOT lost: it is chrome, emitted by the
+        // head, and the region carries no head. `npm run check:a11y` owns `skip-link` over every EMITTED page —
+        // which is the only place it can be checked honestly now that no C# path composes a whole page — and
+        // `check:parity`'s pageSha hashes the whole document for the pinned corpus.
         Assert.Contains("<main id=\"main-content\">", html);
         // Breadcrumb: Home / <file path>. The nested page's Home link carries the correct ../ depth prefix.
         Assert.Contains("Home", html);
-        var skipIndex = html.IndexOf("skip-link", StringComparison.Ordinal);
-        var mainIndex = html.IndexOf("id=\"main-content\"", StringComparison.Ordinal);
-        Assert.True(skipIndex >= 0 && skipIndex < mainIndex, "skip-link must precede the main landmark");
+        // [Story 23.6 AC #8] skip-link-precedes-main moved to `npm run check:a11y`, which asserts it over
+        // the emitted page. The region begins at the nav, so relative ordering against the head is not
+        // decidable here at all — keeping the assertion would have meant weakening it to something true.
         // Exactly one main landmark.
-        Assert.Equal(1, CountOccurrences(html, "id=\"main-content\""));
+        RegionAssert.HasSingleMainLandmark(html);
     }
 
     [Fact]
@@ -37,7 +41,8 @@ public class CodeFileTemplaterTests
     {
         var lines = new[] { "line one", "line two", "line three" };
 
-        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, lines, Nav());
+        var page = CodeFileTemplater.BuildPage(RepoRelative, OutputPath, lines, Nav());
+        var html = RegionAssert.Of(page);
 
         Assert.Contains("id=\"L1\"", html);
         Assert.Contains("id=\"L2\"", html);
@@ -51,8 +56,8 @@ public class CodeFileTemplaterTests
         // A .cs file routes to the csharp grammar so Prism highlights it.
         Assert.Contains("<code class=\"language-csharp\">", html);
         // Prism's stylesheet + highlighter are loaded on a rendered code page.
-        Assert.Contains("prism.css", html);
-        Assert.Contains("prism.js", html);
+        Assert.Contains("prism.css", page.Assets.ExtraHead);
+        Assert.Contains("prism.js", page.Assets.ExtraHead);
         // Line-count meta pill.
         Assert.Contains("<span class=\"pill\">3 lines</span>", html);
     }
@@ -62,7 +67,7 @@ public class CodeFileTemplaterTests
     {
         var lines = new[] { "before", "", "after" };
 
-        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, lines, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(RepoRelative, OutputPath, lines, Nav()));
 
         // Three lines, three anchors — the blank middle line is not collapsed away.
         Assert.Contains("id=\"L1\"", html);
@@ -78,7 +83,7 @@ public class CodeFileTemplaterTests
     {
         var lines = new[] { "if (a < b && c > d) return \"x\";" };
 
-        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, lines, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(RepoRelative, OutputPath, lines, Nav()));
 
         Assert.Contains("if (a &lt; b &amp;&amp; c &gt; d) return &quot;x&quot;;", html);
         // The raw, unescaped angle bracket form must never reach the output.
@@ -88,7 +93,7 @@ public class CodeFileTemplaterTests
     [Fact]
     public void RenderPage_SingleLineUsesSingularPill()
     {
-        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "only" }, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(RepoRelative, OutputPath, new[] { "only" }, Nav()));
 
         Assert.Contains("<span class=\"pill\">1 line</span>", html);
     }
@@ -100,7 +105,7 @@ public class CodeFileTemplaterTests
         const string path = "docs/notes.unknownext";
         const string output = "code/docs/notes.unknownext.html";
 
-        var html = CodeFileTemplater.RenderPage(path, output, new[] { "just text" }, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(path, output, new[] { "just text" }, Nav()));
 
         Assert.Contains("<pre class=\"code-file\"><code>", html);
         Assert.DoesNotContain("language-", html);
@@ -109,7 +114,7 @@ public class CodeFileTemplaterTests
     [Fact]
     public void RenderPlaceholder_RendersShellAndReasonWithoutLineTable()
     {
-        var html = CodeFileTemplater.RenderPlaceholder(RepoRelative, OutputPath, "This file is too large to render inline.", Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPlaceholderPage(RepoRelative, OutputPath, "This file is too large to render inline.", Nav()));
 
         Assert.Contains("<main id=\"main-content\">", html);
         Assert.Contains($"<h1>{RepoRelative}</h1>", html);
@@ -130,7 +135,7 @@ public class CodeFileTemplaterTests
     [Fact]
     public void RenderPage_WithReferences_LeadsWithRelationshipGraphThenSecondarySource()
     {
-        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs));
 
         // The relationships block (graph component + accessible list) is present and is the hero — it precedes the
         // source. Story 24.2: the card is now the component's FRAMED panel, not a hand-written <section>.
@@ -163,14 +168,15 @@ public class CodeFileTemplaterTests
     [Fact]
     public void RenderPage_Cited_EmitsGraphHostIslandAndEngineButNoRetiredSvg()
     {
-        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs);
+        var page = CodeFileTemplater.BuildPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs);
+        var html = RegionAssert.Of(page);
 
         // Host, island and boot handshake — the three halves of the component's contract.
         Assert.Contains("data-relgraph></div>", html);
         Assert.Contains("<script type=\"application/json\" id=\"relgraph-", html);
-        Assert.Contains("data-ss-relgraph-boot", html);
+        Assert.True(page.Assets.GraphBootInline, "a graph host must request the anti-flash boot handshake");
         // The engine is pulled ONLY because the rendered body carries a host (the flag is derived, never hand-set).
-        Assert.Contains("plotly-hierarchy.min.js", html);
+        Assert.True(page.Assets.GraphEngineNeeded, "the graph host must pull the vendored engine");
         // Nothing of the retired SVG survives — this is the ADR 0013 §1/§4 retirement, not a coexistence.
         Assert.DoesNotContain("ref-graph", html);
         Assert.DoesNotContain("ref-edge", html);
@@ -184,7 +190,7 @@ public class CodeFileTemplaterTests
     {
         // The engine flag is derived from the rendered body, so a page with no graph must stay clean of a 1.2 MB
         // bundle it cannot use — and of the boot marker that would otherwise show "Initializing…" over nothing.
-        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav()));
 
         Assert.DoesNotContain("data-relgraph", html);
         Assert.DoesNotContain("plotly-hierarchy.min.js", html);
@@ -198,24 +204,24 @@ public class CodeFileTemplaterTests
         // exists, and Plotly draws a WRONG-SIZED chart rather than complaining. The marker is what routes the tab
         // radios into the deferred-mount handshake, so its absence is a silent rendering defect — pinned here
         // because no rendering assertion can see it.
-        var withGraph = CodeFileTemplater.RenderPage(
-            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight());
+        var withGraph = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight()));
         Assert.Contains("data-relgraph-reveal", withGraph);
         // One per tab radio, so whichever tab the reader arrives on flushes the pending mount.
         Assert.Equal(4, CountOccurrences(withGraph, "data-relgraph-reveal"));
 
         // A tabbed page with NO graph (deep-git insight but no citers and no coupling) must not carry it.
-        var noGraph = CodeFileTemplater.RenderPage(
+        var noGraph = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(
             RepoRelative, OutputPath, new[] { "using System;" }, Nav(),
-            insight: new FileInsight(3, new[] { ("Alice", 3) }, Array.Empty<CoupledFile>(), Array.Empty<CommitTouch>(), 1));
+            insight: new FileInsight(3, new[] { ("Alice", 3) }, Array.Empty<CoupledFile>(), Array.Empty<CommitTouch>(), 1)));
         Assert.DoesNotContain("data-relgraph-reveal", noGraph);
     }
 
     [Fact]
     public void RenderPage_Graph_CarriesTheStory102FramingFromTheSharedSource()
     {
-        var html = CodeFileTemplater.RenderPage(
-            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight()));
 
         Assert.Contains("<h3>Relationships</h3>", html);
         // The framing sentence comes from Charts.WhyText, never hand-rolled at the call site.
@@ -228,7 +234,7 @@ public class CodeFileTemplaterTests
     {
         // A citations-only card (no --deep-git) must not carry a sentence about change coupling: a frame that
         // describes a metric the chart does not draw is the misdescribing-frame class Story 10.2 exists to prevent.
-        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs));
 
         Assert.DoesNotContain(Charts.WhyText(Charts.ChartMetric.ChangeCoupling), html);
         Assert.DoesNotContain("chart-frame-why", html);
@@ -237,8 +243,8 @@ public class CodeFileTemplaterTests
     [Fact]
     public void RenderPage_Legend_DisclosesTheWidthBandingAndNamesNonColourChannels()
     {
-        var html = CodeFileTemplater.RenderPage(
-            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight()));
 
         // ADR 0030 §5: Plotly's line style is trace-level, so stroke width is QUANTISED. A legend claiming a
         // continuous scale beside a banded chart is the misdescribing-entry class 10.7 and 21.1 each closed.
@@ -257,7 +263,7 @@ public class CodeFileTemplaterTests
     {
         // A legend row must never point at zero edges. Citations-only: no coupling, no boundary, no process, no
         // cross entries.
-        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs));
 
         Assert.Contains("gold circle on a solid spoke", html);
         Assert.DoesNotContain("neutral diamond on a dashed spoke", html);
@@ -272,15 +278,15 @@ public class CodeFileTemplaterTests
         // Owner decision D3: both toggles survive as CLIENT edge filters, inside the component's hidden control bar
         // so a JS-off reader never sees an inert checkbox — and only when they govern something. The retired card
         // shipped both unconditionally, which meant a checkbox that toggled nothing.
-        var both = CodeFileTemplater.RenderPage(
+        var both = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(
             RepoRelative, OutputPath, new[] { "using System;" }, Nav(), RefsWithEpics, insight: SampleInsight(),
-            storyRelatedEdges: new[] { (0, 0) });
+            storyRelatedEdges: new[] { (0, 0) }));
         Assert.Contains("<div class=\"ss-relgraph-controls\" hidden>", both);
         Assert.Contains("data-relgraph-filter=\"epic\"", both);
         Assert.Contains("data-relgraph-filter=\"cross\"", both);
 
         // No epic membership and no cross edges → no control bar at all.
-        var neither = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs);
+        var neither = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs));
         Assert.DoesNotContain("ss-relgraph-controls", neither);
         Assert.DoesNotContain("data-relgraph-filter", neither);
     }
@@ -288,9 +294,9 @@ public class CodeFileTemplaterTests
     [Fact]
     public void RenderPage_Island_CarriesEveryEdgeWithItsGoverningFilterAndServerResolvedStyle()
     {
-        var html = CodeFileTemplater.RenderPage(
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(
             RepoRelative, OutputPath, new[] { "using System;" }, Nav(), RefsWithEpics, insight: SampleInsight(),
-            storyRelatedEdges: new[] { (0, 0) }, relatedRelatedEdges: new[] { (0, 1) });
+            storyRelatedEdges: new[] { (0, 0) }, relatedRelatedEdges: new[] { (0, 1) }));
 
         // Style classes are resolved SERVER-side and shipped, so legend, payload and drawn chart cannot disagree.
         Assert.Contains("\"styles\":[", html);
@@ -315,8 +321,8 @@ public class CodeFileTemplaterTests
     {
         // Owner decision D1: the focal file is pinned at the canvas centre and excluded from the relaxation, so the
         // hub-and-spoke read cannot drift. Asserted on the emitted GEOMETRY, not on a configuration flag.
-        var html = CodeFileTemplater.RenderPage(
-            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight()));
 
         Assert.Contains("\"id\":\"focal\",\"l\":\"Sample.cs\",\"p\":\"src/SpecScribe/Sample.cs\",\"x\":\"0.5\",\"y\":\"0.5\"", html);
     }
@@ -327,12 +333,12 @@ public class CodeFileTemplaterTests
         // Node position is DATA (ADR 0030 §2), so the same input must produce the same coordinates. In-process
         // repetition cannot see string-hash randomization across processes — that is verified separately in
         // CouplingLayoutTests — but it does catch an accumulator whose order depends on a dictionary walk.
-        var a = CodeFileTemplater.RenderPage(
+        var a = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(
             RepoRelative, OutputPath, new[] { "using System;" }, Nav(), RefsWithEpics, insight: SampleInsight(),
-            storyRelatedEdges: new[] { (0, 0) }, relatedRelatedEdges: new[] { (0, 1) });
-        var b = CodeFileTemplater.RenderPage(
+            storyRelatedEdges: new[] { (0, 0) }, relatedRelatedEdges: new[] { (0, 1) }));
+        var b = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(
             RepoRelative, OutputPath, new[] { "using System;" }, Nav(), RefsWithEpics, insight: SampleInsight(),
-            storyRelatedEdges: new[] { (0, 0) }, relatedRelatedEdges: new[] { (0, 1) });
+            storyRelatedEdges: new[] { (0, 0) }, relatedRelatedEdges: new[] { (0, 1) }));
 
         Assert.Equal(a, b);
     }
@@ -344,7 +350,7 @@ public class CodeFileTemplaterTests
         // Charts.ReferenceGraph call site — could never draw, because a page with citers always has a
         // relationships panel and therefore always takes the TABBED branch. Recorded as a test rather than left as
         // a reasoning claim, since the whole decision to delete that branch rests on it.
-        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs));
 
         Assert.Contains("code-tab--relationships", html);
         Assert.DoesNotContain("<aside class=\"code-aside\">", html);
@@ -353,7 +359,7 @@ public class CodeFileTemplaterTests
     [Fact]
     public void RenderPage_NoReferences_OmitsRelationshipsBlockButKeepsSource()
     {
-        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav()));
 
         Assert.DoesNotContain("code-relationships", html);
         Assert.DoesNotContain("ref-graph", html);
@@ -366,7 +372,7 @@ public class CodeFileTemplaterTests
     public void RenderPage_WithExternalUrl_AddsAdditiveViewSourceLink()
     {
         const string external = "https://github.com/owner/repo/blob/main/src/SpecScribe/Sample.cs";
-        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, external);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, external));
 
         Assert.Contains("class=\"code-external-link\"", html);
         Assert.Contains($"href=\"{external}\"", html);
@@ -379,7 +385,7 @@ public class CodeFileTemplaterTests
     [Fact]
     public void RenderPage_NoExternalUrl_OmitsViewSourceLink()
     {
-        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs));
 
         Assert.DoesNotContain("code-external-link", html);
     }
@@ -409,8 +415,8 @@ public class CodeFileTemplaterTests
     public void RenderPage_NullInsight_RendersNoAdvancedCoverageSection()
     {
         // A null insight (deep-git off / no data) must leave the page byte-identical to a plain render.
-        var baseline = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs);
-        var withNull = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: null);
+        var baseline = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs));
+        var withNull = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: null));
 
         Assert.DoesNotContain("code-insights", withNull);
         Assert.Equal(baseline, withNull);
@@ -419,8 +425,8 @@ public class CodeFileTemplaterTests
     [Fact]
     public void RenderPage_PopulatedInsight_RendersContributorsFrequencyAndHistory()
     {
-        var html = CodeFileTemplater.RenderPage(
-            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight()));
 
         Assert.Contains("<section class=\"code-insights\"", html);
         // Change frequency line.
@@ -455,8 +461,8 @@ public class CodeFileTemplaterTests
     [Fact]
     public void RenderPage_PopulatedInsight_RendersRelatedFilesAsGraphNodesAndSrOnlyEntries()
     {
-        var html = CodeFileTemplater.RenderPage(
-            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight()));
 
         // The co-changed files render as the graph's second node population (Story 24.2: neutral diamonds in the
         // island's node array, on dashed coupling spokes) …
@@ -480,8 +486,8 @@ public class CodeFileTemplaterTests
     [Fact]
     public void RenderPage_SrOnlyRelatedList_CarriesDirectionalConfidencePerEntry()
     {
-        var html = CodeFileTemplater.RenderPage(
-            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight()));
 
         // 4 of the focal file's 7 changes = 57%; 2 of 7 = 29%. Read from THIS file's side, per AC #3.
         Assert.Contains("changed together 4 times &#183; confidence 57%", html);
@@ -491,8 +497,8 @@ public class CodeFileTemplaterTests
     [Fact]
     public void RenderPage_SrOnlyRelatedList_MarksCrossBoundaryCouplesAsWordsNotColour()
     {
-        var html = CodeFileTemplater.RenderPage(
-            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight()));
 
         // docs/notes.md crosses from src/ into docs/; src/SpecScribe/Other.cs does not. The marker must be readable
         // text (UX-DR19/NFR8) and must attach only to the crossing entry.
@@ -503,8 +509,8 @@ public class CodeFileTemplaterTests
     [Fact]
     public void RenderPage_SrOnlyRelatedList_CarriesLiftOnTheRowTitleAndOmitsItWhenUndefined()
     {
-        var html = CodeFileTemplater.RenderPage(
-            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight()));
 
         // Other.cs has lift 1.4; notes.md's lift is null (undefined denominator) and must simply not appear —
         // never as "NaN"/"∞", which is what an unguarded division would have rendered.
@@ -519,8 +525,8 @@ public class CodeFileTemplaterTests
     {
         // With no insight there are no related-file nodes: the relationships card must be exactly the citations-only
         // card. Byte-identity proves the additive overload and the no-deep-git degradation path.
-        var baseline = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs);
-        var withNull = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: null);
+        var baseline = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs));
+        var withNull = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: null));
 
         Assert.Equal(baseline, withNull);
         Assert.DoesNotContain("\"k\":\"coupled\"", baseline);
@@ -536,8 +542,8 @@ public class CodeFileTemplaterTests
         // Only src/SpecScribe/Other.cs has a code page; docs/notes.md does not → non-link node, never a dead link.
         string? Resolve(string path) => path == "src/SpecScribe/Other.cs" ? "code/src/SpecScribe/Other.cs.html" : null;
 
-        var html = CodeFileTemplater.RenderPage(
-            RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs, insight: SampleInsight(), coupledFileHref: Resolve);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(
+            RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs, insight: SampleInsight(), coupledFileHref: Resolve));
 
         // Resolved coupled file → a linked graph node + a linked sr-only entry (prefixed to the code page's depth).
         Assert.Contains("\"h\":\"../../../code/src/SpecScribe/Other.cs.html\"", html);
@@ -554,8 +560,8 @@ public class CodeFileTemplaterTests
         // abc1234 has a per-commit page; def5678 does not → plain <code>, never a dead link.
         string? Resolve(string shortHash) => shortHash == "abc1234" ? "commit/abc1234.html" : null;
 
-        var html = CodeFileTemplater.RenderPage(
-            RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs, insight: SampleInsight(), commitHref: Resolve);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(
+            RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs, insight: SampleInsight(), commitHref: Resolve));
 
         Assert.Contains("<a href=\"../../../commit/abc1234.html\"><code>abc1234</code></a>", html);
         Assert.Contains("<code>def5678</code>", html);
@@ -568,8 +574,8 @@ public class CodeFileTemplaterTests
         // 2026-07-03 has a day page; 2026-07-01 does not → plain date text, never a dead link.
         string? Resolve(DateOnly date) => date == new DateOnly(2026, 7, 3) ? "commits/2026-07-03.html" : null;
 
-        var html = CodeFileTemplater.RenderPage(
-            RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs, insight: SampleInsight(), dayHref: Resolve);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(
+            RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs, insight: SampleInsight(), dayHref: Resolve));
 
         Assert.Contains("<a href=\"../../../commits/2026-07-03.html\">2026-07-03</a>", html);
         Assert.DoesNotContain("<a href=\"../../../commits/2026-07-01.html\"", html);
@@ -589,7 +595,7 @@ public class CodeFileTemplaterTests
             History: new[] { new CommitTouch("aaa1111", new DateOnly(2026, 7, 1), "E<v>il", "sub&<ject>\"") },
             TotalContributors: 1);
 
-        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs, insight: insight);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs, insight: insight));
 
         Assert.Contains("A&lt;b&gt;&amp;&quot;lice", html);
         Assert.Contains("src/&lt;x&gt;&amp;.cs", html);
@@ -610,7 +616,7 @@ public class CodeFileTemplaterTests
             History: Array.Empty<CommitTouch>(),
             TotalContributors: 1);
 
-        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs, insight: insight);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs, insight: insight));
 
         Assert.Contains("code-insights", html);
         Assert.Contains("Contributors to this file", html);
@@ -631,7 +637,7 @@ public class CodeFileTemplaterTests
             History: Array.Empty<CommitTouch>(),
             TotalContributors: 12);
 
-        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs, insight: insight);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs, insight: insight));
 
         Assert.Contains("+10 more contributors", html);
     }
@@ -647,7 +653,7 @@ public class CodeFileTemplaterTests
             History: Array.Empty<CommitTouch>(),
             TotalContributors: 1);
 
-        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs, insight: insight);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs, insight: insight));
 
         Assert.DoesNotContain("code-insight-more", html);
     }
@@ -657,8 +663,8 @@ public class CodeFileTemplaterTests
     [Fact]
     public void RenderPage_FullData_RendersFourIconedTabsWithInsightsDefault()
     {
-        var html = CodeFileTemplater.RenderPage(
-            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight()));
 
         // Four tabs, in order, each with its modifier + a visible text label.
         foreach (var (mod, label) in new[] { ("insights", "Insights"), ("relationships", "Relationships"), ("history", "History"), ("source", "Code") })
@@ -687,8 +693,8 @@ public class CodeFileTemplaterTests
     [Fact]
     public void RenderPage_Graph_LivesInRelationshipsTabOnly_NotInsights()
     {
-        var html = CodeFileTemplater.RenderPage(
-            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight()));
 
         // The relationship graph renders exactly once, inside the relationships panel. Exactly-once matters more
         // than it used to: a second host would mean a second island id, and the client resolves its payload BY id.
@@ -705,8 +711,8 @@ public class CodeFileTemplaterTests
     [Fact]
     public void RenderPage_History_LivesInHistoryTabOnly_NotInsights()
     {
-        var html = CodeFileTemplater.RenderPage(
-            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(
+            RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight()));
 
         // The history table renders exactly once, inside the history panel — not in Insights.
         Assert.Equal(1, CountOccurrences(html, "code-history-table"));
@@ -721,7 +727,7 @@ public class CodeFileTemplaterTests
     public void RenderPage_RefsOnlyNoInsight_ShowsRelationshipsAndCodeWithRelationshipsDefault()
     {
         // No deep-git insight → no Insights tab and no History tab. Relationships leads (first surviving tab).
-        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs));
 
         Assert.Contains("code-tab--relationships", html);
         Assert.Contains("code-tab--source", html);
@@ -741,7 +747,7 @@ public class CodeFileTemplaterTests
     public void RenderPage_Uncited_NoInsight_RendersNoTabChrome()
     {
         // Only the source has content → no tabs at all; the source spans full width exactly as pre-tab.
-        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav()));
 
         Assert.DoesNotContain("code-tabs", html);
         Assert.DoesNotContain("code-tablist", html);
@@ -759,7 +765,7 @@ public class CodeFileTemplaterTests
     [Fact]
     public void RenderPage_EpicGrouping_EmitsAnEpicHubNodeAndAFilteredMembershipEdge()
     {
-        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), RefsWithEpics);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), RefsWithEpics));
 
         // Story 24.2 D3: "Group by epic" is no longer a pre-rendered variant. ONE layout is solved, the epic hub is
         // in it, and the filter governs whether its membership edge (and therefore the hub) is drawn.
@@ -780,9 +786,9 @@ public class CodeFileTemplaterTests
     public void RenderPage_ShowRelationships_StoryRelatedEdgeIsAFilteredCrossEdgeAndAlwaysInTheTwin()
     {
         var related = new[] { (0, 0) }; // story index 0 also cites related-file index 0
-        var html = CodeFileTemplater.RenderPage(
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(
             RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight(),
-            storyRelatedEdges: related);
+            storyRelatedEdges: related));
 
         Assert.Contains("\"e\":\"xcite\",\"s\":\"cross\"", html);
         // The sentence itself is authored ONCE, as the kind's phrase, instead of on every edge.
@@ -795,9 +801,9 @@ public class CodeFileTemplaterTests
     public void RenderPage_ShowRelationships_RelatedToRelatedEdgeIsAFilteredCrossEdge()
     {
         var pairEdges = new[] { (0, 1) }; // related-file index 0 <-> related-file index 1
-        var html = CodeFileTemplater.RenderPage(
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(
             RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs, insight: SampleInsight(),
-            relatedRelatedEdges: pairEdges);
+            relatedRelatedEdges: pairEdges));
 
         Assert.Contains("\"e\":\"xcouple\",\"s\":\"cross\"", html);
         Assert.Contains("{a} and {b} are themselves frequently co-changed.", html);
@@ -810,7 +816,7 @@ public class CodeFileTemplaterTests
         // "--deep-git off / no FileInsight" degradation: no coupled population, no epic data, no cross edges. The
         // control bar disappears entirely rather than shipping two checkboxes that toggle nothing — the correction
         // to the retired card, which rendered both unconditionally.
-        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), Refs));
 
         Assert.DoesNotContain("ss-relgraph-controls", html);
         Assert.DoesNotContain("\"e\":\"epic\"", html);
@@ -827,16 +833,16 @@ public class CodeFileTemplaterTests
         // The two cross-edge builders are INDEX-ALIGNED with the citer list and the coupled list, and Story 24.2
         // widened the coupled cap — so an index that no longer resolves must be dropped, never silently rebound to
         // whatever node happens to sit at that ordinal.
-        var ex = Record.Exception(() => CodeFileTemplater.RenderPage(
+        var ex = Record.Exception(() => JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(
             RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs, insight: SampleInsight(),
             storyRelatedEdges: new[] { (99, 0), (0, 99), (-1, -1) },
-            relatedRelatedEdges: new[] { (0, 99), (5, 5), (-2, 0) }));
+            relatedRelatedEdges: new[] { (0, 99), (5, 5), (-2, 0) })));
         Assert.Null(ex);
 
-        var html = CodeFileTemplater.RenderPage(
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(
             RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs, insight: SampleInsight(),
             storyRelatedEdges: new[] { (99, 0), (0, 99) },
-            relatedRelatedEdges: new[] { (0, 99), (5, 5) });
+            relatedRelatedEdges: new[] { (0, 99), (5, 5) }));
         Assert.DoesNotContain("\"s\":\"cross\"", html);
     }
 
@@ -846,16 +852,16 @@ public class CodeFileTemplaterTests
         // A minimal citer set with no epic info and no insight at all — the whole card must render without
         // throwing, exactly the graceful-degradation contract.
         var ex = Record.Exception(() =>
-            CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs));
+            JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(RepoRelative, OutputPath, new[] { "x" }, Nav(), Refs)));
         Assert.Null(ex);
     }
 
     [Fact]
     public void RenderPlaceholder_WithInsight_RendersInsightsAndHistoryTabs()
     {
-        var html = CodeFileTemplater.RenderPlaceholder(
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPlaceholderPage(
             RepoRelative, OutputPath, "This file is too large to render inline.", Nav(),
-            insight: SampleInsight());
+            insight: SampleInsight()));
 
         Assert.Contains("class=\"code-placeholder\">This file is too large to render inline.</p>", html);
         Assert.DoesNotContain("class=\"code-line\"", html);
@@ -884,8 +890,8 @@ public class CodeFileTemplaterTests
     [Fact]
     public void RenderPage_TabGroupNames_DifferForSlashVsHyphenPaths()
     {
-        var slash = CodeFileTemplater.RenderPage("a/b.cs", "code/a/b.cs.html", new[] { "x" }, Nav(), Refs, insight: SampleInsight());
-        var hyphen = CodeFileTemplater.RenderPage("a-b.cs", "code/a-b.cs.html", new[] { "x" }, Nav(), Refs, insight: SampleInsight());
+        var slash = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage("a/b.cs", "code/a/b.cs.html", new[] { "x" }, Nav(), Refs, insight: SampleInsight()));
+        var hyphen = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage("a-b.cs", "code/a-b.cs.html", new[] { "x" }, Nav(), Refs, insight: SampleInsight()));
 
         Assert.Contains("name=\"code-view-codex2fax2fb-cs-html\"", slash);
         Assert.Contains("name=\"code-view-codex2fa-b-cs-html\"", hyphen);
@@ -901,7 +907,7 @@ public class CodeFileTemplaterTests
             new PagerLink("../code/a.cs.html", "a.cs"),
             new PagerLink("../code/c.cs.html", "c.cs"));
 
-        var html = CodeFileTemplater.RenderPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), pager: pager);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeFileTemplater.BuildPage(RepoRelative, OutputPath, new[] { "using System;" }, Nav(), pager: pager));
 
         Assert.Contains("<div class=\"page-wayfinding\">", html);
         var wrapperIdx = html.IndexOf("page-wayfinding", StringComparison.Ordinal);

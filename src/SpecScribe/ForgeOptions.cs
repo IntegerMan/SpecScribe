@@ -32,12 +32,16 @@ public sealed class ForgeOptions
     /// flag is the FR-10 performance guarantee — the gate, not a timing test. [Story 3.2]</summary>
     public required bool DeepGitAnalytics { get; init; }
 
-    /// <summary>When true (opt-in via <c>--spa</c>), generation additionally emits the JSON + client-renderer (SPA)
-    /// delivery form — a manifest, grouped content chunks, an entry shell, and the client script — ALONGSIDE the
-    /// untouched static site (ADR 0006 Architecture B, Story 6.7). Off by default: with the flag off NO SPA files
-    /// are written and the static output is byte-identical, so the golden gate is unaffected (AC #3/#5). Not
-    /// <c>required</c> precisely so every existing <see cref="ForgeOptions"/> construction defaults to off. [Story 6.7]</summary>
-    public bool EmitSpa { get; init; }
+    /// <summary>⚠️ <b>The FALSE path is gone. This property is retained, defaulted to <c>true</c>, and no longer
+    /// consulted by <see cref="SiteGenerator"/>.</b> [Story 23.6 AC #6]
+    /// <para>It was the opt-in behind <c>--spa</c>: generation emitted the JSON delivery form ALONGSIDE the static
+    /// site, and with the flag off no IR was written at all. That inverted in Story 23.6. The IR under <c>spa/</c>
+    /// is the canonical output (ADR 0016) and the static pages are RENDERED FROM IT (ADR 0022 §Decision 3), so a
+    /// run that emitted no IR would emit nothing at all — C# no longer writes a content page.</para>
+    /// <para>It is kept rather than deleted so the ~40 existing <see cref="ForgeOptions"/> constructions and their
+    /// <c>emitSpa:</c> arguments keep compiling; the default flipped from <c>false</c> to <c>true</c> so a caller
+    /// that omits it gets the only behaviour that now exists. Setting it <c>false</c> does nothing.</para></summary>
+    public bool EmitSpa { get; init; } = true;
 
     /// <summary>The base URL of the file's source on its hosting platform, e.g.
     /// <c>https://github.com/owner/repo/blob/main</c> (Story 7.7). When set — explicitly via <c>--code-url</c> or
@@ -131,7 +135,9 @@ public sealed class ForgeOptions
         string? startDirectory = null,
         bool includeReadme = true,
         bool deepGitAnalytics = false,
-        bool emitSpa = false,
+        // Story 23.6 AC #6: the IR is unconditional, so the only remaining behaviour is `true`. Kept in the
+        // signature so existing `emitSpa:` call sites compile unchanged; the value is no longer consulted.
+        bool emitSpa = true,
         string? codeSourceBaseUrl = null,
         bool autoDetectCodeUrl = false,
         bool requireSource = true,

@@ -358,7 +358,7 @@ public class RequirementsParserTests
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
         var counts = ProjectCounts.Build(progress, null, WorkInventory.Empty, epics, reqs);
 
-        var html = RequirementsTemplater.RenderIndex(reqs, epics, progress, nav, counts);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(RequirementsTemplater.BuildIndexPage(reqs, epics, progress, nav, counts));
 
         Assert.Contains("id=\"satisfaction\"", html);
         Assert.Contains("Satisfaction at a glance", html);
@@ -441,7 +441,7 @@ public class RequirementsParserTests
             """, epics, progress);
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
-        var html = RequirementsTemplater.RenderIndex(reqs, epics, progress, nav);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(RequirementsTemplater.BuildIndexPage(reqs, epics, progress, nav));
 
         Assert.Contains("id=\"satisfaction\"", html);
         Assert.Contains("href=\"#nfr-uxdr-coverage\"", html);
@@ -489,7 +489,7 @@ public class RequirementsParserTests
             """, epics, progress);
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
-        var html = RequirementsTemplater.RenderIndex(reqs, epics, progress, nav);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(RequirementsTemplater.BuildIndexPage(reqs, epics, progress, nav));
 
         Assert.DoesNotContain("Overall (", html);
         Assert.Contains("Functional (1)", html);
@@ -527,7 +527,7 @@ public class RequirementsParserTests
             """, epics, progress);
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
-        var html = RequirementsTemplater.RenderIndex(reqs, epics, progress, nav);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(RequirementsTemplater.BuildIndexPage(reqs, epics, progress, nav));
 
         Assert.DoesNotContain("Satisfaction at a glance", html);
         Assert.DoesNotContain("id=\"satisfaction\"", html);
@@ -541,7 +541,7 @@ public class RequirementsParserTests
         var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
-        var html = RequirementsTemplater.RenderIndex(reqs, epics, progress, nav);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(RequirementsTemplater.BuildIndexPage(reqs, epics, progress, nav));
 
         // The status-block grid section (AC #1) with a labeled block per requirement...
         Assert.Contains("Requirements at a glance", html);
@@ -796,7 +796,7 @@ public class RequirementsParserTests
         Assert.Equal(new[] { 99 }, reqs.ById["NFR1"].CoverageEpicNumbers);
         Assert.Equal(RequirementStatus.Planned, reqs.ById["NFR1"].Status);
 
-        var html = RequirementsTemplater.RenderIndex(reqs, epics, progress, nav);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(RequirementsTemplater.BuildIndexPage(reqs, epics, progress, nav));
         Assert.Contains("Covering epic not found in the epic list.", html);
         Assert.DoesNotContain("nfr-uxdr-epic-list", html);
     }
@@ -818,7 +818,7 @@ public class RequirementsParserTests
         var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
-        var html = RequirementsTemplater.RenderIndex(reqs, epics, progress, nav);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(RequirementsTemplater.BuildIndexPage(reqs, epics, progress, nav));
 
         Assert.Contains("Non-functional &amp; design coverage", html);
         Assert.Contains("Non-functional requirements", html);
@@ -880,7 +880,7 @@ public class RequirementsParserTests
         var reqs = RequirementsParser.Parse(md, epics, progress);
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
-        var html = RequirementsTemplater.RenderIndex(reqs, epics, progress, nav);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(RequirementsTemplater.BuildIndexPage(reqs, epics, progress, nav));
 
         Assert.DoesNotContain("Non-functional &amp; design coverage", html);
         Assert.DoesNotContain(">Design (", html);
@@ -899,7 +899,7 @@ public class RequirementsParserTests
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
         var req = reqs.ById["UX-DR1"];
 
-        var html = RequirementsTemplater.RenderRequirement(req, progress, nav, epics);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(RequirementsTemplater.BuildRequirementPage(req, progress, nav, epics));
 
         Assert.Contains("UX Design Requirement", html);
         Assert.Contains("requirements.html", html);
@@ -913,7 +913,7 @@ public class RequirementsParserTests
         var (reqs, epics) = ParseMultiEpic();
         var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
-        return RequirementsTemplater.RenderRequirement(reqs.ById[reqId], progress, nav, epics);
+        return JsonSpaRenderAdapter.Shared.RenderContent(RequirementsTemplater.BuildRequirementPage(reqs.ById[reqId], progress, nav, epics));
     }
 
     [Fact]
@@ -1007,7 +1007,7 @@ public class RequirementsParserTests
         var reqs = RequirementsParser.Parse(md, epics, progress);
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
-        var html = RequirementsTemplater.RenderRequirement(reqs.ById["FR1"], progress, nav, epics);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(RequirementsTemplater.BuildRequirementPage(reqs.ById["FR1"], progress, nav, epics));
 
         Assert.Contains("Covering epic(s) named in the map were not found in the epic list.", html);
         Assert.Contains("since-removed epic number", html);
@@ -1047,7 +1047,7 @@ public class RequirementsParserTests
         var reqs = RequirementsParser.Parse(md, epics, progress);
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
-        var html = RequirementsTemplater.RenderRequirement(reqs.ById["FR1"], progress, nav, epics);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(RequirementsTemplater.BuildRequirementPage(reqs.ById["FR1"], progress, nav, epics));
 
         Assert.Contains("No stories drafted in this epic yet.", html);
         Assert.DoesNotContain("coverage-story-card", html);
@@ -1078,7 +1078,7 @@ public class RequirementsParserTests
         var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
-        var html = RequirementsTemplater.RenderIndex(reqs, epics, progress, nav);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(RequirementsTemplater.BuildIndexPage(reqs, epics, progress, nav));
 
         // The donut legend gains a distinct "Not yet mapped" segment separate from "Planned".
         Assert.Contains("Not yet mapped", html);
@@ -1105,7 +1105,7 @@ public class RequirementsParserTests
         var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
-        var html = RequirementsTemplater.RenderIndex(reqs, epics, progress, nav);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(RequirementsTemplater.BuildIndexPage(reqs, epics, progress, nav));
         var fr1 = html[html.IndexOf("id=\"fr1\"", StringComparison.Ordinal)..];
         var fr1Card = fr1[..fr1.IndexOf("</div>\n\n", StringComparison.Ordinal)];
 
@@ -1130,7 +1130,7 @@ public class RequirementsParserTests
         var (reqs, epics) = ParseMultiEpic();
         var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
-        return RequirementsTemplater.RenderRequirement(reqs.ById[reqId], progress, nav, epics, retroMap, deferredWorkHref);
+        return JsonSpaRenderAdapter.Shared.RenderContent(RequirementsTemplater.BuildRequirementPage(reqs.ById[reqId], progress, nav, epics, retroMap, deferredWorkHref));
     }
 
     [Fact]
@@ -1222,7 +1222,7 @@ public class RequirementsParserTests
         var progress = ProgressCalculator.Compute(epics, new Dictionary<string, string>(), git: null);
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
-        var html = RequirementsTemplater.RenderRequirement(req, progress, nav, epics);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(RequirementsTemplater.BuildRequirementPage(req, progress, nav, epics));
 
         Assert.Contains("First Wins", html);
         Assert.Contains("story-1-1", html);

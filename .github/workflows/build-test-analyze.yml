@@ -243,12 +243,37 @@ jobs:
         # via their own `sync-runtime-assets.mjs` prefix. Reproduced locally by deleting web/public/.
         run: npm run sync:assets
 
+      - name: Build the project-independent renderer artefact
+        working-directory: web
+        # Story 23.6. `check:parity` (part of `npm run check` below) RENDERS a pinned IR corpus through the
+        # shipped artefact, so the artefact has to exist first. `build:package` sets SPECSCRIBE_PACKAGE_BUILD=1,
+        # which stubs the manifest empty — so this step does NOT need an IR and could equally run before the
+        # generate above.
+        #
+        # It MUST be `build:package`, never `build`. A plain `nuxt build` bakes the building project's pages
+        # into .output/public, and Nitro serves public/ AHEAD of the SSR route — a package artefact pointed at
+        # another IR then returns the baked project's page with HTTP 200, a wrong answer with a success status
+        # (Story 23.5 hit exactly that). `render-lib.mjs` asserts the artefact carries no prerendered HTML
+        # rather than trusting this step.
+        run: npm run build:package
+
       - name: Check web drift gates
         working-directory: web
         # The three generated-artifact gates Story 23.2/23.3 wrote and which, until now, nothing ran:
         #   check:tokens      — web/assets/tokens.css vs the C# :root block
         #   check:ir-content  — web/assets/ir-content.css vs the C# stylesheet
         #   check:assets      — web/public/ vs src/SpecScribe/assets/
+        #   check:parity      — the pinned corpus vs measurements/parity-pinned.json  [Story 23.6 AC #3]
+        #
+        # check:parity is the REPLACEMENT for GoldenContentFingerprint, which Story 23.6 retires along with
+        # the C# page writer it hashes. It renders a FROZEN 24-route corpus (all 14 surface families) through
+        # the artefact and asserts two digests per route: the <main> region still matches the C# lineage Story
+        # 23.4 proved, and the WHOLE PAGE still matches the pinned renderer snapshot — the latter being the
+        # first gate this project has ever had over <title>, meta, the favicon, the footer, <script src>, the
+        # nav toggle, the Mermaid init and the Hierarchy/Graph anti-flash handshakes.
+        #
+        # Because the corpus is frozen it cannot go red for a reason unrelated to the change under test, which
+        # is ADR 0033 §Decision 2 and the property GoldenContentFingerprint never had.
         # No continue-on-error: a drifted generated artifact is a real failure, and the whole point of
         # wiring these is that they now stop a build instead of rotting.
         #
@@ -318,3 +343,41 @@ jobs:
         # No coverage here — this job answers "does the suite pass on Linux",
         # not "what is covered". Analysis is never uploaded from this job.
         run: dotnet test SpecScribe.slnx --no-build
+
+      # -----------------------------------------------------------------------
+      # ADR 0033 §Decision 4's cross-OS proof for `check:parity`. [Story 23.6]
+      #
+      # "Is deterministic across machines and CI before it is pinned … two local
+      # runs is a floor, not a proof of portability." Story 23.4's IR fingerprint
+      # passed three local runs and still produced three different hashes across
+      # this box, CI-Windows and CI-Ubuntu — which is why that gate was removed
+      # and why this one has to be MEASURED on Linux rather than assumed.
+      #
+      # This job is the right place for it precisely because it is non-gating
+      # (continue-on-error at the job level): a Linux divergence is reported as a
+      # finding, and `build-test-analyze` above is where check:parity gates.
+      #
+      # No dotnet generate and no IR are needed — the corpus is COMMITTED under
+      # web/fixtures/parity-corpus/, which is the property that makes the gate
+      # portable in the first place. `.gitattributes` pins the working tree to LF
+      # on every platform, so the fixture checks out byte-identically here.
+      # -----------------------------------------------------------------------
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Build the project-independent renderer artefact
+        working-directory: web
+        run: npm run build:package
+
+      - name: Check parity on Linux (ADR 0033 §4 cross-OS proof)
+        working-directory: web
+        run: npm run check:parity

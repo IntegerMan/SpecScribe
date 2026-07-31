@@ -97,10 +97,13 @@ public class GitInsightsTemplaterTests
     [Fact]
     public void RenderPage_HasSiteChromeAndBothSections()
     {
-        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
+        var page = GitInsightsTemplater.BuildPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
+        var html = RegionAssert.Of(page);
 
         // Full page shell: skip link + single main landmark + breadcrumb, like the other synthesized pages.
-        Assert.Contains("<a class=\"skip-link\" href=\"#main-content\">Skip to content</a>", html);
+        // [Story 23.6 AC #8] The skip-link assertion lived here and is NOT lost — it is head-emitted chrome,
+        // and the region carries no head. `npm run check:a11y` owns `skip-link` over every EMITTED page,
+        // which is the only place it can be asserted honestly now that no C# path composes a whole page.
         Assert.Contains("<main id=\"main-content\" class=\"deep-page git-insights\">", html);
         Assert.Contains("Git Insights</h1>", html);
         Assert.Contains(">Code Ownership &amp; Bus-Factor</h2>", html);
@@ -133,7 +136,7 @@ public class GitInsightsTemplaterTests
             ContributorCount: 5,
             TotalFilesTouched: 60);
 
-        var html = GitInsightsTemplater.RenderPage(insights, null, Nav(), SampleCodeMap(), SampleTopAuthors());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(GitInsightsTemplater.BuildPage(insights, null, Nav(), SampleCodeMap(), SampleTopAuthors()));
 
         Assert.Contains("top 1 of 60 files by commit count", html);
     }
@@ -144,7 +147,7 @@ public class GitInsightsTemplaterTests
         // Story 20.9: the hand-rolled SVG is gone; the chart is the ONE Hierarchy Explorer over a
         // ProjectOwnership payload. The FACT this test has always asserted — the whole tree is charted, and its
         // legend prints real share ranges rather than a "Less ... More" placeholder — is unchanged and just moved.
-        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(GitInsightsTemplater.BuildPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors()));
 
         Assert.Contains(HierarchyExplorer.HostMarker, html);
         Assert.Contains("ss-hierarchy-data", html);
@@ -164,7 +167,7 @@ public class GitInsightsTemplaterTests
         // the affordance and deletes the mechanism: TWO server-rendered SVGs behind a pure-CSS `display:none`
         // pair become ONE instance whose selector re-types the trace in place. That collapse is the real shape of
         // the conversion, so it is asserted rather than merely described.
-        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(GitInsightsTemplater.BuildPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors()));
 
         Assert.Single(Regex.Matches(html, Regex.Escape(HierarchyExplorer.HostMarker + "></div>")));
         Assert.Single(Regex.Matches(html, "ss-hierarchy-data"));
@@ -187,7 +190,7 @@ public class GitInsightsTemplaterTests
         // re-derives from live git state or wall-clock `now`. The values are identical to the `data-*` the retired
         // SVG wrote (they were LIFTED, not re-derived); only their carrier changed, from attributes on 1,420
         // elements to one JSON island. Same numbers, same units, so no dimension can silently re-bucket.
-        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(GitInsightsTemplater.BuildPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors()));
         var island = Island(html);
 
         Assert.Contains("\"share\":\"78\"", island);   // Charts.cs: Alice 7/9 -> 78%
@@ -209,7 +212,7 @@ public class GitInsightsTemplaterTests
         // here are the ones whose arithmetic must NOT drift — share's fixed 25/50/75 cut points and the
         // spotlight's 30/90/180-day recency boundaries were both deliberate "meaningful on their own scale, never
         // a moving target" decisions, and re-deriving either would recolour every repo's chart.
-        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(GitInsightsTemplater.BuildPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors()));
         var island = Island(html);
 
         foreach (var key in new[] { "share", "top", "spotlight", "staleness" })
@@ -241,7 +244,7 @@ public class GitInsightsTemplaterTests
         //
         // The completeness predicate is a SET match, not a count (Story 20.6 Task 1.3b): every file the payload
         // charts has to appear in the twin, not merely the same NUMBER of things.
-        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(GitInsightsTemplater.BuildPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors()));
 
         Assert.Contains("<details class=\"ss-hierarchy-twin\"", html);
         var twin = html[html.IndexOf("<details class=\"ss-hierarchy-twin\"", StringComparison.Ordinal)..];
@@ -263,7 +266,7 @@ public class GitInsightsTemplaterTests
     [Fact]
     public void RenderPage_ModeSelectorControlsShipHiddenForTheNoJsBaseline()
     {
-        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(GitInsightsTemplater.BuildPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors()));
 
         // NFR-5 / ADR 0013: no inert control ships in the no-JS page. Story 20.9 moved these INSIDE the
         // component's own hidden control bar rather than giving them a second reveal of their own, so the
@@ -284,7 +287,7 @@ public class GitInsightsTemplaterTests
     {
         // Owner feedback: the collapsible text-equivalent tree was removed entirely (not demoted) — the two
         // chart forms plus their rich per-file tooltips are the surface now.
-        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(GitInsightsTemplater.BuildPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors()));
 
         Assert.DoesNotContain("ownership-tree-details", html);
         Assert.DoesNotContain("ownership-tree-file", html);
@@ -296,7 +299,7 @@ public class GitInsightsTemplaterTests
     {
         // Owner feedback: enhance the tooltips — every file wedge/cell gets the same rich .codemap-card hover
         // card BuildTreemapCard/RiskQuadrant already established, not a bare native <title>.
-        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(GitInsightsTemplater.BuildPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors()));
 
         // Story 20.9: the card survives the engine swap verbatim — Story 20.5 made `.ss-tooltip` +
         // `data-tip-html` the ONE tooltip system site-wide precisely so swapping the renderer never swaps the
@@ -315,7 +318,7 @@ public class GitInsightsTemplaterTests
         // Owner feedback: the legend must always match what's actually colored — one shared legend area (not
         // duplicated per view) with four mode-specific blocks; the live JS switcher shows exactly one at a time.
         // Only the share-% block is visible without JS; the rest ship hidden (their mode selector is too).
-        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(GitInsightsTemplater.BuildPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors()));
 
         // Story 20.9 ROUTES these four through the component's framing block rather than rewriting them, and
         // adds the marker that pairs each with the dimension that owns it — so "exactly one visible" became a
@@ -334,7 +337,7 @@ public class GitInsightsTemplaterTests
     [Fact]
     public void RenderPage_IsNotFramedAsARankingOrScoreboard()
     {
-        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(GitInsightsTemplater.BuildPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors()));
 
         // FR-10: descriptive attribution only, never a cross-repo people ranking — in every mode, including
         // the spotlight (recolorSpotlight answers "where has this person worked", never "who did the most").
@@ -347,7 +350,7 @@ public class GitInsightsTemplaterTests
     [Fact]
     public void RenderPage_ReusesTheCommitHeatmapForActivity()
     {
-        var html = GitInsightsTemplater.RenderPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(GitInsightsTemplater.BuildPage(SampleInsights(), SamplePulse(), Nav(), SampleCodeMap(), SampleTopAuthors()));
 
         // Activity over time = the existing accessible heatmap (whose active days link to per-day pages).
         // The headline is derived from the SAME pulse data as the heatmap (not insights.Activity), so the
@@ -382,7 +385,7 @@ public class GitInsightsTemplaterTests
             ContributorCount: 2,
             TotalFilesTouched: 1);
 
-        var html = GitInsightsTemplater.RenderPage(insights, null, Nav(), codeMap, Array.Empty<string>());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(GitInsightsTemplater.BuildPage(insights, null, Nav(), codeMap, Array.Empty<string>()));
 
         // The VISIBLE half - the text twin and every other rendered string - is HTML-escaped exactly as before.
         var visible = html.Replace(Island(html), string.Empty, StringComparison.Ordinal);
@@ -427,7 +430,7 @@ public class GitInsightsTemplaterTests
             Files: Array.Empty<FileChangeStat>(), Activity: Array.Empty<(DateOnly, int)>(),
             CommitCount: 1, ContributorCount: 2, TotalFilesTouched: 1);
 
-        var html = GitInsightsTemplater.RenderPage(insights, null, Nav(), codeMap, Array.Empty<string>());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(GitInsightsTemplater.BuildPage(insights, null, Nav(), codeMap, Array.Empty<string>()));
         var island = Island(html);
 
         // Neither sequence survives anywhere in the payload, so the element cannot be closed or re-framed...
@@ -444,14 +447,14 @@ public class GitInsightsTemplaterTests
         var codeMap = SampleCodeMap();
 
         // No resolver: every file link stays plain text/no href — no dead links.
-        var unresolved = GitInsightsTemplater.RenderPage(insights, null, Nav(), codeMap, SampleTopAuthors());
+        var unresolved = JsonSpaRenderAdapter.Shared.RenderContent(GitInsightsTemplater.BuildPage(insights, null, Nav(), codeMap, SampleTopAuthors()));
         Assert.DoesNotContain("href=\"code/", unresolved);
 
         // With a resolver, the resolved file's wedge/tree entry becomes a real link; the unresolved file stays
         // plain text — per-entry guarding, not all-or-nothing.
-        var resolved = GitInsightsTemplater.RenderPage(
+        var resolved = JsonSpaRenderAdapter.Shared.RenderContent(GitInsightsTemplater.BuildPage(
             insights, null, Nav(), codeMap, SampleTopAuthors(),
-            fileHref: path => path == "src/SpecScribe/Charts.cs" ? "code/src/SpecScribe/Charts.cs.html" : null);
+            fileHref: path => path == "src/SpecScribe/Charts.cs" ? "code/src/SpecScribe/Charts.cs.html" : null));
         Assert.Contains("href=\"code/src/SpecScribe/Charts.cs.html\"", resolved);
         Assert.Contains("src/SpecScribe/HtmlTemplater.cs", resolved);
         Assert.DoesNotContain("href=\"code/src/SpecScribe/HtmlTemplater.cs", resolved);
@@ -478,7 +481,7 @@ public class GitInsightsTemplaterTests
             ContributorCount: 1,
             TotalFilesTouched: 2);
 
-        var html = GitInsightsTemplater.RenderPage(insights, null, Nav(), codeMap, new[] { "Alice" });
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(GitInsightsTemplater.BuildPage(insights, null, Nav(), codeMap, new[] { "Alice" }));
 
         Assert.Contains("Single-maintainer project", html);
         Assert.Contains("gi-solo-repo-note", html);
@@ -497,7 +500,7 @@ public class GitInsightsTemplaterTests
             ContributorCount: 0,
             TotalFilesTouched: 0);
 
-        var html = GitInsightsTemplater.RenderPage(empty, null, Nav(), CodeMap.Empty, Array.Empty<string>());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(GitInsightsTemplater.BuildPage(empty, null, Nav(), CodeMap.Empty, Array.Empty<string>()));
 
         Assert.Contains("No file change data available.", html);
         Assert.Contains("No activity data available.", html);

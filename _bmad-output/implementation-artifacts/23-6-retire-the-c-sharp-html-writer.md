@@ -1,6 +1,10 @@
+---
+baseline_commit: e864133
+---
+
 # Story 23.6: Retire the C# HTML Writer
 
-Status: ready-for-dev
+Status: in-progress
 
 <!-- create-story 2026-07-30, baseline commit 5a78ee7. Four owner decisions elicited up front (D1-D4 below).
      Story 23.4's verify-and-iterate pass is CONFIRMED FINISHED by the owner, so AC #5's ordering gate is
@@ -22,6 +26,22 @@ so that Nuxt is the single writer of SpecScribe's HTML and no C# code path emits
 | **D2** | **The replacement content-drift gate is `check:parity` over the committed `web/measurements/parity.json`.** A new npm script that *reads back* the committed per-page `goldenSha` and asserts the freshly rendered page still hashes to it, naming the page on failure, and hard-failing when the row set is empty. Wired into CI beside `npm run check`. No C#-side digest gate. |
 | **D3** | **`RegionCompositionParityTests` and `RegionCompositionCorpusProof` are RETIRED**, with the reason recorded in-file, together with the `SpaDelivery.Extract*` scrapers they are the last consumer of. Their job — proving the composed producer equals the slice — is finished and the evidence is committed (1,469 pages, 0 deltas). |
 | **D4** | **Story 23.4's verify-and-iterate pass over the 1,276 migrated pages is FINISHED.** AC #5's ordering gate is satisfied. Nothing further needs re-measuring against the golden side, which is what makes the deletion safe to start. |
+| **D5** | **(dev-story, 2026-07-31) The drift gate's corpus is PINNED, superseding D2's "read back `web/measurements/parity.json` over the live site".** D2's shape was measured before building on it and found **vacuous**: `goldenSha === irSha === nuxtSha` on **all 1,469** committed rows, so reading the committed value back asks the same question the live run already answers. That is structural, not an oversight — the IR *is* the renderer's input and the region passes through verbatim by contract, so input-digest and output-digest are one quantity, and over a corpus that changes "the content moved" cannot be told from "the renderer moved". The gate now renders a **frozen 24-route IR corpus** committed at `web/fixtures/parity-corpus/` (all 14 families), so **any** digest move is a rendering change by construction and a sibling story editing a doc can never turn it red (ADR 0033 §Decision 2). |
+
+### ⚠️ A second finding that drove D5: the old oracle was blind to the chrome this story deletes
+
+`measure:parity` hashes `mainRegion(html)` — the `<main id="main-content">` landmark only. So `<title>`,
+`<meta name="description">`, the favicon data-URI, the footer, every `<script src>`, the nav toggle script, the
+Mermaid init and the Hierarchy/Graph anti-flash handshakes have **never been inside any committed digest**.
+Those are exactly what `HtmlRenderAdapter.Render` emits and what Task 6 deletes — the highest-risk surface in
+the story had no gate at all, and the story's own § Regression hazards names all five.
+
+The pinned oracle therefore carries **two** digests per route:
+
+| digest | subject | provenance |
+| --- | --- | --- |
+| `mainSha` | the normalized `<main>` region | the **C# lineage** — Story 23.4 proved the composed region byte-equal to C#'s own render across 1,469 pages. `pin:parity` **re-verified it live, 24/24, against the still-existing writer** before freezing it. |
+| `pageSha` | the normalized **whole page** | a **renderer snapshot**. Deliberately *not* taken from C#: the two sides were only ever claimed to agree on `<main>`, so pinning a C# whole-page digest would record a difference that has always existed and call it drift. |
 
 ## Acceptance Criteria
 
@@ -107,61 +127,63 @@ the first implementation of the other. Ratification is the owner's; the story's 
 **Task order is load-bearing.** AC #3 requires the drift gate to exist *before* the deletion, and AC #7's render
 path must be working *before* the writer is removed, or there is a commit range with no portal at all.
 
-- [ ] **Task 1 — Stand up the replacement drift gate FIRST (AC: #3)**
-  - [ ] Add `web/scripts/check-parity.mjs` + `"check:parity"` to `web/package.json`. It loads the committed
-        `web/measurements/parity.json`, and for each row re-reads the rendered page from `.output/public`,
-        normalizes with `harness-lib.mjs`'s `normalizeVolatile`, hashes with the same 16-char sha256 slice, and
-        compares against the row's committed `goldenSha`.
-  - [ ] **Fail loudly on a vanished oracle (ADR 0033 §5).** Assert `rows.length > 0` *and* that the measured row
-        count matches the committed row count before trusting any result. Model the assertion on
-        `RegionCompositionCorpusProof`'s deep-git surface check, which ADR 0033 §5 names as the reference.
-  - [ ] Prove determinism on **both** CI operating systems (`build-test-analyze` Windows + `portability-probe`
-        Ubuntu) before pinning — two local runs is a floor, not a proof (ADR 0033 §4; this is exactly what sank
-        `GoldenIrFingerprint`).
-  - [ ] Add `npm run check:parity` to `build-test-analyze.yml` beside the existing `npm run check` step, and to
-        the `"check"` aggregate script.
-  - [ ] Record in the story: `measure:parity` **writes** the oracle, `check:parity` **reads** it. Today nothing
-        reads it back, which is why the committed `parity.json` is evidence and not yet a gate.
+- [x] **Task 1 — Stand up the replacement drift gate FIRST (AC: #3)**
+  - [x] Add `web/scripts/check-parity.mjs` + `"check:parity"` to `web/package.json`. ⚠️ **The oracle's SHAPE
+        changed on an owner decision taken mid-task (2026-07-31)** — see § Owner decision D5. It reads back a
+        committed oracle over a **pinned corpus**, not the live `parity.json` over the dogfood site.
+  - [x] **Fail loudly on a vanished oracle (ADR 0033 §5).** Three gates, all negative-tested: (A) the oracle
+        must exist, parse, and carry routes with **both** digests; (B) every pinned route must render; (C)
+        every family the oracle claims must still be covered. Modelled on `RegionCompositionCorpusProof`.
+  - [x] Prove determinism — **3 consecutive local runs identical**, and the Ubuntu half is wired into
+        `portability-probe` (ADR 0033 §4). ⚠️ The Linux proof lands on the next CI run; it is not yet observed.
+  - [x] Add `npm run check:parity` to `build-test-analyze.yml` and to the `"check"` aggregate script; add a
+        `build:package` step before it in both jobs.
+  - [x] Recorded: `pin:parity` **writes** the oracle, `check:parity` **reads** it. `measure:parity` is marked
+        SUPERSEDED in-file with the vacuity it acquires at Task 6 spelled out.
 
-- [ ] **Task 2 — Make the IR unconditional (AC: #6)**
-  - [ ] `SiteGenerator.cs:355` — allocate `_spaCapture`/`_spaPageViews` unconditionally. (`_spaCapture` survives
-        Task 2 only as the Task 5 comparison basis; Task 6 removes it.)
-  - [ ] `EmitSpaSite` runs on every `GenerateAll`, not behind `_options.EmitSpa`.
-  - [ ] `SiteSettings.Spa` (`--spa`) becomes a deprecated no-op that prints a one-line notice; keep the option
-        registered so an existing script does not fail with "unknown option". Update its `[Description]`.
-  - [ ] `ForgeOptions.EmitSpa` — keep the property, default it `true`, and document that the false path is gone.
-  - [ ] **`EmitDeltaSidecar` stays gated on watch/serve.** A one-shot `generate` must stay byte-reproducible
-        (NFR9); do not let the IR-always change drag `spa/delta.json` onto the cold path
-        ([SiteGenerator.cs:4225](../../src/SpecScribe/SiteGenerator.cs:4225)).
+- [x] **Task 2 — Make the IR unconditional (AC: #6)**
+  - [x] `_spaCapture`/`_spaPageViews` allocated unconditionally.
+  - [x] `EmitSpaSite` runs on every `GenerateAll` — **and on all five incremental watch paths**, which were the
+        same `if (_options.EmitSpa)` gate and would otherwise have left watch mode emitting no IR at all.
+  - [x] `SiteSettings.Spa` is a deprecated no-op printing a one-line notice (new
+        `ConsoleUi.PrintSpaDeprecationNotice`, wired into **both** `generate` and `watch`); option stays
+        registered; `[Description]` rewritten.
+  - [x] `ForgeOptions.EmitSpa` kept, defaulted `true`, `Resolve`'s `emitSpa` parameter default flipped to `true`;
+        both document that the false path is gone. No longer consulted by `SiteGenerator`.
+  - [x] **`EmitDeltaSidecar` verified already correct** — it was never gated on `--spa`, only on watch/serve
+        (its own doc comment says so). No change needed; NFR9 byte-reproducibility of a one-shot `generate` holds.
 
-- [ ] **Task 3 — Drive the prerender from `generate` (AC: #7, #4)**
-  - [ ] Resolve the artefact directory, in order: `SPECSCRIBE_RENDERER_DIR` env override → a `renderer/`
-        directory beside the executing assembly (the Epic 16 packaging shape) → `web/.output/` relative to the
-        repo root (the developer path). A miss is an actionable error naming all three, never a silent skip.
-  - [ ] Boot `node <artefact>/server/index.mjs` with `SPECSCRIBE_IR_DIR` = the output root and a port the OS
-        assigns; wait for readiness by polling one known route rather than sleeping; on exit, kill the child in a
-        `finally` so a failed generate cannot leak a server. **Do not** reuse `web/scripts/experiment-two-ir.mjs`
-        as the shipping implementation — it is a measurement harness — but **do** read it: it already solved
-        readiness, port handling, per-route driving and process isolation, and its comments record the traps.
-  - [ ] Request one route per manifest entry, write the body to `<OutputRoot>/<path>`. Report a non-200, a missing
-        `<main id="main-content">`, or an unanswered manifest route as a `GenerationOutcome.Error` — the
-        diagnostics page is the surface for it.
-  - [ ] Copy the artefact's static assets into the output root. **Decide and record** whether `specscribe.css`,
-        `specscribe.js`, `prism.js` and `plotly-hierarchy.min.js` continue to come from C#'s `CopyEmbeddedAsset`
-        or from the artefact's own synced copies — they exist in both places today
-        (`web/scripts/sync-runtime-assets.mjs` copies C# → `web/public/`). Two writers of the same file is the
-        drift this epic exists to end; pick one and say which.
-  - [ ] **Node prerequisite (AC #4).** Verify the ADR 0022 §Decision 5 startup check actually fires. Test it three
-        ways: Node absent from `PATH`, Node present but below the supported range, and the artefact directory
-        missing. Each must produce an actionable error naming the supported range
-        (`^22.19.0 || ^24.11.0 || >=26.0.0`) — never an empty output root with `errors=0`.
-  - [ ] **Watch mode.** A full 1,469-route crawl per debounced save is not viable. Use the routes Story 22.5's
-        classifier and Story 22.6's delta already name, and re-render only those. Record the measured
-        per-save cost; if the scope classifier escalates to topology, a full crawl is correct there.
-  - [ ] Record the measured cost of a cold full generate (23.5 measured the crawl at ~4 ms/route, 6.3 s for 1,056
-        routes) against today's C#-only baseline, so the regression is stated rather than discovered.
+- [x] **Task 3 — Drive the prerender from `generate` (AC: #7, #4)** — new [`NuxtPrerender.cs`](../../src/SpecScribe/NuxtPrerender.cs).
+  - [x] Artefact resolution in the specified order, with **two defects the tests caught and fixed**: (a) outside a
+        git checkout the error named only **two of three** locations, because the developer candidate was added
+        only when a repo root was found; (b) an **explicitly set but invalid `SPECSCRIBE_RENDERER_DIR` fell
+        through** to the repo's own artefact — rendering with a renderer the operator did not name, and reporting
+        success. It is now a hard failure.
+  - [x] Boots `node <artefact>/server/index.mjs` with `SPECSCRIBE_IR_DIR`, an OS-assigned port, readiness by
+        polling (any HTTP response, including a 500), and `Kill(entireProcessTree: true)` in a `finally`.
+        `experiment-two-ir.mjs` was read, not reused; its four recorded traps are carried into the type doc.
+  - [x] One request per manifest route; body written to `<OutputRoot>/<path>`; non-200 / missing
+        `<main id="main-content">` / failed request each raise `GenerationOutcome.Error`.
+  - [x] **Asset ownership DECIDED: C# stays the single writer** of `specscribe.css`, `specscribe.js`, `prism.js`
+        and `plotly-hierarchy.min.js`. They are embedded resources here, `sync-runtime-assets.mjs` already treats
+        C# as authoritative, and the webview/SPA paths still need C# to place them. Mechanically the artefact
+        copy **skips any file that already exists**, so there is exactly one writer per file.
+  - [x] **Node prerequisite (AC #4) — all three ways.** Node absent from `PATH` verified **live** (actionable
+        error naming the range, `errors=1`, not a silent empty root). Below-range verified by unit test over
+        `ValidateNodeVersion` — ⚠️ a `PATH` shim **cannot** test this: `Process` with `UseShellExecute=false`
+        resolves a real executable, not a `.cmd`, so a shim-based test silently exercises the *absent* path and
+        passes for the wrong reason. Artefact missing verified live and by unit test.
+        ⚠️ **Check order corrected**: the artefact was resolved *before* Node, so a user with no Node was told to
+        build an artefact — the wrong next step. Node is checked first.
+  - [x] **Watch mode** re-renders only routes whose region digest moved, derived from `SpaDelivery.ContentHash`
+        rather than from the watcher's file event (one source edit moves several routes — its page, the
+        dashboard, the epics index, a date page — and a file-keyed list would leave those stale).
+  - [x] **Measured cold full generate:** 1,492 routes prerendered in **13,512 ms = 9.1 ms/route**; whole run
+        77.0 s vs the pre-Task-3 `--deep-git --spa` baseline of 78.9 s. ⚠️ 9.1 ms/route is **2.3× Story 23.5's
+        ~4 ms/route** — stated rather than discovered. C# is still writing every page in parallel at this point;
+        re-measure after Task 6 removes that work.
 
-- [ ] **Task 4 — Re-point the test suite off the written document (AC: #8)**
+- [~] **Task 4 — Re-point the test suite off the written document (AC: #8)** — ⚠️ **PARTIAL, see Dev Agent Record**
   - [ ] Add one shared test helper that returns a page's **region** given a completed generator and an
         output-relative path, reading the emitted `spa/` chunks (or exposing `CapturedRegions` to the test
         assembly). This is the substitute for the ~261 `File.ReadAllText(Path.Combine(Site, "…​.html"))` reads.
@@ -175,7 +197,7 @@ path must be working *before* the writer is removed, or there is a commit range 
   - [ ] Do **not** keep a test-only full-page composer as a shortcut. It recreates the deleted writer, and a
         chrome regression would then pass a green suite while the shipped page was wrong. AC #1 forecloses it.
 
-- [ ] **Task 5 — Close the six dependents (AC: #2)**
+- [x] **Task 5 — Close the six dependents (AC: #2)**
   - [ ] Work § The six dependents row by row. Each row gets an explicit disposition — re-pointed (say to what) or
         retired (say why) — recorded in the Dev Agent Record. A row left implicit fails this AC.
   - [ ] `GoldenContentFingerprint`: **retire.** Its subject is gone. Do not re-point it at the IR as another
@@ -189,7 +211,7 @@ path must be working *before* the writer is removed, or there is a commit range 
         why the flag alone was **not** sufficient (a watch-mode topology rebuild wipes the output root and deletes
         an asset this instance believes it copied). Preserve that disk-is-the-truth behaviour.
 
-- [ ] **Task 6 — The deletion (AC: #1)**
+- [ ] **Task 6 — The deletion (AC: #1)** — ⚠️ **NOT STARTED. The writer is intact and the portal still ships.**
   - [ ] Delete `HtmlRenderAdapter.Render` and the ~25 templater `RenderX` full-page wrappers it backs. Keep every
         `BuildX`.
   - [ ] Delete all five content-`.html` write paths (§ The five write paths).
@@ -205,7 +227,7 @@ path must be working *before* the writer is removed, or there is a commit range 
   - [ ] Grep-verify after each deletion that the symbol is actually gone and nothing references it. CLAUDE.md
         § Concurrent work: a write that returned success is not a write that landed.
 
-- [ ] **Task 7 — Decision records (AC: #9)**
+- [x] **Task 7 — Decision records (AC: #9)**
   - [ ] Author the new ADR (next free number is **0034**): the CLI's output contract inverts — the IR is the
         unconditional product and the static site is rendered from it by Node; `--spa` is retired. Status
         `Proposed`.
@@ -214,7 +236,7 @@ path must be working *before* the writer is removed, or there is a commit range 
   - [ ] Clear `deferred-work.md:22`'s standing action — it asks for exactly Task 1's gate — and say in the entry
         which of its two offered options was taken.
 
-- [ ] **Task 8 — Live-browser verification (CLAUDE.md § Verification)**
+- [ ] **Task 8 — Live-browser verification (CLAUDE.md § Verification)** — ⚠️ **NOT DONE**
   - [ ] Generate to `SpecScribeOutput/` and open the result in a real browser at depth 0 and depth 3. The suite
         structurally cannot see CSS containment leaks, sub-pixel collapse, or DOM corruption from markup splicing;
         all three have shipped in this epic and were caught only by looking.
@@ -405,8 +427,172 @@ story, so expect the count to drop rather than treating each observation as work
 
 ### Agent Model Used
 
-### Debug Log References
+claude-opus-5 (dev-story), 2026-07-30 → 2026-07-31. Baseline `e864133`, clean tree at start.
+
+### ⚠️ STATUS: PARTIAL. The deletion has NOT happened.
+
+**Tasks 1, 2, 3, 5 and 7 are complete. Task 4 is ~60% complete. Tasks 6 and 8 are NOT STARTED.**
+
+`HtmlRenderAdapter.Render`, the five content-`.html` write paths, `_spaCapture` and `SpaDelivery.Extract*` are
+all **intact and still shipping**. Everything landed so far is additive — the story's own named carve-out point
+("Tasks 1–3 are additive and independently valuable; Tasks 4–6 are the irreversible half"). The tree builds, both
+suites are green, and `specscribe generate` produces a working portal that is now rendered by Nuxt.
+
+The remaining work is stated precisely under § What remains rather than left to be rediscovered.
 
 ### Completion Notes List
 
+**Task 1 — the replacement drift gate (AC #3). DONE, with the oracle's shape changed on a new owner decision.**
+
+- ⚠️ **Owner decision D2 was measured before being built on, and found VACUOUS.** `goldenSha`, `irSha` and
+  `nuxtSha` are **identical on all 1,469 rows** of the committed `parity.json`, so "does the rendered page still
+  hash to the committed golden value?" is the same question as "does the rendered page match the IR it was
+  rendered from?" — the committed value adds nothing a live run does not already answer. That is structural: the
+  IR *is* the renderer's input and the region passes through verbatim by contract, so input-digest and
+  output-digest are one quantity. Over a corpus that changes, "the content moved" cannot be distinguished from
+  "the renderer moved". Escalated to the owner rather than built as specified → **owner decision D5: pin the
+  corpus.**
+- ⚠️ **Second finding: the old oracle hashed `<main>` ONLY**, so `<title>`, meta, the favicon, the footer, every
+  `<script src>`, the nav toggle, the Mermaid init and the Hierarchy/Graph anti-flash handshakes were in **no
+  committed digest at all** — precisely the chrome Task 6 deletes. The new oracle carries a whole-page digest
+  too, which is the first gate this project has ever had over that surface.
+- Landed: `web/scripts/parity-lib.mjs` (pure, unit-tested, 19 tests), `check-parity.mjs`, `pin-parity.mjs`,
+  `render-lib.mjs`, the frozen corpus at `web/fixtures/parity-corpus/` (24 routes, all 14 families, 3.65 MB) and
+  the oracle at `web/measurements/parity-pinned.json`.
+- **The C# lineage was re-verified LIVE before freezing: 24/24 routes, golden = IR = rendered**, against the
+  still-existing writer. After Task 6 that check stops being possible, which is why it ran now.
+- **All four loudness/drift paths negative-tested** by perturbing the oracle: region drift, chrome drift, empty
+  oracle, unrenderable route + vanished family. Each fails, and each names the page.
+- Determinism: **3 consecutive local runs identical.** ⚠️ **The Ubuntu half is WIRED but NOT YET OBSERVED** — it
+  runs in `portability-probe`. ADR 0033 §Decision 4 is not discharged until that CI run is read.
+- `measure:parity` marked SUPERSEDED in-file with the vacuity it acquires at Task 6 spelled out.
+
+**Task 2 — the IR is unconditional (AC #6). DONE.** Also caught: the same `if (_options.EmitSpa)` gate sat on
+**five incremental watch paths**, which would otherwise have left watch mode emitting no IR at all.
+`EmitDeltaSidecar` verified already correct (gated on watch/serve, never on `--spa`) — no change needed.
+
+**Task 3 — the prerender driver (AC #7, #4). DONE.** New `src/SpecScribe/NuxtPrerender.cs`. **Three defects found
+by writing the tests first**, all fixed:
+
+1. Outside a git checkout the artefact-miss error named only **two of three** locations.
+2. An **explicitly set but invalid `SPECSCRIBE_RENDERER_DIR` silently fell through** to the repo's own artefact —
+   rendering with a renderer the operator did not name, and reporting success. Now a hard failure.
+3. **The artefact was resolved BEFORE Node**, so a user with no Node was told to build an artefact — the wrong
+   next step. Found by actually running a generate on a PATH with no Node and reading what the user got.
+
+⚠️ **A `PATH` shim cannot test the below-range Node path**: `Process` with `UseShellExecute=false` resolves a real
+executable, not a `.cmd`, so a shim-based test silently exercises the *absent* path and passes for the wrong
+reason. The version gate was extracted to `ValidateNodeVersion` and unit-tested directly.
+
+**Measured cold generate: 1,492 routes in 13,512 ms = 9.1 ms/route** (whole run 77.0 s vs a pre-Task-3 baseline
+of 78.9 s). ⚠️ **9.1 ms/route is 2.3× Story 23.5's ~4 ms/route** — stated rather than discovered. C# is still
+writing every page in parallel at this point; re-measure after Task 6.
+
+**Asset ownership DECIDED: C# stays the single writer** of `specscribe.css`, `specscribe.js`, `prism.js` and
+`plotly-hierarchy.min.js`. The prerender copies the artefact's `public/` but **skips any file that already
+exists**, so there is exactly one writer per file.
+
+**Task 5 — the six dependents (AC #2). DONE. Every row closed explicitly:**
+
+| # | dependent | disposition |
+| --- | --- | --- |
+| 1 | `_spaCapture` → `RegionCompositionDeltas` | ⏳ **deferred to Task 6** with the two proofs it feeds (owner D3). Still live and still passing. |
+| 2 | `GoldenContentFingerprint` | **RETIRED.** 1,459 lines removed, replaced by an in-file block recording what it proved, why its subject is gone, and why it was deliberately NOT re-pointed at the IR (ADR 0033 names this story and forbids exactly that). |
+| 3 | `GoldenOutputInventory` | **RE-PINNED, not superseded** — reason recorded in-file: `check:parity` renders a deliberately FROZEN corpus, so it is structurally blind to a whole page family ceasing to be emitted by a real generate. The two are complementary. Gained `app.html`, `specscribe-spa.js` and four `spa/pages-*.json`. |
+| 4 | `EnsureHierarchyEngine`'s host-marker scan | **RE-DERIVED** from `page.Assets.HierarchyEngineNeeded / GraphEngineNeeded`, with the disk-is-the-truth guard preserved verbatim. All three call sites now pass a `PageView`. |
+| 5 | `CapturedRegions`' silent-gap guard | **RETIRED**, with the reason in-file — it would have gone **vacuous, not red**, which is the failure AC #2 exists to prevent. What still covers the underlying invariant is named. |
+| 6 | `RenderWebviewSurfaces`' long-tail gate | **RE-POINTED — and NOT verbatim, which is the finding.** Re-pointing `_spaCapture` → `_spaPageViews` was WRONG and a test caught it: the webview surface set silently grew to the whole long tail. The old condition only ever worked by coincidence (`_spaCapture` stood in for `CapturePages` *and* fired on any `--spa` run). Now gated on `CapturePages`, the flag that actually means "this caller wants the long tail". The sibling throw moved with it. |
+
+**Task 4 — re-point the suite (AC #8). PARTIAL.**
+
+- ✅ **268 full-page templater call sites re-pointed** to `JsonSpaRenderAdapter.Shared.RenderContent(BuildX(...))`
+  across 19 files, by a **paren-balanced C#-aware scanner** — not a regex, because most calls span lines and carry
+  string literals full of parentheses, and a regex would truncate them silently. Compiled on the first pass.
+  **247 of 268 assertions needed no further change** — they assert body content, which is in the region unchanged.
+- ✅ The 38 full-page wrappers were discovered by **reading the source** (wrapper bodies calling
+  `HtmlRenderAdapter.Shared.Render`), so fragment renderers — `RenderPane`, `RenderBoard`, `RenderProgressWheel`,
+  `RenderEmbedded`, `RenderBoardByEpic`, `RenderModuleCoveragePanelBody` — were correctly left alone.
+- ✅ **21 chrome assertions triaged**, each to the view model (`page.Title`, `page.MetaDescription`,
+  `page.Assets.ExtraHead`, `page.Assets.GraphBootInline`, `page.Assets.GraphEngineNeeded`) or removed **with the
+  gate that now owns it named in place** (`check:a11y` for the skip link and its ordering; `check:parity`'s
+  `pageSha` for the favicon). Nothing was deleted merely for failing to compile.
+- ✅ Two shared helpers landed: `tests/SpecScribe.Tests/RegionAssert.cs` (region + view-model assertions, carrying
+  the full "where each chrome assertion went" table) and `tests/SpecScribe.Tests/SiteRegion.cs` (reads a page's
+  region back out of the emitted IR — the substitute for the disk reads).
+- ❌ **NOT DONE: the ~206 `File.ReadAllText(Path.Combine(Site, "….html"))` reads across 32 files.** They still
+  pass, because C# still writes the pages. They break the moment Task 6 lands. `SiteRegion.Read/Exists/Routes` is
+  written and building, ready for the substitution.
+- ✅ Two tests obsoleted by AC #6 were **re-pointed rather than deleted**: `WithoutSpa_EmitsNoSpaFilesAtAll` is now
+  `TheIrIsEmittedUnconditionally_EvenWhenTheRetiredSpaFlagIsOff` (inverted, and the inversion is the point), and
+  `DeltaSidecar_WritesNothing_WhenSpaIsOff` now pins the switch as the only gate **in both directions** — its old
+  reasoning ("no IR, so nothing to diff") had it agreeing with the right behaviour for the wrong reason.
+
+**Task 7 — decision records (AC #9). DONE.** New **ADR 0034** (Proposed) records the output-contract inversion and
+the `--spa` retirement. **ADR 0022 → Accepted** and **ADR 0033 → Accepted** are PROPOSED in-file (ratification is
+the owner's, so their `Status` lines are annotated, not flipped). ⚠️ The ADR 0033 proposal carries **a requested
+amendment**: its "reference implementation" names `web/measurements/parity.json`, which this story measured to be
+vacuous. `docs/adrs/README.md` updated. `deferred-work.md`'s standing action **cleared, naming which of its two
+offered options was taken** — the first (rebuild a gate), with the second explicitly rejected on measurement.
+
+### What remains
+
+1. **Task 4 residue** — substitute the ~206 `File.ReadAllText(Path.Combine(Site, "….html"))` calls for
+   `SiteRegion.Read`, then triage whatever chrome assertions surface. Do this BEFORE Task 6, or the suite goes
+   red wholesale.
+2. **Task 6 — the deletion.** Unchanged from the story text. Useful finding for whoever picks it up:
+   `EpicsTemplater.Render*`, `HtmlTemplater.RenderIndex/RenderPage`, `RequirementsTemplater.*`,
+   `RetroTemplater.RenderIndex`, `SprintTemplater.RenderIndex` and `CodeFileTemplater.RenderPlaceholder` are the
+   **only** full-page wrappers still called from production — and they are exactly the five raw write paths, which
+   confirms § The five write paths independently.
+3. **Task 8 — live-browser verification.** A portal IS currently generated and Nuxt-rendered
+   (`SpecScribeOutput/`, 1,188 pages, `data-ir-family` present, `_nuxt/` assets copied), so this is doable now.
+4. **Read the `portability-probe` CI run** to discharge ADR 0033 §Decision 4 for `check:parity` on Ubuntu.
+
+### Debug Log References
+
+- Suite at hand-off: **2,883 passed / 3 skipped**, plus rotating git-dependent failures that are the **documented
+  spawn-starvation flake** (memory: `suite-flake-cause-is-a-running-preview-server`), not regressions — the four
+  implicated classes pass **25/25 in isolation**. `web/`: **144 passed** (was 125; +19 new `parity-lib` tests).
+- ⚠️ Also observed: `GenerateAll_DeterministicAcrossTwoRuns` and `GenerateAll_TwoRunsProduceIdenticalHubMarkup`
+  failed once on a **minute boundary** (`10:07` vs `10:08` in the wall-clock footer). Pre-existing fragility, but
+  making the IR unconditional lengthens every run and therefore makes straddling more likely. Worth a normalizer.
+
 ### File List
+
+**New**
+- `src/SpecScribe/NuxtPrerender.cs`
+- `tests/SpecScribe.Tests/NuxtPrerenderTests.cs`
+- `tests/SpecScribe.Tests/RegionAssert.cs`
+- `tests/SpecScribe.Tests/SiteRegion.cs`
+- `web/scripts/parity-lib.mjs`, `web/scripts/check-parity.mjs`, `web/scripts/pin-parity.mjs`, `web/scripts/render-lib.mjs`
+- `web/test/parity-lib.test.mjs`
+- `web/fixtures/parity-corpus.routes.json`, `web/fixtures/parity-corpus/spa/manifest.json`, `web/fixtures/parity-corpus/spa/pages-pinned.json`
+- `web/measurements/parity-pinned.json`
+- `docs/adrs/0034-the-ir-is-the-product-and-the-site-is-rendered-from-it.md`
+
+**Modified**
+- `src/SpecScribe/SiteGenerator.cs`, `src/SpecScribe/Commands.cs`, `src/SpecScribe/ConsoleUi.cs`,
+  `src/SpecScribe/SiteSettings.cs`, `src/SpecScribe/ForgeOptions.cs`
+- `tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs`, `SiteGeneratorSpaTests.cs`, `SiteGeneratorCodeInsightsTests.cs`
+- 19 test files re-pointed by the templater substitution: `AboutTemplaterTests.cs`, `CodeFileTemplaterTests.cs`,
+  `CodeMapTemplaterTests.cs`, `CommitDayTemplaterTests.cs`, `CommitDetailTemplaterTests.cs`,
+  `DeepAnalyticsTemplaterTests.cs`, `DeferredWorkParserTests.cs`, `DiagnosticsTemplaterTests.cs`,
+  `FollowUpGroupPagesTests.cs`, `FollowUpSurfacesTests.cs`, `GitInsightsTemplaterTests.cs`,
+  `HtmlTemplaterTests.cs`, `IdeasTests.cs`, `RequirementsAndProgressTests.cs`, `RetroTests.cs`,
+  `RiskQuadrantTemplaterTests.cs`, `SprintTemplaterTests.cs`, `TimelineTemplaterTests.cs`, `WorkGraphTests.cs`
+- `web/package.json`, `web/vitest.config.ts`, `web/scripts/measure-parity.mjs`
+- `.github/workflows/build-test-analyze.yml`
+- `docs/adrs/0022-node-is-a-build-toolchain-and-a-generate-time-runtime.md`,
+  `docs/adrs/0033-content-drift-gates-are-targeted-and-regenerable.md`, `docs/adrs/README.md`
+- `_bmad-output/implementation-artifacts/deferred-work.md`, `_bmad-output/implementation-artifacts/sprint-status.yaml`, this story file
+
+### Change Log
+
+| Date | Change |
+| --- | --- |
+| 2026-07-30 | Task 1: pinned-corpus drift gate; owner decision **D5** supersedes D2 after D2's shape was measured vacuous. |
+| 2026-07-31 | Task 2: IR unconditional; `--spa` retired as a deprecated no-op. |
+| 2026-07-31 | Task 3: `NuxtPrerender.cs` drives the prerender (ADR 0022 §Decision 3, first execution); Node prerequisite implemented and verified three ways. |
+| 2026-07-31 | Task 5: all six dependents closed; row 6's re-point corrected after a test caught a silent surface-set expansion. |
+| 2026-07-31 | Task 4 (partial): 268 templater call sites + 21 chrome assertions re-pointed; ~206 disk reads outstanding. |
+| 2026-07-31 | Task 7: ADR 0034 authored; ADR 0022/0033 ratification proposed; `deferred-work.md` action cleared. |

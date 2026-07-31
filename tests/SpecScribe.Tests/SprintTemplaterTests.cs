@@ -65,7 +65,7 @@ public class SprintTemplaterTests
     [Fact]
     public void RenderIndex_RendersSixColumnBoardWithMappedLanesLinkedCardsToggleAndCommands()
     {
-        var html = SprintTemplater.RenderIndex(Sample(), SampleEpics(), Nav(), SprintCommands());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(SprintTemplater.BuildIndexPage(Sample(), SampleEpics(), Nav(), SprintCommands()));
 
         // Five core lifecycle lanes always; retired/unrecognized only when the sample has such stories (it doesn't).
         foreach (var cls in new[] { "pending", "ready", "active", "review", "done" })
@@ -103,7 +103,7 @@ public class SprintTemplaterTests
             Story("2.3", 2, "Sprint Widget", "epics/story-2-3.html", tasksDone: 3, tasksTotal: 8),   // has a plan
             Story("2.6", 2, "Later Story", artifactOutputPath: null)));                              // no plan
 
-        var html = SprintTemplater.RenderIndex(sprint, epics, Nav(), CommandCatalog.Empty);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(SprintTemplater.BuildIndexPage(sprint, epics, Nav(), CommandCatalog.Empty));
 
         // Id is "Story N.M" (no separate epic badge); the rich tooltip lives on the card's data-tip.
         Assert.Contains("<span class=\"sprint-card-id\">Story 2.3</span>", html);
@@ -128,7 +128,7 @@ public class SprintTemplaterTests
     {
         // Story 1.2 has no ArtifactOutputPath but IS in the model → it must link to its placeholder page
         // (StoryPagePath), never dead-end as plain text. [Story 2.3 redesign]
-        var html = SprintTemplater.RenderIndex(Sample(), SampleEpics(), Nav(), CommandCatalog.Empty);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(SprintTemplater.BuildIndexPage(Sample(), SampleEpics(), Nav(), CommandCatalog.Empty));
 
         Assert.Contains("href=\"epics/story-1-2.html\"", html);
         Assert.Contains("href=\"epics/story-1-3.html\"", html);
@@ -139,7 +139,7 @@ public class SprintTemplaterTests
     {
         // A tracked story absent from the epics model has no page to point at → plain text, no broken link.
         var sprint = SprintStatusParser.Parse("development_status:\n  epic-9: backlog\n  9-9-orphan: backlog\n")!;
-        var html = SprintTemplater.RenderIndex(sprint, SampleEpics(), Nav(), CommandCatalog.Empty);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(SprintTemplater.BuildIndexPage(sprint, SampleEpics(), Nav(), CommandCatalog.Empty));
 
         Assert.DoesNotContain("href=\"epics/story-9-9.html\"", html);
         Assert.Contains("Orphan", html); // prettified slug shown as text
@@ -372,7 +372,7 @@ public class SprintTemplaterTests
             },
         };
 
-        var html = SprintTemplater.RenderIndex(withOpen, null, Nav(), SprintCommands(), retros);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(SprintTemplater.BuildIndexPage(withOpen, null, Nav(), SprintCommands(), retros));
 
         // No modal — the buttons are plain links to real pages.
         Assert.DoesNotContain("retro-menu", html);
@@ -387,7 +387,7 @@ public class SprintTemplaterTests
 
         // No retros and no open items → neither button appears.
         var none = SprintStatusParser.Parse("development_status:\n  epic-1: in-progress\n  1-1-x: done\n")!;
-        var bare = SprintTemplater.RenderIndex(none, null, Nav(), CommandCatalog.Empty);
+        var bare = JsonSpaRenderAdapter.Shared.RenderContent(SprintTemplater.BuildIndexPage(none, null, Nav(), CommandCatalog.Empty));
         Assert.DoesNotContain("href=\"retros.html\"", bare);
         Assert.DoesNotContain("sprint-flag", bare);
     }
@@ -395,9 +395,11 @@ public class SprintTemplaterTests
     [Fact]
     public void RenderIndex_HoldsSkipLinkAndSingleMainLandmark()
     {
-        var html = SprintTemplater.RenderIndex(Sample(), SampleEpics(), Nav(), CommandCatalog.Empty);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(SprintTemplater.BuildIndexPage(Sample(), SampleEpics(), Nav(), CommandCatalog.Empty));
 
-        Assert.Contains("<a class=\"skip-link\" href=\"#main-content\">Skip to content</a>", html);
+        // [Story 23.6 AC #8] The skip-link assertion lived here and is NOT lost — it is head-emitted chrome,
+        // and the region carries no head. `npm run check:a11y` owns `skip-link` over every EMITTED page,
+        // which is the only place it can be asserted honestly now that no C# path composes a whole page.
         Assert.Contains("<main id=\"main-content\"", html);
         Assert.Equal(1, CountOccurrences(html, "id=\"main-content\""));
         Assert.Contains("from sprint-status.yaml", html);
@@ -630,7 +632,7 @@ public class SprintTemplaterTests
     [Fact]
     public void RenderIndex_SharesOneEpicFilterAcrossBoardViews()
     {
-        var html = SprintTemplater.RenderIndex(Sample(), SampleEpics(), Nav(), SprintCommands());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(SprintTemplater.BuildIndexPage(Sample(), SampleEpics(), Nav(), SprintCommands()));
         Assert.Equal(1, CountOccurrences(html, "class=\"sprint-filterable\""));
         Assert.Contains("data-default-epics=\"1\"", html);
         Assert.Contains("class=\"board-view board-view-status\"", html);

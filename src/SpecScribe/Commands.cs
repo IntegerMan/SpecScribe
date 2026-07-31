@@ -31,6 +31,7 @@ public sealed class GenerateCommand : Command<SiteSettings>
         var resolved = SettingsResolver.Resolve(settings);
         ConsoleUi.PrintLogo();
         ConsoleUi.PrintResolvedConfig(resolved);
+        if (settings.Spa) ConsoleUi.PrintSpaDeprecationNotice(); // Story 23.6 AC #6
         if (settings.ShowConfig)
         {
             ConsoleUi.PrintConfigDiagnostics(resolved);
@@ -47,6 +48,12 @@ public sealed class GenerateCommand : Command<SiteSettings>
     public static GenerationRun RunGeneration(ForgeOptions options)
     {
         var generator = new SiteGenerator(options);
+        // Render the static site from the IR. [Story 23.6 AC #7, ADR 0022 §Decision 3]
+        //
+        // This is the ONE place the human-facing pipeline turns HTML on, and it covers `generate`, `watch` and
+        // the interactive menu because all three route through here. `webview` deliberately does NOT: it
+        // constructs its own generator, consumes the region directly, and never wanted `.html` at all.
+        generator.PrerenderHtml = true;
         var sw = Stopwatch.StartNew();
         var events = ConsoleUi.RunWithProgress(generator);
         sw.Stop();
@@ -568,6 +575,7 @@ public sealed class WatchCommand : Command<SiteSettings>
         var options = resolved.Options;
         ConsoleUi.PrintLogo();
         ConsoleUi.PrintResolvedConfig(resolved);
+        if (settings.Spa) ConsoleUi.PrintSpaDeprecationNotice(); // Story 23.6 AC #6
         if (settings.ShowConfig)
         {
             // Report and exit without starting the loop — `--show-config` is a question, not a run.

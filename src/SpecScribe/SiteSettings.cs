@@ -31,8 +31,13 @@ public class SiteSettings : CommandSettings
     [Description("Enable deeper git analytics (change coupling and hotspots) as an opt-in dashboard panel. Default: off, so baseline generation performance is unaffected.")]
     public bool DeepGit { get; set; }
 
+    /// <summary>DEPRECATED and a NO-OP since Story 23.6. The IR (<c>spa/</c>) is now emitted on every run.
+    /// <para>The option stays REGISTERED on purpose: removing it would make an existing script or CI step fail
+    /// with "unknown option" rather than simply doing the right thing. It prints a one-line notice instead, so
+    /// the deprecation is visible without being fatal. It is deliberately NOT re-purposed to mean something
+    /// else — silently changing a flag's meaning is worse than retiring it.</para></summary>
     [CommandOption("--spa")]
-    [Description("Also emit a JSON + client-renderer (SPA) delivery form alongside the static site: one entry shell, a manifest, and a few content chunks that navigate the whole site client-side (fewer files for large repos). Default: off; the static site is unchanged and is the no-JS fallback.")]
+    [Description("DEPRECATED, no-op. The JSON intermediate representation under spa/ is now emitted on every run — it is the canonical output, and the static pages are rendered from it. Accepted and ignored so existing scripts keep working; it will be removed in a future release.")]
     public bool Spa { get; set; }
 
     [CommandOption("--code-url <BASE>")]

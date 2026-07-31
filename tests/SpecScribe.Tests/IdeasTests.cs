@@ -428,7 +428,7 @@ public class IdeasTests : IDisposable
             Entry("k1", IdeaVerdict.Killed, "Killed"),
         });
 
-        var html = IdeasTemplater.RenderListPage(model, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(IdeasTemplater.BuildListPage(model, Nav()));
 
         Assert.Contains("id=\"ideas-hardened\"", html);
         Assert.Contains("2 ideas", html);
@@ -453,7 +453,7 @@ public class IdeasTests : IDisposable
             Entry("k", IdeaVerdict.Killed, "Killed"),
         });
 
-        var html = IdeasTemplater.RenderListPage(model, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(IdeasTemplater.BuildListPage(model, Nav()));
 
         // UX-DR17 / "no state signalled by colour alone": the WORD is in the markup for every verdict, including
         // the clarified exit the three-bucket list cannot express on its own.
@@ -479,7 +479,7 @@ public class IdeasTests : IDisposable
     {
         // The D2 mitigation: the list groups a clarified session under "In progress", so the detail page has to be
         // the record that it was COMPLETE. Without this sentence the bucketing would be the portal's only claim.
-        var html = IdeasTemplater.RenderDetailPage(Entry("c", IdeaVerdict.InProgress, "Clarified"), Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(IdeasTemplater.BuildDetailPage(Entry("c", IdeaVerdict.InProgress, "Clarified"), Nav()));
 
         Assert.Contains("clarified", html);
         Assert.Contains("complete", html);
@@ -491,7 +491,7 @@ public class IdeasTests : IDisposable
     {
         // NFR8 / D4: absent, not "none found". A "no downstream artifact" placeholder would be a claim the
         // evidence does not support.
-        var html = IdeasTemplater.RenderDetailPage(Entry("x", IdeaVerdict.Hardened, "Hardened"), Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(IdeasTemplater.BuildDetailPage(Entry("x", IdeaVerdict.Hardened, "Hardened"), Nav()));
 
         Assert.DoesNotContain("idea-downstream", html);
         Assert.DoesNotContain("What it became", html);
@@ -500,7 +500,7 @@ public class IdeasTests : IDisposable
     [Fact]
     public void RenderDetailPage_NoCarriedReport_OmitsTheReportLink()
     {
-        var html = IdeasTemplater.RenderDetailPage(Entry("x", IdeaVerdict.Killed, "Killed"), Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(IdeasTemplater.BuildDetailPage(Entry("x", IdeaVerdict.Killed, "Killed"), Nav()));
 
         Assert.DoesNotContain("original forge report", html);
     }
@@ -510,7 +510,7 @@ public class IdeasTests : IDisposable
     {
         var entry = Entry("x", IdeaVerdict.Hardened, "Hardened") with { CarriedReportHtml = SafeReport("HARDENED") };
 
-        var html = IdeasTemplater.RenderDetailPage(entry, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(IdeasTemplater.BuildDetailPage(entry, Nav()));
 
         // Both live under ideas/, so the href is the bare sibling filename — not the page prefix plus the
         // root-relative path, which would climb out of the directory.

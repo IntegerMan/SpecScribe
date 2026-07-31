@@ -1,0 +1,98 @@
+[
+  {
+    "path": "code/spike/nuxt-ir/app.vue.html",
+    "family": "code-file"
+  },
+  {
+    "path": "code/src/SpecScribe/MarkdownConverter.cs.html",
+    "family": "code-file"
+  },
+  {
+    "path": "commits/2026-07-04.html",
+    "family": "commit-day"
+  },
+  {
+    "path": "commits/2026-07-17.html",
+    "family": "commit-day"
+  },
+  {
+    "path": "commit/7d8882e.html",
+    "family": "commit-detail"
+  },
+  {
+    "path": "commit/1210a41.html",
+    "family": "commit-detail"
+  },
+  {
+    "path": "index.html",
+    "family": "dashboard"
+  },
+  {
+    "path": "adrs/0004-cross-surface-interaction-and-theme-contract.html",
+    "family": "doc-prose"
+  },
+  {
+    "path": "implementation-artifacts/spec-address-deferred-next-steps.html",
+    "family": "doc-prose"
+  },
+  {
+    "path": "epics/epic-14.html",
+    "family": "epic-detail"
+  },
+  {
+    "path": "epics/epic-26.html",
+    "family": "epic-detail"
+  },
+  {
+    "path": "epics.html",
+    "family": "epics-index"
+  },
+  {
+    "path": "follow-ups/action-schedule-a-story-spec-to-fix-htmltemplater-knownindexgroups.html",
+    "family": "follow-up"
+  },
+  {
+    "path": "follow-ups/deferred-epic-angular-weight-on-project-glance-is-max.html",
+    "family": "follow-up"
+  },
+  {
+    "path": "deep-analytics.html",
+    "family": "insight"
+  },
+  {
+    "path": "impact-map.html",
+    "family": "insight"
+  },
+  {
+    "path": "about-sdd-gsd.html",
+    "family": "portal-meta"
+  },
+  {
+    "path": "about-sdd.html",
+    "family": "portal-meta"
+  },
+  {
+    "path": "requirements/nfr3.html",
+    "family": "requirement"
+  },
+  {
+    "path": "requirements/ux-dr23.html",
+    "family": "requirement"
+  },
+  {
+    "path": "retros.html",
+    "family": "retro"
+  },
+  {
+    "path": "sprint.html",
+    "family": "sprint"
+  },
+  {
+    "path": "epics/story-11-2.html",
+    "family": "story-detail"
+  },
+  {
+    "path": "epics/story-10-1.html",
+    "family": "story-detail"
+  }
+]

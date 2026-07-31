@@ -78,7 +78,7 @@ public class AboutTemplaterTests
     public void RenderPage_ShowsAssemblyMetadataAndDiagnosticsLink()
     {
         var meta = ProductMetadata.FromAssembly();
-        var html = AboutTemplater.RenderPage(Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(AboutTemplater.BuildPage(Nav()));
 
         Assert.Contains("About SpecScribe", html);
         // Asserted against the REFLECTED values, not hardcoded copies, so the page can't drift from the package.
@@ -89,7 +89,9 @@ public class AboutTemplaterTests
         // The reachability path's final hop: About → diagnostics run log.
         Assert.Contains("href=\"diagnostics.html\"", html);
         // Full page shell (skip link + single main landmark), like every other synthesized page.
-        Assert.Contains("<a class=\"skip-link\" href=\"#main-content\">Skip to content</a>", html);
+        // [Story 23.6 AC #8] The skip-link assertion lived here and is NOT lost — it is head-emitted chrome,
+        // and the region carries no head. `npm run check:a11y` owns `skip-link` over every EMITTED page,
+        // which is the only place it can be asserted honestly now that no C# path composes a whole page.
         Assert.Contains("<main id=\"main-content\"", html);
         // The centered content-column layout shared with the diagnostics page.
         Assert.Contains("<main id=\"main-content\" class=\"info-page\">", html);

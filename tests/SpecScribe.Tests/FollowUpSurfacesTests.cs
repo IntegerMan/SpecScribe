@@ -271,8 +271,8 @@ public class FollowUpSurfacesTests : IDisposable
             Groups = Array.Empty<(string, IReadOnlyList<(string, string)>)>(),
             QuickLinks = Array.Empty<(string, string, string, string)>(),
         };
-        var html = FollowUpDetailTemplater.RenderActionPage(
-            item, "action-route-epic-1-debt", nav, commands);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(FollowUpDetailTemplater.BuildActionPage(
+            item, "action-route-epic-1-debt", nav, commands));
 
         Assert.Contains("data-copy=", html);
         Assert.Contains("class=\"followup-detail\"", html);
@@ -305,8 +305,8 @@ public class FollowUpSurfacesTests : IDisposable
             Groups = Array.Empty<(string, IReadOnlyList<(string, string)>)>(),
             QuickLinks = Array.Empty<(string, string, string, string)>(),
         };
-        var html = FollowUpDetailTemplater.RenderDeferredPage(
-            item, "Deferred work", null, "deferred-orphan", nav, "deferred-work.html");
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(FollowUpDetailTemplater.BuildDeferredPage(
+            item, "Deferred work", null, "deferred-orphan", nav, "deferred-work.html"));
 
         Assert.DoesNotContain("pill-link", html);
         Assert.DoesNotContain("epics/epic-", html);
@@ -331,7 +331,7 @@ public class FollowUpSurfacesTests : IDisposable
             Groups = Array.Empty<(string, IReadOnlyList<(string, string)>)>(),
             QuickLinks = Array.Empty<(string, string, string, string)>(),
         };
-        var html = FollowUpDetailTemplater.RenderDeferredPage(
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(FollowUpDetailTemplater.BuildDeferredPage(
             item,
             "code review of 1-1-foundation.md",
             "epics/story-1-1.html",
@@ -339,7 +339,7 @@ public class FollowUpSurfacesTests : IDisposable
             nav,
             "implementation-artifacts/deferred-work.html",
             commands,
-            epicNumber: 1);
+            epicNumber: 1));
 
         Assert.Contains("href=\"../epics/story-1-1.html\"", html);
         Assert.Contains("class=\"pill pill-link\" href=\"../epics/epic-1.html\"", html);
@@ -779,8 +779,8 @@ public class FollowUpSurfacesTests : IDisposable
         var commands = new CommandCatalog("BMad", new Dictionary<string, string> { ["quick-dev"] = "/bmad-quick-dev" });
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
-        var html = DeferredWorkTemplater.RenderPage(
-            model, nav, "implementation-artifacts/deferred-work.html", "Deferred Work", commands);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(DeferredWorkTemplater.BuildPage(
+            model, nav, "implementation-artifacts/deferred-work.html", "Deferred Work", commands));
 
         Assert.Contains("class=\"chart-panel next-steps list-batch-actions\"", html);
         Assert.Contains(">Address all<", html);
@@ -816,8 +816,8 @@ public class FollowUpSurfacesTests : IDisposable
         var commands = new CommandCatalog("BMad", new Dictionary<string, string> { ["quick-dev"] = "/bmad-quick-dev" });
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
-        var html = DeferredWorkTemplater.RenderPage(
-            model, nav, "deferred-work.html", "Deferred Work", commands);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(DeferredWorkTemplater.BuildPage(
+            model, nav, "deferred-work.html", "Deferred Work", commands));
 
         Assert.Contains("class=\"chart-panel next-steps list-batch-actions\"", html);
         Assert.Contains(">Address all<", html);
@@ -832,8 +832,8 @@ public class FollowUpSurfacesTests : IDisposable
         var model = DeferredWorkParser.Parse(markdown);
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
-        var html = DeferredWorkTemplater.RenderPage(
-            model, nav, "deferred-work.html", "Deferred Work", CommandCatalog.Empty);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(DeferredWorkTemplater.BuildPage(
+            model, nav, "deferred-work.html", "Deferred Work", CommandCatalog.Empty));
 
         Assert.DoesNotContain("list-batch-actions", html);
         Assert.DoesNotContain("data-copy=", html);
@@ -851,7 +851,7 @@ public class FollowUpSurfacesTests : IDisposable
         var commands = new CommandCatalog("BMad", new Dictionary<string, string> { ["quick-dev"] = "/bmad-quick-dev" });
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
-        var html = DeferredWorkTemplater.RenderPage(model, nav, "deferred-work.html", "Deferred Work", commands);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(DeferredWorkTemplater.BuildPage(model, nav, "deferred-work.html", "Deferred Work", commands));
 
         Assert.DoesNotContain("list-batch-actions", html);
     }
@@ -865,7 +865,7 @@ public class FollowUpSurfacesTests : IDisposable
         var commands = new CommandCatalog("BMad", new Dictionary<string, string> { ["quick-dev"] = "/bmad-quick-dev" });
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
 
-        var html = ActionItemsTemplater.RenderPage(open, null, commands, nav);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(ActionItemsTemplater.BuildPage(open, null, commands, nav));
 
         Assert.Contains("class=\"chart-panel next-steps list-batch-actions\"", html);
         Assert.Contains(">Address all<", html);
@@ -884,7 +884,7 @@ public class FollowUpSurfacesTests : IDisposable
         var open = new[] { new SprintActionItem("Fix issue", "open", 1, "Dana") };
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
 
-        var html = ActionItemsTemplater.RenderPage(open, null, CommandCatalog.Empty, nav);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(ActionItemsTemplater.BuildPage(open, null, CommandCatalog.Empty, nav));
 
         Assert.DoesNotContain("list-batch-actions", html);
     }
@@ -900,7 +900,7 @@ public class FollowUpSurfacesTests : IDisposable
         var commands = new CommandCatalog("BMad", new Dictionary<string, string> { ["quick-dev"] = "/bmad-quick-dev" });
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true);
 
-        var html = ActionItemsTemplater.RenderPage(open, null, commands, nav);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(ActionItemsTemplater.BuildPage(open, null, commands, nav));
 
         Assert.Contains("Story 1.1", html);
         var matches = Regex.Matches(html, "data-copy=\"([^\"]*)\"");

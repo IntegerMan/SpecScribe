@@ -72,9 +72,10 @@ jobs:
     needs: build
     timeout-minutes: 10
     permissions:
-      # actions/deploy-pages@v5 requires all three: `pages: write` to create the
-      # deployment, `id-token: write` for its OIDC verification of the artifact,
-      # and `contents: read`.
+      # actions/deploy-pages@v5 requires `pages: write` to create the deployment and
+      # `id-token: write` for its OIDC verification of the artifact. `contents: read`
+      # is not enforced by the action itself; it's kept as the job's explicit,
+      # minimal default rather than inheriting a broader top-level grant.
       contents: read
       pages: write
       id-token: write

@@ -161,6 +161,19 @@ public static class ConsoleUi
         return path;
     }
 
+    /// <summary>One-line notice that <c>--spa</c> no longer does anything. [Story 23.6 AC #6]
+    /// <para>The flag is accepted and ignored rather than removed, so an existing script does not fail with
+    /// "unknown option". Silence would be worse than either: the user asked for a behaviour that is now the
+    /// default, and nothing would tell them the flag had stopped meaning what they think it means.</para></summary>
+    public static void PrintSpaDeprecationNotice()
+    {
+        AnsiConsole.MarkupLine(
+            "[yellow]--spa is deprecated and does nothing.[/] [grey]The JSON intermediate representation under "
+            + "spa/ is now emitted on every run — it is the canonical output, and the static pages are rendered "
+            + "from it. Drop the flag; it will be removed in a future release.[/]");
+        AnsiConsole.WriteLine();
+    }
+
     /// <summary>Prints a clickable <c>file://</c> URL to the generated index so the site can be opened straight
     /// from the terminal (Ctrl+Click in most terminals).</summary>
     public static void PrintOutputLink(ForgeOptions options)

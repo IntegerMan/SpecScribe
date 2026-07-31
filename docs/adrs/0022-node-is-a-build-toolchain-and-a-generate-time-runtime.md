@@ -1,6 +1,11 @@
 # ADR 0022 — Node Is a Build-Time Toolchain and a Generate-Time Runtime, Never a Shipped Toolchain
 
 - **Status:** Proposed — 2026-07-27
+  - ⏫ **Ratification to `Accepted` PROPOSED by [Story 23.6](../../_bmad-output/implementation-artifacts/23-6-retire-the-c-sharp-html-writer.md) (2026-07-31).** §Decision 3 has now been
+    EXECUTED for the first time rather than only measured: `specscribe generate` boots the prebuilt artefact,
+    sets `SPECSCRIBE_IR_DIR`, and issues one request per manifest route (`src/SpecScribe/NuxtPrerender.cs`) —
+    1,492/1,492 routes of this repository, 9.1 ms/route. §Decision 5's Node prerequisite is implemented and its
+    failure path verified live. Ratification is the owner's; this line is the proposal, not the act.
 - **Authored by:** Story 23.5 (packaging reconciliation)
 - **Amends:** ADR 0006 §Decision (the "self-contained packaging … stand[s]" clause)
 - **Answers:** ADR 0009 §:66 and §:74, which named this reconciliation as a spike-owned unknown

@@ -1,0 +1,747 @@
+{
+  "schemaVersion": 2,
+  "siteTitle": "SpecScribe",
+  "entry": "index.html",
+  "nav": [
+    {
+      "label": "Home",
+      "outputRelativePath": "index.html"
+    },
+    {
+      "label": "Epics",
+      "outputRelativePath": "epics.html"
+    },
+    {
+      "label": "Requirements",
+      "outputRelativePath": "requirements.html"
+    },
+    {
+      "label": "Traceability",
+      "outputRelativePath": "traceability.html"
+    },
+    {
+      "label": "Cadence",
+      "outputRelativePath": "cadence.html"
+    },
+    {
+      "label": "Impact Map",
+      "outputRelativePath": "impact-map.html"
+    },
+    {
+      "label": "Sprint",
+      "outputRelativePath": "sprint.html"
+    },
+    {
+      "label": "Git Insights",
+      "outputRelativePath": "git-insights.html"
+    },
+    {
+      "label": "Deep Analytics",
+      "outputRelativePath": "deep-analytics.html"
+    },
+    {
+      "label": "Code Map",
+      "outputRelativePath": "code-map.html"
+    },
+    {
+      "label": "Risk Quadrant",
+      "outputRelativePath": "risk-quadrant.html"
+    },
+    {
+      "label": "Work Graph",
+      "outputRelativePath": "work-graph.html"
+    },
+    {
+      "label": "Action Items",
+      "outputRelativePath": "action-items.html"
+    },
+    {
+      "label": "Deferred Work",
+      "outputRelativePath": "implementation-artifacts/deferred-work.html"
+    },
+    {
+      "label": "Readme",
+      "outputRelativePath": "readme.html"
+    },
+    {
+      "label": "PRD",
+      "outputRelativePath": "planning-artifacts/prds/prd-SpecScribe-2026-07-05/prd.html"
+    },
+    {
+      "label": "Architecture",
+      "outputRelativePath": "specs/spec-specscribe/ARCHITECTURE-SPINE.html"
+    },
+    {
+      "label": "Spec",
+      "outputRelativePath": "specs/spec-specscribe/SPEC.html"
+    },
+    {
+      "label": "ADRs",
+      "outputRelativePath": "adrs/index.html"
+    },
+    {
+      "label": "How to use SpecScribe",
+      "outputRelativePath": "how-to-read.html"
+    },
+    {
+      "label": "Design System",
+      "outputRelativePath": "design-system.html"
+    },
+    {
+      "label": "About Spec-Driven Development",
+      "outputRelativePath": "about-sdd.html"
+    },
+    {
+      "label": "About",
+      "outputRelativePath": "about.html"
+    },
+    {
+      "label": "Logs",
+      "outputRelativePath": "diagnostics.html"
+    }
+  ],
+  "pages": {
+    "code/spike/nuxt-ir/app.vue.html": {
+      "title": "spike/nuxt-ir/app.vue — SpecScribe",
+      "chunk": "spa/pages-pinned.json",
+      "breadcrumb": [
+        {
+          "label": "Home",
+          "outputRelativePath": "index.html"
+        },
+        {
+          "label": "spike/nuxt-ir/app.vue",
+          "outputRelativePath": null
+        }
+      ],
+      "parent": "index.html",
+      "children": [],
+      "head": {
+        "title": "spike/nuxt-ir/app.vue — SpecScribe",
+        "description": "Source file spike/nuxt-ir/app.vue in SpecScribe."
+      },
+      "scriptIslands": [],
+      "contentHash": "a0e484174abca5b9",
+      "bytes": 29065
+    },
+    "code/src/SpecScribe/MarkdownConverter.cs.html": {
+      "title": "src/SpecScribe/MarkdownConverter.cs — SpecScribe",
+      "chunk": "spa/pages-pinned.json",
+      "breadcrumb": [
+        {
+          "label": "Home",
+          "outputRelativePath": "index.html"
+        },
+        {
+          "label": "src/SpecScribe/MarkdownConverter.cs",
+          "outputRelativePath": null
+        }
+      ],
+      "parent": "index.html",
+      "children": [],
+      "head": {
+        "title": "src/SpecScribe/MarkdownConverter.cs — SpecScribe",
+        "description": "Source file src/SpecScribe/MarkdownConverter.cs in SpecScribe."
+      },
+      "scriptIslands": [
+        {
+          "id": "relgraph-codex2fsrcx2fspecscribex2fmarkdownconverter-cs-html-data",
+          "kind": "data"
+        }
+      ],
+      "contentHash": "470e8c2cd4618b6d",
+      "bytes": 118622
+    },
+    "commits/2026-07-04.html": {
+      "title": "Commits on Sat, Jul 4, 2026 — SpecScribe",
+      "chunk": "spa/pages-pinned.json",
+      "breadcrumb": [
+        {
+          "label": "Home",
+          "outputRelativePath": "index.html"
+        },
+        {
+          "label": "Commits on Sat, Jul 4, 2026",
+          "outputRelativePath": null
+        }
+      ],
+      "parent": "index.html",
+      "children": [],
+      "head": {
+        "title": "Commits on Sat, Jul 4, 2026 — SpecScribe",
+        "description": "The 2 commits that landed on Sat, Jul 4, 2026 in SpecScribe."
+      },
+      "scriptIslands": [],
+      "contentHash": "eaf9a517983b6517",
+      "bytes": 26590
+    },
+    "commits/2026-07-17.html": {
+      "title": "Commits on Fri, Jul 17, 2026 — SpecScribe",
+      "chunk": "spa/pages-pinned.json",
+      "breadcrumb": [
+        {
+          "label": "Home",
+          "outputRelativePath": "index.html"
+        },
+        {
+          "label": "Commits on Fri, Jul 17, 2026",
+          "outputRelativePath": null
+        }
+      ],
+      "parent": "index.html",
+      "children": [],
+      "head": {
+        "title": "Commits on Fri, Jul 17, 2026 — SpecScribe",
+        "description": "The 18 commits and 15 artifacts updated on Fri, Jul 17, 2026 in SpecScribe."
+      },
+      "scriptIslands": [],
+      "contentHash": "6c1ccfa5127efd95",
+      "bytes": 39209
+    },
+    "commit/7d8882e.html": {
+      "title": "Commit 7d8882e — SpecScribe",
+      "chunk": "spa/pages-pinned.json",
+      "breadcrumb": [
+        {
+          "label": "Home",
+          "outputRelativePath": "index.html"
+        },
+        {
+          "label": "Commit 7d8882e",
+          "outputRelativePath": null
+        }
+      ],
+      "parent": "index.html",
+      "children": [],
+      "head": {
+        "title": "Commit 7d8882e — SpecScribe",
+        "description": "Commit 7d8882e in SpecScribe: Merge branch 'worktree-story-19-2-work-graph'"
+      },
+      "scriptIslands": [],
+      "contentHash": "0594c8dd7bac5246",
+      "bytes": 75642
+    },
+    "commit/1210a41.html": {
+      "title": "Commit 1210a41 — SpecScribe",
+      "chunk": "spa/pages-pinned.json",
+      "breadcrumb": [
+        {
+          "label": "Home",
+          "outputRelativePath": "index.html"
+        },
+        {
+          "label": "Commit 1210a41",
+          "outputRelativePath": null
+        }
+      ],
+      "parent": "index.html",
+      "children": [],
+      "head": {
+        "title": "Commit 1210a41 — SpecScribe",
+        "description": "Commit 1210a41 in SpecScribe: fix: close Story 9.13 deferred glance weight, no-plan, and source-key debt"
+      },
+      "scriptIslands": [],
+      "contentHash": "43ca5ce9b3cb513f",
+      "bytes": 80854
+    },
+    "index.html": {
+      "title": "SpecScribe — Project Dashboard",
+      "chunk": "spa/pages-pinned.json",
+      "breadcrumb": [],
+      "parent": null,
+      "children": [
+        "about-sdd.html",
+        "adrs/0004-cross-surface-interaction-and-theme-contract.html",
+        "code/spike/nuxt-ir/app.vue.html",
+        "code/src/SpecScribe/MarkdownConverter.cs.html",
+        "commit/1210a41.html",
+        "commit/7d8882e.html",
+        "commits/2026-07-04.html",
+        "commits/2026-07-17.html",
+        "deep-analytics.html",
+        "epics.html",
+        "impact-map.html",
+        "implementation-artifacts/spec-address-deferred-next-steps.html",
+        "retros.html",
+        "sprint.html"
+      ],
+      "head": {
+        "title": "SpecScribe — Project Dashboard",
+        "description": "Project dashboard and living documentation for SpecScribe, generated by SpecScribe."
+      },
+      "scriptIslands": [
+        {
+          "id": "dashboard-hierarchy-data",
+          "kind": "data"
+        }
+      ],
+      "contentHash": "84ce7e987e02a985",
+      "bytes": 1719177
+    },
+    "adrs/0004-cross-surface-interaction-and-theme-contract.html": {
+      "title": "ADR 0004: Preserve Cross-Surface Interaction Semantics and Host-Aware Theme Boundaries — SpecScribe",
+      "chunk": "spa/pages-pinned.json",
+      "breadcrumb": [
+        {
+          "label": "Home",
+          "outputRelativePath": "index.html"
+        },
+        {
+          "label": "ADR 0004: Preserve Cross-Surface Interaction Semantics and Host-Aware Theme Boundaries",
+          "outputRelativePath": null
+        }
+      ],
+      "parent": "index.html",
+      "children": [],
+      "head": {
+        "title": "ADR 0004: Preserve Cross-Surface Interaction Semantics and Host-Aware Theme Boundaries — SpecScribe",
+        "description": "ADR 0004: Preserve Cross-Surface Interaction Semantics and Host-Aware Theme Boundaries — living documentation for SpecScribe, generated by SpecScribe."
+      },
+      "scriptIslands": [],
+      "contentHash": "933d3f1f0f081ceb",
+      "bytes": 36872
+    },
+    "implementation-artifacts/spec-address-deferred-next-steps.html": {
+      "title": "Address deferred Next Steps on story and epic pages — SpecScribe",
+      "chunk": "spa/pages-pinned.json",
+      "breadcrumb": [
+        {
+          "label": "Home",
+          "outputRelativePath": "index.html"
+        },
+        {
+          "label": "Address deferred Next Steps on story and epic pages",
+          "outputRelativePath": null
+        }
+      ],
+      "parent": "index.html",
+      "children": [],
+      "head": {
+        "title": "Address deferred Next Steps on story and epic pages — SpecScribe",
+        "description": "Address deferred Next Steps on story and epic pages — living documentation for SpecScribe, generated by SpecScribe."
+      },
+      "scriptIslands": [],
+      "contentHash": "b9d7c0f35f506ca7",
+      "bytes": 60569
+    },
+    "epics/epic-14.html": {
+      "title": "Epic 14: Squad Coverage — SpecScribe",
+      "chunk": "spa/pages-pinned.json",
+      "breadcrumb": [
+        {
+          "label": "Home",
+          "outputRelativePath": "index.html"
+        },
+        {
+          "label": "Epics",
+          "outputRelativePath": "epics.html"
+        },
+        {
+          "label": "14 · Squad Coverage",
+          "outputRelativePath": null
+        }
+      ],
+      "parent": "epics.html",
+      "children": [],
+      "head": {
+        "title": "Epic 14: Squad Coverage — SpecScribe",
+        "description": "Epic 14: Squad Coverage — SpecScribe"
+      },
+      "scriptIslands": [
+        {
+          "id": "epic-14-hierarchy-data",
+          "kind": "data"
+        }
+      ],
+      "contentHash": "e3496bbcc134dfe6",
+      "bytes": 55175
+    },
+    "epics/epic-26.html": {
+      "title": "Epic 26: Optional External Code-Analysis Insights — Findings Alongside Code, Directories, and Planning — SpecScribe",
+      "chunk": "spa/pages-pinned.json",
+      "breadcrumb": [
+        {
+          "label": "Home",
+          "outputRelativePath": "index.html"
+        },
+        {
+          "label": "Epics",
+          "outputRelativePath": "epics.html"
+        },
+        {
+          "label": "26 · Optional External Code-Ana…",
+          "outputRelativePath": null
+        }
+      ],
+      "parent": "epics.html",
+      "children": [],
+      "head": {
+        "title": "Epic 26: Optional External Code-Analysis Insights — Findings Alongside Code, Directories, and Planning — SpecScribe",
+        "description": "Epic 26: Optional External Code-Analysis Insights — Findings Alongside Code, Directories, and Planning — SpecScribe"
+      },
+      "scriptIslands": [
+        {
+          "id": "epic-26-hierarchy-data",
+          "kind": "data"
+        }
+      ],
+      "contentHash": "fa79d40b9fce85fa",
+      "bytes": 109463
+    },
+    "epics.html": {
+      "title": "Epics & Stories — SpecScribe",
+      "chunk": "spa/pages-pinned.json",
+      "breadcrumb": [
+        {
+          "label": "Home",
+          "outputRelativePath": "index.html"
+        },
+        {
+          "label": "Epics",
+          "outputRelativePath": null
+        }
+      ],
+      "parent": "index.html",
+      "children": [
+        "epics/epic-14.html",
+        "epics/epic-26.html"
+      ],
+      "head": {
+        "title": "Epics & Stories — SpecScribe",
+        "description": "Epics & Stories — SpecScribe"
+      },
+      "scriptIslands": [
+        {
+          "id": "epics-index-hierarchy-data",
+          "kind": "data"
+        }
+      ],
+      "contentHash": "6e1776d33e601f95",
+      "bytes": 421620
+    },
+    "follow-ups/action-schedule-a-story-spec-to-fix-htmltemplater-knownindexgroups.html": {
+      "title": "Schedule a story/spec to fix HtmlTemplater.KnownIndexGroups omitting… — SpecScribe",
+      "chunk": "spa/pages-pinned.json",
+      "breadcrumb": [
+        {
+          "label": "Home",
+          "outputRelativePath": "index.html"
+        },
+        {
+          "label": "Open Action Items",
+          "outputRelativePath": "action-items.html"
+        },
+        {
+          "label": "Schedule a story/spec to fix HtmlTemplater.KnownIndexGroups omitting…",
+          "outputRelativePath": null
+        }
+      ],
+      "parent": "action-items.html",
+      "children": [],
+      "head": {
+        "title": "Schedule a story/spec to fix HtmlTemplater.KnownIndexGroups omitting… — SpecScribe",
+        "description": "Action item follow-up for SpecScribe."
+      },
+      "scriptIslands": [],
+      "contentHash": "8d724fff982ebe25",
+      "bytes": 34286
+    },
+    "follow-ups/deferred-epic-angular-weight-on-project-glance-is-max.html": {
+      "title": "Epic angular weight on project glance is max(1, Σ max(1, TasksTotal)) and no… — SpecScribe",
+      "chunk": "spa/pages-pinned.json",
+      "breadcrumb": [
+        {
+          "label": "Home",
+          "outputRelativePath": "index.html"
+        },
+        {
+          "label": "Deferred Work",
+          "outputRelativePath": "implementation-artifacts/deferred-work.html"
+        },
+        {
+          "label": "Epic angular weight on project glance is max(1, Σ max(1, TasksTotal)) and no…",
+          "outputRelativePath": null
+        }
+      ],
+      "parent": "implementation-artifacts/deferred-work.html",
+      "children": [],
+      "head": {
+        "title": "Epic angular weight on project glance is max(1, Σ max(1, TasksTotal)) and no… — SpecScribe",
+        "description": "Deferred work follow-up for SpecScribe."
+      },
+      "scriptIslands": [],
+      "contentHash": "520d614b92465699",
+      "bytes": 46608
+    },
+    "deep-analytics.html": {
+      "title": "Deep Git Analytics — SpecScribe",
+      "chunk": "spa/pages-pinned.json",
+      "breadcrumb": [
+        {
+          "label": "Home",
+          "outputRelativePath": "index.html"
+        },
+        {
+          "label": "Deep Analytics",
+          "outputRelativePath": null
+        }
+      ],
+      "parent": "index.html",
+      "children": [],
+      "head": {
+        "title": "Deep Git Analytics — SpecScribe",
+        "description": "Deeper git insights for SpecScribe: change coupling between files and the repository's change hotspots."
+      },
+      "scriptIslands": [],
+      "contentHash": "8c651ad86d42b1ee",
+      "bytes": 59787
+    },
+    "impact-map.html": {
+      "title": "Impact Map — SpecScribe",
+      "chunk": "spa/pages-pinned.json",
+      "breadcrumb": [
+        {
+          "label": "Home",
+          "outputRelativePath": "index.html"
+        },
+        {
+          "label": "Impact Map",
+          "outputRelativePath": null
+        }
+      ],
+      "parent": "index.html",
+      "children": [],
+      "head": {
+        "title": "Impact Map — SpecScribe",
+        "description": "Planning-to-code impact map for SpecScribe — an interactive treemap of which code areas each epic's commits touched, sized by churn and colored by commit activity."
+      },
+      "scriptIslands": [
+        {
+          "id": "impact-hierarchy-data",
+          "kind": "data"
+        }
+      ],
+      "contentHash": "94d8ce9789f44bbd",
+      "bytes": 1363216
+    },
+    "about-sdd-gsd.html": {
+      "title": "GSD — SpecScribe",
+      "chunk": "spa/pages-pinned.json",
+      "breadcrumb": [
+        {
+          "label": "Home",
+          "outputRelativePath": "index.html"
+        },
+        {
+          "label": "About Spec-Driven Development",
+          "outputRelativePath": "about-sdd.html"
+        },
+        {
+          "label": "GSD",
+          "outputRelativePath": null
+        }
+      ],
+      "parent": "about-sdd.html",
+      "children": [],
+      "head": {
+        "title": "GSD — SpecScribe",
+        "description": "About GSD for Spec-Driven Development — orientation, SpecScribe support, and getting started."
+      },
+      "scriptIslands": [],
+      "contentHash": "04fe9ace2642f063",
+      "bytes": 24259
+    },
+    "about-sdd.html": {
+      "title": "About Spec-Driven Development — SpecScribe",
+      "chunk": "spa/pages-pinned.json",
+      "breadcrumb": [
+        {
+          "label": "Home",
+          "outputRelativePath": "index.html"
+        },
+        {
+          "label": "About Spec-Driven Development",
+          "outputRelativePath": null
+        }
+      ],
+      "parent": "index.html",
+      "children": [
+        "about-sdd-gsd.html"
+      ],
+      "head": {
+        "title": "About Spec-Driven Development — SpecScribe",
+        "description": "Which Spec-Driven Development frameworks SpecScribe understands, and how to get started."
+      },
+      "scriptIslands": [],
+      "contentHash": "8fd9a691d5a596ca",
+      "bytes": 30744
+    },
+    "requirements/nfr3.html": {
+      "title": "NFR3 — SpecScribe",
+      "chunk": "spa/pages-pinned.json",
+      "breadcrumb": [
+        {
+          "label": "Home",
+          "outputRelativePath": "index.html"
+        },
+        {
+          "label": "Requirements",
+          "outputRelativePath": "requirements.html"
+        },
+        {
+          "label": "NFR3",
+          "outputRelativePath": null
+        }
+      ],
+      "parent": "requirements.html",
+      "children": [],
+      "head": {
+        "title": "NFR3 — SpecScribe",
+        "description": "NFR3 — SpecScribe"
+      },
+      "scriptIslands": [],
+      "contentHash": "d0a377fa5a08aa7b",
+      "bytes": 33894
+    },
+    "requirements/ux-dr23.html": {
+      "title": "UX-DR23 — SpecScribe",
+      "chunk": "spa/pages-pinned.json",
+      "breadcrumb": [
+        {
+          "label": "Home",
+          "outputRelativePath": "index.html"
+        },
+        {
+          "label": "Requirements",
+          "outputRelativePath": "requirements.html"
+        },
+        {
+          "label": "UX-DR23",
+          "outputRelativePath": null
+        }
+      ],
+      "parent": "requirements.html",
+      "children": [],
+      "head": {
+        "title": "UX-DR23 — SpecScribe",
+        "description": "UX-DR23 — SpecScribe"
+      },
+      "scriptIslands": [],
+      "contentHash": "7fd858f4cc1985cb",
+      "bytes": 52099
+    },
+    "retros.html": {
+      "title": "Retrospectives — SpecScribe",
+      "chunk": "spa/pages-pinned.json",
+      "breadcrumb": [
+        {
+          "label": "Home",
+          "outputRelativePath": "index.html"
+        },
+        {
+          "label": "Retrospectives",
+          "outputRelativePath": null
+        }
+      ],
+      "parent": "index.html",
+      "children": [],
+      "head": {
+        "title": "Retrospectives — SpecScribe",
+        "description": "Epic retrospectives for SpecScribe."
+      },
+      "scriptIslands": [],
+      "contentHash": "7fdc4139b3ea6003",
+      "bytes": 47073
+    },
+    "sprint.html": {
+      "title": "Sprint Status — SpecScribe",
+      "chunk": "spa/pages-pinned.json",
+      "breadcrumb": [
+        {
+          "label": "Home",
+          "outputRelativePath": "index.html"
+        },
+        {
+          "label": "Sprint Status",
+          "outputRelativePath": null
+        }
+      ],
+      "parent": "index.html",
+      "children": [],
+      "head": {
+        "title": "Sprint Status — SpecScribe",
+        "description": "Sprint delivery status for SpecScribe — a board of every epic and story by lifecycle stage."
+      },
+      "scriptIslands": [],
+      "contentHash": "111705f3cf90526f",
+      "bytes": 530105
+    },
+    "epics/story-11-2.html": {
+      "title": "Story 11.2: Spec Kit Baseline Adapter Coverage — SpecScribe",
+      "chunk": "spa/pages-pinned.json",
+      "breadcrumb": [
+        {
+          "label": "Home",
+          "outputRelativePath": "index.html"
+        },
+        {
+          "label": "Epics",
+          "outputRelativePath": "epics.html"
+        },
+        {
+          "label": "11 · Spec Kit Coverage",
+          "outputRelativePath": "epics/epic-11.html"
+        },
+        {
+          "label": "Story 11.2",
+          "outputRelativePath": null
+        }
+      ],
+      "parent": "epics/epic-11.html",
+      "children": [],
+      "head": {
+        "title": "Story 11.2: Spec Kit Baseline Adapter Coverage — SpecScribe",
+        "description": "Story 11.2: Spec Kit Baseline Adapter Coverage — SpecScribe"
+      },
+      "scriptIslands": [],
+      "contentHash": "35f9fb12f4297a6f",
+      "bytes": 36225
+    },
+    "epics/story-10-1.html": {
+      "title": "Story 10.1: Insights Navigation and Structure Page Retirement — SpecScribe",
+      "chunk": "spa/pages-pinned.json",
+      "breadcrumb": [
+        {
+          "label": "Home",
+          "outputRelativePath": "index.html"
+        },
+        {
+          "label": "Epics",
+          "outputRelativePath": "epics.html"
+        },
+        {
+          "label": "10 · Portal Legibility for Ever…",
+          "outputRelativePath": "epics/epic-10.html"
+        },
+        {
+          "label": "Story 10.1",
+          "outputRelativePath": null
+        }
+      ],
+      "parent": "epics/epic-10.html",
+      "children": [],
+      "head": {
+        "title": "Story 10.1: Insights Navigation and Structure Page Retirement — SpecScribe",
+        "description": "Story 10.1: Insights Navigation and Structure Page Retirement — SpecScribe"
+      },
+      "scriptIslands": [
+        {
+          "id": "story-10-1-hierarchy-data",
+          "kind": "data"
+        }
+      ],
+      "contentHash": "c2a727fe65429833",
+      "bytes": 184023
+    }
+  }
+}

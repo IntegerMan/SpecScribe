@@ -40,11 +40,14 @@ public class TimelineTemplaterTests
         var today = DateOnly.FromDateTime(DateTime.Now);
         var git = PulseFor((today, 2));
 
-        var html = TimelineTemplater.RenderPage(git, new[] { today }, git.CommitsByDay, NoArtifacts, Nav());
+        var page = TimelineTemplater.BuildPage(git, new[] { today }, git.CommitsByDay, NoArtifacts, Nav());
+        var html = RegionAssert.Of(page);
 
-        Assert.Contains("<a class=\"skip-link\" href=\"#main-content\">Skip to content</a>", html);
+        // [Story 23.6 AC #8] The skip-link assertion lived here and is NOT lost — it is head-emitted chrome,
+        // and the region carries no head. `npm run check:a11y` owns `skip-link` over every EMITTED page,
+        // which is the only place it can be asserted honestly now that no C# path composes a whole page.
         Assert.Contains("<main id=\"main-content\">", html);
-        Assert.Contains("<title>Activity Timeline — SpecScribe</title>", html);
+        RegionAssert.HasTitle(page, "Activity Timeline — SpecScribe");
         Assert.Contains("<h1>Activity Timeline</h1>", html);
         Assert.Contains("crumb-current", html);   // Home / Timeline breadcrumb
         Assert.Contains(">Timeline<", html);
@@ -63,7 +66,7 @@ public class TimelineTemplaterTests
         });
         var daysNewestFirst = new[] { d2, d1 };
 
-        var html = TimelineTemplater.RenderPage(git, daysNewestFirst, git.CommitsByDay, artifacts, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(TimelineTemplater.BuildPage(git, daysNewestFirst, git.CommitsByDay, artifacts, Nav()));
 
         // Root-level page → date links are relative to root (commits/…), not ../.
         Assert.Contains($"class=\"timeline-date\" href=\"commits/{Charts.D(d2)}.html\">{Charts.DReadable(d2)}</a>", html);
@@ -88,7 +91,7 @@ public class TimelineTemplaterTests
         var d1 = new DateOnly(2026, 7, 4);
         var git = PulseFor((d1, 1));
 
-        var html = TimelineTemplater.RenderPage(git, new[] { d1 }, git.CommitsByDay, NoArtifacts, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(TimelineTemplater.BuildPage(git, new[] { d1 }, git.CommitsByDay, NoArtifacts, Nav()));
 
         Assert.Contains("<li class=\"list-row timeline-row\">", html);
         Assert.Contains("<div class=\"list-row-scan\">", html);
@@ -103,7 +106,7 @@ public class TimelineTemplaterTests
         var today = DateOnly.FromDateTime(DateTime.Now);
         var git = PulseFor((today.AddDays(-2), 1), (today, 2));
 
-        var html = TimelineTemplater.RenderPage(git, new[] { today, today.AddDays(-2) }, git.CommitsByDay, NoArtifacts, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(TimelineTemplater.BuildPage(git, new[] { today, today.AddDays(-2) }, git.CommitsByDay, NoArtifacts, Nav()));
 
         Assert.Contains("class=\"heatmap\"", html);
         Assert.Contains("timeline-heatmap", html);
@@ -115,7 +118,7 @@ public class TimelineTemplaterTests
         var day = new DateOnly(2026, 7, 6);
         var artifacts = ActivityModel.GroupArtifactsByDay(new[] { (day, "Architecture", "planning-artifacts/ARCHITECTURE.html") });
 
-        var html = TimelineTemplater.RenderPage(git: null, new[] { day }, NoCommits, artifacts, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(TimelineTemplater.BuildPage(git: null, new[] { day }, NoCommits, artifacts, Nav()));
 
         Assert.DoesNotContain("class=\"heatmap\"", html);
         Assert.DoesNotContain("timeline-heatmap", html);
@@ -127,7 +130,7 @@ public class TimelineTemplaterTests
     [Fact]
     public void RenderPage_EmptyUnion_RendersFriendlyNote_NoList()
     {
-        var html = TimelineTemplater.RenderPage(git: null, Array.Empty<DateOnly>(), NoCommits, NoArtifacts, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(TimelineTemplater.BuildPage(git: null, Array.Empty<DateOnly>(), NoCommits, NoArtifacts, Nav()));
 
         Assert.Contains("No activity to show yet.", html);
         Assert.DoesNotContain("timeline-list", html);

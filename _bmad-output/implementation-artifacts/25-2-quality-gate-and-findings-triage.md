@@ -17,7 +17,7 @@ touches:
 
 # Story 25.2: Quality Gate and Findings Triage into the Project Backlog
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -225,6 +225,46 @@ Binding clarifications:
   - [x] Re-check whether the **SonarJS blind spot** is still live (`specscribe.js` at `lines=2954` with **no
         `ncloc`** — verified still true today). It is not this story's to fix, but "no JavaScript findings"
         must not enter the triage record as "clean".
+
+### Review Findings
+
+Code review run 2026-07-30 against this story's own 3 commits (`a9676b2`, `55c6c1e`, `6017c2c`), scoped to its
+own File List. Sibling-story hunks bundled into the same commits (18.3/18.4/18.5/20.8/23.5/25.3 in
+`sprint-status.yaml`) were excluded from scope. Blind Hunter, Edge Case Hunter, and an Acceptance Auditor ran in
+parallel; 7 findings survived triage (14 dismissed as noise, already-handled, or verified as non-issues).
+
+- [x] [Review][Decision] Propose an ADR for the quality-gate/coverage/rule-decision policy choices? — RESOLVED:
+      owner chose to propose one. See
+      [ADR 0035 — The SonarCloud Quality Gate Is Inherited Deliberately, and Rule-Level Exceptions Have One
+      Home](../../docs/adrs/0035-sonarcloud-quality-gate-and-rule-decision-policy.md) (Proposed, 2026-07-31),
+      which formalizes 1a–1e and AC #3's rule-decision-home choice as a standing, owner-ratifiable record.
+- [x] [Review][Patch] Stale `S6444`/`SpaDelivery.cs` security-rating driver claim in `deferred-work.md` never
+      reconciled — FIXED: `deferred-work.md:1172`'s evidence line now states the corrected, ADR-0035-linked
+      picture (S6444/S4036 confirmed Story 17.2's, drives project + at-times new-code security rating, but exact
+      count/location is expected to move under the sliding new-code window) instead of the stale five-instance
+      claim. [_bmad-output/implementation-artifacts/deferred-work.md:1172]
+- [x] [Review][Patch] "The 771 INFO / 776 external-Roslyn issues are ONE [decision]" — unreconciled count
+      discrepancy. FIXED: corrected `776` → `771` in `sprint-status.yaml`, consistent with every other citation
+      of this figure. [_bmad-output/implementation-artifacts/sprint-status.yaml:470]
+- [x] [Review][Patch] Task 7's "note that `build-test-analyze.yml` has zero findings" subtask is checked off as
+      done, but that observation was never actually written into `docs/SonarCloudSetup.md` or `deferred-work.md`.
+      FIXED: added to the § *Rule-level decisions* table row for `githubactions:S8233`/`S8264`. [docs/SonarCloudSetup.md]
+- [x] [Review][Patch] The `permissions:` comment "`actions/deploy-pages@v5` requires all three: `pages: write`
+      ... `id-token: write` ... and `contents: read`" overstates what the action itself enforces. FIXED: reworded
+      to state only the two permissions the action actually requires, with `contents: read` reframed as the
+      job's explicit minimal default rather than an action requirement.
+      [.github/workflows/publish-docs-live-pages.yml:75]
+- [x] [Review][Defer] `GoldenContentFingerprint` move attributed to a concurrent Story 20.8 session via `git
+      status` plus the specific file/session named (`SiteGeneratorAdapterTests.cs`), rather than the full
+      bisect-into-a-throwaway-tree procedure CLAUDE.md prescribes for proving fingerprint-move causality —
+      deferred, pre-existing verification-rigor gap; low risk here because only one concurrent session's files
+      intersected the fingerprint's inputs, but the lighter method should not become the default going forward.
+      [_bmad-output/implementation-artifacts/25-2-quality-gate-and-findings-triage.md]
+- [x] [Review][Defer] The flaky-test triage entry for `FileWatcherServiceTests.BurstOfSaves_CoalescesAndLeavesCoherentOutput`
+      attributes the failure to generic machine contention without cross-referencing this project's own
+      previously-diagnosed "git SPAWN starvation" preview-server flake pattern, a strong candidate explanation
+      for the same load-sensitive shape — deferred, pre-existing documentation gap for whoever next investigates
+      this flake. [_bmad-output/implementation-artifacts/deferred-work.md]
 
 ## Dev Notes
 

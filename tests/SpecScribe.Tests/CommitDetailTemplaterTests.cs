@@ -28,7 +28,7 @@ public class CommitDetailTemplaterTests
             body: "First paragraph.\n\nSecond paragraph.",
             files: new[] { new DeepFileChange("src/A.cs", 3, 1), new DeepFileChange("src/B.cs", 10, 0) });
 
-        var html = CommitDetailTemplater.RenderPage(commit, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CommitDetailTemplater.BuildPage(commit, Nav()));
 
         // Subject as <h1>.
         Assert.Contains("<h1>Fix the thing</h1>", html);
@@ -51,7 +51,7 @@ public class CommitDetailTemplaterTests
     [Fact]
     public void RenderPage_PreservesSingleNewlinesAsLineBreaksWithinAParagraph()
     {
-        var html = CommitDetailTemplater.RenderPage(Commit(body: "Line A\nLine B"), Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CommitDetailTemplater.BuildPage(Commit(body: "Line A\nLine B"), Nav()));
         Assert.Contains("Line A<br>", html);
         Assert.Contains("Line B", html);
     }
@@ -59,12 +59,15 @@ public class CommitDetailTemplaterTests
     [Fact]
     public void RenderPage_HonorsTheSiteA11yContract()
     {
-        var html = CommitDetailTemplater.RenderPage(Commit(), Nav());
-
-        Assert.Contains("<a class=\"skip-link\" href=\"#main-content\">Skip to content</a>", html);
+        var page = CommitDetailTemplater.BuildPage(Commit(), Nav());
+        var html = RegionAssert.Of(page);
+        // [Story 23.6 AC #8] The skip link assertion lived here and is NOT lost: it is chrome, emitted by the
+        // head, and the region carries no head. `npm run check:a11y` owns `skip-link` over every EMITTED page —
+        // which is the only place it can be checked honestly now that no C# path composes a whole page — and
+        // `check:parity`'s pageSha hashes the whole document for the pinned corpus.
         Assert.Contains("<main id=\"main-content\" class=\"commit-detail\">", html);
         // Exactly one main landmark.
-        Assert.Equal(1, CountOccurrences(html, "<main id=\"main-content\""));
+        RegionAssert.HasSingleMainLandmark(html);
         // Breadcrumb to Home, then the short hash.
         Assert.Contains("Commit abc1234", html);
         // The files table carries a caption (a11y).
@@ -80,7 +83,7 @@ public class CommitDetailTemplaterTests
             body: "body <script>alert(1)</script> & more",
             files: new[] { new DeepFileChange("src/<evil>.cs", 1, 0) });
 
-        var html = CommitDetailTemplater.RenderPage(commit, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CommitDetailTemplater.BuildPage(commit, Nav()));
 
         Assert.Contains("fix &lt;div&gt; &amp; &quot;q&quot;", html);
         Assert.Contains("&lt;b&gt;Bob&lt;/b&gt;", html);
@@ -97,7 +100,7 @@ public class CommitDetailTemplaterTests
     {
         var commit = Commit(files: new[] { new DeepFileChange("assets/logo.png", null, null) });
 
-        var html = CommitDetailTemplater.RenderPage(commit, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CommitDetailTemplater.BuildPage(commit, Nav()));
 
         Assert.Contains("assets/logo.png", html);
         Assert.Contains("commit-file-binary", html);
@@ -115,7 +118,7 @@ public class CommitDetailTemplaterTests
     [Fact]
     public void RenderPage_EmptyBodyOmitsTheProseBlock()
     {
-        var html = CommitDetailTemplater.RenderPage(Commit(body: "   "), Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CommitDetailTemplater.BuildPage(Commit(body: "   "), Nav()));
         Assert.DoesNotContain("commit-message", html);
         // No empty paragraph left behind.
         Assert.DoesNotContain("<p></p>", html);
@@ -127,7 +130,7 @@ public class CommitDetailTemplaterTests
         var commit = new DeepCommit("abc1234def567", "Solo Author", null, "Subject", "",
             new[] { new DeepFileChange("src/A.cs", 1, 0) });
 
-        var html = CommitDetailTemplater.RenderPage(commit, Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CommitDetailTemplater.BuildPage(commit, Nav()));
 
         // Attribution is author-only when the timestamp didn't parse — no date/time, no crash.
         Assert.Contains("<span class=\"pill commit-attribution\">by Solo Author</span>", html);
@@ -136,7 +139,7 @@ public class CommitDetailTemplaterTests
     [Fact]
     public void RenderPage_MissingSubjectDegradesWithoutEmptyHeading()
     {
-        var html = CommitDetailTemplater.RenderPage(Commit(subject: ""), Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CommitDetailTemplater.BuildPage(Commit(subject: ""), Nav()));
         Assert.Contains("<h1>(no subject)</h1>", html);
         Assert.DoesNotContain("<h1></h1>", html);
     }
@@ -153,7 +156,7 @@ public class CommitDetailTemplaterTests
         // Resolver returns a root-relative code page only for A.cs; the templater prepends its own "../" prefix.
         string? Resolver(string path) => path == "src/A.cs" ? "code/src/A.cs.html" : null;
 
-        var html = CommitDetailTemplater.RenderPage(commit, Nav(), Resolver);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CommitDetailTemplater.BuildPage(commit, Nav(), Resolver));
 
         Assert.Contains("href=\"../code/src/A.cs.html\"><code>src/A.cs</code></a>", html);
         // B.cs has no page → plain <code>, never a dead link.
@@ -164,7 +167,7 @@ public class CommitDetailTemplaterTests
     [Fact]
     public void RenderPage_NullResolverRendersAllPathsPlain()
     {
-        var html = CommitDetailTemplater.RenderPage(Commit(), Nav());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CommitDetailTemplater.BuildPage(Commit(), Nav()));
         Assert.Contains("<code>src/A.cs</code>", html);
         Assert.DoesNotContain("<a href=\"../code/", html);
     }
@@ -178,7 +181,7 @@ public class CommitDetailTemplaterTests
             new PagerLink("../commit/older.html", "older commit"),
             new PagerLink("../commit/newer.html", "newer commit"));
 
-        var html = CommitDetailTemplater.RenderPage(Commit(), Nav(), pager: pager);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CommitDetailTemplater.BuildPage(Commit(), Nav(), pager: pager));
 
         Assert.Contains("<div class=\"page-wayfinding\">", html);
         var wrapperIdx = html.IndexOf("page-wayfinding", StringComparison.Ordinal);

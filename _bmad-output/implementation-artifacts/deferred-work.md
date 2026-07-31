@@ -22,7 +22,21 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
   action for whoever next touches Story 23.4 or the IR/`--spa` pipeline: either rebuild an IR-level content-drift
   gate on normalization that's actually been proven deterministic across OSes, or treat `measure:parity`'s
   committed per-page hashes (`<main>` region only, in `web/measurements/parity.json`) as the interim substitute
-  for AC #5's intent. The removed test's full investigation notes (what was ruled out: unsorted directory walks
+  for AC #5's intent.
+  **✅ CLEARED by Story 23.6 (2026-07-31) — the FIRST option was taken, not the second.**
+  A rebuilt gate landed: `npm run check:parity` (`web/scripts/check-parity.mjs`), wired into `npm run check` and
+  into BOTH CI jobs. ⚠️ **The second option was evaluated and REJECTED on measurement, not on taste**: reading
+  `web/measurements/parity.json` back over the live site is VACUOUS, because `goldenSha`, `irSha` and `nuxtSha`
+  are identical on all 1,469 rows — the committed value asks the same question the live run already answers. It
+  is also blind to the chrome Story 23.6 deletes, hashing `<main>` only.
+  The gate that replaced it renders a FROZEN 24-route corpus (all 14 surface families) committed at
+  `web/fixtures/parity-corpus/`, so content churn can never turn it red, and it hashes BOTH the `<main>` region
+  (the C# lineage, re-verified live 24/24 against the still-existing writer before freezing) and the WHOLE PAGE
+  (the first gate this project has ever had over `<title>`, meta, the favicon, the footer, `<script src>`, the
+  nav toggle, the Mermaid init and the Hierarchy/Graph anti-flash handshakes).
+  Determinism: 3 consecutive local runs identical. ⚠️ **The Ubuntu half is WIRED but NOT YET OBSERVED** — it
+  runs in `portability-probe` and lands on the next CI run. ADR 0033 §Decision 4 is not fully discharged until
+  that run is read. The removed test's full investigation notes (what was ruled out: unsorted directory walks
   now fixed; considered and NOT confirmed: process-level string-hash-seed randomization affecting `HashSet`
   enumeration order, `Parallel`/`AsParallel` usage — none found in the render path;
   `Environment.NewLine` leaking into JSON — none found) are preserved in the git history of
@@ -1169,7 +1183,7 @@ Baseline SonarCloud triage of the whole codebase, performed rule-first against a
 
 - source_spec: `25-2-quality-gate-and-findings-triage.md`
   summary: Regex denial-of-service hardening — 156 `csharpsquid:S6444` ("regular expressions should be executed with a timeout") plus 1 `csharpsquid:S4036` ("use an absolute path for this command", `GitMetrics.cs:1154`). Together these are 157 of the project's 160 unresolved vulnerabilities and the sole driver of its security rating **C**. MINOR severity understates them here: SpecScribe parses markdown, epics, and sprint files from arbitrary third-party repositories, so catastrophic backtracking is an input-driven surface rather than a theoretical one. Deliberately NOT suppressed — the fix is `RegexOptions.NonBacktracking` or an explicit timeout at the approximately 40 construction sites, not a rule deactivation.
-  evidence: Sonar baseline triage, verified with `resolved=false` against analysis `2026-07-27T17:49:06Z`. Scheduled to **Story 17.2** (Security and Privacy Hardening), whose AC #2 already covers this ground. Five new S6444 instances in `src/SpecScribe/SpaDelivery.cs:190,205,246,249,252` are what currently hold `new_security_rating` at B and keep the quality gate red. [`src/SpecScribe/GitMetrics.cs:1154`, `src/SpecScribe/SpaDelivery.cs:190`]
+  evidence: Sonar baseline triage, verified with `resolved=false` against analysis `2026-07-27T17:49:06Z`. Scheduled to **Story 17.2** (Security and Privacy Hardening), whose AC #2 already covers this ground. **Corrected 2026-07-31** (this story's own code review; independently re-derived by Story 25.6 on 2026-07-29): the `csharpsquid:S6444`/`S4036` band is confirmed **Story 17.2's**, never Epic 23's, and still drives both the project-level and (as of the last re-measurement) the new-code security rating — but the specific instance count and file:line locations move under the `days: 30` sliding new-code window (it went from "five instances in `SpaDelivery.cs`" to "161 of 164 new-code vulnerabilities, mostly `src/`" within days) and should be re-measured rather than trusted from this record. See [ADR 0035](../../docs/adrs/0035-sonarcloud-quality-gate-and-rule-decision-policy.md) for the standing gate/rule-decision policy this band is scheduled against. [`src/SpecScribe/GitMetrics.cs:1154`, `src/SpecScribe/SpaDelivery.cs:190`]
 
 - source_spec: `25-2-quality-gate-and-findings-triage.md`
   summary: Structural remediation band — 94 `csharpsquid:S1192` (duplicated string literals), 86 `S3776` (cognitive complexity, CRITICAL), 48 nested ternaries across `S3358` in C#/TS/JS, 29 `S3267` (loops that should be LINQ), 28 `S107` (too many parameters), 9 `S125` (commented-out code), plus the smaller `S2589`/`S1121`/`S127`/`S1066`/`S1172` tail. Approximately 300 issues, all maintainability, all in first-party C#.
@@ -1314,3 +1328,13 @@ Baseline SonarCloud triage of the whole codebase, performed rule-first against a
 - source_spec: `22-5-incremental-event-driven-regeneration-engine.md`
   summary: No oracle-parity case drives two watch routes concurrently, though `FileWatcherService` arms one debounce `Timer` per distinct changed path — each on its own thread-pool thread — and the design's own doc comments rest on `_gate` serialization to make that safe. `IncrementalOracleParityTests.RunClass` applies exactly one change class and dispatches its paths in a sequential `foreach`, so the concurrent-pass shape the production watcher actually produces is unproven by the permanent gate. Related: the rename case is exercised in one event order only (delete-then-create), never reversed and never concurrently, so the ordering claim behind "rename escalates and then narrowly re-renders the new path" rests on a single order.
   evidence: Confirmed during code review, 2026-07-29 (Edge Case Hunter layer, verified by direct read), by reading `RunClass`'s dispatch loop and `RenameGenericDoc`'s returned path order against `FileWatcherService`'s per-path `Debounce` timer construction. Deferred rather than patched because the suite already carries a rotating file-write-contention flake (Story 23.2), so a concurrency case needs its own flake budget. [`tests/SpecScribe.Tests/IncrementalOracleParityTests.cs` `RunClass`, `RenameGenericDoc`]
+
+## Deferred from: code review of 25-2-quality-gate-and-findings-triage (2026-07-30)
+
+- source_spec: `25-2-quality-gate-and-findings-triage.md`
+  summary: `GoldenContentFingerprint`'s move (`126eed3a…` → `3171cf5c…`) is attributed in this story's Verification section to a concurrent Story 20.8 session, verified via `git status` plus naming the specific changed file (`SiteGeneratorAdapterTests.cs`), rather than the full bisect-into-a-throwaway-tree procedure CLAUDE.md prescribes for proving fingerprint-move causality. Low risk here because only one concurrent session's files intersected the fingerprint's inputs, but the lighter method should not become the default going forward — future stories should still bisect when more than one candidate session is in flight.
+  evidence: Confirmed during code review, 2026-07-30 (Blind Hunter layer + Acceptance Auditor). [`_bmad-output/implementation-artifacts/25-2-quality-gate-and-findings-triage.md`]
+
+- source_spec: `25-2-quality-gate-and-findings-triage.md`
+  summary: The flaky-test triage entry for `FileWatcherServiceTests.BurstOfSaves_CoalescesAndLeavesCoherentOutput` (filed by this story as a 13th deferred item) attributes the failure to generic machine contention ("a portal generation and a browser alongside it, and a concurrent agent session was building") without cross-referencing this project's own previously-diagnosed "git SPAWN starvation" preview-server flake pattern — a strong candidate explanation for the same load-sensitive shape. Worth checking against the known cause first when this flake is next investigated.
+  evidence: Confirmed during code review, 2026-07-30 (Blind Hunter layer). [`_bmad-output/implementation-artifacts/deferred-work.md`]

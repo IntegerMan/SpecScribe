@@ -261,6 +261,35 @@ public sealed class SiteGenerator
     /// exactly how a timestamp gets into a CI artifact.</para></summary>
     public bool EmitDeltaSidecar { get; set; }
 
+    /// <summary>When true, every IR emit is followed by a static prerender: the prebuilt Nitro artefact is booted
+    /// against this run's output root and one request is issued per route from the manifest just written, with each
+    /// response saved to its output-relative <c>.html</c>. [Story 23.6 AC #7, ADR 0022 §Decision 3]
+    ///
+    /// <para><b>Why this is an opt-in switch and not simply always-on.</b> It is the same shape as
+    /// <see cref="EmitDeltaSidecar"/> and for the same class of reason: the ~2,860-test unit suite runs
+    /// <c>GenerateAll</c> hundreds of times, and booting a Nitro server for each would make the suite depend on
+    /// Node AND on a built artefact. Story 23.6's Dev Notes rule that out in as many words — "Do not make the C#
+    /// unit suite depend on Node or on a built artefact" — because the region is the right subject for a C#
+    /// assertion and chrome belongs to <c>web/test/</c>.</para>
+    ///
+    /// <para>The CLI turns it on: <c>generate</c>, <c>watch</c> and the interactive menu all render HTML. The
+    /// <c>webview</c> command does NOT — it consumes the region directly and never wanted <c>.html</c> at all.</para></summary>
+    public bool PrerenderHtml { get; set; }
+
+    /// <summary>The routes the last <see cref="EmitSpaSite"/> wrote into the manifest — the prerender's work list.
+    /// ADR 0022 §Decision 3: SpecScribe "issues one request per route from the manifest it just emitted", so this
+    /// is that manifest's own key set rather than a crawl or a directory walk.</summary>
+    private IReadOnlyList<string> _lastIrRoutes = Array.Empty<string>();
+
+    /// <summary>The subset of <see cref="_lastIrRoutes"/> whose region actually moved in the last emit — the
+    /// narrow work list an incremental watch pass prerenders instead of the whole site. See the derivation in
+    /// <see cref="EmitSpaSite"/> for why it is keyed on the content digest rather than on the watcher event.</summary>
+    private IReadOnlyList<string> _changedIrRoutes = Array.Empty<string>();
+
+    /// <summary>Previous emit's route → region digest map, the basis <see cref="_changedIrRoutes"/> diffs against.
+    /// Null until the first emit of a session (⇒ that emit re-renders everything, which is correct).</summary>
+    private Dictionary<string, string>? _lastRouteHashes;
+
     /// <summary>The PREVIOUS emit's manifest JSON — the basis <see cref="SpaDelivery.BuildDelta"/> diffs against.
     /// Null until the first emit of a session (⇒ that emit's delta is a <c>full</c> marker).
     /// <para><b>Captured at the EMIT seam, deliberately, and NOT gated on a route's reported outcome.</b> Story
@@ -350,16 +379,16 @@ public sealed class SiteGenerator
             _prelude = null; // see BuildSurfacePrelude's lifetime rule
             ResetDerivedStateForFullRebuild();
 
-            // Fresh capture buffer for this full build when the opt-in SPA form is on OR the webview asked for
-            // page capture (null otherwise → no capture). Capture is memory-only either way.
-            _spaCapture = _options.EmitSpa || CapturePages
-                ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-                : null;
+            // ⚠️ UNCONDITIONAL since Story 23.6 (AC #6). These were allocated only when `--spa` or the webview
+            // asked for capture; both are now allocated on every full build, because the IR is no longer an
+            // optional extra — it is the ONLY thing standing between the user and an empty output root. C# no
+            // longer writes a content page, so a run that emitted no IR would emit nothing at all.
+            //
+            // Capture stays memory-only, exactly as before.
+            _spaCapture = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             // Story 23.4 AC #3: the composed-region capture runs on exactly the same condition, so the two paths
             // are always comparable on any run that produces an IR at all.
-            _spaPageViews = _spaCapture is null
-                ? null
-                : new Dictionary<string, CapturedPageView>(StringComparer.OrdinalIgnoreCase);
+            _spaPageViews = new Dictionary<string, CapturedPageView>(StringComparer.OrdinalIgnoreCase);
 
             // All planning-artifact ingestion (sprint, module detection, retros, epics → requirements) runs
             // through the framework adapter, which returns one normalized bundle + non-fatal diagnostics.
@@ -688,9 +717,12 @@ public sealed class SiteGenerator
             events.Add(WriteDesignSystem(nav));
             events.AddRange(WriteAboutSdd(nav));
 
-            // Opt-in JSON+SPA delivery form, emitted LAST so every captured page is present. Strictly additive:
-            // writes only its own files under OutputRoot, leaving every static page byte-identical (AC #3/#5/#6).
-            if (_options.EmitSpa)
+            // The canonical IR (ADR 0016), emitted LAST so every captured page is present.
+            //
+            // ⚠️ UNCONDITIONAL since Story 23.6 (AC #6) — it was `if (_options.EmitSpa)`, i.e. off unless
+            // `--spa` was passed, and `--spa` defaulted to FALSE. That was safe only while C# also wrote a
+            // `.html` per page. It no longer does, so this emit is the whole product: skipping it would leave
+            // the user an empty output root. `--spa` survives as a deprecated no-op (see SiteSettings).
             {
                 _familyDegradedStories.Clear();
                 EmitSpaSite(nav);
@@ -709,6 +741,10 @@ public sealed class SiteGenerator
                         $"full content: {string.Join("; ", _familyDegradedStories)}"));
                 }
             }
+
+            // Render the static `.html` from the IR just emitted. [Story 23.6 AC #7, ADR 0022 §Decision 3]
+            // Strictly after EmitSpaSite: the prerender drives one request per route from the manifest on disk.
+            events.AddRange(Prerender(_lastIrRoutes));
 
             // Story 22.5: install the rebuild-scope baseline from the set this pass RENDERED — LAST, after the
             // render, not before the output-root wipe.
@@ -766,7 +802,7 @@ public sealed class SiteGenerator
             }
             // Keep the opt-in SPA form in sync in watch mode: _spaCapture already holds the fresh page (captured by
             // GenerateOneInternal's WriteOutput), so re-emitting rebuilds the manifest/chunks from current state.
-            if (_options.EmitSpa) EmitSpaSite(nav);
+            EmitSpaSite(nav); PrerenderChanged(); // unconditional + narrow re-render since Story 23.6 (AC #6/#7)
             return ev;
         }
     }
@@ -802,7 +838,7 @@ public sealed class SiteGenerator
                 var nav = _nav ?? BuildNav(Array.Empty<string>());
                 RefreshCodeSurfaces(nav);
                 WriteIndex(nav);
-                if (_options.EmitSpa) EmitSpaSite(nav);
+                EmitSpaSite(nav); PrerenderChanged(); // unconditional + narrow re-render since Story 23.6 (AC #6/#7)
                 return new GenerationEvent(GenerationOutcome.Removed, relative, sw.Elapsed);
             }
 
@@ -1224,7 +1260,7 @@ public sealed class SiteGenerator
                 // No inventory write: a family route runs only for a path whose existence already agrees with the
                 // inventory, and `files` is a fresh disk walk — installing it here absorbed a sibling's pending
                 // add/delete and classified it Narrow. See _sourceInventory. [code review 2026-07-29]
-                if (_options.EmitSpa) EmitSpaSite(nav);
+                EmitSpaSite(nav); PrerenderChanged(); // unconditional + narrow re-render since Story 23.6 (AC #6/#7)
 
                 // Only a pass that actually tore down a stale output family reports Removed — a project that simply
                 // has no epics.md (and never did) keeps reporting the long-standing Skipped no-op, so the common
@@ -1299,7 +1335,7 @@ public sealed class SiteGenerator
             RefreshCodeSurfaces(nav, epicsEvents);
             WriteIndex(nav, followUpInventory);
             // No inventory write — see the sibling branch above and _sourceInventory. [code review 2026-07-29]
-            if (_options.EmitSpa) EmitSpaSite(nav);
+            EmitSpaSite(nav); PrerenderChanged(); // unconditional + narrow re-render since Story 23.6 (AC #6/#7)
 
             var errored = epicsEvents.FirstOrDefault(e => e.Outcome == GenerationOutcome.Error);
             if (errored is not null)
@@ -1599,7 +1635,7 @@ public sealed class SiteGenerator
             RefreshCodeSurfaces(nav, events);
             WriteIndex(nav);
             // No inventory write — see RegenerateEpics and _sourceInventory. [code review 2026-07-29]
-            if (_options.EmitSpa) EmitSpaSite(nav);
+            EmitSpaSite(nav); PrerenderChanged(); // unconditional + narrow re-render since Story 23.6 (AC #6/#7)
 
             var errored = events.FirstOrDefault(e => e.Outcome == GenerationOutcome.Error);
             if (errored is not null)
@@ -3152,13 +3188,14 @@ public sealed class SiteGenerator
             // categorical scheme Story 7.9's file-type legend uses), a different bound than "how many contributors
             // show up per file."
             var topAuthors = GitMetrics.BuildTopAuthors(_progress.DeepGit.Commits, capN: Charts.OwnershipTopAuthorPaletteSize);
-            var html = WritePage(GitInsightsTemplater.BuildPage(
-                insights, _progress.Git, nav, codeMap, topAuthors, fileHref: CodeItemHref, today: _today));
+            var gitInsightsPage = GitInsightsTemplater.BuildPage(
+                insights, _progress.Git, nav, codeMap, topAuthors, fileHref: CodeItemHref, today: _today);
+            WritePage(gitInsightsPage);
             // Story 20.9: this page now hosts a Hierarchy Explorer, so it needs the vendored engine on disk in its
             // own right. It cannot rely on the dashboard having copied it first — a repo with git history but no
-            // epics renders this page and no dashboard chart. Idempotent, and it reads the FINISHED html rather
-            // than a belief about it.
-            EnsureHierarchyEngine(html);
+            // epics renders this page and no dashboard chart. Idempotent, and it reads the page's OWN asset flags
+            // rather than re-detecting host markup in a rendered string. [Story 23.6 Task 5]
+            EnsureHierarchyEngine(gitInsightsPage);
             events.Add(new GenerationEvent(GenerationOutcome.Generated, SiteNav.GitInsightsOutputPath, sw.Elapsed));
         }
         catch (Exception ex)
@@ -3627,25 +3664,30 @@ public sealed class SiteGenerator
     {
         if (_spaPageViews is not { } views) yield break;
 
-        // A page whose finished HTML was captured but whose VIEW MODEL was not is a page still on the
-        // pre-23.4 `WriteOutput(path, ApplyReferenceLinks(...))` path. It would simply be absent from the IR —
-        // no error, no log, just a route the SPA and webview cannot reach while its .html sits on disk beside
-        // them. That is the exact silent-gap class this story exists to close, so it throws.
-        if (_spaCapture is { } capture && capture.Count != views.Count)
-        {
-            var missing = capture.Keys
-                .Select(PathUtil.NormalizeSlashes)
-                .Where(k => !views.ContainsKey(k))
-                .OrderBy(k => k, StringComparer.Ordinal)
-                .ToList();
-            if (missing.Count > 0)
-            {
-                throw new InvalidOperationException(
-                    $"{missing.Count} captured page(s) have no PageView and would be silently missing from the "
-                    + "IR — they are still written through WriteOutput rather than WritePage. Route them "
-                    + $"through WritePage (Story 23.4 AC #3). First: {string.Join(", ", missing.Take(5))}");
-            }
-        }
+        // ── RETIRED, deliberately and with its reason on the record. [Story 23.6 Task 5, dependent #5] ──────
+        //
+        // This was:
+        //
+        //     if (_spaCapture is { } capture && capture.Count != views.Count) { …throw… }
+        //
+        // It guarded against a page whose finished HTML was captured but whose VIEW MODEL was not — a page
+        // still on the pre-23.4 `WriteOutput(path, ApplyReferenceLinks(...))` path, which would be silently
+        // absent from the IR: no error, no log, just a route the SPA and webview cannot reach while its .html
+        // sat on disk beside them.
+        //
+        // ⚠️ IT IS RETIRED BECAUSE ITS SUBJECT IS GONE, NOT BECAUSE IT STOPPED MATTERING. Story 23.6 deletes
+        // `_spaCapture` along with the writer that filled it, and the un-migrated write path it watched for is
+        // deleted in the same story. Left in place it would have been strictly WORSE than removing it: with
+        // `_spaCapture` null the condition is never entered, so it would have gone VACUOUS rather than red —
+        // a guard that still looks like a guard in the diff while asserting nothing. That failure mode is the
+        // reason this story enumerated its dependents at all (AC #2), and it is why this comment exists rather
+        // than a silent deletion.
+        //
+        // What still covers the underlying invariant: every page now reaches the IR through `WritePage`, which
+        // populates `_spaPageViews` at the same seam it composes the region — there is no second write path
+        // left for a page to hide on. `EveryIrRegion_HasOneBalancedWayfindingBand_AndExactlyOneMainLandmark`
+        // asserts over the whole emitted IR, and `check:parity`'s per-family coverage floor fails loudly if a
+        // whole surface family stops appearing.
 
         foreach (var (path, captured) in views)
         {
@@ -3712,12 +3754,34 @@ public sealed class SiteGenerator
             // pages (Story 7.3 — one per active day, unbounded on old repos), and Story 7.5's commit/ detail
             // pages (prefix — that story's cache is concurrent in-flight work). In-editor those clicks toast
             // honestly; 7.2 citations already open the real file via revealSource. [spec-webview-doc-page-surfaces]
-            if (CapturePages && _spaCapture is null)
+            // ⚠️ BOTH conditions RE-POINTED at `_spaPageViews`. [Story 23.6 Task 5, dependent #6]
+            //
+            // They read `_spaCapture` — the rendered-document capture this story deletes — even though the body
+            // below consumes the COMPOSED producer (`CapturedRegions` iterates `_spaPageViews` and reads nothing
+            // from a rendered page). Deleting `_spaCapture` naively would therefore have turned the gate below
+            // permanently false and silently dropped EVERY doc / ADR / requirement / sprint / retro surface from
+            // the webview, with no test failing: the surfaces would simply not be there.
+            //
+            // This is the highest-risk row in AC #2's table precisely because it is a one-word condition whose
+            // failure mode is a quietly smaller webview — the same shape as Story 23.4's finding 4, where the
+            // same content was dropped by three independent layers and only a browser caught it.
+            if (CapturePages && _spaPageViews is null)
             {
                 throw new InvalidOperationException(
                     "CapturePages was set after GenerateAll(); set it before generating so the write seam captures pages.");
             }
-            if (_spaCapture is not null)
+            // ⚠️ GATED ON `CapturePages`, which is the flag that actually means "this caller wants the long tail".
+            //
+            // The old condition was `_spaCapture is not null`, and re-pointing it verbatim at `_spaPageViews`
+            // was WRONG — a test caught it (`RenderWebviewSurfaces_CoversAllFiveSurfaceFamilies` started
+            // returning the whole long tail). The old condition only ever worked by coincidence: `_spaCapture`
+            // was allocated when `EmitSpa || CapturePages`, so it stood in for CapturePages *and* silently
+            // included the long tail on any `--spa` run too. Now that the IR is unconditional (AC #6) the
+            // coincidence is gone and the conflation is visible.
+            //
+            // `CapturePages` is the honest gate: the `webview` command sets it, nothing else does, and it is
+            // the only caller that wants doc/ADR/requirement/sprint/retro surfaces.
+            if (CapturePages)
             {
                 var familyPaths = new HashSet<string>(
                     surfaces.Select(s => PathUtil.NormalizeSlashes(s.OutputRelativePath)),
@@ -4190,6 +4254,32 @@ public sealed class SiteGenerator
         var entryRegion = bundle.Pages.First(p => p.OutputRelativePath == bundle.EntryPath).ContentHtml;
         WriteSpaFile(SpaDelivery.EntryFileName, SpaDelivery.BuildEntryShell(bundle.SiteTitle, entryRegion));
 
+        // The prerender's work list — the manifest's OWN routes, captured at the emit seam. [Story 23.6 AC #7]
+        _lastIrRoutes = bundle.Pages.Select(p => PathUtil.NormalizeSlashes(p.OutputRelativePath)).ToList();
+
+        // ── The NARROW work list for watch mode. [Story 23.6 AC #7] ──────────────────────────────────────────
+        //
+        // A full 1,492-route crawl per debounced save is not viable — at Story 23.5's measured ~4 ms/route that
+        // is ~6 s of rendering for a one-character edit. So an incremental pass re-renders only the routes whose
+        // REGION actually changed, keyed on the same per-page digest Story 22.2 emits into the manifest and
+        // Story 22.6's delta channel diffs.
+        //
+        // Deriving it from the content hash rather than from the watcher's file event is deliberate: one source
+        // edit moves several routes (its own page, the dashboard, the epics index, a date page), and a
+        // file-keyed list would silently leave those stale. A digest comparison names exactly the set that moved.
+        var hashes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var page in bundle.Pages)
+        {
+            hashes[PathUtil.NormalizeSlashes(page.OutputRelativePath)] = SpaDelivery.ContentHash(page.ContentHtml);
+        }
+        _changedIrRoutes = _lastRouteHashes is null
+            // First emit of the session: everything is new, so the narrow list IS the full list.
+            ? _lastIrRoutes
+            : hashes.Where(kv => !_lastRouteHashes.TryGetValue(kv.Key, out var was) || was != kv.Value)
+                    .Select(kv => kv.Key)
+                    .ToList();
+        _lastRouteHashes = hashes;
+
         try
         {
             EmitDelta(dataFiles);
@@ -4201,6 +4291,58 @@ public sealed class SiteGenerator
             // never turn an otherwise-successful IR/site emit into a reported Error for the calling route. NFR2:
             // degrade, never amplify. (code review, Story 22.6)
             Console.Error.WriteLine($"[delta] failed to write the watch-mode delta sidecar: {ex.Message}");
+        }
+    }
+
+    /// <summary>Renders <paramref name="routes"/> to static <c>.html</c> by booting the prebuilt Nitro artefact
+    /// against this run's output root. [Story 23.6 AC #7, ADR 0022 §Decision 3]
+    ///
+    /// <para>A no-op unless <see cref="PrerenderHtml"/> is set — see that property for why the unit suite must not
+    /// boot a renderer.</para>
+    ///
+    /// <para><b>A missing artefact, an absent Node, or an out-of-range Node is a reported Error, never a silent
+    /// skip (AC #4).</b> That is the whole hazard this story creates: C# can no longer produce HTML at all, so a
+    /// prerender that quietly did nothing would leave the user an empty output root with <c>errors=0</c> — which
+    /// reads as success. <see cref="NuxtPrerender"/> raises each of those as an actionable message naming the
+    /// supported Node range and the three artefact locations it looked in.</para></summary>
+    /// <summary>Watch-mode prerender: re-renders only the routes whose region moved in the last emit.
+    /// [Story 23.6 AC #7]
+    /// <para>Fire-and-report rather than event-returning, because the five incremental call sites sit in
+    /// routes with differing event plumbing; a prerender failure during watch is written to stderr where the
+    /// watch loop's own per-save reporting lives. A one-shot <c>generate</c> takes the evented path
+    /// (<see cref="Prerender"/>) so its failures reach the exit code and the diagnostics page.</para></summary>
+    private void PrerenderChanged()
+    {
+        foreach (var ev in Prerender(_changedIrRoutes))
+        {
+            if (ev.Outcome == GenerationOutcome.Error)
+            {
+                Console.Error.WriteLine($"[prerender] {ev.RelativePath}: {ev.Message}");
+            }
+        }
+    }
+
+    private IReadOnlyList<GenerationEvent> Prerender(IReadOnlyList<string> routes)
+    {
+        if (!PrerenderHtml || routes.Count == 0) return Array.Empty<GenerationEvent>();
+
+        try
+        {
+            var result = NuxtPrerender.Render(_options.OutputRoot, routes);
+            // The prerender is now a material share of a cold generate, and a user watching a 40-second run
+            // deserves to know which half is which. stderr, so a machine consumer of stdout is unaffected
+            // (the Story 5.1 rule: the machine summary line never routes through Spectre).
+            Console.Error.WriteLine(
+                $"[prerender] {result.Rendered} route(s) in {result.Elapsed.TotalMilliseconds:0} ms "
+                + $"({result.Elapsed.TotalMilliseconds / Math.Max(1, result.Rendered):0.0} ms/route)"
+                + (result.Failed > 0 ? $", {result.Failed} failed" : string.Empty));
+            return result.Events;
+        }
+        catch (InvalidOperationException ex)
+        {
+            // Resolution and prerequisite failures land here. One event, anchored on the output root, so the
+            // diagnostics page and the CLI summary both carry it and `errors` is non-zero.
+            return [new GenerationEvent(GenerationOutcome.Error, "(renderer)", TimeSpan.Zero, ex.Message)];
         }
     }
 
@@ -4337,9 +4479,11 @@ public sealed class SiteGenerator
         var unplanned = UnplannedWorkGeometry.From(inventory, followUps, _epicsModel, retros: _retros);
         // `_workGraph` is handed in verbatim — the SAME instance WriteWorkGraph renders — so the Story 20.3
         // related-work pane is a pure read over the already-computed model, never a second projection. [Story 20.3]
-        var html = HtmlTemplater.RenderIndex(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, inventory, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts, followUps, unplanned, cadence: _cadence, workGraph: _workGraph, dateCutoff: _today, testArtifacts: _testArtifacts);
-        WriteTextWithRetry(indexPath, ApplyReferenceLinks(html, "index.html"));
-        EnsureHierarchyEngine(html);
+        // Built once and used twice: the view model feeds both the write below and the asset gate, so the two
+        // can no longer disagree about what the page needs. [Story 23.6 Task 5]
+        var indexPage = HtmlTemplater.BuildIndexPage(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, inventory, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts, followUps, unplanned, cadence: _cadence, workGraph: _workGraph, dateCutoff: _today, testArtifacts: _testArtifacts);
+        WriteTextWithRetry(indexPath, ApplyReferenceLinks(HtmlRenderAdapter.Shared.Render(indexPage).Content, "index.html"));
+        EnsureHierarchyEngine(indexPage);
     }
 
     /// <summary>Pending asset-copy events, drained by <c>GenerateAll</c> after the Index phase. A conditional asset
@@ -4364,9 +4508,29 @@ public sealed class SiteGenerator
     /// and every code-free site. Guarded like every other per-file write — a missing or misconfigured embedded
     /// resource degrades to a reported error rather than throwing out of the phase (NFR2). Idempotent, so Story
     /// 20.7's other surfaces can each call it. [Story 20.5]</para></summary>
-    private void EnsureHierarchyEngine(string renderedHtml)
+    private void EnsureHierarchyEngine(PageView page)
     {
-        if (!HierarchyExplorer.ContainsHost(renderedHtml)) return;
+        // ⚠️ RE-DERIVED FROM THE VIEW MODEL, not scanned out of a rendered document. [Story 23.6 Task 5, #4]
+        //
+        // This took the finished HTML string and ran `HierarchyExplorer.ContainsHost` over it. That string is
+        // what Story 23.6 deletes, so the scan had to move — and `page.Assets` already carries the answer
+        // STRUCTURALLY: the same flags `HtmlRenderAdapter.Render` used to decide whether to emit the
+        // `<script src>` at all. Reading them is strictly more direct than re-detecting the host markup that
+        // those very flags produced.
+        //
+        // ⚠️ THE DISK-IS-THE-TRUTH GUARD BELOW IS PRESERVED VERBATIM, and it is the reason this is not simply
+        // "trust the flag". Its own comment explains the defect: a topology change during a watch session
+        // triggers a full rebuild that wipes and recreates the output root, deleting an asset this generator
+        // instance believes it has already copied. The flag says "needed"; only the disk says "present".
+        //
+        // Story 24.2 note: EITHER engine flag pulls the same vendored bundle (ADR 0030), which is exactly what
+        // `HtmlRenderAdapter.Render` asserted when it emitted one `<script src>` for both.
+        if (!page.Assets.HierarchyEngineNeeded && !page.Assets.GraphEngineNeeded) return;
+        EnsureHierarchyEngineCore();
+    }
+
+    private void EnsureHierarchyEngineCore()
+    {
         // The flag alone is NOT sufficient, and the difference is a real defect rather than a tidiness point: a
         // topology change during a watch session triggers a full rebuild that wipes and recreates the output root,
         // which deletes an asset this generator instance has already "copied". Trusting the flag there leaves the
@@ -4648,11 +4812,12 @@ public sealed class SiteGenerator
         var full = variants.FirstOrDefault(v => v.Key == "full");
         if (full is null || full.Map.IsEmpty) return null;
 
-        var html = WritePage(CodeMapTemplater.BuildPage(variants, nav, fileHref: CodeItemHref));
+        var codeMapPage = CodeMapTemplater.BuildPage(variants, nav, fileHref: CodeItemHref);
+        WritePage(codeMapPage);
         // Story 20.9: four Hierarchy Explorer instances live on this page, so the engine has to be on disk even in
         // a source-only repo with no epics and therefore no dashboard chart. See EnsureHierarchyEngine — the flag
         // is an optimization and the disk is the truth.
-        EnsureHierarchyEngine(html);
+        EnsureHierarchyEngine(codeMapPage);
         return full.Map;
     }
 

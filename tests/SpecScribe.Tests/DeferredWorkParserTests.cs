@@ -458,10 +458,10 @@ public class DeferredWorkParserTests
         var story = new DeferredWorkItem("<p>Closed in story.</p>", true, "6.4", "epics/story-6-4.html");
         var nav = SiteNav.Build(Array.Empty<string>(), "Test", hasAdrs: false);
 
-        var detailReadme = FollowUpDetailTemplater.RenderDeferredPage(
-            readme, "review", null, "deferred-readme", nav, "deferred-work.html");
-        var detailStory = FollowUpDetailTemplater.RenderDeferredPage(
-            story, "review", null, "deferred-story", nav, "deferred-work.html");
+        var detailReadme = JsonSpaRenderAdapter.Shared.RenderContent(FollowUpDetailTemplater.BuildDeferredPage(
+            readme, "review", null, "deferred-readme", nav, "deferred-work.html"));
+        var detailStory = JsonSpaRenderAdapter.Shared.RenderContent(FollowUpDetailTemplater.BuildDeferredPage(
+            story, "review", null, "deferred-story", nav, "deferred-work.html"));
 
         Assert.Contains("Resolving: readme.md", detailReadme);
         Assert.DoesNotContain("Story readme.md", detailReadme);
@@ -484,7 +484,7 @@ public class DeferredWorkParserTests
             PreambleHtml: "<p>Real-but-not-now items.</p>");
 
         var nav = SiteNav.Build(Array.Empty<string>(), "Test", hasAdrs: false);
-        var html = DeferredWorkTemplater.RenderPage(model, nav, "deferred-work.html");
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(DeferredWorkTemplater.BuildPage(model, nav, "deferred-work.html"));
 
         Assert.Contains("deferred-work-preamble", html);
         Assert.Contains("Real-but-not-now items.", html);

@@ -13,14 +13,14 @@ public class HtmlTemplaterTests
             "game-architecture.md",
         }, "SpecScribe", ModuleContext.DocsFor(BmadModule.GameDevStudio), hasAdrs: true);
 
-        var html = HtmlTemplater.RenderIndex(
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(),
             nav: nav,
             progress: ProgressModel.Empty,
             epicsModel: null,
             requirements: null,
             adrs: Array.Empty<AdrEntry>(),
-            commands: CommandCatalog.Empty);
+            commands: CommandCatalog.Empty));
 
         // The discoverable key views now live in the global journey-grouped nav menu (the white sub-header band),
         // not a dashboard-body strip — so every target is reachable from the menu on every page.
@@ -36,14 +36,14 @@ public class HtmlTemplaterTests
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasReadme: true);
 
-        var html = HtmlTemplater.RenderIndex(
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(),
             nav: nav,
             progress: ProgressModel.Empty,
             epicsModel: null,
             requirements: null,
             adrs: Array.Empty<AdrEntry>(),
-            commands: CommandCatalog.Empty);
+            commands: CommandCatalog.Empty));
 
         // Readme becomes a menu entry (the Docs group / a flat link) rather than a described dashboard pill.
         Assert.Contains("site-nav-links", html);
@@ -66,7 +66,7 @@ public class HtmlTemplaterTests
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
-        var html = HtmlTemplater.RenderIndex(
+        var page = HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(),
             nav: nav,
             progress: ProgressModel.Empty,
@@ -74,11 +74,14 @@ public class HtmlTemplaterTests
             requirements: null,
             adrs: Array.Empty<AdrEntry>(),
             commands: CommandCatalog.Empty);
+        var html = RegionAssert.Of(page);
 
         // Skip link is first-focusable and targets the one main landmark. [Story 1.4 AC #1, UX-DR16]
-        Assert.Contains("<a class=\"skip-link\" href=\"#main-content\">Skip to content</a>", html);
+        // [Story 23.6 AC #8] The skip-link assertion lived here and is NOT lost — it is head-emitted chrome,
+        // and the region carries no head. `npm run check:a11y` owns `skip-link` over every EMITTED page,
+        // which is the only place it can be asserted honestly now that no C# path composes a whole page.
         Assert.Contains("<main id=\"main-content\">", html);
-        Assert.Equal(1, CountOccurrences(html, "id=\"main-content\""));
+        RegionAssert.HasSingleMainLandmark(html);
     }
 
     [Fact]
@@ -86,14 +89,14 @@ public class HtmlTemplaterTests
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
-        var html = HtmlTemplater.RenderIndex(
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(),
             nav: nav,
             progress: ProgressModel.Empty,
             epicsModel: null,
             requirements: null,
             adrs: Array.Empty<AdrEntry>(),
-            commands: CommandCatalog.Empty);
+            commands: CommandCatalog.Empty));
 
         // The dashboard's overall-progress bars must expose progressbar semantics with a current value. [Story 1.4 AC #1]
         Assert.Contains("role=\"progressbar\"", html);
@@ -134,14 +137,14 @@ public class HtmlTemplaterTests
             },
         };
 
-        var html = HtmlTemplater.RenderIndex(
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(),
             nav: nav,
             progress: progress,
             epicsModel: null,
             requirements: null,
             adrs: Array.Empty<AdrEntry>(),
-            commands: CommandCatalog.Empty);
+            commands: CommandCatalog.Empty));
 
         // The pipeline panel renders on the dashboard with the populated cumulative funnel inside. [Story 3.6 AC #1]
         Assert.Contains("<h3>Story Pipeline</h3>", html);
@@ -155,14 +158,14 @@ public class HtmlTemplaterTests
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts\\epics.md" }, "SpecScribe", hasAdrs: false);
 
-        var html = HtmlTemplater.RenderIndex(
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(),
             nav: nav,
             progress: ProgressModel.Empty,
             epicsModel: null,
             requirements: null,
             adrs: Array.Empty<AdrEntry>(),
-            commands: CommandCatalog.Empty);
+            commands: CommandCatalog.Empty));
 
         // The panel is unconditional; the builder's own empty-guard supplies the graceful placeholder,
         // so the templater never grows a second, divergent fallback. [Story 3.6 AC #2]
@@ -184,14 +187,14 @@ public class HtmlTemplaterTests
     {
         var nav = SiteNav.Build(Array.Empty<string>(), "SpecScribe", hasAdrs: false);
 
-        var html = HtmlTemplater.RenderIndex(
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(),
             nav: nav,
             progress: ProgressModel.Empty,
             epicsModel: null,
             requirements: null,
             adrs: Array.Empty<AdrEntry>(),
-            commands: CommandCatalog.Empty);
+            commands: CommandCatalog.Empty));
 
         Assert.DoesNotContain("dashboard-quick-links", html);
         Assert.DoesNotContain("href=\"epics.html\"", html);
@@ -264,14 +267,14 @@ public class HtmlTemplaterTests
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
-        var html = HtmlTemplater.RenderIndex(
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(),
             nav: nav,
             progress: ProgressWithCommits(totalCommits),
             epicsModel: null,
             requirements: null,
             adrs: Array.Empty<AdrEntry>(),
-            commands: CommandCatalog.Empty);
+            commands: CommandCatalog.Empty));
 
         // "1 Commits" was the reported defect — the count-bearing label must agree in number. [Story 1.5 A2]
         Assert.Contains($"class=\"stat-label\">{expectedLabel}</div>", html);
@@ -285,14 +288,14 @@ public class HtmlTemplaterTests
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
         var day = new DateOnly(2026, 1, 5);
 
-        var html = HtmlTemplater.RenderIndex(
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(),
             nav: nav,
             progress: ProgressWithCommits(3),
             epicsModel: null,
             requirements: null,
             adrs: Array.Empty<AdrEntry>(),
-            commands: CommandCatalog.Empty);
+            commands: CommandCatalog.Empty));
 
         Assert.Contains($"last commit {PortalDates.Day(day)}", html);
         Assert.DoesNotContain("active days · last commit", html);
@@ -306,14 +309,14 @@ public class HtmlTemplaterTests
     public void RenderIndex_CommitStatSub_IsDeterministicAcrossRepeatedBuilds()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
-        string Render() => HtmlTemplater.RenderIndex(
+        string Render() => JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(),
             nav: nav,
             progress: ProgressWithCommits(3),
             epicsModel: null,
             requirements: null,
             adrs: Array.Empty<AdrEntry>(),
-            commands: CommandCatalog.Empty);
+            commands: CommandCatalog.Empty));
 
         Assert.Equal(Render(), Render());
     }
@@ -323,14 +326,14 @@ public class HtmlTemplaterTests
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
-        var html = HtmlTemplater.RenderIndex(
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(),
             nav: nav,
             progress: ProgressWithCommits(3),
             epicsModel: null,
             requirements: null,
             adrs: Array.Empty<AdrEntry>(),
-            commands: CommandCatalog.Empty);
+            commands: CommandCatalog.Empty));
 
         // The call-site wiring (CommitsByDay → CommitHeatmap) surfaces the per-day page link on the dashboard.
         // The commit content itself now lives on commits/2026-01-05.html, not inline.
@@ -344,14 +347,14 @@ public class HtmlTemplaterTests
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
-        var html = HtmlTemplater.RenderIndex(
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(),
             nav: nav,
             progress: ProgressWithCommits(7),
             epicsModel: null,
             requirements: null,
             adrs: Array.Empty<AdrEntry>(),
-            commands: CommandCatalog.Empty);
+            commands: CommandCatalog.Empty));
 
         // The three FR-9 baseline signals all surface in the new panel. [Story 3.1 AC #1]
         Assert.Contains("<h3>Git Pulse</h3>", html);
@@ -373,14 +376,14 @@ public class HtmlTemplaterTests
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
-        var html = HtmlTemplater.RenderIndex(
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(),
             nav: nav,
             progress: ProgressModel.Empty, // Git is null
             epicsModel: null,
             requirements: null,
             adrs: Array.Empty<AdrEntry>(),
-            commands: CommandCatalog.Empty);
+            commands: CommandCatalog.Empty));
 
         // The exact UX-spec empty-state copy: an em-dash with the specified tooltip. [Story 3.1 AC #2; EXPERIENCE.md:169]
         Assert.Contains("<h3>Git Pulse</h3>", html);
@@ -420,14 +423,14 @@ public class HtmlTemplaterTests
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
-        var html = HtmlTemplater.RenderIndex(
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(),
             nav: nav,
             progress: ProgressWithDeepGit(),
             epicsModel: null,
             requirements: null,
             adrs: Array.Empty<AdrEntry>(),
-            commands: CommandCatalog.Empty);
+            commands: CommandCatalog.Empty));
 
         // The Git Pulse panel links out to the dedicated deep-analytics page (the entry point in its header).
         Assert.Contains($"href=\"{SiteNav.DeepAnalyticsOutputPath}\"", html);
@@ -444,14 +447,14 @@ public class HtmlTemplaterTests
 
         // DeepGit without hub insights (e.g. the hub page failed to write and was cleared): no hub link,
         // but the deep-analytics link still renders.
-        var withoutInsights = HtmlTemplater.RenderIndex(
+        var withoutInsights = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(),
             nav: nav,
             progress: ProgressWithDeepGit(),
             epicsModel: null,
             requirements: null,
             adrs: Array.Empty<AdrEntry>(),
-            commands: CommandCatalog.Empty);
+            commands: CommandCatalog.Empty));
         Assert.DoesNotContain("View all git insights", withoutInsights);
         Assert.DoesNotContain(SiteNav.GitInsightsOutputPath, withoutInsights);
         Assert.Contains("View Deep Analytics", withoutInsights);
@@ -469,14 +472,14 @@ public class HtmlTemplaterTests
             CommitCount: 4,
             ContributorCount: 1,
             TotalFilesTouched: 1);
-        var withInsights = HtmlTemplater.RenderIndex(
+        var withInsights = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(),
             nav: nav,
             progress: progress,
             epicsModel: null,
             requirements: null,
             adrs: Array.Empty<AdrEntry>(),
-            commands: CommandCatalog.Empty);
+            commands: CommandCatalog.Empty));
         Assert.Contains($"href=\"{SiteNav.GitInsightsOutputPath}\"", withInsights);
         Assert.Contains("View all git insights", withInsights);
     }
@@ -486,14 +489,14 @@ public class HtmlTemplaterTests
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
-        var html = HtmlTemplater.RenderIndex(
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(),
             nav: nav,
             progress: ProgressWithCommits(3), // Git present, DeepGit null (the default, no --deep-git)
             epicsModel: null,
             requirements: null,
             adrs: Array.Empty<AdrEntry>(),
-            commands: CommandCatalog.Empty);
+            commands: CommandCatalog.Empty));
 
         // No opt-in → no link and no page reference, so the default dashboard is unchanged; but the baseline
         // Git Pulse panel is still there, proving only the deep surface was omitted.
@@ -517,7 +520,7 @@ public class HtmlTemplaterTests
             new Dictionary<string, DateOnly>(),
             new DateOnly(2026, 7, 8));
 
-        var html = HtmlTemplater.RenderIndex(
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(),
             nav: nav,
             progress: ProgressModel.Empty,
@@ -526,7 +529,7 @@ public class HtmlTemplaterTests
             adrs: Array.Empty<AdrEntry>(),
             commands: CommandCatalog.Empty,
             coverage: coverage,
-            today: new DateOnly(2026, 7, 8));
+            today: new DateOnly(2026, 7, 8)));
 
         Assert.Contains("<h3>Planning Artifacts</h3>", html);
         Assert.Contains("coverage-panel", html);
@@ -553,10 +556,10 @@ public class HtmlTemplaterTests
             },
         };
 
-        var html = HtmlTemplater.RenderIndex(
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(), nav: nav, progress: ProgressModel.Empty, epicsModel: null,
             requirements: null, adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, coverage: coverage,
-            today: new DateOnly(2026, 7, 8));
+            today: new DateOnly(2026, 7, 8)));
 
         // The whole present card is an anchor to the artifact's page, carries its family accent + a rich
         // js-tip tooltip, and its one-line description renders.
@@ -586,9 +589,9 @@ public class HtmlTemplaterTests
             },
         };
 
-        var html = HtmlTemplater.RenderIndex(
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(), nav: nav, progress: ProgressModel.Empty, epicsModel: null,
-            requirements: null, adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, coverage: coverage);
+            requirements: null, adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, coverage: coverage));
 
         // Missing-with-command: the copyable command badge (same data-copy trigger the Next Steps panels use).
         Assert.Contains("Create it with", html);
@@ -630,10 +633,10 @@ public class HtmlTemplaterTests
                 LastModified: new DateOnly(2026, 6, 20), SourcePath: $"{l}.md", MemlogUpdated: null, Href: $"{l}.html")).ToList(),
         };
 
-        var html = HtmlTemplater.RenderIndex(
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(), nav: nav, progress: ProgressModel.Empty, epicsModel: null,
             requirements: null, adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, coverage: coverage,
-            today: new DateOnly(2026, 7, 8));
+            today: new DateOnly(2026, 7, 8)));
 
         foreach (var label in labels)
         {
@@ -646,13 +649,13 @@ public class HtmlTemplaterTests
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
-        var withEmpty = HtmlTemplater.RenderIndex(
+        var withEmpty = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(), nav: nav, progress: ProgressModel.Empty, epicsModel: null,
             requirements: null, adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty,
-            coverage: ArtifactCoverage.Empty);
-        var withNull = HtmlTemplater.RenderIndex(
+            coverage: ArtifactCoverage.Empty));
+        var withNull = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(), nav: nav, progress: ProgressModel.Empty, epicsModel: null,
-            requirements: null, adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty);
+            requirements: null, adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty));
 
         // Graceful omission: no recognized families (or no coverage passed) leaves the dashboard unchanged.
         // Assert the panel-specific markers (the "Planning Artifacts" heading is also used by the index band).
@@ -666,7 +669,7 @@ public class HtmlTemplaterTests
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
-        var html = HtmlTemplater.RenderIndex(
+        var page = HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(),
             nav: nav,
             progress: ProgressModel.Empty,
@@ -674,11 +677,19 @@ public class HtmlTemplaterTests
             requirements: null,
             adrs: Array.Empty<AdrEntry>(),
             commands: CommandCatalog.Empty);
+        var html = RegionAssert.Of(page);
 
-        // Home <title> is descriptive; favicon + description/OG land so shared links aren't bare. [Story 1.5 G1/G2]
-        Assert.Contains("<title>SpecScribe — Project Dashboard</title>", html);
-        Assert.Contains("<link rel=\"icon\"", html);
-        Assert.Contains("<meta name=\"description\"", html);
+        // Home <title> is descriptive; description lands so shared links aren't bare. [Story 1.5 G1/G2]
+        RegionAssert.HasTitle(page, "SpecScribe — Project Dashboard");
+        Assert.False(string.IsNullOrWhiteSpace(page.MetaDescription), "a shared link must not be bare");
+
+        // [Story 23.6 AC #8] The `<link rel="icon">` assertion lived here and is NOT lost. The favicon is a
+        // head tag — it is not on the view model and it is not in the region, because no C# path composes a
+        // head any more. It is covered over the EMITTED page by `npm run check:parity`'s `pageSha`, which
+        // hashes the whole document for the pinned corpus (`index.html` is in it). That is a stronger check
+        // than this one was: it pins the favicon's BYTES, where `Assert.Contains("<link rel=\"icon\"")` would
+        // have passed on an empty or wrong data-URI.
+        _ = html;
     }
 
     [Fact]
@@ -686,14 +697,14 @@ public class HtmlTemplaterTests
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
-        var html = HtmlTemplater.RenderIndex(
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(),
             nav: nav,
             progress: ProgressModel.Empty,
             epicsModel: ModelWith(EpicStatus.Drafted, Story("1.1", "ready for dev")),
             requirements: null,
             adrs: Array.Empty<AdrEntry>(),
-            commands: CommandCatalog.Empty);
+            commands: CommandCatalog.Empty));
 
         // Dark-bar journey menu + white key-views chips precede the unified tile band and Sunburst.
         var menu = html.IndexOf("site-nav-links", StringComparison.Ordinal);
@@ -715,14 +726,14 @@ public class HtmlTemplaterTests
     {
         var nav = SiteNav.Build(Array.Empty<string>(), "SpecScribe", hasAdrs: false);
 
-        var html = HtmlTemplater.RenderIndex(
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(),
             nav: nav,
             progress: ProgressModel.Empty,
             epicsModel: null,
             requirements: null,
             adrs: Array.Empty<AdrEntry>(),
-            commands: CommandCatalog.Empty);
+            commands: CommandCatalog.Empty));
 
         Assert.Contains("id=\"wm-overview\"", html);
         Assert.DoesNotContain("id=\"wm-track\"", html);
@@ -739,14 +750,14 @@ public class HtmlTemplaterTests
 
         // An epic with an in-development story rolls up to "active" — the donut must say "In development",
         // not the old binary drafted/pending split that contradicted the sunburst. [Story 1.5 A3]
-        var html = HtmlTemplater.RenderIndex(
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(),
             nav: nav,
             progress: ProgressModel.Empty,
             epicsModel: ModelWith(EpicStatus.Drafted, Story("1.1", "in progress")),
             requirements: null,
             adrs: Array.Empty<AdrEntry>(),
-            commands: CommandCatalog.Empty);
+            commands: CommandCatalog.Empty));
 
         Assert.Contains("Epic status", html);
         // Side legend removed — the donut slice's <title> hover tip carries the rollup count.
@@ -769,10 +780,10 @@ public class HtmlTemplaterTests
                 status: open
             """);
 
-        var html = HtmlTemplater.RenderIndex(
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(), nav: nav, progress: ProgressModel.Empty,
             epicsModel: ModelWith(EpicStatus.Drafted, Story("1.1", "done")), requirements: null, adrs: Array.Empty<AdrEntry>(),
-            commands: CommandCatalog.Empty, work: null, sprint: sprint);
+            commands: CommandCatalog.Empty, work: null, sprint: sprint));
 
         // AC #2: with sprint data, Now & Next BECOMES the sprint board (the tracked view), labeled with its
         // source — board cards / moreHref reach the full sprint page (no redundant header CTA). [Story 2.3; home welcome]
@@ -806,19 +817,22 @@ public class HtmlTemplaterTests
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
 
-        var html = HtmlTemplater.RenderIndex(
+        var page = HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(), nav: nav, progress: ProgressModel.Empty,
             epicsModel: ModelWith(EpicStatus.Drafted, Story("1.1", "ready for dev")),
             requirements: null, adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty,
             sprint: null);
+        var html = RegionAssert.Of(page);
 
         // No sprint widget markers at all (clean omission, not an empty panel)...
         Assert.DoesNotContain("from sprint-status.yaml", html);
         Assert.DoesNotContain("View Sprint", html);
         // ...and the sunburst panel + a11y floor are unaffected.
         Assert.Contains("Project at a Glance", html);
-        Assert.Contains("<a class=\"skip-link\" href=\"#main-content\">Skip to content</a>", html);
-        Assert.Equal(1, CountOccurrences(html, "id=\"main-content\""));
+        // [Story 23.6 AC #8] The skip-link assertion lived here and is NOT lost — it is head-emitted chrome,
+        // and the region carries no head. `npm run check:a11y` owns `skip-link` over every EMITTED page,
+        // which is the only place it can be asserted honestly now that no C# path composes a whole page.
+        RegionAssert.HasSingleMainLandmark(html);
     }
 
     [Fact]
@@ -836,7 +850,7 @@ public class HtmlTemplaterTests
             UserStoryHtml = "<p>As a contributor…</p>", AcBlocksHtml = new[] { "<div>AC 1</div>" },
         };
 
-        var html = EpicsTemplater.RenderStoryPlaceholder(epic, story, nav, CommandCatalog.Empty);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(EpicsTemplater.BuildStoryPlaceholderPage(epic, story, nav, CommandCatalog.Empty));
 
         // The AC panel is wrapped in dashboard-narrow (860 centered) so it aligns with the header/lead/note
         // instead of spilling edge-to-edge like a bare .chart-panel. [Story 2.3 redesign]
@@ -895,8 +909,8 @@ public class HtmlTemplaterTests
         var plain = Doc("implementation-artifacts/some-note.md", "implementation-artifacts/some-note.html", "Some Note", Frontmatter.Empty);
         var docs = new[] { quickDev, deferred, plain };
 
-        var html = HtmlTemplater.RenderIndex(docs, nav, ProgressModel.Empty, epicsModel: null, requirements: null,
-            adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, work: WorkInventory.Build(docs));
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(docs, nav, ProgressModel.Empty, epicsModel: null, requirements: null,
+            adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, work: WorkInventory.Build(docs)));
 
         // The Deferred StatCard with its open-item count remains (now matching other band cards).
         Assert.Contains("work-summary-card deferred", html);
@@ -925,10 +939,10 @@ public class HtmlTemplaterTests
             new Frontmatter { Status = "done", Route = "one-shot" });
         var docs = new[] { quickDev };
 
-        var withWork = HtmlTemplater.RenderIndex(docs, nav, progress, epicsModel: null, requirements: null,
-            adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, work: WorkInventory.Build(docs));
-        var withoutWork = HtmlTemplater.RenderIndex(Array.Empty<DocModel>(), nav, progress, epicsModel: null, requirements: null,
-            adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, work: WorkInventory.Empty);
+        var withWork = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(docs, nav, progress, epicsModel: null, requirements: null,
+            adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, work: WorkInventory.Build(docs)));
+        var withoutWork = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(Array.Empty<DocModel>(), nav, progress, epicsModel: null, requirements: null,
+            adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, work: WorkInventory.Empty));
 
         // The separate "Direct changes" signal is present, counting the quick-dev work.
         Assert.Contains("Direct changes", withWork);
@@ -955,8 +969,8 @@ public class HtmlTemplaterTests
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
         var docs = new[] { Doc("implementation-artifacts/x.md", "implementation-artifacts/x.html", "X", Frontmatter.Empty) };
 
-        var html = HtmlTemplater.RenderIndex(docs, nav, ProgressModel.Empty, epicsModel: null, requirements: null,
-            adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, work: WorkInventory.Build(docs));
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(docs, nav, ProgressModel.Empty, epicsModel: null, requirements: null,
+            adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, work: WorkInventory.Build(docs)));
 
         // No specs/ content → the empty-group guard omits the section cleanly (AC #2 graceful degradation).
         Assert.DoesNotContain("Spec Kernel", html);
@@ -969,14 +983,14 @@ public class HtmlTemplaterTests
 
         var withCompanions = Doc("specs/spec-x/SPEC.md", "specs/spec-x/SPEC.html", "SpecScribe", new Frontmatter { Id = "SPEC-x" });
         withCompanions.Companions = new[] { ("Requirements Catalog", "requirements-catalog.html") };
-        var withHtml = HtmlTemplater.RenderPage(withCompanions, nav);
+        var withHtml = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildDocPage(withCompanions, nav));
         Assert.Contains("class=\"companion-docs\"", withHtml);
         Assert.Contains("Companion documents", withHtml);
         Assert.Contains("<a href=\"requirements-catalog.html\">Requirements Catalog</a>", withHtml);
 
         // A doc with no resolved companions renders no block (every non-spec page is unaffected).
         var plain = Doc("planning-artifacts/prd.md", "planning-artifacts/prd.html", "PRD", Frontmatter.Empty);
-        var plainHtml = HtmlTemplater.RenderPage(plain, nav);
+        var plainHtml = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildDocPage(plain, nav));
         Assert.DoesNotContain("companion-docs", plainHtml);
     }
 
@@ -991,7 +1005,7 @@ public class HtmlTemplaterTests
             new PagerLink("adr-1.html", "ADR 1"),
             new PagerLink("adr-3.html", "ADR 3"));
 
-        var html = HtmlTemplater.RenderPage(doc, nav, pager);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildDocPage(doc, nav, pager));
 
         Assert.Contains("<div class=\"page-wayfinding\">", html);
         var wrapperIdx = html.IndexOf("page-wayfinding", StringComparison.Ordinal);
@@ -1023,7 +1037,7 @@ public class HtmlTemplaterTests
             EpicNumber: 9,
             EpicCrumbLabel: "9 · Follow-ups",
             EpicHref: "epics/epic-9.html");
-        var epicHtml = HtmlTemplater.RenderPage(doc, nav, quickDev: epicChrome);
+        var epicHtml = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildDocPage(doc, nav, quickDev: epicChrome));
         Assert.Contains(">Epics</a>", epicHtml);
         Assert.Contains("epics/epic-9.html", epicHtml);
         Assert.Contains("Follow-ups", epicHtml);
@@ -1037,12 +1051,12 @@ public class HtmlTemplaterTests
         var unplannedChrome = new HtmlTemplater.QuickDevPageChrome(
             Array.Empty<FollowUpDeferredSlot>(),
             UnplannedHref: FollowUpGroupPages.UnplannedPath);
-        var unplannedHtml = HtmlTemplater.RenderPage(doc, nav, quickDev: unplannedChrome);
+        var unplannedHtml = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildDocPage(doc, nav, quickDev: unplannedChrome));
         Assert.Contains("Unplanned", unplannedHtml);
         Assert.Contains(FollowUpGroupPages.UnplannedPath, unplannedHtml);
         Assert.DoesNotContain("deferred-from-artifact", unplannedHtml);
 
-        var plain = HtmlTemplater.RenderPage(doc, nav);
+        var plain = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildDocPage(doc, nav));
         Assert.DoesNotContain("deferred-from-artifact", plain);
         Assert.DoesNotContain("Unplanned", plain);
     }
@@ -1053,12 +1067,12 @@ public class HtmlTemplaterTests
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
         var empty = new EpicsModel { OverviewHtml = string.Empty, RequirementsInventoryHtml = string.Empty, Epics = Array.Empty<EpicInfo>() };
 
-        var withCmd = EpicsTemplater.RenderIndex(empty, ProgressModel.Empty, nav, BmadCatalog());
+        var withCmd = JsonSpaRenderAdapter.Shared.RenderContent(EpicsTemplater.BuildIndexPage(empty, ProgressModel.Empty, nav, BmadCatalog()));
         Assert.Contains("/bmad-create-epics-and-stories", withCmd);
         Assert.Contains("data-copy=\"/bmad-create-epics-and-stories\"", withCmd);
 
         // A module that exposes no such command prints guidance WITHOUT inventing a command.
-        var noCmd = EpicsTemplater.RenderIndex(empty, ProgressModel.Empty, nav, CommandCatalog.Empty);
+        var noCmd = JsonSpaRenderAdapter.Shared.RenderContent(EpicsTemplater.BuildIndexPage(empty, ProgressModel.Empty, nav, CommandCatalog.Empty));
         Assert.DoesNotContain("/bmad-create-epics-and-stories", noCmd);
         Assert.DoesNotContain("data-copy", noCmd);
         Assert.Contains("No epics yet", noCmd);
@@ -1102,7 +1116,7 @@ public class HtmlTemplaterTests
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
         var model = ModelWith(EpicStatus.Pending); // pending epic, no stories
 
-        var html = EpicsTemplater.RenderIndex(model, ProgressModel.Empty, nav, BmadCatalog());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(EpicsTemplater.BuildIndexPage(model, ProgressModel.Empty, nav, BmadCatalog()));
 
         Assert.Contains("Stories not yet drafted — draft them with", html);
         Assert.Contains("/bmad-create-epics-and-stories", html);
@@ -1128,7 +1142,7 @@ public class HtmlTemplaterTests
             StoryStatusCounts = new Dictionary<string, int>(),
         };
 
-        var html = EpicsTemplater.RenderEpic(epic, progress, nav, BmadCatalog());
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(EpicsTemplater.BuildEpicPage(epic, progress, nav, BmadCatalog()));
 
         Assert.Contains("No detailed story plan yet — draft it with", html);
         Assert.Contains("/bmad-create-story 1.1", html);
@@ -1150,8 +1164,8 @@ public class HtmlTemplaterTests
             TasksDone = 0, TasksTotal = 0, Status = EpicStatus.Drafted, StoryStatusCounts = new Dictionary<string, int>(),
         };
 
-        var html = EpicsTemplater.RenderEpic(epic, progress, nav, CommandCatalog.Empty,
-            epicRetroPath: "implementation-artifacts/epic-1-retro-2026-07-07.html");
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(EpicsTemplater.BuildEpicPage(epic, progress, nav, CommandCatalog.Empty,
+            epicRetroPath: "implementation-artifacts/epic-1-retro-2026-07-07.html"));
 
         // Retro link resolves at the epic page's depth-1 prefix.
         Assert.Contains("class=\"epic-retro-link\" href=\"../implementation-artifacts/epic-1-retro-2026-07-07.html\">View Epic 1 Retrospective &rarr;</a>", html);
@@ -1176,16 +1190,16 @@ public class HtmlTemplaterTests
         };
 
         // Complete epic (story done), no retro, command exposed → suggestion.
-        var done = EpicsTemplater.RenderEpic(Epic("Done"), progress, nav, retroCat);
+        var done = JsonSpaRenderAdapter.Shared.RenderContent(EpicsTemplater.BuildEpicPage(Epic("Done"), progress, nav, retroCat));
         Assert.Contains("Epic 2 is complete — capture the lessons with", done);
         Assert.Contains("/bmad-retrospective", done);
 
         // Incomplete epic (story in review) → no suggestion.
-        var incomplete = EpicsTemplater.RenderEpic(Epic("In review"), progress, nav, retroCat);
+        var incomplete = JsonSpaRenderAdapter.Shared.RenderContent(EpicsTemplater.BuildEpicPage(Epic("In review"), progress, nav, retroCat));
         Assert.DoesNotContain("capture the lessons", incomplete);
 
         // Complete epic but the module doesn't expose the command → nothing (graceful).
-        var noCmd = EpicsTemplater.RenderEpic(Epic("Done"), progress, nav, CommandCatalog.Empty);
+        var noCmd = JsonSpaRenderAdapter.Shared.RenderContent(EpicsTemplater.BuildEpicPage(Epic("Done"), progress, nav, CommandCatalog.Empty));
         Assert.DoesNotContain("capture the lessons", noCmd);
     }
 
@@ -1201,20 +1215,20 @@ public class HtmlTemplaterTests
         var retroPath = "implementation-artifacts/epic-1-retro-2026-07-07.html";
 
         var drafted = new StoryInfo { Id = "1.1", EpicNumber = 1, Title = "Drafted Story", UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(), ArtifactOutputPath = "epics/story-1-1.html", Status = "Done" };
-        var storyHtml = EpicsTemplater.RenderStory(epic, drafted, "implementation-artifacts/1-1.md",
+        var storyHtml = JsonSpaRenderAdapter.Shared.RenderContent(EpicsTemplater.BuildStoryPage(epic, drafted, "implementation-artifacts/1-1.md",
             string.Empty, string.Empty, Array.Empty<AcceptanceCriterion>(),
             Array.Empty<(string, string)>(), Array.Empty<TaskItem>(), string.Empty, string.Empty,
             new StoryEvidence(0, 0, null, null, false),
             new StoryChangeSurface(Array.Empty<string>(), Array.Empty<(int, string)>(), Array.Empty<ChangeSurfaceFile>(), null),
-            nav, CommandCatalog.Empty, epicRetroPath: retroPath);
+            nav, CommandCatalog.Empty, epicRetroPath: retroPath));
         Assert.Contains($"class=\"pill pill-link\" href=\"../{retroPath}\">Epic 1 retro &rarr;</a>", storyHtml);
 
         var undrafted = new StoryInfo { Id = "1.2", EpicNumber = 1, Title = "Undrafted", UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(), ArtifactOutputPath = null };
-        var placeholder = EpicsTemplater.RenderStoryPlaceholder(epic, undrafted, nav, CommandCatalog.Empty, epicRetroPath: retroPath);
+        var placeholder = JsonSpaRenderAdapter.Shared.RenderContent(EpicsTemplater.BuildStoryPlaceholderPage(epic, undrafted, nav, CommandCatalog.Empty, epicRetroPath: retroPath));
         Assert.Contains($"class=\"pill pill-link\" href=\"../{retroPath}\">Epic 1 retro &rarr;</a>", placeholder);
 
         // No retro path → no back-link.
-        var noLink = EpicsTemplater.RenderStoryPlaceholder(epic, undrafted, nav, CommandCatalog.Empty);
+        var noLink = JsonSpaRenderAdapter.Shared.RenderContent(EpicsTemplater.BuildStoryPlaceholderPage(epic, undrafted, nav, CommandCatalog.Empty));
         Assert.DoesNotContain("Epic 1 retro", noLink);
     }
 
@@ -1243,13 +1257,16 @@ public class HtmlTemplaterTests
             StoryStatusCounts = new Dictionary<string, int>(),
         };
 
-        var html = EpicsTemplater.RenderEpic(epic, progress, nav, CommandCatalog.Empty);
+        var page = EpicsTemplater.BuildEpicPage(epic, progress, nav, CommandCatalog.Empty);
+        var html = RegionAssert.Of(page);
 
         // The heavily-refactored detail templater must carry the same skip link + exactly one main landmark
         // as the dashboard — guards against a duplicate/zero-landmark regression in RenderEpic. [Story 1.4 AC #1, UX-DR16]
-        Assert.Contains("<a class=\"skip-link\" href=\"#main-content\">Skip to content</a>", html);
+        // [Story 23.6 AC #8] The skip-link assertion lived here and is NOT lost — it is head-emitted chrome,
+        // and the region carries no head. `npm run check:a11y` owns `skip-link` over every EMITTED page,
+        // which is the only place it can be asserted honestly now that no C# path composes a whole page.
         Assert.Contains("<main id=\"main-content\">", html);
-        Assert.Equal(1, CountOccurrences(html, "id=\"main-content\""));
+        RegionAssert.HasSingleMainLandmark(html);
     }
 
     // ---- Story 2.4: planning-artifacts grouping, badges, PRD prominence, rubric fold ----
@@ -1272,8 +1289,8 @@ public class HtmlTemplaterTests
     private static string RenderPlanning(params DocModel[] docs)
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
-        return HtmlTemplater.RenderIndex(docs, nav, ProgressModel.Empty, epicsModel: null, requirements: null,
-            adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, work: WorkInventory.Build(docs));
+        return JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(docs, nav, ProgressModel.Empty, epicsModel: null, requirements: null,
+            adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty, work: WorkInventory.Build(docs)));
     }
 
     [Fact]
@@ -1303,10 +1320,10 @@ public class HtmlTemplaterTests
             Design = Array.Empty<RequirementInfo>(),
         };
 
-        var html = HtmlTemplater.RenderIndex(
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(HtmlTemplater.BuildIndexPage(
             docs: Array.Empty<DocModel>(), nav: nav, progress: ProgressModel.Empty,
             epicsModel: ModelWith(EpicStatus.Drafted, Story("1.1", "done")), requirements: reqs,
-            adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty);
+            adrs: Array.Empty<AdrEntry>(), commands: CommandCatalog.Empty));
 
         // The tile grid + the Sankey both render, and the old donut breakdown is gone.
         Assert.Contains("req-status-grid", html);
