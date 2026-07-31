@@ -4294,7 +4294,7 @@ Replace SpecScribe's C# presentation/templating layer (~4,691 LOC templaters) wi
 - **Story 23.2 — Component library + design-token bridge.** Port the shared presentation tokens (status/motion families, AD-7) into scoped Vue components; establish the CSS module conventions.
 - **Story 23.3 — Migrate baseline surfaces (dashboard, epics) to Vue/Nuxt over the IR**, proving parity with the golden output.
 - **Story 23.5 — Packaging reconciliation** — Node build step in distribution (Epic 16 touchpoint); resolve the self-contained-binary vs. Node-toolchain story. **⚠️ RESEQUENCED AHEAD OF 23.4** by the Story 23.1 spike gate — see the note below.
-- **Story 23.6 — Retire the C# HTML writer** — ⛔ **ADDED 2026-07-30** (owner decision **D7** at Story 23.4's dev-story session 4). The deletion of `HtmlRenderAdapter.Render`'s page composition and `WriteOutput`'s `.html` writes, **carved out of Story 23.4** so that story could close on the work it actually finished. Gated on the owner's verify-and-iterate pass over 23.4's 1,276 migrated pages, and on a replacement content-drift gate satisfying [ADR 0033](../../docs/adrs/0033-content-drift-gates-are-targeted-and-regenerable.md) — because `GoldenIrFingerprint` was removed on 2026-07-30 and `GoldenContentFingerprint` is voided by this deletion.
+- **Story 23.6 — Retire the C# HTML writer** — ⛔ **ADDED 2026-07-30** (owner decision **D7** at Story 23.4's dev-story session 4). The deletion of `HtmlRenderAdapter.Render`'s page composition and `WriteOutput`'s `.html` writes, **carved out of Story 23.4** so that story could close on the work it actually finished. Both original gates are **cleared as of create-story 2026-07-30**: the owner confirmed the verify-and-iterate pass over 23.4's 1,276 migrated pages is finished (D4), and the replacement content-drift gate satisfying [ADR 0033](../../docs/adrs/0033-content-drift-gates-are-targeted-and-regenerable.md) is decided — a new `check:parity` reading back the committed `web/measurements/parity.json` (D2). Status **`ready-for-dev`**, and the scope grew: `--spa` proved to be off by default, so the story now also makes the IR unconditional and drives the prerender from `generate` per ADR 0022 §Decision 3 (D1). See the story section below.
 - **Story 23.4 — Migrate remaining surfaces + retire the C# `HtmlRenderAdapter` for content** (charts remain C#-SVG in the IR). ~~**Blocked until 23.5 lands.**~~ **UNBLOCKED 2026-07-27** — Story 23.5 is complete and [ADR 0022](../../docs/adrs/0022-node-is-a-build-toolchain-and-a-generate-time-runtime.md) settles packaging: the Node toolchain is build/CI-time only, the shipped artefact is a project-independent 3.78 MB prebuilt `.output/` that renders any project's IR at server runtime, and the standalone binary takes a documented Node prerequisite. The 23.1 gate's binary ("client-rendered SPA *or* Node at run time") was **false** — see the [packaging strategy report](../implementation-artifacts/23-5-packaging-strategy-report.md).
 
 <!-- 2026-07-23 (Story 23.1 spike gate, owner-confirmed in code review): EXECUTION ORDER IS 23.2 → 23.3 → 23.5 → 23.4.
@@ -4517,8 +4517,56 @@ So that SpecScribe has a single renderer and no drift hazard between two templat
 
 > **⛔ Seeded 2026-07-30 by owner decision D7 at Story 23.4's dev-story session 4 — the deletion carved out of
 > [Story 23.4](#story-234-migrate-remaining-surfaces--retire-the-c-htmlrenderadapter-for-content) rather than left
-> as an open checkbox on a story that is otherwise complete. Status `backlog`. ⚠️ Not yet through `create-story` —
-> run it before dev, and elicit the gate decision up front (see the blocker below).**
+> as an open checkbox on a story that is otherwise complete.**
+>
+> **✅ Through `create-story` 2026-07-30 (baseline `5a78ee7`). Status `ready-for-dev`.** The
+> [story file](../implementation-artifacts/23-6-retire-the-c-sharp-html-writer.md) carries **9 ACs**: the five
+> below, sharpened, plus four added by the owner decisions elicited at create-story. The blocker below **is
+> settled** — do not re-litigate it during dev.
+>
+> **Four owner decisions locked at elicitation:**
+>
+> - **D1 — the IR becomes UNCONDITIONAL, and `generate` shells out to Node to emit the `.html`.** Forced by a
+>   finding the seeding note did not have: `--spa` is still **off by default** (`SiteSettings.cs:36`;
+>   `_spaCapture`/`_spaPageViews` are allocated only when `EmitSpa || CapturePages`), so deleting the writer today
+>   would leave a plain `specscribe generate` emitting nothing but `specscribe.css`/`.js`. This is
+>   [ADR 0022](../../docs/adrs/0022-node-is-a-build-toolchain-and-a-generate-time-runtime.md) §Decision 3 —
+>   *"SpecScribe drives the prerender … one request per route from the manifest it just emitted"* — executed for
+>   the first time. **→ new ACs #6 and #7.**
+> - **D2 — the replacement content-drift gate is a new `check:parity` that READS BACK the committed
+>   `web/measurements/parity.json`.** No C#-side digest gate. `measure:parity` only ever *wrote* that oracle;
+>   nothing reads it, which is why the committed 1,469 rows are evidence and not yet a gate. **→ AC #3.**
+> - **D3 — `RegionCompositionParityTests` and `RegionCompositionCorpusProof` are RETIRED**, reason recorded
+>   in-file, together with the `SpaDelivery.Extract*` scrapers they are the last consumer of. **→ AC #2.**
+> - **D4 — Story 23.4's verify-and-iterate pass over the 1,276 migrated pages is FINISHED**, which satisfies
+>   AC #5's ordering gate and is what makes the deletion safe to start. **→ AC #5 marked satisfied.**
+>
+> **Four findings traced in the tree at `5a78ee7` that this section did not have:**
+>
+> 1. **`measure:parity` itself goes vacuous.** `goldenRoot = ir.IR_DIR` = `SpecScribeOutput/` — the directory C#
+>    writes the `.html` into. With no golden, every row takes the `NO GOLDEN` branch, `measured` is empty,
+>    `migrationDeltas` is empty, and the script exits **0**. The harness that produced this story's oracle would
+>    report success while measuring nothing. `check:links` has the same one-sidedness.
+> 2. **The four-gate table below is really SIX.** `CapturedRegions`' silent-gap guard
+>    (`SiteGenerator.cs:3634`) and `RenderWebviewSurfaces`' long-tail gate (`:3720`) are both
+>    `_spaCapture is not null` conditions that go **vacuous**. `:3720` is the dangerous one: it gates the *entire*
+>    doc/ADR/requirement/sprint/retro webview surface set even though the body inside consumes the **composed**
+>    producer, so a naive deletion silently shrinks the webview with no test failing.
+> 3. **AC #1 names two write paths; there are FIVE.** `WriteOutput`, plus raw `File.WriteAllText` at `:3234`,
+>    `:3249`, `:3261`, `:3268`, plus `WriteTextWithRetry` at `:4341` — the dashboard/epics families never joined
+>    the `WritePage` seam. AC #1 is amended accordingly.
+> 4. **The test blast radius is the largest single piece of the story:** ~261 `Path.Combine(Site, …)` reads
+>    across 35 test files and ~300 templater `RenderX` call sites across 22. All mechanically substitutable to the
+>    region, because Story 23.4 already split every templater into `BuildX` → `PageView`. **→ new AC #8**, which
+>    forbids dropping an assertion merely because it stopped compiling.
+>
+> **Confirmed good, and worth stating:** `CapturedRegions` (`:3625`) iterates `_spaPageViews` only and reads
+> nothing from the rendered document. The circularity that shaped all of 23.4 is genuinely broken in the tree.
+>
+> **Also owed (new AC #9):** a new ADR recording the output-contract inversion — the IR is the unconditional
+> product and the static site is rendered from it by Node, with `--spa` retired — plus proposals to move
+> **ADR 0022** and **ADR 0033** from `Proposed` to `Accepted`, this story being the first execution of the one and
+> the first implementation of the other.
 
 As a maintainer finishing owner decision D2,
 I want `HtmlRenderAdapter.Render`'s full-page composition and `WriteOutput`'s `.html` writes deleted, with every
