@@ -23,6 +23,16 @@ AD-2 / AD-6).
 Live push: edit any `_bmad-output/**/*.md` (or `docs/adrs/**/*.md`) file and the visible surface refreshes in
 place, preserving your scroll position and drill context.
 
+## Local install task (build + register)
+
+This repo now includes a one-shot workspace task that packages the extension as a VSIX and installs it into your
+local VS Code instance:
+
+- Task: `SpecScribe: Build + Register Extension Local`
+
+Run it from **Terminal > Run Task...** or **Command Palette > Tasks: Run Task**. The task chains the extension host
+build, VSIX packaging, then runs `code --install-extension <latest-vsix> --force`.
+
 ## F5 smoke checklist (manual — Story 6.8)
 
 The manifest/menu/trust behaviors below have **no automated harness** (the extension has no TS test runner; the

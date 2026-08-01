@@ -125,6 +125,41 @@
         "SpecScribe: Build Extension"
       ],
       "problemMatcher": []
+    },
+    {
+      "label": "SpecScribe: Package Extension VSIX",
+      "type": "shell",
+      "command": "npm",
+      "args": [
+        "run",
+        "package",
+        "--",
+        "--allow-missing-repository",
+        "--skip-license"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/extension"
+      },
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "SpecScribe: Build Extension Host"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "SpecScribe: Build + Register Extension Local",
+      "type": "shell",
+      "command": "pwsh",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "$vsix = Get-ChildItem -Path \"${workspaceFolder}/extension\" -Filter \"*.vsix\" | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if (-not $vsix) { throw 'No VSIX found in extension folder.' }; & code --install-extension $vsix.FullName --force"
+      ],
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "SpecScribe: Package Extension VSIX"
+      ],
+      "problemMatcher": []
     }
   ]
 }
