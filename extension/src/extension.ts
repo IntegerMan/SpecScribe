@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
-// SpecScribe Status — the production thin extension-host shim (Story 6.4, governed by ADR 0005).
+// SpecScribe — the production thin extension-host shim (Story 6.4, governed by ADR 0005).
 //
 // This file is deliberately the WHOLE TypeScript surface. Its only responsibilities (the "irreducible shim"):
 //   1. register commands + menus and set the `specscribe.available` context key (a folder is open — the extension
@@ -111,6 +111,17 @@ interface WebviewPayload {
   surfaces: Record<string, SurfaceContent>;
   /** The activity-bar tree + status-bar data. Optional so an older core (pre-6.9) still parses. [Story 6.9] */
   outline?: ProjectOutline;
+  /** True on the FIRST-PAINT PRELUDE frame only: the ENTRY SURFACE ALONE is here — exactly what a freshly-opened
+   * panel displays — and the epics family plus the ~700 doc/ADR/requirement surfaces are still being rendered
+   * and arrive on the very next delta frame. The outline is empty for that window too. The panel paints
+   * immediately instead of waiting out the whole bundle, and a click on a surface that has not landed yet says
+   * "still loading" rather than the permanent "isn't available in the in-editor view" toast — which during this
+   * window would be a lie.
+   *
+   * <p>Optional and absent-means-false, so a payload from an older core (which never sends it) reads as complete —
+   * exactly today's behaviour. Mirrors the C# `partial` field. [spec-vscode-extension-name-latency-and-webview-sunburst
+   * Goal 2]</p> */
+  partial?: boolean;
 }
 
 /** The literal `frame` value a Story 22.6 DELTA frame carries. A full payload deliberately carries no `frame`
@@ -147,6 +158,12 @@ interface DeltaFrame {
   changedSurfaces: Record<string, SurfaceContent>;
   removedSurfaces: string[];
   outline?: ProjectOutline;
+  /** Always `false` from the core: every delta is computed against a COMPLETE current bundle, so folding one
+   * always produces a complete payload — including the frame that completes a first-paint prelude. Read through
+   * `?? false` so an older core that omits it also clears a `partial` basis, which is the safe direction: the
+   * worst case is the honest-but-permanent "isn't available" toast, never a surface stuck reporting "loading"
+   * forever. [spec-vscode-extension-name-latency-and-webview-sunburst Goal 2] */
+  partial?: boolean;
 }
 
 function isDeltaFrame(value: WebviewPayload | DeltaFrame): value is DeltaFrame {
@@ -181,6 +198,10 @@ function applyDeltaFrame(base: WebviewPayload, frame: DeltaFrame): WebviewPayloa
     repoRoot: frame.repoRoot ?? base.repoRoot,
     surfaces,
     outline: frame.outline ?? base.outline,
+    // NOT `?? base.partial`: a delta always completes its basis, so the merged payload is complete even when the
+    // basis was the first-paint prelude. Inheriting `base.partial` would leave the panel answering "still loading"
+    // for the rest of the session. [spec-vscode-extension-name-latency-and-webview-sunburst Goal 2]
+    partial: frame.partial ?? false,
   };
 }
 
@@ -411,7 +432,16 @@ function bindWorkspace(context: vscode.ExtensionContext) {
 function resolveTarget(cache: WebviewPayload, target: SurfaceTarget): string {
   if (target === 'epics') {
     const key = Object.keys(cache.surfaces).find((k) => /(^|\/)epics\.html$/.test(k));
-    return key ?? cache.entry;
+    if (key) return key;
+    // ⚠️ While the payload is the first-paint PRELUDE the epics surface has not been rendered YET, and folding to
+    // the entry here is the one path that escapes `push`'s own partial-aware guard: both call sites compare the
+    // result against `cache.entry` and do nothing when it matches, so "Open Epics" on a cold project would open
+    // the DASHBOARD with no message and never honour the request when the delta landed. Returning the unresolved
+    // well-known key instead lets `push` see a miss, say "still loading", and replay it. On a COMPLETE payload the
+    // original entry fallback still applies — there the surface really is absent.
+    // [Blind Hunter finding 2 / Edge Case Hunter finding 3]
+    if (cache.partial) return 'epics.html';
+    return cache.entry;
   }
   return cache.entry;
 }
@@ -472,6 +502,12 @@ function createController(
   let painted = false;                                // true once first-paint set the document (guards live-push)
   let current = '';                                   // the surface the user is looking at — refreshes re-push THIS
   let pendingReveal: Reveal = initialReveal;          // applied once the first payload lands
+  /** A surface the user asked for while the payload was still a first-paint PRELUDE (`payload.partial`), i.e.
+   * before its delta landed. Held so the click RESOLVES when the remainder arrives instead of needing a second
+   * click — the I/O matrix's "Link resolves once the delta lands" row. Cleared the moment it is honored, and
+   * overwritten (not queued) by a later click: only the most recent intent is worth honoring.
+   * [spec-vscode-extension-name-latency-and-webview-sunburst Goal 2] */
+  let awaitingSurface: string | undefined;
 
   // Read `store` fresh on every use rather than capturing it once: a workspace-folder change (bindWorkspace)
   // disposes the old store and rebinds the module-level `store` to a new one, and this panel must follow that
@@ -483,6 +519,16 @@ function createController(
   function push(target: string, reason: 'navigate' | 'refresh', fragment = '') {
     const cache = currentStore().payload;
     if (!cache) return;
+    // Silently swapping to the dashboard because a surface has not been RENDERED YET is exactly the "blank/wrong
+    // region, no explanation" failure the prelude split must not introduce. While the payload is partial, say so
+    // and honor the request when the remainder lands. A missing target on a COMPLETE payload keeps the original
+    // entry fallback — that one really is unreachable. [Goal 2]
+    if (cache.partial && target !== '' && !cache.surfaces[target]) {
+      awaitingSurface = target;
+      void vscode.window.showInformationMessage(
+        `SpecScribe: "${target}" is still loading — it will open as soon as this project finishes rendering.`);
+      return;
+    }
     const surface = cache.surfaces[target] ?? cache.surfaces[cache.entry];
     if (!surface) return;
     current = cache.surfaces[target] ? target : cache.entry;
@@ -544,6 +590,16 @@ function createController(
       const cache = currentStore().payload;
       if (!cache) return;
       if (!cache.surfaces[msg.target]) {
+        if (cache.partial) {
+          // The payload is still the first-paint PRELUDE: this surface is being rendered right now and lands on
+          // the next frame. Saying "isn't available in the in-editor view" here would be simply false, and telling
+          // the user to run `specscribe generate` would send them off to fix a non-problem. Remember the target so
+          // the click resolves itself when the remainder arrives. [Goal 2]
+          awaitingSurface = msg.target;
+          void vscode.window.showInformationMessage(
+            `SpecScribe: "${msg.target}" is still loading — it will open as soon as this project finishes rendering.`);
+          return;
+        }
         // Not one of the webview's navigable surfaces. Since spec-webview-doc-page-surfaces the bundle carries
         // the whole site EXCEPT code/commit-drill pages (owner-excluded — they scale with the target repo), so
         // this is the honest fallback for those hrefs and for stale/unknown targets. No promise about what a
@@ -553,6 +609,7 @@ function createController(
           'Run "specscribe generate" to browse the full site in a browser.');
         return;
       }
+      awaitingSurface = undefined;
       push(msg.target, 'navigate', msg.fragment ?? '');
       return;
     }
@@ -575,7 +632,21 @@ function createController(
     // `isLoading` is true only between the start-fire and the settle-fire, so this cleanly keeps the single swap.
     // [spec-vscode-any-workspace-and-processing-indicators review patch]
     if (currentStore().isLoading) return;
-    if (currentStore().payload) push(current, 'refresh');
+    const cache = currentStore().payload;
+    if (!cache) return;
+    // A surface clicked while the payload was still the first-paint prelude resolves HERE, the moment the frame
+    // carrying it lands — the honest completion of the "still loading" answer, rather than leaving the user to
+    // click again. Cleared unconditionally once the payload is complete, so an unknown target that will never
+    // arrive falls back to the ordinary refresh instead of being retried forever. [Goal 2]
+    if (awaitingSurface !== undefined && !cache.partial) {
+      const target = awaitingSurface;
+      awaitingSurface = undefined;
+      if (cache.surfaces[target]) {
+        push(target, 'navigate');
+        return;
+      }
+    }
+    push(current, 'refresh');
   });
   p.onDidDispose(() => sub.dispose());
 
@@ -659,6 +730,11 @@ class SpecScribeStore {
   get outline(): ProjectOutline | undefined { return this.cache?.outline; }
   get lastError(): unknown | undefined { return this.error; }
   get isLoaded(): boolean { return this.cache !== undefined; }
+  /** True while the cached payload is still the first-paint PRELUDE — the entry surface alone, with the epics
+   * family and the long tail arriving on the next delta frame. The tree reads this so an outline that is merely
+   * NOT THERE YET is not reported as "no epics here", which for a real BMad project is simply false.
+   * [Goal 2, spec-vscode-extension-name-latency-and-webview-sunburst] */
+  get isPartial(): boolean { return this.cache?.partial === true; }
   /** True while a spawn is in flight — drives the status bar's "rendering…" busy indicator so an in-progress
    * render never looks inert (Goal B). [spec-vscode-any-workspace-and-processing-indicators] */
   get isLoading(): boolean { return this.loading !== undefined; }
@@ -967,6 +1043,13 @@ class OutlineTreeProvider implements vscode.TreeDataProvider<OutlineNode> {
     const nodes: OutlineNode[] = [];
     // Stale/error affordance (AC #2): a failed refresh must be visible — surface it above the last-good data.
     if (store.lastError) nodes.push(messageNode('⚠ Last refresh failed — showing cached data', 'warning'));
+    if (outline.epics.length === 0 && store.isPartial) {
+      // The payload is still the first-paint PRELUDE (the entry surface alone): the epics family is being
+      // rendered right now and lands on the next delta frame. Falling through to the "no epics here" node below
+      // would state something false about a real BMad project for the length of that window. [Goal 2]
+      nodes.push(messageNode('Loading SpecScribe outline…', 'loading~spin'));
+      return nodes;
+    }
     if (outline.epics.length === 0) {
       // No epics is the normal state for a non-bmad workspace (or a bmad project with no epics yet) — read it as
       // designed guidance, not an error: the dashboard still renders this folder's code map & README.
@@ -1025,7 +1108,12 @@ function renderStatusBar(): void {
   if (!item) return;
   if (!folderOpen || !store) { item.hide(); return; }
 
-  if (store.isLoading) {
+  if (store.isLoading || store.isPartial) {
+    // `isPartial` rides the same branch as `isLoading` on purpose: the first-paint PRELUDE settles the load (the
+    // panel can paint) while the epic/story outline it counts is still being rendered, so the summary would read
+    // "0 active · 0 review" for the length of that window. A busy indicator is the honest answer — the counts are
+    // not zero, they are not known yet. [Goal 2, spec-vscode-extension-name-latency-and-webview-sunburst]
+    //
     // A spawn is in flight (first render, manual refresh, or watcher rebuild): show a live busy indicator so the
     // user sees that work is happening rather than an inert or stale count (Goal B). Takes precedence over the
     // last-good count and the stale-error state — we're actively re-rendering. [spec-vscode-any-workspace…]
@@ -1179,7 +1267,7 @@ function createPanel(context: vscode.ExtensionContext): vscode.WebviewPanel {
 
   const p = vscode.window.createWebviewPanel(
     'specscribeStatus',
-    'SpecScribe Status',
+    'SpecScribe',
     location,
     {
       enableScripts: true,           // the one nonce'd bridge script (navigation + live-push)

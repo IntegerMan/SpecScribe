@@ -106,7 +106,66 @@ public sealed class WebviewCommand : Command<SiteSettings>
         // pages into navigable surfaces — the panel's header nav works in-editor. Memory-only: the scratch output's
         // written bytes are unchanged. [spec-webview-doc-page-surfaces]
         generator.CapturePages = true;
+        // Skip the canonical-IR emit on THIS path only. The webview payload is composed in memory by
+        // RenderWebviewSurfaces; the ~1,400 `spa/*.json` files the emit writes go into the scratch directory
+        // above and are never opened again — 9,397 ms of the measured 78,773 ms pass, spent entirely in front of
+        // the panel's first paint. `generate`, `watch` and the interactive menu leave it ON (they must: since
+        // Story 23.6 / ADR 0022 the IR is the only artifact they produce). [Goal 2,
+        // spec-vscode-extension-name-latency-and-webview-sunburst]
+        generator.EmitIr = false;
+        // Same reasoning, one layer lower: the panel reads composed REGIONS, so the full static documents this pass
+        // would otherwise render, linkify and write into the scratch directory are discarded unread. Measured at
+        // ~12 s of the pass on this repository. Proven lossless by hashing the whole 53 MB payload with it on and
+        // off. [Goal 2, spec-vscode-extension-name-latency-and-webview-sunburst]
+        generator.WriteStaticPages = false;
+
+        // Resolved roots come from the PRE-redirect `resolved` (the project's real roots), never the scratch-redirected
+        // `options`, exactly like configuredOutputRoot. [Story 6.11]
+        // Resolved BEFORE GenerateAll because the first-paint checkpoint below writes a payload from inside it.
+        var outputRoot = ResolveConfiguredOutputRoot(resolved);
+        var sourceRoot = ResolveSourceRoot(resolved);
+        var adrRoot = ResolveAdrRoot(resolved);
+        var repoRootOffset = ResolveRepoRootOffset(resolved);
+
+        // ── THE FIRST-PAINT CHECKPOINT (Goal 2) ───────────────────────────────────────────────────────────────
+        //
+        // `SiteGenerator.OnFirstPaintReady` fires the instant every model the dashboard reads exists and BEFORE
+        // the long-tail page phases — the code pages, the code map, the risk quadrant, traceability, the impact
+        // map, the work-graph page, ideas/test-artifact pages, the cadence build, the index write, diagnostics.
+        // The panel therefore paints without waiting for a single phase whose output it cannot display.
+        //
+        // The prelude is the ENTRY SURFACE ALONE. The panel shows exactly ONE surface when it opens; the previous
+        // boundary (dashboard + the whole epics family) put 194 surfaces and 28.5 MB in front of first byte, and
+        // producing them re-reads and re-parses every story artifact. The epics family now rides the SAME delta
+        // frame as the long tail.
+        //
+        // Only under `--serve --serve-delta`: that flag pair IS the consumer's statement that it understands a
+        // second frame. Without it there is nowhere for the remainder to go, so the first push stays whole and
+        // this callback is never installed — `OnFirstPaintReady` stays null and GenerateAll behaves as before.
+        WebviewBundle? prelude = null;
+        if (settings is { Serve: true, ServeDelta: true })
+        {
+            generator.OnFirstPaintReady = g =>
+            {
+                prelude = g.RenderWebviewSurfaces(includeLongTail: false, includeEpicsFamily: false);
+                Console.Out.WriteLine(SerializePayload(
+                    prelude, outputRoot, sourceRoot, adrRoot, repoRootOffset, partial: true));
+                Console.Out.Flush();
+            };
+        }
+
         var events = generator.GenerateAll();
+        // ⚠️ DISARM THE CHECKPOINT. It is a FIRST-paint hook, and this generator instance outlives this call:
+        // `RunServeLoop` hands it to FileWatcherService, whose topology and data-source routes
+        // (`RunTopologyPass` → `RegenerateTopology`, and `RegenerateFromDataSource`) both call `GenerateAll()`
+        // again. Left installed, saving `sprint-status.yaml` — or creating/renaming/deleting any watched file —
+        // would re-fire the checkpoint mid-session and write a SECOND full payload carrying one surface and
+        // `partial: true`. The consumer treats any non-`frame` line as a session re-base, so the panel's cache
+        // would collapse to `index.html` alone and its `lastSequence` would reset to 0 while this process's
+        // counter kept climbing — making the next delta read as a sequence gap, which the extension answers by
+        // tearing the live channel down. Nulling it here costs nothing and is the whole fix.
+        // [Edge Case Hunter finding 1]
+        generator.OnFirstPaintReady = null;
         // The run's non-fatal notices as structured JSON lines on stderr — the SAME DiagnosticNotice.FromEvents
         // projection the Story 4.8 diagnostics page renders (coherence: the two surfaces can never disagree). This
         // covers BOTH Error and Skipped (the pre-6.12 human loop missed Skipped) and emits nothing on a clean run
@@ -115,19 +174,13 @@ public sealed class WebviewCommand : Command<SiteSettings>
         var notices = DiagnosticNotice.FromEvents(events);
         Console.Error.Write(SerializeDiagnostics(notices, resolved));
 
-        var bundle = generator.RenderWebviewSurfaces();
-        // Resolved roots come from the PRE-redirect `resolved` (the project's real roots), never the scratch-redirected
-        // `options`, exactly like configuredOutputRoot. [Story 6.11]
-        var payload = SerializePayload(
-            bundle,
-            ResolveConfiguredOutputRoot(resolved),
-            ResolveSourceRoot(resolved),
-            ResolveAdrRoot(resolved),
-            ResolveRepoRootOffset(resolved));
-
+        // ── The one-shot path is UNSPLIT, deliberately ────────────────────────────────────────────────────────
+        // Without a live channel there is no second frame to carry the remainder, so a split here would lose the
+        // long tail outright. One complete payload, byte-for-byte the shape it has always been. [Goal 2]
         if (!settings.Serve)
         {
-            Console.Out.Write(payload);
+            Console.Out.Write(SerializePayload(
+                generator.RenderWebviewSurfaces(), outputRoot, sourceRoot, adrRoot, repoRootOffset));
             return 0;
         }
 
@@ -136,9 +189,51 @@ public sealed class WebviewCommand : Command<SiteSettings>
         // reusing the EXACT debounce/RegenerateEpics() incremental path `specscribe watch` already relies on
         // (FileWatcherService). The extension keeps this one process alive for the panel's lifetime instead of
         // spawning a fresh `specscribe webview` process — and therefore a fresh full GenerateAll() — on every save.
-        Console.Out.WriteLine(payload);
-        Console.Out.Flush();
-        return RunServeLoop(options, resolved, generator, settings.ServeDelta, bundle);
+        //
+        // ── FIRST-PAINT SPLIT (Goal 2, spec-vscode-extension-name-latency-and-webview-sunburst) ────────────────
+        //
+        // With `--serve-delta` the first stdout frame is the PRELUDE — the ENTRY SURFACE ALONE, which is exactly
+        // what a freshly-opened panel displays — and the epics family plus the ~700 captured doc/ADR/requirement
+        // surfaces follow as the session's FIRST DELTA FRAME on the shipped Story 22.6 channel. On this repository
+        // that moves 55 MB of surface JSON off the critical path to first byte.
+        //
+        // No new frame shape is invented: the prelude IS a full payload (it carries no `frame` discriminator), and
+        // the remainder rides `SerializeDeltaPayload` exactly as an incremental push does. An already-shipped VSIX
+        // therefore needs no change to be correct — `PersistentRenderer` re-bases on the full frame and folds the
+        // delta onto it, which is what it already does after every save.
+        //
+        // Gated on `--serve-delta` because that flag IS the consumer's statement that it understands delta frames.
+        // Without it there is no second frame to send, so the first push stays whole.
+        WebviewBundle bundle;
+        var sequence = 0L;
+        if (settings.ServeDelta)
+        {
+            // Normally already written by the OnFirstPaintReady checkpoint above, from INSIDE GenerateAll. The
+            // fallback covers the one case the checkpoint cannot reach — a pass that never got that far — and
+            // degrades to the pre-checkpoint behaviour rather than losing the prelude frame outright.
+            if (prelude is null)
+            {
+                prelude = generator.RenderWebviewSurfaces(includeLongTail: false, includeEpicsFamily: false);
+                Console.Out.WriteLine(SerializePayload(
+                    prelude, outputRoot, sourceRoot, adrRoot, repoRootOffset, partial: true));
+                Console.Out.Flush();
+            }
+
+            // Completes the SAME bundle: the epics family and the long tail arrive together on ONE delta frame,
+            // and the dashboard surface + entry document are refreshed so the cadence strip the prelude could not
+            // yet carry lands with them. See WithLongTailSurfaces.
+            bundle = generator.WithLongTailSurfaces(prelude, addEpicsFamily: true);
+            Console.Out.WriteLine(SerializeDeltaPayload(
+                prelude, bundle, ++sequence, outputRoot, sourceRoot, adrRoot, repoRootOffset));
+            Console.Out.Flush();
+        }
+        else
+        {
+            bundle = generator.RenderWebviewSurfaces();
+            Console.Out.WriteLine(SerializePayload(bundle, outputRoot, sourceRoot, adrRoot, repoRootOffset));
+            Console.Out.Flush();
+        }
+        return RunServeLoop(options, resolved, generator, settings.ServeDelta, bundle, sequence);
     }
 
     /// <summary>The persistent-mode loop: rewrites and re-streams the webview payload after every debounced
@@ -154,12 +249,17 @@ public sealed class WebviewCommand : Command<SiteSettings>
     /// <param name="initialBundle">The bundle the caller already streamed as the first full payload — the basis
     /// the first DELTA frame is computed against. Passing it in (rather than starting from null) is what makes the
     /// second push a real delta instead of a redundant second full payload.</param>
+    /// <param name="startSequence">The last delta sequence the caller has ALREADY written, so the loop's first push
+    /// continues the run rather than restarting it. Non-zero exactly when the first-paint split emitted the long
+    /// tail as frame 1 — restarting at 1 there would look to the consumer like a sequence gap, which
+    /// <c>PersistentRenderer</c> answers by tearing the connection down. [Goal 2]</param>
     private static int RunServeLoop(
         ForgeOptions options,
         ForgeOptions resolved,
         SiteGenerator generator,
         bool serveDelta = false,
-        WebviewBundle? initialBundle = null)
+        WebviewBundle? initialBundle = null,
+        long startSequence = 0)
     {
         // FileWatcherService fires one debounce Timer PER distinct changed path, each on its own thread-pool
         // thread — two files touched inside the same debounce window can invoke this callback concurrently.
@@ -170,7 +270,7 @@ public sealed class WebviewCommand : Command<SiteSettings>
         // debounce timers above can never compute a frame against a basis the other has already replaced — the
         // failure mode where a surface that changed is reported unchanged, with no test failing. [Story 22.6 Trap 1]
         var previousBundle = initialBundle;
-        var sequence = 0L;
+        var sequence = startSequence;
         using var watcher = new FileWatcherService(options, generator, ev =>
         {
             lock (pushLock)
@@ -230,18 +330,28 @@ public sealed class WebviewCommand : Command<SiteSettings>
     /// the configured output root, and the host-neutral <c>outline</c> (tree + status-bar summary). Extracted from
     /// <see cref="Execute"/> so the JSON contract the extension depends on — camelCase throughout, <c>surfaces</c>
     /// keyed by output-relative path, <c>outline</c> present — is unit-testable without a spawn. [Story 6.9]</summary>
+    /// <param name="partial">True ONLY for the first-paint PRELUDE frame — the ENTRY SURFACE ALONE, with the epics
+    /// family AND the long tail still to arrive on the next delta. It is what lets the panel answer a click on a not-yet-arrived
+    /// surface with "still loading" instead of the permanent "isn't available in the in-editor view" toast, which
+    /// during that window would be a lie. ADDITIVE: the field is always present, always <c>false</c> on every path
+    /// that existed before, and an older VSIX ignores an unknown field. [Goal 2,
+    /// spec-vscode-extension-name-latency-and-webview-sunburst]</param>
     public static string SerializePayload(
         WebviewBundle bundle,
         string configuredOutputRoot,
         string sourceRoot = SourceDirDefault,
         string adrRoot = AdrDirDefault,
-        string repoRoot = ".")
+        string repoRoot = ".",
+        bool partial = false)
     {
         var payload = new
         {
             siteTitle = bundle.SiteTitle,
             entry = bundle.EntryPath,
             document = bundle.EntryDocument,
+            // See the parameter doc: "this payload is not the whole surface set yet". Never true off the
+            // `--serve --serve-delta` first frame.
+            partial,
             // Host-delivery of a core-resolved DATUM (not rendering — ADR 0005 §1): the workspace-relative
             // root a plain `generate` would write to. Sourced from the PRE-redirect resolved options so it is
             // the project's real configured output, never the temp scratch dir this command actually renders
@@ -342,6 +452,11 @@ public sealed class WebviewCommand : Command<SiteSettings>
             sequence,
             siteTitle = current.SiteTitle,
             entry = current.EntryPath,
+            // Every caller passes a COMPLETE `current` bundle, so folding this frame always yields a complete
+            // payload — including the frame that completes a first-paint prelude. Stated on the wire rather than
+            // inferred, so the consumer never has to guess when the "still loading" answer stops being true.
+            // [Goal 2, spec-vscode-extension-name-latency-and-webview-sunburst]
+            partial = false,
             // The entry DOCUMENT is the biggest single string on the wire, so it rides only when it actually
             // moved. Null ⇒ "keep what you have"; the consumer must not treat an absent document as an empty one.
             document = string.Equals(previous.EntryDocument, current.EntryDocument, StringComparison.Ordinal)

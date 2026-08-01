@@ -61,3 +61,27 @@ Each record is numbered by its filename prefix and carries a `**Status:**` line.
   finding at 25.2's own review: without a single authoritative record, Story 25.6 had to independently
   rediscover and correct a stale claim about which rule drove `new_security_rating` that had gone stale across
   three separate files.)
+- [ADR 0036 — The Webview Shell Supplies Chrome Scripts](0036-the-webview-shell-supplies-chrome-scripts.md) — **Proposed** 2026-08-01
+  (authored by `spec-vscode-extension-name-latency-and-webview-sunburst`, from an owner report that "the main
+  plotly sunburst isn't populating with data in the VS Extension". **Amends [ADR 0032](0032-csp-posture-after-the-projection-layer.md)
+  §Decision 2's enforcement clause ONLY** — not the policy string, not Decision 1. Context: hierarchy and graph
+  charts render on the webview as a panel heading and a legend describing a chart that is not there, because
+  three legs are severed — the island is stripped, the mount code is not shipped, and the engine `<script src>`
+  is emitted only by `HtmlRenderAdapter.Render`, which this adapter never calls. ⚠️ **None of it was ever a CSP
+  limit**: the `hierarchy-chart` host exception describes its own cause as *"a SEQUENCING choice rather than a
+  technical limit"*, and ADR 0030 §Good says *"the webview CSP needs no relaxation"*. **Decides:** the webview
+  shell emits the engine + mount code as nonce'd `<script>` blocks — which is exactly what ADR 0032 §Decision 3
+  already permits — with **no change to the policy string**; the mount logic must not be forked (a webview-only
+  copy is the three-arc-renderers failure ADR 0012 exists to end); ADR 0032 §Decision 2's second enforcement
+  point (*"`WebviewRenderAdapter` strips every JSON island"*) is **removed**, since the strip never enforced that
+  invariant — the same sentence explicitly *permits* inert data islands, and the strip existed for **dead
+  weight**, a rationale that expires once an engine can read them; `data-island` and `hierarchy-chart` host
+  exceptions are **retired** and `asset.js` **narrowed**; and hierarchy charts plus Epic 24 graphs are covered
+  **together**, satisfying ADR 0030's "decided once, for both". ⚠️ **Deliberately NOT a new CSP decision** — ADR
+  0032 already discharged ADR 0012 §Decision 5's "landed once, not twice", and the seeded plan to write one was
+  rejected as exactly the duplication that clause forbids. Costs stated rather than discovered: **+4,528,007 B**
+  of islands across 167 pages and **+1,223,563 B** of engine, per an explicit **owner decision of no per-island
+  budget** taken against a measured 15× cliff between `story-23-2.html` (81,884 B) and `code-map.html`
+  (1,243,124 B) — so Story 20.9's 1.24 MB returns, no longer dead but still the first line item to revisit. No
+  text-twin audit is owed: [ADR 0031](0031-text-twin-standardization-moves-to-its-own-epic.md) moved that to
+  Epic 28. ⚠️ **Open:** ADR 0032 is itself still `Proposed` — the two want ratifying together.)

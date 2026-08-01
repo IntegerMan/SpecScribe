@@ -1,5 +1,4 @@
 using System.Text;
-using System.Text.RegularExpressions;
 
 namespace SpecScribe;
 
@@ -37,6 +36,23 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
     /// generated HTML surface — which never loads this — stays byte-identical.</summary>
     private static readonly Lazy<string> ThemeBridge = new(() => ReadEmbedded("SpecScribe.assets.specscribe-webview-theme.css"));
 
+    /// <summary>The vendored plotly.js hierarchy/graph engine (ADR 0012 / ADR 0030), inlined into the shell under
+    /// the document nonce. <b>Inlined, not <c>&lt;script src&gt;</c>:</b> `localResourceRoots` is empty by design,
+    /// so nothing loads from disk — an inline nonce'd block is what satisfies `script-src 'nonce-…'` without
+    /// touching the policy string, which is exactly the shape ADR 0032 §3 names. ~1.22 MB, paid once per document
+    /// (the shell is built once; navigation swaps only the region), never once per surface. [ADR 0036 §1]</summary>
+    private static readonly Lazy<string> ChartEngine = new(() => ReadEmbedded("SpecScribe.assets.plotly-hierarchy.min.js"));
+
+    /// <summary>The production <c>specscribe.js</c> — the SAME file the static site ships, not a webview fork.
+    ///
+    /// <para>ADR 0036 §2 forbids forking the mount logic, and this is where that is honored: shipping the whole
+    /// script means the Hierarchy Explorer and the Story 24.2 relationship graph mount here through the identical
+    /// code path they use in a browser, so the two cannot drift. It is safe to ship WHOLE rather than trimmed for
+    /// a checked reason: the file registers no nav-toggle handler (the bridge below owns that, and a second one
+    /// would double-toggle), and it already listens for <c>specscribe:content-swapped</c> — the re-init seam
+    /// Story 20.2 built for precisely this kind of <c>innerHTML</c> swap.</para></summary>
+    private static readonly Lazy<string> AppScript = new(() => ReadEmbedded("SpecScribe.assets.specscribe.js"));
+
     private static string ReadEmbedded(string resourceName)
     {
         using var stream = typeof(WebviewRenderAdapter).Assembly.GetManifestResourceStream(resourceName)
@@ -65,46 +81,32 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
         var sb = new StringBuilder();
         sb.Append(HtmlRenderAdapter.Shared.RenderNavMarkup(page.Nav));
         sb.Append(HtmlRenderAdapter.Shared.RenderWayfinding(page.OutputRelativePath, page.Breadcrumb, page.Pager));
-        // Drop any inline JSON data island (the Hierarchy Explorer payload). NOT a CSP matter: a
-        // <script type="application/json"> block is data, never executed, so script-src does not apply and the CSP
-        // would not have blocked it. It is dropped because it is dead weight HERE — this surface deliberately ships
-        // no specscribe.js (the `asset.js` host exception), so nothing can ever read the island, and the webview
-        // inlines its document. Registered as the `data-island` webview exception in HostRenderExceptions — an
-        // unregistered divergence is a bug.
+        // The body rides VERBATIM, data islands included. [ADR 0036]
         //
-        // CORRECTED BY STORY 20.7: this comment used to end "the static SVG chart + its Story 9.13 links stay
-        // fully intact". 20.7 retired that SVG. What survives the strip and carries the information here is the
-        // TEXT TWIN — <details>/<div>/<ul> markup, matched by no part of the regex below — and its links resolve
-        // under this adapter's path rewriting like any other. The absent chart PICTURE is its own registered
-        // exception (`hierarchy-chart`), the ADR 0012 §5 / ADR 0013 §7 fallback owner decision D3 accepted.
-        // [Story 20.2; rationale corrected + registered by the 20.2 review; amended Story 20.7]
-        sb.Append(StripDataIslands(page.BodyHtml));
+        // This used to call StripDataIslands. The strip was never a CSP matter — a <script type="application/json">
+        // block is data, never executed, so script-src does not apply and ADR 0032 §2 explicitly PERMITS inert
+        // islands inside the region. It existed for DEAD WEIGHT: the webview shipped no engine and no
+        // specscribe.js, so nothing here could ever read an island, and Story 20.9 measured 4.5 MB of unreadable
+        // payload riding into a document the editor holds in memory.
+        //
+        // That rationale expired the moment WrapDocument started supplying the chart engine and the mount code as
+        // nonce'd chrome (ADR 0036 §1) — which is exactly what ADR 0032 §2 means by "replaced by whichever shell
+        // consumes the region". The island is now LIVE DATA on this surface, read by getElementById the same way
+        // it is on the static site. What was dead weight is now the payload.
+        //
+        // The region still carries no EXECUTABLE script, which is the invariant that actually matters and the one
+        // the surface tests now pin. [ADR 0036 §3; supersedes Story 20.2 / 20.9's strip]
+        sb.Append(page.BodyHtml);
         return sb.ToString();
     }
 
-    /// <summary>The island strip, exposed so the CAPTURED-page path can apply the same rule this one does.
-    ///
-    /// <para><b>It was missing there, and Story 20.9 made that expensive rather than merely untidy.</b> A page
-    /// written through <c>WriteOutput</c> (<c>code-map.html</c>, <c>git-insights.html</c>) becomes a webview
-    /// surface by slicing its <c>&lt;main&gt;</c> out of the captured HTML — a path that never ran
-    /// <see cref="RenderContent"/> and therefore never stripped anything. The island sits inside
-    /// <c>&lt;main&gt;</c>, so it rode along. That was ~470 KB of unreadable payload before this story and
-    /// <b>4.5 MB</b> after it, inlined into a document the editor holds in memory, on a surface that ships no
-    /// <c>specscribe.js</c> and so can never read a byte of it.</para>
-    ///
-    /// <para>The <c>data-island</c> entry in <see cref="HostRenderExceptions"/> already described this surface as
-    /// carrying no islands, so this is the code being brought up to the registered contract rather than a new
-    /// divergence. What carries the information here is unchanged: the text twin (or, on the Code Map, its
-    /// per-variant file table), which is <c>&lt;details&gt;</c>/<c>&lt;table&gt;</c> markup no part of the regex
-    /// matches. <b>The SPA deliberately does NOT call this</b> — it is a real browser that keeps
-    /// <c>specscribe.js</c>, so its islands are live data, not dead weight. [Story 20.9 Task 5.2]</para></summary>
-    public static string StripDataIslands(string html) => JsonDataIsland.Replace(html, string.Empty);
-
-    /// <summary>Matches an inline <c>&lt;script type="application/json"&gt;…&lt;/script&gt;</c> data island (with its
-    /// trailing newline) so the webview region ships none — inert data the CSP would block anyway. [Story 20.2]</summary>
-    private static readonly Regex JsonDataIsland = new(
-        "<script type=\"application/json\"[^>]*>.*?</script>\\n?",
-        RegexOptions.Compiled | RegexOptions.Singleline);
+    // REMOVED BY ADR 0036: `StripDataIslands` and its `JsonDataIsland` regex.
+    //
+    // Both existed to keep unreadable payload out of a surface that shipped no engine. Now that WrapDocument
+    // supplies the engine and the mount code as nonce'd chrome, an island is live data on both the PageView path
+    // (RenderContent) and the captured-page path (SiteGenerator.AppendLongTailSurfaces) — so neither has a caller,
+    // and a public helper that no longer describes what this adapter does is worse than no helper. Deleted rather
+    // than left `[Obsolete]` because the behaviour it named is retired, not deprecated.
 
     /// <summary>Wraps an already-rendered content region in the webview document shell: CSP meta (script-src
     /// nonce-locked; style-src 'unsafe-inline' for the render's inline style attributes — ADR 0005's measured,
@@ -127,6 +129,12 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
         // that button's visibility on it (empty → hidden, e.g. the dashboard). Attribute-escaped like __PATH__; the
         // host only ever OPENS it read-only, never writes it.
         .Replace("__SOURCE__", PathUtil.Html(PathUtil.NormalizeSlashes(sourcePath ?? "")))
+        // The two chrome scripts ADR 0036 §1 moved onto this shell. Substituted BEFORE __CONTENT__ so the region —
+        // the one part of this document that is not ours — is still inserted last and therefore never re-scanned
+        // for placeholder tokens. That ordering is the same reason the shim lifts the content out before it
+        // substitutes __NONCE__/__CSP_SOURCE__: a region must never be able to forge a shell token.
+        .Replace("__ENGINE_JS__", ChartEngine.Value)
+        .Replace("__APP_JS__", AppScript.Value)
         .Replace("__CONTENT__", contentHtml);
 
     // The shell around the swappable region. Kept as one template so the CSP policy, container id, and bridge
@@ -307,6 +315,22 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
             // value and hides the button.
             surface.setAttribute('data-source', m.source || '');
             syncRevealBtn();
+            // Re-mount the charts in the swapped-in region (ADR 0036 §1). `innerHTML` does not execute scripts —
+            // which is fine, because the engine and specscribe.js live in the SHELL and survive every swap — but
+            // it does mean the new region's chart hosts have never been visited. This is the seam Story 20.2
+            // already built for exactly this: specscribe.js listens for `specscribe:content-swapped` and re-runs
+            // both `initHierarchyExplorers` and `initRelationshipGraphs` over `detail.root`. Mounts are
+            // idempotent — an already-mounted host carries `data-hierarchy-ready` and is skipped — so a
+            // double-dispatch costs nothing.
+            //
+            // Dispatched AFTER data-path/data-source are refreshed so anything the mount reads off the container
+            // sees the new surface's values, never the outgoing one's.
+            try {
+              document.dispatchEvent(new CustomEvent('specscribe:content-swapped', { detail: { root: surface } }));
+            } catch (err) {
+              // A charting failure must never cost the reader the content that already painted. The region is
+              // fully rendered by this point; the twin below each chart carries the same information.
+            }
             if (m.reason === 'navigate') {
               var el = m.fragment ? document.getElementById(m.fragment) : null;
               if (el) { el.scrollIntoView(); } else { window.scrollTo(0, 0); }
@@ -315,9 +339,44 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
             // reading context survives a source edit (AC #3 "refreshes in place without full panel reset").
           });
 
+          // Claim the shared chart-navigation seam (ADR 0036 §2). A Plotly sector is not an anchor, so chart
+          // activation navigates programmatically and the delegated `a[href]` listener above can never see it —
+          // it would assign `location.href` and try to navigate the PANEL to a relative path that is not a
+          // webview resource (`localResourceRoots` is empty), losing this bridge, the inlined stylesheet and the
+          // engine with it. Installing the hook routes those activations through the exact same resolve +
+          // postMessage path an anchor click takes, so the two can never drift.
+          //
+          // Defined BEFORE the engine and specscribe.js are parsed — they are emitted after this block — so the
+          // seam is in place the first time any chart mounts.
+          window.__specscribeNavigate = function (href) {
+            if (!href || !vscode) return;
+            if (/^[a-z][a-z0-9+.-]*:/i.test(href)) { vscode.postMessage({ type: 'openExternal', href: href }); return; }
+            var target = href, fragment = '';
+            var hash = target.indexOf('#');
+            if (hash >= 0) { fragment = target.slice(hash + 1); target = target.slice(0, hash); }
+            // A pure same-page fragment (the drill-scope links) must scroll, not round-trip to the host.
+            if (target === '') {
+              var el = fragment ? document.getElementById(fragment) : null;
+              if (el) el.scrollIntoView();
+              return;
+            }
+            var current = surface ? (surface.getAttribute('data-path') || '') : '';
+            vscode.postMessage({ type: 'navigate', target: resolve(target, current), fragment: fragment });
+          };
+
           if (vscode) vscode.postMessage({ type: 'ready' });
         })();
         </script>
+        <!-- ── The chrome scripts (ADR 0036 §1) ──────────────────────────────────────────────────────────────
+             Both carry the document nonce, so `script-src 'nonce-…'` admits them with NO change to the policy
+             string. They sit at the END of the body, after the region has parsed, which is what lets
+             specscribe.js mount on first paint without the `defer` the static site uses.
+
+             ORDER IS LOAD-BEARING: the engine defines the global specscribe.js mounts against, so it must parse
+             first. Emitted after the bridge script above so the bridge's message listener is registered before
+             either of these can throw — a mount failure must never cost the panel its navigation. -->
+        <script nonce="__NONCE__">__ENGINE_JS__</script>
+        <script nonce="__NONCE__">__APP_JS__</script>
         </body>
         </html>
         """;

@@ -398,3 +398,44 @@
 .ss-reveal-src-btn:hover {
   background: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-hoverBackground, var(--vscode-button-background, #1177bb)));
 }
+
+/* ── Chart mount failure reveals the text twin (ADR 0036 §1, the fallback half) ─────────────────────────────
+   This sheet is inlined ONLY by WebviewRenderAdapter, so an unscoped rule here is webview-only by construction
+   — it is never served to a browser and cannot move the static site's bytes.
+
+   Why it is needed at all: the dashboard's twin is emitted `sr-only` (HierarchyExplorer.TextTwinHtml), which is
+   correct while a chart is drawn beside it — ADR 0013 Decision 2 asks for availability, not on-screen
+   duplication. But if the mount DECLINES or throws, `.ss-hierarchy` never gains `data-hierarchy-ready` and stays
+   `display:none`, and the reader is left with a panel heading and a legend describing a chart that is not there.
+   That is precisely the defect this work exists to fix, so the failure path must not reintroduce it.
+
+   Scoped to the panel's own failure marker, so a healthy panel is untouched and nothing here duplicates a chart
+   that did render. Broader text-twin standardization is Epic 28's (ADR 0031); this is only the honest-failure
+   half the charting change itself owes.
+
+   TWO CORRECTIONS from the edge-case review, both of which made the first version of this rule dead code:
+
+   1. NOT scoped on `.chart-panel`. The client resolves the panel as
+      `root.closest("[data-explorer]") || root.parentNode` (specscribe.js), and `data-explorer` is an OPT-IN hook a
+      call site may omit — in which case the marker lands on an arbitrary parent that need not carry that class, and
+      a `.chart-panel[...]` selector would silently never match. The attribute alone is the reliable anchor.
+
+   2. BOTH components, not just the hierarchy one. The relationship graph (Story 24.2 / ADR 0030) sets its own
+      marker, `data-relgraph-failed`, and its twin is the call-site-supplied `ul.ref-list.sr-only` rather than a
+      `.ss-hierarchy-twin`. ADR 0036 §5 decides hierarchy and graphs TOGETHER, so covering only the first would
+      have left the graphs with exactly the heading-and-legend defect this whole change exists to remove.
+
+   Deliberately NOT a blanket `[data-*-failed] .sr-only` — each component also ships an `aria-live` region
+   (`.ss-hierarchy-live`, `.ss-relgraph-live`) that is `sr-only` and normally EMPTY, and revealing those would put
+   a blank strip on screen. The twin is named explicitly for that reason. */
+[data-hierarchy-failed] .ss-hierarchy-twin.sr-only,
+[data-relgraph-failed] .ref-list.sr-only {
+  position: static;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip: auto;
+  clip-path: none;
+  white-space: normal;
+  margin-top: 0.8rem;
+}

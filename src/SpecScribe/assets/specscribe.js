@@ -7,6 +7,25 @@
 (function () {
   "use strict";
 
+  // ---- The ONE navigation seam every chart activation goes through --------------------------------
+  // Charts navigate PROGRAMMATICALLY (a Plotly sector is not an <a>), and a host that intercepts anchor
+  // clicks therefore cannot see them. The VS Code webview is exactly such a host: its bridge listens for
+  // `a[href]` clicks and posts `{type:'navigate'}`, so a bare `location.href = …` slipped straight past it
+  // and attempted a top-level navigation inside the panel — at best inert, at worst replacing the document
+  // (and with it the bridge, the inlined stylesheet and the chart engine) with no way back but reopening.
+  //
+  // A host may install `window.__specscribeNavigate` to claim these. Absent one — the static site and the
+  // SPA, both real browsers — the default is the original assignment, so their behaviour is byte-for-byte
+  // unchanged. This is a SEAM rather than a webview branch on purpose: ADR 0036 §2 forbids forking the
+  // mount logic, and one shared hook is what keeps hierarchy and graph activation on the same code path.
+  // [ADR 0036 §2; Blind Hunter finding 1]
+  function navigateTo(href) {
+    if (!href) return;
+    var hook = window.__specscribeNavigate;
+    if (typeof hook === "function") { hook(href); return; }
+    location.href = href;
+  }
+
   // ---- On-brand tooltip for SVG segments -------------------------------------------------
   // A single reused tooltip element positioned near the pointer/focus. Text comes from the segment's
   // <title>, so we never duplicate label strings into markup. While our tooltip is showing we detach the
@@ -1936,7 +1955,7 @@
         announce("Selected " + n.label + ". " + n.statusLabel + (n.detail ? ", " + n.detail : "") + ".");
         return;
       }
-      if (n.href) location.href = n.href;
+      if (n.href) navigateTo(n.href);
     }
 
     function drillTo(id, pushHash) {
@@ -2986,7 +3005,7 @@
     function activate(el) {
       var href = el.getAttribute("data-relgraph-href");
       if (!href) { announce(el.getAttribute("aria-label") || ""); return; }
-      window.location.href = href;
+      navigateTo(href);
     }
 
     function onNodeClick(ev) { activate(ev.currentTarget); }

@@ -1,6 +1,6 @@
 {
   "name": "specscribe-status",
-  "displayName": "SpecScribe Status",
+  "displayName": "SpecScribe",
   "description": "Read-only, live-updating in-editor view of a SpecScribe project's dashboard and epics surfaces. All rendering happens in the SpecScribe C# core; this extension is a thin host shim (ADR 0005).",
   "version": "0.1.0",
   "private": true,
@@ -266,12 +266,12 @@
             "active"
           ],
           "enumDescriptions": [
-            "Open the SpecScribe Status panel beside the active editor.",
-            "Open the SpecScribe Status panel in the active editor column."
+            "Open the SpecScribe panel beside the active editor.",
+            "Open the SpecScribe panel in the active editor column."
           ],
           "default": "beside",
           "scope": "window",
-          "markdownDescription": "Where the SpecScribe Status panel opens relative to your editor. A host/window concern — project behavior (source/ADR roots, output, deep-git) lives in the directory-scoped `.specscribe` file, not here."
+          "markdownDescription": "Where the SpecScribe panel opens relative to your editor. A host/window concern — project behavior (source/ADR roots, output, deep-git) lives in the directory-scoped `.specscribe` file, not here."
         }
       }
     }

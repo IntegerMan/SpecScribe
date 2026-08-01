@@ -276,6 +276,69 @@ public sealed class SiteGenerator
     /// <c>webview</c> command does NOT — it consumes the region directly and never wanted <c>.html</c> at all.</para></summary>
     public bool PrerenderHtml { get; set; }
 
+    /// <summary>Emit the canonical IR (<c>spa/*.json</c> + <c>app.html</c> + the client script) at the end of every
+    /// pass. <b>ON by default</b>, because since Story 23.6 / ADR 0022 the IR <em>is</em> the product for every
+    /// human-facing route: <c>generate</c>, <c>watch</c> and the interactive menu must never turn it off, or the
+    /// user is left an empty output root and the prerender has no manifest to walk.
+    ///
+    /// <para><b>The one caller that turns it OFF is <c>webview</c>, and only because the payload provably cannot
+    /// read it.</b> The webview bundle is composed in memory by <see cref="RenderWebviewSurfaces"/> from
+    /// <see cref="_spaPageViews"/>; nothing on that path opens a file under
+    /// <see cref="ForgeOptions.OutputRoot"/>. The emit writes ~1,400 JSON files into a per-project temp scratch
+    /// directory the panel then abandons — measured at 9,397 ms of the 78,773 ms
+    /// <see cref="GenerateAll"/> pass on this repository (2026-07-31), i.e. pure latency in front of first paint.
+    ///
+    /// <para><b>The one behavioural consequence, stated rather than discovered.</b> Skipping the emit also skips
+    /// the <see cref="_familyDegradedStories"/> tally <see cref="GenerateAll"/> turns into an Error event, because
+    /// that tally is filled by the emit's own <see cref="BuildFamilySurfaces"/> call. On the webview path the same
+    /// degrade is still applied to the surfaces themselves (<see cref="RenderWebviewSurfaces"/> runs the identical
+    /// builder) — it simply is not additionally reported as a generation event. The static site, which is the
+    /// surface that event guards, is unaffected: it never runs with this off.</para></summary>
+    public bool EmitIr { get; set; } = true;
+
+    /// <summary>Render each page's FULL static document at the <see cref="WritePage"/> seam — the finished
+    /// <c>&lt;html&gt;</c> chrome, linkified whole, written to <see cref="ForgeOptions.OutputRoot"/> and kept in the
+    /// <see cref="_spaCapture"/> oracle. <b>ON by default</b>; every route except <c>webview</c> keeps it on.
+    ///
+    /// <para><b>Why <c>webview</c> can turn it off without losing anything.</b> That path consumes exactly one
+    /// producer — the composed region in <see cref="_spaPageViews"/>, which <see cref="CapturedRegions"/> iterates
+    /// and <see cref="RenderWebviewSurfaces"/> filters — and that half of <see cref="WritePage"/> still runs. The
+    /// full document it also built is written into a per-project temp scratch directory the panel abandons, and
+    /// <see cref="_spaCapture"/>'s only remaining reader is <see cref="RegionCompositionDeltas"/>, a test-suite
+    /// oracle no CLI route calls. No <see cref="WritePage"/> call site uses the returned string.</para>
+    ///
+    /// <para><b>Scope, stated exactly: this is the <see cref="WritePage"/> seam and only that seam.</b>
+    /// <see cref="WriteIndex"/> renders and writes <c>index.html</c> through <see cref="WriteTextWithRetry"/>
+    /// directly and is deliberately NOT gated here — it is one page, and its write is entangled with
+    /// <see cref="EnsureHierarchyEngine"/>'s conditional-asset gate. So a run with this off still leaves
+    /// <c>index.html</c> and the embedded stylesheet/script in the output root.</para>
+    ///
+    /// <para><b>The verification that this loses nothing is a byte comparison, not an argument.</b> The `webview`
+    /// payload was captured with this ON and with it OFF and the two 53 MB JSON documents hash identically
+    /// (SHA-256), which is the same oracle used for the concurrent first-touch resolver. Any future change here
+    /// should be re-proved the same way rather than reasoned about.</para></summary>
+    public bool WriteStaticPages { get; set; } = true;
+
+    /// <summary>Opt-in FIRST-PAINT CHECKPOINT: invoked exactly once per <see cref="GenerateAll"/> pass, at the
+    /// moment every model the dashboard reads is built and BEFORE the long-tail page phases that the dashboard
+    /// provably does not consume (code pages, the code map, the risk quadrant, traceability, the impact map, the
+    /// work-graph page, ideas/test-artifact pages, the cadence build, the index write, diagnostics, the IR emit and
+    /// the prerender). <b>Null by default</b>, and when null <see cref="GenerateAll"/> behaves exactly as before —
+    /// the checkpoint is a call site, not a branch in the phase order.
+    ///
+    /// <para><b>The phase order itself is UNCONDITIONAL.</b> The dashboard-critical data builds
+    /// (<see cref="BuildArtifactCoverage"/>, <see cref="WorkInventory"/>, <see cref="ProjectCounts"/>) were hoisted
+    /// above the long-tail page phases for every route — generate, watch and webview alike — precisely so there is
+    /// ONE order to reason about. Two conditional orders would be a divergence bug waiting to happen, and
+    /// <c>check:parity</c>'s frozen 24-route corpus is the proof that the hoist is output-neutral.</para>
+    ///
+    /// <para><b>What the callback may do.</b> It runs INSIDE <see cref="GenerateAll"/>'s <c>_gate</c> (a reentrant
+    /// Monitor), so <see cref="RenderWebviewSurfaces"/> is callable from it. The cached
+    /// <see cref="_prelude"/> is invalidated the instant it returns, because later phases still move state the
+    /// dashboard reads — <see cref="_cadence"/> above all — and a snapshot taken here must not become the answer a
+    /// later consumer gets. [Goal 2, spec-vscode-extension-name-latency-and-webview-sunburst]</para></summary>
+    public Action<SiteGenerator>? OnFirstPaintReady { get; set; }
+
     /// <summary>The routes the last <see cref="EmitSpaSite"/> wrote into the manifest — the prerender's work list.
     /// ADR 0022 §Decision 3: SpecScribe "issues one request per route from the manifest it just emitted", so this
     /// is that manifest's own key set rather than a crawl or a directory walk.</summary>
@@ -342,6 +405,23 @@ public sealed class SiteGenerator
     /// for why this is a label only. Internal: <see cref="FileWatcherService"/> is the only caller.</summary>
     internal void SetWatchTrigger(string? trigger) => _watchTrigger = trigger;
 
+    /// <summary>Opt-in per-phase wall-clock for <see cref="GenerateAll"/> — one <c>[phase] name  N ms</c> line per
+    /// phase on stderr — OFF unless <c>SPECSCRIBE_PHASE_TIMING</c> is set to something other than <c>0</c>.
+    ///
+    /// <para><b>Off by default is a contract, not a default.</b> On the <c>webview</c> path stdout is the machine
+    /// channel (pure JSON) and stderr is the structured Problems channel the VS Code shim parses as JSON lines;
+    /// neither may carry debug prose in a shipped run, so this must never become unconditional.</para>
+    ///
+    /// <para><b>Why it is kept rather than deleted.</b> The Goal 2 latency work is measurement-driven and its
+    /// spec's own Design Notes say to "re-measure after each latency task rather than assuming". Every phase figure
+    /// quoted in <see cref="EmitIr"/>, <see cref="WriteStaticPages"/> and
+    /// <see cref="PrewarmedFirstTouchResolver"/> is reproducible with this switch on, and re-instrumenting by hand
+    /// each time is how a stale number gets quoted as current.
+    /// [Goal 2, spec-vscode-extension-name-latency-and-webview-sunburst]</para></summary>
+    private static readonly bool PhaseTimingEnabled =
+        Environment.GetEnvironmentVariable("SPECSCRIBE_PHASE_TIMING") is { Length: > 0 } phaseTimingFlag
+        && !string.Equals(phaseTimingFlag, "0", StringComparison.Ordinal);
+
     public SiteGenerator(ForgeOptions options)
     {
         _options = options;
@@ -352,10 +432,20 @@ public sealed class SiteGenerator
 
     public IReadOnlyList<GenerationEvent> GenerateAll(IGenerationReporter? reporter = null)
     {
+        var phaseClock = PhaseTimingEnabled ? Stopwatch.StartNew() : null;
+        var phaseTotal = PhaseTimingEnabled ? Stopwatch.StartNew() : null;
+        void Mark(string phase)
+        {
+            if (phaseClock is null) return;
+            Console.Error.WriteLine($"[phase] {phase,-30} {phaseClock.ElapsedMilliseconds,8} ms");
+            phaseClock.Restart();
+        }
+
         reporter?.BeginPhase(GenerationPhase.Scan);
         var files = EnumerateSourceFiles();
         var sourceRelatives = files.Select(ToSourceRelative).ToList();
         reporter?.EndPhase(GenerationPhase.Scan);
+        Mark("scan-source-files");
 
         var events = new List<GenerationEvent>();
         lock (_gate)
@@ -365,16 +455,28 @@ public sealed class SiteGenerator
             // Inside _gate (review-fix, Story 5.3): RegenerateEpics/GenerateOne/RegenerateAdrs read _codeFiles via
             // BuildNav inside their own locked sections, so assigning it outside this lock raced them the moment
             // RegenerateTopology gave GenerateAll a caller other than watch startup.
-            _codeFiles = EnumerateCodeFiles();
+            //
+            // ⚠️ STARTED HERE, JOINED JUST BEFORE THE NAV BUILD — the one consumer that needs it. The walk is a
+            // `git ls-files` child process plus a line-count read of every listed file: 1,129 ms of pure I/O wait
+            // on this repository, sitting in series in front of the ingest phase, which is itself another git
+            // child process (1,657 ms). Overlapping the two removes the shorter one from the critical path to
+            // first paint. The walk is a pure function of the filesystem and reads no mutable generator state
+            // (only the immutable `_options`), so running it off the gate holder's thread races no field, and
+            // `_codeFiles` is still ASSIGNED on this thread under `_gate` exactly as before.
+            //
+            // ⚠️ WHICH IS WHY THE OUTPUT-ROOT WIPE MOVED DOWN TO THE JOIN, AND IT IS NOT TIDYING. When git is
+            // unavailable the walk degrades to `FallbackCodeWalk`, a raw filesystem walk that does NOT exclude
+            // the output root — so with the wipe and `EnsureScaffold` left above, the walk would race a directory
+            // being deleted and re-populated with `specscribe.css`/`.js` and return a DIFFERENT file set run to
+            // run. `SiteGeneratorCodeMapTests.GenerateAll_DeterministicAcrossTwoRuns` caught exactly that.
+            // Moving the wipe below the join restores the walk's original observation window byte-for-byte: it
+            // still sees the output root in its PRE-wipe state, as it always has. Nothing between the old and new
+            // wipe positions reads or writes the output root — ingest, progress, the work graph, ideas and
+            // test-artifact discovery all read the SOURCE tree and git — and the wipe still precedes every page
+            // write, which is the invariant it exists for.
+            var codeFilesWalk = Task.Run(EnumerateCodeFiles);
+            Mark("start-code-file-walk");
 
-            // A full rebuild starts from a clean slate so renamed/removed source docs don't leave
-            // orphaned HTML behind (incremental watch-mode updates never wipe the whole tree).
-            if (Directory.Exists(_options.OutputRoot))
-            {
-                Directory.Delete(_options.OutputRoot, recursive: true);
-            }
-
-            EnsureScaffold();
             _docs.Clear();
             _prelude = null; // see BuildSurfacePrelude's lifetime rule
             ResetDerivedStateForFullRebuild();
@@ -389,6 +491,7 @@ public sealed class SiteGenerator
             // Story 23.4 AC #3: the composed-region capture runs on exactly the same condition, so the two paths
             // are always comparable on any run that produces an IR at all.
             _spaPageViews = new Dictionary<string, CapturedPageView>(StringComparer.OrdinalIgnoreCase);
+            Mark("reset-derived-state");
 
             // All planning-artifact ingestion (sprint, module detection, retros, epics → requirements) runs
             // through the framework adapter, which returns one normalized bundle + non-fatal diagnostics.
@@ -396,6 +499,7 @@ public sealed class SiteGenerator
             // adapter can keep BMad's epics-before-requirements ordering without owning git. [Story 4.1]
             ProgressModel? progress = null;
             var bundle = _adapter.Ingest(_options, files, (model, artifactsById) => progress = ComputeProgress(model, artifactsById));
+            Mark("ingest+progress(git)");
 
             // Sprint presence drives the nav gate, and the sprint page + home widget read this same parsed
             // instance. Missing/malformed → null → the page, widget, and nav item all omit cleanly. [Story 2.3]
@@ -416,6 +520,7 @@ public sealed class SiteGenerator
             // write share one gate (a non-empty model). Reads deferred/quick-dev from source (via ResolveFollowUpWork)
             // since _docs isn't populated yet; cached in _workGraph and reused verbatim by WriteWorkGraph.
             _workGraph = BuildWorkGraphModel(bundle.Epics, progress, bundle.Requirements, files);
+            Mark("work-graph-model");
             var hasWorkGraph = !_workGraph.IsEmpty;
             // Discover forge session workspaces now (Story 18.4) — BEFORE nav — so the Project "Ideas" entry and the
             // page write share one gate (a non-empty model). Workspaces are found by a `.memlog.md` dotfile scan,
@@ -433,6 +538,24 @@ public sealed class SiteGenerator
             _testArtifacts = TestArtifactDiscovery.Discover(
                 _options.RepoRoot, _options.SourceRoot, testArtifactDiagnostics);
             var hasTestArtifacts = !_testArtifacts.IsEmpty;
+            // Join the overlapped source-code walk started at the top of this pass — see there for why the overlap
+            // is safe. `_codeFiles` is assigned on THIS thread, still under `_gate`, exactly as before, so every
+            // reader's synchronization is unchanged; only the waiting moved. `GetAwaiter().GetResult()` rather
+            // than `.Result` so a failure surfaces as its own exception instead of an AggregateException wrapper
+            // (the walk is already never-throw by its own contract, which makes this a formality rather than a
+            // handler).
+            _codeFiles = codeFilesWalk.GetAwaiter().GetResult();
+
+            // A full rebuild starts from a clean slate so renamed/removed source docs don't leave
+            // orphaned HTML behind (incremental watch-mode updates never wipe the whole tree).
+            // Deliberately AFTER the join — see the walk's own note for why the two cannot overlap.
+            if (Directory.Exists(_options.OutputRoot))
+            {
+                Directory.Delete(_options.OutputRoot, recursive: true);
+            }
+
+            EnsureScaffold();
+            Mark("join-walk+wipe+scaffold");
             var nav = SiteNav.Build(
                 sourceRelatives, _options.SiteTitle, _module.Docs, AdrsExist(), ReadmeAvailable, SprintAvailable,
                 hasCodeMap: _codeFiles.Count > 0,
@@ -446,6 +569,7 @@ public sealed class SiteGenerator
                 deferredWorkOutputPath: deferredWorkPath,
                 diagnostics: navDiagnostics);
             _nav = nav;
+            Mark("discovery+nav");
 
             // Render the README up front so that, if it fails, we can drop the Readme nav entry before any
             // other page is written — the site never links to a readme.html that wasn't actually produced.
@@ -466,6 +590,7 @@ public sealed class SiteGenerator
                     _nav = nav;
                 }
             }
+            Mark("readme");
 
             // Files the adapter consumed into dedicated surfaces (story artifacts, retro notes) — the generic
             // pages loop below must not also render them.
@@ -548,6 +673,7 @@ public sealed class SiteGenerator
             // output written here. In-portal pages are ALWAYS discovered now (Story 7.7 made --code-url additive),
             // so _codePages is populated even with an external base set — the link mode is chosen at render time.
             DiscoverCodeReferences(files);
+            Mark("discover-code-references");
 
             // Story 21.3: correlate epics/stories with the code files their commits touched, mined from the SAME
             // bounded --deep-git numstat fetch (no second git call). Built HERE — after DiscoverCodeReferences so
@@ -558,6 +684,7 @@ public sealed class SiteGenerator
             _planningImpact = _epicsModel is { } impactEpics && progress?.DeepGit?.Commits is { Count: > 0 } impactCommits
                 ? PlanningCodeImpact.Build(impactEpics, impactCommits, CodePageHref)
                 : PlanningCodeImpactData.Empty;
+            Mark("planning-impact");
 
             // Render the epic/story/requirements pages only when the whole ingest chain produced its models —
             // the exact set of writes the previous single try/catch performed after a successful parse.
@@ -567,8 +694,10 @@ public sealed class SiteGenerator
                 events.AddRange(RenderEpicsPages(epicsSourceFile, files, bundle.StoryArtifactsById, epicsModel, requirementsModel, progress, nav));
                 reporter?.EndPhase(GenerationPhase.Epics);
             }
+            Mark("epics+stories-pages");
 
             RenderRetroPages(nav);
+            Mark("retro-pages");
 
             // Epic/story artifacts were rendered as detail pages above; everything else renders standalone.
             var pageFiles = files
@@ -583,10 +712,12 @@ public sealed class SiteGenerator
                 reporter?.Tick(GenerationPhase.Pages);
             }
             reporter?.EndPhase(GenerationPhase.Pages);
+            Mark("doc-pages");
 
             reporter?.BeginPhase(GenerationPhase.Adrs);
             events.AddRange(GenerateAdrsInternal(nav));
             reporter?.EndPhase(GenerationPhase.Adrs);
+            Mark("adr-pages");
 
             // Per-commit detail pages (Story 7.5, FR-10). Runs BEFORE the code pages, the per-day pages, and the
             // Git Insights hub so _commitPages is populated when those render their guarded hash links (the code
@@ -597,11 +728,53 @@ public sealed class SiteGenerator
             {
                 events.AddRange(GenerateCommitDetailsInternal(deepCommits.Commits, nav));
             }
+            Mark("commit-detail-pages");
 
             // Date pages + activity timeline (Story 7.3). Runs BEFORE the code pages so _commitDays is populated
             // when those render the History tab's date links (mirrors the commit-detail pages' ordering above, for
             // the same reason).
             RefreshDatePagesAndTimeline(nav, events, reporter);
+            Mark("date-pages+timeline");
+
+            // ── DASHBOARD-CRITICAL DATA, HOISTED ─────────────────────────────────────────────────────────────
+            //
+            // These three builds were the LAST things computed before the index write, sitting behind every
+            // long-tail page phase — the code pages, the code map, the risk quadrant, traceability, the impact
+            // map, the work-graph page, ideas and test-artifact pages. The dashboard consumes none of those, so
+            // the models it DOES consume are built here instead: this is the earliest point at which every input
+            // exists (`_docs` is filled by the pages loop above, `_adrs` by the ADR phase, `_timelinePath` by the
+            // date phase), and it is what lets `OnFirstPaintReady` fire before the long tail runs at all.
+            //
+            // ⚠️ UNCONDITIONAL — one phase order for generate, watch and webview. See OnFirstPaintReady.
+            //
+            // ⚠️ THE EVENT APPENDS DELIBERATELY DID NOT MOVE. `AppendUnmodeledCoverageNotice` and
+            // `AppendCountDivergenceNotice` stay at their original positions below, because the diagnostics page
+            // renders `events` IN ORDER — reordering the appends would rewrite diagnostics.html for every project
+            // and break `check:parity` for a pure-latency change. The BUILDS moved; the REPORTING did not.
+            //
+            // Nothing between here and the old positions reads `_coverage` or `_counts`: the code-page,
+            // deep-analytics and git-insights phases are the only phases in between, and neither field appears in
+            // any of them. [Goal 2, spec-vscode-extension-name-latency-and-webview-sunburst]
+            _coverage = BuildArtifactCoverage(sourceRelatives);
+            var workInventory = WorkInventory.Build(_docs.Values.ToList());
+            _counts = ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, workInventory, _epicsModel, _requirements);
+            Mark("dashboard-data(coverage+inventory+counts)");
+
+            // ── FIRST-PAINT CHECKPOINT ───────────────────────────────────────────────────────────────────────
+            // Every model `HtmlTemplater.BuildIndexPage` reads now exists, with ONE stated exception: `_cadence`
+            // is still null (its build is one `git log --follow` per done story and is the single most expensive
+            // remaining phase). The webview's prelude frame therefore paints a dashboard whose delivery-cadence
+            // strip is absent, and the completing delta frame carries the corrected surface. That divergence is
+            // deliberate and is the only visible difference between the two frames.
+            if (OnFirstPaintReady is { } onFirstPaintReady)
+            {
+                onFirstPaintReady(this);
+                // The callback's dashboard is a SNAPSHOT of this instant. Later phases move state it closed over
+                // (cadence above all), so the cache must not survive into them — see BuildSurfacePrelude's
+                // lifetime rule, which this obeys rather than excepts.
+                _prelude = null;
+            }
+            Mark("first-paint-checkpoint");
 
             // In-portal code file pages for source files referenced by planning/implementation artifacts (Story 7.1,
             // FR15) plus the git-analytics file sets (see DiscoverCodeReferences). Additive: a page class under code/,
@@ -609,6 +782,7 @@ public sealed class SiteGenerator
             // link). When --deep-git produced per-file insights each page gains an opt-in "Advanced coverage" section
             // (Story 7.4); a null insight leaves it baseline.
             events.AddRange(GenerateCodePagesInternal(files, nav, reporter));
+            Mark("code-pages");
 
             // Opt-in deep-git analytics page (hotspots + change-coupling graph). Generated only when --deep-git
             // produced data (DeepGit is only non-null when the flag gated the deep pass on); the dashboard's Git
@@ -629,6 +803,7 @@ public sealed class SiteGenerator
                     _progress!.DeepGit = null;
                 }
             }
+            Mark("deep-analytics-page");
 
             // Aggregate Git Insights hub (file change frequency, activity over time, contributor attribution)
             // — Story 3.8's deep-git surface. Gated on the same opt-in data as the deep-analytics page above:
@@ -639,64 +814,65 @@ public sealed class SiteGenerator
             // stay unwired until Stories 7.1/7.4/7.5 land their cached page maps — the templater renders those
             // cells as plain text (guard-all-links-on-target-availability). [Story 3.8]
             GenerateGitInsightsInternal(nav, events, reporter);
+            Mark("git-insights-page");
 
             if (readmeEvent is not null)
             {
                 events.Add(readmeEvent);
             }
 
-            // Artifact-family coverage insight — computed here, AFTER epics/pages have run, so ResolveFamilyHref
-            // can check the now-fully-populated _docs/_epicsModel/_requirements before linking a "present"
-            // family to a page (never a broken link — same ordering WriteStructure relies on for _docs below).
-            // Cached so every WriteIndex call shares one instance. Never-throw: any failure degrades to Empty,
-            // the panel omits, and generation still succeeds (AD-4 / NFR2). [Story 3.3 Task 2; review: reordered]
-            _coverage = BuildArtifactCoverage(sourceRelatives);
-            // The panel omission above is silent on the page by design, so record WHY here — once per generate
-            // run, on the events path, next to the other run-level notice. [Story 18.6 owner decision D3]
+            // Artifact-family coverage insight and the portal-wide count ledger are BUILT ABOVE, at the
+            // dashboard-data hoist — see that block for why, and for why these two notice appends stayed here.
+            // The panel omission is silent on the page by design, so record WHY here — once per generate run, on
+            // the events path, next to the other run-level notice. [Story 18.6 owner decision D3]
             AppendUnmodeledCoverageNotice(events, _module);
-
-            // Built once and shared with WriteSprint / WriteActionItems / WriteIndex. Lifted above WriteSprint
-            // so the sprint page can consume the shared ledger without moving the sprint write later in the
-            // phase order (diagnostics event ordering is load-bearing for the golden fingerprint). [Story 2.3 review; Story 8.3]
-            var workInventory = WorkInventory.Build(_docs.Values.ToList());
             // Story 8.3: one portal-wide count ledger. Divergence → exactly one Unsupported AdapterDiagnostic
             // (same channel as Story 8.2 / 4.1).
-            _counts = ProjectCounts.Build(_progress ?? ProgressModel.Empty, _sprint, workInventory, _epicsModel, _requirements);
             AppendCountDivergenceNotice(events, _counts);
+            Mark("coverage+count-notices");
             // Sprint page reads the epics model (titles/links) + the shared ledger (tracked totals). [Story 2.3; 8.3]
             WriteSprint(nav);
+            Mark("sprint-page");
             // The source-code treemap reads the cached source-code walk + the (now-populated) deep-git per-file
             // metrics, so it's written after the pages/git phases — like WriteSprint, gated on the same source-code
             // signal as its nav item. Replaced the retired Story 3.4 structure tree. [Story 7.6]
             var fullCodeMap = WriteCodeMap(nav);
+            Mark("code-map-page");
             // The refactor-target risk quadrant (Story 7.10) — split out to its own Insights nav entry (review
             // pass) so it isn't buried at the bottom of the (already long) Code Map page. Reuses WriteCodeMap's
             // already-built unfiltered map (Story 7.10 review-fix) instead of re-walking _codeFiles a second time.
             WriteRiskQuadrant(nav, fullCodeMap);
+            Mark("risk-quadrant-page");
             // The requirement traceability matrix (Story 21.1) — shares Requirements' hasEpics gate; needs
             // _counts (built just above) for its ledger-sourced legend/ranking caption.
             WriteTraceability(nav);
+            Mark("traceability-page");
             // The planning ↔ code impact map (Story 21.3) — writes the SAME _planningImpact instance the epic/story
             // widgets already consumed, so the page and widgets can never disagree. Gated on the combined
             // hasEpics && hasDeepAnalytics signal the nav entry used (a deep-git run must have happened at all).
             WriteImpactMap(nav);
+            Mark("impact-map-page");
             // The epic-scoped work graph (Story 19.2) — the model was projected + gated before nav; writing the
             // SAME cached instance keeps the Insights entry and the page in lockstep.
             WriteWorkGraph(nav);
+            Mark("work-graph-page");
             // The forged-ideas surface (Story 18.4) — the model was discovered + gated before nav; writing from the
             // SAME cached instance keeps the Project entry and the pages in lockstep. Written HERE, after the pages
             // phase, because AC #2's forward links can only be resolved once _docs knows which targets actually got
             // a page (a target with no page is dropped, never emitted as a dead link).
             events.AddRange(WriteIdeas(nav));
             events.AddRange(WriteTestArtifacts(nav));
+            Mark("ideas+test-artifacts");
             // Delivery cadence (Story 21.2) — built ONCE here (after ProgressCalculator filled LastUpdatedDate),
             // then shared by WriteCadence and the dashboard strip (WriteIndex reads _cadence). The bounded
             // per-done-story first-touch git lookups happen exactly once, in this build.
-            _cadence = DeliveryCadence.Build(_epicsModel, DeliveryCadence.GitFirstTouchResolver(_options.RepoRoot));
+            _cadence = DeliveryCadence.Build(_epicsModel, PrewarmedFirstTouchResolver(_epicsModel));
+            Mark("cadence-build(git-per-story)");
             WriteCadence(nav);
             WriteRetroIndex(nav);
             WriteActionItems(nav, workInventory);
             RefreshFollowUpSurfaces(nav, workInventory);
+            Mark("cadence+retro+actions+followups");
 
             reporter?.BeginPhase(GenerationPhase.Index);
             WriteIndex(nav, workInventory);
@@ -704,6 +880,7 @@ public sealed class SiteGenerator
             // before diagnostics is written below, so a copy failure lands on the run's own notice page.
             events.AddRange(DrainPendingAssetEvents());
             reporter?.EndPhase(GenerationPhase.Index);
+            Mark("index-page");
 
             // Diagnostics + About are the whole-run reporting surface (Story 4.8): written LAST, after every
             // phase has appended its events, so the diagnostics page reflects the COMPLETE non-fatal notice set.
@@ -716,6 +893,7 @@ public sealed class SiteGenerator
             events.Add(WriteHowToRead(nav));
             events.Add(WriteDesignSystem(nav));
             events.AddRange(WriteAboutSdd(nav));
+            Mark("diagnostics+about+sdd");
 
             // The canonical IR (ADR 0016), emitted LAST so every captured page is present.
             //
@@ -741,10 +919,12 @@ public sealed class SiteGenerator
                         $"full content: {string.Join("; ", _familyDegradedStories)}"));
                 }
             }
+            Mark("emit-ir(EmitSpaSite)");
 
             // Render the static `.html` from the IR just emitted. [Story 23.6 AC #7, ADR 0022 §Decision 3]
             // Strictly after EmitSpaSite: the prerender drives one request per route from the manifest on disk.
             events.AddRange(Prerender(_lastIrRoutes));
+            Mark("prerender-html");
 
             // Story 22.5: install the rebuild-scope baseline from the set this pass RENDERED — LAST, after the
             // render, not before the output-root wipe.
@@ -773,6 +953,11 @@ public sealed class SiteGenerator
                     "the rebuild-scope inventory could not be re-read after this pass; watch mode will escalate " +
                     "conservatively until the next successful full rebuild"));
             }
+            Mark("source-inventory");
+        }
+        if (phaseTotal is not null)
+        {
+            Console.Error.WriteLine($"[phase] {"TOTAL GenerateAll",-30} {phaseTotal.ElapsedMilliseconds,8} ms");
         }
         return events;
     }
@@ -3264,45 +3449,77 @@ public sealed class SiteGenerator
             // would silently omit deferred items that index.html (rendered after _docs fills) shows, and
             // full-gen would diverge from watch-mode RegenerateEpics. Read-only: no _docs mutation, no output.
             var workForFollowUps = ResolveFollowUpWork(files);
-            var deferredModel = ResolveDeferredModel(workForFollowUps, files);
-            var epicsCounts = _counts ?? ProjectCounts.Build(progress, _sprint, workForFollowUps, model, _requirements);
-            var followUps = BuildFollowUpGeometry(workForFollowUps, epicsCounts, deferredModel);
-            var unplanned = UnplannedWorkGeometry.From(workForFollowUps, followUps, model, retros: _retros);
-            File.WriteAllText(Path.Combine(_options.OutputRoot, "epics.html"), ApplyReferenceLinks(EpicsTemplater.RenderIndex(model, progress, nav, _module.Commands, epicsCounts, followUps, unplanned), "epics.html"));
 
-            // Rebuild the epics output dir each pass so a story removed or renumbered in epics.md — or an
-            // undrafted story that got a placeholder and then vanished — can't leave a stale page behind,
-            // mirroring the ADR output dir's rebuild. GenerateAll already wiped OutputRoot (no-op here); this
-            // matters for watch-mode RegenerateEpics, which doesn't wipe the whole tree.
-            var epicsDir = Path.Combine(_options.OutputRoot, "epics");
-            if (Directory.Exists(epicsDir)) Directory.Delete(epicsDir, recursive: true);
-            Directory.CreateDirectory(epicsDir);
+            // ⚠️ THE EPICS FAMILY'S STATIC DOCUMENTS ARE THE `WriteStaticPages` SEAM'S LAST HOLDOUT.
+            //
+            // This block writes `epics.html`, one `epics/epic-N.html` per epic and one
+            // `epics/story-N-M.html` per drafted story with `File.WriteAllText` — it never goes through
+            // `WritePage`, so the flag that turns every OTHER full-document render off did not reach it. On this
+            // repository that left the `webview` path rendering, linkifying and writing ~230 whole documents into
+            // a temp scratch directory the panel abandons: 9,252 ms of the 22,177 ms pass, the single largest
+            // phase, and every millisecond of it in front of first paint.
+            //
+            // **The webview cannot observe the difference, and that is structural rather than argued.** The
+            // epics family reaches the panel through `BuildFamilySurfaces`, which re-renders each epic/story
+            // from the SAME cached models and the SAME `BuildStoryPageFragments` pipeline; it reads nothing this
+            // block writes. What this block ALSO does — cache `_storyArtifactsById` / `_referenceMap` /
+            // `_epicsSourcePath`, and write the requirements pages through `WritePage` (which captures the
+            // composed region the panel does read) — is deliberately OUTSIDE the guard and still runs.
+            // `ApplyReferenceLinks` is pure: it mutates no generator state, so skipping it strands nothing.
+            //
+            // `generate`, `watch` and the interactive menu leave `WriteStaticPages` on and are byte-unchanged.
+            // [Goal 2, spec-vscode-extension-name-latency-and-webview-sunburst]
+            FollowUpGeometry? followUps = null;
+            UnplannedWorkGeometry? unplanned = null;
+            if (WriteStaticPages)
+            {
+                var deferredModel = ResolveDeferredModel(workForFollowUps, files);
+                var epicsCounts = _counts ?? ProjectCounts.Build(progress, _sprint, workForFollowUps, model, _requirements);
+                followUps = BuildFollowUpGeometry(workForFollowUps, epicsCounts, deferredModel);
+                unplanned = UnplannedWorkGeometry.From(workForFollowUps, followUps, model, retros: _retros);
+                File.WriteAllText(Path.Combine(_options.OutputRoot, "epics.html"), ApplyReferenceLinks(EpicsTemplater.RenderIndex(model, progress, nav, _module.Commands, epicsCounts, followUps, unplanned), "epics.html"));
 
+                // Rebuild the epics output dir each pass so a story removed or renumbered in epics.md — or an
+                // undrafted story that got a placeholder and then vanished — can't leave a stale page behind,
+                // mirroring the ADR output dir's rebuild. GenerateAll already wiped OutputRoot (no-op here); this
+                // matters for watch-mode RegenerateEpics, which doesn't wipe the whole tree.
+                var epicsDir = Path.Combine(_options.OutputRoot, "epics");
+                if (Directory.Exists(epicsDir)) Directory.Delete(epicsDir, recursive: true);
+                Directory.CreateDirectory(epicsDir);
+            }
+
+            // UNGATED, and at its original position: the requirements pages go through `WritePage`, so they
+            // populate the composed-region capture the panel DOES read. Their `_spaPageViews` insertion order is
+            // unchanged because nothing above or below this line writes through `WritePage`.
             WriteRequirements(requirements, model, progress, nav, workForFollowUps);
 
-            foreach (var epic in model.Epics)
+            if (WriteStaticPages)
             {
-                var epicRetroPath = EpicRetroMap.TryGetValue(epic.Number, out var erp) ? erp : null;
-                File.WriteAllText(Path.Combine(epicsDir, $"epic-{epic.Number}.html"), ApplyReferenceLinks(EpicsTemplater.RenderEpic(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic), followUps, unplanned, _planningImpact, EpicSubgraph(epic.Number)), $"epics/epic-{epic.Number}.html", skipEpicNumber: epic.Number));
-
-                foreach (var story in epic.Stories)
+                var epicsDir = Path.Combine(_options.OutputRoot, "epics");
+                foreach (var epic in model.Epics)
                 {
-                    if (story.ArtifactOutputPath is null)
-                    {
-                        // Undrafted story: emit a placeholder page at the exact path its real page will
-                        // use, so "Story N.M" mentions always have a live target and a later-drafted
-                        // artifact overwrites it in place. ArtifactOutputPath stays null — placeholders
-                        // must never count as detailed stories anywhere progress is computed.
-                        var placeholderPath = StoryEpicLinkifier.StoryPagePath(story.Id);
-                        var placeholderHtml = EpicsTemplater.RenderStoryPlaceholder(epic, story, nav, _module.Commands, epicRetroPath, StoryPager(model, story));
-                        File.WriteAllText(Path.Combine(_options.OutputRoot, placeholderPath.Replace('/', Path.DirectorySeparatorChar)), ApplyReferenceLinks(placeholderHtml, placeholderPath, skipStoryId: story.Id));
-                        continue;
-                    }
+                    var epicRetroPath = EpicRetroMap.TryGetValue(epic.Number, out var erp) ? erp : null;
+                    File.WriteAllText(Path.Combine(epicsDir, $"epic-{epic.Number}.html"), ApplyReferenceLinks(EpicsTemplater.RenderEpic(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic), followUps, unplanned, _planningImpact, EpicSubgraph(epic.Number)), $"epics/epic-{epic.Number}.html", skipEpicNumber: epic.Number));
 
-                    // story.Status/TasksDone were filled by ProgressCalculator above — no re-read needed.
-                    var f = BuildStoryPageFragments(story, artifactMap[story.Id], referenceMap);
-                    var storyHtml = EpicsTemplater.RenderStory(epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria, f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav, _module.Commands, epicRetroPath, StoryPager(model, story), followUps, _planningImpact, StorySubgraph(epic, story, followUps));
-                    File.WriteAllText(Path.Combine(_options.OutputRoot, "epics", $"story-{story.Id.Replace('.', '-')}.html"), ApplyReferenceLinks(storyHtml, story.ArtifactOutputPath!, skipStoryId: story.Id));
+                    foreach (var story in epic.Stories)
+                    {
+                        if (story.ArtifactOutputPath is null)
+                        {
+                            // Undrafted story: emit a placeholder page at the exact path its real page will
+                            // use, so "Story N.M" mentions always have a live target and a later-drafted
+                            // artifact overwrites it in place. ArtifactOutputPath stays null — placeholders
+                            // must never count as detailed stories anywhere progress is computed.
+                            var placeholderPath = StoryEpicLinkifier.StoryPagePath(story.Id);
+                            var placeholderHtml = EpicsTemplater.RenderStoryPlaceholder(epic, story, nav, _module.Commands, epicRetroPath, StoryPager(model, story));
+                            File.WriteAllText(Path.Combine(_options.OutputRoot, placeholderPath.Replace('/', Path.DirectorySeparatorChar)), ApplyReferenceLinks(placeholderHtml, placeholderPath, skipStoryId: story.Id));
+                            continue;
+                        }
+
+                        // story.Status/TasksDone were filled by ProgressCalculator above — no re-read needed.
+                        var f = BuildStoryPageFragments(story, artifactMap[story.Id], referenceMap);
+                        var storyHtml = EpicsTemplater.RenderStory(epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria, f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav, _module.Commands, epicRetroPath, StoryPager(model, story), followUps, _planningImpact, StorySubgraph(epic, story, followUps));
+                        File.WriteAllText(Path.Combine(_options.OutputRoot, "epics", $"story-{story.Id.Replace('.', '-')}.html"), ApplyReferenceLinks(storyHtml, story.ArtifactOutputPath!, skipStoryId: story.Id));
+                    }
                 }
             }
 
@@ -3717,7 +3934,20 @@ public sealed class SiteGenerator
     /// (AD-1/AD-2). Requires a completed <see cref="GenerateAll"/> pass on this instance (the webview CLI command
     /// runs one first); a pure READ of cached state plus source story artifacts — it writes nothing (AC #6).
     /// [Story 6.4]</summary>
-    public WebviewBundle RenderWebviewSurfaces()
+    /// <param name="includeLongTail">False leaves the ~700 captured doc/ADR/requirement surfaces off the
+    /// bundle. The `webview --serve --serve-delta` path emits that prelude as its first stdout frame and then
+    /// completes the bundle with <see cref="WithLongTailSurfaces"/>, so first paint stops waiting on the slice and
+    /// the JSON serialization of surfaces the user has not navigated to yet. Default true ⇒ every existing caller,
+    /// including the one-shot path, is unchanged and still gets ONE complete bundle. [Goal 2,
+    /// spec-vscode-extension-name-latency-and-webview-sunburst]</param>
+    /// <param name="includeEpicsFamily">False yields the ENTRY SURFACE ALONE — just the dashboard — leaving the
+    /// epics index, every epic page and every story page to the completing delta alongside the long tail. This is
+    /// the boundary the first-paint prelude is actually drawn at, because the panel displays exactly ONE surface
+    /// when it opens: with the family included the prelude was 194 surfaces / 28.5 MB, nearly half the payload,
+    /// and <see cref="BuildFamilySurfaces"/> re-reads and re-parses every story artifact to produce it. Default
+    /// true ⇒ every existing caller is unchanged. [Goal 2,
+    /// spec-vscode-extension-name-latency-and-webview-sunburst]</param>
+    public WebviewBundle RenderWebviewSurfaces(bool includeLongTail = true, bool includeEpicsFamily = true)
     {
         lock (_gate)
         {
@@ -3728,7 +3958,11 @@ public sealed class SiteGenerator
             // webview's dashboard can never disagree with the generated index.html, and — new in 22.4 — it can
             // never disagree with the IR either, because there is no second builder left to drift.
             var prelude = BuildSurfacePrelude(nav);
-            var families = BuildFamilySurfaces(nav, prelude);
+            // The dashboard IS families[0] by construction (see BuildFamilySurfaces' first line), so the
+            // entry-only bundle is that one element rather than a second, differently-built dashboard.
+            var families = includeEpicsFamily
+                ? BuildFamilySurfaces(nav, prelude)
+                : new List<FamilySurface> { new(prelude.DashboardPage) };
             var surfaces = new List<WebviewSurface>(families.Count);
             foreach (var f in families)
             {
@@ -3781,52 +4015,9 @@ public sealed class SiteGenerator
             //
             // `CapturePages` is the honest gate: the `webview` command sets it, nothing else does, and it is
             // the only caller that wants doc/ADR/requirement/sprint/retro surfaces.
-            if (CapturePages)
+            if (CapturePages && includeLongTail)
             {
-                var familyPaths = new HashSet<string>(
-                    surfaces.Select(s => PathUtil.NormalizeSlashes(s.OutputRelativePath)),
-                    StringComparer.OrdinalIgnoreCase);
-                var excluded = new HashSet<string>(_codePages.Values, StringComparer.OrdinalIgnoreCase);
-                foreach (var day in _commitDays)
-                {
-                    excluded.Add(PathUtil.NormalizeSlashes(day.OutputRelativePath));
-                }
-                var sourceByOutput = BuildCapturedSourceMap();
-
-                // THE WEBVIEW'S FILTER over the shared region producer — this, and only this, is what makes the
-                // webview a different projection from the SPA (Story 22.4 AC #1/#2):
-                //   1. the exclusion set above (code pages, commit-day pages, the commit/ prefix)
-                //   2. the degrade skip
-                //   3. the JSON-island strip
-                //   4. the SourcePath join
-                // The SPA consumes the same sequence unfiltered.
-                // Filter 1 runs INSIDE the producer (as a skip predicate) rather than over its output, so an
-                // excluded page is never sliced at all. Same set, same result, none of the discarded work.
-                // [Story 22.4 code review]
-                bool WebviewExcludes(string path) =>
-                    excluded.Contains(path) || path.StartsWith("commit/", StringComparison.OrdinalIgnoreCase);
-
-                foreach (var captured in CapturedRegions(nav, familyPaths, WebviewExcludes))
-                {
-                    if (captured.Degraded)
-                    {
-                        // No <main> landmark → the slice degraded to nav-only. A silently BLANK surface is
-                        // worse than the shim's honest toast, so skip it (the SPA keeps its nav-only degrade:
-                        // a browser tab is escapable; a status panel claiming "links work" is not).
-                        //
-                        // The flag is computed at the slice, inside CapturedRegions, against the nav-markup
-                        // REFERENCE — so the strip below can no longer defeat it by ordering, which is how this
-                        // check used to be fragile (Trap 3).
-                        continue;
-                    }
-                    // Same rule the PageView path applies in WebviewRenderAdapter.RenderContent, which this path
-                    // never ran: this surface ships no specscribe.js, so an inline JSON island is dead weight it
-                    // can never read — and after Story 20.9 that is 4.5 MB of it on code-map.html alone. The
-                    // `data-island` host exception already described the webview as carrying none.
-                    var region = WebviewRenderAdapter.StripDataIslands(captured.Region);
-                    sourceByOutput.TryGetValue(captured.Path, out var capturedSource);
-                    surfaces.Add(new WebviewSurface(captured.Path, captured.Title, region, capturedSource));
-                }
+                AppendLongTailSurfaces(nav, surfaces);
             }
 
             // The entry document embeds the dashboard's ALREADY-linkified content, so wrapping happens after
@@ -3836,6 +4027,121 @@ public sealed class SiteGenerator
             var entry = surfaces[0];
             var entryDocument = WebviewRenderAdapter.Shared.WrapDocument(prelude.DashboardPage, entry.ContentHtml, entry.SourcePath);
             return new WebviewBundle(_options.SiteTitle, entry.OutputRelativePath, entryDocument, surfaces, outline);
+        }
+    }
+
+    /// <summary>Completes a PRELUDE bundle — one produced by <c>RenderWebviewSurfaces(includeLongTail: false)</c> —
+    /// with the long-tail surfaces, reusing the family surfaces it already carries.
+    ///
+    /// <para><b>Why this exists rather than a second <see cref="RenderWebviewSurfaces"/> call.</b>
+    /// <see cref="BuildFamilySurfaces"/> re-renders every epic and story page, re-reading and re-parsing each story
+    /// artifact's markdown; calling it twice to obtain the two halves would spend the whole family render a second
+    /// time and hand back the latency the split just saved. The families are rendered ONCE per pass and the delta
+    /// is computed against the same instances.</para>
+    ///
+    /// <para>Returns <paramref name="prelude"/> unchanged when <see cref="CapturePages"/> is off — that flag, not
+    /// this method, is what decides whether a long tail exists at all.</para>
+    /// [Goal 2, spec-vscode-extension-name-latency-and-webview-sunburst]</summary>
+    /// <param name="addEpicsFamily">True completes an ENTRY-ONLY prelude — one produced with
+    /// <c>includeEpicsFamily: false</c> — by rendering the epics family, rebuilding the outline over it, and
+    /// REFRESHING the dashboard surface and entry document from a prelude rebuilt at this later moment. The
+    /// refresh is the honest half: `_cadence` is built after the first-paint checkpoint, so the dashboard that
+    /// painted first has no delivery-cadence strip and this frame is what corrects it. Leaving the entry document
+    /// stale would make the delta's `document: null` ("keep what you have") a lie for any consumer that re-creates
+    /// its panel from the cached payload. Default false ⇒ existing callers, whose prelude already carries the
+    /// family, are unchanged. [Goal 2, spec-vscode-extension-name-latency-and-webview-sunburst]</param>
+    public WebviewBundle WithLongTailSurfaces(WebviewBundle prelude, bool addEpicsFamily = false)
+    {
+        lock (_gate)
+        {
+            if (!CapturePages && !addEpicsFamily) return prelude;
+            var nav = _nav ?? throw new InvalidOperationException(
+                "WithLongTailSurfaces requires a completed GenerateAll() pass on this generator.");
+
+            var surfaces = new List<WebviewSurface>(prelude.Surfaces);
+            var outline = prelude.Outline;
+            var entryDocument = prelude.EntryDocument;
+            if (addEpicsFamily)
+            {
+                var current = BuildSurfacePrelude(nav);
+                var families = BuildFamilySurfaces(nav, current);
+                surfaces.Clear();
+                foreach (var f in families)
+                {
+                    surfaces.Add(WebviewSurfaceFor(f.Page, f.SurfaceSourcePath, f.SkipStoryId, f.SkipEpicNumber));
+                }
+                // Same invariant RenderWebviewSurfaces relies on: the outline is projected from the SAME
+                // FamilySurface list the surfaces were rendered from, so every node's SurfacePath matches a key
+                // a tree click can push() to (Story 6.9 fact #5).
+                outline = BuildOutline(families, current.FollowUps);
+                entryDocument = WebviewRenderAdapter.Shared.WrapDocument(
+                    current.DashboardPage, surfaces[0].ContentHtml, surfaces[0].SourcePath);
+            }
+
+            if (CapturePages)
+            {
+                AppendLongTailSurfaces(nav, surfaces);
+            }
+            // When the family was already present the entry document is carried over verbatim rather than
+            // re-wrapped — the append never touches surfaces[0] — which is what makes the delta frame's
+            // `document` field come out null ("keep what you have") instead of re-shipping 1.5 MB of dashboard.
+            return prelude with { Surfaces = surfaces, Outline = outline, EntryDocument = entryDocument };
+        }
+    }
+
+    /// <summary>THE WEBVIEW'S FILTER over the shared region producer — extracted verbatim from
+    /// <see cref="RenderWebviewSurfaces"/> so the whole-bundle path and the prelude-then-delta path run the
+    /// identical filter rather than two copies of it. Appends in place; <paramref name="surfaces"/> supplies the
+    /// family paths that must not be shadowed.</summary>
+    private void AppendLongTailSurfaces(SiteNav nav, List<WebviewSurface> surfaces)
+    {
+        var familyPaths = new HashSet<string>(
+            surfaces.Select(s => PathUtil.NormalizeSlashes(s.OutputRelativePath)),
+            StringComparer.OrdinalIgnoreCase);
+        var excluded = new HashSet<string>(_codePages.Values, StringComparer.OrdinalIgnoreCase);
+        foreach (var day in _commitDays)
+        {
+            excluded.Add(PathUtil.NormalizeSlashes(day.OutputRelativePath));
+        }
+        var sourceByOutput = BuildCapturedSourceMap();
+
+        // THE WEBVIEW'S FILTER over the shared region producer — this, and only this, is what makes the
+        // webview a different projection from the SPA (Story 22.4 AC #1/#2):
+        //   1. the exclusion set above (code pages, commit-day pages, the commit/ prefix)
+        //   2. the degrade skip
+        //   3. the JSON-island strip
+        //   4. the SourcePath join
+        // The SPA consumes the same sequence unfiltered.
+        // Filter 1 runs INSIDE the producer (as a skip predicate) rather than over its output, so an
+        // excluded page is never sliced at all. Same set, same result, none of the discarded work.
+        // [Story 22.4 code review]
+        bool WebviewExcludes(string path) =>
+            excluded.Contains(path) || path.StartsWith("commit/", StringComparison.OrdinalIgnoreCase);
+
+        foreach (var captured in CapturedRegions(nav, familyPaths, WebviewExcludes))
+        {
+            if (captured.Degraded)
+            {
+                // No <main> landmark → the slice degraded to nav-only. A silently BLANK surface is
+                // worse than the shim's honest toast, so skip it (the SPA keeps its nav-only degrade:
+                // a browser tab is escapable; a status panel claiming "links work" is not).
+                //
+                // The flag is computed at the slice, inside CapturedRegions, against the nav-markup
+                // REFERENCE — so the strip below can no longer defeat it by ordering, which is how this
+                // check used to be fragile (Trap 3).
+                continue;
+            }
+            // Islands ride through, matching what WebviewRenderAdapter.RenderContent now does for the PageView
+            // path. This call used to strip them for dead-weight reasons that ADR 0036 retired: the webview shell
+            // supplies the chart engine and the mount code as nonce'd chrome, so an island here is live data the
+            // surface can read — including code-map.html's 1.24 MB one, which the owner explicitly chose to keep
+            // when offered a per-island byte budget (ADR 0036 §6).
+            //
+            // The two paths must agree. They did not before Story 20.9 noticed, and the asymmetry cost 4.5 MB;
+            // keeping the same rule in both places is what stops that recurring in the other direction.
+            var region = captured.Region;
+            sourceByOutput.TryGetValue(captured.Path, out var capturedSource);
+            surfaces.Add(new WebviewSurface(captured.Path, captured.Title, region, capturedSource));
         }
     }
 
@@ -4040,13 +4346,21 @@ public sealed class SiteGenerator
         bool linkify = true)
     {
         var path = page.OutputRelativePath;
-        var rendered = HtmlRenderAdapter.Shared.Render(page).Content;
-        var html = linkify
-            ? ApplyReferenceLinks(
-                rendered, path,
-                skipRequirementId: skipRequirementId, skipStoryId: skipStoryId, skipEpicNumber: skipEpicNumber)
-            : rendered;
-        WriteOutput(path, html, capture);
+        // The FULL-DOCUMENT half of this seam — chrome + head + nav + body, linkified whole, written to disk and
+        // kept in the _spaCapture oracle — is skipped when WriteStaticPages is off. The composed-region half below
+        // is NOT: it is the producer every consumer of this pass actually reads. See WriteStaticPages for why the
+        // one caller that turns this off cannot observe the difference.
+        var html = string.Empty;
+        if (WriteStaticPages)
+        {
+            var rendered = HtmlRenderAdapter.Shared.Render(page).Content;
+            html = linkify
+                ? ApplyReferenceLinks(
+                    rendered, path,
+                    skipRequirementId: skipRequirementId, skipStoryId: skipStoryId, skipEpicNumber: skipEpicNumber)
+                : rendered;
+            WriteOutput(path, html, capture);
+        }
         if (capture && _spaPageViews is not null)
         {
             // Composed HERE, in the same breath as the document's own linkify pass, so both observe identical
@@ -4221,6 +4535,12 @@ public sealed class SiteGenerator
     /// is on. Never touches a source artifact or an existing static page. [Story 6.7]</summary>
     private void EmitSpaSite(SiteNav nav)
     {
+        // The opt-out lives HERE, at the single producer, rather than at the six call sites — a route that forgot
+        // the guard would silently re-pay the cost this switch exists to remove, and `webview --serve`'s
+        // incremental routes (RegenerateEpics/Adrs/Topology/FromDataSource) are exactly the ones a per-call-site
+        // guard would miss. See EmitIr for why OFF is safe on that one path and unsafe everywhere else.
+        if (!EmitIr) return;
+
         var bundle = BuildSpaBundle(nav);
         var dataFiles = SpaDelivery.BuildDataFiles(bundle);
 
@@ -5149,6 +5469,73 @@ public sealed class SiteGenerator
         return _docs.Keys.Any(k => string.Equals(PathUtil.NormalizeSlashes(k), normalized, StringComparison.OrdinalIgnoreCase))
             ? PathUtil.NormalizeSlashes(PathUtil.ToOutputRelative(normalized))
             : null;
+    }
+
+    /// <summary>Bound on how many <c>git log --follow</c> child processes <see cref="PrewarmedFirstTouchResolver"/>
+    /// may have in flight. Deliberately small: <see cref="GitMetrics"/> gives every git call a <b>3 second</b>
+    /// timeout whose failure mode is a silent <c>null</c> (the story simply drops out of cycle-time, with no
+    /// diagnostic), so over-subscribing the machine would trade latency for quietly missing data — the exact
+    /// trade this optimisation must not make.</summary>
+    private static readonly int FirstTouchParallelism = Math.Clamp(Environment.ProcessorCount, 1, 8);
+
+    /// <summary>The delivery-cadence first-touch resolver, with every lookup already resolved.
+    ///
+    /// <para><b>Why this exists.</b> <see cref="DeliveryCadence.GitFirstTouchResolver"/> is called once per done
+    /// story and each call spawns a <c>git log --follow</c>. That is bounded by story count — but on this
+    /// repository it was the single largest phase of a full pass: <b>29,923 ms of a 78,773 ms</b>
+    /// <see cref="GenerateAll"/> (2026-07-31), ~250 sequential child processes each costing ~120 ms of process
+    /// setup that overlaps perfectly.</para>
+    ///
+    /// <para><b>Why it cannot change a single byte of output.</b> Each lookup is an independent, side-effect-free
+    /// read of git history keyed on one artifact path; <see cref="DeliveryCadence.Build"/> still consumes them in
+    /// its own deterministic story order, from this pre-warmed map. Concurrency moves <em>when</em> the answers are
+    /// computed, never <em>what</em> they are or the order they are folded in.</para>
+    ///
+    /// <para>Keyed on the artifact path rather than the story so two stories that share an artifact resolve it
+    /// once, and falls back to a live resolve for any key the pre-warm did not cover — so a story the pre-warm
+    /// filter misclassifies degrades to today's behaviour rather than losing its cycle-time.</para></summary>
+    private Func<StoryInfo, DateOnly?> PrewarmedFirstTouchResolver(EpicsModel? epics)
+    {
+        var resolver = DeliveryCadence.GitFirstTouchResolver(_options.RepoRoot);
+        if (epics is null) return resolver;
+
+        // The SAME admission rule DeliveryCadence.Build applies before it calls the resolver — done, placeable,
+        // and drafted. Pre-warming a wider set would spend git calls Build never asks for.
+        var byArtifact = new Dictionary<string, StoryInfo>(StringComparer.OrdinalIgnoreCase);
+        foreach (var story in epics.Epics.SelectMany(e => e.Stories))
+        {
+            if (StatusStyles.ForStory(story) != "done") continue;
+            if (story.LastUpdatedDate is null) continue;
+            if (story.ArtifactSourcePath is not { Length: > 0 } path) continue;
+            byArtifact.TryAdd(path, story);
+        }
+        if (byArtifact.Count < 2) return resolver;
+
+        // ⚠️ ONLY NON-NULL RESULTS ARE CACHED, and that is a correctness requirement rather than tidiness.
+        //
+        // `GitMetrics`' per-call budget is 3 seconds and its documented failure mode on expiry is a SILENT null —
+        // no exception, no diagnostic. This method runs up to `FirstTouchParallelism` git children at once, so it
+        // makes that timeout MORE likely than the serial path it replaced, not less (this repository has measured a
+        // 6,496 ms cold `git log`). Caching a null would therefore let one loaded machine bake "this story has no
+        // first-touch date" into `cadence.html` and the dashboard's cadence strip — silently, and differently from
+        // run to run, which is exactly the non-determinism this pre-warm claims not to introduce.
+        //
+        // A miss falls through to `resolver(story)` below, so a null costs one ordinary serial call — precisely
+        // what the pre-warm replaced. A story with genuinely no git history pays that call twice; a story whose
+        // first call merely lost a race gets a real answer. Both are strictly better than a cached lie.
+        // [Edge Case Hunter finding 7]
+        var cache = new System.Collections.Concurrent.ConcurrentDictionary<string, DateOnly>(StringComparer.OrdinalIgnoreCase);
+        Parallel.ForEach(
+            byArtifact,
+            new ParallelOptions { MaxDegreeOfParallelism = FirstTouchParallelism },
+            entry =>
+            {
+                if (resolver(entry.Value) is { } resolved) cache[entry.Key] = resolved;
+            });
+
+        return story => story.ArtifactSourcePath is { Length: > 0 } p && cache.TryGetValue(p, out var cached)
+            ? cached
+            : resolver(story);
     }
 
     /// <summary>Writes <c>cadence.html</c> — the delivery-cadence page (story-completion heatmap + cycle-time

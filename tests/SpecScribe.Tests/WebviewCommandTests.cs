@@ -325,4 +325,84 @@ public class WebviewCommandTests
         Assert.True(outline.TryGetProperty("epics", out _));
         Assert.True(outline.TryGetProperty("summary", out _));
     }
+
+    // ===== Goal 2 (spec-vscode-extension-name-latency-and-webview-sunburst): the first-paint prelude split =====
+
+    /// <summary><c>partial</c> is the ONE additive field the split adds, and it must be true on exactly one frame
+    /// in a session: the first-paint prelude. Everywhere else it is false, so a panel can never be left answering
+    /// "still loading" for a surface that is genuinely unreachable.</summary>
+    [Fact]
+    public void SerializePayload_IsPartial_OnlyWhenTheCallerAsksForThePreludeFrame()
+    {
+        var bundle = Bundle("<html>dash</html>", Surface("index.html", "<p>A</p>"));
+
+        var complete = JsonDocument.Parse(
+            WebviewCommand.SerializePayload(bundle, "SpecScribeOutput")).RootElement;
+        var prelude = JsonDocument.Parse(
+            WebviewCommand.SerializePayload(bundle, "SpecScribeOutput", partial: true)).RootElement;
+
+        Assert.False(complete.GetProperty("partial").GetBoolean());
+        Assert.True(prelude.GetProperty("partial").GetBoolean());
+    }
+
+    /// <summary>A delta always completes its basis, so it must CLEAR <c>partial</c> — including the frame that
+    /// completes a prelude. A frame that inherited the basis's flag would strand the panel in "still loading".</summary>
+    [Fact]
+    public void DeltaFrame_ClearsPartial()
+    {
+        var bundle = Bundle("<html>d</html>", Surface("index.html", "<p>A</p>"));
+
+        Assert.False(Frame(bundle, bundle).GetProperty("partial").GetBoolean());
+    }
+
+    /// <summary>The row the whole split lives or dies on: <b>no surface is lost across the split</b>. The prelude
+    /// frame plus the delta frame, folded the way <c>applyDeltaFrame</c> folds them host-side, must reconstruct
+    /// exactly the surface set a single complete payload would have carried.</summary>
+    [Fact]
+    public void PreludeThenDelta_ReconstructsExactlyTheOneShotSurfaceSet()
+    {
+        var families = new[] { Surface("index.html", "<p>dash</p>"), Surface("epics.html", "<p>epics</p>") };
+        var longTail = new[] { Surface("docs/a.html", "<p>A</p>", source: "docs/a.md"), Surface("adrs/1.html", "<p>1</p>") };
+        var prelude = Bundle("<html>dash</html>", families);
+        var complete = Bundle("<html>dash</html>", families.Concat(longTail).ToArray());
+
+        var preludeFrame = JsonDocument.Parse(
+            WebviewCommand.SerializePayload(prelude, "SpecScribeOutput", partial: true)).RootElement;
+        var deltaFrame = Frame(prelude, complete);
+
+        // Fold exactly as the TS store does: base surfaces, then changed, then removals.
+        var merged = preludeFrame.GetProperty("surfaces").EnumerateObject()
+            .ToDictionary(p => p.Name, p => p.Value.GetProperty("content").GetString(), StringComparer.Ordinal);
+        foreach (var changed in deltaFrame.GetProperty("changedSurfaces").EnumerateObject())
+        {
+            merged[changed.Name] = changed.Value.GetProperty("content").GetString();
+        }
+        foreach (var removed in deltaFrame.GetProperty("removedSurfaces").EnumerateArray())
+        {
+            merged.Remove(removed.GetString()!);
+        }
+
+        Assert.Equal(
+            complete.Surfaces.Select(s => s.OutputRelativePath).OrderBy(p => p, StringComparer.Ordinal).ToArray(),
+            merged.Keys.OrderBy(p => p, StringComparer.Ordinal).ToArray());
+        Assert.All(complete.Surfaces, s => Assert.Equal(s.ContentHtml, merged[s.OutputRelativePath]));
+        // The dashboard document does NOT re-ride on the completing frame (it never moved), and the prelude
+        // already carried it — so first paint is complete and the 1.5 MB document is shipped exactly once.
+        Assert.Equal(JsonValueKind.Null, deltaFrame.GetProperty("document").ValueKind);
+        Assert.Equal(complete.EntryDocument, preludeFrame.GetProperty("document").GetString());
+        Assert.Equal(complete.EntryPath, preludeFrame.GetProperty("entry").GetString());
+    }
+
+    /// <summary>A `--serve` session that never split still behaves as before: the first frame is whole and carries
+    /// no <c>partial</c> claim, so an older VSIX (and the one-shot path) are untouched by this work.</summary>
+    [Fact]
+    public void OneShotShapedPayload_NeverClaimsToBePartial()
+    {
+        var bundle = Bundle("<html>d</html>", Surface("index.html", "<p>A</p>"), Surface("docs/a.html", "<p>B</p>"));
+
+        var payload = JsonDocument.Parse(WebviewCommand.SerializePayload(bundle, "SpecScribeOutput")).RootElement;
+
+        Assert.False(payload.GetProperty("partial").GetBoolean());
+        Assert.Equal(2, payload.GetProperty("surfaces").EnumerateObject().Count());
+    }
 }

@@ -1,4 +1,4 @@
-# SpecScribe Status — VS Code extension
+# SpecScribe — VS Code extension
 
 A **read-only, live-updating in-editor view** of a SpecScribe project's dashboard and epics surfaces
 (dashboard, epics index, epic pages, story pages, story placeholders — Story 6.4's navigable set).

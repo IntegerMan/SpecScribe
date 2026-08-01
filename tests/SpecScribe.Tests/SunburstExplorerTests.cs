@@ -173,10 +173,13 @@ public class SunburstExplorerTests
     }
 
     [Fact]
-    public void WebviewAdapter_StripsTheIsland_ButKeepsTheTwinAndItsLinks()
+    public void WebviewAdapter_KeepsTheIsland_AndTheTwinWithItsLinks()
     {
-        // The webview ships no specscribe.js, so the island is unreadable weight there — dropped, and registered as
-        // the `data-island` host exception. What must NOT be dropped is whatever carries the INFORMATION.
+        // AMENDED BY ADR 0036. This comment used to read "the webview ships no specscribe.js, so the island is
+        // unreadable weight there — dropped, and registered as the `data-island` host exception." Every clause of
+        // that is now false: the shell ships specscribe.js and the chart engine, the island is the payload the
+        // chart is DRAWN from, and the exception is retired. The assertions below were inverted to match; this
+        // lead comment was missed in that pass and is corrected here.
         //
         // Story 20.7 rewrote this test rather than deleting it, and the rewrite is the whole point. It used to
         // assert the webview keeps "the chart and its links", meaning the server-rendered SVG. That SVG is gone, so
@@ -220,21 +223,31 @@ public class SunburstExplorerTests
 
         var rendered = new WebviewRenderAdapter().RenderContent(page);
 
-        // The island goes.
-        Assert.DoesNotContain("application/json", rendered);
-        Assert.DoesNotContain("ss-hierarchy-data", rendered);
+        // INVERTED BY ADR 0036. This used to assert the island was stripped. It now must SURVIVE: the shell
+        // supplies the chart engine and specscribe.js, so the island is the payload the sunburst is drawn from,
+        // and removing it is precisely what made the chart render as a legend with nothing beside it.
+        Assert.Contains("application/json", rendered);
+        Assert.Contains("ss-hierarchy-data", rendered);
+        Assert.Contains("{\"nodes\":[]}", rendered);
+        // The mount target has to come through with it.
+        Assert.Contains("data-hierarchy", rendered);
 
-        // The twin stays, COMPLETE and NAVIGABLE — the two halves ADR 0013 §2 actually requires. A twin whose
-        // links were rewritten away would be a hole dressed as a degradation.
+        // The twin stays too, COMPLETE and NAVIGABLE — the two halves ADR 0013 §2 actually requires. It is no
+        // longer the primary presentation (that is the chart again), but it remains the failure path, so a twin
+        // whose links were rewritten away would still be a hole dressed as a degradation.
         Assert.Contains("ss-hierarchy-twin", rendered);
         Assert.Contains("Epic 1: Alpha", rendered);
         Assert.Contains("epics/epic-1.html", rendered);
         Assert.Contains("Stories drafted", rendered);
 
-        // And no chart picture is claimed here — that absence is itself registered, not silent.
+        // No server-rendered SVG comes back — Story 20.7 retired that renderer and ADR 0036 did not revive it. The
+        // chart is drawn client-side from the island above, which is why the island had to survive.
         Assert.DoesNotContain("<svg class=\"sunburst\"", rendered);
-        Assert.Contains(HostRenderExceptions.Registry, e => e.SurfaceId == "webview" && e.FactId == "data-island");
-        Assert.Contains(HostRenderExceptions.Registry, e => e.SurfaceId == "webview" && e.FactId == "hierarchy-chart");
+        // The two exceptions that registered the strip and the missing picture are RETIRED, and their absence is
+        // asserted rather than merely no longer mentioned: a stale entry claiming this surface carries no island
+        // would send the next reader looking for a strip that is gone.
+        Assert.DoesNotContain(HostRenderExceptions.Registry, e => e.SurfaceId == "webview" && e.FactId == "data-island");
+        Assert.DoesNotContain(HostRenderExceptions.Registry, e => e.SurfaceId == "webview" && e.FactId == "hierarchy-chart");
     }
 
     [Fact]

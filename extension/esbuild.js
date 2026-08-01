@@ -1,4 +1,4 @@
-// esbuild config for the SpecScribe Status extension (the current recommended VS Code extension bundler —
+// esbuild config for the SpecScribe extension (the current recommended VS Code extension bundler —
 // toolchain confirmed by the Story 6.3 spike). Bundles src/extension.ts to dist/extension.js.
 const esbuild = require('esbuild');
 

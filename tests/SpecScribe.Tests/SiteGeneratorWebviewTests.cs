@@ -167,10 +167,16 @@ public class SiteGeneratorWebviewTests : IDisposable
         Assert.All(bundle.Surfaces, s =>
         {
             // Nav + (except home) breadcrumb travel with every content region, so a swap always refreshes the
-            // active-nav highlight and drill trail; and no region carries a script (innerHTML swaps would never
-            // execute one — anything script-shaped here would be dead code).
+            // active-nav highlight and drill trail; and no region carries an EXECUTABLE script (innerHTML swaps
+            // would never run one — anything executable here would be dead code).
+            //
+            // AMENDED BY ADR 0036: this used to assert `DoesNotContain("<script")` outright. Regions now carry
+            // inert `<script type="application/json">` data islands, which ADR 0032 §2 explicitly permits and
+            // which the shell's engine reads. The assertion is therefore tightened to the invariant that actually
+            // matters rather than relaxed: a blunt substring ban conflated "no code" with "no script-shaped
+            // markup", and only the first was ever the contract.
             Assert.Contains("<nav class=\"site-nav\"", s.ContentHtml);
-            Assert.DoesNotContain("<script", s.ContentHtml);
+            AssertNoExecutableScript(s.OutputRelativePath, s.ContentHtml);
             Assert.False(string.IsNullOrWhiteSpace(s.Title));
         });
 
@@ -509,22 +515,28 @@ public class SiteGeneratorWebviewTests : IDisposable
     /// the webview omitted it identically). This pins the whole thing structurally rather than depending on the
     /// fixture being a git repo: the webview dashboard's body must be the SAME bytes the static page wrote, so ANY
     /// argument divergence at that call site fails here, not only this one.
-    /// <para>The one expected difference is the webview's own registered <c>data-island</c> exception — inline
-    /// <c>&lt;script type="application/json"&gt;</c> blocks it deliberately strips — so the static side is compared
-    /// with those removed. Nothing else is allowed to differ.</para></summary>
+    /// <para>Since ADR 0036 there is NO expected difference at all: the webview's <c>data-island</c> exception is
+    /// retired and the region ships verbatim, so the two <c>&lt;main&gt;</c> blocks must match byte for byte. The
+    /// comparison used to subtract the islands from the static side; dropping that subtraction makes this the
+    /// strictest form of the check.</para></summary>
     [Fact]
-    public void WebviewDashboardBody_IsByteIdenticalToTheStaticPage_ExceptTheStrippedDataIslands()
+    public void WebviewDashboardBody_IsByteIdenticalToTheStaticPage()
     {
         var gen = GeneratedSite();
         var bundle = gen.RenderWebviewSurfaces();
 
         var staticIndex = File.ReadAllText(Path.Combine(Site, "index.html"));
         var webviewMain = MainBlock(bundle.Surfaces.Single(s => s.OutputRelativePath == "index.html").ContentHtml);
-        var staticMain = StripJsonIslands(MainBlock(staticIndex));
+        var staticMain = MainBlock(staticIndex);
 
+        // STRENGTHENED BY ADR 0036: this used to compare against the static <main> with its islands REMOVED,
+        // because the webview stripped them. The region now ships verbatim, so the comparison is exact — the
+        // strongest form this parity check has ever had, and the one that would catch any future divergence in
+        // either direction rather than only outside the islands.
         Assert.Equal(staticMain, webviewMain);
-        // Guard against a vacuous green: the fixture really does carry islands, so the strip above is load-bearing.
-        Assert.Contains("<script type=\"application/json\"", MainBlock(staticIndex));
+        // Guard against a vacuous green: the fixture really does carry an island, so byte-equality here is
+        // genuinely asserting the island travelled rather than that neither side had one.
+        Assert.Contains("<script type=\"application/json\"", webviewMain);
     }
 
     private static string MainBlock(string html)
@@ -535,9 +547,8 @@ public class SiteGeneratorWebviewTests : IDisposable
         return html[start..end];
     }
 
-    private static string StripJsonIslands(string html) => System.Text.RegularExpressions.Regex.Replace(
-        html, "<script type=\"application/json\"[^>]*>.*?</script>\\n?", string.Empty,
-        System.Text.RegularExpressions.RegexOptions.Singleline);
+    // `StripJsonIslands` removed with ADR 0036: its only caller compared the static <main> minus its islands
+    // against the stripped webview region, and that subtraction is exactly what the decision retired.
 
     /// <summary>Story 22.2 AC #5: a CAPTURED webview surface keeps the page-local context band the static page
     /// computed for it. Before this, the capture loop re-rendered nav from <c>nav.ToNavigationView(path)</c> —
@@ -589,12 +600,13 @@ public class SiteGeneratorWebviewTests : IDisposable
         Assert.Contains("codemap-table", codeMap.ContentHtml);
         Assert.Contains("src/Lib/Widget.cs", codeMap.ContentHtml);
 
-        // And the island does NOT: this surface ships no specscribe.js, so a JSON payload here is dead weight it
-        // can never read - 4.5 MB of it on this page after Story 20.9. The `data-island` host exception already
-        // described the webview as carrying none; the CAPTURED-page path simply never applied the strip the
-        // PageView path did, which nobody noticed while the payload was small. Confirmed, not assumed.
-        Assert.DoesNotContain("ss-hierarchy-data", codeMap.ContentHtml);
-        Assert.DoesNotContain("<script", codeMap.ContentHtml);
+        // And so does the island, since ADR 0036 — inverted from "must NOT". The shell supplies the engine and
+        // specscribe.js, so this page's payload is what its chart is drawn from rather than dead weight. It is the
+        // largest island on the site (1.24 MB), and the owner chose to keep it explicitly when offered a
+        // per-island byte budget (ADR 0036 §6) — so this assertion is also the record of that decision holding.
+        Assert.Contains("ss-hierarchy-data", codeMap.ContentHtml);
+        // Still no EXECUTABLE script: every <script> here must be an inert island. [ADR 0032 §2]
+        AssertNoExecutableScript(codeMap.OutputRelativePath, codeMap.ContentHtml);
     }
 
     /// <summary>Story 22.4 AC #2. <b>EVERY</b> surface in the bundle — family AND captured — carries no
@@ -625,15 +637,75 @@ public class SiteGeneratorWebviewTests : IDisposable
         Assert.Contains(bundle.Surfaces, s => s.OutputRelativePath == "code-map.html");
         Assert.Contains(bundle.Surfaces, s => s.OutputRelativePath.StartsWith("adrs/", StringComparison.Ordinal));
 
+        // ADR 0036: executable script only — inert JSON islands are permitted (and, since the shell ships the
+        // engine, are the chart payload rather than dead weight). See AssertNoExecutableScript for why this is a
+        // tightening of the old blanket `<script` ban rather than a loosening of it.
         var offenders = bundle.Surfaces
-            .Where(s => s.ContentHtml.Contains("<script", StringComparison.OrdinalIgnoreCase))
+            .Where(s => ExecutableScriptCount(s.ContentHtml) > 0)
             .Select(s => s.OutputRelativePath)
             .ToList();
         Assert.Empty(offenders);
 
-        // The entry document is the one place a script IS expected (the host bridge), so the assertion above
-        // deliberately covers surfaces only — stated here so a reader does not "fix" the omission.
+        // Guard against this test going vacuous in the other direction: if islands ever stopped riding along, the
+        // assertion above would still pass while the charts silently died. At least one captured surface must
+        // carry one. code-map.html is the guaranteed case — its island is the largest on the site.
+        var codeMap = bundle.Surfaces.Single(s => s.OutputRelativePath == "code-map.html");
+        Assert.Contains("<script type=\"application/json\"", codeMap.ContentHtml, StringComparison.Ordinal);
+
+        // The entry document is the one place a script IS expected (the host bridge, and since ADR 0036 the chart
+        // engine + specscribe.js), so the assertion above deliberately covers surfaces only — stated here so a
+        // reader does not "fix" the omission.
         Assert.Contains("<script", bundle.EntryDocument);
+    }
+
+    /// <summary>How many EXECUTABLE <c>&lt;script</c> tags a region carries — every <c>&lt;script</c> that is not
+    /// an inert <c>type="application/json"</c> data island.
+    ///
+    /// <para>This is the invariant ADR 0032 §Decision 2 actually states: <i>"The IR content region carries no
+    /// executable script. It may carry inert <c>&lt;script type="application/json"&gt;</c> data islands, which are
+    /// DOM data rather than code."</i> Before ADR 0036 the webview stripped islands, so a blanket
+    /// <c>DoesNotContain("&lt;script")</c> happened to hold and was used as the assertion — but it was always a
+    /// proxy, and Story 22.4's review had already flagged that the test and the strip asserted different
+    /// contracts. Now that islands ride through, the proxy would fail for a reason that is not a defect, so the
+    /// assertion is written against the real contract instead.</para></summary>
+    private static int ExecutableScriptCount(string html)
+    {
+        // Walks actual tag positions rather than subtracting two substring counts. The subtraction form was
+        // fragile in BOTH directions: reorder an island's attributes (`class` before `type`) and every island
+        // reads as executable — loud, but wrong; and any prose in a region containing the literal
+        // `<script type="application/json"` inflates the island count and can net a REAL executable tag to zero —
+        // silent, and exactly the failure this assertion exists to catch. Since ADR 0036 deleted the structural
+        // strip, this check is the only enforcement of ADR 0032 §2 left on this surface, so it has to be honest.
+        var count = 0;
+        for (var i = html.IndexOf("<script", StringComparison.OrdinalIgnoreCase);
+             i >= 0;
+             i = html.IndexOf("<script", i + "<script".Length, StringComparison.OrdinalIgnoreCase))
+        {
+            var end = html.IndexOf('>', i);
+            var tag = end > i ? html[i..end] : html[i..];
+            // An island is any <script> whose type is application/json, wherever `type` sits among the attributes.
+            if (tag.Contains("application/json", StringComparison.OrdinalIgnoreCase)) continue;
+            count++;
+        }
+        return count;
+    }
+
+    private static void AssertNoExecutableScript(string surfacePath, string html)
+    {
+        var count = ExecutableScriptCount(html);
+        Assert.True(count == 0, $"{surfacePath} carries {count} executable <script> tag(s); regions may carry only inert application/json islands.");
+    }
+
+    private static int CountOccurrences(string haystack, string needle)
+    {
+        var n = 0;
+        for (var i = haystack.IndexOf(needle, StringComparison.OrdinalIgnoreCase);
+             i >= 0;
+             i = haystack.IndexOf(needle, i + needle.Length, StringComparison.OrdinalIgnoreCase))
+        {
+            n++;
+        }
+        return n;
     }
 
     [Fact]

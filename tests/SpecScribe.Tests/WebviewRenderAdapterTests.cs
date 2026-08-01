@@ -5,9 +5,11 @@ namespace SpecScribe.Tests;
 /// <summary>Story 6.4 AC #4 coverage: the <see cref="WebviewRenderAdapter"/> (the second concrete
 /// <see cref="IRenderAdapter"/>, surface id <c>webview</c>) runs against the SAME parity harness the HTML surface
 /// does — 6.1's chrome facts and 6.2's section facts — and diverges ONLY on the three facts registered in
-/// <see cref="HostRenderExceptions.Registry"/> (inlined CSS, absent enhancement script, CSP-blocked Mermaid).
-/// Also pins the webview document contract ADR 0005 ratified: strict CSP, exactly one nonce'd bridge script, the
-/// two host-runtime placeholders, and a script-free swappable content region. [Story 6.4]</summary>
+/// <see cref="HostRenderExceptions.Registry"/> — since ADR 0036 just two: inlined CSS and CSP-blocked Mermaid.
+/// Also pins the webview document contract ADR 0005 ratified and ADR 0032 restated: strict CSP (unchanged), the
+/// two host-runtime placeholders, and a content region free of EXECUTABLE script — which since ADR 0036 means the
+/// three nonce'd chrome scripts live in the shell while inert data islands ride in the region.
+/// [Story 6.4; amended ADR 0036]</summary>
 public class WebviewRenderAdapterTests
 {
     private static SiteNav Nav() =>
@@ -317,24 +319,78 @@ public class WebviewRenderAdapterTests
         Assert.DoesNotContain("<link rel=\"stylesheet\"", doc);
         Assert.Contains("<style>", doc);
         Assert.Contains("--status-", doc); // a token only the real specscribe.css carries
-        // …and no external script is referenced: the enhancement script is deliberately absent (the body must
-        // reach the same information without it — the feature-parity rule; the inlined CSS may still MENTION it
-        // in a comment, which is why this pins the tag, not the name) and the ?v= cache-bust scheme is
-        // meaningless here.
+        // …and no EXTERNAL script is referenced. Since ADR 0036 the webview does ship specscribe.js and the chart
+        // engine, but both are INLINED under the nonce for the same reason the CSS is: `localResourceRoots` is
+        // empty, so nothing can load from disk and a <script src> would simply fail. The ?v= cache-bust scheme is
+        // meaningless here either way.
         Assert.DoesNotContain("<script src=", doc);
         Assert.DoesNotContain("?v=", doc);
     }
 
     [Fact]
-    public void Render_CarriesExactlyOneScript_TheNoncedBridge()
+    public void Render_CarriesExactlyThreeNoncedScripts_BridgeEngineAndApp()
     {
         var doc = WebviewRenderAdapter.Shared.Render(EpicPage(Nav())).Content;
 
-        // One <script> total — the nonce'd bridge. In particular the HTML surface's inline nav-toggle script
-        // (which the CSP would silently block) must NOT be emitted; the bridge owns the toggle instead.
-        Assert.Equal(1, Count(doc, "<script"));
+        // THREE <script> tags since ADR 0036, and every one of them nonce'd: the bridge, the vendored chart
+        // engine, and the production specscribe.js. This used to assert exactly one.
+        //
+        // What has NOT changed, and is the point of counting rather than merely checking presence: the HTML
+        // surface's inline nav-toggle script must still never be emitted (the CSP would silently block it, and the
+        // bridge owns the toggle instead), and nothing may sneak in un-nonced. So the count is pinned AND every
+        // occurrence is required to carry the nonce — a bare `<script>` would satisfy a presence check and be
+        // dead on arrival in the panel.
+        Assert.Equal(3, Count(doc, "<script"));
+        Assert.Equal(3, Count(doc, "<script nonce=\"__NONCE__\">"));
+
         Assert.Contains("acquireVsCodeApi", doc);
         Assert.Contains("postMessage", doc);
+    }
+
+    [Fact]
+    public void Render_InlinesTheChartEngineAndTheUnforkedAppScript()
+    {
+        var doc = WebviewRenderAdapter.Shared.Render(EpicPage(Nav())).Content;
+
+        // ADR 0036 §1: the engine ships INLINE, not as a <script src> — `localResourceRoots` is empty by design,
+        // so a src would simply fail to load. Pinned by a marker only the real vendored bundle carries.
+        Assert.Contains("Plotly", doc, StringComparison.Ordinal);
+        // ADR 0036 §2 (do not fork the mount logic): the real specscribe.js is what ships, so the Explorer and the
+        // Story 24.2 graph mount through the identical code path a browser uses. `initHierarchyExplorers` is
+        // defined only in that file, so its presence proves the production script travelled — not a webview copy.
+        Assert.Contains("initHierarchyExplorers", doc, StringComparison.Ordinal);
+        Assert.Contains("specscribe:content-swapped", doc, StringComparison.Ordinal);
+    }
+
+    /// <summary>The shim substitutes <c>__NONCE__</c>/<c>__CSP_SOURCE__</c> across the SHELL (it lifts the content
+    /// region out first, so a region can never forge a nonce). ADR 0036 put ~1.4 MB of vendored JavaScript INTO
+    /// that shell — so if either asset happened to contain a placeholder token, the shim would rewrite bytes
+    /// inside a minified bundle. Cheap to assert, silent and baffling if it ever came true.</summary>
+    [Fact]
+    public void InlinedAssets_ContainNeitherHostPlaceholderToken()
+    {
+        var doc = WebviewRenderAdapter.Shared.Render(EpicPage(Nav())).Content;
+
+        // The shell legitimately contains each token; what must not happen is the ASSETS contributing extra
+        // occurrences. __CSP_SOURCE__ appears 3× (img-src, style-src, font-src) and __NONCE__ 4× (script-src plus
+        // the three script tags) — all of them in the CSP meta and the tags, none from the ~1.4 MB of inlined JS.
+        Assert.Equal(3, Count(doc, "__CSP_SOURCE__"));
+        Assert.Equal(4, Count(doc, "__NONCE__"));
+
+        // ALL FIVE placeholders, not just the two the shim substitutes. `__CONTENT__` is the dangerous one and was
+        // originally missed: `WrapDocument` replaces it AFTER ~1.4 MB of vendored JavaScript is already in the
+        // string, so an engine bundle that happened to contain that literal would have the page's content region
+        // spliced into the middle of a minified script — silent, and baffling to diagnose. All five must be fully
+        // consumed by the time the document is built.
+        foreach (var token in new[] { "__TITLE__", "__PATH__", "__SOURCE__", "__ENGINE_JS__", "__APP_JS__", "__CONTENT__", "__CSS__", "__THEME_CSS__", "__HELPER_PROMPT__" })
+        {
+            Assert.False(doc.Contains(token, StringComparison.Ordinal),
+                $"{token} survived into the rendered document — an inlined asset almost certainly reintroduced it.");
+        }
+
+        // And the closing tag that would end either inline block early. Clean in both vendored assets today;
+        // nothing but this assertion stops a future re-vendor from breaking it.
+        Assert.Equal(3, Count(doc, "</script>"));
     }
 
     [Fact]
@@ -348,9 +404,38 @@ public class WebviewRenderAdapterTests
         Assert.Contains("<nav class=\"site-nav\"", content);
         Assert.Contains("<div class=\"breadcrumb\"", content);
         Assert.Contains(page.BodyHtml, content);
-        // …and is script-free: innerHTML swaps never execute scripts, so anything script-shaped in here would be
-        // dead weight at best and a parity lie at worst.
+        // …and carries no EXECUTABLE script: innerHTML swaps never run one, so anything executable in here would
+        // be dead weight at best and a parity lie at worst. (Inert application/json islands ARE permitted since
+        // ADR 0036 — this fixture's body simply has none, which is why the blanket check still reads correctly
+        // here. The island case is pinned by RenderContent_KeepsInertDataIslands below.)
         Assert.DoesNotContain("<script", content);
+    }
+
+    /// <summary>ADR 0036: the region ships data islands VERBATIM. This is the single most load-bearing assertion
+    /// of that decision — the island is the chart's only data source, and stripping it is exactly what made the
+    /// sunburst render as a legend with no chart. A regression here is silent: the page still renders, the panel
+    /// still navigates, and only the chart quietly disappears.</summary>
+    [Fact]
+    public void RenderContent_KeepsInertDataIslands()
+    {
+        var page = EpicPage(Nav()) with
+        {
+            BodyHtml =
+                "<main id=\"main-content\">\n" +
+                "<div class=\"ss-hierarchy\" id=\"h1\" data-hierarchy></div>\n" +
+                "<script type=\"application/json\" class=\"ss-hierarchy-data\" id=\"h1-data\">{\"nodes\":[]}</script>\n" +
+                "</main>\n",
+        };
+
+        var content = WebviewRenderAdapter.Shared.RenderContent(page);
+
+        Assert.Contains("<script type=\"application/json\"", content);
+        Assert.Contains("{\"nodes\":[]}", content);
+        // The host the engine mounts into must survive too — an island with no host is as useless as a host with
+        // no island.
+        Assert.Contains("data-hierarchy", content);
+        // Still no EXECUTABLE script: the island is the only <script> in the region.
+        Assert.Equal(Count(content, "<script"), Count(content, "<script type=\"application/json\""));
     }
 
     [Fact]
@@ -416,15 +501,27 @@ public class WebviewRenderAdapterTests
         // rather than left silent precisely because the thing that makes it a documented degradation instead of a
         // hole is that the twin survives with its links. The ADR 0005 CSP amendment that would let Plotly load here
         // lands once, with Story 23.4.
+        // ADR 0036 retired TWO of the five — `data-island` (regions ship verbatim; the island is live chart data
+        // now, not dead weight) and `hierarchy-chart` (charts mount here, so there is no missing picture) — and
+        // NARROWED `asset.js`. What remains is two CARRIER differences plus one CSP casualty.
+        //
+        // `asset.js` stays because the parity fact is the `<script src="..." defer>` TAG, not the behaviour: the
+        // webview inlines specscribe.js instead of referencing it, so the fact genuinely still differs even though
+        // nothing is missing any more. Exactly the shape asset.css has always had.
+        //
+        // Pinned as an exact set, not a count: a registry that keeps entries for divergences that no longer exist
+        // is as misleading as one missing an entry that does, and only an exact-set assertion catches both.
         var webview = HostRenderExceptions.Registry.Where(e => e.SurfaceId == "webview").ToList();
-        Assert.Equal(5, webview.Count);
+        Assert.Equal(3, webview.Count);
         Assert.All(webview, e => Assert.False(string.IsNullOrWhiteSpace(e.Reason)));
         Assert.Equal(
-            new[] { "asset.css", "asset.js", "data-island", "hierarchy-chart", "mermaid" },
+            new[] { "asset.css", "asset.js", "mermaid" },
             webview.Select(e => e.FactId).OrderBy(f => f, StringComparer.Ordinal).ToList());
-        // The amended `data-island` reason must not still claim the retired SVG carries the information.
-        var island = webview.Single(e => e.FactId == "data-island");
-        Assert.Contains("text twin", island.Reason, StringComparison.OrdinalIgnoreCase);
+        // The narrowed asset.js reason must state that the script is INLINED. Asserted positively rather than as
+        // "does not say absent": the reason deliberately quotes its own superseded wording to explain the change,
+        // so a negative check on that phrase would fail on the very text that documents it correctly.
+        var assetJs = webview.Single(e => e.FactId == "asset.js");
+        Assert.Contains("inlines", assetJs.Reason, StringComparison.OrdinalIgnoreCase);
         // Global hygiene across every surface: a section.* fact may never be excepted (a body divergence is
         // always a bug).
         Assert.DoesNotContain(HostRenderExceptions.Registry, e => e.FactId.StartsWith("section.", StringComparison.Ordinal));
