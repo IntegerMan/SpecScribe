@@ -761,6 +761,38 @@ IR, the SPA shell, and no `.html`) and the ROUTE set in the IR (29 — the page 
 would let a page family vanish from the IR while its assets stayed put. Plus a direct assertion that no C# path
 writes a `.html`, so the failure names the cause instead of diffing forty paths.
 
+### ⚠️ CI fix #3 — `check:ir-content` was validating a NARROWER corpus than the one that ships
+
+CI went red at `check:ir-content` with **+4 / −182 rules**. That is a mass prune, not incidental drift, so per
+CLAUDE.md I established causality before touching the baseline — and it was not a CSS change at all.
+
+`extract:ir-content` PRUNES any rule whose selector names a class it cannot find in the IR, so the generated
+layer is only correct for the corpus it was extracted from. Two workflows generate two different corpora:
+
+| workflow | generate | corpus |
+| --- | --- | --- |
+| `publish-docs-live-pages.yml` — **what actually ships** | `--deep-git` | code-insights history/relationships tabs, relgraph swatches, deep-analytics panels |
+| `build-test-analyze.yml` — the gate | *(no flag)* | none of those surfaces |
+
+Commit `b397084` (a concurrent session) regenerated the layer from a **deep-git** IR — `+912 / −104` lines — so
+the committed layer is correct for the published site. The gate then pruned 182 of those rules because its own
+generate is shallow. **Reproduced both directions locally: `+4 / −182` without the flag, `+0 / −2` with it.**
+
+**Fixed by aligning the GATE to the published corpus** (`--deep-git` added to the CI generate), not by
+regenerating the layer to match the shallow run. That direction matters: re-extracting from the narrower corpus
+would have silently stripped styling from surfaces the deployed portal actually renders — the exact
+prune-with-a-green-gate failure CLAUDE.md § *Changing `specscribe.css`* warns about.
+
+The residual `−2` (`.mini-donut`) was the documented data-dependence: my own story-file edits change the
+epics/story pages, which changes the IR. Regenerated, and **confirmed stable across two full generate+extract
+cycles** (identical diff both times) before committing.
+
+⚠️ **A structural limitation this exposed, worth a follow-up rather than a fix here.** `extract:ir-content`
+prunes against ONE corpus, so whichever you pick loses the other's rules — the shallow run's four
+graceful-degradation rules (`codemap-notice`, `risk-quadrant-empty`) are pruned by the deep-git extraction just
+as the 182 were pruned by the shallow one. A project with no git history would lose that notice styling. The
+layer needs the UNION of corpora, not one of them.
+
 ### ⚠️ TWO GATES WERE VACUOUS AND I REPORTED THEM GREEN — corrected
 
 I ran `check:a11y` and `check:links`, saw them exit 0, and told the owner "all gates green". That was wrong,
