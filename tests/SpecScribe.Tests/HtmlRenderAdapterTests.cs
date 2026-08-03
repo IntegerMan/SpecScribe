@@ -34,44 +34,24 @@ public class HtmlRenderAdapterTests
         BodyHtml = "<main id=\"main-content\">\n<h1>Foundation</h1>\n</main>\n\n",
     };
 
-    [Fact]
-    public void Render_AssemblesChromeAroundBodyInOrder()
-    {
-        var html = HtmlRenderAdapter.Shared.Render(StoryPage(Nav())).Content;
-
-        // Head → nav → breadcrumb → body → footer → close, in order.
-        var doctype = html.IndexOf("<!DOCTYPE html>", StringComparison.Ordinal);
-        var navIdx = html.IndexOf("<nav class=\"site-nav\"", StringComparison.Ordinal);
-        var crumb = html.IndexOf("<div class=\"breadcrumb\"", StringComparison.Ordinal);
-        var body = html.IndexOf("<main id=\"main-content\">", StringComparison.Ordinal);
-        var footer = html.IndexOf("<footer class=\"doc-footer\">", StringComparison.Ordinal);
-        var close = html.IndexOf("</body>\n</html>\n", StringComparison.Ordinal);
-        Assert.True(doctype >= 0 && doctype < navIdx && navIdx < crumb && crumb < body && body < footer && footer < close,
-            $"chrome order wrong: {doctype}/{navIdx}/{crumb}/{body}/{footer}/{close}");
-
-        // The title + prefixed, cache-busted assets land in the head; the breadcrumb resolves the "../" prefix.
-        Assert.Contains("<title>Story 1.1: Foundation — SpecScribe</title>", html);
-        Assert.Contains($"href=\"../{ForgeOptions.StylesheetName}?v=", html);
-        Assert.Contains($"src=\"../{ForgeOptions.ScriptName}?v=", html);
-        Assert.Contains("href=\"../index.html\"", html); // Home crumb: epics/story-1-1.html is depth 1 → "../"
-    }
+    // [Story 23.6 AC #1/#8] TWO TESTS WERE RETIRED HERE with the method they exercised.
+    //
+    //  · `Render_AssemblesChromeAroundBodyInOrder` pinned the full-document concatenation order
+    //    (doctype → nav → breadcrumb → body → footer → close) and the head's title and cache-busted asset
+    //    links. No C# code path composes a document, so there is no order left to assert. What replaced it:
+    //    `npm run check:parity`'s `pageSha`, which hashes the WHOLE rendered page across a frozen 24-route
+    //    corpus — a stronger check than this one, since it sees the real head rather than four substrings of
+    //    it. The region half of the test (that the breadcrumb resolves its `../` prefix) survives below in
+    //    `Region_...` form.
+    //  · `Render_InjectsMermaidInitOnlyWhenManifestSaysSo` pinned the mermaid init and its placement after the
+    //    footer. Chrome, and now the renderer's: `web/test/chrome-needs.test.ts` pins the same decision from
+    //    the same evidence (a `<pre class="mermaid">` in the region), and `IrSurface.vue` places it at
+    //    `bodyClose`. ⚠️ Worth knowing why this matters: the renderer had NO mermaid handling at all until
+    //    Story 23.6, so this C# test was the only thing asserting the init existed anywhere — while the
+    //    shipped portal had already stopped emitting it.
 
     [Fact]
-    public void Render_InjectsMermaidInitOnlyWhenManifestSaysSo()
-    {
-        var nav = Nav();
-        var without = HtmlRenderAdapter.Shared.Render(StoryPage(nav)).Content;
-        Assert.DoesNotContain("mermaid.initialize", without);
-
-        var withMermaid = StoryPage(nav) with { Assets = StoryPage(nav).Assets with { MermaidNeeded = true } };
-        var html = HtmlRenderAdapter.Shared.Render(withMermaid).Content;
-        Assert.Contains("mermaid.initialize", html);
-        // The init script sits after the footer, before the closing body tag (matching the templaters).
-        Assert.True(html.IndexOf("<footer", StringComparison.Ordinal) < html.IndexOf("mermaid.initialize", StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public void Render_EmptyBreadcrumb_EmitsNoBreadcrumbBlock()
+    public void Region_EmptyBreadcrumb_EmitsNoBreadcrumbBlock()
     {
         var nav = Nav();
         var home = StoryPage(nav) with
@@ -81,8 +61,18 @@ public class HtmlRenderAdapterTests
             Breadcrumb = BreadcrumbTrail.Empty,
             Nav = nav.ToNavigationView(SiteNav.HomeOutputPath),
         };
-        var html = HtmlRenderAdapter.Shared.Render(home).Content;
-        Assert.DoesNotContain("<div class=\"breadcrumb\"", html);
+        var region = RegionAssert.Of(home);
+        Assert.DoesNotContain("<div class=\"breadcrumb\"", region);
+    }
+
+    /// <summary>The surviving half of the retired `Render_AssemblesChromeAroundBodyInOrder`: the breadcrumb
+    /// resolves its depth prefix. That is region content, so it is still a C# question. [Story 23.6 AC #8]</summary>
+    [Fact]
+    public void Region_Breadcrumb_ResolvesTheDepthPrefix()
+    {
+        var region = RegionAssert.Of(StoryPage(Nav()));
+        // epics/story-1-1.html is depth 1, so the Home crumb reaches the root through "../".
+        Assert.Contains("href=\"../index.html\"", region);
     }
 
     [Fact]
@@ -110,11 +100,10 @@ public class HtmlRenderAdapterTests
         Assert.Equal(viaSiteNav, viaAdapter);
     }
 
-    [Fact]
-    public void Adapter_IdentifiesAsTheHtmlSurface()
-    {
-        Assert.Equal("html", HtmlRenderAdapter.Shared.Id);
-    }
+    // [Story 23.6 AC #1] `Adapter_IdentifiesAsTheHtmlSurface` was retired with the `IRenderAdapter.Id` it
+    // asserted. `HtmlRenderAdapter` is no longer a delivery adapter — it composes the nav and wayfinding markup
+    // that live INSIDE the region, and the two surviving adapters (`JsonSpaRenderAdapter`,
+    // `WebviewRenderAdapter`) carry the surface ids now.
 
     // ----- Story 10.11: PageView.Pager + the coherent wayfinding strip ---------------------------------------
 
@@ -160,53 +149,40 @@ public class HtmlRenderAdapterTests
     }
 
     [Fact]
-    public void Render_PageViewPager_RendersInWayfindingStrip_NotInsideBodyHeader()
+    public void Region_PageViewPager_RendersInWayfindingStrip_NotInsideBodyHeader()
     {
         var nav = Nav();
         var page = StoryPage(nav) with { Pager = Pager() };
 
-        var html = HtmlRenderAdapter.Shared.Render(page).Content;
+        // [Story 23.6 AC #8] Asked of the REGION. The wayfinding band was never chrome in the head sense — it
+        // is nav + wayfinding + body that the IR carries and every surface consumes, so this assertion moved
+        // subject without losing anything, and now covers the webview and SPA as well as the rendered page.
+        var region = RegionAssert.Of(page);
 
-        Assert.Contains("<div class=\"page-wayfinding\">", html);
-        Assert.Contains("Epic 1", html);
-        var wayfinding = html.IndexOf("page-wayfinding", StringComparison.Ordinal);
-        var body = html.IndexOf("<main id=\"main-content\">", StringComparison.Ordinal);
-        Assert.True(wayfinding < body, "pager must render in the chrome strip, before the opaque body");
+        Assert.Contains("<div class=\"page-wayfinding\">", region);
+        Assert.Contains("Epic 1", region);
+        var wayfinding = region.IndexOf("page-wayfinding", StringComparison.Ordinal);
+        var body = region.IndexOf("<main id=\"main-content\">", StringComparison.Ordinal);
+        Assert.True(wayfinding < body, "pager must render in the wayfinding strip, before the opaque body");
     }
 
     [Fact]
-    public void Render_NoPager_OmitsWayfindingStripEntirely()
+    public void Region_NoPager_OmitsWayfindingStripEntirely()
     {
-        var html = HtmlRenderAdapter.Shared.Render(StoryPage(Nav())).Content;
-        Assert.DoesNotContain("page-wayfinding", html);
-        Assert.DoesNotContain("entity-pager", html);
+        var region = RegionAssert.Of(StoryPage(Nav()));
+        Assert.DoesNotContain("page-wayfinding", region);
+        Assert.DoesNotContain("entity-pager", region);
     }
 
-    [Fact]
-    public void Render_TocBearingBody_AppendsActiveSectionScript_AfterBodyBeforeFooter()
-    {
-        var nav = Nav();
-        var withToc = StoryPage(nav) with
-        {
-            BodyHtml = "<main id=\"main-content\">\n<div class=\"page-shell\"><div class=\"page-rail\">"
-                + "<nav class=\"toc-sidebar\" aria-label=\"On this page\"></nav></div></div>\n</main>\n\n",
-        };
-
-        var html = HtmlRenderAdapter.Shared.Render(withToc).Content;
-
-        Assert.Contains("IntersectionObserver", html);
-        var body = html.IndexOf("<main id=\"main-content\">", StringComparison.Ordinal);
-        var script = html.IndexOf("IntersectionObserver", StringComparison.Ordinal);
-        var footer = html.IndexOf("<footer class=\"doc-footer\">", StringComparison.Ordinal);
-        Assert.True(body < script && script < footer, "the tracking script must sit after the body, before the footer");
-    }
-
-    [Fact]
-    public void Render_NoTocInBody_OmitsActiveSectionScript()
-    {
-        var html = HtmlRenderAdapter.Shared.Render(StoryPage(Nav())).Content;
-        Assert.DoesNotContain("IntersectionObserver", html);
-    }
+    // [Story 23.6 AC #1/#8] The TOC active-section pair was RETIRED here. Both asserted a chrome-level script
+    // `HtmlRenderAdapter.Render` appended after the body — `Toc.ActiveSectionScript`, gated on the body carrying
+    // a `.toc-sidebar`. The gate is unchanged in substance and moved to the renderer, which derives it from the
+    // same landmark (`web/ir/adapter.ts` § `chromeNeeds.needsToc`) and emits the script at `bodyClose`;
+    // `web/test/chrome-needs.test.ts` pins both the positive and negative case.
+    //
+    // ⚠️ Like mermaid, this script was MISSING from the rendered portal before Story 23.6 — the renderer never
+    // emitted it, so the sidebar highlighted nothing. These tests stayed green throughout, because their subject
+    // was a C# string that no longer reached a reader.
 
     [Fact]
     public void StoryPlaceholder_RendersUserStoryNoteAsOwnBlockAboveTheBlurb()

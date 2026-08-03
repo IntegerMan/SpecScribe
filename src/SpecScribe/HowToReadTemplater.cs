@@ -10,13 +10,6 @@ namespace SpecScribe;
 /// defines. [Story 10.3; Story 5.6; Help nav; How to use SpecScribe]</summary>
 public static class HowToReadTemplater
 {
-    /// <param name="module">The detected module context, passed WHOLE rather than as its three projections:
-    /// since Story 18.2 the glossary and command-legend sections need the module's identity state and label,
-    /// not just its term list, and threading two more positional parameters through would have made the
-    /// signature a list of facts that must be kept mutually consistent by every caller. [Story 18.2]</param>
-    public static string RenderPage(SiteNav nav, ModuleContext module) =>
-        HtmlRenderAdapter.Shared.Render(BuildPage(nav, module)).Content;
-
     /// <summary>Builds this page's host-neutral <see cref="PageView"/> — see
     /// <see cref="RiskQuadrantTemplater.BuildPage"/> for why every standalone templater grew one.
     /// <para>⚠️ <b>The body starts at <c>&lt;header class="doc-header"&gt;</c>, not at <c>&lt;main&gt;</c>.</b>

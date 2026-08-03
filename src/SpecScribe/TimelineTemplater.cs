@@ -12,16 +12,6 @@ namespace SpecScribe;
 /// artifact-driven list still renders; empty union → a friendly note. [Story 7.3]</summary>
 public static class TimelineTemplater
 {
-    public static string RenderPage(
-        GitPulse? git,
-        IReadOnlyList<DateOnly> daysNewestFirst,
-        IReadOnlyDictionary<DateOnly, IReadOnlyList<CommitInfo>> commitsByDay,
-        IReadOnlyDictionary<DateOnly, IReadOnlyList<(string Label, string Href)>> artifactsByDay,
-        SiteNav nav,
-        DateOnly? today = null) =>
-        HtmlRenderAdapter.Shared.Render(
-            BuildPage(git, daysNewestFirst, commitsByDay, artifactsByDay, nav, today)).Content;
-
     /// <summary>Builds this page's host-neutral <see cref="PageView"/> — see
     /// <see cref="RiskQuadrantTemplater.BuildPage"/> for why every standalone templater grew one. [Story 23.4 AC #3]</summary>
     public static PageView BuildPage(

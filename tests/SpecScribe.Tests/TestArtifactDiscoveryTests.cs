@@ -28,8 +28,8 @@ public class TestArtifactDiscoveryTests : IDisposable
     private string Adrs => Path.Combine(_root, "docs", "adrs");
     private string Site => Path.Combine(_root, "site");
     private string ArtifactsDir => Path.Combine(Source, "test-artifacts");
-    private string IndexPage => Path.Combine(Site, "index.html");
-    private string TestArtifactsPage => Path.Combine(Site, "test-artifacts.html");
+    private string IndexRoute => "index.html";
+    private string TestArtifactsRoute => "test-artifacts.html";
 
     public TestArtifactDiscoveryTests()
     {
@@ -377,7 +377,7 @@ public class TestArtifactDiscoveryTests : IDisposable
         // Test Artifacts page itself still renders without the summary it could not read.
         var gen = new SiteGenerator(Options());
         var events = gen.GenerateAll();
-        Assert.True(File.Exists(TestArtifactsPage));
+        Assert.True(SiteRegion.Exists(Site, TestArtifactsRoute));
         Assert.Contains(events, e => e.Outcome == GenerationOutcome.Generated && e.RelativePath == "test-artifacts.html");
         Assert.DoesNotContain(events, e =>
             e.Outcome == GenerationOutcome.Error && !e.FromAdapterDiagnostic);
@@ -410,7 +410,7 @@ public class TestArtifactDiscoveryTests : IDisposable
         var gen = new SiteGenerator(Options());
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
-        var html = File.ReadAllText(TestArtifactsPage);
+        var html = SiteRegion.Read(Site, TestArtifactsRoute);
         // FR1 resolves against RequirementsModel.ById; 18.4-AC-1 resolves via its story-id prefix.
         Assert.Contains("Module test coverage by requirement", html);
         Assert.Contains(">FR1<", html);
@@ -431,7 +431,7 @@ public class TestArtifactDiscoveryTests : IDisposable
         var gen = new SiteGenerator(Options());
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
-        var html = File.ReadAllText(TestArtifactsPage);
+        var html = SiteRegion.Read(Site, TestArtifactsRoute);
         // The matrix's own FR1 row LOOKS joinable. It must not be joined, and the page must say why in words.
         Assert.DoesNotContain("Module test coverage by requirement", html);
         Assert.Contains("is <strong>not</strong> mapped onto this project", html);
@@ -448,12 +448,12 @@ public class TestArtifactDiscoveryTests : IDisposable
         var gen = new SiteGenerator(Options());
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
-        Assert.True(File.Exists(TestArtifactsPage));
-        var html = File.ReadAllText(TestArtifactsPage);
+        Assert.True(SiteRegion.Exists(Site, TestArtifactsRoute));
+        var html = SiteRegion.Read(Site, TestArtifactsRoute);
         Assert.Contains("Quality gate", html);
         // No epics.md ⇒ no requirements and no stories ⇒ nothing resolves, stated rather than blank.
         Assert.DoesNotContain("Module test coverage by requirement", html);
-        Assert.False(File.Exists(Path.Combine(Site, "traceability.html")));
+        Assert.False(SiteRegion.Exists(Site, "traceability.html"));
     }
 
     // ---- Generation-level surfaces --------------------------------------------------------------------------
@@ -469,9 +469,9 @@ public class TestArtifactDiscoveryTests : IDisposable
         var gen = new SiteGenerator(Options());
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
-        Assert.True(File.Exists(TestArtifactsPage));
+        Assert.True(SiteRegion.Exists(Site, TestArtifactsRoute));
 
-        var index = File.ReadAllText(IndexPage);
+        var index = SiteRegion.Read(Site, IndexRoute);
         Assert.Contains("test-artifacts.html", index);          // nav entry + quick link
         Assert.Contains("module-coverage-panel", index);        // the dashboard panel
         Assert.Contains("Module Coverage", index);
@@ -488,7 +488,7 @@ public class TestArtifactDiscoveryTests : IDisposable
         var gen = new SiteGenerator(Options());
         gen.GenerateAll();
 
-        var html = File.ReadAllText(TestArtifactsPage);
+        var html = SiteRegion.Read(Site, TestArtifactsRoute);
         foreach (var tier in Enum.GetValues<CoverageTier>())
         {
             if (tier == CoverageTier.Unsupported) continue; // no unsupported artifact in this fixture
@@ -511,16 +511,17 @@ public class TestArtifactDiscoveryTests : IDisposable
         var gen = new SiteGenerator(Options());
         gen.GenerateAll();
 
-        var renderedNfr = Directory
-            .EnumerateFiles(Site, "nfr-assessment.html", SearchOption.AllDirectories)
+        // [Story 23.6 AC #8] Asked of the route set, not of a *.html walk: the double-render this guards against
+        // would now show up as two ROUTES for one document, and a walk that finds no files at all would report
+        // "rendered once" as readily as "not rendered".
+        var renderedNfr = SiteRegion.Routes(Site)
+            .Where(r => r.EndsWith("/nfr-assessment.html", StringComparison.Ordinal) || r == "nfr-assessment.html")
             .ToList();
         Assert.Single(renderedNfr);
-        Assert.Equal(
-            Path.Combine(Site, "test-artifacts", "nfr-assessment.html"),
-            renderedNfr[0]);
+        Assert.Equal("test-artifacts/nfr-assessment.html", renderedNfr[0]);
 
         // And the list page links exactly that page.
-        Assert.Contains("test-artifacts/nfr-assessment.html", File.ReadAllText(TestArtifactsPage));
+        Assert.Contains("test-artifacts/nfr-assessment.html", SiteRegion.Read(Site, TestArtifactsRoute));
     }
 
     [Fact]
@@ -555,9 +556,9 @@ public class TestArtifactDiscoveryTests : IDisposable
         Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
 
         // No page.
-        Assert.False(File.Exists(TestArtifactsPage));
+        Assert.False(SiteRegion.Exists(Site, TestArtifactsRoute));
 
-        var index = File.ReadAllText(IndexPage);
+        var index = SiteRegion.Read(Site, IndexRoute);
         // No nav entry, no quick link, no panel — and no notice either. Absent, never "0 artifacts". [NFR8]
         Assert.DoesNotContain("test-artifacts.html", index);
         Assert.DoesNotContain("Module Coverage", index);
@@ -565,9 +566,9 @@ public class TestArtifactDiscoveryTests : IDisposable
         Assert.DoesNotContain(events, e => e.Message is { } m && m.Contains("test artifact", StringComparison.OrdinalIgnoreCase));
 
         // BMM's own surfaces are untouched.
-        Assert.True(File.Exists(Path.Combine(Site, "epics.html")));
-        Assert.True(File.Exists(Path.Combine(Site, "requirements.html")));
-        Assert.True(File.Exists(Path.Combine(Site, "traceability.html")));
+        Assert.True(SiteRegion.Exists(Site, "epics.html"));
+        Assert.True(SiteRegion.Exists(Site, "requirements.html"));
+        Assert.True(SiteRegion.Exists(Site, "traceability.html"));
     }
 
     [Fact]

@@ -17,45 +17,6 @@ namespace SpecScribe;
 /// legible monospace with working line numbers and <c>#L{n}</c> anchors.</summary>
 public static class CodeFileTemplater
 {
-    /// <summary>Renders the full code page. In this tool a code page leads with its <em>relationships</em> — the
-    /// graph of artifacts that reference the file — and treats the source itself as secondary supporting detail;
-    /// <see cref="AppendRelationships"/> is emitted first and the source table drops into a clearly-secondary
-    /// <c>&lt;section class="code-source-section"&gt;</c> below it. <paramref name="lines"/> is still rendered verbatim
-    /// — one anchored <c>.code-line</c> per element, numbered from 1, including blank lines — so line numbers stay
-    /// 1:1 and every locked <c>id="L{n}"</c> anchor still resolves for Story 7.2's deep links. The caller owns
-    /// newline normalization; escaping is applied here. <paramref name="referencedBy"/> (Story 7.2, AC #2) is the set
-    /// of citing artifacts (output-relative URL + display title); an empty list omits the whole relationships block.
-    /// <paramref name="externalSourceUrl"/> (Story 7.7), when set, adds an additive "view online" link to the hosted
-    /// source — it never replaces the in-portal page.
-    ///
-    /// <para><paramref name="insight"/> (Story 7.4), when non-null, appends an opt-in "Advanced coverage" section
-    /// under the source: the file's contributors (attribution), change frequency, coupled files, and a bounded
-    /// change history — all gated on <c>--deep-git</c> upstream. A null insight renders nothing extra, so the
-    /// baseline page is byte-identical to a run without deep-git. <paramref name="coupledFileHref"/> resolves a
-    /// coupled file's repo-relative path to its <c>code/…html</c> page (null → plain text), and
-    /// <paramref name="commitHref"/> resolves a history entry's short hash to its <c>commit/…html</c> page (null →
-    /// plain <c>&lt;code&gt;</c>), and <paramref name="dayHref"/> resolves a history entry's date to its
-    /// <c>commits/{date}.html</c> page (null → plain text); all three return output-relative paths that this method
-    /// prefixes.</para></summary>
-    public static string RenderPage(
-        string repoRelativePath,
-        string outputRelativePath,
-        IReadOnlyList<string> lines,
-        SiteNav nav,
-        IReadOnlyList<(string OutputUrl, string Title, (int Number, string Title)? Epic)>? referencedBy = null,
-        string? externalSourceUrl = null,
-        FileInsight? insight = null,
-        Func<string, string?>? coupledFileHref = null,
-        Func<string, string?>? commitHref = null,
-        Func<DateOnly, string?>? dayHref = null,
-        EntityPager? pager = null,
-        IReadOnlyList<(int RefIndex, int RelatedIndex)>? storyRelatedEdges = null,
-        IReadOnlyList<(int RelatedIndexA, int RelatedIndexB)>? relatedRelatedEdges = null,
-        NavLocalContext? localContext = null) =>
-        HtmlRenderAdapter.Shared.Render(BuildPage(
-            repoRelativePath, outputRelativePath, lines, nav, referencedBy, externalSourceUrl, insight,
-            coupledFileHref, commitHref, dayHref, pager, storyRelatedEdges, relatedRelatedEdges, localContext)).Content;
-
     /// <summary>Builds a code page's host-neutral <see cref="PageView"/> — the AD-2 delivery contract, so the IR's
     /// content region can be COMPOSED (<see cref="JsonSpaRenderAdapter.RenderContent"/>: nav markup + wayfinding +
     /// body) instead of sliced back out of a rendered full page. <see cref="RenderPage"/> is the unchanged HTML
@@ -880,31 +841,6 @@ public static class CodeFileTemplater
         var i = norm.LastIndexOf('/');
         return i >= 0 && i < norm.Length - 1 ? norm[(i + 1)..] : norm;
     }
-
-
-    /// <summary>Renders a clearly-marked placeholder page for a referenced file that exists but can't be shown
-    /// inline (binary, oversized, or unreadable). The page still carries the full nav/breadcrumb/a11y shell and a
-    /// stable URL so navigation never breaks (AC #1) — only the line table is replaced by an explanatory note.
-    /// When deep-git <paramref name="insight"/> (or relationships) is available, Insights/History/Relationships tabs
-    /// still render — the Code panel holds the placeholder reason. [spec-7-1-deferred-debt-cleanup]</summary>
-    public static string RenderPlaceholder(
-        string repoRelativePath,
-        string outputRelativePath,
-        string reason,
-        SiteNav nav,
-        IReadOnlyList<(string OutputUrl, string Title, (int Number, string Title)? Epic)>? referencedBy = null,
-        string? externalSourceUrl = null,
-        EntityPager? pager = null,
-        NavLocalContext? localContext = null,
-        FileInsight? insight = null,
-        Func<string, string?>? coupledFileHref = null,
-        Func<string, string?>? commitHref = null,
-        Func<DateOnly, string?>? dayHref = null,
-        IReadOnlyList<(int RefIndex, int RelatedIndex)>? storyRelatedEdges = null,
-        IReadOnlyList<(int RelatedIndexA, int RelatedIndexB)>? relatedRelatedEdges = null) =>
-        HtmlRenderAdapter.Shared.Render(BuildPlaceholderPage(
-            repoRelativePath, outputRelativePath, reason, nav, referencedBy, externalSourceUrl, pager, localContext,
-            insight, coupledFileHref, commitHref, dayHref, storyRelatedEdges, relatedRelatedEdges)).Content;
 
     /// <summary>Builds a not-rendered code page's host-neutral <see cref="PageView"/> — see
     /// <see cref="BuildPage"/>. No Prism head here: a placeholder renders no <c>&lt;code&gt;</c> block.

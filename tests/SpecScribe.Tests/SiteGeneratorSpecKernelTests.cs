@@ -12,8 +12,8 @@ public class SiteGeneratorSpecKernelTests : IDisposable
     private string Source => Path.Combine(_root, "_bmad-output");
     private string Adrs => Path.Combine(_root, "docs", "adrs");
     private string Site => Path.Combine(_root, "site");
-    private string HomeIndex => Path.Combine(Site, "index.html");
-    private string SpecPage => Path.Combine(Site, "specs", "spec-x", "SPEC.html");
+    private string HomeIndexRoute => "index.html";
+    private string SpecRoute => "specs/spec-x/SPEC.html";
 
     private const string EpicsMd = """
         # Epics
@@ -104,7 +104,7 @@ public class SiteGeneratorSpecKernelTests : IDisposable
     {
         GenerateSite();
 
-        var index = File.ReadAllText(HomeIndex);
+        var index = SiteRegion.Read(Site, HomeIndexRoute);
         // The Spec quick-link pill is the surviving reachability net for the spec kernel on home. [spec-declutter-home-dashboard]
         Assert.Contains(">Spec</a>", index);
         // The home Spec Kernel index band was removed with the rest of the home index bands — no band title,
@@ -119,7 +119,7 @@ public class SiteGeneratorSpecKernelTests : IDisposable
     {
         GenerateSite();
 
-        var spec = File.ReadAllText(SpecPage);
+        var spec = SiteRegion.Read(Site, SpecRoute);
         Assert.Contains("class=\"companion-docs\"", spec);
         // Present companions resolve to their generated pages (SPEC.html sits two dirs deep → ../../).
         Assert.Contains("href=\"../../specs/spec-x/requirements-catalog.html\"", spec);
@@ -135,7 +135,7 @@ public class SiteGeneratorSpecKernelTests : IDisposable
     {
         GenerateSite();
 
-        var spec = File.ReadAllText(SpecPage);
+        var spec = SiteRegion.Read(Site, SpecRoute);
         // The companion block lives inside the two-column page shell's rail, beneath the TOC — not the content
         // column. Assert it renders after the TOC sidebar, both inside .page-shell. [Story 2.2 polish]
         var shell = spec.IndexOf("class=\"page-shell\"", StringComparison.Ordinal);
@@ -150,7 +150,7 @@ public class SiteGeneratorSpecKernelTests : IDisposable
     {
         GenerateSite();
 
-        var spec = File.ReadAllText(SpecPage);
+        var spec = SiteRegion.Read(Site, SpecRoute);
         // The authored CAP-N / intent / success bullet nest is restyled into cards. [Story 2.2 polish]
         Assert.Contains("<div class=\"capabilities\">", spec);
         Assert.Contains("<div class=\"capability-id\">CAP-1</div>", spec);
@@ -168,7 +168,7 @@ public class SiteGeneratorSpecKernelTests : IDisposable
         Directory.Delete(Path.Combine(Source, "specs"), recursive: true);
         GenerateSite();
 
-        var index = File.ReadAllText(HomeIndex);
+        var index = SiteRegion.Read(Site, HomeIndexRoute);
         // The Spec Kernel section BAND is omitted (Story 2.2 graceful degradation). Assert the band title
         // specifically — the Story 3.3 Planning Coverage panel legitimately names Spec Kernel as a *missing*
         // family (AC #1 "key missing families"), so a blanket string check would be a false positive.
@@ -182,7 +182,7 @@ public class SiteGeneratorSpecKernelTests : IDisposable
         GenerateSite();
 
         // Standalone spec pages keep the shared "On this page" TOC sidebar (verify, don't rebuild — Task 5).
-        var spec = File.ReadAllText(SpecPage);
+        var spec = SiteRegion.Read(Site, SpecRoute);
         Assert.Contains("toc-sidebar", spec);
         Assert.Contains(">Why</a>", spec);
     }

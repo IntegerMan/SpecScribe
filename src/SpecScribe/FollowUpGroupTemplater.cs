@@ -9,9 +9,6 @@ namespace SpecScribe;
 /// [Story 9.13; spec-follow-up-list-batch-actions]</summary>
 public static class FollowUpGroupTemplater
 {
-    public static string RenderPage(FollowUpGroupSpec group, SiteNav nav, CommandCatalog? commands = null) =>
-        HtmlRenderAdapter.Shared.Render(BuildPage(group, nav, commands)).Content;
-
     /// <summary>Builds a group page's host-neutral <see cref="PageView"/> — the AD-2 delivery contract, so the
     /// IR's content region can be COMPOSED (<see cref="JsonSpaRenderAdapter.RenderContent"/>: nav markup +
     /// wayfinding + body) instead of sliced back out of a rendered full page. <see cref="RenderPage"/> is the

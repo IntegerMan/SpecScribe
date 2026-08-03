@@ -476,7 +476,7 @@ public class RetroTests : IDisposable
             // never ingested, so both all-done epics read "In review".
             foreach (var number in new[] { 1, 2 })
             {
-                var epicHtml = File.ReadAllText(Path.Combine(site, "epics", $"epic-{number}.html"));
+                var epicHtml = SiteRegion.Read(site, $"epics/epic-{number}.html");
                 Assert.Contains("epic-1-2-retro-2026-07-20.html", epicHtml);
                 // The epic's OWN header badge — asserted on the badge class, not on the page text: the status
                 // legend renders the word "In review" on every page regardless of this epic's tier.
@@ -485,7 +485,7 @@ public class RetroTests : IDisposable
             }
 
             // And it is a first-class retro page naming both epics, not a generic document.
-            var retroHtml = File.ReadAllText(Path.Combine(site, "implementation-artifacts", "epic-1-2-retro-2026-07-20.html"));
+            var retroHtml = SiteRegion.Read(site, "implementation-artifacts/epic-1-2-retro-2026-07-20.html");
             Assert.Contains("<div class=\"story-kicker\">Epics 1 &amp; 2 Retrospective</div>", retroHtml);
             Assert.Contains("epics/epic-1.html", retroHtml);
             Assert.Contains("epics/epic-2.html", retroHtml);

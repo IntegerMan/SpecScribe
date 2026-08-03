@@ -24,14 +24,6 @@ namespace SpecScribe;
 /// [Story 7.6; Story 20.9 conversion]</para></summary>
 public static class CodeMapTemplater
 {
-    /// <summary>Renders the whole page from all four precomputed filter combinations (<see cref="CodeMap.BuildVariants"/>).
-    /// Headline stats describe the unfiltered ("full") variant regardless of which panel the checkboxes currently show
-    /// — the checkboxes are a view onto one codebase, not a different one. <paramref name="fileHref"/> is the guarded
-    /// in-portal code-page resolver (Story 7.1): a non-null return routes a file to its code page, a null return (or a
-    /// null resolver) leaves it a plain, focusable rect — never a broken link.</summary>
-    public static string RenderPage(IReadOnlyList<CodeMapVariant> variants, SiteNav nav, Func<string, string?>? fileHref = null) =>
-        HtmlRenderAdapter.Shared.Render(BuildPage(variants, nav, fileHref)).Content;
-
     /// <summary>Builds this page's host-neutral <see cref="PageView"/> — see
     /// <see cref="RiskQuadrantTemplater.BuildPage"/> for why every standalone templater grew one. This page emits
     /// NO boot marker at all (neither head nor inline) and only pulls the engine, which is the third of the three

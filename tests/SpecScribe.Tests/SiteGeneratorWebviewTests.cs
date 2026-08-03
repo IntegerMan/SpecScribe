@@ -525,7 +525,7 @@ public class SiteGeneratorWebviewTests : IDisposable
         var gen = GeneratedSite();
         var bundle = gen.RenderWebviewSurfaces();
 
-        var staticIndex = File.ReadAllText(Path.Combine(Site, "index.html"));
+        var staticIndex = SiteRegion.Read(Site, "index.html");
         var webviewMain = MainBlock(bundle.Surfaces.Single(s => s.OutputRelativePath == "index.html").ContentHtml);
         var staticMain = MainBlock(staticIndex);
 
@@ -571,7 +571,7 @@ public class SiteGeneratorWebviewTests : IDisposable
         // The sliced nav stops at the nav element: the HTML surface's inline toggle script never rides along.
         Assert.DoesNotContain("<script", adr.ContentHtml);
         // …and it agrees byte-for-byte with what the static page rendered, because it IS that string.
-        var staticAdr = File.ReadAllText(Path.Combine(Site, "adrs", "0001-a-decision.html"));
+        var staticAdr = SiteRegion.Read(Site, "adrs/0001-a-decision.html");
         var staticNav = staticAdr[staticAdr.IndexOf("<nav class=\"site-nav\"", StringComparison.Ordinal)..];
         staticNav = staticNav[..(staticNav.IndexOf("</nav>", StringComparison.Ordinal) + "</nav>".Length)];
         Assert.Contains(staticNav, adr.ContentHtml);
@@ -789,7 +789,7 @@ public class SiteGeneratorWebviewTests : IDisposable
         var gen = GeneratedSiteWithCapture();
         var bundle = gen.RenderWebviewSurfaces();
 
-        Assert.True(File.Exists(Path.Combine(Site, "adrs", "index.html")), "synthesized landing written to the site");
+        Assert.True(SiteRegion.Exists(Site, "adrs/index.html"), "synthesized landing written to the site");
         var landing = bundle.Surfaces.Single(s => s.OutputRelativePath == SiteNav.AdrsLandingOutputPath);
         Assert.Contains("0001-a-decision.html", landing.ContentHtml);
         Assert.Contains("ADR 0001: A Decision", landing.ContentHtml);
@@ -811,9 +811,9 @@ public class SiteGeneratorWebviewTests : IDisposable
 
             Assert.Contains(events, e => e.Outcome == GenerationOutcome.Error
                 && e.RelativePath.Contains("README", StringComparison.OrdinalIgnoreCase));
-            Assert.True(File.Exists(Path.Combine(Site, "adrs", "index.html")),
+            Assert.True(SiteRegion.Exists(Site, "adrs/index.html"),
                 "synthesized landing written despite the README failing to render");
-            var landingHtml = File.ReadAllText(Path.Combine(Site, "adrs", "index.html"));
+            var landingHtml = SiteRegion.Read(Site, "adrs/index.html");
             Assert.Contains("0001-a-decision.html", landingHtml);
         }
     }
@@ -830,7 +830,7 @@ public class SiteGeneratorWebviewTests : IDisposable
         var gen = new SiteGenerator(Options());
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
-        var landingHtml = File.ReadAllText(Path.Combine(Site, "adrs", "index.html"));
+        var landingHtml = SiteRegion.Read(Site, "adrs/index.html");
         Assert.Contains("Decisions Overview", landingHtml);
         Assert.Contains("Hand-authored index.", landingHtml);
     }
@@ -864,7 +864,7 @@ public class SiteGeneratorWebviewTests : IDisposable
 
         var bundle = GeneratedSiteWithCapture().RenderWebviewSurfaces();
 
-        Assert.True(File.Exists(Path.Combine(Site, "code", "src", "Widget.cs.html")),
+        Assert.True(SiteRegion.Exists(Site, "code/src/Widget.cs.html"),
             "the code page itself is still generated into the site");
         Assert.DoesNotContain(bundle.Surfaces,
             s => s.OutputRelativePath.StartsWith("code/", StringComparison.OrdinalIgnoreCase));

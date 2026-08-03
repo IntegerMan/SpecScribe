@@ -15,8 +15,8 @@ public class SiteGeneratorGroupedNavTests : IDisposable
     private string Source => Path.Combine(_root, "_bmad-output");
     private string Adrs => Path.Combine(_root, "docs", "adrs");
     private string Site => Path.Combine(_root, "site");
-    private string IndexPage => Path.Combine(Site, "index.html");
-    private string EpicsPage => Path.Combine(Site, "epics.html");
+    private string IndexRoute => "index.html";
+    private string EpicsRoute => "epics.html";
 
     private const string EpicsMd = """
         # Epics
@@ -107,21 +107,21 @@ public class SiteGeneratorGroupedNavTests : IDisposable
         var events = new SiteGenerator(Options(deepGit: false)).GenerateAll();
         AssertNoErrors(events);
 
-        var index = File.ReadAllText(IndexPage);
-        var epics = File.ReadAllText(EpicsPage);
+        var index = SiteRegion.Read(Site, IndexRoute);
+        var epics = SiteRegion.Read(Site, EpicsRoute);
 
         Assert.DoesNotContain("site-nav-group-summary\">Insights", index);
         Assert.DoesNotContain("git-insights.html", index);
         Assert.DoesNotContain("deep-analytics.html", index);
         Assert.DoesNotContain(">Structure<", index);
-        Assert.False(File.Exists(Path.Combine(Site, "structure.html")));
+        Assert.False(SiteRegion.Exists(Site, "structure.html"));
 
         Assert.Contains("Delivery", index);
         Assert.Contains("site-nav-group", index);
         Assert.Contains("<summary class=\"site-nav-group-summary\"", index);
 
-        AssertNoBrokenLocalLinks(IndexPage);
-        AssertNoBrokenLocalLinks(EpicsPage);
+        SiteRegion.AssertNoBrokenLocalLinks(Site, IndexRoute);
+        SiteRegion.AssertNoBrokenLocalLinks(Site, EpicsRoute);
         Assert.DoesNotContain("site-nav-group-summary\">Insights", epics);
     }
 
@@ -136,16 +136,16 @@ public class SiteGeneratorGroupedNavTests : IDisposable
         var events = new SiteGenerator(Options()).GenerateAll();
         AssertNoErrors(events);
 
-        Assert.True(File.Exists(Path.Combine(Site, "action-items.html")));
-        Assert.True(File.Exists(Path.Combine(Site, "implementation-artifacts", "deferred-work.html")));
+        Assert.True(SiteRegion.Exists(Site, "action-items.html"));
+        Assert.True(SiteRegion.Exists(Site, "implementation-artifacts/deferred-work.html"));
 
-        foreach (var page in new[] { IndexPage, EpicsPage })
+        foreach (var page in new[] { IndexRoute, EpicsRoute })
         {
-            var html = File.ReadAllText(page);
+            var html = SiteRegion.Read(Site, page);
             Assert.Contains("Follow-ups", html);
             Assert.Contains("href=\"action-items.html\"", html);
             Assert.Contains("href=\"implementation-artifacts/deferred-work.html\"", html);
-            AssertNoBrokenLocalLinks(page);
+            SiteRegion.AssertNoBrokenLocalLinks(Site, page);
         }
     }
 
@@ -155,10 +155,10 @@ public class SiteGeneratorGroupedNavTests : IDisposable
         var events = new SiteGenerator(Options()).GenerateAll();
         AssertNoErrors(events);
 
-        var index = File.ReadAllText(IndexPage);
+        var index = SiteRegion.Read(Site, IndexRoute);
         Assert.DoesNotContain("Follow-ups", index);
         Assert.DoesNotContain("action-items.html", index);
-        Assert.False(File.Exists(Path.Combine(Site, "action-items.html")));
+        Assert.False(SiteRegion.Exists(Site, "action-items.html"));
     }
 
     [Fact]
@@ -170,35 +170,17 @@ public class SiteGeneratorGroupedNavTests : IDisposable
         var events = new SiteGenerator(Options(deepGit: true)).GenerateAll();
         AssertNoErrors(events);
 
-        Assert.True(File.Exists(Path.Combine(Site, "git-insights.html")));
-        Assert.True(File.Exists(Path.Combine(Site, "deep-analytics.html")));
+        Assert.True(SiteRegion.Exists(Site, "git-insights.html"));
+        Assert.True(SiteRegion.Exists(Site, "deep-analytics.html"));
 
-        var epics = File.ReadAllText(EpicsPage);
+        var epics = SiteRegion.Read(Site, EpicsRoute);
         Assert.Contains("Insights", epics);
         Assert.Contains("href=\"git-insights.html\"", epics);
         Assert.Contains("href=\"deep-analytics.html\"", epics);
-        AssertNoBrokenLocalLinks(EpicsPage);
-        AssertNoBrokenLocalLinks(IndexPage);
+        SiteRegion.AssertNoBrokenLocalLinks(Site, EpicsRoute);
+        SiteRegion.AssertNoBrokenLocalLinks(Site, IndexRoute);
     }
 
-    private void AssertNoBrokenLocalLinks(string pagePath)
-    {
-        var html = File.ReadAllText(pagePath);
-        var pageDir = Path.GetDirectoryName(pagePath)!;
-        foreach (Match m in Regex.Matches(html, "href=\"([^\"]+)\""))
-        {
-            var raw = m.Groups[1].Value;
-            if (raw.StartsWith("#", StringComparison.Ordinal)
-                || Regex.IsMatch(raw, "^[a-zA-Z][a-zA-Z0-9+.-]*:"))
-                continue;
-
-            var target = raw.Split('#')[0].Split('?')[0];
-            if (target.Length == 0) continue;
-
-            var resolved = Path.GetFullPath(Path.Combine(pageDir, target.Replace('/', Path.DirectorySeparatorChar)));
-            Assert.True(File.Exists(resolved), $"broken link: {raw} → {resolved}");
-        }
-    }
 
     private bool TryCreateGitHistory()
     {

@@ -24,9 +24,25 @@ public sealed record SemanticFacts
     public required string? ParentDrillTarget { get; init; }
     public required IReadOnlyList<string> ChildDrillTargets { get; init; }
     public required string? StatusStage { get; init; }
-    public required string Stylesheet { get; init; }
-    public required string Script { get; init; }
+
+    /// <summary>The page's region carries at least one rendered mermaid diagram.
+    /// <para>[Story 23.6] Re-derived from the REGION (`Mermaid.BlockMarker`) rather than from the deleted head's
+    /// `mermaid.initialize` script. It stays a semantic fact because the webview declares a SANCTIONED
+    /// divergence on it — the panel does not run mermaid — and deleting the fact would have deleted the meaning
+    /// of that declaration along with the test that pins it.</para></summary>
     public required bool MermaidPresent { get; init; }
+
+    // [Story 23.6 AC #1] `Stylesheet` and `Script` were REMOVED from this record.
+    //
+    // Both were evidenced by scanning a rendered DOCUMENT for `<link rel="stylesheet">` and
+    // `<script src=… defer>` — head tags that only `HtmlRenderAdapter.Render` ever emitted. No C# surface produces a head now: the two remaining delivery adapters both emit the REGION, and
+    // the renderer builds the head from the IR (`web/components/surfaces/IrSurface.vue`).
+    //
+    // Keeping them would have been worse than removing them. `FromPageView` reads the expected values straight
+    // off `page.Assets`, so they would have compared a populated expectation against an always-empty
+    // observation and reported three divergences on every page — or, if defaulted to match, three facts
+    // asserting nothing. What owns them instead: `npm run check:parity`'s `pageSha` (the whole rendered page,
+    // frozen corpus) for the asset links.
 }
 
 /// <summary>The host-neutral MEANING of a decomposed page BODY, distilled to the SECTION facts a delivery
@@ -94,8 +110,6 @@ public static class RenderParity
         RegexOptions.Compiled | RegexOptions.Singleline);
     private static readonly Regex Anchor = new("<a href=\"(?<href>[^\"]*)\"(?<attrs>[^>]*)>(?<content>.*?)</a>", RegexOptions.Compiled | RegexOptions.Singleline);
     private static readonly Regex CrumbEntry = new("<a href=\"(?<href>[^\"]*)\">(?<label>.*?)</a>|<span class=\"crumb-current\"[^>]*>(?<current>.*?)</span>", RegexOptions.Compiled | RegexOptions.Singleline);
-    private static readonly Regex Stylesheet = new("<link rel=\"stylesheet\" href=\"(?<href>[^\"]*)\">", RegexOptions.Compiled);
-    private static readonly Regex Script = new("<script src=\"(?<href>[^\"]*)\" defer>", RegexOptions.Compiled);
     // Any anchor's href, in document order — used to evidence the ACTUAL order children appear in, rather than
     // trusting the reference's own declared order (a surface that renders children out of order must be caught).
     private static readonly Regex AnyAnchorHref = new("<a[^>]+href=\"(?<href>[^\"]*)\"", RegexOptions.Compiled);
@@ -116,12 +130,14 @@ public static class RenderParity
         ParentDrillTarget = page.Interaction.ParentTarget is { } p ? NormalizeTarget(p) : null,
         ChildDrillTargets = page.Interaction.ChildTargets.Select(NormalizeTarget).ToList(),
         StatusStage = page.Interaction.StatusStage,
-        Stylesheet = NormalizeTarget(page.Assets.StylesheetHref),
-        Script = NormalizeTarget(page.Assets.ScriptHref),
         MermaidPresent = page.Assets.MermaidNeeded,
     };
 
-    /// <summary>The facts a surface's rendered <paramref name="html"/> EVIDENCES. The <paramref name="reference"/>
+    /// <summary>The facts a surface's rendered CONTENT REGION <paramref name="html"/> EVIDENCES.
+    /// <para>[Story 23.6 AC #1] The parameter used to be a whole document. It is the region now — nav markup +
+    /// wayfinding + body — because that is the only thing any C# delivery adapter produces. Every fact this
+    /// harness still checks lives in the region; the three that did not were removed (see
+    /// <see cref="SemanticFacts"/>).</para> The <paramref name="reference"/>
     /// supplies the checklist of drill children / status stage to look for, so a fact the output DROPPED (a child
     /// link that isn't there, a status badge that isn't rendered) simply doesn't appear here and the comparison
     /// with <see cref="FromPageView"/> flags it. [Story 6.1]</summary>
@@ -134,9 +150,6 @@ public static class RenderParity
         var breadcrumb = ExtractBreadcrumb(html);
         var parent = breadcrumb.LastOrDefault(c => c.Target is not null)?.Target;
 
-        var cssMatch = Stylesheet.Match(html);
-        var scriptMatch = Script.Match(html);
-
         return new SemanticFacts
         {
             SiteTitle = siteTitle,
@@ -147,14 +160,12 @@ public static class RenderParity
             // renders children correctly-present but out of order is caught by the SequenceEqual in
             // FindDivergences, not masked by re-deriving order from what we're supposed to be checking against.
             ChildDrillTargets = ExtractChildDrillTargets(html, reference.Interaction.ChildTargets),
+            MermaidPresent = html.Contains(Mermaid.BlockMarker, StringComparison.Ordinal),
             // The status stage is evidenced only if the page actually renders a badge carrying it. Matches the
             // <span class="status-badge ..."> element itself (word-bounded, order/extra-class tolerant) rather than
             // a raw substring, so an unrelated "status-badge {s}" occurring elsewhere can't false-positive and a
             // reordered/extended class list on the real badge can't false-negative.
             StatusStage = reference.Interaction.StatusStage is { } s && StatusBadgeMatches(html, s) ? s : null,
-            Stylesheet = cssMatch.Success ? NormalizeTarget(cssMatch.Groups["href"].Value) : string.Empty,
-            Script = scriptMatch.Success ? NormalizeTarget(scriptMatch.Groups["href"].Value) : string.Empty,
-            MermaidPresent = html.Contains("mermaid.initialize", StringComparison.Ordinal),
         };
     }
 
@@ -185,8 +196,6 @@ public static class RenderParity
         Check("drill.parent", expected.ParentDrillTarget == actual.ParentDrillTarget, () => $"'{expected.ParentDrillTarget}' vs '{actual.ParentDrillTarget}'");
         Check("drill.child", expected.ChildDrillTargets.SequenceEqual(actual.ChildDrillTargets), () => $"missing [{string.Join(", ", expected.ChildDrillTargets.Except(actual.ChildDrillTargets))}]");
         Check("status", expected.StatusStage == actual.StatusStage, () => $"'{expected.StatusStage}' vs '{actual.StatusStage}'");
-        Check("asset.css", expected.Stylesheet == actual.Stylesheet, () => $"'{expected.Stylesheet}' vs '{actual.Stylesheet}'");
-        Check("asset.js", expected.Script == actual.Script, () => $"'{expected.Script}' vs '{actual.Script}'");
         Check("mermaid", expected.MermaidPresent == actual.MermaidPresent, () => $"{expected.MermaidPresent} vs {actual.MermaidPresent}");
         return divergences;
     }

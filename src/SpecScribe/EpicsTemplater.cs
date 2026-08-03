@@ -9,9 +9,6 @@ namespace SpecScribe;
 /// (the golden regression is the gate). [Story 6.1; Story 6.2]</para></summary>
 public static class EpicsTemplater
 {
-    public static string RenderIndex(EpicsModel model, ProgressModel progress, SiteNav nav, CommandCatalog commands, ProjectCounts? counts = null, FollowUpGeometry? followUps = null, UnplannedWorkGeometry? unplanned = null) =>
-        HtmlRenderAdapter.Shared.Render(BuildIndexPage(model, progress, nav, commands, counts, followUps, unplanned)).Content;
-
     /// <summary>Builds the epics-index <see cref="PageView"/> without committing to a surface — the mechanical
     /// split of <see cref="RenderIndex"/> (bytes unchanged: it now just feeds this through the HTML adapter) that
     /// lets the webview surface render the SAME page model through <see cref="WebviewRenderAdapter"/> instead of
@@ -59,9 +56,6 @@ public static class EpicsTemplater
         };
         return page;
     }
-
-    public static string RenderEpic(EpicInfo epic, EpicProgress progress, SiteNav nav, CommandCatalog commands, string? epicRetroPath = null, EntityPager? pager = null, FollowUpGeometry? followUps = null, UnplannedWorkGeometry? unplanned = null, PlanningCodeImpactData? impact = null, WorkGraphEpic? workGraph = null) =>
-        HtmlRenderAdapter.Shared.Render(BuildEpicPage(epic, progress, nav, commands, epicRetroPath, pager, followUps, unplanned, impact, workGraph)).Content;
 
     /// <summary>Builds an epic page's <see cref="PageView"/> — see <see cref="BuildIndexPage"/> for why the
     /// build/render split exists. [Story 6.4]</summary>
@@ -123,30 +117,6 @@ public static class EpicsTemplater
         };
         return page;
     }
-
-    public static string RenderStory(
-        EpicInfo epic,
-        StoryInfo story,
-        string artifactSourceRelativePath,
-        string blurbHtml,
-        string remainderHtml,
-        IReadOnlyList<AcceptanceCriterion> acceptanceCriteria,
-        IReadOnlyList<(string Label, string ContentHtml)> devAgentRecord,
-        IReadOnlyList<TaskItem> tasks,
-        string reviewFindingsHtml,
-        string changeLogHtml,
-        StoryEvidence evidence,
-        StoryChangeSurface changeSurface,
-        SiteNav nav,
-        CommandCatalog commands,
-        string? epicRetroPath = null,
-        EntityPager? pager = null,
-        FollowUpGeometry? followUps = null,
-        PlanningCodeImpactData? impact = null,
-        WorkGraphEpic? workGraph = null) =>
-        HtmlRenderAdapter.Shared.Render(BuildStoryPage(
-            epic, story, artifactSourceRelativePath, blurbHtml, remainderHtml, acceptanceCriteria, devAgentRecord,
-            tasks, reviewFindingsHtml, changeLogHtml, evidence, changeSurface, nav, commands, epicRetroPath, pager, followUps, impact, workGraph)).Content;
 
     /// <summary>Builds a drafted story page's <see cref="PageView"/> — see <see cref="BuildIndexPage"/> for why
     /// the build/render split exists. [Story 6.4]</summary>
@@ -228,14 +198,6 @@ public static class EpicsTemplater
         };
         return page;
     }
-
-    /// <summary>Renders the placeholder page for a story that exists in epics.md but has no implementation
-    /// artifact yet. Lives at the exact path the real story page will use (see
-    /// <see cref="StoryEpicLinkifier.StoryPagePath"/>), so inline "Story N.M" mentions always resolve and a
-    /// later-drafted artifact overwrites it in place. Shows what the plan already knows (narrative + epics.md
-    /// acceptance criteria) and signposts the create-story command instead of dead-ending.</summary>
-    public static string RenderStoryPlaceholder(EpicInfo epic, StoryInfo story, SiteNav nav, CommandCatalog commands, string? epicRetroPath = null, EntityPager? pager = null) =>
-        HtmlRenderAdapter.Shared.Render(BuildStoryPlaceholderPage(epic, story, nav, commands, epicRetroPath, pager)).Content;
 
     /// <summary>Builds an undrafted story's placeholder <see cref="PageView"/> — see <see cref="BuildIndexPage"/>
     /// for why the build/render split exists. [Story 6.4]</summary>

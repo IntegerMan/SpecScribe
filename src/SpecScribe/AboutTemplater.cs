@@ -120,9 +120,6 @@ public sealed record ProductMetadata(
 /// to <see cref="SiteNav.DiagnosticsOutputPath"/>. A small, static informational page (no JS). [Story 4.8 Task 5]</summary>
 public static class AboutTemplater
 {
-    public static string RenderPage(SiteNav nav) =>
-        HtmlRenderAdapter.Shared.Render(BuildPage(nav)).Content;
-
     /// <summary>Builds this page's host-neutral <see cref="PageView"/> — see
     /// <see cref="HowToReadTemplater.BuildPage"/> for why the body starts at the doc-header, not the landmark.
     /// [Story 23.4 AC #3]</summary>

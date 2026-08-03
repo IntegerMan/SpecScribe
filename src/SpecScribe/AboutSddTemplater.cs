@@ -7,23 +7,55 @@ namespace SpecScribe;
 /// and a vertical methodology state diagram (supported frameworks only). Always written. [About SDD]</summary>
 public static class AboutSddTemplater
 {
-    public static readonly (string Id, string Label, string OutputPath, bool Supported)[] Frameworks =
+    /// <summary>The framework roster. <c>Url</c> is the framework's CANONICAL documentation home and
+    /// <c>Blurb</c> a one-paragraph statement of what the framework actually is — both null where SpecScribe has
+    /// not pinned them yet, which is a visible choice rather than a silent omission.
+    ///
+    /// <para>⚠️ <c>Url</c>/<c>Blurb</c> exist because a roster of bare ids and labels proved genuinely ambiguous.
+    /// Story 12.1's spike found that "GSD" had no canonical URL recorded here OR in <c>README.md</c>, and that the
+    /// ambiguity had already produced a wrong answer: the story was drafted against <c>gsd-build/gsd-2</c> — the
+    /// RETIRED predecessor, which "now continues as GSD Pi" — instead of GSD Core, the current-version product.
+    /// The two GSD entries are DISTINCT products, not two versions of one: <b>GSD Core</b> is markdown-native
+    /// under <c>.planning/</c> with no database, while <b>GSD Pi</b> is SQLite-authoritative under <c>.gsd/</c>
+    /// with the markdown as rendered projections. Keep them pinned. [Story 12.1]</para>
+    ///
+    /// <para><c>Blurb</c> is a pre-composed HTML fragment (it carries <c>&lt;code&gt;</c> markers), not escaped
+    /// text — matching how every other body string in this templater is built.</para>
+    ///
+    /// <para><c>Label</c> deliberately stays "GSD"/"GSD-Pi" rather than becoming "GSD Core"/"GSD Pi": the labels
+    /// are load-bearing for nav pills and page titles, and the disambiguation the roster needed is carried by
+    /// <c>Url</c> + <c>Blurb</c>. Renaming the labels is a separate, owner-facing display decision.</para></summary>
+    public static readonly (string Id, string Label, string OutputPath, bool Supported, string? Url, string? Blurb)[] Frameworks =
     [
-        ("bmad", "BMad", SiteNav.AboutSddBmadOutputPath, true),
-        ("gds", "BMad GDS", SiteNav.AboutSddGdsOutputPath, true),
-        ("speckit", "Spec Kit", SiteNav.AboutSddSpecKitOutputPath, false),
-        ("gsd", "GSD", SiteNav.AboutSddGsdOutputPath, false),
-        ("gsd-pi", "GSD-Pi", SiteNav.AboutSddGsdPiOutputPath, false),
-        ("superpowers", "Superpowers", SiteNav.AboutSddSuperpowersOutputPath, false),
+        ("bmad", "BMad", SiteNav.AboutSddBmadOutputPath, true,
+            "https://github.com/bmad-code-org/BMAD-METHOD", null),
+        ("gds", "BMad GDS", SiteNav.AboutSddGdsOutputPath, true,
+            "https://github.com/bmad-code-org/bmad-module-game-dev-studio", null),
+        ("speckit", "Spec Kit", SiteNav.AboutSddSpecKitOutputPath, false,
+            "https://github.com/github/spec-kit",
+            "<strong>GitHub Spec Kit</strong> drives development from a specification: a <code>.specify/</code> "
+            + "install marker plus numbered <code>specs/&lt;NNN&gt;-slug/</code> folders holding a spec, plan, and "
+            + "task breakdown, authored through <code>/speckit.*</code> commands."),
+        ("gsd", "GSD", SiteNav.AboutSddGsdOutputPath, false,
+            "https://docs.opengsd.net/core",
+            "<strong>GSD Core</strong> (Get Shit Done) is a spec-driven framework layered on your existing AI "
+            + "coding runtime as <code>/gsd-*</code> slash commands. It keeps every artifact as plain Markdown and "
+            + "JSON in a <code>.planning/</code> directory &mdash; project brief, requirements, roadmap, and live "
+            + "state at the root, then one folder per phase &mdash; and decomposes work as Milestone &rarr; Phase "
+            + "&rarr; Task. There is no database: what is on disk is the project."),
+        ("gsd-pi", "GSD-Pi", SiteNav.AboutSddGsdPiOutputPath, false,
+            "https://docs.opengsd.net/pi",
+            "<strong>GSD Pi</strong> is Get Shit Done's autonomous agent CLI &mdash; the successor to GSD 2 &mdash; "
+            + "and it stores state differently from GSD Core. A SQLite database at <code>.gsd/gsd.db</code> is the "
+            + "single source of truth, and the Markdown beside it (<code>.gsd/</code> state, decisions, knowledge, "
+            + "and <code>milestones/</code>) is <em>rendered from</em> that database. Work decomposes as Milestone "
+            + "&rarr; Slice &rarr; Task. SpecScribe reads the Markdown projections, never the database."),
+        ("superpowers", "Superpowers", SiteNav.AboutSddSuperpowersOutputPath, false, null, null),
     ];
-
-    public static string RenderHub(SiteNav nav, bool methodPresent, bool gdsPresent) =>
-        HtmlRenderAdapter.Shared.Render(BuildHubPage(nav, methodPresent, gdsPresent)).Content;
 
     /// <summary>Builds the hub page's host-neutral <see cref="PageView"/> — the AD-2 delivery contract, so the
     /// IR's content region can be COMPOSED (<see cref="JsonSpaRenderAdapter.RenderContent"/>) instead of sliced
-    /// back out of a rendered full page. <see cref="RenderHub"/> is the unchanged HTML projection of this same
-    /// model, so the bytes are identical. [Story 23.4 AC #3]</summary>
+    /// back out of a rendered full page. [Story 23.4 AC #3]</summary>
     public static PageView BuildHubPage(SiteNav nav, bool methodPresent, bool gdsPresent)
     {
         var outputPath = SiteNav.AboutSddOutputPath;
@@ -71,9 +103,6 @@ public static class AboutSddTemplater
         return End(page, hasMermaid: false);
     }
 
-    public static string RenderFrameworkPage(SiteNav nav, string frameworkId, bool methodPresent, bool gdsPresent) =>
-        HtmlRenderAdapter.Shared.Render(BuildFrameworkPage(nav, frameworkId, methodPresent, gdsPresent)).Content;
-
     /// <summary>Builds a framework page's host-neutral <see cref="PageView"/> — see <see cref="BuildHubPage"/>.
     /// [Story 23.4 AC #3]</summary>
     public static PageView BuildFrameworkPage(SiteNav nav, string frameworkId, bool methodPresent, bool gdsPresent)
@@ -96,13 +125,13 @@ public static class AboutSddTemplater
         switch (frameworkId)
         {
             case "bmad":
-                AppendBmadBody(sb, detected);
+                AppendBmadBody(sb, detected, fw.Url!);
                 return End(page, hasMermaid: true);
             case "gds":
-                AppendGdsBody(sb, detected);
+                AppendGdsBody(sb, detected, fw.Url!);
                 return End(page, hasMermaid: true);
             default:
-                AppendComingSoonBody(sb, fw.Label);
+                AppendComingSoonBody(sb, fw.Label, fw.Url, fw.Blurb);
                 return End(page, hasMermaid: false);
         }
     }
@@ -166,7 +195,7 @@ public static class AboutSddTemplater
     private static void AppendCompactRow(StringBuilder sb, string label, bool supported) =>
         sb.Append($"      <tr><th scope=\"row\">{label}</th><td>{Check(supported)}</td></tr>\n");
 
-    private static void AppendBmadBody(StringBuilder sb, bool detected)
+    private static void AppendBmadBody(StringBuilder sb, bool detected, string url)
     {
         sb.Append("  <h2 id=\"overview\">What it is</h2>\n");
         sb.Append("  <p><strong>BMad</strong> (BMad Method) is an AI-assisted methodology for product briefs, ");
@@ -176,7 +205,7 @@ public static class AboutSddTemplater
         sb.Append("  <h2 id=\"get-started\">Get started</h2>\n");
         sb.Append("  <p>Install into a repo, then run the help skill to pick your next step:</p>\n");
         sb.Append("  <pre class=\"sdd-install\"><code>npx bmad-method install</code></pre>\n");
-        sb.Append("  <p>See <a href=\"https://github.com/bmad-code-org/BMAD-METHOD\">the official documentation</a> ");
+        sb.Append($"  <p>See <a href=\"{PathUtil.Html(url)}\">the official documentation</a> ");
         sb.Append("for more information and installation options.</p>\n");
         if (!detected)
             sb.Append("  <p class=\"sdd-absent-info\">BMad is not detected in this repository yet (_bmad/bmm).</p>\n");
@@ -277,7 +306,7 @@ public static class AboutSddTemplater
     private static void AppendModuleRow(StringBuilder sb, string label, string code, string treatment) =>
         sb.Append($"      <tr><th scope=\"row\">{PathUtil.Html(label)}</th><td><code>{PathUtil.Html(code)}</code></td><td>{treatment}</td></tr>\n");
 
-    private static void AppendGdsBody(StringBuilder sb, bool detected)
+    private static void AppendGdsBody(StringBuilder sb, bool detected, string url)
     {
         sb.Append("  <h2 id=\"overview\">What it is</h2>\n");
         sb.Append("  <p><strong>BMad GDS</strong> (Game Dev Studio) adapts BMad for game development — GDD, ");
@@ -287,7 +316,7 @@ public static class AboutSddTemplater
         sb.Append("  <h2 id=\"get-started\">Get started</h2>\n");
         sb.Append("  <p>Add the GDS module during BMad install (or to an existing install):</p>\n");
         sb.Append("  <pre class=\"sdd-install\"><code>npx bmad-method install --modules gds</code></pre>\n");
-        sb.Append("  <p>See <a href=\"https://github.com/bmad-code-org/bmad-module-game-dev-studio\">the official documentation</a> ");
+        sb.Append($"  <p>See <a href=\"{PathUtil.Html(url)}\">the official documentation</a> ");
         sb.Append("for more information and installation options.</p>\n");
         if (!detected)
             sb.Append("  <p class=\"sdd-absent-info\">BMad GDS is not detected in this repository yet (_bmad/gds).</p>\n");
@@ -313,11 +342,27 @@ public static class AboutSddTemplater
         sb.Append(Mermaid.Block(Mermaid.SddGdsDiagram()));
     }
 
-    private static void AppendComingSoonBody(StringBuilder sb, string label)
+    /// <summary>The placeholder body for a framework SpecScribe does not yet project. Carries the framework's
+    /// IDENTITY (<paramref name="blurb"/>) and its canonical documentation home (<paramref name="url"/>) when the
+    /// roster pins them, so "coming soon" still says what the thing IS rather than only that it is absent — the
+    /// same honest-absence posture NFR8 asks of every other surface. <paramref name="blurb"/> is pre-composed
+    /// HTML; <paramref name="label"/> and <paramref name="url"/> are escaped. [Story 12.1]</summary>
+    private static void AppendComingSoonBody(StringBuilder sb, string label, string? url, string? blurb)
     {
         sb.Append("  <h2 id=\"overview\">Coming soon</h2>\n");
+        if (!string.IsNullOrEmpty(blurb))
+        {
+            sb.Append($"  <p>{blurb}</p>\n");
+        }
+
         sb.Append($"  <p>{PathUtil.Html(label)} support in SpecScribe is planned. This page is a placeholder ");
         sb.Append("so the framework roster stays honest while adapters land in later epics.</p>\n");
+        if (!string.IsNullOrEmpty(url))
+        {
+            sb.Append($"  <p>See <a href=\"{PathUtil.Html(url)}\">the official documentation</a> ");
+            sb.Append("for more information and installation options.</p>\n");
+        }
+
         sb.Append("  <h2 id=\"specscribe-support\">SpecScribe support</h2>\n");
         AppendFamilySupportTable(sb, supported: false);
     }

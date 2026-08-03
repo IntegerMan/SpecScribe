@@ -1,6 +1,10 @@
+---
+baseline_commit: b397084d7704e1df670eeaafd6ba2c11ae3a696a
+---
+
 # Story 12.1: GSD and GSD-Pi Integration Spike
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -125,43 +129,90 @@ Live-checked at create-story via the GSD docs (`docs.opengsd.net`) and the `gsd-
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Confirm the contract shapes against live code (AC: #1)**
-  - [ ] Read `IArtifactAdapter.cs`, `ArtifactBundle.cs`, `AdapterDiagnostic.cs`, `BmadArtifactAdapter.cs`, `EpicsModel.cs`, `RequirementsModel.cs`, `RetroModel.cs`, `SprintStatus.cs` in full (paths above) — do not rely solely on this story's summary tables; they are a starting point, not a substitute for reading the code.
-  - [ ] Confirm (or correct) this story's claim that no adapter-selection registry exists (`SiteGenerator.cs:47-51`), and check whether Story 11.1 has already landed/recommended a registry shape (read its Completion Notes if `done`).
-  - [ ] Re-read the `gds` vs `gsd`/`gsd-pi` distinction in `AboutSddTemplater.cs` so you never conflate BMad GDS (supported) with GSD (this spike).
+- [x] **Task 1 — Confirm the contract shapes against live code (AC: #1)**
+  - [x] Read `IArtifactAdapter.cs`, `ArtifactBundle.cs`, `AdapterDiagnostic.cs`, `BmadArtifactAdapter.cs`, `EpicsModel.cs`, `RequirementsModel.cs`, `RetroModel.cs`, `SprintStatus.cs` in full (paths above) — do not rely solely on this story's summary tables; they are a starting point, not a substitute for reading the code.
+  - [x] Confirm (or correct) this story's claim that no adapter-selection registry exists (`SiteGenerator.cs:47-51`), and check whether Story 11.1 has already landed/recommended a registry shape (read its Completion Notes if `done`).
+  - [x] Re-read the `gds` vs `gsd`/`gsd-pi` distinction in `AboutSddTemplater.cs` so you never conflate BMad GDS (supported) with GSD (this spike).
 
-- [ ] **Task 2 — Obtain and inspect representative current-version GSD AND GSD-Pi repositories (AC: #1, #2)**
-  - [ ] Fetch `https://docs.opengsd.net/pi/concepts/project-structure.md` (the GSD-Pi filenames create-study could not resolve) and confirm GSD-Pi's exact `.gsd/` layout.
-  - [ ] Inspect the GSD (`gsd-build/gsd-2`) and GSD-Pi (`open-gsd/gsd-pi`) repos/templates (or a real `.gsd/`-initialized sample) to confirm exact file names, folder depth (`.gsd/milestones/M###/slices/S##/`), the `.gsd/` marker, and the gitignore reality of `gsd.db` — the table above is a hypothesis from doc-page fetches, not a repo inspection.
-  - [ ] Confirm the exact numbering/naming convention for `M###` milestones and `S##` slices (zero-padding? sequential per-repo?).
-  - [ ] Determine whether the `.gsd/*.md` projections are reliably committed in a real repo, or can be stale/absent when only the gitignored `gsd.db` is current (difference #3) — this decides tiers and diagnostics.
+- [x] **Task 2 — Obtain and inspect representative current-version GSD AND GSD-Pi repositories (AC: #1, #2)**
+  - [x] Fetch `https://docs.opengsd.net/pi/concepts/project-structure.md` (the GSD-Pi filenames create-study could not resolve) and confirm GSD-Pi's exact `.gsd/` layout.
+  - [x] Inspect the GSD (`gsd-build/gsd-2`) and GSD-Pi (`open-gsd/gsd-pi`) repos/templates (or a real `.gsd/`-initialized sample) to confirm exact file names, folder depth (`.gsd/milestones/M###/slices/S##/`), the `.gsd/` marker, and the gitignore reality of `gsd.db` — the table above is a hypothesis from doc-page fetches, not a repo inspection.
+  - [x] Confirm the exact numbering/naming convention for `M###` milestones and `S##` slices (zero-padding? sequential per-repo?).
+  - [x] Determine whether the `.gsd/*.md` projections are reliably committed in a real repo, or can be stale/absent when only the gitignored `gsd.db` is current (difference #3) — this decides tiers and diagnostics.
 
-- [ ] **Task 3 — Resolve the GSD vs GSD-Pi relationship (AC: #1)**
-  - [ ] State explicitly whether GSD and GSD-Pi share one adapter surface (same `AppliesTo` sniff + ingest, per-variant tolerance) or need two, with the on-disk evidence and the consequence for Story 12.2's scope.
-  - [ ] Note any GSD-Pi-only or GSD-only artifacts/conventions that would force divergence.
+- [x] **Task 3 — Resolve the GSD vs GSD-Pi relationship (AC: #1)**
+  - [x] State explicitly whether GSD and GSD-Pi share one adapter surface (same `AppliesTo` sniff + ingest, per-variant tolerance) or need two, with the on-disk evidence and the consequence for Story 12.2's scope.
+  - [x] Note any GSD-Pi-only or GSD-only artifacts/conventions that would force divergence.
 
-- [ ] **Task 4 — Classify every discovered artifact type with a declared coverage tier (AC: #1)**
-  - [ ] Fix a small coverage-tier vocabulary aligned to FR-4 (**rendered / summarized / unsupported**) [requirements-catalog.md:18] and define what each tier means for SpecScribe output.
-  - [ ] For each GSD/GSD-Pi artifact type (`.gsd/` marker, `gsd.db`, PROJECT.md, REQUIREMENTS.md, DECISIONS.md, KNOWLEDGE.md, STATE.md, milestones/roadmaps, slices/plans, slice summaries, tasks), classify as **mappable** (name the exact target: `ArtifactBundle` field + model type/record) / **partially-mappable** (name what maps and what doesn't) / **unsupported** (name why), AND assign a **coverage tier**.
-  - [ ] Resolve explicitly whether a GSD *Milestone* → `EpicInfo`, *Slice* → `StoryInfo`, *Task* → `StoryInfo.TasksDone/TasksTotal`, or the three-level shape needs a documented compromise — the central modeling question (see "host-neutral models" caveat).
-  - [ ] Classify `.gsd/DECISIONS.md` explicitly: ADR side-channel, new `ArtifactBundle` field, or out of scope — mirror 11.1's `constitution.md` classification.
-  - [ ] State explicitly, confirmed against real repos: is `Requirements` mappable-via-REQUIREMENTS.md or null, is `Sprint` partially-mappable-via-STATE.md or null, is `Retros` empty or fed by slice summaries — do NOT copy Spec Kit's null table.
+- [x] **Task 4 — Classify every discovered artifact type with a declared coverage tier (AC: #1)**
+  - [x] Fix a small coverage-tier vocabulary aligned to FR-4 (**rendered / summarized / unsupported**) [requirements-catalog.md:18] and define what each tier means for SpecScribe output.
+  - [x] For each GSD/GSD-Pi artifact type (`.gsd/` marker, `gsd.db`, PROJECT.md, REQUIREMENTS.md, DECISIONS.md, KNOWLEDGE.md, STATE.md, milestones/roadmaps, slices/plans, slice summaries, tasks), classify as **mappable** (name the exact target: `ArtifactBundle` field + model type/record) / **partially-mappable** (name what maps and what doesn't) / **unsupported** (name why), AND assign a **coverage tier**.
+  - [x] Resolve explicitly whether a GSD *Milestone* → `EpicInfo`, *Slice* → `StoryInfo`, *Task* → `StoryInfo.TasksDone/TasksTotal`, or the three-level shape needs a documented compromise — the central modeling question (see "host-neutral models" caveat).
+  - [x] Classify `.gsd/DECISIONS.md` explicitly: ADR side-channel, new `ArtifactBundle` field, or out of scope — mirror 11.1's `constitution.md` classification.
+  - [x] State explicitly, confirmed against real repos: is `Requirements` mappable-via-REQUIREMENTS.md or null, is `Sprint` partially-mappable-via-STATE.md or null, is `Retros` empty or fed by slice summaries — do NOT copy Spec Kit's null table.
 
-- [ ] **Task 5 — Framework-extra data and deliberately-unsupported conventions (AC: #2)**
-  - [ ] For any GSD convention richer than the shared model (e.g. `gsd.db` DB-authority, KNOWLEDGE.md Rules/Patterns/Lessons, the milestone/slice/task three-level grain, DB-derived projection staleness), record it as either a candidate projection extension (name what it would add) or an explicit non-goal (with rationale).
-  - [ ] For anything SpecScribe will deliberately not support, name the exact `AdapterDiagnosticCategory` (`Unsupported`/`Malformed`/`Skipped`/`Error`/`Informational`) its non-fatal notice would use and draft the notice's wording, mirroring `BmadArtifactAdapter`'s existing diagnostic messages [BmadArtifactAdapter.cs:170-188, 219-224, 262-276] for tone/specificity. In particular, draft the notice for "`.gsd/` present but markdown projections absent/stale (DB is authoritative)".
+- [x] **Task 5 — Framework-extra data and deliberately-unsupported conventions (AC: #2)**
+  - [x] For any GSD convention richer than the shared model (e.g. `gsd.db` DB-authority, KNOWLEDGE.md Rules/Patterns/Lessons, the milestone/slice/task three-level grain, DB-derived projection staleness), record it as either a candidate projection extension (name what it would add) or an explicit non-goal (with rationale).
+  - [x] For anything SpecScribe will deliberately not support, name the exact `AdapterDiagnosticCategory` (`Unsupported`/`Malformed`/`Skipped`/`Error`/`Informational`) its non-fatal notice would use and draft the notice's wording, mirroring `BmadArtifactAdapter`'s existing diagnostic messages [BmadArtifactAdapter.cs:170-188, 219-224, 262-276] for tone/specificity. In particular, draft the notice for "`.gsd/` present but markdown projections absent/stale (DB is authoritative)".
 
-- [ ] **Task 6 — Name the adapter-registry gap as a shared finding, coordinated with 11.1 (AC: #1, #2)**
-  - [ ] Confirm the registry-gap claim against `SiteGenerator.cs`. State plainly that Story 12.2 cannot wire in a second adapter without SOME selection mechanism, that this gap is **shared with 11.1** (not GSD-specific), and that whichever coverage story lands first closes it once for all frameworks.
-  - [ ] Recommend (not build) a minimal registry shape, and defer to 11.1's conclusion/ADR if it exists. Do NOT propose a second, GSD-specific registry ADR.
+- [x] **Task 6 — Name the adapter-registry gap as a shared finding, coordinated with 11.1 (AC: #1, #2)**
+  - [x] Confirm the registry-gap claim against `SiteGenerator.cs`. State plainly that Story 12.2 cannot wire in a second adapter without SOME selection mechanism, that this gap is **shared with 11.1** (not GSD-specific), and that whichever coverage story lands first closes it once for all frameworks.
+  - [x] Recommend (not build) a minimal registry shape, and defer to 11.1's conclusion/ADR if it exists. Do NOT propose a second, GSD-specific registry ADR.
 
-- [ ] **Task 7 — Record findings; no production code (AC: #1, #2)**
-  - [ ] Write the coverage map (artifact-type × classification × target projection × coverage tier table + GSD/GSD-Pi relationship decision + non-goals + shared registry-gap finding + 12.2 recommendation) into this story's **Completion Notes**, mirroring Story 11.1's / 19.1's convention.
-  - [ ] Do **not** land production `src/**`/`tests/**` changes from this story. No new ADR unless Task 6 concludes a genuine fork exists AND 11.1 has not already covered it — coordinate to keep it a single shared registry ADR.
+- [x] **Task 7 — Record findings; no production code (AC: #1, #2)**
+  - [x] Write the coverage map (artifact-type × classification × target projection × coverage tier table + GSD/GSD-Pi relationship decision + non-goals + shared registry-gap finding + 12.2 recommendation) into this story's **Completion Notes**, mirroring Story 11.1's / 19.1's convention.
+  - [x] Do **not** land production `src/**`/`tests/**` changes from this story. No new ADR unless Task 6 concludes a genuine fork exists AND 11.1 has not already covered it — coordinate to keep it a single shared registry ADR.
+
+### Owner-directed scope addition (2026-08-02)
+
+The spike's findings were reviewed by the owner mid-story, who **confirmed the roster pinning and directed that
+this story land it, together with the plan updates**. That deliberately supersedes Task 7's "no production
+code" / "no `src/**`/`tests/**` changes" constraint and the seed non-goal list — recorded here rather than
+absorbed silently, since a spike shipping production code is exactly the drift the story warned about. Scope is
+bounded to the roster/documentation pinning and the plan split; **no adapter, parser, or registry work** is in
+this story, and Stories 12.2/12.3 still own all of that.
+
+- [x] **Task 8 — Pin the framework roster to the correct products (owner-confirmed)**
+  - [x] Extend `AboutSddTemplater.Frameworks` with a canonical `Url` and an identity `Blurb`, pinning
+    `gsd` → GSD Core (`docs.opengsd.net/core`) and `gsd-pi` → GSD Pi (`docs.opengsd.net/pi`).
+  - [x] Render both on the placeholder framework page so "Coming soon" states what the framework *is*, not only
+    that it is absent (NFR8's honest-absence posture).
+  - [x] Cover with tests that fail if the two products are ever conflated again, or if either URL is pointed back
+    at the retired `gsd-build/gsd-2`.
+  - [x] Leave the display `Label`s (`GSD`/`GSD-Pi`) unchanged — see the note below.
+
+- [x] **Task 9 — Split the baseline-coverage story per framework (owner-directed)**
+  - [x] Replace Story 12.2 ("GSD and GSD-Pi Baseline Adapter Coverage") with **12.2 GSD Core** + **12.3 GSD Pi**
+    in `epics.md`, each with framework-specific ACs, and record why in an inline note.
+  - [x] Land the matching `development_status` keys in `sprint-status.yaml` **in the same change**
+    (CLAUDE.md § Decision records: a structural scope change recorded in only one artifact is a drift bug).
+  - [x] Update Epic 12's intro to state the two-adapter-surfaces conclusion.
+
+- [x] **Task 10 — Update the user-facing documentation**
+  - [x] Link both GSD rows in `README.md`'s "Supported frameworks" table to their canonical docs.
+  - [x] Add a short disambiguation note stating the two are distinct products, with their differing markers,
+    authority models, and hierarchies, and that the retired `gsd-build/gsd-2` continues as GSD Pi.
+
+**Deliberate non-change — the display labels.** `Label` stays `GSD`/`GSD-Pi` rather than becoming
+`GSD Core`/`GSD Pi`. The labels are load-bearing for the nav pills, page titles and breadcrumbs, and
+`SiteGeneratorHowToReadTests.cs:254-255` asserts the pill text — a file a concurrent session is actively editing,
+so renaming would have put this story inside another story's hunks for a cosmetic gain. The disambiguation the
+roster actually lacked is carried by `Url` + `Blurb`. **Renaming the labels is a separate display decision and is
+left to the owner.**
 
 ### Review Findings
 
-_(populated during code-review)_
+- [x] [Review][Patch] Owner resolved 2026-08-02: keep the widened `Url`/`Blurb` scope (`bmad`, `speckit`), but wire it up properly — `Url`/`Blurb` were populated for `bmad` and `speckit`, not just `gsd`/`gsd-pi` as Task 8 authorized [src/SpecScribe/AboutSddTemplater.cs:30-31, 33-37], and neither the File List nor Change Log disclosed it. `AppendBmadBody` never read `fw.Url` — it hardcoded its own identical literal [AboutSddTemplater.cs:208] — so the field was dead, and `AboutSdd_EveryFrameworkWithACanonicalUrl_RendersItAsALink` only passed for `bmad` by coincidence of two independently-maintained strings agreeing. `AppendGdsBody` also hardcodes a URL but `gds`'s roster `Url` was left `null`, an inconsistent application. **Fix:** make `AppendBmadBody` and `AppendGdsBody` read `fw.Url` instead of a hardcoded literal (add `gds`'s canonical URL to the roster too), and record the `bmad`/`speckit`/`gds` widening explicitly in this story's File List/Change Log.
+
+- [x] [Review][Patch] Story 12.3 (GSD Pi) AC drops the "reuse CoverageTier, not a parallel scale" clause that 12.2 states [_bmad-output/planning-artifacts/epics.md:2647 vs 2679] — Story 12.2 AC #2 says "...reusing the existing CoverageTier vocabulary rather than a parallel scale," matching this story's own Completion Notes Recommendation #4 ("Reuse `CoverageTier`/`CoverageTiers`... Do not mint a tier scale") which applies to both GSD Core and GSD Pi, not just Core. Story 12.3's equivalent AC #3 omits the clause. Mirror 12.2's wording into 12.3 AC #3.
+
+- [x] [Review][Patch] Story 12.3 (GSD Pi) has no AC pinning the Milestone/Slice → `EpicInfo`/`StoryInfo` id-synthesis choice in a test [_bmad-output/planning-artifacts/epics.md:2656-2680] — 12.2 AC #3 requires "the chosen level mapping and the synthesized story-id form are pinned by a test." This story's own Completion Notes Recommendation #6 says the `StoryInfo.Id` synthesis choice (GSD Pi's `"{milestone}.{slice}"` vs GSD Core's `"{phase}.{wave}"`) must be pinned "before writing discovery globs" for the family generally — i.e. Pi needs this too. Add an equivalent AC to 12.3.
+
+- [x] [Review][Patch] Dangling `<see cref="RenderHub"/>` in `BuildHubPage`'s doc comment after `RenderHub`/`RenderFrameworkPage` were deleted in this same diff [src/SpecScribe/AboutSddTemplater.cs:57] — this diff removes the two public wrapper methods (confirmed no other callers exist in the codebase) but leaves the doc comment sentence "`<see cref="RenderHub"/>` is the unchanged HTML projection of this same model, so the bytes are identical" referencing a method that no longer exists. Update or remove the sentence. Also undisclosed in the File List (a hunk unrelated to the roster/`Url`/`Blurb` work, per CLAUDE.md's hunk-attribution guidance).
+
+- [x] [Review][Patch] Stale downstream story key reference in this story's own "Project Structure Notes" [12-1-gsd-and-gsd-pi-integration-spike.md:245] — still reads "Downstream story key (not created by this spike): `12-2-gsd-and-gsd-pi-baseline-adapter-coverage`," the pre-split singular key. Task 9 replaced it everywhere else (`epics.md`, `sprint-status.yaml`) with `12-2-gsd-core-baseline-adapter-coverage` + `12-3-gsd-pi-baseline-adapter-coverage`, but this line inside the same file was not updated. A reader following this note looks up a key that no longer exists.
+
+- [x] [Review][Defer] Story 12.1's own epics.md Acceptance Criteria were not revisited to reflect the owner-directed scope addition [_bmad-output/planning-artifacts/epics.md:2608-2620] — deferred, pre-existing framing issue, not a functional bug. Tasks 8-10 land production code (roster `Url`/`Blurb`, `epics.md`/`sprint-status.yaml` split, README updates), but the story's charter ACs in `epics.md` still read as pure-spike language ("a written coverage map classifies..."). The story file itself discloses the deviation clearly in its "Owner-directed scope addition" note and Change Log, so this is only misleading to a reader who reads `epics.md`'s AC block in isolation. Not blocking; noted for awareness in future spike-with-scope-addition stories.
 
 ## Dev Notes
 
@@ -201,7 +252,7 @@ _(populated during code-review)_
 
 - Story file: `_bmad-output/implementation-artifacts/12-1-gsd-and-gsd-pi-integration-spike.md`
 - Sprint key: `12-1-gsd-and-gsd-pi-integration-spike`
-- Downstream story key (not created by this spike): `12-2-gsd-and-gsd-pi-baseline-adapter-coverage`
+- Downstream story keys (not created by this spike): `12-2-gsd-core-baseline-adapter-coverage`, `12-3-gsd-pi-baseline-adapter-coverage`
 - No `src/`/`tests/` touches expected.
 - No ADR file expected unless Task 6 concludes a genuine architecture fork (registry design) not already covered by 11.1 — if so, it is ONE shared registry ADR (`docs/adrs/`, next number, indexed in `docs/adrs/README.md`), coordinated with 11.1, escalated rather than decided silently.
 
@@ -233,14 +284,497 @@ No GSD/GSD-Pi code, adapter, or prior exploration exists anywhere in this repo b
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+claude-opus-5[1m] (Opus 5, 1M context) — dev-story, 2026-08-02.
 
 ### Debug Log References
 
+The spike proper (Tasks 1–7) ran no builds and produced no code: evidence is (a) direct reads of the contract
+sources under `src/SpecScribe/`, and (b) live fetches of the Open GSD documentation on 2026-08-02 (URLs cited
+inline below). The `src/`/`tests/` changes in the File List come from the **owner-directed scope addition**
+(Tasks 8–10) and were developed red-green: `AboutSddFrameworkRosterTests.cs` was written first and failed to
+compile against the roster (`'…' does not contain a definition for 'Url'`), then passed 4/4 once
+`AboutSddTemplater.Frameworks` gained `Url`/`Blurb`.
+
+**Regression suite — run, and the 19 failures proven NOT to be this story's (2026-08-02).**
+`dotnet test tests/SpecScribe.Tests` in the shared working tree reported **19 failed / 2925 passed / 2944 total**.
+This story changed only two markdown/YAML files, so per CLAUDE.md § Concurrent work ("establish causality first…
+bisect into a throwaway tree, never by resetting the shared tree") I bisected rather than assuming:
+
+1. `git archive HEAD` into the scratchpad (`scratchpad/head-tree`), ran the suite there → **2944 passed, 0 failed.**
+   HEAD is green.
+2. Overlaid **only this story's two files** onto that pristine tree and re-ran → **2944 passed, 0 failed.**
+
+So the 19 failures were entirely attributable to another session's uncommitted working-tree changes, not to this
+story. Corroborating detail: the sampled failure
+(`SiteGeneratorHowToReadTests.HowToRead_SubtitleAndIntro_MentionGeneratingNotJustReading`, line 520) asserts on
+page copy — "how to generate and refresh the site from…" — that is absent from the rendered nav, and
+`tests/SpecScribe.Tests/SiteGeneratorHowToReadTests.cs` is one of ~35 test files showing `M` in `git status` at
+session start. That is a test edited ahead of its `src/` counterpart in a sibling session. **Not touched, not
+"fixed," and no baseline regenerated** — it is not this story's to resolve, and reflexive regeneration is exactly
+what CLAUDE.md forbids.
+
+**Final regression state after the owner-directed scope addition: 2948 passed / 0 failed** (the original 2944 plus
+this story's 4 new tests). The sibling session landed its `src/` counterparts during this story, and the 19
+failures resolved on their own — confirming the attribution above without this story touching any of them. Two
+intermediate runs showed a single differing failure
+(`FileWatcherServiceTests.WatchedSourceFileStaysWritableAndDeletableDuringRegeneration`,
+`SiteGeneratorEpicsRemovalTests.RegenerateEpics_WhenEpicsFileDeleted_RemovesTheWholeEpicsOutputFamily`); both pass
+3/3 in isolation and are filesystem-timing flakes under parallel load, in areas this story does not touch.
+
+**Sources fetched 2026-08-02** — all reachable, all quoted from rather than paraphrased where load-bearing:
+
+- `https://docs.opengsd.net/llms.txt` — the documentation index. **This is the file that broke the story's premise:**
+  it enumerates *three* separate product lines — `core/`, `pi/`, and `browser/`.
+- `https://docs.opengsd.net/core/introduction.md`, `core/installation.md`, `core/guides/new-project.md`,
+  `core/concepts/planning-artifacts.md`, `core/concepts/workflow.md`, `core/guides/phase-lifecycle.md`,
+  `core/commands/workflow-commands.md` — GSD Core.
+- `https://docs.opengsd.net/pi/concepts/project-structure.md`, `pi/configuration/git-automation.md` — GSD Pi.
+- `https://getshitdone.help/` and `https://getshitdone.help/gsd-directory/` — GSD 2 (`gsd-build/gsd-2`).
+- `https://github.com/gsd-build/gsd-2/blob/main/docs/dev/architecture.md`, `deepwiki.com/gsd-build/gsd-2`,
+  plus web search establishing that `gsd-build/gsd-2` "is no longer the active home… now continues as GSD Pi".
+
+**Residual uncertainty, stated rather than papered over.** I could not obtain a real `.gsd/`- or
+`.planning/`-initialized sample repository (both products generate their state on first run against a live model
+provider; no committed fixture is published in either repo). Every layout claim below therefore rests on
+*current vendor documentation*, not on a directory listing. The doc pages were internally consistent and
+mutually corroborating, and the two structure pages (`pi/concepts/project-structure.md`,
+`getshitdone.help/gsd-directory/`) both present explicit full-tree listings — but Story 12.2 must re-confirm
+exact filenames against a generated repo before writing discovery globs. Specifically unresolved: GSD Core's
+requirement-id format is documented as "stable IDs like `REQ-001`" on the planning-artifacts page but no example
+file is published; and neither product documents its `STATE.md` grammar.
+
 ### Completion Notes List
+
+## Coverage map — GSD family × shared adapter contract (Story 12.1 deliverable)
+
+### ⚠️ Headline finding: the story's central premise is wrong, and it changes the answer
+
+Story 12.1's create-story context states, as verified fact, that GSD and GSD-Pi "share the same `.gsd/` marker,
+the same authoritative-SQLite-plus-markdown-projection model, and the same **Milestone → Slice → Task**
+hierarchy," and frames the spike's central question as "do they collapse to ONE adapter surface … or genuinely
+diverge?"
+
+**That premise held for the product pair create-story actually looked at (GSD 2 → GSD Pi), but not for the
+current-version pair the AC asks about.** The Open GSD lineup today is *three* products, not two versions of one:
+
+| Product | Package | Marker dir | Authority | Hierarchy | Kind of thing |
+|---|---|---|---|---|---|
+| **GSD Core** | `@opengsd/gsd-core` | **`.planning/`** | **Plain Markdown + JSON. No database.** | Milestone → **Phase** → Task | Meta-prompting framework layered on your AI coding runtime (slash commands) — same *kind* of thing as BMad and Spec Kit |
+| **GSD Pi** | `@opengsd/gsd-pi` | `.gsd/` | **SQLite `gsd.db` authoritative**; `.md` are projections | Milestone → **Slice** → Task | Standalone autonomous agent CLI |
+| GSD Browser | — | — | — | — | Browser-automation MCP server. **Not a planning framework; out of scope entirely.** |
+
+And `gsd-build/gsd-2` (the repo create-story surveyed, documented at `getshitdone.help`) is the **retired
+predecessor** — "no longer the active home for GSD 2 development. The project now continues as GSD Pi." Its npm
+package is literally named `gsd-pi`.
+
+The AC says "representative **current-version** GSD and GSD-Pi repositories." Applied honestly, that means:
+
+- **`gsd`** (SpecScribe's roster id, `Supported: false`) → **GSD Core**, `.planning/`, markdown-native.
+- **`gsd-pi`** → **GSD Pi**, `.gsd/`, SQLite-authoritative.
+- **GSD 2 is a third, retired layout** that neither roster entry should be pinned to.
+
+This is not a quibble. It inverts three of the story's four stated "structural differences," and it makes the
+family *more* tractable than create-story feared, not less — the product SpecScribe would call "GSD" turns out
+to be the markdown-native one.
+
+> **✅ CONFIRMED BY THE OWNER AND LANDED IN THIS STORY (2026-08-02).** `README.md`'s "Supported frameworks" table
+> recorded **no canonical URL** for either GSD entry, and `AboutSddTemplater.Frameworks` carried only ids and
+> labels — the ambiguity that produced this story's wrong premise, and which would have recurred in every
+> downstream coverage story and framework page. The owner confirmed the pinning and directed this story to land
+> it: `gsd` → `docs.opengsd.net/core` (GSD Core), `gsd-pi` → `docs.opengsd.net/pi` (GSD Pi), in **both** the
+> roster and the README, with the placeholder framework pages now stating what each framework is. See Tasks 8–10.
+
+### Task 3 — the GSD ↔ GSD-Pi relationship: **two adapter surfaces, not one**
+
+**Decision: they do NOT collapse.** The evidence is not a matter of tolerance-tuning; every load-bearing
+discovery input differs.
+
+| Dimension | GSD Core | GSD Pi | Collapsible? |
+|---|---|---|---|
+| `AppliesTo` marker | `.planning/` at repo root | `.gsd/` at repo root | **No** — disjoint sniffs |
+| Source of truth | Markdown + `config.json` on disk | `gsd.db` (SQLite); md are rendered projections | **No** — different reliability story, so different tiers |
+| Mid-level noun | **Phase** (`.planning/phases/NN-slug/`) | **Slice** (`S##-` prefixed, flat in the milestone dir) | **No** — different vocabulary *and* different path grammar |
+| Per-unit artifact path | `.planning/phases/NN-slug/NN-YY-PLAN.md` | `.gsd/milestones/M###/S##-PLAN.md` | **No** — one nests per unit, one flattens |
+| Requirement ids | Documented as stable `REQ-001`-style | "capability contract", numbering undocumented | Partially |
+| Project overview | `PROJECT.md` **exists** | **No `PROJECT.md`**; `CODEBASE.md` + `PREFERENCES.md` instead | **No** |
+| Top-level roadmap | `ROADMAP.md` at `.planning/` root | none at root; per-milestone `M###-ROADMAP.md` | **No** |
+| Status projection | `STATE.md` | `STATE.md` | Yes — the one genuine overlap |
+
+Only `STATE.md` (name and rough purpose) and the word "Milestone" survive as shared. **Two `AppliesTo` sniffs and
+two discovery grammars are required.** Whether that is two `IArtifactAdapter` classes or one class with two
+internal discovery strategies is a 12.2 implementation choice with no contract consequence — the registry selects
+on `AppliesTo`, and a single class can only return one boolean, so **two classes is the cleaner default**
+(`GsdCoreArtifactAdapter`, `GsdPiArtifactAdapter`).
+
+**Consequence for Story 12.2's scope: it is roughly double what its title implies.** Epic 12's Story 12.2 ("GSD
+and GSD-Pi Baseline Adapter Coverage") is currently one `backlog` story covering both. Two disjoint discovery
+grammars, two marker sniffs, and two tier ladders is not one story's worth of work at this project's story size.
+**✅ SPLIT CONFIRMED BY THE OWNER AND EXECUTED IN THIS STORY (2026-08-02):** Story 12.2 is now **12.2 (GSD Core)**
+and **12.3 (GSD Pi)**, with **GSD Core first** — it is markdown-native, so it needs none of the DB-projection
+reliability machinery and lands the higher-value coverage sooner. Per CLAUDE.md § Decision records the change
+co-landed in `epics.md` **and** `sprint-status.yaml`; see Task 9.
+
+### The three axes, kept separate (as AC #1 and Dev Notes require)
+
+This spike states three orthogonal things per artifact. Conflating them is the named failure mode:
+
+1. **Classification** — mappable / partially-mappable / unsupported. *Does it fit the shared model?*
+2. **Coverage tier** — `Rendered` / `Summarized` / `Unsupported`. *How deeply is it interpreted?*
+3. **Diagnostic category** — one of the five `AdapterDiagnosticCategory` values. *What non-fatal notice fires?*
+
+**Correction to the story's Task 4 instruction — the tier vocabulary already exists in code; do not mint one.**
+The story asks this spike to "fix a small coverage-tier vocabulary aligned to FR-4." It is already fixed, as a
+real closed type, shipped by **Story 18.5**: `enum CoverageTier { Rendered, Summarized, Unsupported }` plus
+`static class CoverageTiers` (`Word`, `Description`, `AccentToken`, `Order`) in
+`src/SpecScribe/TestArtifactsModel.cs:18-76`. Its doc comment says explicitly that it is "the PRD's
+`rendered`/`summarized`/`unsupported` coverage-tier vocabulary, made a real type," answering a PRD open question.
+It is already rendered as a legend on the About-SDD page (`AboutSddTemplater.cs:255-258`) and as per-artifact
+badges on the Test Artifacts page. **Story 12.2 must reuse `CoverageTier`, not define a parallel scale** —
+`CoverageTiers` holds the same one-classifier discipline `StatusStyles` holds for lifecycle, and the tier word
+must never be spelled by a surface itself. Every tier below is one of those three enum values.
+
+Note the tier semantics that Story 18.5 pinned, because they constrain the map below: `Rendered` means "a full
+page exists and SpecScribe interprets nothing beyond rendering its prose" — it is *lower* interpretation depth
+than `Summarized`, which means "a structured headline is additionally extracted." `CoverageTiers.Order` is
+`Summarized, Rendered, Unsupported` (best-understood first). A file with no page and no extraction is
+`Unsupported`, which is "an honest statement of the interpretation boundary," not a failure.
+
+### Coverage map — GSD Core (`.planning/`) → `ArtifactBundle`
+
+| GSD Core artifact | Path | Classification | Target projection | Tier | Diagnostic |
+|---|---|---|---|---|---|
+| Install marker | `.planning/` at repo root | mappable | `AppliesTo` self-selection signal (mirrors `_bmad/`) | n/a | none |
+| Project overview | `.planning/PROJECT.md` | partially-mappable | No `ArtifactBundle` field for it. Renders via the generic `*.md` pass; a `ModuleDoc`-style "well-known planning doc" entry is the natural home, but `ModuleContext` is BMad-typed (see below) | `Rendered` | none |
+| Requirements | `.planning/REQUIREMENTS.md` | **partially-mappable** | `Requirements` → `RequirementsModel` | `Summarized` | `Unsupported` when ids don't parse |
+| Roadmap | `.planning/ROADMAP.md` | **mappable** | `Epics` → `EpicsModel` (**this is the epics source**) + `EpicsSourceFullPath` | `Summarized` | `Malformed` on parse failure |
+| Live state | `.planning/STATE.md` | **partially-mappable** | `Sprint` → `SprintStatus` | `Summarized` | `Unsupported` when no per-phase status is recoverable |
+| Phase dir | `.planning/phases/NN-slug/` | mappable | Story-artifact discovery root | n/a | none |
+| Phase plan | `NN-YY-PLAN.md` | **mappable** | `StoryArtifactsById[id]` + `ConsumedSourceRelatives`; task checkboxes → `StoryInfo.TasksDone/TasksTotal` | `Rendered` | `Skipped` on id collision |
+| Phase summary | `NN-YY-SUMMARY.md` | partially-mappable | Companion to the plan; **not** a `RetroModel` | `Rendered` | `Skipped` (loses the story-artifact slot to `-PLAN.md`) |
+| Phase context | `NN-CONTEXT.md` | unsupported | generic `*.md` page only | `Rendered` | none |
+| Discussion log | `NN-DISCUSSION-LOG.md` | unsupported | generic `*.md` page only | `Rendered` | none |
+| Research | `NN-RESEARCH.md`, `.planning/research/` | unsupported | generic `*.md` page only | `Rendered` | none |
+| Verification / UAT | `NN-VERIFICATION.md`, `NN-UAT.md` | **partially-mappable** | Closest analog to `Retros` (a per-phase closure verdict), but see the `Retros` ruling below | `Rendered` | none |
+| Config | `.planning/config.json` | **unsupported** | none — the source scan is `*.md`, so a `.json` is structurally invisible (the same ADR 0020 constraint that made TEA's two JSON files `Summarized`-only) | `Unsupported` | `Informational` |
+| Handoff | `.planning/continue-here.md` | unsupported | generic `*.md` page only | `Rendered` | none |
+| Codebase map | `.planning/codebase/` | unsupported | generic `*.md` page only | `Rendered` | none |
+| Debug / spikes / sketches / threads / seeds / todos | `.planning/{debug,spikes,sketches,threads,seeds,todos}/` | unsupported | generic `*.md` pages; `sketches/` is HTML → invisible to the `*.md` scan | `Rendered` / `Unsupported` (sketches) | `Informational` for `sketches/` |
+| Slash commands | `/gsd-*` (10 commands, in the runtime's config dir, **not in the repo**) | **unsupported** | `ModuleContext.Commands` → `CommandCatalog`, but see the blocker below | `Unsupported` | `Informational` |
+
+### Coverage map — GSD Pi (`.gsd/`) → `ArtifactBundle`
+
+| GSD Pi artifact | Path | Classification | Target projection | Tier | Diagnostic |
+|---|---|---|---|---|---|
+| Install marker | `.gsd/` at repo root | mappable | `AppliesTo` self-selection signal | n/a | none |
+| **Authoritative DB** | `.gsd/gsd.db` (SQLite, gitignored) | **unsupported — deliberate non-goal** | **none. SpecScribe reads markdown, never a database** | `Unsupported` | `Informational` (see draft below) |
+| Live state | `.gsd/STATE.md` | **partially-mappable** | `Sprint` → `SprintStatus` | `Summarized` | `Unsupported` when no per-slice status is recoverable |
+| Requirements | `.gsd/REQUIREMENTS.md` ("capability contract", **deep mode only**) | **partially-mappable** | `Requirements` → `RequirementsModel` | `Summarized` | `Unsupported` when unnumbered; **absent in non-deep-mode repos → `Requirements = null`, no diagnostic** |
+| Decisions | `.gsd/DECISIONS.md` | **partially-mappable** | **ADR side-channel** — see the ruling below | `Rendered` | none |
+| Knowledge | `.gsd/KNOWLEDGE.md` (Rules / Patterns / Lessons) | unsupported | generic `*.md` page only | `Rendered` | none |
+| Codebase map | `.gsd/CODEBASE.md` | unsupported | generic `*.md` page only | `Rendered` | none |
+| Preferences | `.gsd/PREFERENCES.md` (YAML-in-markdown) | **partially-mappable** | No field. But it carries `git.commit_docs`, which **explains** an absent-projections repo — read it only to choose the right diagnostic wording | `Rendered` | none |
+| Milestone dir | `.gsd/milestones/M###/` | mappable | Epic-level grouping | n/a | none |
+| Milestone roadmap | `M###-ROADMAP.md` | **mappable** | `Epics` → `EpicsModel`/`EpicInfo` (**per-milestone; there is no single root epics file** — see the modeling ruling) | `Summarized` | `Malformed` on parse failure |
+| Milestone context | `M###-CONTEXT.md` | unsupported | generic `*.md` page only | `Rendered` | none |
+| Milestone summary | `M###-SUMMARY.md` | **partially-mappable** | Closest analog to `Retros` — but see the `Retros` ruling | `Rendered` | none |
+| Slice plan | `M###/S##-PLAN.md` | **mappable** | `StoryArtifactsById[id]` + `ConsumedSourceRelatives`; task defs → `StoryInfo.TasksDone/TasksTotal` | `Rendered` | `Skipped` on id collision |
+| Slice assessment | `M###/S##-ASSESSMENT.md` (UAT verdict) | partially-mappable | Companion to the slice plan | `Rendered` | `Skipped` |
+| Task summary | `M###/T##-SUMMARY.md` | unsupported | generic `*.md` page; the third level has no home in the two-level model | `Rendered` | none |
+| Research | `.gsd/research/{STACK,FEATURES,ARCHITECTURE,PITFALLS}.md` | unsupported | generic `*.md` pages | `Rendered` | none |
+| Reports | `.gsd/reports/M###-report.html` | **unsupported** | none — `.html`, invisible to the `*.md` scan | `Unsupported` | `Informational` |
+| Runtime state | `.gsd/{exec,runtime,journal}/`, `.gsd-worktrees/`, `.gsd-backups/` | **unsupported — deliberate non-goal** | none; gitignored runtime | `Unsupported` | none (ignored, **not** diagnosed — mirrors `PathUtil.IsIgnoredSourceFile`) |
+
+### The four rulings the story demanded explicitly
+
+**1. Milestone → Slice/Phase → Task against the two-level `EpicsModel`: flatten the top two, drop the third to a tally.**
+
+`EpicsModel` is two-level (`EpicInfo` → `StoryInfo`) and `StoryInfo.Id` is hard-typed to BMad's `"N.M"`
+two-level numbering (`EpicsModel.cs:9-10`, and `BmadArtifactAdapter.ArtifactFilenamePattern` at line 55 parses
+exactly `^(?<epic>\d+)-(?<story>\d+)-`). The GSD family is three-level. **Ruling:**
+
+- **Milestone → `EpicInfo`.** GSD Pi's `M###` is zero-padded-3 and sequential; GSD Core's milestones live in
+  `ROADMAP.md` and its phases are `NN-slug` (zero-padded-2). Both parse to `EpicInfo.Number` cleanly.
+- **Slice (Pi) / Phase (Core) → `StoryInfo`.** Both have exactly the per-unit artifact grain
+  (`S##-PLAN.md` / `NN-YY-PLAN.md`) that mirrors BMad's per-story markdown file, which is what
+  `StoryArtifactsById` and every story surface actually consume.
+- **Task → `StoryInfo.TasksDone`/`TasksTotal` only.** Tasks are decomposed *inside* the plan file in both
+  products, exactly like BMad's `## Tasks / Subtasks` checkboxes — so this is not a compromise at all for Core.
+  It **is** a real loss for GSD Pi, which additionally writes a per-task `T##-SUMMARY.md` file; that file has no
+  home in the two-level model and is classified `unsupported`/`Rendered` above.
+- **`StoryInfo.Id` compromise:** synthesize `"{milestone}.{slice}"` (e.g. `M002`/`S03` → `"2.3"`). This fits the
+  existing `"N.M"` contract and every downstream consumer, at the cost of not round-tripping the zero-padding.
+  GSD Core's `NN-YY-PLAN.md` has a *second* numeric level within the phase (execution waves) — recommend
+  `"{phase}.{wave}"`, which means a Core "story" is a *plan*, not a *phase*. **12.2 must pick one and pin it in
+  a test**; both are defensible and they are not interchangeable.
+- **The honest cost, stated for NFR8:** in both products the epic-level noun (Milestone) is *coarser* than a BMad
+  epic and the story-level noun is *finer*. `EpicStatus { Drafted, Pending }` and
+  `EpicSection { VerticalSlice, FurtherDevelopment }` (`EpicsModel.cs:3-5`) are BMad epics.md conventions with no
+  GSD analog — a GSD adapter must pick constant values for both and they will be semantically empty. That is
+  framework-extra loss in the *reverse* direction (shared model too specific, not too general) and is the single
+  strongest argument for the projection extension proposed below.
+
+**2. `.gsd/DECISIONS.md` → ADR side-channel. Same ruling 11.1 should reach for `constitution.md`.**
+
+ADRs are not part of `ArtifactBundle` at all — there is no field and no parser class; `docs/adrs/*.md` are read
+through the separate, always-optional `ForgeOptions.AdrSourceRoot` path, entirely outside `IArtifactAdapter`.
+`DECISIONS.md` is a *register* (many decisions in one file), whereas the ADR side-channel expects
+*one file per decision* — `ForgeOptions.AdrFallbackProbeSubdirs` (lines 110-118) probes directories and
+`HasMarkdownWithinOneLevel` counts `*.md` files. So `DECISIONS.md` **cannot** simply be pointed at by
+`--adrs`. **Ruling: ADR side-channel in spirit, not mechanically reachable today.** Classify as
+partially-mappable / `Rendered` (it gets a page via the generic pass), and record "split a decision *register*
+into ADR entries" as a **candidate projection extension** (below) rather than forcing it. **Explicitly not a new
+`ArtifactBundle` field** — that would fork the ADR concept across two channels.
+
+**3. `Requirements`: mappable-via-`REQUIREMENTS.md` for both — but conditionally, and NOT the way Spec Kit was.**
+
+Do not carry Spec Kit's `Requirements = null` over; both GSD products ship a `REQUIREMENTS.md`.
+
+- **GSD Core:** documented as "Numbered requirements (v1, v2, out-of-scope) with stable IDs like `REQ-001`."
+  That is a genuinely parseable id grammar — but it is **`REQ-`, not `FR`/`NFR`/`UX-DR`**, and `RequirementInfo.Id`
+  is a computed property over a closed `RequirementKind` enum that *throws* on an unknown kind
+  (`RequirementsModel.cs:43-49`). A `REQ-001` cannot be represented without either mapping it onto
+  `RequirementKind.Functional` (lossy, and the rendered id would read `FR1`, which is **wrong on screen**) or
+  extending the enum. **12.2 must not silently map `REQ-001` → `FR1`.**
+- **GSD Pi:** `REQUIREMENTS.md` is **deep-mode only** — a normal Pi repo may not have one at all. Absent → 
+  `Requirements = null` with **no diagnostic** (honest absence, NFR8), not an `Unsupported` notice.
+- **Both:** `RequirementStatus` is rolled up from an FR→Epic *Coverage Map* section that is a BMad epics.md
+  convention. Neither GSD product publishes one, so every requirement would land on `Unmapped` — which renders as
+  "no covering epic at all — no plan exists yet," i.e. **actively misleading**. This is the strongest single
+  argument for tier `Summarized` rather than `Rendered`: extract the requirement list, do **not** claim coverage
+  status. 12.2 should default GSD requirements to `Planned` or introduce an explicit "coverage map absent" state
+  rather than let `Unmapped` imply an oversight that does not exist.
+
+**4. `Retros`: EMPTY for both. `Retros = []`.**
+
+The story asked whether slice/milestone summaries feed `Retros`. **They do not.** `RetroModel` requires
+`EpicNumbers`, `Title`, `DateText`, `Participants`, and a body whose `## Action Items` table gets badged
+(`RetroModel.cs:17-38`), and `RetroParser` keys on the `epic-N-retro-*.md` filename convention. A GSD
+`M###-SUMMARY.md` / `NN-YY-SUMMARY.md` is an *execution* summary — what got built and what deviated — with no
+participants, no action-items table, and no retrospective ritual behind it. Forcing it into `RetroModel` would
+populate a "Retrospectives" surface with content that is not a retrospective, and — because
+`EpicInfo.HasRetrospective` gates the sunburst/donut/chip "In review → finished" tier — would silently mark
+milestones *closed out* on every visual surface on the strength of a build log. That is exactly the
+misleadingly-empty failure NFR8 forbids. **`Retros = []` for both products, no diagnostic** (honest absence).
+GSD Pi's `S##-ASSESSMENT.md` (a UAT verdict) is the nearest thing to a *quality gate*, and if anything it belongs
+with the Story 18.5 test-artifacts/gate surface, not with retros — noted as a 12.3 follow-up, not proposed here.
+
+### AC #2 — framework-extra data: candidate projection extensions vs explicit non-goals
+
+**Candidate projection extensions (recorded, NOT landed by this spike):**
+
+1. **A third hierarchy level on `EpicsModel`.** Both products are Milestone → Slice/Phase → Task, and both write a
+   per-task or per-wave artifact that the two-level model discards. This is now the *second* framework to want it
+   (Epic 19's work-graph spike wants a general graph). Worth one design pass across 12.2/13.x rather than five
+   per-framework compromises.
+2. **A non-BMad `RequirementKind` / free-form requirement id.** Needed for `REQ-001` and for any framework whose
+   ids aren't `FR`/`NFR`/`UX-DR`. Today `RequirementInfo.Id` throws on an unmodeled kind.
+3. **A "coverage map absent" `RequirementStatus`.** So a framework without an FR→Epic map doesn't render every
+   requirement as `Unmapped` (= "no plan exists"), which is false.
+4. **Decision-register support** — one markdown file holding many decisions, projected into the existing ADR
+   surface. Serves GSD's `DECISIONS.md` and (per 11.1) Spec Kit's `constitution.md`.
+5. **Framework-neutral `ModuleContext`.** See the blocker below — this one is not optional if the About-SDD
+   matrix's "Planning docs" and "Commands" columns are ever to be ticked for a non-BMad framework.
+
+**Explicit non-goals (with rationale):**
+
+- **Reading `gsd.db`.** SpecScribe reads markdown, never a database. Restated and reaffirmed: the DB-authority
+  fact is a *tier and diagnostic* finding, not a reason to take a SQLite dependency.
+- **`.gsd/reports/*.html` and `.planning/sketches/*.html`.** The source scan is `*.md` by construction
+  (ADR 0020). Rendering a foreign tool's self-contained HTML report inside the portal would also mean adopting its
+  styling and its scripts.
+- **`.planning/config.json` and `.gsd/PREFERENCES.md` as *configuration*.** SpecScribe may read `PREFERENCES.md`'s
+  `git.commit_docs` to choose a diagnostic's wording, but must not honor either file as settings — SpecScribe's
+  own options come from `ForgeOptions`.
+- **`.gsd/{exec,runtime,journal}/`, `.gsd-worktrees/`, `.gsd-backups/`.** Gitignored runtime state. **Ignored, not
+  diagnosed** — matching the `IArtifactAdapter` contract's rule that "ignored working files are neither ingested
+  nor diagnosed."
+- **A new authoring schema.** Unchanged: SpecScribe never asks a GSD user to add SpecScribe-specific files.
+- **Any `src/`/`tests/` change in this story.** Confirmed: none made.
+
+### AC #2 — drafted non-fatal notices (all five categories are the whole vocabulary; no sixth invented)
+
+Drafted in the register of `BmadArtifactAdapter`'s existing messages (lines 166-188, 213-225, 296-299) — name the
+artifact, name the consequence, no blame, no imperative.
+
+```text
+Informational  .gsd/gsd.db
+  "GSD Pi's authoritative store is a SQLite database; SpecScribe reads only the markdown projections
+   alongside it, so anything not yet rendered to markdown is not shown."
+
+Informational  .gsd
+  "'.gsd/' is present but holds no markdown projections — GSD Pi's 'git.commit_docs: false' keeps planning
+   documents local-only. Only the database is current; no GSD surfaces are generated."
+
+Unsupported    .gsd/STATE.md            (and .planning/STATE.md)
+  "state projection has no recoverable per-slice status; sprint surfaces are omitted"
+
+Unsupported    .planning/REQUIREMENTS.md
+  "requirement ids are not in a recognized numbering scheme; requirements are listed without coverage status"
+
+Informational  .planning/config.json     (and .gsd/reports/M001-report.html, .planning/sketches/*.html)
+  "recognized GSD artifact in a non-markdown format; SpecScribe's source scan reads markdown only,
+   so it is named but not rendered"
+
+Malformed      .planning/ROADMAP.md      (and .gsd/milestones/M001/M001-ROADMAP.md)
+  <parser exception message>            // verbatim BmadArtifactAdapter.cs:166-167 shape
+
+Skipped        .gsd/milestones/M001/S01-ASSESSMENT.md
+  "Slice 2.1 matched more than one artifact filename; 'S01-PLAN.md' was ingested as the story artifact."
+```
+
+Note the second notice deliberately fires on the **directory**, not on a file — there is no file to anchor it to.
+`AdapterDiagnostic.RelativePath` is a plain string and `DiagnosticAnchorRoot` already exists for exactly this kind
+of "subject lives beside the source tree" case (`AdapterDiagnostic.cs:43-48`), so this needs no contract change,
+but 12.2 should confirm the diagnostics page renders a directory path acceptably.
+
+### Task 6 — the shared adapter-registry gap, plus a SECOND prerequisite the story did not anticipate
+
+**Gap 1 — the adapter registry. Confirmed, unchanged, and shared with 11.1.**
+`SiteGenerator.cs:59-63` still holds one hardcoded field — `private readonly BmadArtifactAdapter _adapter = new();`
+— with the comment "the adapter registry that selects among IArtifactAdapter implementations arrives with
+Stories 4.3+." Those stories are the ones relocated into Epics 11–15, so **the registry still has no owner.**
+Story 11.1 is still `ready-for-dev` with empty Completion Notes, so there is nothing yet to defer to.
+
+*Recommended minimal shape (recommended, not built):* an ordered `IReadOnlyList<IArtifactAdapter>`, first
+`AppliesTo` match wins, `BmadArtifactAdapter` last as the fallback so a bare `_bmad-output` tree with no install
+keeps rendering exactly as today. One wrinkle 12.2 must handle and 11.2 does not: `SiteGenerator` holds the
+adapter as the **concrete** `BmadArtifactAdapter` type, not the interface, "because the watch paths also need its
+scoped epics re-ingest" (`IngestEpics`/`EpicsIngest`). A registry returning `IArtifactAdapter` therefore breaks
+watch-mode incremental regeneration unless the scoped re-ingest is either lifted onto the interface or the watch
+path degrades to a full re-ingest for non-BMad adapters. **AD-5 says watch behavior must not regress**, so this is
+a real design constraint, not a detail.
+
+**No second ADR proposed.** Per the story's instruction and CLAUDE.md's "read `docs/adrs/` before declaring a
+crossing," this is ONE shared registry decision. Whichever of 11.2 / 12.2 lands first closes it for all
+frameworks; if it warrants an ADR, that is one registry ADR, coordinated — not one per spike.
+
+**Gap 2 — source-root discovery is BMad-hardcoded too. NEW; not named by 11.1 or by this story's context.**
+`ForgeOptions.SourceDirName` is the literal `"_bmad-output"` (`ForgeOptions.cs:87`), and `Resolve` walks *up from
+the cwd looking for a directory containing `_bmad-output`* to find the repo root, throwing
+`DirectoryNotFoundException` when there is none (lines 154-173). **A pure GSD repo has no `_bmad-output`, so
+`specscribe generate` fails before any adapter is consulted.** `AppliesTo` never runs. Two further BMad
+couplings ride along: `RepoRoot` is derived as the *parent* of an explicit `--source`, and `ReadProjectName`
+reads `_bmad/config.toml`, falling back to the site title `"BMad Live Docs"` (line 86) — so a GSD site would be
+branded with a BMad default.
+
+This means **the registry alone is not sufficient** to make Story 12.2 (or 11.2) deliver a working non-BMad site.
+Both prerequisites must close together. The minimal fix is to let source-root discovery probe a framework-supplied
+set of marker directories (`_bmad-output`, `.planning`, `.gsd`, `.specify`) rather than one hardcoded name, and to
+neutralize the default site title. Recording it here as a **shared finding for the same coordinated decision**, on
+the same "close it once for all frameworks, not per-framework" basis as Gap 1.
+
+**Gap 3 — `ArtifactBundle.Module` is structurally unfillable by a non-BMad adapter.**
+`Module` is `required` and never null, but `ModuleContext` is BMad-typed to the bone: `BmadModule` is a closed
+enum of `Unknown`/`BmadMethod`/`GameDevStudio`/`Unmodeled` (`ModuleContext.cs:13-27`), `Code` is documented as
+"the `_bmad/{code}/` install-directory name," and `Detect` keys on that directory. A GSD adapter can therefore
+only return `ModuleContext.None` — which means **no command catalog, no glossary, no module planning docs**. This
+is why the About-SDD six-noun matrix's **"Planning docs" and "Commands" columns cannot be ticked for GSD** by
+Story 12.2 no matter how good its parsing is, even though GSD Core publishes ten well-defined `/gsd-*` slash
+commands that would populate a `CommandCatalog` beautifully. Not a blocker for the other four nouns; it *is* a
+hard ceiling on two of them, and 12.2 should say so on the framework page rather than leave the columns looking
+like unfinished work.
+
+### Recommendation for Story 12.2 (and a proposed 12.3)
+
+1. **Confirm the roster→product pinning first** (`gsd` = GSD Core `.planning/`, `gsd-pi` = GSD Pi `.gsd/`), and
+   record the canonical URLs in `README.md` and the framework roster. Everything else depends on it.
+2. **Split 12.2 into 12.2 (GSD Core) and 12.3 (GSD Pi)**; do GSD Core first (markdown-native, no projection
+   reliability problem, higher value per unit of work). Land the split in `epics.md` **and**
+   `sprint-status.yaml` together.
+3. **Close Gaps 1 + 2 together, once, in whichever coverage story lands first** — registry *and* framework-neutral
+   source-root discovery. Handle the `IngestEpics` watch-path constraint (AD-5) explicitly.
+4. **Reuse `CoverageTier`/`CoverageTiers`** (Story 18.5). Do not mint a tier scale.
+5. **Target the four reachable nouns** — Epics & Stories, Requirements, Sprint, Retros(=honestly empty) — and say
+   plainly on the framework page that Planning docs and Commands await a framework-neutral `ModuleContext`.
+6. **Pin the `StoryInfo.Id` synthesis in a test** (`"{milestone}.{slice}"` vs `"{phase}.{wave}"`) before writing
+   discovery globs.
+7. **Re-verify every filename against a generated repo.** This map is documentation-derived; see the Debug Log's
+   residual-uncertainty note.
 
 ### File List
 
+The spike itself (Tasks 1–7) produced no code. The `src/`/`tests/` entries below are all from the **owner-directed
+scope addition** (Tasks 8–10) and are confined to the framework roster — no adapter, parser, or registry work.
+
+Added:
+
+- `tests/SpecScribe.Tests/AboutSddFrameworkRosterTests.cs` — 4 tests pinning the two GSD products as distinct
+  (marker directory + canonical docs host per entry), and forbidding either URL from pointing at the retired
+  `gsd-build/gsd-2`. A **new file rather than an addition to `SiteGeneratorHowToReadTests.cs`**, deliberately: that
+  file is being edited by a concurrent session, and CLAUDE.md's hunk-attribution rule makes a separate file the
+  cleaner boundary for review.
+
+Modified:
+
+- `src/SpecScribe/AboutSddTemplater.cs` — `Frameworks` gains `Url` + `Blurb`; `AppendComingSoonBody` renders both.
+  **Scope note (code review 2026-08-02):** Task 8 authorized pinning only `gsd`/`gsd-pi`, but the roster tuple
+  widening also populated `Url` for `bmad` and `Url`+`Blurb` for `speckit` (Epic 11's subject) without disclosure.
+  Owner reviewed and chose to keep the widened scope rather than revert it. As part of the same review,
+  `AppendBmadBody`/`AppendGdsBody` were changed to read `fw.Url` instead of a hardcoded literal (previously
+  `bmad`'s new `Url` field was dead code, and `gds` had no `Url` at all despite `AppendGdsBody` also hardcoding
+  one) — `gds` now carries its canonical URL in the roster too.
+- `README.md` — both GSD rows linked in the "Supported frameworks" table, plus a disambiguation note.
+- `_bmad-output/planning-artifacts/epics.md` — Story 12.2 split into 12.2 (GSD Core) + 12.3 (GSD Pi); Epic 12
+  intro records the two-adapter-surfaces conclusion.
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — story key → `in-progress` → `review`; the 12.2 key
+  replaced by `12-2-gsd-core-baseline-adapter-coverage` + `12-3-gsd-pi-baseline-adapter-coverage`; `last_updated`.
+- `_bmad-output/implementation-artifacts/12-1-gsd-and-gsd-pi-integration-spike.md` (this file — frontmatter
+  `baseline_commit`, task checkboxes, Tasks 8–10, Dev Agent Record, File List, Change Log, Status)
+
 ## Change Log
 
+- 2026-08-02 — **Code review (bmad-code-review).** Scoped to this story's own File List (6 files), sibling-session
+  changes excluded per CLAUDE.md. 1 decision-needed, 4 patch, 1 defer, 6 dismissed. Owner resolved the
+  decision-needed item (undisclosed `bmad`/`speckit` `Url`/`Blurb` widening) by keeping the widened scope and
+  wiring it up properly. All 4 patches applied: (1) `AppendBmadBody`/`AppendGdsBody` now read `fw.Url` instead of
+  a hardcoded literal, and `gds` gained its canonical URL in the roster (previously `null` despite
+  `AppendGdsBody` hardcoding one) — the widening is disclosed in the File List above; (2) Story 12.3's AC #3
+  gained the "reusing the existing CoverageTier vocabulary rather than a parallel scale" clause 12.2 already had;
+  (3) Story 12.3 gained a new AC #4 pinning the Milestone→Slice story-id synthesis form (`"{milestone}.{slice}"`)
+  by a test, mirroring 12.2 AC #3; (4) the dangling `<see cref="RenderHub"/>` left in `BuildHubPage`'s doc comment
+  after this diff deleted `RenderHub`/`RenderFrameworkPage` was removed; (5) the stale pre-split downstream-key
+  reference in this story's own Project Structure Notes was corrected to name both `12-2-gsd-core-...` and
+  `12-3-gsd-pi-...`. 1 item deferred to `deferred-work.md` (Story 12.1's own `epics.md` AC block not revisited for
+  the owner-directed scope addition — non-blocking, already disclosed elsewhere in this story). Verified:
+  `dotnet build` clean (0 warnings/errors); `AboutSddFrameworkRosterTests` 4/4 pass; broader `AboutSdd*` suite
+  12/12 pass. Status: `review` → `done`.
+
+- 2026-08-02 — **Owner-directed scope addition** (same dev-story session, after the owner reviewed the spike's
+  findings). The owner **confirmed the roster pinning** and directed this story to land it plus the plan updates,
+  deliberately superseding Task 7's "no production code" constraint; scope bounded to the roster/documentation
+  pinning and the plan split, with no adapter/parser/registry work (Tasks 8-10). Landed: (a)
+  `AboutSddTemplater.Frameworks` gains a canonical `Url` and an identity `Blurb` — `gsd` → GSD Core
+  (`docs.opengsd.net/core`), `gsd-pi` → GSD Pi (`docs.opengsd.net/pi`) — rendered on the placeholder framework
+  pages so "Coming soon" states what each framework *is* rather than only that it is absent; (b) `README.md`'s
+  framework table linked, with a disambiguation note naming the differing markers, authority models and
+  hierarchies and recording that the retired `gsd-build/gsd-2` continues as GSD Pi; (c) **Story 12.2 split into
+  12.2 (GSD Core, first) + 12.3 (GSD Pi)**, co-landed in `epics.md` **and** `sprint-status.yaml` per the
+  decision-records rule, with framework-specific ACs and Epic 12's intro updated to the two-adapter-surfaces
+  conclusion. New test file `tests/SpecScribe.Tests/AboutSddFrameworkRosterTests.cs` (4 tests, written red-green)
+  pins the two products as distinct by marker directory and docs host, and fails if either URL is ever pointed
+  back at the retired `gsd-2`. Deliberate non-change: the display `Label`s stay `GSD`/`GSD-Pi` — renaming them to
+  `GSD Core`/`GSD Pi` is a separate owner display decision and would have put this story inside a concurrent
+  session's hunks in `SiteGeneratorHowToReadTests.cs`. Full suite **2948 passed / 0 failed**.
+- 2026-08-02 — Story 12.1 implemented (dev-story, baseline `b397084`). Spike complete; no production code.
+  **Headline: the story's central premise was wrong and the coverage map corrects it.** Current-version GSD is
+  **GSD Core** (`@opengsd/gsd-core`) — marker `.planning/`, plain markdown + JSON, **no SQLite**, hierarchy
+  Milestone → **Phase** → Task — not the `.gsd/`+SQLite product create-story surveyed; that was `gsd-build/gsd-2`,
+  the **retired** predecessor which "now continues as GSD Pi." Task 3 therefore resolves **two adapter surfaces,
+  not one** (disjoint markers, authority models, mid-level nouns and path grammars; only `STATE.md` overlaps), and
+  recommends splitting Story 12.2 into 12.2 (GSD Core, first) + 12.3 (GSD Pi) — recorded as an owner
+  recommendation, not executed, per the epics.md/sprint-status.yaml co-landing rule. Second correction: the
+  coverage-tier vocabulary **already exists in code** (`CoverageTier`/`CoverageTiers`, Story 18.5,
+  `TestArtifactsModel.cs:18-76`) and is already rendered as an About-SDD legend — 12.2 reuses it rather than
+  minting one. Rulings: Milestone→`EpicInfo`, Slice/Phase→`StoryInfo`, Task→`TasksDone/TasksTotal` only;
+  `DECISIONS.md`→ADR side-channel in spirit but not mechanically reachable (it is a *register*, the side-channel
+  expects one-file-per-decision); `Requirements` mappable-but-`Summarized` for both (GSD Pi's is deep-mode-only;
+  `REQ-001` cannot be represented without extending the throwing `RequirementKind`; no FR→Epic coverage map means
+  `Unmapped` would misleadingly read as "no plan exists"); **`Retros = []` for both** — forcing execution
+  summaries into `RetroModel` would flip `EpicInfo.HasRetrospective` and silently mark milestones closed on every
+  visual surface. Beyond 11.1's shared registry gap (confirmed; 11.1 still `ready-for-dev` so nothing to defer
+  to yet), found **two further prerequisites**: `ForgeOptions` hardcodes `_bmad-output` as the repo-root discovery
+  marker so `generate` fails in a pure GSD repo *before* any adapter is consulted (and defaults the site title to
+  "BMad Live Docs"), and `ArtifactBundle.Module`/`ModuleContext` is BMad-typed to a closed enum keyed on
+  `_bmad/{code}/`, making the About-SDD matrix's "Planning docs" and "Commands" columns structurally unfillable
+  for GSD. No ADR proposed — the registry decision stays ONE shared decision coordinated with 11.1.
 - 2026-07-20 — Story 12.1 drafted (create-story). Ultimate context engine analysis completed — comprehensive developer guide created. Spike-only: coverage map (with declared coverage tiers) + GSD↔GSD-Pi relationship decision + 12.2 scope recommendation; no production code. Second story of the five per-framework spike-led epics (11–15); covers TWO frameworks (GSD + GSD-Pi) and introduces the mandatory coverage-tier axis.

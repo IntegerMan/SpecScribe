@@ -48,7 +48,7 @@ public class SiteGeneratorDesignSystemTests : IDisposable
         Assert.Contains("<h1>Design System</h1>", html);
 
         // The Help nav group + the dashboard's Help quick-links band both carry it, on every page.
-        var index = File.ReadAllText(Path.Combine(Site, "index.html"));
+        var index = SiteRegion.Read(Site, "index.html");
         Assert.Contains($"href=\"{SiteNav.DesignSystemOutputPath}\"", index);
         Assert.Contains("Design System", index);
     }

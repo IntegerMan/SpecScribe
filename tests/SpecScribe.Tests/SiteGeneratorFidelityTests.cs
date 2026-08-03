@@ -13,7 +13,7 @@ public class SiteGeneratorFidelityTests : IDisposable
     private string Source => Path.Combine(_root, "_bmad-output");
     private string Adrs => Path.Combine(_root, "docs", "adrs");
     private string Site => Path.Combine(_root, "site");
-    private string StoryPage => Path.Combine(Site, "epics", "story-1-1.html");
+    private string StoryRoute => "epics/story-1-1.html";
 
     // Init-script fingerprint — the pinned mermaid CDN module import that HtmlTemplater/EpicsTemplater inject.
     private const string InitScriptMarker = "cdn.jsdelivr.net/npm/mermaid@11";
@@ -121,7 +121,7 @@ public class SiteGeneratorFidelityTests : IDisposable
     public void GenerateAll_StoryPageHasAcAnchorsMatchingItsReferences()
     {
         GenerateSite();
-        var html = File.ReadAllText(StoryPage);
+        var html = SiteRegion.Read(Site, StoryRoute);
 
         // Every criterion gets a stable anchor...
         Assert.Contains("id=\"ac-1\"", html);
@@ -135,7 +135,7 @@ public class SiteGeneratorFidelityTests : IDisposable
     public void GenerateAll_EveryAcReferenceAnchorResolvesToAnExistingCriterion()
     {
         GenerateSite();
-        var html = File.ReadAllText(StoryPage);
+        var html = SiteRegion.Read(Site, StoryRoute);
 
         // No .ac-ref href may point at an id that isn't actually on the page (no dead deep-links).
         foreach (System.Text.RegularExpressions.Match m in
@@ -152,7 +152,7 @@ public class SiteGeneratorFidelityTests : IDisposable
     public void GenerateAll_StoryPageRendersTaskCheckboxesWithCompletionState()
     {
         GenerateSite();
-        var html = File.ReadAllText(StoryPage);
+        var html = SiteRegion.Read(Site, StoryRoute);
 
         Assert.Contains("type=\"checkbox\"", html);
         // Task 1 is done → a checked checkbox is present on the page.
@@ -165,32 +165,41 @@ public class SiteGeneratorFidelityTests : IDisposable
     public void GenerateAll_StoryPageWithMermaidInBodyCarriesClientRenderBlockAndInitScript()
     {
         GenerateSite();
-        var html = File.ReadAllText(StoryPage);
+        var html = SiteRegion.Read(Site, StoryRoute);
 
-        // The fragment-rendered fence became a client-render block AND the detail page injected the init script.
-        Assert.Contains("<pre class=\"mermaid\">", html);
+        // The fragment-rendered fence became a client-render block, which is what makes the renderer emit the
+        // init module for this page.
+        Assert.Contains(Mermaid.BlockMarker, html);
         Assert.DoesNotContain("<code class=\"language-mermaid\">", html);
-        Assert.Contains(InitScriptMarker, html);
+        // [Story 23.6 AC #8] The init MODULE is chrome, and no C# code path emits a page's chrome any more. The
+        // question splits in two and both halves are still asserted: the site ships the script (here, off the
+        // IR's chrome block — the renderer's only source for it), and THIS page gets it because its region
+        // carries the block marker above. The per-page half is `web/test/chrome-needs.test.ts`, which pins
+        // `chromeNeeds().needsMermaid` against exactly this marker.
+        Assert.Contains(InitScriptMarker, SiteRegion.Chrome(Site).MermaidInitScript);
     }
 
     [Fact]
     public void GenerateAll_FullDocPageWithMermaidCarriesInitScript()
     {
         GenerateSite();
-        var html = File.ReadAllText(Path.Combine(Site, "planning-artifacts", "diagram-doc.html"));
+        var html = SiteRegion.Read(Site, "planning-artifacts/diagram-doc.html");
 
-        Assert.Contains("<pre class=\"mermaid\">", html);
-        Assert.Contains(InitScriptMarker, html);
+        Assert.Contains(Mermaid.BlockMarker, html);
+        // [Story 23.6 AC #8] Chrome — see the note on the story-page test above for where each half now lives.
+        Assert.Contains(InitScriptMarker, SiteRegion.Chrome(Site).MermaidInitScript);
     }
 
     [Fact]
     public void GenerateAll_PageWithoutMermaidOmitsInitScript()
     {
         GenerateSite();
-        var html = File.ReadAllText(Path.Combine(Site, "planning-artifacts", "plain-doc.html"));
+        var html = SiteRegion.Read(Site, "planning-artifacts/plain-doc.html");
 
-        // Negative control: baseline generation never pulls in the CDN module when no diagram is present.
-        Assert.DoesNotContain(InitScriptMarker, html);
+        // Negative control. [Story 23.6 AC #8] The site-level script always exists now, so the honest negative
+        // is "this page carries no diagram, therefore the renderer emits no module for it" — the marker the
+        // renderer keys on, not the module body.
+        Assert.DoesNotContain(Mermaid.BlockMarker, html);
         Assert.Contains("language-csharp", html);
     }
 
@@ -213,7 +222,7 @@ public class SiteGeneratorFidelityTests : IDisposable
     public void GenerateAll_GenericDocRendersSidebarNotStrip_InSourceHeadingOrder()
     {
         GenerateSite();
-        var html = File.ReadAllText(Path.Combine(Site, "planning-artifacts", "guide.html"));
+        var html = SiteRegion.Read(Site, "planning-artifacts/guide.html");
 
         // The shared seam renders the accessible sidebar, and the retired top-strip is gone everywhere.
         Assert.Contains("<nav class=\"toc-sidebar\" aria-label=\"On this page\">", html);
@@ -229,7 +238,7 @@ public class SiteGeneratorFidelityTests : IDisposable
     public void GenerateAll_StoryDetailPageBuildsSidebarInEmissionOrder()
     {
         GenerateSite();
-        var html = File.ReadAllText(StoryPage);
+        var html = SiteRegion.Read(Site, StoryRoute);
 
         Assert.Contains("<nav class=\"toc-sidebar\" aria-label=\"On this page\">", html);
         var order = TocAnchorOrder(html);
@@ -253,7 +262,7 @@ public class SiteGeneratorFidelityTests : IDisposable
     public void GenerateAll_EveryStoryTocEntryPointsAtAnIdThatExistsOnThePage()
     {
         GenerateSite();
-        var html = File.ReadAllText(StoryPage);
+        var html = SiteRegion.Read(Site, StoryRoute);
 
         // No dead links: every sidebar entry's target id must actually be present on the page.
         foreach (var anchor in TocAnchorOrder(html))
@@ -266,7 +275,7 @@ public class SiteGeneratorFidelityTests : IDisposable
     public void GenerateAll_EpicDetailPageSidebarJumpsToEachStoryCard()
     {
         GenerateSite();
-        var html = File.ReadAllText(Path.Combine(Site, "epics", "epic-1.html"));
+        var html = SiteRegion.Read(Site, "epics/epic-1.html");
 
         Assert.Contains("<nav class=\"toc-sidebar\" aria-label=\"On this page\">", html);
         // The epic page's story jump-list must point at real story-card ids (no dead links).

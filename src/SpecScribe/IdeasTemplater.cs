@@ -16,9 +16,6 @@ namespace SpecScribe;
 /// [Story 18.4]</summary>
 public static class IdeasTemplater
 {
-    public static string RenderListPage(IdeasModel model, SiteNav nav) =>
-        HtmlRenderAdapter.Shared.Render(BuildListPage(model, nav)).Content;
-
     /// <summary>Builds the list page's host-neutral <see cref="PageView"/> — the AD-2 delivery contract, so the
     /// IR's content region can be COMPOSED (<see cref="JsonSpaRenderAdapter.RenderContent"/>: nav markup +
     /// wayfinding + body) instead of sliced back out of a rendered full page. <see cref="RenderListPage"/> is the
@@ -109,14 +106,6 @@ public static class IdeasTemplater
         sb.Append("</section>\n\n");
         return sb.ToString();
     }
-
-    /// <summary>One idea's synthesized detail page: the session's chronology, the distilled hand-off when the idea
-    /// hardened, a link out to the forge's own report when it was safe to carry, and any forward link to what the
-    /// idea went on to become. Synthesized because <c>forged-idea.md</c> exists ONLY on a hardened exit — linking
-    /// straight to it would leave every killed, clarified and in-progress idea with no destination at all
-    /// (owner decision D1).</summary>
-    public static string RenderDetailPage(IdeaEntry idea, SiteNav nav) =>
-        HtmlRenderAdapter.Shared.Render(BuildDetailPage(idea, nav)).Content;
 
     /// <summary>Builds a detail page's host-neutral <see cref="PageView"/> — see <see cref="BuildListPage"/>.
     /// [Story 23.4 AC #3]</summary>

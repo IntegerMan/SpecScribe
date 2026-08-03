@@ -17,8 +17,8 @@ public class SiteGeneratorCadenceTests : IDisposable
     private string Impl => Path.Combine(Source, "implementation-artifacts");
     private string Adrs => Path.Combine(_root, "docs", "adrs");
     private string Site => Path.Combine(_root, "site");
-    private string CadencePage => Path.Combine(Site, "cadence.html");
-    private string IndexPage => Path.Combine(Site, "index.html");
+    private string CadenceRoute => "cadence.html";
+    private string IndexRoute => "index.html";
 
     private const string EpicsMd = """
         # Epics
@@ -109,8 +109,8 @@ public class SiteGeneratorCadenceTests : IDisposable
     {
         GenerateWithDoneStories();
 
-        Assert.True(File.Exists(CadencePage), "cadence.html should be generated when epics.md exists");
-        var html = File.ReadAllText(CadencePage);
+        Assert.True(SiteRegion.Exists(Site, CadenceRoute), "cadence.html should be generated when epics.md exists");
+        var html = SiteRegion.Read(Site, CadenceRoute);
 
         Assert.Contains("<main id=\"main-content\"", html);
         Assert.Contains("class=\"breadcrumb\"", html);
@@ -131,7 +131,7 @@ public class SiteGeneratorCadenceTests : IDisposable
     public void GenerateAll_CadencePage_CarriesTheApproximateCycleTimeCaveat()
     {
         GenerateWithDoneStories();
-        var html = File.ReadAllText(CadencePage);
+        var html = SiteRegion.Read(Site, CadenceRoute);
         // The honesty caveat must be visible (Note slot), not buried (AC #2).
         Assert.Contains("chart-frame-note", html);
         Assert.Contains("Approximate", html);
@@ -141,7 +141,7 @@ public class SiteGeneratorCadenceTests : IDisposable
     public void GenerateAll_AddsCadenceNavEntryBesideTraceability()
     {
         GenerateWithDoneStories();
-        var index = File.ReadAllText(IndexPage);
+        var index = SiteRegion.Read(Site, IndexRoute);
         Assert.Contains("href=\"cadence.html\"", index);
         Assert.Contains(">Cadence</a>", index);
     }
@@ -150,7 +150,7 @@ public class SiteGeneratorCadenceTests : IDisposable
     public void GenerateAll_Dashboard_ShowsCadenceStripLinkingToCadencePage()
     {
         GenerateWithDoneStories();
-        var index = File.ReadAllText(IndexPage);
+        var index = SiteRegion.Read(Site, IndexRoute);
         Assert.Contains("cadence-panel", index);
         Assert.Contains("cadence-strip", index);
         Assert.Contains("View delivery cadence", index);
@@ -160,7 +160,7 @@ public class SiteGeneratorCadenceTests : IDisposable
     public void GenerateAll_CadencePage_NoBrokenLocalLinks()
     {
         GenerateWithDoneStories();
-        AssertNoBrokenLocalLinks(CadencePage);
+        SiteRegion.AssertNoBrokenLocalLinks(Site, CadenceRoute);
     }
 
     [Fact]
@@ -170,8 +170,8 @@ public class SiteGeneratorCadenceTests : IDisposable
         var gen = new SiteGenerator(Options());
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
-        Assert.False(File.Exists(CadencePage), "no cadence.html without epics.md (shared hasEpics gate)");
-        var index = File.ReadAllText(IndexPage);
+        Assert.False(SiteRegion.Exists(Site, CadenceRoute), "no cadence.html without epics.md (shared hasEpics gate)");
+        var index = SiteRegion.Read(Site, IndexRoute);
         Assert.DoesNotContain("href=\"cadence.html\"", index);
         Assert.DoesNotContain(">Cadence<", index);
     }
@@ -183,12 +183,12 @@ public class SiteGeneratorCadenceTests : IDisposable
         var gen = new SiteGenerator(Options());
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
-        Assert.True(File.Exists(CadencePage), "the page still writes (hasEpics), degrading honestly inside");
-        var html = File.ReadAllText(CadencePage);
+        Assert.True(SiteRegion.Exists(Site, CadenceRoute), "the page still writes (hasEpics), degrading honestly inside");
+        var html = SiteRegion.Read(Site, CadenceRoute);
         Assert.Contains("No completed stories to chart yet", html);
         Assert.Contains("No story has a derivable cycle-time", html);
         // Nothing to show → no dashboard strip (omit, don't show an empty panel).
-        Assert.DoesNotContain("cadence-strip", File.ReadAllText(IndexPage));
+        Assert.DoesNotContain("cadence-strip", SiteRegion.Read(Site, IndexRoute));
     }
 
     [Fact]
@@ -200,22 +200,4 @@ public class SiteGeneratorCadenceTests : IDisposable
         Assert.False(string.IsNullOrWhiteSpace(page.ContentHtml));
     }
 
-    private void AssertNoBrokenLocalLinks(string pagePath)
-    {
-        var html = File.ReadAllText(pagePath);
-        var pageDir = Path.GetDirectoryName(pagePath)!;
-        foreach (Match m in Regex.Matches(html, "href=\"([^\"]+)\""))
-        {
-            var raw = m.Groups[1].Value;
-            if (raw.StartsWith("#", StringComparison.Ordinal)
-                || Regex.IsMatch(raw, "^[a-zA-Z][a-zA-Z0-9+.-]*:"))
-                continue;
-
-            var target = raw.Split('#')[0].Split('?')[0];
-            if (target.Length == 0) continue;
-
-            var resolved = Path.GetFullPath(Path.Combine(pageDir, target.Replace('/', Path.DirectorySeparatorChar)));
-            Assert.True(File.Exists(resolved), $"broken link: {raw} -> {resolved}");
-        }
-    }
 }

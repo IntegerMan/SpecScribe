@@ -455,11 +455,11 @@ public class SiteGeneratorAdapterTests : IDisposable
         Assert.Contains("development_status", diag.Message);
 
         // …and every successful artifact still renders, while the sprint surfaces omit cleanly.
-        Assert.False(File.Exists(Path.Combine(Site, "sprint.html")));
-        Assert.True(File.Exists(Path.Combine(Site, "index.html")));
-        Assert.True(File.Exists(Path.Combine(Site, "epics.html")));
-        Assert.True(File.Exists(Path.Combine(Site, "epics", "story-1-1.html")));
-        Assert.DoesNotContain("href=\"sprint.html\"", File.ReadAllText(Path.Combine(Site, "index.html")));
+        Assert.False(SiteRegion.Exists(Site, "sprint.html"));
+        Assert.True(SiteRegion.Exists(Site, "index.html"));
+        Assert.True(SiteRegion.Exists(Site, "epics.html"));
+        Assert.True(SiteRegion.Exists(Site, "epics/story-1-1.html"));
+        Assert.DoesNotContain("href=\"sprint.html\"", SiteRegion.Read(Site, "index.html"));
     }
 
     [Fact]
@@ -481,8 +481,8 @@ public class SiteGeneratorAdapterTests : IDisposable
         Assert.StartsWith("[Informational]", notice.Message);
 
         // The doc page still renders; the home no longer carries the (removed) unrecognized-folder index band.
-        Assert.True(File.Exists(Path.Combine(Site, "design-notes", "ideas.html")));
-        var index = File.ReadAllText(Path.Combine(Site, "index.html"));
+        Assert.True(SiteRegion.Exists(Site, "design-notes/ideas.html"));
+        var index = SiteRegion.Read(Site, "index.html");
         Assert.DoesNotContain("Design Notes</div>", index);
         Assert.DoesNotContain("href=\"design-notes/ideas.html\"", index);
     }
@@ -516,8 +516,8 @@ public class SiteGeneratorAdapterTests : IDisposable
         var events = new SiteGenerator(Options()).GenerateAll();
         Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
 
-        Assert.True(File.Exists(Path.Combine(Site, "about.html")));
-        var diag = File.ReadAllText(Path.Combine(Site, "diagnostics.html"));
+        Assert.True(SiteRegion.Exists(Site, "about.html"));
+        var diag = SiteRegion.Read(Site, "diagnostics.html");
         Assert.Contains("No notices", diag);
         Assert.DoesNotContain("diagnostics-table", diag);
         // AC #2: the effective-config disclosure still renders in the all-clear case, carrying the run's config.
@@ -535,7 +535,7 @@ public class SiteGeneratorAdapterTests : IDisposable
         File.WriteAllText(SprintYaml, "just: some\nunrelated: keys\n");
 
         new SiteGenerator(Options()).GenerateAll();
-        var diag = File.ReadAllText(Path.Combine(Site, "diagnostics.html"));
+        var diag = SiteRegion.Read(Site, "diagnostics.html");
 
         Assert.Contains("diagnostics-table", diag);
         // The doc-subtitle pins the notice count — "1 notice" proves the single mapped diagnostic isn't doubled.
@@ -582,11 +582,11 @@ public class SiteGeneratorAdapterTests : IDisposable
         new SiteGenerator(Options()).GenerateAll();
 
         // Root page → bare href; depth-1 pages (adrs/, epics/) → "../about.html".
-        Assert.Contains("href=\"about.html\"", File.ReadAllText(Path.Combine(Site, "index.html")));
-        Assert.Contains("href=\"../about.html\"", File.ReadAllText(Path.Combine(Site, "adrs", "index.html")));
-        Assert.Contains("href=\"../about.html\"", File.ReadAllText(Path.Combine(Site, "epics", "story-1-1.html")));
+        Assert.Contains("href=\"about.html\"", SiteRegion.Read(Site, "index.html"));
+        Assert.Contains("href=\"../about.html\"", SiteRegion.Read(Site, "adrs/index.html"));
+        Assert.Contains("href=\"../about.html\"", SiteRegion.Read(Site, "epics/story-1-1.html"));
         // The About page links on to the diagnostics run log (the reachability path's final hop).
-        Assert.Contains("href=\"diagnostics.html\"", File.ReadAllText(Path.Combine(Site, "about.html")));
+        Assert.Contains("href=\"diagnostics.html\"", SiteRegion.Read(Site, "about.html"));
     }
 
     private static int Count(string haystack, string needle)
@@ -620,12 +620,12 @@ public class SiteGeneratorAdapterTests : IDisposable
 
         // The epic HEADER badge reads "In review". No story here is in review (Story 2.1 is done), so a
         // review-class status badge on this page can only be the epic's own header badge.
-        var epic2 = File.ReadAllText(Path.Combine(Site, "epics", "epic-2.html"));
+        var epic2 = SiteRegion.Read(Site, "epics/epic-2.html");
         Assert.Contains("<span class=\"status-badge review js-tip\"", epic2);
 
         // …and the epics-index chip for Epic 2 agrees (the same retro-gated classifier), so the surfaces are
         // consistent rather than one reading "Done" and another "In review".
-        var epicsIndex = File.ReadAllText(Path.Combine(Site, "epics.html"));
+        var epicsIndex = SiteRegion.Read(Site, "epics.html");
         Assert.Contains("epic-chip review", epicsIndex);
     }
 
@@ -642,7 +642,7 @@ public class SiteGeneratorAdapterTests : IDisposable
         var ev = gen.RegenerateEpics();
 
         Assert.Equal(GenerationOutcome.Updated, ev.Outcome);
-        Assert.Contains("Renamed Story", File.ReadAllText(Path.Combine(Site, "epics", "story-1-1.html")));
-        Assert.Contains("Renamed Story", File.ReadAllText(Path.Combine(Site, "epics.html")));
+        Assert.Contains("Renamed Story", SiteRegion.Read(Site, "epics/story-1-1.html"));
+        Assert.Contains("Renamed Story", SiteRegion.Read(Site, "epics.html"));
     }
 }

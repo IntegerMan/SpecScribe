@@ -91,7 +91,7 @@ public class FileWatcherServiceCrashGuardTests : IDisposable
     public void ThrowingEventCallback_DoesNotStopLaterPassesFromDoingRealWork()
     {
         // Swallowing must not also mean giving up: the point of surviving a broken reporter is that generation keeps
-        // working. Asserted on the OUTPUT (the page really regenerates), not merely on "no exception".
+        // working. Asserted on the OUTPUT (the pageRoute really regenerates), not merely on "no exception".
         var gen = GeneratedSite();
         using var watcher = new FileWatcherService(
             Options(), gen, _ => throw new InvalidOperationException("reporter is broken"));
@@ -101,9 +101,9 @@ public class FileWatcherServiceCrashGuardTests : IDisposable
         File.WriteAllText(DocPath, "# Guide\n\nSECOND-EDIT\n");
         watcher.RunDebouncedPass(DocPath);
 
-        var page = Path.Combine(Site, "notes", "guide.html");
-        Assert.True(File.Exists(page));
-        Assert.Contains("SECOND-EDIT", File.ReadAllText(page));
+        var pageRoute = "notes/guide.html";
+        Assert.True(SiteRegion.Exists(Site, pageRoute));
+        Assert.Contains("SECOND-EDIT", SiteRegion.Read(Site, pageRoute));
     }
 
     /// <summary>Makes every regeneration route throw, by replacing the output ROOT with a plain file: the first thing
@@ -191,7 +191,7 @@ public class FileWatcherServiceCrashGuardTests : IDisposable
         watcher.RunDebouncedPass(DocPath);
 
         Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
-        Assert.Contains("AFTER-RECOVERY", File.ReadAllText(Path.Combine(Site, "notes", "guide.html")));
+        Assert.Contains("AFTER-RECOVERY", SiteRegion.Read(Site, "notes/guide.html"));
     }
 
     [Fact]
@@ -208,7 +208,7 @@ public class FileWatcherServiceCrashGuardTests : IDisposable
 
         var ev = Assert.Single(events);
         Assert.NotEqual(GenerationOutcome.Error, ev.Outcome);
-        Assert.Contains("EDITED", File.ReadAllText(Path.Combine(Site, "notes", "guide.html")));
+        Assert.Contains("EDITED", SiteRegion.Read(Site, "notes/guide.html"));
     }
 
     [Fact]

@@ -146,157 +146,17 @@ public static class SpaDelivery
     private static readonly Regex TitleRegex =
         new("<title>(?<t>.*?)</title>", RegexOptions.Compiled | RegexOptions.Singleline);
 
-    /// <summary>Slices one page's SWAPPABLE content region out of the render pipeline's OWN output — the full page
-    /// string the generator already holds before it writes the file (NOT a read-back of a generated <c>.html</c>,
-    /// which would be scraping and an AD-1/AD-2 violation — see the Story 6.7 Dev Notes boundary). The region is the
-    /// freshly-rendered nav markup (byte-identical to the page's own nav, minus the inline toggle script the client
-    /// owns) plus the page's contiguous wayfinding band + <c>&lt;main id="main-content"&gt;…&lt;/main&gt;</c> block —
-    /// the universal Story 1.4 landmark every templater emits. A page missing the landmark degrades to nav-only
-    /// rather than aborting the whole SPA emit.
-    /// <para>The band is sliced from its OUTERMOST marker so every emitted region has ONE shape and is
-    /// element-balanced — see the two-marker note below. [Story 6.7; Story 22.4 AC #4]</para></summary>
-    public static string ExtractContentRegion(string fullPageHtml, string navMarkup)
-    {
-        const string mainCloser = "</main>";
-        var mainOpen = fullPageHtml.IndexOf(MainLandmarkMarker, StringComparison.Ordinal);
-        // Search for the closer starting AT the opener, not from index 0 — a page whose body legitimately
-        // contains an earlier literal "</main>" (e.g. a doc's raw-HTML code sample) must never be allowed to
-        // put mainClose before mainOpen, which would make the slice below throw. [Story 6.7 review]
-        var mainClose = mainOpen >= 0
-            ? fullPageHtml.IndexOf(mainCloser, mainOpen, StringComparison.Ordinal)
-            : -1;
-        if (mainOpen < 0 || mainClose < 0)
-        {
-            return navMarkup;
-        }
-        mainClose += mainCloser.Length;
-
-        // The wayfinding band (when present) immediately precedes <main> and carries no script, so nav + [band +
-        // main] is contiguous and script-free — exactly the RenderContent shape (nav markup + wayfinding + body).
-        //
-        // TWO markers, because the band has two shapes (Story 22.4 AC #4). A page whose pager renders non-empty
-        // gets HtmlRenderAdapter.RenderWayfinding's <div class="page-wayfinding"> WRAPPER around the breadcrumb;
-        // every other page gets the bare breadcrumb, byte-identically to RenderBreadcrumb. Slicing from the inner
-        // breadcrumb on a wrapped page carried the wrapper's closing </div> WITHOUT its opener — an IR region
-        // unbalanced by one element on 594 of this repo's 1,400 pages, which the TS adapter then had to detect
-        // and repair. Preferring the wrapper emits ONE region shape for the whole IR, and the repair is deleted.
-        //
-        // Take the EARLIEST candidate that precedes mainOpen (the wrapper always encloses the breadcrumb, so it
-        // is the earlier of the two when both are present). Anchoring on "precedes <main>" is what keeps a
-        // breadcrumb-shaped string inside the page BODY — a doc's raw-HTML code sample — from splitting the
-        // region; region-split.test.ts pins that case. Only the slice's START moves: the end is still </main>,
-        // which HtmlTemplater's section-nav script placement depends on. [Story 22.4 AC #4]
-        const string wrapMarker = "<div class=\"page-wayfinding\"";
-        const string crumbMarker = "<div class=\"breadcrumb\"";
-        var wrapOpen = fullPageHtml.IndexOf(wrapMarker, StringComparison.Ordinal);
-        var crumbOpen = fullPageHtml.IndexOf(crumbMarker, StringComparison.Ordinal);
-        var bodyStart = mainOpen;
-        if (wrapOpen >= 0 && wrapOpen < bodyStart) bodyStart = wrapOpen;
-        if (crumbOpen >= 0 && crumbOpen < bodyStart) bodyStart = crumbOpen;
-        return navMarkup + fullPageHtml[bodyStart..mainClose];
-    }
-
-    /// <summary>The page title as the browser tab shows it — the full page's <c>&lt;title&gt;</c> (entity-decoded).
-    /// Empty when a captured page somehow carries none. [Story 6.7]</summary>
-    public static string ExtractTitle(string fullPageHtml)
-    {
-        var m = TitleRegex.Match(fullPageHtml);
-        return m.Success ? WebUtility.HtmlDecode(m.Groups["t"].Value) : string.Empty;
-    }
-
     // Matches the breadcrumb markup HtmlRenderAdapter.RenderBreadcrumb produces, in document order: either a
     // linked crumb (<a href="...">Label</a>) or the current, unlinked crumb (<span class="crumb-current" ...>Label</span>).
     private static readonly Regex CrumbRegex = new(
         "<a href=\"(?<href>[^\"]*)\">(?<alabel>[^<]*)</a>|<span class=\"crumb-current\"[^>]*>(?<clabel>[^<]*)</span>",
         RegexOptions.Compiled);
 
-    /// <summary>Recovers the page's breadcrumb trail as structured <see cref="BreadcrumbCrumb"/> data from the
-    /// render pipeline's OWN captured output — the same string <see cref="ExtractContentRegion"/> slices, never a
-    /// re-read of a generated file. Every dashboard/epics family page already carries this structurally via its
-    /// <see cref="PageView.Breadcrumb"/> (<see cref="SiteGenerator.AddSpaSurface"/> uses that directly); this
-    /// extraction exists so every OTHER captured page — docs, ADRs, sprint, requirements, commits, etc. — gets the
-    /// SAME structured parent/drill data the manifest ships (Story 6.7 review: the manifest previously carried none
-    /// of this for non-family pages). A linked crumb's href always equals <c>RelativePrefix(currentOutputRelativePath)
-    /// + targetPath</c> (see <see cref="PathUtil.RenderHeadOpen"/>'s sibling <c>RenderBreadcrumb</c>), so stripping
-    /// that exact, independently-computed prefix recovers the output-relative target with no dot-segment parsing.
-    /// [Story 6.7 review]</summary>
-    public static IReadOnlyList<BreadcrumbCrumb> ExtractBreadcrumb(string fullPageHtml, string currentOutputRelativePath)
-    {
-        var crumbStart = fullPageHtml.IndexOf("<div class=\"breadcrumb\"", StringComparison.Ordinal);
-        if (crumbStart < 0)
-        {
-            return Array.Empty<BreadcrumbCrumb>();
-        }
-        var crumbEnd = fullPageHtml.IndexOf("</div>", crumbStart, StringComparison.Ordinal);
-        if (crumbEnd < 0)
-        {
-            return Array.Empty<BreadcrumbCrumb>();
-        }
-
-        var prefix = PathUtil.RelativePrefix(currentOutputRelativePath);
-        var crumbSection = fullPageHtml.Substring(crumbStart, crumbEnd - crumbStart);
-        var crumbs = new List<BreadcrumbCrumb>();
-        foreach (Match m in CrumbRegex.Matches(crumbSection))
-        {
-            if (m.Groups["href"].Success)
-            {
-                var href = WebUtility.HtmlDecode(m.Groups["href"].Value);
-                var target = href.StartsWith(prefix, StringComparison.Ordinal) ? href[prefix.Length..] : href;
-                crumbs.Add(new BreadcrumbCrumb(WebUtility.HtmlDecode(m.Groups["alabel"].Value), target));
-            }
-            else
-            {
-                crumbs.Add(new BreadcrumbCrumb(WebUtility.HtmlDecode(m.Groups["clabel"].Value), null));
-            }
-        }
-        return crumbs;
-    }
-
     private static readonly Regex MetaDescriptionRegex = new(
         "<meta name=\"description\" content=\"(?<d>[^\"]*)\">", RegexOptions.Compiled);
 
-    /// <summary>The page's <c>&lt;meta name="description"&gt;</c> text (entity-decoded), for the IR's head
-    /// projection — the same extraction discipline (and the same HTML-decode step) <see cref="ExtractTitle"/>
-    /// already applies to <c>&lt;title&gt;</c>, over the render pipeline's OWN captured output rather than a
-    /// disk read-back. Null when a captured page somehow carries none; the caller falls back to the title,
-    /// exactly as <see cref="PathUtil.RenderHeadOpen"/> does when it builds the tag in the first place.
-    /// [Story 22.2]</summary>
-    public static string? ExtractMetaDescription(string fullPageHtml)
-    {
-        var m = MetaDescriptionRegex.Match(fullPageHtml);
-        return m.Success ? WebUtility.HtmlDecode(m.Groups["d"].Value) : null;
-    }
-
     private static readonly Regex NavBlockRegex = new(
         "<nav class=\"site-nav\".*?</nav>\\n?", RegexOptions.Compiled | RegexOptions.Singleline);
-
-    /// <summary>Slices the page's OWN rendered nav element out of the captured page string, so a captured page
-    /// keeps the page-local context band (<c>site-nav-local-context</c>) the static renderer computed for it
-    /// (Story 22.2 AC #5). Before this, every captured page's nav was RE-rendered from
-    /// <c>nav.ToNavigationView(path)</c>, which takes no local-context argument — so an ADR page silently lost
-    /// its "ADRs" band and got the generic key-views nav instead (Story 23.1's enumerated difference #2). There
-    /// is no path → <see cref="NavLocalContext"/> resolver to re-derive it from: every call site builds one
-    /// inline at render time and discards it.
-    /// <para>The slice ends at the FIRST <c>&lt;/nav&gt;</c> — <see cref="HtmlRenderAdapter.RenderNavMarkup"/>
-    /// nests no second <c>&lt;nav&gt;</c> inside <c>.site-nav</c> (its groups are <c>&lt;details&gt;</c>, its
-    /// bands are <c>&lt;div&gt;</c>) — and therefore stops exactly where the markup does, EXCLUDING the inline
-    /// <c>NavToggleScript</c> that immediately follows it on the HTML surface (the SPA client and the webview
-    /// bridge each own the toggle through delegation; an injected script would never execute anyway).</para>
-    /// <para>Byte-faithful and plumbing-free: it consumes the same captured string
-    /// <see cref="ExtractContentRegion"/> slices, never a disk read-back, so the AD-1/AD-2 boundary holds.
-    /// Returns null when the page carries no site nav, leaving the caller on its re-rendered fallback.</para>
-    /// <para>⚠️ <b>Anchored the same way <see cref="ExtractContentRegion"/> anchors its own markers</b> (code
-    /// review): a match is accepted only when it precedes the page's <see cref="MainLandmarkMarker"/>. Without
-    /// this, a doc page whose own PROSE quotes this exact nav markup (this file's own doc comments do, for
-    /// instance) could be mistaken for the page's real chrome nav — the same self-reference class
-    /// <see cref="ExtractContentRegion"/>'s own comment names.</para>
-    /// [Story 22.2]</summary>
-    public static string? ExtractNavMarkup(string fullPageHtml)
-    {
-        var mainOpen = fullPageHtml.IndexOf(MainLandmarkMarker, StringComparison.Ordinal);
-        var m = NavBlockRegex.Match(fullPageHtml);
-        return m.Success && (mainOpen < 0 || m.Index < mainOpen) ? m.Value : null;
-    }
 
     /// <summary>One embedded <c>&lt;script&gt;</c> a consumer of a page's content region must deal with — the
     /// strip-or-nonce decision, made declarable rather than something each consumer re-derives with its own
@@ -736,7 +596,8 @@ public static class SpaDelivery
                 Encoding.UTF8.GetByteCount(encoded[page.OutputRelativePath].ValueJson));
         }
         var navGraph = bundle.Nav.Select(n => new ManifestNavItem(n.Label, n.OutputRelativePath)).ToList();
-        var manifest = new Manifest(SchemaVersion, bundle.SiteTitle, bundle.EntryPath, navGraph, oversized, pages);
+        var manifest = new Manifest(
+            SchemaVersion, bundle.SiteTitle, bundle.EntryPath, navGraph, ManifestChrome.Current, oversized, pages);
         files.Add(new OutputFile(ManifestPath, JsonSerializer.Serialize(manifest, JsonOptions)));
         foreach (var (chunkFile, content, _) in chunkFiles)
         {
@@ -870,11 +731,64 @@ public static class SpaDelivery
         string ContentHash,
         int Bytes);
 
+    /// <summary>The SITE-LEVEL CHROME the IR did not used to carry. [Story 23.6 AC #7]
+    ///
+    /// <para><b>Why this exists, concretely.</b> Before this story the Nuxt renderer obtained three of these by
+    /// SCRAPING the generated <c>index.html</c> — <c>web/ir/adapter.ts</c> § <c>readGoldenChrome</c>, whose own
+    /// comment called the omission "ONE named gap handed to Epic 22". That read is a dependency on the C# HTML
+    /// writer, so it is a SEVENTH dependent of the deletion, and one not listed in the story's § The six
+    /// dependents. Its failure mode is the worst kind: the scrape is wrapped in <c>try/catch</c> returning empty
+    /// strings, so deleting the writer would have dropped the favicon, the asset cache-bust and the anti-flash
+    /// boot marker off every rendered page SILENTLY, with every gate green.</para>
+    ///
+    /// <para><b>The three script bodies are inner text, not tags.</b> The adapter injects them through
+    /// <c>useHead</c>'s <c>innerHTML</c>, which supplies its own <c>&lt;script&gt;</c> wrapper; shipping the
+    /// wrapper here would nest one inside another. <see cref="Unwrap"/> is the single place that strips it, so the
+    /// C# constants stay the one definition of each script and nothing is re-typed on the other side.</para>
+    ///
+    /// <para><b>Placement and gating are the CONSUMER's, deliberately.</b> Which pages need which script is
+    /// derived structurally from the region on the renderer side (a <c>data-hierarchy</c> / <c>data-relgraph</c> /
+    /// <c>&lt;pre class="mermaid"&gt;</c> / <c>.toc-sidebar</c> probe), exactly as
+    /// <c>needsHierarchyEngine</c> already was — the same discipline as the C# side, where each
+    /// <c>AssetManifest</c> flag is computed from the finished body so a flag cannot disagree with the page that
+    /// carries it.</para></summary>
+    private sealed record ManifestChrome(
+        string AssetVersion,
+        string FaviconDataUri,
+        string HierarchyBootScript,
+        string GraphBootScript,
+        string MermaidInitScript,
+        string TocActiveSectionScript)
+    {
+        public static ManifestChrome Current { get; } = new(
+            PathUtil.CurrentAssetVersion,
+            PathUtil.CurrentFaviconDataUri,
+            Unwrap(HierarchyExplorer.BootScript),
+            Unwrap(RelationshipGraph.BootScript),
+            Unwrap(Mermaid.InitScript()),
+            Unwrap(Toc.ActiveSectionScript));
+
+        /// <summary>Strips the outer <c>&lt;script …&gt;</c>/<c>&lt;/script&gt;</c> pair, leaving the body.
+        /// Returns the input unchanged if it is not wrapped, so a constant that stops being a tag one day
+        /// degrades to "shipped verbatim" rather than to a silently truncated script.</summary>
+        private static string Unwrap(string script)
+        {
+            var open = script.IndexOf('>');
+            var close = script.LastIndexOf("</script>", StringComparison.Ordinal);
+            if (!script.TrimStart().StartsWith("<script", StringComparison.Ordinal) || open < 0 || close <= open)
+            {
+                return script;
+            }
+            return script[(open + 1)..close].Trim();
+        }
+    }
+
     private sealed record Manifest(
         int SchemaVersion,
         string SiteTitle,
         string Entry,
         IReadOnlyList<ManifestNavItem> Nav,
+        ManifestChrome Chrome,
         IReadOnlyList<ManifestOversizedPage> OversizedPages,
         IReadOnlyDictionary<string, ManifestEntry> Pages);
 }

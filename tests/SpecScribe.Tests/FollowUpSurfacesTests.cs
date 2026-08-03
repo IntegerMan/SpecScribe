@@ -151,7 +151,7 @@ public class FollowUpSurfacesTests : IDisposable
         File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "sprint-status.yaml"), SprintWithDupes);
         Assert.DoesNotContain(new SiteGenerator(Options()).GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
-        var html = File.ReadAllText(Path.Combine(Site, "action-items.html"));
+        var html = SiteRegion.Read(Site, "action-items.html");
 
         // Scan-first row grammar (Story 9.10) + primary link to detail page (Story 9.11).
         Assert.Contains("class=\"followup-row\"", html);
@@ -238,7 +238,7 @@ public class FollowUpSurfacesTests : IDisposable
         // The item's own detail page is the one whose file name matches its slug — several pages in this
         // group MENTION "Schedule retros promptly" (as a local-context sibling link), so match on the
         // generated slug rather than a raw text search across all pages.
-        var schedulePage = File.ReadAllText(Path.Combine(followUpsDir, "action-schedule-retros-promptly.html"));
+        var schedulePage = SiteRegion.Read(followUpsDir, "action-schedule-retros-promptly.html");
 
         Assert.Contains("site-nav-local-context", schedulePage);
         Assert.Contains("Epic 1 follow-ups", schedulePage);
@@ -366,9 +366,9 @@ public class FollowUpSurfacesTests : IDisposable
 
         Assert.DoesNotContain(new SiteGenerator(Options()).GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
-        var deferredPath = Path.Combine(Site, "implementation-artifacts", "deferred-work.html");
-        Assert.True(File.Exists(deferredPath));
-        var html = File.ReadAllText(deferredPath);
+        var deferredRoute = "implementation-artifacts/deferred-work.html";
+        Assert.True(SiteRegion.Exists(Site, deferredRoute));
+        var html = SiteRegion.Read(Site, deferredRoute);
 
         Assert.Contains("class=\"followup-row\"", html);
         Assert.Contains("class=\"followup-row resolved\"", html);
@@ -385,7 +385,7 @@ public class FollowUpSurfacesTests : IDisposable
         // Provenance source link still on the group heading.
         Assert.Contains("href=\"../epics/story-1-1.html\"", html);
 
-        var index = File.ReadAllText(Path.Combine(Site, "index.html"));
+        var index = SiteRegion.Read(Site, "index.html");
         Assert.Contains("deferred-work.html", index);
         // One open item (the unresolved casing mismatch) — resolved item must not inflate the count.
         Assert.Contains(">1<", index); // open count chip — loose but WorkInventory contract covered below
@@ -412,7 +412,7 @@ public class FollowUpSurfacesTests : IDisposable
 
         Assert.DoesNotContain(new SiteGenerator(Options()).GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
-        var html = File.ReadAllText(Path.Combine(Site, "implementation-artifacts", "deferred-work.html"));
+        var html = SiteRegion.Read(Site, "implementation-artifacts/deferred-work.html");
         Assert.DoesNotContain("deferred-work-fallback", html);
         Assert.Contains("followup-row", html);
         Assert.Contains("href=\"../follow-ups/deferred-", html);
@@ -444,7 +444,7 @@ public class FollowUpSurfacesTests : IDisposable
 
         Assert.DoesNotContain(new SiteGenerator(Options()).GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
-        var html = File.ReadAllText(Path.Combine(Site, "implementation-artifacts", "deferred-work.html"));
+        var html = SiteRegion.Read(Site, "implementation-artifacts/deferred-work.html");
         Assert.Contains("deferred-work-fallback", html);
         Assert.DoesNotContain("followup-row", html);
         Assert.Contains("Just prose", html);
@@ -462,7 +462,7 @@ public class FollowUpSurfacesTests : IDisposable
             """);
 
         Assert.DoesNotContain(new SiteGenerator(Options()).GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
-        Assert.False(File.Exists(Path.Combine(Site, "action-items.html")));
+        Assert.False(SiteRegion.Exists(Site, "action-items.html"));
         Assert.False(Directory.Exists(Path.Combine(Site, "follow-ups")));
     }
 
@@ -478,8 +478,8 @@ public class FollowUpSurfacesTests : IDisposable
             """);
 
         Assert.DoesNotContain(new SiteGenerator(Options()).GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
-        Assert.False(File.Exists(Path.Combine(Site, "implementation-artifacts", "deferred-work.html")));
-        var index = File.ReadAllText(Path.Combine(Site, "index.html"));
+        Assert.False(SiteRegion.Exists(Site, "implementation-artifacts/deferred-work.html"));
+        var index = SiteRegion.Read(Site, "index.html");
         Assert.DoesNotContain("deferred-work.html", index);
     }
 
@@ -495,7 +495,7 @@ public class FollowUpSurfacesTests : IDisposable
 
         Assert.DoesNotContain(new SiteGenerator(Options()).GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
-        var index = File.ReadAllText(Path.Combine(Site, "index.html"));
+        var index = SiteRegion.Read(Site, "index.html");
         Assert.Contains("sb-followup-open", index);
         // The `.sunburst-hint` ring explainer that used to state this went with Charts.Sunburst (Story 20.7).
         // The fact survives in the payload and the twin, where the aggregate is one node per open/done bucket
@@ -508,7 +508,7 @@ public class FollowUpSurfacesTests : IDisposable
         Assert.Contains("Action items", index);
         Assert.Contains("Deferred work", index);
 
-        var epic1 = File.ReadAllText(Path.Combine(Site, "epics", "epic-1.html"));
+        var epic1 = SiteRegion.Read(Site, "epics/epic-1.html");
         Assert.Contains("sb-followup-open", epic1);
         // Epic-level peers (2 open actions) aggregate to the group page. The epic's Work Graph tab (Story 19.2)
         // is a separate provenance surface that DOES link/name each action, so scope the sunburst-aggregation
@@ -522,7 +522,7 @@ public class FollowUpSurfacesTests : IDisposable
         Assert.DoesNotContain("href=\"follow-ups/deferred-", epic1);
         Assert.DoesNotContain("href=\"follow-ups/action-", epic1);
 
-        var epic2 = File.ReadAllText(Path.Combine(Site, "epics", "epic-2.html"));
+        var epic2 = SiteRegion.Read(Site, "epics/epic-2.html");
         Assert.Contains("sb-followup-open", epic2);
         Assert.Contains("href=\"../follow-ups/group-epic-2.html\"", epic2);
     }
@@ -587,7 +587,7 @@ public class FollowUpSurfacesTests : IDisposable
 
         // Index sunburst: Follow-ups orphan → filtered group page; epic arc stays epic page;
         // follow-up leaves are aggregated (group-epic-N / group-follow-ups), not per-item detail.
-        var index = File.ReadAllText(Path.Combine(Site, "index.html"));
+        var index = SiteRegion.Read(Site, "index.html");
         Assert.Contains("href=\"follow-ups/group-follow-ups.html\"", index);
         Assert.Contains("href=\"epics/epic-1.html\"", index);
         Assert.Contains("href=\"follow-ups/group-epic-", index);
@@ -706,11 +706,10 @@ public class FollowUpSurfacesTests : IDisposable
         var gen = new SiteGenerator(Options());
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
-        var beforeDetails = Directory.GetFiles(Path.Combine(Site, "follow-ups"), "deferred-*.html");
-        Assert.Equal(2, beforeDetails.Length);
+        var beforeDetails = DeferredDetailRoutes();
+        Assert.Equal(2, beforeDetails.Count);
         Assert.DoesNotContain(
-            Directory.GetFiles(Path.Combine(Site, "follow-ups"), "deferred-*.html")
-                .Select(File.ReadAllText),
+            DeferredDetailRoutes().Select(r => SiteRegion.Read(Site, r)),
             h => h.Contains("Brand-new watch deferred item", StringComparison.Ordinal));
 
         // Watch routes deferred-work.md → RegenerateEpics (IsEpicsRelated), not GenerateOne.
@@ -730,20 +729,20 @@ public class FollowUpSurfacesTests : IDisposable
         var ev = gen.RegenerateEpics();
         Assert.NotEqual(GenerationOutcome.Error, ev.Outcome);
 
-        var deferredList = File.ReadAllText(Path.Combine(Site, "implementation-artifacts", "deferred-work.html"));
+        var deferredList = SiteRegion.Read(Site, "implementation-artifacts/deferred-work.html");
         Assert.Contains("Brand-new watch deferred item", deferredList);
 
-        var afterDetails = Directory.GetFiles(Path.Combine(Site, "follow-ups"), "deferred-*.html");
-        Assert.True(afterDetails.Length >= 3);
+        var afterDetails = DeferredDetailRoutes();
+        Assert.True(afterDetails.Count >= 3);
         Assert.Contains(
-            afterDetails.Select(File.ReadAllText),
+            afterDetails.Select(r => SiteRegion.Read(Site, r)),
             h => h.Contains("Brand-new watch deferred item", StringComparison.Ordinal));
 
         // Group pages also refresh (9.13 prune/membership).
-        Assert.True(File.Exists(Path.Combine(Site, "follow-ups", "group-epic-1.html")));
+        Assert.True(SiteRegion.Exists(Site, "follow-ups/group-epic-1.html"));
         Assert.Contains(
             "Brand-new watch deferred item",
-            File.ReadAllText(Path.Combine(Site, "follow-ups", "group-epic-1.html")));
+            SiteRegion.Read(Site, "follow-ups/group-epic-1.html"));
 
         // Resolve the new open bullet — list must show it settled; group may still list it as Resolved.
         File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "deferred-work.md"), """
@@ -760,10 +759,10 @@ public class FollowUpSurfacesTests : IDisposable
             """);
         Assert.NotEqual(GenerationOutcome.Error, gen.RegenerateEpics().Outcome);
 
-        var afterResolve = File.ReadAllText(Path.Combine(Site, "implementation-artifacts", "deferred-work.html"));
+        var afterResolve = SiteRegion.Read(Site, "implementation-artifacts/deferred-work.html");
         Assert.Contains("Brand-new watch deferred item", afterResolve);
         Assert.Contains("class=\"followup-row resolved\"", afterResolve);
-        var groupAfterResolve = File.ReadAllText(Path.Combine(Site, "follow-ups", "group-epic-1.html"));
+        var groupAfterResolve = SiteRegion.Read(Site, "follow-ups/group-epic-1.html");
         Assert.Contains("Brand-new watch deferred item", groupAfterResolve);
         Assert.Contains(">Resolved</span>", groupAfterResolve);
     }
@@ -949,9 +948,18 @@ public class FollowUpSurfacesTests : IDisposable
 
         Assert.Contains(
             "GenerateOne-parity deferred item",
-            File.ReadAllText(Path.Combine(Site, "implementation-artifacts", "deferred-work.html")));
+            SiteRegion.Read(Site, "implementation-artifacts/deferred-work.html"));
         Assert.Contains(
-            Directory.GetFiles(Path.Combine(Site, "follow-ups"), "deferred-*.html").Select(File.ReadAllText),
+            DeferredDetailRoutes().Select(r => SiteRegion.Read(Site, r)),
             h => h.Contains("GenerateOne-parity deferred item", StringComparison.Ordinal));
     }
+    /// <summary>The deferred-item DETAIL routes in the IR — the replacement for
+    /// <c>Directory.GetFiles(Path.Combine(Site, "follow-ups"), "deferred-*.html")</c>. [Story 23.6 AC #8]
+    /// <para>Counting these on disk stops being possible once nothing writes pages, and — worse — a walk of a
+    /// directory that no longer exists returns EMPTY, so <c>Assert.DoesNotContain</c> over it would pass while
+    /// asserting nothing.</para></summary>
+    private IReadOnlyList<string> DeferredDetailRoutes() =>
+        SiteRegion.RoutesUnder(Site, "follow-ups/")
+            .Where(r => Path.GetFileName(r).StartsWith("deferred-", StringComparison.Ordinal))
+            .ToList();
 }

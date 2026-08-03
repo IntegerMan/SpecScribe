@@ -65,7 +65,7 @@ public class RequirementLocalContextTests : IDisposable
         var events = new SiteGenerator(Options()).GenerateAll();
         Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
 
-        var html = File.ReadAllText(Path.Combine(Site, "requirements", "fr1.html"));
+        var html = SiteRegion.Read(Site, "requirements/fr1.html");
         Assert.Contains("site-nav-local-context", html);
         Assert.Contains("Core Loop", html);
         Assert.Contains("local-context-pill active", html);

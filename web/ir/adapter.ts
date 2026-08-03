@@ -312,39 +312,75 @@ function parseAttributes(raw: string, path: string): Record<string, string> {
   return attrs
 }
 
+/**
+ * Which CHROME SCRIPTS a page needs, derived structurally from its own region. [Story 23.6]
+ *
+ * Exported and pure so it can be unit-tested without an IR on disk — the four probes below are the entire
+ * reason the rendered page boots its charts, renders its diagrams and tracks its TOC, and before Story 23.6
+ * three of the four did not exist at all.
+ *
+ * **Derived, never read from a flag, and that is deliberate.** The C# side computes the equivalent
+ * `AssetManifest` flags by running the same predicates over the finished body (`HierarchyExplorer.ContainsHost`,
+ * `RelationshipGraph.ContainsHost`, `Mermaid.ContainsBlock`), precisely so a flag cannot disagree with the page
+ * carrying it. Reading a flag out of the IR instead would reintroduce exactly the class of bug Story 20.7 hit:
+ * four surfaces that shipped the mount point but never set the flag, so the chart silently never arrived.
+ *
+ * **Attributes are matched as attributes, not as substrings.** `code/**` pages render this repository's own
+ * source, so `data-hierarchy`, `data-relgraph` and the mermaid marker all appear on them as entity-escaped
+ * PROSE. A naive `includes()` put 1.22 MB of charting engine on four pages that have no chart; the story's Dev
+ * Notes call this out as having bitten three separate stories.
+ */
+export function chromeNeeds(mainInnerHtml: string): {
+  needsHierarchyEngine: boolean
+  needsGraphEngine: boolean
+  needsMermaid: boolean
+  needsToc: boolean
+} {
+  return {
+    needsHierarchyEngine: /<[^>]*\sdata-hierarchy(?=[\s>=])/.test(mainInnerHtml),
+    needsGraphEngine: /<[^>]*\sdata-relgraph(?=[\s>=])/.test(mainInnerHtml),
+    // `Mermaid.BlockMarker` — the literal opening tag every rendered diagram carries. A tag, so the escaped
+    // prose form (`&lt;pre class="mermaid"&gt;`) does not match it.
+    needsMermaid: mainInnerHtml.includes('<pre class="mermaid">'),
+    // The C# side gated the tracker on `<nav class="toc-sidebar" aria-label="On this page">`; matched here as
+    // the class on a real tag so a page that merely discusses the sidebar does not load it.
+    needsToc: /<[^>]*\sclass="[^"]*\btoc-sidebar\b/.test(mainInnerHtml),
+  }
+}
+
 // ── Public reads ─────────────────────────────────────────────────────────────────────────────────────────
 
 const paths = Object.keys(manifest.pages)
 
 /**
- * Three CHROME values the IR does not carry, COPIED off the generated entry page rather than re-typed here.
+ * The site-level CHROME the IR now carries, READ FROM THE MANIFEST. [Story 23.6]
  *
- * - the `?v=` cache-bust: the emitting assembly's module version id, which nothing on this side can compute
- *   (the IR deliberately omits it — a per-page copy would churn every page's bytes on every build);
- * - the favicon `data:` URI: a 1 KB constant that would be a second definition free to drift if re-typed;
- * - the Hierarchy Explorer's anti-flash boot script, which lives outside the captured content region.
+ * ⚠️ THIS USED TO SCRAPE THE GENERATED `index.html`, AND THAT WAS A DEPENDENCY ON THE C# HTML WRITER.
  *
- * All three degrade to empty (and an omitted tag) when the static site was not generated alongside the IR.
- * They are ONE named gap handed to Epic 22: the IR projects a page's head TITLE and DESCRIPTION, but not
- * the surrounding chrome — asset links, favicon, boot marker, footer. Until it does, this adapter reads the
- * shipped values instead of inventing them, and the story record lists what it had to reach for.
+ * The previous implementation read `IR_DIR/manifest.entry` off disk and regex'd three values out of it: the
+ * `?v=` cache-bust, the favicon `data:` URI, and the Hierarchy Explorer's anti-flash boot script. Story 23.6
+ * deletes the writer, so that file no longer exists — and because the read was wrapped in a `try/catch` that
+ * returned empty strings, the failure would have been SILENT: favicon gone, cache-bust gone, and the boot
+ * marker gone (so the fallback SVG paints and is then swapped, which is the exact flash the marker prevents)
+ * on every page, with every gate green. It was a seventh dependent of the deletion, absent from the story's
+ * own § The six dependents table.
+ *
+ * `SpaDelivery.ManifestChrome` is the producer. Its comment carries the rest of the reasoning, including why
+ * the script bodies arrive unwrapped. This also closes the "ONE named gap handed to Epic 22" the old comment
+ * here described.
+ *
+ * The `?? ''` fallbacks are for a manifest emitted BEFORE this field existed (the frozen parity corpus is
+ * re-pinned in the same change, but a stale IR on someone's disk is not): an absent value omits its tag,
+ * which is the same degrade the scrape had.
  */
-function readGoldenChrome(): { assetVersion: string; faviconDataUri: string; hierarchyBootScript: string } {
-  try {
-    const entryHtml = readFileSync(join(IR_DIR, manifest.entry), 'utf8')
-    const head = entryHtml.slice(0, entryHtml.indexOf('</head>'))
-    const boot = /<script>((?:(?!<\/script>)[\s\S])*data-ss-hierarchy-boot[\s\S]*?)<\/script>/.exec(entryHtml)
-    return {
-      assetVersion: /specscribe\.css\?v=([0-9a-fA-F]+)/.exec(head)?.[1] ?? '',
-      faviconDataUri: /<link rel="icon" href="([^"]*)">/.exec(head)?.[1] ?? '',
-      hierarchyBootScript: boot?.[1] ?? '',
-    }
-  } catch {
-    return { assetVersion: '', faviconDataUri: '', hierarchyBootScript: '' }
-  }
-}
-
-const goldenHead = readGoldenChrome()
+const chrome = (manifest.chrome ?? {}) as Partial<{
+  assetVersion: string
+  faviconDataUri: string
+  hierarchyBootScript: string
+  graphBootScript: string
+  mermaidInitScript: string
+  tocActiveSectionScript: string
+}>
 
 export const site: IrSite = {
   title: manifest.siteTitle,
@@ -352,9 +388,12 @@ export const site: IrSite = {
   nav: (manifest.nav ?? []).map((n) => ({ label: n.label, path: n.outputRelativePath })),
   paths,
   schemaVersion: manifest.schemaVersion ?? 0,
-  assetVersion: goldenHead.assetVersion,
-  faviconDataUri: goldenHead.faviconDataUri,
-  hierarchyBootScript: goldenHead.hierarchyBootScript,
+  assetVersion: chrome.assetVersion ?? '',
+  faviconDataUri: chrome.faviconDataUri ?? '',
+  hierarchyBootScript: chrome.hierarchyBootScript ?? '',
+  graphBootScript: chrome.graphBootScript ?? '',
+  mermaidInitScript: chrome.mermaidInitScript ?? '',
+  tocActiveSectionScript: chrome.tocActiveSectionScript ?? '',
 }
 
 /** True when the manifest knows this page path. */
@@ -393,10 +432,7 @@ export function page(path: string): IrPage {
     region,
     hasDataIsland: islands.some((i) => i.kind === 'data'),
     hasExecutableIsland: islands.some((i) => i.kind === 'executable'),
-    // Matched as a real ATTRIBUTE inside a tag, not as a substring: four `code/**` pages render this very
-    // file's source, where the same text appears entity-escaped as prose. A substring test loaded 1.22 MB
-    // of charting engine onto each of them for a chart that does not exist.
-    needsHierarchyEngine: /<[^>]*\sdata-hierarchy(?=[\s>=])/.test(region.mainInnerHtml),
+    ...chromeNeeds(region.mainInnerHtml),
     needsPrism: path.startsWith('code/'),
   }
   pageCache.set(path, resolved)

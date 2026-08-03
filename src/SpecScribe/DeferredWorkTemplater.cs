@@ -6,17 +6,6 @@ namespace SpecScribe;
 /// or falls back to the plain markdown body when the note isn't in the Deferred-from shape. [Story 9.6]</summary>
 public static class DeferredWorkTemplater
 {
-    public static string RenderPage(
-        DeferredWorkModel model,
-        SiteNav nav,
-        string outputRelativePath,
-        string title = "Deferred Work",
-        CommandCatalog? commands = null,
-        EpicsModel? epicsModel = null,
-        IReadOnlyDictionary<string, string>? hrefMap = null) =>
-        HtmlRenderAdapter.Shared.Render(
-            BuildPage(model, nav, outputRelativePath, title, commands, epicsModel, hrefMap)).Content;
-
     /// <summary>Builds this page's host-neutral <see cref="PageView"/> — see
     /// <see cref="HowToReadTemplater.BuildPage"/> for why the body starts at the doc-header, not the landmark.
     /// [Story 23.4 AC #3]</summary>

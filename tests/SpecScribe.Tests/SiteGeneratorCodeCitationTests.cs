@@ -16,9 +16,9 @@ public class SiteGeneratorCodeCitationTests : IDisposable
     private string Site => Path.Combine(_root, "site");
     private string ArtifactsDir => Path.Combine(Source, "implementation-artifacts");
     private string SrcDir => Path.Combine(_root, "src", "Lib");
-    private string CodePage => Path.Combine(Site, "code", "src", "Lib", "Foo.cs.html");
-    private string NotesPage => Path.Combine(Site, "implementation-artifacts", "notes.html");
-    private string OtherPage => Path.Combine(Site, "implementation-artifacts", "other.html");
+    private string CodeRoute => "code/src/Lib/Foo.cs.html";
+    private string NotesRoute => "implementation-artifacts/notes.html";
+    private string OtherRoute => "implementation-artifacts/other.html";
 
     public SiteGeneratorCodeCitationTests()
     {
@@ -74,7 +74,7 @@ public class SiteGeneratorCodeCitationTests : IDisposable
     {
         Generate();
 
-        var html = File.ReadAllText(NotesPage);
+        var html = SiteRegion.Read(Site, NotesRoute);
         Assert.Contains("code/src/Lib/Foo.cs.html#L42", html);
         Assert.Contains("code/src/Lib/Foo.cs.html#L15", html);
         // No residual dead view-source link into the raw source tree.
@@ -86,7 +86,7 @@ public class SiteGeneratorCodeCitationTests : IDisposable
     {
         Generate();
 
-        var html = File.ReadAllText(CodePage);
+        var html = SiteRegion.Read(Site, CodeRoute);
         // The relationships block (graph component + accessible list) is the hero of the code page.
         Assert.Contains("code-relationships", html);
         Assert.Contains("data-relgraph", html);
@@ -103,19 +103,19 @@ public class SiteGeneratorCodeCitationTests : IDisposable
         Generate();
 
         // Proves the resolver runs in the whole-page pass, not a story-only block.
-        Assert.Contains("code/src/Lib/Foo.cs.html", File.ReadAllText(OtherPage));
+        Assert.Contains("code/src/Lib/Foo.cs.html", SiteRegion.Read(Site, OtherRoute));
     }
 
     [Fact]
     public void Output_IsDeterministicAcrossRuns()
     {
         Generate();
-        var first = File.ReadAllText(NotesPage);
-        var firstCode = File.ReadAllText(CodePage);
+        var first = SiteRegion.Read(Site, NotesRoute);
+        var firstCode = SiteRegion.Read(Site, CodeRoute);
 
         Generate();
-        Assert.Equal(first, File.ReadAllText(NotesPage));
-        Assert.Equal(firstCode, File.ReadAllText(CodePage));
+        Assert.Equal(first, SiteRegion.Read(Site, NotesRoute));
+        Assert.Equal(firstCode, SiteRegion.Read(Site, CodeRoute));
     }
 
     [Fact]
@@ -124,14 +124,14 @@ public class SiteGeneratorCodeCitationTests : IDisposable
         Generate(codeSourceBaseUrl: "https://github.com/IntegerMan/SpecScribe/blob/main");
 
         // Citations still resolve to the in-portal code pages — the external base never diverts them.
-        var notes = File.ReadAllText(NotesPage);
+        var notes = SiteRegion.Read(Site, NotesRoute);
         Assert.Contains("code/src/Lib/Foo.cs.html#L42", notes);
         Assert.Contains("code/src/Lib/Foo.cs.html#L15", notes);
         Assert.DoesNotContain("github.com/IntegerMan/SpecScribe/blob/main/src/Lib/Foo.cs#L42", notes);
 
         // The in-portal page IS generated and carries an additive "view source online" link to the hosted file.
-        Assert.True(File.Exists(CodePage));
-        var code = File.ReadAllText(CodePage);
+        Assert.True(SiteRegion.Exists(Site, CodeRoute));
+        var code = SiteRegion.Read(Site, CodeRoute);
         Assert.Contains("code-external-link", code);
         Assert.Contains("https://github.com/IntegerMan/SpecScribe/blob/main/src/Lib/Foo.cs", code);
         Assert.Contains("View on GitHub", code);

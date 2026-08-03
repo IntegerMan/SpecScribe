@@ -18,11 +18,11 @@ public class SiteGeneratorImpactMapTests : IDisposable
     private string Source => Path.Combine(_root, "_bmad-output");
     private string Adrs => Path.Combine(_root, "docs", "adrs");
     private string Site => Path.Combine(_root, "site");
-    private string ImpactMapPage => Path.Combine(Site, "impact-map.html");
-    private string EpicsPage => Path.Combine(Site, "epics.html");
-    private string Epic1Page => Path.Combine(Site, "epics", "epic-1.html");
-    private string Story11Page => Path.Combine(Site, "epics", "story-1-1.html");
-    private string Story13Page => Path.Combine(Site, "epics", "story-1-3.html");
+    private string ImpactMapRoute => "impact-map.html";
+    private string EpicsRoute => "epics.html";
+    private string Epic1Route => "epics/epic-1.html";
+    private string Story11Route => "epics/story-1-1.html";
+    private string Story13Route => "epics/story-1-3.html";
 
     private const string EpicsMd = """
         # Epics
@@ -126,12 +126,12 @@ public class SiteGeneratorImpactMapTests : IDisposable
             "git CLI unavailable on this host — cannot exercise --deep-git generation; install git rather than silently skipping this test");
         GenerateSite(deepGit: true);
 
-        Assert.True(File.Exists(ImpactMapPage));
+        Assert.True(SiteRegion.Exists(Site, ImpactMapRoute));
 
         // The Delivery nav entry appears (root-relative on the epics page).
-        Assert.Contains("href=\"impact-map.html\"", File.ReadAllText(EpicsPage));
+        Assert.Contains("href=\"impact-map.html\"", SiteRegion.Read(Site, EpicsRoute));
 
-        var impact = File.ReadAllText(ImpactMapPage);
+        var impact = SiteRegion.Read(Site, ImpactMapRoute);
         Assert.Contains("Epic 1", impact);
         // The commit touched Widget.cs, which got an in-portal code page → a real, non-dead link.
         Assert.Contains("code/src/Sample/Widget.cs.html", impact);
@@ -146,7 +146,7 @@ public class SiteGeneratorImpactMapTests : IDisposable
         Assert.True(TryCreateGitHistory("Story 1.1 foundation work"), "git CLI unavailable");
         GenerateSite(deepGit: true);
 
-        var impact = File.ReadAllText(ImpactMapPage);
+        var impact = SiteRegion.Read(Site, ImpactMapRoute);
         // STORY 20.7 converted this surface to the Hierarchy Explorer. The scaffold is the component's — ONE
         // island, ONE host, one selector — replacing the bespoke `impact-map-data` island and the two hand-rolled
         // mounts that `renderTreemap`/`renderSunburst` filled. Two islands on one page was the drift, not the fix.
@@ -193,7 +193,7 @@ public class SiteGeneratorImpactMapTests : IDisposable
 
         // The Delivery nav entry for the impact map renders with its concept glyph, like every other nav item —
         // an <svg class="ss-icon"> immediately precedes the "Impact Map" link label on the epics page.
-        var epicsHtml = File.ReadAllText(EpicsPage);
+        var epicsHtml = SiteRegion.Read(Site, EpicsRoute);
         Assert.Contains(Icons.ForConcept("Impact Map"), epicsHtml);
     }
 
@@ -203,19 +203,19 @@ public class SiteGeneratorImpactMapTests : IDisposable
         Assert.True(TryCreateGitHistory("Story 1.1 foundation work"), "git CLI unavailable");
         GenerateSite(deepGit: true);
 
-        var epicHtml = File.ReadAllText(Epic1Page);
+        var epicHtml = SiteRegion.Read(Site, Epic1Route);
         Assert.Contains("Code Areas Touched", epicHtml);
         Assert.Contains("code/src/Sample/Widget.cs.html", epicHtml);
         Assert.Contains("See the full impact map", epicHtml);
 
-        var storyHtml = File.ReadAllText(Story11Page);
+        var storyHtml = SiteRegion.Read(Site, Story11Route);
         Assert.Contains("Code Areas Touched", storyHtml);
         Assert.Contains("code/src/Sample/Widget.cs.html", storyHtml);
 
         // Negative case (Task 5): a story with its own artifact/page but zero commit attribution shows no
         // widget at all — absent, not an empty panel (NFR8). [Review][Patch]
-        Assert.True(File.Exists(Story13Page), "Story 1.3 has its own artifact and should still get a page");
-        Assert.DoesNotContain("Code Areas Touched", File.ReadAllText(Story13Page));
+        Assert.True(SiteRegion.Exists(Site, Story13Route), "Story 1.3 has its own artifact and should still get a page");
+        Assert.DoesNotContain("Code Areas Touched", SiteRegion.Read(Site, Story13Route));
     }
 
     // ---- Without --deep-git: combined gate holds (hasEpics alone is NOT sufficient) ----
@@ -228,16 +228,16 @@ public class SiteGeneratorImpactMapTests : IDisposable
         Assert.True(TryCreateGitHistory("Story 1.1 foundation work"), "git CLI unavailable");
         GenerateSite(deepGit: false);
 
-        Assert.False(File.Exists(ImpactMapPage));
+        Assert.False(SiteRegion.Exists(Site, ImpactMapRoute));
 
         // Positive control: the epics page (and its Delivery nav) still exist — proving hasEpics IS true here, so
         // the omission below is specifically the missing hasDeepAnalytics half, not a missing roster.
-        var epicsHtml = File.ReadAllText(EpicsPage);
+        var epicsHtml = SiteRegion.Read(Site, EpicsRoute);
         Assert.Contains("href=\"traceability.html\"", epicsHtml); // a bare-hasEpics Delivery sibling is present
         Assert.DoesNotContain("href=\"impact-map.html\"", epicsHtml);
 
-        Assert.DoesNotContain("Code Areas Touched", File.ReadAllText(Epic1Page));
-        Assert.DoesNotContain("Code Areas Touched", File.ReadAllText(Story11Page));
+        Assert.DoesNotContain("Code Areas Touched", SiteRegion.Read(Site, Epic1Route));
+        Assert.DoesNotContain("Code Areas Touched", SiteRegion.Read(Site, Story11Route));
     }
 
     // ---- SPA / webview coherence ----

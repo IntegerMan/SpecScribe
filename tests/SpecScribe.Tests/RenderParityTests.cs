@@ -3,10 +3,15 @@ using SpecScribe;
 namespace SpecScribe.Tests;
 
 /// <summary>AC #2 coverage: the semantic-parity harness detects whether a rendered surface dropped or
-/// reinterpreted a semantic fact of its source <see cref="PageView"/>. Story 6.1's only surface is the
-/// <see cref="HtmlRenderAdapter"/>, so its output must show FULL parity, and an injected divergence must be
-/// caught — proving the harness genuinely detects regressions (not a byte-only check that proves nothing new).
-/// This is the exact hook Story 6.2's webview adapter runs against. [Story 6.1]</summary>
+/// reinterpreted a semantic fact of its source <see cref="PageView"/>. The surface under test must show FULL
+/// parity, and an injected divergence must be caught — proving the harness genuinely detects regressions (not a
+/// byte-only check that proves nothing new). This is the exact hook the webview adapter runs against.
+/// <para>[Story 23.6 AC #8] The subject moved from the whole document to the CONTENT REGION, because
+/// <c>HtmlRenderAdapter.Render</c> is deleted and the region is what every C# surface now emits. Three facts
+/// left <see cref="SemanticFacts"/> with it — the stylesheet link, the script tag and the mermaid init were all
+/// head tags — and its doc comment records where each went. Everything this file still asserts (site title,
+/// nav, breadcrumb, drill parent/children, status stage) is region content and is unchanged.</para>
+/// [Story 6.1, Story 23.6]</summary>
 public class RenderParityTests
 {
     private static SiteNav Nav() =>
@@ -56,7 +61,7 @@ public class RenderParityTests
     public void HtmlAdapterOutput_HasFullParityWithItsPageView()
     {
         var page = EpicPage(Nav());
-        var html = HtmlRenderAdapter.Shared.Render(page).Content;
+        var html = RegionAssert.Of(page);
 
         // The HTML adapter reproduces every semantic fact — nav graph, breadcrumb/drill, assets, status, children.
         var divergences = RenderParity.FindDivergences(page, html, "html");
@@ -64,16 +69,17 @@ public class RenderParityTests
     }
 
     [Fact]
-    public void Extract_RecoversTheDrillAndAssetFacts()
+    public void Extract_RecoversTheDrillFacts()
     {
         var page = EpicPage(Nav());
-        var facts = RenderParity.Extract(HtmlRenderAdapter.Shared.Render(page).Content, page);
+        var facts = RenderParity.Extract(RegionAssert.Of(page), page);
 
         Assert.Equal("SpecScribe", facts.SiteTitle);
         Assert.Equal(SiteNav.EpicsOutputPath, facts.ParentDrillTarget); // drill-up recovered from the breadcrumb
         Assert.Equal(new[] { "epics/story-1-1.html", "epics/story-1-2.html" }, facts.ChildDrillTargets);
         Assert.Equal("active", facts.StatusStage);
-        Assert.Equal(ForgeOptions.StylesheetName, facts.Stylesheet); // "../" prefix + ?v= token folded away
+        // [Story 23.6 AC #8] The stylesheet fact was dropped from `SemanticFacts` with the head that evidenced
+        // it — see that record's comment. `check:parity`'s `pageSha` owns the asset links now.
         // Journey order: Home → Delivery → Project → Help (How to use / About SDD / About / Logs).
         Assert.Equal(new[] { "index.html", "epics.html", "requirements.html", "traceability.html", "cadence.html", "readme.html", "adrs/index.html", "how-to-read.html", "design-system.html", "about-sdd.html", "about.html", "diagnostics.html" },
             facts.Nav.Select(n => n.Target).ToList());
@@ -87,7 +93,7 @@ public class RenderParityTests
             new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasSprint: true,
             hasGitInsights: true, hasDeepAnalytics: true);
         var page = EpicPage(nav);
-        var html = HtmlRenderAdapter.Shared.Render(page).Content;
+        var html = RegionAssert.Of(page);
         var facts = RenderParity.Extract(html, page);
 
         Assert.Equal(
@@ -110,7 +116,7 @@ public class RenderParityTests
             hasGitInsights: true, hasDeepAnalytics: true,
             hasActionItems: true, hasDeferredWork: true, deferredWorkOutputPath: "deferred-work.html");
         var page = EpicPage(nav);
-        var html = HtmlRenderAdapter.Shared.Render(page).Content;
+        var html = RegionAssert.Of(page);
         var facts = RenderParity.Extract(html, page);
 
         Assert.Equal(
@@ -140,7 +146,7 @@ public class RenderParityTests
             new NavLocalItem("Story 1.2", "story-1-2.html", IsActive: true),
         });
         var page = EpicPage(nav) with { Nav = nav.ToNavigationView("epics/epic-1.html", localContext) };
-        var html = HtmlRenderAdapter.Shared.Render(page).Content;
+        var html = RegionAssert.Of(page);
 
         var facts = RenderParity.Extract(html, page);
         Assert.DoesNotContain(facts.Nav, n => n.Label is "Story 1.1" or "Story 1.2");
@@ -152,8 +158,8 @@ public class RenderParityTests
     {
         // The rendered body links only story 1.1; the PageView (fake) claims a child the output doesn't contain.
         var real = EpicPage(Nav());
-        var html = HtmlRenderAdapter.Shared.Render(
-            real with { BodyHtml = "<main id=\"main-content\">\n<a href=\"../epics/story-1-1.html\">1.1</a>\n</main>\n\n" }).Content;
+        var html = RegionAssert.Of(
+            real with { BodyHtml = "<main id=\"main-content\">\n<a href=\"../epics/story-1-1.html\">1.1</a>\n</main>\n\n" });
 
         var divergences = RenderParity.FindDivergences(real, html, "html");
         Assert.Contains(divergences, d => d.StartsWith("drill.child", StringComparison.Ordinal));
@@ -163,7 +169,7 @@ public class RenderParityTests
     public void FindDivergences_CatchesAMisreportedStatusStage()
     {
         var page = EpicPage(Nav());
-        var html = HtmlRenderAdapter.Shared.Render(page).Content; // body renders a "active" badge
+        var html = RegionAssert.Of(page); // body renders a "active" badge
 
         // A PageView that claims the page is "done" when the rendered badge says "active" is a divergence.
         var lying = page with { Interaction = page.Interaction with { StatusStage = "done" } };
@@ -175,7 +181,7 @@ public class RenderParityTests
     public void FindDivergences_CatchesADroppedNavItem()
     {
         var page = EpicPage(Nav());
-        var html = HtmlRenderAdapter.Shared.Render(page).Content;
+        var html = RegionAssert.Of(page);
 
         // Inject a nav item into the reference that the rendered bar never carried.
         var extraNav = page.Nav with { Items = page.Nav.Items.Append(new NavItem("Ghost", "ghost.html", "Ghost")).ToList() };
@@ -187,7 +193,7 @@ public class RenderParityTests
     public void FindDivergences_HostRenderExceptionSilencesTheSanctionedDivergence()
     {
         var page = EpicPage(Nav());
-        var html = HtmlRenderAdapter.Shared.Render(page).Content;
+        var html = RegionAssert.Of(page);
         var lying = page with { Interaction = page.Interaction with { StatusStage = "done" } };
 
         // Without an exception the status divergence surfaces…

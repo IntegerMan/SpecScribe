@@ -1,7 +1,7 @@
 # ADR 0034: The IR is the product; the static site is rendered from it by Node
 
 - **Status:** Proposed
-- **Date:** 2026-07-31
+- **Date:** 2026-07-31 (amended 2026-08-02 — Decision 6 added; see § Amendment history)
 - **Deciders:** Owner (Matt Eland)
 - **Context story:** [Story 23.6](../../_bmad-output/implementation-artifacts/23-6-retire-the-c-sharp-html-writer.md)
   (owner decisions D1 and D5), which executes it.
@@ -30,6 +30,15 @@ writer, however, is not a subtraction: it changes what `specscribe generate` *is
 ⚠️ **The specific hazard that forced this to be a decision rather than a refactor.** `--spa` defaulted to
 **false**. Deleting the C# writer without touching that default would have left a plain `specscribe generate`
 emitting `specscribe.css`, `specscribe.js` — and no pages and no IR. An empty output root, at `errors=0`.
+
+⚠️ **A second hazard, found while executing this ADR, is why Decision 6 exists.** The IR projected each page's
+content region, title and description — but **not the surrounding chrome**: no favicon, no asset cache-bust, no
+anti-flash boot scripts. The Nuxt renderer obtained three of those by **reading the generated `index.html` off
+disk and regexing them out of it** (`web/ir/adapter.ts` § `readGoldenChrome`), a read whose own comment called
+the omission "ONE named gap handed to Epic 22". That made the renderer a **consumer of the very artifact this
+ADR deletes**, and the read was wrapped in a `try/catch` returning empty strings — so the deletion would have
+dropped the favicon, the cache-bust and the anti-flash marker from every page **silently, at `errors=0`**, which
+is the same failure shape as the `--spa` hazard above and was equally invisible to every gate.
 
 ## Decision
 
@@ -62,13 +71,47 @@ emitting `specscribe.css`, `specscribe.js` — and no pages and no IR. An empty 
    exists**, so there is exactly one writer per file. Two writers of the same file is the drift this epic exists
    to end.
 
+6. **The IR carries the site-level CHROME, and the renderer derives per-page need from the region.**
+   *(Added by amendment, 2026-08-02.)*
+
+   If the IR is the product, it must be **sufficient** — a consumer holding only the IR must be able to produce
+   the site. It was not: the head's chrome existed nowhere in it. The manifest now carries a site-level `chrome`
+   block (`SpaDelivery.ManifestChrome`) with the six values no page's region can hold:
+
+   | key | what it is |
+   | --- | --- |
+   | `assetVersion` | the `?v=` cache-bust — the emitting assembly's module version id, which nothing downstream can compute |
+   | `faviconDataUri` | the favicon `data:` URI, a constant that would be free to drift if re-typed on the other side |
+   | `hierarchyBootScript` | the Hierarchy Explorer's anti-flash handshake |
+   | `graphBootScript` | the relationship graph's own handshake (its own marker family, per ADR 0030) |
+   | `mermaidInitScript` | the mermaid init module's body |
+   | `tocActiveSectionScript` | the TOC active-section tracker |
+
+   Two properties of this decision are load-bearing:
+
+   - **Site-level, not per-page.** These are constants; a per-page copy would churn every page's bytes on every
+     build. The IR states them once.
+   - **WHICH pages need them is DERIVED, never read from a flag.** The renderer probes each region for the
+     marker that makes the script necessary — `data-hierarchy`, `data-relgraph`, `<pre class="mermaid">`,
+     `.toc-sidebar` (`web/ir/adapter.ts` § `chromeNeeds`). This mirrors the C# side, where every `AssetManifest`
+     flag is computed from the *finished body* precisely so a flag cannot disagree with the page carrying it.
+     Shipping the flags in the IR instead would reintroduce Story 20.7's bug exactly: four surfaces that emitted
+     the mount point but never set the flag, so the chart rendered its payload and mounted nothing.
+
+   The block is **purely additive**, so `SpaDelivery.SchemaVersion` is deliberately **not** bumped — that
+   constant's own compatibility rule reserves a bump for a removal, rename, type change or meaning change, and an
+   older consumer ignores a key it does not read.
+
 ## Consequences
 
 - **`specscribe generate` now requires Node.** This is the single biggest change to the product's runtime
   contract since ADR 0005. It is stated in ADR 0022 and is re-confirmed here as accepted.
-- **A cold full generate costs more.** Measured on this repository at 1,492 routes: **13.5 s of prerender,
-  9.1 ms/route**. ⚠️ That is **2.3× Story 23.5's measured ~4 ms/route** and the difference is stated rather than
-  discovered. Watch mode re-renders only routes whose region digest moved, so a debounced save does not pay it.
+- **A cold full generate costs more, but less than first measured.** Before the deletion, with C# still writing
+  every page in parallel: 1,492 routes, **13.5 s of prerender, 9.1 ms/route** — ⚠️ 2.3× Story 23.5's ~4 ms/route,
+  stated at the time rather than discovered. **After the deletion: 1,213 routes in 4,492 ms = 3.7 ms/route**, a
+  2.5× improvement that puts it back in line with 23.5's figure and confirms the gap was the duplicated C# write,
+  not the prerender transport. Watch mode re-renders only routes whose region digest moved, so a debounced save
+  does not pay it.
 - **The IR is now on the cold path**, so its emission cost is unconditional. `EmitDeltaSidecar` remains gated on
   watch/serve so a one-shot `generate` stays byte-reproducible (NFR9) — the delta carries a wall clock.
 - **`GoldenContentFingerprint` is retired**, its subject having been deleted. Its successor is `npm run
@@ -77,10 +120,25 @@ emitting `specscribe.css`, `specscribe.js` — and no pages and no IR. An empty 
 - **~268 test call sites moved from the full page to the region**, and ~206 more move from reading a written
   `.html` to reading the IR. The C# unit suite deliberately does **not** boot Node: the region is the right
   subject for a C# assertion, and chrome belongs to `web/test/` and the web gates.
-- **A blind spot is closed, not opened.** The previous per-page oracle hashed `<main>` only, so `<title>`, meta,
-  the favicon, the footer, `<script src>` tags, the nav toggle, the Mermaid init and the Hierarchy/Graph
-  anti-flash handshakes were in **no** committed digest — precisely the chrome this ADR's decision 3 deletes the
-  C# emitter for. `check:parity` now hashes the whole page for a frozen corpus.
+- **A blind spot is closed, not opened — and it was hiding live breakage.** The previous per-page oracle hashed
+  `<main>` only, so `<title>`, meta, the favicon, the footer, `<script src>` tags, the nav toggle, the Mermaid
+  init and the Hierarchy/Graph anti-flash handshakes were in **no** committed digest — precisely the chrome
+  Decision 3 deletes the C# emitter for. `check:parity` now hashes the whole page for a frozen corpus.
+
+  ⚠️ **What that blind spot had already concealed, found by auditing `Render` line by line against
+  `IrSurface.vue` rather than by any gate:** the Nuxt renderer had **no mermaid handling, no relationship-graph
+  boot or engine, and no TOC tracker at all**. From the moment ADR 0022 §Decision 3's prerender became the writer
+  of every `.html`, every mermaid diagram on the shipped portal was an inert `<pre>` block and every relationship
+  graph shipped without the bundle it mounts into. Three features, dark, with a green suite. The reason no gate
+  saw it is structural and worth carrying forward: **`pageSha` is a renderer SNAPSHOT, not a comparison against
+  C#** — it pinned the broken output as correct on the day it was pinned. A snapshot gate detects *drift from
+  what shipped*; it cannot detect *what never shipped*. Decision 6 supplies the missing chrome and
+  `web/test/chrome-needs.test.ts` pins the derivation, but the general lesson is that a renderer-snapshot oracle
+  must be paired with a first-principles audit whenever the emitter changes hands.
+- **The renderer no longer reads the generated site.** `readGoldenChrome`'s scrape of `index.html` is deleted, so
+  the IR is now genuinely sufficient: `SPECSCRIBE_IR_DIR` plus the artefact is the whole input. That also removes
+  a boot-order coupling nobody had written down — the Nitro server resolves `IR_DIR` at module scope, so the
+  scrape only ever worked because C# happened to have written `index.html` before the prerender booted.
 - **The C# SPA delivery form (`app.html`, `specscribe-spa.js`) still ships.** Whether it still earns its keep now
   that Nuxt renders the site is a real question and an explicit **non-goal** here. ADR 0024 currently keeps it.
 
@@ -98,6 +156,15 @@ emitting `specscribe.css`, `specscribe.js` — and no pages and no IR. An empty 
 - **Bundle a JavaScript runtime with the standalone binary.** Rejected in ADR 0022 (+50–100 MB per RID) and kept
   only as an escape hatch if the Node prerequisite proves unacceptable.
 
+## Amendment history
+
+- **2026-08-02 — Decision 6 added (the IR carries site-level chrome).** Proposed by Story 23.6 while executing
+  this ADR's own Decision 3. The trigger was concrete rather than theoretical: deleting the C# writer removed the
+  file the renderer had been scraping its chrome out of, and because that scrape swallowed its own failure the
+  loss would have been silent. The amendment is recorded here rather than as a new ADR because it does not change
+  this ADR's decision — it *completes* it. "The IR is the product" is only true if the IR is sufficient to
+  produce the site, and it was not.
+
 ## Ratified decisions
 
-None yet — this ADR is **Proposed**. Ratification is the owner's.
+None yet — this ADR is **Proposed**, including Decision 6. Ratification is the owner's.

@@ -100,11 +100,43 @@ useHead({
       ? [{ innerHTML: site.hierarchyBootScript, tagPosition: 'head' as const }]
       : []),
     /**
+     * The relationship graph's own anti-flash marker, on the same head seam and for the same reason.
+     * [Story 23.6 / 24.2] Absent entirely before Story 23.6 — see `IrPage.needsGraphEngine`.
+     */
+    ...(page.needsGraphEngine && site.graphBootScript
+      ? [{ innerHTML: site.graphBootScript, tagPosition: 'head' as const }]
+      : []),
+    /**
      * The charting engine, at body close and unversioned — the golden page's exact placement, which also
      * guarantees `Plotly` is defined before the deferred `specscribe.js` runs its auto-init.
+     *
+     * EITHER flag pulls it and a page carrying both a hierarchy and a graph still emits exactly one tag —
+     * the same `||` the C# writer applied, because ADR 0030 put both components in this one bundle.
      */
-    ...(page.needsHierarchyEngine
+    ...(page.needsHierarchyEngine || page.needsGraphEngine
       ? [{ src: `${prefix}plotly-hierarchy.min.js`, tagPosition: 'bodyClose' as const }]
+      : []),
+    /**
+     * The TOC active-section tracker, at body close — it queries `.toc-sidebar` immediately and returns if
+     * absent, so it must run after the region is in the DOM. [Story 23.6]
+     */
+    ...(page.needsToc && site.tocActiveSectionScript
+      ? [{ innerHTML: site.tocActiveSectionScript, tagPosition: 'bodyClose' as const }]
+      : []),
+    /**
+     * The mermaid init, at body close. `type: 'module'` is load-bearing, not decoration: the body is an ES
+     * `import` of mermaid from the CDN and does nothing as a classic script. `startOnLoad: true` means it
+     * renders every `<pre class="mermaid">` itself once the module evaluates.
+     *
+     * ⚠️ Nuxt shipped NO mermaid init at all before Story 23.6, so every diagram on the rendered portal was an
+     * inert code block. See `IrPage.needsMermaid`.
+     */
+    ...(page.needsMermaid && site.mermaidInitScript
+      ? [{
+          innerHTML: site.mermaidInitScript,
+          type: 'module',
+          tagPosition: 'bodyClose' as const,
+        }]
       : []),
   ],
 })

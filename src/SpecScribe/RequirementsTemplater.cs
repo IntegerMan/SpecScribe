@@ -7,10 +7,6 @@ namespace SpecScribe;
 /// and derived status). Mirrors <see cref="EpicsTemplater"/>.</summary>
 public static class RequirementsTemplater
 {
-    public static string RenderIndex(RequirementsModel model, EpicsModel epics, ProgressModel progress, SiteNav nav,
-        ProjectCounts? counts = null) =>
-        HtmlRenderAdapter.Shared.Render(BuildIndexPage(model, epics, progress, nav, counts)).Content;
-
     /// <summary>Builds the index page's host-neutral <see cref="PageView"/> — the AD-2 delivery contract. Story
     /// 23.4 moved every standalone templater onto it so the IR's content region can be COMPOSED
     /// (<see cref="JsonSpaRenderAdapter.RenderContent"/>: nav markup + wayfinding + body) instead of sliced back
@@ -203,10 +199,6 @@ public static class RequirementsTemplater
         sb.Append(strip);
         sb.Append("</div>\n\n");
     }
-
-    public static string RenderRequirement(RequirementInfo req, ProgressModel progress, SiteNav nav, EpicsModel epics,
-        IReadOnlyDictionary<int, string>? epicRetroMap = null, string? deferredWorkHref = null, RequirementsModel? requirements = null) =>
-        HtmlRenderAdapter.Shared.Render(BuildRequirementPage(req, progress, nav, epics, epicRetroMap, deferredWorkHref, requirements)).Content;
 
     /// <summary>Builds a requirement detail page's host-neutral <see cref="PageView"/> — see
     /// <see cref="BuildIndexPage"/>. The per-requirement nav local context is threaded straight to

@@ -2,80 +2,56 @@ using System.Text;
 
 namespace SpecScribe;
 
-/// <summary>The FIRST and (Story 6.1) ONLY concrete <see cref="IRenderAdapter"/>: turns a host-neutral
-/// <see cref="PageView"/> into today's exact HTML for the shared page chrome (head + nav + breadcrumb + footer),
-/// composing the opaque <see cref="PageView.BodyHtml"/> into that shell. This is the delivery-seam mirror of
-/// Story 4.1's <see cref="BmadArtifactAdapter"/> — it CONSUMES view models and emits host output; it never
-/// re-parses a source artifact (AD-2).
-/// <para><b>Byte-for-byte guarantee.</b> This adapter is a mechanical RE-HOMING of the chrome string-building
-/// that lived across the templaters and <see cref="SiteNav"/>, not a rewrite: <see cref="RenderNav"/> /
+/// <summary>The shared composer of a page's NAVIGATION AND WAYFINDING MARKUP — the parts of the chrome that live
+/// INSIDE the content region, and so belong to every surface rather than to one of them.
+///
+/// <para><b>[Story 23.6 AC #1] This is no longer an <see cref="IRenderAdapter"/>.</b> It was the FIRST and only
+/// concrete one: it turned a <see cref="PageView"/> into a whole HTML document. That method is gone (see the
+/// tombstone below) and with it the last C# code path that emits a page, so this type no longer implements the
+/// DELIVERY seam at all — it is a helper the two surviving delivery adapters
+/// (<see cref="JsonSpaRenderAdapter"/> for the IR and the SPA, <see cref="WebviewRenderAdapter"/> for the panel)
+/// both compose with. Keeping the interface would have claimed a capability the class no longer has.</para>
+///
+/// <para>What survives is still a mechanical re-homing of the string-building that used to live across the
+/// templaters and <see cref="SiteNav"/>, not a rewrite: <see cref="RenderNavMarkup"/> /
 /// <see cref="RenderBreadcrumb"/> hold the verbatim strings, and <see cref="SiteNav.RenderNavBar"/> /
-/// <see cref="SiteNav.RenderBreadcrumb"/> now delegate here so every un-migrated page renders identically. The
-/// golden-output regression (SiteGeneratorAdapterTests) is the gate: any changed byte fails it. [Story 6.1]</para></summary>
-public sealed partial class HtmlRenderAdapter : IRenderAdapter
+/// <see cref="SiteNav.RenderBreadcrumb"/> delegate here so there is one definition of each. The gate is
+/// <c>npm run check:parity</c>'s <c>mainSha</c>, which carries the C# lineage for this markup across a frozen
+/// 24-route corpus (ADR 0033). [Story 6.1, Story 23.6]</para></summary>
+public sealed partial class HtmlRenderAdapter
 {
-    /// <summary>The single shared instance — the adapter is stateless, so <see cref="SiteNav"/>'s delegating
+    /// <summary>The single shared instance — the composer is stateless, so <see cref="SiteNav"/>'s delegating
     /// chrome helpers and the templaters reuse one instance rather than allocating per page.</summary>
     public static readonly HtmlRenderAdapter Shared = new();
 
-    public string Id => "html";
-
-    /// <summary>Composes the full page: head open + nav + breadcrumb + the opaque body + footer + (mermaid init
-    /// when needed) + close. The concatenation order and every helper call match what the templaters produced
-    /// inline, so the rendered bytes are unchanged (AC #1). The footer's generation timestamp is produced here,
-    /// exactly as the templaters produced it. [Story 6.1]</summary>
-    public RenderedArtifact Render(PageView page)
-    {
-        var sb = new StringBuilder();
-        sb.Append(PathUtil.RenderHeadOpen(page.Title, page.Assets.StylesheetHref, page.Assets.ScriptHref, page.MetaDescription, page.Assets.ExtraHead));
-        sb.Append(RenderNav(page.Nav));
-        sb.Append(RenderWayfinding(page.OutputRelativePath, page.Breadcrumb, page.Pager));
-        // The Hierarchy Explorer's anti-flash handshake (Story 20.5 owner round) — emitted BEFORE the body so it
-        // runs while the body is still parsing, which is the only moment the server SVG can be suppressed without
-        // the reader watching it paint and then be replaced. Chrome-level for the same reason the plotly bundle is:
-        // the webview and SPA use page.BodyHtml directly and must carry no script.
-        if (page.Assets.HierarchyBootInline)
-        {
-            sb.Append(HierarchyExplorer.BootScript);
-        }
-        // The relationship graph's own anti-flash handshake (Story 24.2), on the same chrome-level seam and for the
-        // same reason. Its own marker family, so the two components' boot state cannot be confused for each other.
-        if (page.Assets.GraphBootInline)
-        {
-            sb.Append(RelationshipGraph.BootScript);
-        }
-        sb.Append(page.BodyHtml);
-        // The active-section tracking script rides the SAME chrome-level seam as the Mermaid init script below —
-        // appended AFTER the opaque body, never inside it — so the webview's RenderContent and the SPA family
-        // surfaces (both of which use page.BodyHtml directly, not this full Render output) never carry it. That
-        // is what gives webview/SPA their clean NFR8 degrade to today's static TOC there, matching their CSP/
-        // innerHTML non-execution, without a separate per-surface branch. [Story 10.11]
-        if (page.BodyHtml.Contains("<nav class=\"toc-sidebar\" aria-label=\"On this page\">", StringComparison.Ordinal))
-        {
-            sb.Append(Toc.ActiveSectionScript);
-        }
-        sb.Append(PathUtil.RenderFooter(PathUtil.RelativePrefix(page.OutputRelativePath)));
-        // The vendored plotly.js hierarchy engine (Story 20.5 / ADR 0012) rides the SAME chrome-level seam as the
-        // Mermaid init below — appended AFTER the opaque body, never inside it — so the webview's RenderContent and
-        // the SPA family (both of which use page.BodyHtml directly, not this Render output) never carry it. That is
-        // deliberate: WebviewRenderAdapter strips every JSON island, and whether the webview gets the component at
-        // all is Story 20.7's decision to make jointly with the ADR 0005 CSP amendment (owner D4). A local file
-        // reference, never a CDN (NFR-3).
-        // Story 24.2: the relationship graph rides the SAME vendored bundle (ADR 0030 — `scatter` was already
-        // registered in it, so the marginal cost is zero bytes), so EITHER flag pulls it and a page carrying both a
-        // hierarchy and a graph still emits exactly one <script src>.
-        if (page.Assets.HierarchyEngineNeeded || page.Assets.GraphEngineNeeded)
-        {
-            var prefix = PathUtil.RelativePrefix(page.OutputRelativePath);
-            sb.Append($"<script src=\"{prefix}{ForgeOptions.HierarchyEngineScriptName}\"></script>\n");
-        }
-        if (page.Assets.MermaidNeeded)
-        {
-            sb.Append(Mermaid.InitScript());
-        }
-        sb.Append("</body>\n</html>\n");
-        return new RenderedArtifact(page.OutputRelativePath, sb.ToString());
-    }
+    // ═══════════════════════════════════════════════════════════════════════════════════════════════════════
+    // `Render` was DELETED here by Story 23.6 (AC #1). NOTHING IN C# COMPOSES A WHOLE PAGE ANY MORE.
+    //
+    // WHAT IT DID. head open + nav + wayfinding + the two anti-flash handshakes + the opaque body + the TOC
+    // tracker + footer + the charting engine + the mermaid init + close. It was the last writer of SpecScribe's
+    // HTML; Nuxt renders every page from the IR now (ADR 0022 §Decision 3, ADR 0034).
+    //
+    // ⚠️ WHERE ITS CHROME WENT — the part that does NOT survive by itself. Six things this method emitted live
+    // outside any page's content region, so the IR did not carry them and nothing else produced them:
+    //
+    //   `<title>` / `<meta name="description">` ...... the IR's per-page `head` projection (Story 22.2)
+    //   favicon, the `?v=` asset cache-bust ......... the IR's site-level `chrome` block (Story 23.6)
+    //   HierarchyExplorer.BootScript ................ ditto, keyed on `chromeNeeds().needsHierarchyEngine`
+    //   RelationshipGraph.BootScript ................ ditto, keyed on `needsGraphEngine`
+    //   Toc.ActiveSectionScript ..................... ditto, keyed on `needsToc`
+    //   Mermaid.InitScript() ........................ ditto, keyed on `needsMermaid`
+    //   plotly-hierarchy.min.js `<script src>` ...... emitted by the renderer on `hierarchy || graph` (ADR 0030)
+    //
+    // Three of those seven were ALREADY MISSING from the rendered portal before this deletion — the renderer had
+    // no mermaid, graph or TOC handling at all, so from the moment Task 3 made the prerender the writer, every
+    // mermaid diagram was an inert `<pre>` block and every relationship graph shipped without its engine. Found
+    // by auditing this method line by line against `web/components/surfaces/IrSurface.vue`, not by any gate:
+    // `check:parity`'s `pageSha` is a renderer SNAPSHOT, so it had pinned the broken output as correct.
+    //
+    // `RenderNavMarkup`, `RenderBreadcrumb`, `RenderWayfinding`, `RenderDashboardBody` and `RenderEpicsBody`
+    // survive below — they compose the REGION, which is exactly what the IR carries and what the webview and
+    // SPA consume through the one seam ADR 0024 defines.
+    // ═══════════════════════════════════════════════════════════════════════════════════════════════════════
 
     /// <summary>Renders the site nav bar from a <see cref="NavigationView"/>. The verbatim string-building that
     /// used to live on <see cref="SiteNav.RenderNavBar"/>, re-homed here behind the render adapter — the icon key

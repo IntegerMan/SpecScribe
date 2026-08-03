@@ -156,10 +156,12 @@ public class SiteGeneratorSpaTests : IDisposable
         return gen;
     }
 
-    /// <summary>Every static <c>.html</c> page the site emitted (the SPA's own entry shell excluded).</summary>
+    /// <summary>Every page the site emitted (the SPA's own entry shell excluded).
+    /// <para>[Story 23.6 AC #8] Was a <c>*.html</c> walk of the output root. The route set is the same inventory
+    /// now that the IR is what a generate produces — and, unlike the walk, it cannot silently shrink to zero and
+    /// leave the callers' "covers every page" comparisons passing over two empty lists.</para></summary>
     private IReadOnlyList<string> StaticHtmlPages() =>
-        Directory.EnumerateFiles(Site, "*.html", SearchOption.AllDirectories)
-            .Select(p => PathUtil.NormalizeSlashes(Path.GetRelativePath(Site, p)))
+        SiteRegion.Routes(Site)
             .Where(p => p != SpaDelivery.EntryFileName)
             .OrderBy(p => p, StringComparer.Ordinal)
             .ToList();
@@ -200,7 +202,7 @@ public class SiteGeneratorSpaTests : IDisposable
         // across the site and two pages can be in one SPA session, so the ids are checked as distinct too.
         var gen = GeneratedSite();
 
-        var staticIndex = File.ReadAllText(Path.Combine(Site, "index.html"));
+        var staticIndex = SiteRegion.Read(Site, "index.html");
         Assert.Contains("data-explorer", staticIndex);
         Assert.Contains("id=\"dashboard-hierarchy-data\"", staticIndex);
         // 20.2's island and its join hooks are gone from the shipped page, not merely unread.
@@ -293,7 +295,7 @@ public class SiteGeneratorSpaTests : IDisposable
         GeneratedSite();
 
         var bundle = Path.Combine(Site, ForgeOptions.HierarchyEngineScriptName);
-        var index = File.ReadAllText(Path.Combine(Site, "index.html"));
+        var index = SiteRegion.Read(Site, "index.html");
         var hostsChart = index.Contains("data-hierarchy", StringComparison.Ordinal);
 
         Assert.Equal(hostsChart, File.Exists(bundle));
@@ -307,32 +309,40 @@ public class SiteGeneratorSpaTests : IDisposable
         // set `HierarchyEngineNeeded`. Every layer below the browser was green: the page rendered, the payload was
         // correct, the twin stood in, and the chart simply never arrived. A hard-coded `["index.html"]` could not
         // have caught it — it would have gone on passing while four surfaces were silently chartless.
-        var tag = $"{ForgeOptions.HierarchyEngineScriptName}\"></script>";
-        var pages = Directory.EnumerateFiles(Site, "*.html", SearchOption.AllDirectories)
-            .Select(p => (Path: PathUtil.NormalizeSlashes(Path.GetRelativePath(Site, p)), Html: File.ReadAllText(p)))
-            .Where(p => p.Path != SpaDelivery.EntryFileName)
+        // [Story 23.6 AC #8] ⚠️ THE SUBJECT OF THE SECOND HALF MOVED, and the split is the substance.
+        //
+        // The old assertion paired `<script src="plotly-hierarchy.min.js">` — CHROME, emitted by the deleted
+        // `HtmlRenderAdapter.Render` from `page.Assets.HierarchyEngineNeeded` — against the chart host in the body.
+        // No C# code path emits that tag any more. The renderer derives the need STRUCTURALLY from the region it
+        // is handed (`web/ir/adapter.ts`: `needsHierarchyEngine` is a `data-hierarchy` probe over
+        // `region.mainInnerHtml`), so the tag and the host cannot disagree by construction, and
+        // `web/test/contracts.test.ts` pins that derivation. Re-asserting it here would assert nothing.
+        //
+        // What is STILL a C# decision, and still exactly Story 20.7's bug, is the ASSET COPY: `EnsureHierarchyEngine`
+        // ships the 1.2 MB bundle only when a page sets the flag. A family that hosts a chart but never sets
+        // `HierarchyEngineNeeded` still yields a site whose chart cannot mount — the engine simply is not there.
+        // That is what this now asserts, per-region rather than per-tag, so the "no fewer" half survives the
+        // deletion.
+        var routesHostingChart = SiteRegion.Routes(Site)
+            .Where(r => HierarchyExplorer.ContainsHost(SiteRegion.Read(Site, r)))
+            .OrderBy(r => r, StringComparer.Ordinal)
             .ToList();
 
-        var pagesWithTag = pages.Where(p => p.Html.Contains(tag, StringComparison.Ordinal))
-            .Select(p => p.Path).OrderBy(p => p, StringComparer.Ordinal).ToList();
-        var pagesHostingChart = pages.Where(p => HierarchyExplorer.ContainsHost(p.Html))
-            .Select(p => p.Path).OrderBy(p => p, StringComparer.Ordinal).ToList();
-
-        Assert.Equal(pagesHostingChart, pagesWithTag);
+        Assert.Equal(routesHostingChart.Count > 0, File.Exists(bundle));
 
         if (hostsChart)
         {
             // Guard against a vacuous green: this fixture HAS epics, so the converted family really is exercised.
-            Assert.Contains("index.html", pagesWithTag);
-            Assert.Contains("epics.html", pagesWithTag);
-            Assert.Contains(pagesWithTag, p => p.StartsWith("epics/epic-", StringComparison.Ordinal));
-            Assert.Contains(pagesWithTag, p => p.StartsWith("epics/story-", StringComparison.Ordinal));
-            // And a page with no chart still ships no 1.2 MB bundle reference.
-            Assert.DoesNotContain("about.html", pagesWithTag);
+            Assert.Contains("index.html", routesHostingChart);
+            Assert.Contains("epics.html", routesHostingChart);
+            Assert.Contains(routesHostingChart, p => p.StartsWith("epics/epic-", StringComparison.Ordinal));
+            Assert.Contains(routesHostingChart, p => p.StartsWith("epics/story-", StringComparison.Ordinal));
+            // And a page with no chart hosts none — the "no more" half, now read off the region.
+            Assert.DoesNotContain("about.html", routesHostingChart);
         }
         else
         {
-            Assert.Empty(pagesWithTag);
+            Assert.Empty(routesHostingChart);
         }
     }
 
@@ -348,7 +358,7 @@ public class SiteGeneratorSpaTests : IDisposable
         // the explorer's published `data-sb-scope`. Do not read a green here as proof of live SPA parity.
         var gen = GeneratedSite();
 
-        var staticIndex = File.ReadAllText(Path.Combine(Site, "index.html"));
+        var staticIndex = SiteRegion.Read(Site, "index.html");
         var spaIndex = gen.RenderSpaBundle().Pages.Single(p => p.OutputRelativePath == "index.html").ContentHtml;
 
         // The fixture is only guaranteed to carry a pane when it has work-graph signal; when it does, both forms
@@ -483,7 +493,7 @@ public class SiteGeneratorSpaTests : IDisposable
     {
         var gen = GeneratedSite();
         var region = gen.RenderSpaBundle().Pages.Single(p => p.OutputRelativePath == "index.html").ContentHtml;
-        var staticIndex = File.ReadAllText(Path.Combine(Site, "index.html"));
+        var staticIndex = SiteRegion.Read(Site, "index.html");
 
         Assert.Equal(MainBlock(staticIndex), MainBlock(region));
     }
@@ -508,7 +518,7 @@ public class SiteGeneratorSpaTests : IDisposable
         Assert.Contains("site-nav-local-context", adrNav);
         Assert.Contains("aria-label=\"ADRs\"", adrNav);
         // It IS the static page's own nav, byte-for-byte — not a re-render that happens to look similar.
-        var staticAdr = File.ReadAllText(Path.Combine(Site, "adrs", "0001-a-decision.html"));
+        var staticAdr = SiteRegion.Read(Site, "adrs/0001-a-decision.html");
         Assert.Equal(NavOf(staticAdr[staticAdr.IndexOf("<nav class=\"site-nav\"", StringComparison.Ordinal)..]), adrNav);
         // The inline nav-toggle script that follows the nav on the HTML surface is excluded (the client owns the
         // toggle through delegation, and an injected script never executes after an innerHTML swap).
@@ -656,9 +666,9 @@ public class SiteGeneratorSpaTests : IDisposable
         File.WriteAllText(Path.Combine(codeDir, "apple.py"), "print('a')\n");
 
         var gen = GeneratedSite(spa: false);
-        var codeMapPath = Path.Combine(Site, "code-map.html");
-        Assert.True(File.Exists(codeMapPath), "code-map.html did not render — the fallback walk found nothing");
-        var html = File.ReadAllText(codeMapPath);
+        var codeMapRoute = "code-map.html";
+        Assert.True(SiteRegion.Exists(Site, codeMapRoute), "code-map.html did not render — the fallback walk found nothing");
+        var html = SiteRegion.Read(Site, codeMapRoute);
 
         var apple = html.IndexOf("apple.py", StringComparison.Ordinal);
         var mango = html.IndexOf("mango.py", StringComparison.Ordinal);
@@ -747,7 +757,7 @@ public class SiteGeneratorSpaTests : IDisposable
 
         var gen = GeneratedSite();
         Assert.Contains(gen.RenderSpaBundle().Pages, p => p.OutputRelativePath == "adrs/0002-second-decision.html");
-        Assert.True(File.Exists(Path.Combine(Site, "adrs", "0002-second-decision.html")));
+        Assert.True(SiteRegion.Exists(Site, "adrs/0002-second-decision.html"));
 
         // Simulate a watch-mode delete (or an equivalent rename, which the same wipe+rebuild path handles
         // identically): the source record vanishes, then RegenerateAdrs runs — the real dispatch route ANY
@@ -755,7 +765,7 @@ public class SiteGeneratorSpaTests : IDisposable
         File.Delete(Path.Combine(Adrs, "0002-second-decision.md"));
         gen.RegenerateAdrs();
 
-        Assert.False(File.Exists(Path.Combine(Site, "adrs", "0002-second-decision.html")));
+        Assert.False(SiteRegion.Exists(Site, "adrs/0002-second-decision.html"));
         var bundle = gen.RenderSpaBundle();
         Assert.DoesNotContain(bundle.Pages, p => p.OutputRelativePath == "adrs/0002-second-decision.html");
         // The surviving ADR (from the constructor fixture) is untouched.
@@ -1300,7 +1310,7 @@ public class SiteGeneratorSpaTests : IDisposable
 
         Assert.NotEqual(GenerationOutcome.Error, ev.Outcome);
         // The page itself still rendered — the failure was isolated to the sidecar, not the site.
-        Assert.True(File.Exists(Path.Combine(Site, "planning-artifacts", "sidecar-fail.html")));
+        Assert.True(SiteRegion.Exists(Site, "planning-artifacts/sidecar-fail.html"));
     }
 
     /// <summary>⚠ THE Task 1 FINDING, pinned so it cannot silently regress. The story's Trap 2 said not to advance

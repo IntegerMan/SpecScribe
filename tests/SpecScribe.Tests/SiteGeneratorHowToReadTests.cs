@@ -116,10 +116,10 @@ public class SiteGeneratorHowToReadTests : IDisposable
     {
         new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
 
-        var howToReadPath = Path.Combine(Site, "how-to-read.html");
-        Assert.True(File.Exists(howToReadPath));
+        var howToReadRoute = "how-to-read.html";
+        Assert.True(SiteRegion.Exists(Site, howToReadRoute));
 
-        var index = File.ReadAllText(Path.Combine(Site, "index.html"));
+        var index = SiteRegion.Read(Site, "index.html");
         Assert.Contains("href=\"how-to-read.html\"", index);
         Assert.Contains("Help", index);
         Assert.Contains("href=\"about-sdd.html\"", index);
@@ -131,13 +131,13 @@ public class SiteGeneratorHowToReadTests : IDisposable
     public void HowToRead_NavAndH1LabeledHowToUseSpecScribe()
     {
         new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
-        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+        var html = SiteRegion.Read(Site, "how-to-read.html");
 
         Assert.Contains("<h1>How to use SpecScribe</h1>", html);
         Assert.DoesNotContain("sdd-tab", html);
         Assert.DoesNotContain("class=\"mermaid\"", html);
 
-        var index = File.ReadAllText(Path.Combine(Site, "index.html"));
+        var index = SiteRegion.Read(Site, "index.html");
         Assert.Contains("How to use SpecScribe", index);
         Assert.Contains("About Spec-Driven Development", index);
         Assert.DoesNotContain("How to read this portal", index);
@@ -148,20 +148,20 @@ public class SiteGeneratorHowToReadTests : IDisposable
     {
         new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
 
-        Assert.True(File.Exists(Path.Combine(Site, "about-sdd.html")));
-        Assert.True(File.Exists(Path.Combine(Site, "about-sdd-bmad.html")));
-        Assert.True(File.Exists(Path.Combine(Site, "about-sdd-gds.html")));
-        Assert.True(File.Exists(Path.Combine(Site, "about-sdd-speckit.html")));
-        Assert.True(File.Exists(Path.Combine(Site, "about-sdd-gsd.html")));
-        Assert.True(File.Exists(Path.Combine(Site, "about-sdd-gsd-pi.html")));
-        Assert.True(File.Exists(Path.Combine(Site, "about-sdd-superpowers.html")));
+        Assert.True(SiteRegion.Exists(Site, "about-sdd.html"));
+        Assert.True(SiteRegion.Exists(Site, "about-sdd-bmad.html"));
+        Assert.True(SiteRegion.Exists(Site, "about-sdd-gds.html"));
+        Assert.True(SiteRegion.Exists(Site, "about-sdd-speckit.html"));
+        Assert.True(SiteRegion.Exists(Site, "about-sdd-gsd.html"));
+        Assert.True(SiteRegion.Exists(Site, "about-sdd-gsd-pi.html"));
+        Assert.True(SiteRegion.Exists(Site, "about-sdd-superpowers.html"));
     }
 
     [Fact]
     public void AboutSdd_Hub_ShowsSupportMatrix()
     {
         new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
-        var html = File.ReadAllText(Path.Combine(Site, "about-sdd.html"));
+        var html = SiteRegion.Read(Site, "about-sdd.html");
 
         Assert.Contains("<h1>About Spec-Driven Development</h1>", html);
         Assert.Contains("sdd-support-matrix", html);
@@ -175,8 +175,8 @@ public class SiteGeneratorHowToReadTests : IDisposable
     public void AboutSdd_BmadPresent_ShowsDetectedChip()
     {
         new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
-        var hub = File.ReadAllText(Path.Combine(Site, "about-sdd.html"));
-        var bmad = File.ReadAllText(Path.Combine(Site, "about-sdd-bmad.html"));
+        var hub = SiteRegion.Read(Site, "about-sdd.html");
+        var bmad = SiteRegion.Read(Site, "about-sdd-bmad.html");
 
         Assert.Contains("sdd-detected", hub);
         Assert.Contains(">Detected<", hub);
@@ -204,7 +204,9 @@ public class SiteGeneratorHowToReadTests : IDisposable
         Assert.Contains("Product Brief Created", bmad);
         Assert.Contains("In a Sprint", bmad);
         Assert.Contains("the official documentation", bmad);
-        Assert.Contains("mermaid.esm.min.mjs", bmad);
+        // [Story 23.6 AC #8] The init module is site-level chrome; this page gets it because its section carries
+        // the mermaid block asserted just above. See `web/test/chrome-needs.test.ts` for the per-page half.
+        Assert.Contains("mermaid.esm.min.mjs", SiteRegion.Chrome(Site).MermaidInitScript);
         Assert.DoesNotContain("BMad is not detected", bmad);
     }
 
@@ -212,7 +214,7 @@ public class SiteGeneratorHowToReadTests : IDisposable
     public void AboutSdd_GdsAbsent_ShowsInstallCta()
     {
         new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
-        var html = File.ReadAllText(Path.Combine(Site, "about-sdd-gds.html"));
+        var html = SiteRegion.Read(Site, "about-sdd-gds.html");
 
         Assert.Contains("npx bmad-method install --modules gds", html);
         Assert.Contains("https://github.com/bmad-code-org/bmad-module-game-dev-studio", html);
@@ -226,8 +228,8 @@ public class SiteGeneratorHowToReadTests : IDisposable
     public void AboutSdd_SpecKit_ShowsComingSoon()
     {
         new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
-        var hub = File.ReadAllText(Path.Combine(Site, "about-sdd.html"));
-        var speckit = File.ReadAllText(Path.Combine(Site, "about-sdd-speckit.html"));
+        var hub = SiteRegion.Read(Site, "about-sdd.html");
+        var speckit = SiteRegion.Read(Site, "about-sdd-speckit.html");
 
         Assert.Contains("Coming soon", hub);
         Assert.Contains("Coming soon", speckit);
@@ -240,8 +242,8 @@ public class SiteGeneratorHowToReadTests : IDisposable
     public void AboutSdd_LocalContextWhiteBar_LinksOverviewAndFrameworks()
     {
         new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
-        var hub = File.ReadAllText(Path.Combine(Site, "about-sdd.html"));
-        var bmad = File.ReadAllText(Path.Combine(Site, "about-sdd-bmad.html"));
+        var hub = SiteRegion.Read(Site, "about-sdd.html");
+        var bmad = SiteRegion.Read(Site, "about-sdd-bmad.html");
 
         // Hub: Overview is the active pill (span, not a self-link); frameworks are links. Overview carries the
         // same Icons.ForConcept glyph the dark-bar Insights dropdown shows for this label (Story 10.10; icon:
@@ -264,7 +266,7 @@ public class SiteGeneratorHowToReadTests : IDisposable
     public void HowToRead_ReadingOrder_ListsAvailablePagesInJourney5Sequence()
     {
         new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
-        var full = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+        var full = SiteRegion.Read(Site, "how-to-read.html");
 
         // Scope to the Reading order <ol> only — the page's own nav bar also links every one of these pages
         // (in nav-group order, not journey order), so searching the whole page would assert the wrong thing.
@@ -299,7 +301,7 @@ public class SiteGeneratorHowToReadTests : IDisposable
             var output = Path.Combine(shallowRoot, "site");
 
             new SiteGenerator(ForgeOptions.Resolve(source: source, output: output, projectName: "SpecScribe", includeReadme: false)).GenerateAll();
-            var html = File.ReadAllText(Path.Combine(output, "how-to-read.html"));
+            var html = SiteRegion.Read(output, "how-to-read.html");
 
             Assert.DoesNotContain("href=\"readme.html\"", html);
             Assert.DoesNotContain("href=\"prd.html\"", html);
@@ -317,7 +319,7 @@ public class SiteGeneratorHowToReadTests : IDisposable
     public void HowToRead_Glossary_ListsBmadMethodTerms_AndOmitsAcronymTitlesFromSharedRendering()
     {
         new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
-        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+        var html = SiteRegion.Read(Site, "how-to-read.html");
 
         Assert.Contains("<h2 id=\"glossary\">Glossary</h2>", html);
         Assert.Contains("<dt>FR</dt><dd>A specific capability the system must provide.</dd>", html);
@@ -334,7 +336,7 @@ public class SiteGeneratorHowToReadTests : IDisposable
     public void ContentPage_FirstUseOfEachAcronym_ExpandsToAbbr_LaterUsesStayPlain()
     {
         new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
-        var html = File.ReadAllText(Path.Combine(Site, "epics.html"));
+        var html = SiteRegion.Read(Site, "epics.html");
 
         Assert.Contains("<abbr title=\"Functional Requirement\">FR</abbr>", html);
         Assert.Contains("<abbr title=\"Non-Functional Requirement\">NFR</abbr>", html);
@@ -366,22 +368,22 @@ public class SiteGeneratorHowToReadTests : IDisposable
 
             new SiteGenerator(ForgeOptions.Resolve(source: source, output: output, projectName: "SpecScribe", includeReadme: false)).GenerateAll();
 
-            Assert.True(File.Exists(Path.Combine(output, "how-to-read.html")));
-            Assert.True(File.Exists(Path.Combine(output, "about-sdd.html")));
-            Assert.True(File.Exists(Path.Combine(output, "about-sdd-bmad.html")));
+            Assert.True(SiteRegion.Exists(output, "how-to-read.html"));
+            Assert.True(SiteRegion.Exists(output, "about-sdd.html"));
+            Assert.True(SiteRegion.Exists(output, "about-sdd-bmad.html"));
 
-            var howToRead = File.ReadAllText(Path.Combine(output, "how-to-read.html"));
+            var howToRead = SiteRegion.Read(output, "how-to-read.html");
             Assert.DoesNotContain("sdd-tab", howToRead);
             Assert.Contains("<h1>How to use SpecScribe</h1>", howToRead);
 
-            var bmad = File.ReadAllText(Path.Combine(output, "about-sdd-bmad.html"));
+            var bmad = SiteRegion.Read(output, "about-sdd-bmad.html");
             Assert.Contains("npx bmad-method install</code>", bmad);
             Assert.Contains("BMad is not detected", bmad);
 
-            var gds = File.ReadAllText(Path.Combine(output, "about-sdd-gds.html"));
+            var gds = SiteRegion.Read(output, "about-sdd-gds.html");
             Assert.Contains("npx bmad-method install --modules gds", gds);
 
-            var hub = File.ReadAllText(Path.Combine(output, "about-sdd.html"));
+            var hub = SiteRegion.Read(output, "about-sdd.html");
             Assert.Contains("Coming soon", hub);
             Assert.DoesNotContain("sdd-detected", hub);
         }
@@ -402,9 +404,9 @@ public class SiteGeneratorHowToReadTests : IDisposable
             "modules:\n  - name: core\n    version: 6.0.0\n  - name: bmm\n    version: 6.0.0\n  - name: gds\n    version: 6.0.0");
 
         new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
-        var hub = File.ReadAllText(Path.Combine(Site, "about-sdd.html"));
-        var bmad = File.ReadAllText(Path.Combine(Site, "about-sdd-bmad.html"));
-        var gds = File.ReadAllText(Path.Combine(Site, "about-sdd-gds.html"));
+        var hub = SiteRegion.Read(Site, "about-sdd.html");
+        var bmad = SiteRegion.Read(Site, "about-sdd-bmad.html");
+        var gds = SiteRegion.Read(Site, "about-sdd-gds.html");
 
         Assert.Contains("sdd-detected", hub);
         Assert.Contains(">Detected<", hub);
@@ -420,7 +422,7 @@ public class SiteGeneratorHowToReadTests : IDisposable
     public void HowToRead_GenerateSection_CoversGenerateAndWatch_BetweenReadingOrderAndGlossary()
     {
         new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
-        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+        var html = SiteRegion.Read(Site, "how-to-read.html");
 
         Assert.Contains("<h2 id=\"generate\">Generate with SpecScribe</h2>", html);
         Assert.Contains("<code>specscribe generate</code>", html);
@@ -439,7 +441,7 @@ public class SiteGeneratorHowToReadTests : IDisposable
     public void HowToRead_GenerateSection_NamesPathOverrides_AndDefersToHelpForTheRest()
     {
         new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
-        var html = GenerateSectionOf(File.ReadAllText(Path.Combine(Site, "how-to-read.html")));
+        var html = GenerateSectionOf(SiteRegion.Read(Site, "how-to-read.html"));
 
         Assert.Contains("<code>--source</code>", html);
         Assert.Contains("<code>--adrs</code>", html);
@@ -458,12 +460,12 @@ public class SiteGeneratorHowToReadTests : IDisposable
     public void HowToRead_GenerateSection_NamesDiagnosticsFieldLabels_AndLinksThere()
     {
         new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
-        var full = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+        var full = SiteRegion.Read(Site, "how-to-read.html");
         var html = GenerateSectionOf(full);
 
         // The exact labels DiagnosticsTemplater.RenderConfig renders, so prose here maps onto what a real run
         // shows — not a renamed parallel vocabulary.
-        var diagnostics = File.ReadAllText(Path.Combine(Site, "diagnostics.html"));
+        var diagnostics = SiteRegion.Read(Site, "diagnostics.html");
         foreach (var label in new[] { "Source root", "ADR location", "Output directory", "README included", "Deep-git analytics", "External source base" })
         {
             Assert.Contains(label, html);
@@ -490,7 +492,7 @@ public class SiteGeneratorHowToReadTests : IDisposable
             var output = Path.Combine(bareRoot, "site");
 
             new SiteGenerator(ForgeOptions.Resolve(source: source, output: output, projectName: "SpecScribe", includeReadme: false)).GenerateAll();
-            var full = File.ReadAllText(Path.Combine(output, "how-to-read.html"));
+            var full = SiteRegion.Read(output, "how-to-read.html");
 
             Assert.DoesNotContain("<h2 id=\"reading-order\">", full);
             Assert.DoesNotContain("<h2 id=\"glossary\">", full);
@@ -513,11 +515,14 @@ public class SiteGeneratorHowToReadTests : IDisposable
     public void HowToRead_SubtitleAndIntro_MentionGeneratingNotJustReading()
     {
         new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
-        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+        var html = SiteRegion.Read(Site, "how-to-read.html");
 
         Assert.Contains("then generate the site yourself", html);
         Assert.Contains("how to rebuild", html);
-        Assert.Contains("how to generate and refresh the site from the command line", html); // meta description
+        // [Story 23.6 AC #8] The meta description is CHROME — asserted against the IR's head projection, which
+        // is the value the renderer emits, rather than as a substring of a document C# no longer writes.
+        Assert.Contains("how to generate and refresh the site from the command line",
+            SiteRegion.Head(Site, "how-to-read.html").Description);
     }
 
     /// <summary>The Generate section's own markup, from its <c>h2</c> to the next one (or the end of the panel) —
@@ -553,7 +558,7 @@ public class SiteGeneratorHowToReadTests : IDisposable
         InstallOnly("tea", TeaCsv);
 
         new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
-        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+        var html = SiteRegion.Read(Site, "how-to-read.html");
 
         // The heading and its anchor survive so in-page links to #glossary still resolve...
         Assert.Contains("<h2 id=\"glossary\">Glossary</h2>", html);
@@ -574,7 +579,7 @@ public class SiteGeneratorHowToReadTests : IDisposable
         InstallOnly("tea", TeaCsv);
 
         new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
-        var epics = File.ReadAllText(Path.Combine(Site, "epics.html"));
+        var epics = SiteRegion.Read(Site, "epics.html");
 
         // epics.md deliberately uses bare FR/NFR/AC/ADR/PRD tokens — with no glossary there is nothing to
         // expand, so the site-wide AbbreviationExpander must leave every one of them plain.
@@ -588,7 +593,7 @@ public class SiteGeneratorHowToReadTests : IDisposable
         InstallOnly("tea", TeaCsv);
 
         new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
-        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+        var html = SiteRegion.Read(Site, "how-to-read.html");
 
         // The catalog parses fine, but the legend promises commands "captioned on story and epic pages" —
         // surfaces that only exist for a modeled module. It renders only for a MODELED primary.
@@ -616,7 +621,7 @@ public class SiteGeneratorHowToReadTests : IDisposable
         InstallOnly("tea", TeaCsv);
 
         new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
-        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+        var html = SiteRegion.Read(Site, "how-to-read.html");
 
         // The acknowledgement still renders, anchor and all — this patch must not have silenced it.
         Assert.Contains("<h2 id=\"glossary\">Glossary</h2>", html);
@@ -625,7 +630,10 @@ public class SiteGeneratorHowToReadTests : IDisposable
         // ...but nothing on the page promises a glossary that does not exist.
         Assert.DoesNotContain("Start with the reading order and glossary below", html);
         Assert.DoesNotContain("what the recurring terms mean", html);
-        Assert.Contains("Orientation for a first visit", html);
+        // [Story 23.6 AC #8] Chrome: on the UNMODELED path the phrase lives only in the meta description (the
+        // doc-subtitle that also carries it is emitted on the modeled path), so the head projection is where it
+        // is now asked for.
+        Assert.Contains("Orientation for a first visit", SiteRegion.Head(Site, "how-to-read.html").Description);
     }
 
     [Fact]
@@ -634,7 +642,7 @@ public class SiteGeneratorHowToReadTests : IDisposable
         // The other side of Patch P2: a real glossary is real content, so the modeled path's header copy is
         // unchanged. AC #3 — BMad Method's surfaces must not move. [Review][Patch P2]
         new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
-        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+        var html = SiteRegion.Read(Site, "how-to-read.html");
 
         Assert.Contains("Start with the reading order and glossary below", html);
         Assert.Contains("what the recurring terms mean", html);
@@ -672,7 +680,7 @@ public class SiteGeneratorHowToReadTests : IDisposable
     public void HowToRead_BypassesApplyReferenceLinks()
     {
         new SiteGenerator(Options(Source, Adrs, Site)).GenerateAll();
-        var html = File.ReadAllText(Path.Combine(Site, "how-to-read.html"));
+        var html = SiteRegion.Read(Site, "how-to-read.html");
 
         // Must not contain <abbr> tags (page defines the glossary, mustn't self-expand).
         Assert.DoesNotContain("<abbr", html);

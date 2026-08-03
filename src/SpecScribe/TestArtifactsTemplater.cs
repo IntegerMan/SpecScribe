@@ -21,9 +21,6 @@ namespace SpecScribe;
 /// applies to.</para> [Story 18.5]</summary>
 public static class TestArtifactsTemplater
 {
-    public static string RenderListPage(TestArtifactsModel model, SiteNav nav) =>
-        HtmlRenderAdapter.Shared.Render(BuildListPage(model, nav)).Content;
-
     /// <summary>Builds this page's host-neutral <see cref="PageView"/> — the AD-2 delivery contract, so the IR's
     /// content region can be COMPOSED (<see cref="JsonSpaRenderAdapter.RenderContent"/>: nav markup + wayfinding +
     /// body) instead of sliced back out of a rendered full page. <see cref="RenderListPage"/> is the unchanged HTML

@@ -16,8 +16,8 @@ public class SiteGeneratorTimelineTests : IDisposable
 
     private string Source => Path.Combine(_root, "_bmad-output");
     private string Site => Path.Combine(_root, "site");
-    private string Timeline => Path.Combine(Site, "timeline.html");
-    private string Index => Path.Combine(Site, "index.html");
+    private string TimelineRoute => "timeline.html";
+    private string IndexRoute => "index.html";
     private string CommitsDayDir => Path.Combine(Site, "commits");
 
     private const string EpicsMd = """
@@ -69,10 +69,10 @@ public class SiteGeneratorTimelineTests : IDisposable
         var events = new SiteGenerator(Options()).GenerateAll();
 
         AssertNoErrors(events);
-        Assert.False(File.Exists(Timeline), "no git → no verifiable activity dates → no timeline (no mtime fallback)");
-        Assert.False(Directory.Exists(CommitsDayDir), "no git → no date pages");
-        Assert.DoesNotContain("View activity timeline", File.ReadAllText(Index));
-        Assert.True(File.Exists(Path.Combine(Site, "epics.html")), "baseline generation must still succeed");
+        Assert.False(SiteRegion.Exists(Site, TimelineRoute), "no git → no verifiable activity dates → no timeline (no mtime fallback)");
+        Assert.False(SiteRegion.HasRoutesUnder(Site, "commits/"), "no git → no date pages");
+        Assert.DoesNotContain("View activity timeline", SiteRegion.Read(Site, IndexRoute));
+        Assert.True(SiteRegion.Exists(Site, "epics.html"), "baseline generation must still succeed");
     }
 
     [Fact]
@@ -86,17 +86,17 @@ public class SiteGeneratorTimelineTests : IDisposable
         var events = new SiteGenerator(Options(deepGit: true)).GenerateAll();
         AssertNoErrors(events);
 
-        Assert.True(File.Exists(Timeline));
-        var timeline = File.ReadAllText(Timeline);
+        Assert.True(SiteRegion.Exists(Site, TimelineRoute));
+        var timeline = SiteRegion.Read(Site, TimelineRoute);
         Assert.Contains("artifact updated", timeline); // the summary counts the real artifact change ("1 artifact updated")
 
         // Exactly one date page (the single commit day) lists epics.md under "Artifacts updated" — linking to its
         // generated page — and no page attributes an artifact to a day git didn't record a change on.
-        var dayPages = Directory.GetFiles(CommitsDayDir, "*.html");
+        var dayPages = SiteRegion.RoutesUnder(Site, "commits/");
         Assert.NotEmpty(dayPages);
-        var withArtifacts = dayPages.Where(p => File.ReadAllText(p).Contains("artifacts-updated")).ToList();
+        var withArtifacts = dayPages.Where(p => SiteRegion.Read(Site, p).Contains("artifacts-updated")).ToList();
         Assert.Single(withArtifacts);
-        var page = File.ReadAllText(withArtifacts[0]);
+        var page = SiteRegion.Read(Site, withArtifacts[0]);
         Assert.Contains("class=\"artifact-update-list\"", page);
         Assert.Contains("../epics.html", page); // the recognized artifact links to its page
 
@@ -117,10 +117,10 @@ public class SiteGeneratorTimelineTests : IDisposable
         var events = new SiteGenerator(Options(source: emptySource, output: emptySite)).GenerateAll();
 
         AssertNoErrors(events);
-        Assert.False(File.Exists(Path.Combine(emptySite, "timeline.html")));
-        Assert.False(Directory.Exists(Path.Combine(emptySite, "commits")));
-        Assert.DoesNotContain("View activity timeline", File.ReadAllText(Path.Combine(emptySite, "index.html")));
-        Assert.True(File.Exists(Path.Combine(emptySite, "index.html")), "baseline generation must still succeed");
+        Assert.False(SiteRegion.Exists(emptySite, "timeline.html"));
+        Assert.False(SiteRegion.HasRoutesUnder(emptySite, "commits/"));
+        Assert.DoesNotContain("View activity timeline", SiteRegion.Read(emptySite, "index.html"));
+        Assert.True(SiteRegion.Exists(emptySite, "index.html"), "baseline generation must still succeed");
     }
 
     [Fact]
@@ -131,19 +131,19 @@ public class SiteGeneratorTimelineTests : IDisposable
         var events = new SiteGenerator(Options()).GenerateAll();
         AssertNoErrors(events);
 
-        Assert.True(File.Exists(Timeline));
-        var timeline = File.ReadAllText(Timeline);
+        Assert.True(SiteRegion.Exists(Site, TimelineRoute));
+        var timeline = SiteRegion.Read(Site, TimelineRoute);
         Assert.Contains("class=\"heatmap\"", timeline);          // reused activity-over-time visual
         Assert.Contains("class=\"timeline-date\" href=\"commits/", timeline);
 
         // Every timeline date row links to a date page that actually exists (no dead links).
         foreach (Match m in Regex.Matches(timeline, "href=\"(commits/[0-9-]+\\.html)\""))
         {
-            Assert.True(File.Exists(Path.Combine(Site, m.Groups[1].Value.Replace('/', Path.DirectorySeparatorChar))),
+            Assert.True(SiteRegion.Exists(Site, m.Groups[1].Value),
                 $"timeline links a missing date page: {m.Groups[1].Value}");
         }
 
-        Assert.Contains("View activity timeline", File.ReadAllText(Index));
+        Assert.Contains("View activity timeline", SiteRegion.Read(Site, IndexRoute));
     }
 
     [Fact]
@@ -155,12 +155,12 @@ public class SiteGeneratorTimelineTests : IDisposable
         AssertNoErrors(events);
 
         // The dashboard heatmap still links each active cell to its commits/{date}.html date page.
-        Assert.Contains("href=\"commits/", File.ReadAllText(Index));
+        Assert.Contains("href=\"commits/", SiteRegion.Read(Site, IndexRoute));
 
         // A commit-bearing day page keeps its commit rows + subject linkification (unchanged shape).
-        var dayPages = Directory.GetFiles(CommitsDayDir, "*.html");
+        var dayPages = SiteRegion.RoutesUnder(Site, "commits/");
         Assert.NotEmpty(dayPages);
-        Assert.Contains(dayPages, p => File.ReadAllText(p).Contains("commit-day-list"));
+        Assert.Contains(dayPages, p => SiteRegion.Read(Site, p).Contains("commit-day-list"));
     }
 
     [Fact]
@@ -177,14 +177,14 @@ public class SiteGeneratorTimelineTests : IDisposable
         static string Stable(string html) =>
             Regex.Replace(html, @"on \w+ \d{1,2}, \d{4} at \d{1,2}:\d{2} UTC[+-]\d{2}:\d{2}", "on <t>");
 
-        Assert.Equal(Stable(File.ReadAllText(Timeline)), Stable(File.ReadAllText(Path.Combine(site2, "timeline.html"))));
+        Assert.Equal(Stable(SiteRegion.Read(Site, TimelineRoute)), Stable(SiteRegion.Read(site2, "timeline.html")));
 
-        var pages1 = Directory.GetFiles(CommitsDayDir, "*.html").OrderBy(p => p, StringComparer.Ordinal).ToList();
-        var pages2 = Directory.GetFiles(Path.Combine(site2, "commits"), "*.html").OrderBy(p => p, StringComparer.Ordinal).ToList();
-        Assert.Equal(pages1.Select(Path.GetFileName), pages2.Select(Path.GetFileName));
+        var pages1 = SiteRegion.RoutesUnder(Site, "commits/").OrderBy(p => p, StringComparer.Ordinal).ToList();
+        var pages2 = SiteRegion.RoutesUnder(site2, "commits/").OrderBy(p => p, StringComparer.Ordinal).ToList();
+        Assert.Equal(pages1, pages2);
         for (var i = 0; i < pages1.Count; i++)
         {
-            Assert.Equal(Stable(File.ReadAllText(pages1[i])), Stable(File.ReadAllText(pages2[i])));
+            Assert.Equal(Stable(SiteRegion.Read(Site, pages1[i])), Stable(SiteRegion.Read(site2, pages2[i])));
         }
     }
 
@@ -197,9 +197,9 @@ public class SiteGeneratorTimelineTests : IDisposable
         var events = new SiteGenerator(Options()).GenerateAll();
         AssertNoErrors(events);
 
-        var middle = Path.Combine(CommitsDayDir, "2026-03-02.html");
-        Assert.True(File.Exists(middle), "expected a date page for the middle backdated day");
-        var html = File.ReadAllText(middle);
+        var middle = "commits/2026-03-02.html";
+        Assert.True(SiteRegion.Exists(Site, middle), "expected a date page for the middle backdated day");
+        var html = SiteRegion.Read(Site, middle);
 
         // Chronological: Prev links to the EARLIER adjacent day, Next to the LATER — the user-chosen direction.
         var prev = Regex.Match(html, "entity-pager-prev\"[^>]*href=\"([^\"]+)\"").Groups[1].Value;
@@ -224,18 +224,18 @@ public class SiteGeneratorTimelineTests : IDisposable
 
         var gen = new SiteGenerator(Options(deepGit: true));
         AssertNoErrors(gen.GenerateAll());
-        Assert.True(File.Exists(Timeline));
-        var dayPage = Directory.GetFiles(CommitsDayDir, "*.html").First(p => File.ReadAllText(p).Contains("artifacts-updated"));
+        Assert.True(SiteRegion.Exists(Site, TimelineRoute));
+        var dayPage = SiteRegion.RoutesUnder(Site, "commits/").First(r => SiteRegion.Read(Site, r).Contains("artifacts-updated"));
 
-        File.WriteAllText(dayPage, "STALE-SENTINEL");
-        File.WriteAllText(Timeline, "STALE-SENTINEL");
+        SiteRegion.PoisonRoute(Site, dayPage);
+        SiteRegion.PoisonRoute(Site, TimelineRoute);
 
         var ev = gen.GenerateOne(notesPath);
 
         Assert.NotEqual(GenerationOutcome.Error, ev.Outcome);
-        Assert.DoesNotContain("STALE-SENTINEL", File.ReadAllText(dayPage));
-        Assert.Contains("artifacts-updated", File.ReadAllText(dayPage));
-        Assert.DoesNotContain("STALE-SENTINEL", File.ReadAllText(Timeline));
+        Assert.DoesNotContain("STALE-SENTINEL", SiteRegion.Read(Site, dayPage));
+        Assert.Contains("artifacts-updated", SiteRegion.Read(Site, dayPage));
+        Assert.DoesNotContain("STALE-SENTINEL", SiteRegion.Read(Site, TimelineRoute));
     }
 
     [Fact]
@@ -247,19 +247,19 @@ public class SiteGeneratorTimelineTests : IDisposable
 
         var gen = new SiteGenerator(Options(deepGit: true));
         AssertNoErrors(gen.GenerateAll());
-        Assert.True(File.Exists(Timeline));
-        var dayPage = Directory.GetFiles(CommitsDayDir, "*.html").First(p => File.ReadAllText(p).Contains("artifacts-updated"));
+        Assert.True(SiteRegion.Exists(Site, TimelineRoute));
+        var dayPage = SiteRegion.RoutesUnder(Site, "commits/").First(r => SiteRegion.Read(Site, r).Contains("artifacts-updated"));
 
-        File.WriteAllText(dayPage, "STALE-SENTINEL");
-        File.WriteAllText(Timeline, "STALE-SENTINEL");
+        SiteRegion.PoisonRoute(Site, dayPage);
+        SiteRegion.PoisonRoute(Site, TimelineRoute);
 
         File.WriteAllText(Path.Combine(Source, "planning-artifacts", "epics.md"), EpicsMd + "\n");
         var ev = gen.RegenerateEpics();
 
         Assert.NotEqual(GenerationOutcome.Error, ev.Outcome);
-        Assert.DoesNotContain("STALE-SENTINEL", File.ReadAllText(dayPage));
-        Assert.Contains("artifacts-updated", File.ReadAllText(dayPage));
-        Assert.DoesNotContain("STALE-SENTINEL", File.ReadAllText(Timeline));
+        Assert.DoesNotContain("STALE-SENTINEL", SiteRegion.Read(Site, dayPage));
+        Assert.Contains("artifacts-updated", SiteRegion.Read(Site, dayPage));
+        Assert.DoesNotContain("STALE-SENTINEL", SiteRegion.Read(Site, TimelineRoute));
     }
 
     [Fact]
@@ -278,19 +278,19 @@ public class SiteGeneratorTimelineTests : IDisposable
 
         var gen = new SiteGenerator(Options(deepGit: true));
         AssertNoErrors(gen.GenerateAll());
-        var dayPage = Directory.GetFiles(CommitsDayDir, "*.html").First(p => File.ReadAllText(p).Contains("artifacts-updated"));
-        Assert.Contains(">Notes<", File.ReadAllText(dayPage));
+        var dayPage = SiteRegion.RoutesUnder(Site, "commits/").First(r => SiteRegion.Read(Site, r).Contains("artifacts-updated"));
+        Assert.Contains(">Notes<", SiteRegion.Read(Site, dayPage));
 
         using (new FileStream(notesPath, FileMode.Open, FileAccess.Read, FileShare.None))
         {
             gen.GenerateOne(notesPath);
-            var lockedHtml = File.ReadAllText(dayPage);
+            var lockedHtml = SiteRegion.Read(Site, dayPage);
             Assert.Contains(">notes<", lockedHtml); // falls back to the filename stem, never throws
             Assert.DoesNotContain(">Notes<", lockedHtml);
         }
 
         gen.GenerateOne(notesPath);
-        Assert.Contains(">Notes<", File.ReadAllText(dayPage)); // recovers once the lock is released
+        Assert.Contains(">Notes<", SiteRegion.Read(Site, dayPage)); // recovers once the lock is released
     }
 
     [Fact]
@@ -306,8 +306,8 @@ public class SiteGeneratorTimelineTests : IDisposable
         var events = new SiteGenerator(Options(deepGit: true)).GenerateAll();
         AssertNoErrors(events);
 
-        var dayPage = Directory.GetFiles(CommitsDayDir, "*.html").First(p => File.ReadAllText(p).Contains("artifacts-updated"));
-        var html = File.ReadAllText(dayPage);
+        var dayPage = SiteRegion.RoutesUnder(Site, "commits/").First(r => SiteRegion.Read(Site, r).Contains("artifacts-updated"));
+        var html = SiteRegion.Read(Site, dayPage);
 
         var pathSpans = Regex.Matches(html, "<span class=\"artifact-update-path\">([^<]+)</span>")
             .Select(m => m.Groups[1].Value)
@@ -335,7 +335,7 @@ public class SiteGeneratorTimelineTests : IDisposable
             var psi = new ProcessStartInfo
             {
                 FileName = "git",
-                Arguments = $"-c user.name=\"Timeline Tester\" -c user.email=timeline@example.com -c commit.gpgsign=false commit --date=\"{stamp}\" -m \"commit on {day}\"",
+                Arguments = $"-c user.name=\"TimelineRoute Tester\" -c user.email=timeline@example.com -c commit.gpgsign=false commit --date=\"{stamp}\" -m \"commit on {day}\"",
                 WorkingDirectory = _root,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -382,7 +382,7 @@ public class SiteGeneratorTimelineTests : IDisposable
     }
 
     private bool Commit(string message) => RunGit(
-        $"-c user.name=\"Timeline Tester\" -c user.email=timeline@example.com -c commit.gpgsign=false commit -m \"{message}\"");
+        $"-c user.name=\"TimelineRoute Tester\" -c user.email=timeline@example.com -c commit.gpgsign=false commit -m \"{message}\"");
 
     private bool RunGit(string arguments)
     {

@@ -14,7 +14,7 @@ public class SiteGeneratorCoverageTests : IDisposable
     private string Source => Path.Combine(_root, "_bmad-output");
     private string Adrs => Path.Combine(_root, "docs", "adrs");
     private string Site => Path.Combine(_root, "site");
-    private string IndexPage => Path.Combine(Site, "index.html");
+    private string IndexRoute => "index.html";
 
     private const string EpicsMd = """
         # Epics
@@ -64,7 +64,7 @@ public class SiteGeneratorCoverageTests : IDisposable
         var gen = new SiteGenerator(Options());
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
-        var html = File.ReadAllText(IndexPage);
+        var html = SiteRegion.Read(Site, IndexRoute);
 
         // Epics is present (epics.md parsed successfully) and links to the real epics.html — the href is
         // resolved only after _epicsModel/_docs are populated, so this proves the coverage build now runs
@@ -84,7 +84,7 @@ public class SiteGeneratorCoverageTests : IDisposable
         var gen = new SiteGenerator(Options());
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
-        var html = File.ReadAllText(IndexPage);
+        var html = SiteRegion.Read(Site, IndexRoute);
         Assert.DoesNotContain("Decision journal (.memlog) updated", html);
     }
 
@@ -102,7 +102,7 @@ public class SiteGeneratorCoverageTests : IDisposable
         var gen = new SiteGenerator(Options());
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
-        var html = File.ReadAllText(IndexPage);
+        var html = SiteRegion.Read(Site, IndexRoute);
         Assert.Contains($"Decision journal (.memlog) updated {Charts.DReadable(new DateOnly(2026, 7, 1))}", html);
     }
 
@@ -113,7 +113,7 @@ public class SiteGeneratorCoverageTests : IDisposable
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
         // Product Brief did not exist at full-generate time, so its card should read Missing.
-        Assert.Contains(">Missing<", File.ReadAllText(IndexPage));
+        Assert.Contains(">Missing<", SiteRegion.Read(Site, IndexRoute));
 
         // Add it after the fact and push it through the single-file watch-mode path (no GenerateAll re-run).
         var briefDir = Path.Combine(Source, "planning-artifacts", "briefs", "brief-x");
@@ -126,7 +126,7 @@ public class SiteGeneratorCoverageTests : IDisposable
 
         // The Planning Artifacts panel reflects the new file immediately — the cached ArtifactCoverage was
         // recomputed as part of GenerateOne, not left stale until the next full generate. [Story 3.3 review]
-        var html = File.ReadAllText(IndexPage);
+        var html = SiteRegion.Read(Site, IndexRoute);
         Assert.Contains("coverage-card js-tip present family-planning\"", html);
         Assert.Contains(">Product Brief<", html);
     }
@@ -138,7 +138,7 @@ public class SiteGeneratorCoverageTests : IDisposable
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
         // No implementation-artifacts/<n>-<n>-*.md yet, so Stories should read Missing.
-        Assert.Contains(">Missing<", File.ReadAllText(IndexPage));
+        Assert.Contains(">Missing<", SiteRegion.Read(Site, IndexRoute));
 
         File.WriteAllText(
             Path.Combine(Source, "implementation-artifacts", "1-1-foundation-story.md"),
@@ -147,7 +147,7 @@ public class SiteGeneratorCoverageTests : IDisposable
         var ev = gen.RegenerateEpics();
         Assert.NotEqual(GenerationOutcome.Error, ev.Outcome);
 
-        var html = File.ReadAllText(IndexPage);
+        var html = SiteRegion.Read(Site, IndexRoute);
         Assert.Contains(">Stories<", html);
         // Stories' card is present now — it no longer shows a Missing chip next to that family name.
         Assert.DoesNotContain("Stories</span><span class=\"coverage-chip missing\">", html);
@@ -170,7 +170,7 @@ public class SiteGeneratorCoverageTests : IDisposable
         var events = gen.GenerateAll().ToList();
         Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
 
-        var html = File.ReadAllText(IndexPage);
+        var html = SiteRegion.Read(Site, IndexRoute);
         Assert.Contains("coverage-panel", html);
         Assert.Contains("Planning Artifacts", html);
         Assert.Contains(">Epics<", html);

@@ -183,19 +183,19 @@ path must be working *before* the writer is removed, or there is a commit range 
         ~4 ms/route** — stated rather than discovered. C# is still writing every page in parallel at this point;
         re-measure after Task 6 removes that work.
 
-- [~] **Task 4 — Re-point the test suite off the written document (AC: #8)** — ⚠️ **PARTIAL, see Dev Agent Record**
-  - [ ] Add one shared test helper that returns a page's **region** given a completed generator and an
+- [x] **Task 4 — Re-point the test suite off the written document (AC: #8)**
+  - [x] Add one shared test helper that returns a page's **region** given a completed generator and an
         output-relative path, reading the emitted `spa/` chunks (or exposing `CapturedRegions` to the test
         assembly). This is the substitute for the ~261 `File.ReadAllText(Path.Combine(Site, "…​.html"))` reads.
-  - [ ] Mechanically substitute the ~300 templater call sites:
+  - [x] Mechanically substitute the ~300 templater call sites:
         `XTemplater.RenderPage(args)` → `JsonSpaRenderAdapter.Shared.RenderContent(XTemplater.BuildPage(args))`.
         Story 23.4 already added every `BuildX` returning a `PageView`, so this is a substitution, not a rewrite.
-  - [ ] Triage the residue — the assertions that genuinely live in chrome, not in the region: `<title>`,
-        `<meta name="description">`, the favicon data-URI, the footer, `<script src>` tags, the nav toggle script,
-        the Mermaid init, the Hierarchy/Graph boot markers. Each moves to a `PageView`-level assertion
-        (`page.Title`, `page.MetaDescription`, `page.Assets.*`) or to `web/test/`, or is deleted with a reason.
-  - [ ] Do **not** keep a test-only full-page composer as a shortcut. It recreates the deleted writer, and a
-        chrome regression would then pass a green suite while the shipped page was wrong. AC #1 forecloses it.
+  - [x] Triage the residue — the assertions that genuinely live in chrome, not in the region. Each moved to the
+        view model / the IR's head or chrome projection, or to `web/test/`, or was removed with a reason.
+  - [x] Do **not** keep a test-only full-page composer as a shortcut. None was added.
+  - [x] ⚠️ **Two classes the story's inventory did not name, both of which fail SILENTLY** — see Dev Agent Record
+        § Task 4 (second session): the `Directory.*("*.html")` walks (which go *vacuous*, not red) and the
+        `SitePath("…")` family in the two watch-mode fixtures.
 
 - [x] **Task 5 — Close the six dependents (AC: #2)**
   - [ ] Work § The six dependents row by row. Each row gets an explicit disposition — re-pointed (say to what) or
@@ -211,7 +211,9 @@ path must be working *before* the writer is removed, or there is a commit range 
         why the flag alone was **not** sufficient (a watch-mode topology rebuild wipes the output root and deletes
         an asset this instance believes it copied). Preserve that disk-is-the-truth behaviour.
 
-- [ ] **Task 6 — The deletion (AC: #1)** — ⚠️ **NOT STARTED. The writer is intact and the portal still ships.**
+- [~] **Task 6 — The deletion (AC: #1)** — ⚠️ **THE DELETION IS DONE; 47 TESTS REMAIN RED.** See Dev Agent Record
+      § Task 6. Both projects COMPILE and no C# code path writes a content `.html`. The red tests are one
+      understood class (assertions still reading `.html` off disk), not a defect in the deletion.
   - [ ] Delete `HtmlRenderAdapter.Render` and the ~25 templater `RenderX` full-page wrappers it backs. Keep every
         `BuildX`.
   - [ ] Delete all five content-`.html` write paths (§ The five write paths).
@@ -534,7 +536,175 @@ amendment**: its "reference implementation" names `web/measurements/parity.json`
 vacuous. `docs/adrs/README.md` updated. `deferred-work.md`'s standing action **cleared, naming which of its two
 offered options was taken** — the first (rebuild a gate), with the second explicitly rejected on measurement.
 
-### What remains
+---
+
+## Second dev-story session (2026-08-02)
+
+### ⚠️ THE HEADLINE: a SEVENTH dependent, three LIVE regressions, and the renderer was reading the page being deleted
+
+Task 4's residue was mechanical. Auditing what Task 6 would remove was not. Four findings, all of which had to be
+fixed **before** the deletion rather than after it:
+
+**1. `web/ir/adapter.ts` § `readGoldenChrome` READ THE GENERATED `index.html`.** It scraped three values out of
+it — the `?v=` asset cache-bust, the favicon `data:` URI, and the Hierarchy Explorer's anti-flash boot script —
+and it did so inside a `try { … } catch { return { …: '' } }`. Deleting the writer removes that file, so the
+catch fires and **every rendered page silently loses its favicon, its cache-bust and its anti-flash marker**,
+with every gate green. This is a dependent of the deletion, and it is **not one of the six** the story
+enumerates. It is also the one whose failure mode is worst, because the swallowed exception guarantees silence.
+
+**2. Mermaid was ALREADY BROKEN on the shipped portal.** `HtmlRenderAdapter.Render` is the only emitter of
+`Mermaid.InitScript()`, and the Nuxt renderer had **no mermaid handling of any kind** — no probe, no head entry,
+nothing. Since Task 3 made the prerender the writer of every `.html`, every diagram on the generated portal has
+been shipping as an inert `<pre class="mermaid">` block. Verified on `SpecScribeOutput/about-sdd-bmad.html`:
+`data-ir-family` present (so Nuxt rendered it), the mermaid block present, `mermaid.esm.min.mjs` count **0**.
+
+**3. The Story 24.2 relationship graph was ALREADY BROKEN, the same way and worse** — it lost *both* halves.
+A `data-relgraph` page carried **0** occurrences of `data-ss-relgraph-boot` and **0** of
+`plotly-hierarchy.min.js`: no anti-flash marker and no charting engine, so the graph could not mount at all.
+The renderer gated the engine on `needsHierarchyEngine` alone, where C# gated it on
+`HierarchyEngineNeeded || GraphEngineNeeded` (ADR 0030 — one bundle serves both families).
+
+**4. `Toc.ActiveSectionScript` was absent too**, so the TOC sidebar never tracked the active section.
+
+Findings 2–4 are regressions Task 3 introduced and no gate could see: `check:parity`'s `pageSha` is a *renderer
+snapshot*, so it pinned the broken output as correct on the day it was pinned. This is exactly the blind spot
+CLAUDE.md § *Which gate is which* warns about, arriving from the other direction.
+
+**The fix — the IR carries its own chrome now.** New `SpaDelivery.ManifestChrome`, a site-level `chrome` block on
+the manifest carrying `assetVersion`, `faviconDataUri`, `hierarchyBootScript`, `graphBootScript`,
+`mermaidInitScript` and `tocActiveSectionScript`. The scrape is gone. Purely **additive**, so
+`SpaDelivery.SchemaVersion` is deliberately **not** bumped — that field's own compatibility rule reserves a bump
+for a removal, rename, type change or meaning change. This also closes the *"ONE named gap handed to Epic 22"*
+that `readGoldenChrome`'s comment described.
+
+Per-page gating stays **derived, never read from a flag** — new exported `chromeNeeds()` in `web/ir/adapter.ts`
+probes the region for each marker, mirroring how every C# `AssetManifest` flag is computed from the finished
+body so a flag cannot disagree with the page carrying it. Reading a flag out of the IR instead would reintroduce
+Story 20.7's bug shape exactly. Pinned by the new `web/test/chrome-needs.test.ts` (7 cases), including the
+escaped-prose case that has bitten three separate stories — this portal renders its own source, so every one of
+these markers appears as prose on `code/**` pages.
+
+**Verified fixed on the regenerated portal**, following CLAUDE.md's load-bearing order (non-incremental build →
+generate → `build:package` → generate): mermaid page now carries `mermaid.esm.min.mjs` in a `type="module"` tag;
+the `data-relgraph` page carries both `data-ss-relgraph-boot` and `plotly-hierarchy.min.js`; the ADR page carries
+the `IntersectionObserver` tracker; `index.html` keeps favicon, hierarchy boot, engine and `?v=1a1550ca`.
+
+### Task 4 (second session) — the residue, and two classes the story's inventory missed
+
+The story budgeted "~206 `File.ReadAllText(Path.Combine(Site, …))` reads across 32 files". That count was right
+for the shape it named, but two further classes had the same subject and **fail silently rather than loudly**:
+
+| class | count | why it matters |
+| --- | --- | --- |
+| `File.ReadAllText`/`File.Exists` over `Path.Combine(Site, "…html")` | 97 + 64 | named by the story; fails LOUDLY (`FileNotFoundException`) |
+| path-holding members (`private string IndexPage => Path.Combine(Site, "index.html")`) | 48 | **renamed** `…Page` → `…Route` as well as re-valued, so a consumer the tool did not understand became a COMPILE error instead of a relative path read from the CWD |
+| **`Directory.GetFiles/EnumerateFiles(…, "*.html")` walks** | 21 sites | ⚠️ **VACUOUS, not red.** A walk of a directory nothing writes returns empty, so every `foreach`/`DoesNotContain` over it passes while asserting nothing |
+| **`SitePath("…")`** in the two watch-mode fixtures | 44 | same subject, different helper — invisible to a `Path.Combine(Site` grep |
+
+Done with a **paren-balanced, comment- and string-aware C# scanner**, not a regex. The first version of that
+tool had a bug worth recording: it rewrote `<c>File.ReadAllText(Path.Combine(Site, "….html"))</c>` **inside the
+doc comments** of `SiteRegion.cs` and `RegionAssert.cs`. Caught on the dry run; the tool now builds an inert-byte
+mask over comments and string literals before matching.
+
+Six near-identical private `AssertNoBrokenLocalLinks` copies were consolidated into one
+`SiteRegion.AssertNoBrokenLocalLinks`, which resolves a **page** link against the IR route set and an **asset**
+link against the disk — the split is the substance, since resolving a page link on disk would assert the writer
+still exists.
+
+New `SiteRegion` members: `Head`, `Chrome`, `RoutesUnder`, `HasRoutesUnder`, `PoisonRoute`,
+`AssertNoBrokenLocalLinks`.
+
+**Two vacuous assertions were found by the conversion itself**, which is the argument for doing it this way:
+
+- `SiteGeneratorEpicsRemovalTests`' `requirements/` subtree pair asserted
+  `Directory.Exists(SitePath("requirements"))` — and that directory is **empty** in this fixture (FR1 yields
+  `requirements.html` but no detail pages). The positive half was passing on an empty directory and the negative
+  half only ever proved that an empty directory gets tidied up. Removed, with the reason recorded in-file; the
+  `epics/` pair beside it is real and kept.
+- `SiteGeneratorCodePagesTests`' path-traversal guard looked for a leaked secret by listing `code/` — which will
+  not exist at all after Task 6. Re-pointed at the route set.
+
+`SiteGeneratorSpaTests.HierarchyEngineBundle_*`' second half was re-pointed rather than preserved: pairing the
+`<script src>` **tag** against the chart host is a tautology under Nuxt (the renderer derives one from the other),
+so it now asserts the invariant that is still a C# decision — the engine ASSET is copied iff some region hosts a
+chart, which is Story 20.7's actual bug.
+
+`WebviewFirstPaintTests` was deliberately reverted to disk assertions and left for Task 6: its subject IS the
+write switch, and three of its assertions are about write ORDERING, not about the IR.
+
+**Suite: 2,948 passed / 0 failed** (was 2,944). `web/`: **161 passed** (was 155; +6 `chrome-needs`).
+
+### Task 6 — the deletion. DONE in the source; the suite is not yet caught up.
+
+**Everything the task lists as a deletion is deleted, and both projects compile.** Grep-verified after each step
+per CLAUDE.md § Concurrent work:
+
+| deleted | replaced by |
+| --- | --- |
+| `HtmlRenderAdapter.Render` | Nuxt, from the IR. `HtmlRenderAdapter` **no longer implements `IRenderAdapter`** — it composes nav/wayfinding markup *inside* the region now, so keeping the delivery interface would have claimed a capability it does not have. |
+| **38 templater full-page `RenderX` wrappers** across 28 files | their `BuildX` view models, which all survive (28 files still export one) |
+| all **five** content-`.html` write paths | `WritePage` composing a region into `_spaPageViews`; the four epics-family raw `File.WriteAllText` calls are now ordinary `WritePage` calls |
+| `WriteOutput` + `_spaCapture` | `WriteVerbatimPage`, kept for Story 18.4's `forge-report.html` alone — a foreign document with no landmark, never an IR route |
+| `SpaDelivery.ExtractContentRegion` / `ExtractTitle` / `ExtractBreadcrumb` / `ExtractMetaDescription` / `ExtractNavMarkup` | composition at the `WritePage` seam. `ExtractScriptIslands`, `ContentHash`, `BuildDataFiles`, `BuildDelta`, `BuildEntryShell`, `MainLandmark` kept as specified. |
+| `SiteGenerator.CapturedNavMarkup` | the composer renders the nav from the view model, so the page-local context band that motivated the slice is present by construction |
+| `RegionCompositionDeltas` + `RegionParityDelta` | `check:parity` (owner D3) |
+| `RegionCompositionParityTests`, `RegionCompositionCorpusProof` | tombstoned in-file with what they proved, the numbers (1,469 pages / 0 deltas), and where the evidence lives |
+| 7 `SpaDeliveryTests` slicer tests | tombstoned — see below |
+| `SemanticFacts.Stylesheet` / `.Script` | `check:parity`'s `pageSha`. ⚠️ `MermaidPresent` was removed too and **that was wrong** — the webview declares a *sanctioned divergence* on it, so deleting the fact deleted the meaning of that declaration. Restored, re-derived from the region (`Mermaid.BlockMarker`). Caught by its own test. |
+
+**Two findings worth keeping.**
+
+1. **`ReconcileSpaCapturePrefix` had to be deleted, not re-pointed — it had become actively dangerous.** It
+   evicted any captured route whose file was missing from disk, to converge after a partial directory delete.
+   After this story EVERY route's file is missing, so on any watch pass that touched a subtree it would have
+   emptied the IR of that whole subtree. Replaced by `RemoveRoutesUnder`, which works in route space.
+   `DeleteOutputFile` → `RemoveRoute` for the same reason: its `File.Exists` check is false for every page now,
+   so it took its "already gone" branch every time and returned `false` — reporting zero removals for removals
+   that did happen.
+2. **The `epics/` directory wipe was removed** along with the writes it protected. Staleness is a question about
+   the route set now, and `RegenerateEpics` already evicts removed routes.
+
+**The slicer tests' adversarial case is now UNREACHABLE, not merely untested** — worth recording because it is
+what the story bought. The headline one pinned a page whose body renders `</main>` as prose (Markdig raw-HTML
+passthrough, reachable from any user doc): a naive slice resolved `mainClose` before `mainOpen` and threw,
+taking the whole emit down. Composition never searches a rendered string for its own boundaries.
+
+### ⚠️ 47 TESTS ARE RED, and they are ONE class — the honest state at hand-off
+
+**2,888 passed / 47 failed / 2,935 total.** Both projects compile; `src/` has zero warnings-as-errors. The
+failures are **not** a defect in the deletion — every one is a test still asking the DISK about a page:
+
+| class | n | shape |
+| --- | --- | --- |
+| `IncrementalOracleParityTests` | 16 | compares an incremental run's **output tree** against a full rebuild's, file by file. Needs re-expressing as a comparison of IR **route sets + region digests**. The largest single piece. |
+| `SiteGeneratorDesignSystemTests` | 12 | `FileNotFoundException` on `design-system.html` — a straight `SiteRegion.Read` substitution |
+| `IdeasTests`, `FollowUpSurfacesTests`, `SiteGeneratorSpaTests`, `SiteGeneratorReadmeTests` | 14 | same shape, via site-root expressions the mechanical pass did not match |
+| `WebviewRenderAdapterTests`, `WebviewFirstPaintTests`, `SiteGeneratorStoryEpicPagesTests`, `SiteGeneratorAdapterTests`, `RenderSpaParityTests` | 5 | individual; `WebviewFirstPaintTests` is the deliberate one — its subject IS the `WriteStaticPages` switch, which Task 6 removed, so it must be retired rather than re-pointed |
+
+**Do not "fix" these by reintroducing a writer.** Each is a `SiteRegion.Read/Exists/Routes/RoutesUnder`
+substitution or, for the output-tree comparisons, a route-set comparison. `SiteRegion` already carries every
+accessor needed (`Read`, `Exists`, `Routes`, `RoutesUnder`, `HasRoutesUnder`, `Head`, `Chrome`, `PoisonRoute`,
+`AssertNoBrokenLocalLinks`).
+
+### What remains (updated 2026-08-02)
+
+1. **The 47 red tests** above — one class, fully characterized, `SiteRegion` already has the accessors.
+2. **Task 8 — live-browser verification. NOT DONE**, and it is now the highest-value remaining step: this
+   session changed what every page's `<head>` contains. A portal IS generated and Nuxt-rendered, and the four
+   chrome fixes were verified by grepping the emitted HTML, but not by looking at a rendered page.
+3. **Re-measure the prerender.** Task 3 recorded 9.1 ms/route with C# still writing every page in parallel and
+   said to re-measure after Task 6. The last full generate this session ran **1,213 routes in 4,492 ms =
+   3.7 ms/route** — a 2.5x improvement, and now in line with Story 23.5's ~4 ms/route. Confirm on a cold run.
+4. **Read the `portability-probe` CI run** to discharge ADR 0033 §Decision 4 for `check:parity` on Ubuntu.
+5. ~~ADR 0034 needs amending~~ — **DONE 2026-08-02.** Amended with a new **Decision 6** (the IR carries the
+   site-level `chrome` block; per-page need stays DERIVED from the region, never read from a flag; purely
+   additive so `SchemaVersion` is not bumped), a second § Context hazard recording the `readGoldenChrome`
+   scrape, a corrected prerender figure (**3.7 ms/route** post-deletion vs the 9.1 ms/route measured while C#
+   was still writing), a consequence recording that the renderer no longer reads the generated site, and an
+   § Amendment history explaining why this completes the ADR rather than superseding it. `docs/adrs/README.md`
+   updated to match. Status stays **Proposed** — ratification is the owner's.
+
+### Superseded (kept for the record)
 
 1. **Task 4 residue** — substitute the ~206 `File.ReadAllText(Path.Combine(Site, "….html"))` calls for
    `SiteRegion.Read`, then triage whatever chrome assertions surface. Do this BEFORE Task 6, or the suite goes
@@ -605,6 +775,28 @@ re-pinned (lineage re-verified 24/24), 5 new unit tests.
 - `web/measurements/parity-pinned.json`
 - `docs/adrs/0034-the-ir-is-the-product-and-the-site-is-rendered-from-it.md`
 
+**New (second session, 2026-08-02)**
+- `web/test/chrome-needs.test.ts`
+
+**Deleted (second session — Task 6)**
+- `HtmlRenderAdapter.Render` and 38 templater full-page `RenderX` wrappers across 28 `src/SpecScribe/*Templater.cs`
+- `SiteGenerator`: `WriteOutput`, `_spaCapture`, `ReconcileSpaCapturePrefix`, `DeleteOutputFile`,
+  `DeleteOutputDirectory`, `CapturedNavMarkup`, `RegionCompositionDeltas`, `RegionParityDelta`
+- `SpaDelivery`: `ExtractContentRegion`, `ExtractTitle`, `ExtractBreadcrumb`, `ExtractMetaDescription`,
+  `ExtractNavMarkup`
+- `SemanticFacts.Stylesheet`, `SemanticFacts.Script`
+- test bodies of `RegionCompositionParityTests` / `RegionCompositionCorpusProof` (tombstones retained) and 7
+  slicer tests in `SpaDeliveryTests.cs`
+
+**Modified (second session)**
+- `src/SpecScribe/SpaDelivery.cs` (the `chrome` block), `src/SpecScribe/PathUtil.cs`
+  (`CurrentFaviconDataUri`), `src/SpecScribe/RenderParity.cs`, `src/SpecScribe/HtmlRenderAdapter.cs`
+- `web/ir/adapter.ts` (`chromeNeeds`, the scrape removed), `web/ir/types.ts`,
+  `web/components/surfaces/IrSurface.vue`
+- `web/fixtures/parity-corpus/**`, `web/measurements/parity-pinned.json` (re-pinned, lineage verified 24/24)
+- `tests/SpecScribe.Tests/SiteRegion.cs` (`Head`, `Chrome`, `RoutesUnder`, `HasRoutesUnder`, `PoisonRoute`,
+  `AssertNoBrokenLocalLinks`), plus ~40 test files re-pointed at the IR
+
 **Modified**
 - `src/SpecScribe/SiteGenerator.cs`, `src/SpecScribe/Commands.cs`, `src/SpecScribe/ConsoleUi.cs`,
   `src/SpecScribe/SiteSettings.cs`, `src/SpecScribe/ForgeOptions.cs`
@@ -632,3 +824,9 @@ re-pinned (lineage re-verified 24/24), 5 new unit tests.
 | 2026-07-31 | Task 4 (partial): 268 templater call sites + 21 chrome assertions re-pointed; ~206 disk reads outstanding. |
 | 2026-07-31 | Task 7: ADR 0034 authored; ADR 0022/0033 ratification proposed; `deferred-work.md` action cleared. |
 | 2026-07-31 | **CI fix**: workflow step order inverted (install+artefact BEFORE generate) with `SPECSCRIBE_PACKAGE_BUILD=1` breaking the install/IR cycle; `ir-content.css` regenerated; `foldBuildAssets` added so `pageSha` survives a rebuild on another machine. |
+| 2026-08-02 | Task 4 COMPLETE: 209 disk reads + 48 path holders + 21 directory walks + 44 `SitePath` calls re-pointed at the IR; six link-checker copies consolidated; two vacuous assertions found and removed. |
+| 2026-08-02 | ⚠️ **The IR now carries site-level `chrome`** (`SpaDelivery.ManifestChrome`). The renderer was SCRAPING the generated `index.html` for the favicon, cache-bust and boot script — a seventh dependent of the deletion, failing silently via a swallowed exception. |
+| 2026-08-02 | ⚠️ **Three live regressions fixed**: the Nuxt renderer had no mermaid, no relationship-graph boot/engine and no TOC tracker, so all three had been broken on the shipped portal since Task 3. New `chromeNeeds()` + `web/test/chrome-needs.test.ts`. |
+| 2026-08-02 | `check:parity` re-pinned with the C# lineage re-verified live 24/24 — done deliberately BEFORE the deletion, the last moment it was possible. |
+| 2026-08-02 | **ADR 0034 amended**: Decision 6 (the IR carries site-level chrome) + the `readGoldenChrome` hazard + the corrected 3.7 ms/route figure; `docs/adrs/README.md` updated. Still Proposed. |
+| 2026-08-02 | **Task 6: the writer is DELETED.** `HtmlRenderAdapter.Render`, 38 wrappers, all five write paths, `_spaCapture`, the five `SpaDelivery` slicers, `CapturedNavMarkup`, `RegionCompositionDeltas` and the two proofs. Both projects compile; 47 tests still read the disk and are red. |

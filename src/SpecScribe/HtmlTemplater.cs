@@ -15,9 +15,6 @@ public static class HtmlTemplater
         string? UnplannedHref = null,
         string? DeferredListHref = null);
 
-    public static string RenderPage(DocModel doc, SiteNav nav, EntityPager? pager = null, QuickDevPageChrome? quickDev = null, NavLocalContext? localContext = null) =>
-        HtmlRenderAdapter.Shared.Render(BuildDocPage(doc, nav, pager, quickDev, localContext)).Content;
-
     /// <summary>Builds a generic doc page's host-neutral <see cref="PageView"/> — the AD-2 delivery contract, and
     /// the single largest family this story moves (every <c>adrs/</c>, <c>implementation-artifacts/</c>,
     /// <c>planning-artifacts/</c> and <c>specs/</c> page). Story 23.4 moved every standalone templater onto it so
@@ -171,15 +168,6 @@ public static class HtmlTemplater
     /// now owns the group set (Story 6.2 relocated <c>KnownIndexGroups</c> there). [Story 4.2 Task 3/5]</summary>
     public static bool IsWellKnownTopLevelFolder(string folder) =>
         DashboardViewBuilder.IsWellKnownTopLevelFolder(folder);
-
-    /// <summary>Builds the home dashboard page. The BODY is now decomposed into a host-neutral
-    /// <see cref="DashboardView"/> (built by <see cref="DashboardViewBuilder"/>) and rendered to today's exact
-    /// bytes by <see cref="HtmlRenderAdapter.RenderDashboardBody"/>; the shared chrome (head/nav/breadcrumb/
-    /// footer) is assembled by the same adapter from the <see cref="PageView"/> — the DELIVERY-seam contract
-    /// (AD-2). This is 6.1's opaque <see cref="PageView.BodyHtml"/> seam now carrying an adapter-rendered-from-data
-    /// body instead of a templater-hand-built one; bytes unchanged. [Story 6.1; Story 6.2]</summary>
-    public static string RenderIndex(IReadOnlyList<DocModel> docs, SiteNav nav, ProgressModel progress, EpicsModel? epicsModel, RequirementsModel? requirements, IReadOnlyList<AdrEntry> adrs, CommandCatalog commands, WorkInventory? work = null, SprintStatus? sprint = null, IReadOnlyList<RetroModel>? retros = null, ArtifactCoverage? coverage = null, bool hasTimeline = false, Func<string, string?>? codeItemHref = null, ProjectCounts? counts = null, FollowUpGeometry? followUps = null, UnplannedWorkGeometry? unplanned = null, DateOnly? today = null, DeliveryCadenceData? cadence = null, WorkGraphModel? workGraph = null, DateOnly? dateCutoff = null, TestArtifactsModel? testArtifacts = null) =>
-        HtmlRenderAdapter.Shared.Render(BuildIndexPage(docs, nav, progress, epicsModel, requirements, adrs, commands, work, sprint, retros, coverage, hasTimeline, codeItemHref, counts, followUps, unplanned, today, cadence, workGraph, dateCutoff, testArtifacts)).Content;
 
     /// <summary>Builds the dashboard's <see cref="PageView"/> without committing to a surface — the mechanical
     /// split of <see cref="RenderIndex"/> (which now just feeds this through the HTML adapter, bytes unchanged)

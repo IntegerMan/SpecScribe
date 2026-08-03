@@ -14,14 +14,6 @@ namespace SpecScribe;
 /// by the script only once there's more than one page's worth). [Story 7.10]</summary>
 public static class RiskQuadrantTemplater
 {
-    /// <summary>Renders the whole page from the unfiltered <see cref="CodeMap"/> (the same "full" set the Code
-    /// Map page's headline stats + this story's chart already use — no per-filter-variant duplication).
-    /// <paramref name="fileHref"/> is the guarded in-portal code-page resolver (Story 7.2 seam): a non-null
-    /// return routes a file/point to its code page, a null return (or a null resolver) leaves it plain — never a
-    /// broken link.</summary>
-    public static string RenderPage(CodeMap map, SiteNav nav, Func<string, string?>? fileHref = null) =>
-        HtmlRenderAdapter.Shared.Render(BuildPage(map, nav, fileHref)).Content;
-
     /// <summary>Builds this page's host-neutral <see cref="PageView"/> — the AD-2 delivery contract. Story 23.4
     /// moved every standalone templater onto it so the IR's content region can be COMPOSED
     /// (<see cref="JsonSpaRenderAdapter.RenderContent"/>: nav markup + wayfinding + <c>&lt;main&gt;</c>) instead of

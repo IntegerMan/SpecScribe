@@ -87,33 +87,6 @@ public class SiteGeneratorEpicsRemovalTests : IDisposable
 
     // Every local href on the page must resolve to a real file — the assertion that actually catches a page left
     // linking into an output subtree that was deleted out from under it.
-    private void AssertNoBrokenLocalLinks(string pageFullPath)
-    {
-        var html = File.ReadAllText(pageFullPath);
-        var pageDir = Path.GetDirectoryName(pageFullPath)!;
-        foreach (Match m in Regex.Matches(html, "href=\"(?<href>[^\"]+)\""))
-        {
-            var href = m.Groups["href"].Value;
-            // Anything with a URI scheme (http:, data:, mailto:, vscode:, command:) or a bare fragment is not a
-            // local file reference — only same-site relative hrefs can dangle.
-            if (href.StartsWith("#", StringComparison.Ordinal)
-                || Regex.IsMatch(href, @"^[a-zA-Z][a-zA-Z0-9+.\-]*:"))
-            {
-                continue;
-            }
-
-            var target = href.Split('#')[0].Split('?')[0];
-            if (target.Length == 0) continue;
-
-            var resolved = Path.GetFullPath(Path.Combine(pageDir, target.Replace('/', Path.DirectorySeparatorChar)));
-            // Surrounding markup in the message: a dangling href is only actionable if you can see which widget
-            // emitted it.
-            var from = Math.Max(0, m.Index - 220);
-            var context = html.Substring(from, Math.Min(440, html.Length - from));
-            Assert.True(File.Exists(resolved) || Directory.Exists(resolved),
-                $"{Path.GetFileName(pageFullPath)} links to '{href}', which does not exist on disk.\nContext:\n…{context}…");
-        }
-    }
 
     [Fact]
     public void RegenerateEpics_WhenEpicsFileDeleted_RemovesTheWholeEpicsOutputFamily()
@@ -121,14 +94,13 @@ public class SiteGeneratorEpicsRemovalTests : IDisposable
         var gen = GeneratedSite();
 
         // Baseline: the whole epics-derived family exists.
-        Assert.True(File.Exists(SitePath("epics.html")));
-        Assert.True(File.Exists(SitePath("requirements.html")));
-        Assert.True(File.Exists(SitePath("traceability.html")));
-        Assert.True(File.Exists(SitePath("cadence.html")));
-        Assert.True(Directory.Exists(SitePath("epics")));
-        Assert.True(Directory.Exists(SitePath("requirements")));
-        Assert.True(File.Exists(SitePath("epics/epic-1.html")));
-        Assert.True(File.Exists(SitePath("epics/story-1-1.html")));
+        Assert.True(SiteRegion.Exists(Site, "epics.html"));
+        Assert.True(SiteRegion.Exists(Site, "requirements.html"));
+        Assert.True(SiteRegion.Exists(Site, "traceability.html"));
+        Assert.True(SiteRegion.Exists(Site, "cadence.html"));
+        Assert.True(SiteRegion.HasRoutesUnder(Site, "epics/"));
+        Assert.True(SiteRegion.Exists(Site, "epics/epic-1.html"));
+        Assert.True(SiteRegion.Exists(Site, "epics/story-1-1.html"));
 
         // The topology change under test: epics.md itself disappears while watch mode is live.
         File.Delete(EpicsPath);
@@ -138,31 +110,40 @@ public class SiteGeneratorEpicsRemovalTests : IDisposable
         Assert.Equal(GenerationOutcome.Removed, ev.Outcome);
         Assert.Contains("removed", ev.Message ?? string.Empty, StringComparison.OrdinalIgnoreCase);
 
-        Assert.False(File.Exists(SitePath("epics.html")), "stale epics.html must be deleted");
-        Assert.False(File.Exists(SitePath("requirements.html")), "stale requirements.html must be deleted");
-        Assert.False(File.Exists(SitePath("traceability.html")), "stale traceability.html must be deleted");
-        Assert.False(File.Exists(SitePath("cadence.html")), "stale cadence.html must be deleted");
-        Assert.False(Directory.Exists(SitePath("epics")), "stale epics/ subtree must be deleted");
-        Assert.False(Directory.Exists(SitePath("requirements")), "stale requirements/ subtree must be deleted");
+        Assert.False(SiteRegion.Exists(Site, "epics.html"), "stale epics.html must be deleted");
+        Assert.False(SiteRegion.Exists(Site, "requirements.html"), "stale requirements.html must be deleted");
+        Assert.False(SiteRegion.Exists(Site, "traceability.html"), "stale traceability.html must be deleted");
+        Assert.False(SiteRegion.Exists(Site, "cadence.html"), "stale cadence.html must be deleted");
+        Assert.False(SiteRegion.HasRoutesUnder(Site, "epics/"), "stale epics/ subtree must be deleted");
     }
+
+    // [Story 23.6 AC #8] ⚠️ THE `requirements/` SUBTREE PAIR WAS REMOVED, AND IT WAS ALREADY VACUOUS.
+    //
+    // Both halves used to read `Directory.Exists(SitePath("requirements"))`. Converting them to the route set
+    // made the positive half fail, which is how the vacuity surfaced: this fixture declares FR1 in epics.md and
+    // gets `requirements.html` (the index, still asserted above and below) but NO `requirements/*.html` detail
+    // pages — the directory was created and left EMPTY. So `Assert.True(Directory.Exists(...))` was passing on
+    // an empty directory, and `Assert.False(...)` was asserting only that an empty directory gets tidied up.
+    // Neither said anything about the subtree the message claimed. The `epics/` pair above is the real one and
+    // is kept; re-adding a requirements-subtree assertion needs a fixture that actually emits detail pages.
 
     [Fact]
     public void RegenerateEpics_WhenEpicsFileDeleted_LeavesNoNavEntryOrLinkPointingAtARemovedPage()
     {
         var gen = GeneratedSite();
-        Assert.Contains("href=\"epics.html\"", File.ReadAllText(SitePath("index.html")));
+        Assert.Contains("href=\"epics.html\"", SiteRegion.Read(Site, "index.html"));
 
         File.Delete(EpicsPath);
         gen.RegenerateEpics();
 
-        var index = File.ReadAllText(SitePath("index.html"));
+        var index = SiteRegion.Read(Site, "index.html");
         Assert.DoesNotContain("href=\"epics.html\"", index);
         Assert.DoesNotContain("href=\"requirements.html\"", index);
         Assert.DoesNotContain("href=\"traceability.html\"", index);
         Assert.DoesNotContain("href=\"cadence.html\"", index);
 
         // The whole point of AC #3: nothing still on disk points into the subtree that was just removed.
-        AssertNoBrokenLocalLinks(SitePath("index.html"));
+        SiteRegion.AssertNoBrokenLocalLinks(Site, "index.html");
     }
 
     [Fact]
@@ -171,17 +152,17 @@ public class SiteGeneratorEpicsRemovalTests : IDisposable
         // Open Question #2's chosen default: sprint-status.yaml is still present, so its page stays — but it must be
         // RE-RENDERED, because the version on disk was written with live links into the epics pages now deleted.
         var gen = GeneratedSite();
-        var before = File.ReadAllText(SitePath("sprint.html"));
+        var before = SiteRegion.Read(Site, "sprint.html");
         Assert.Contains("href=\"epics/epic-1.html\"", before);
 
         File.Delete(EpicsPath);
         gen.RegenerateEpics();
 
-        Assert.True(File.Exists(SitePath("sprint.html")), "sprint.html survives — its own source is untouched");
-        var after = File.ReadAllText(SitePath("sprint.html"));
+        Assert.True(SiteRegion.Exists(Site, "sprint.html"), "sprint.html survives — its own source is untouched");
+        var after = SiteRegion.Read(Site, "sprint.html");
         Assert.DoesNotContain("href=\"epics/epic-1.html\"", after);
         Assert.DoesNotContain("href=\"epics/story-1-1.html\"", after);
-        AssertNoBrokenLocalLinks(SitePath("sprint.html"));
+        SiteRegion.AssertNoBrokenLocalLinks(Site, "sprint.html");
     }
 
     [Fact]
@@ -218,16 +199,16 @@ public class SiteGeneratorEpicsRemovalTests : IDisposable
         var gen = GeneratedSite();
         File.Delete(EpicsPath);
         gen.RegenerateEpics();
-        Assert.False(File.Exists(SitePath("epics.html")));
+        Assert.False(SiteRegion.Exists(Site, "epics.html"));
 
         File.WriteAllText(EpicsPath, EpicsMd);
         var ev = gen.RegenerateEpics();
 
         Assert.Equal(GenerationOutcome.Updated, ev.Outcome);
-        Assert.True(File.Exists(SitePath("epics.html")));
-        Assert.True(File.Exists(SitePath("epics/epic-1.html")));
-        Assert.True(File.Exists(SitePath("requirements.html")));
-        Assert.Contains("href=\"epics.html\"", File.ReadAllText(SitePath("index.html")));
+        Assert.True(SiteRegion.Exists(Site, "epics.html"));
+        Assert.True(SiteRegion.Exists(Site, "epics/epic-1.html"));
+        Assert.True(SiteRegion.Exists(Site, "requirements.html"));
+        Assert.Contains("href=\"epics.html\"", SiteRegion.Read(Site, "index.html"));
     }
 
     [Fact]
@@ -243,7 +224,7 @@ public class SiteGeneratorEpicsRemovalTests : IDisposable
         File.WriteAllText(Path.Combine(notes, "guide.md"), "# Guide\n\nA note that lives in a folder.\n");
 
         var gen = GeneratedSite();
-        Assert.True(File.Exists(SitePath("notes/guide.html")), "baseline page exists under the original folder name");
+        Assert.True(SiteRegion.Exists(Site, "notes/guide.html"), "baseline page exists under the original folder name");
 
         Directory.Move(notes, Path.Combine(Source, "handbook"));
         var ev = gen.RegenerateTopology();
@@ -252,8 +233,8 @@ public class SiteGeneratorEpicsRemovalTests : IDisposable
         Assert.Equal("<directory change>", ev.RelativePath);
         Assert.Equal("full rebuild", ev.Message);
 
-        Assert.True(File.Exists(SitePath("handbook/guide.html")), "page exists at the new location");
-        Assert.False(File.Exists(SitePath("notes/guide.html")), "no orphan page survives at the old location");
+        Assert.True(SiteRegion.Exists(Site, "handbook/guide.html"), "page exists at the new location");
+        Assert.False(SiteRegion.Exists(Site, "notes/guide.html"), "no orphan page survives at the old location");
     }
 
     [Fact]
@@ -304,11 +285,14 @@ public class SiteGeneratorEpicsRemovalTests : IDisposable
         Assert.Empty(exceptions);
 
         // No file was left mid-write: every generated page is non-empty and closes its document.
-        foreach (var page in Directory.GetFiles(Site, "*.html", SearchOption.AllDirectories))
+        // [Story 23.6 AC #8] `</html>` was chrome; the region's closing landmark carries the same "not torn"
+        // signal, and the empty-route-set guard keeps the loop from passing by iterating nothing.
+        Assert.NotEmpty(SiteRegion.Routes(Site));
+        foreach (var page in SiteRegion.Routes(Site))
         {
-            var html = File.ReadAllText(page);
-            Assert.False(string.IsNullOrWhiteSpace(html), $"{page} is empty — a torn write");
-            Assert.Contains("</html>", html);
+            var region = SiteRegion.Read(Site, page);
+            Assert.False(string.IsNullOrWhiteSpace(region), $"{page} is empty — a torn write");
+            Assert.Contains("</main>", region);
         }
 
         // Ground truth: a fresh from-scratch generation into a clean directory produces the same page set the

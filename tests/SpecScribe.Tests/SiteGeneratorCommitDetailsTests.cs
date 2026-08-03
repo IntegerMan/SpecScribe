@@ -18,7 +18,7 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
     private string Site => Path.Combine(_root, "site");
     private string CommitDir => Path.Combine(Site, "commit");
     private string CommitsDayDir => Path.Combine(Site, "commits");
-    private string HubPage => Path.Combine(Site, "git-insights.html");
+    private string HubRoute => "git-insights.html";
 
     private const string EpicsMd = """
         # Epics
@@ -67,16 +67,16 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
         var events = new SiteGenerator(Options(deepGit: false)).GenerateAll();
 
         AssertNoErrors(events);
-        Assert.False(Directory.Exists(CommitDir), "commit/ must not exist when --deep-git is off");
+        Assert.False(SiteRegion.HasRoutesUnder(Site, "commit/"), "commit/ must not exist when --deep-git is off");
 
         // This fixture is not a git repo, so there are no date pages at all now (Story 7.3's date pages are
         // git-derived — no mtime fallback). If any did render, none links into commit/ when --deep-git is off
         // (the resolver has no pages) and any commit hashes stay plain <code>.
-        if (Directory.Exists(CommitsDayDir))
+        if (SiteRegion.HasRoutesUnder(Site, "commits/"))
         {
-            foreach (var page in Directory.GetFiles(CommitsDayDir, "*.html"))
+            foreach (var page in SiteRegion.RoutesUnder(Site, "commits/"))
             {
-                var day = File.ReadAllText(page);
+                var day = SiteRegion.Read(Site, page);
                 Assert.DoesNotContain("../commit/", day);
                 if (day.Contains("commit-day-list"))
                 {
@@ -94,8 +94,8 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
         var events = new SiteGenerator(Options(deepGit: true)).GenerateAll();
 
         AssertNoErrors(events);
-        Assert.False(Directory.Exists(CommitDir));
-        Assert.True(File.Exists(Path.Combine(Site, "epics.html")), "baseline generation must still succeed");
+        Assert.False(SiteRegion.HasRoutesUnder(Site, "commit/"));
+        Assert.True(SiteRegion.Exists(Site, "epics.html"), "baseline generation must still succeed");
     }
 
     [SkippableFact]
@@ -107,13 +107,13 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
         var events = new SiteGenerator(Options(deepGit: true)).GenerateAll();
 
         AssertNoErrors(events);
-        Assert.True(Directory.Exists(CommitDir), "commit/ must be generated when --deep-git has data");
+        Assert.True(SiteRegion.HasRoutesUnder(Site, "commit/"), "commit/ must be generated when --deep-git has data");
 
-        var pages = Directory.GetFiles(CommitDir, "*.html");
+        var pages = SiteRegion.RoutesUnder(Site, "commit/");
         Assert.NotEmpty(pages);
-        Assert.True(pages.Length <= 300, "per-commit pages are bounded by the -n 300 deep window");
+        Assert.True(pages.Count <= 300, "per-commit pages are bounded by the -n 300 deep window");
 
-        var allPages = string.Concat(pages.Select(File.ReadAllText));
+        var allPages = string.Concat(pages.Select(r => SiteRegion.Read(Site, r)));
         Assert.Contains("Implement Story 1.1 foundation", allPages);   // a known commit subject
         Assert.Contains("by Detail Tester", allPages);                  // author shown as attribution, not a rank
     }
@@ -130,11 +130,11 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
 
         // The subject "Story 1.1" gets linkified inside <h1> (see the reference-linkification test below), so
         // match on the h1's inner text loosely rather than the exact escaped subject string.
-        var pages = Directory.GetFiles(CommitDir, "*.html");
-        var olderPage = pages.Single(p => Regex.Match(File.ReadAllText(p), "<h1>(.*?)</h1>", RegexOptions.Singleline).Groups[1].Value.Contains("foundation"));
-        var olderHtml = File.ReadAllText(olderPage);
-        var newerPage = pages.Single(p => Regex.Match(File.ReadAllText(p), "<h1>(.*?)</h1>", RegexOptions.Singleline).Groups[1].Value.Contains("Second commit"));
-        var newerHtml = File.ReadAllText(newerPage);
+        var pages = SiteRegion.RoutesUnder(Site, "commit/");
+        var olderPage = pages.Single(p => Regex.Match(SiteRegion.Read(Site, p), "<h1>(.*?)</h1>", RegexOptions.Singleline).Groups[1].Value.Contains("foundation"));
+        var olderHtml = SiteRegion.Read(Site, olderPage);
+        var newerPage = pages.Single(p => Regex.Match(SiteRegion.Read(Site, p), "<h1>(.*?)</h1>", RegexOptions.Singleline).Groups[1].Value.Contains("Second commit"));
+        var newerHtml = SiteRegion.Read(Site, newerPage);
 
         // The oldest commit's page has no earlier sibling (Prev disabled) and Next points at the newer commit.
         Assert.Contains("entity-pager-prev is-disabled", olderHtml);
@@ -158,9 +158,9 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
         var events = new SiteGenerator(Options(deepGit: true)).GenerateAll();
         AssertNoErrors(events);
 
-        var pages = Directory.GetFiles(CommitDir, "*.html");
-        var olderPage = pages.Single(p => Regex.Match(File.ReadAllText(p), "<h1>(.*?)</h1>", RegexOptions.Singleline).Groups[1].Value.Contains("foundation"));
-        var olderHtml = File.ReadAllText(olderPage);
+        var pages = SiteRegion.RoutesUnder(Site, "commit/");
+        var olderPage = pages.Single(p => Regex.Match(SiteRegion.Read(Site, p), "<h1>(.*?)</h1>", RegexOptions.Singleline).Groups[1].Value.Contains("foundation"));
+        var olderHtml = SiteRegion.Read(Site, olderPage);
 
         Assert.Contains("site-nav-local-context", olderHtml);
         Assert.Contains("Recent commits", olderHtml);
@@ -180,15 +180,15 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
         AssertNoErrors(events);
 
         // The per-day page's hash is now a link into commit/ (from commits/ depth → ../commit/…).
-        var dayPages = Directory.GetFiles(CommitsDayDir, "*.html");
+        var dayPages = SiteRegion.RoutesUnder(Site, "commits/");
         Assert.NotEmpty(dayPages);
-        var anyDayLinks = dayPages.Any(p => File.ReadAllText(p).Contains("class=\"commit-hash-link\" href=\"../commit/"));
+        var anyDayLinks = dayPages.Any(p => SiteRegion.Read(Site, p).Contains("class=\"commit-hash-link\" href=\"../commit/"));
         Assert.True(anyDayLinks, "a day page's hash should link into commit/ when a per-commit page exists");
 
         // The Git Insights hub no longer carries a commit-hash link (Story 7.11 rewrite removed the
         // per-file "latest {hash}" line along with the master-detail panel it lived in) — it still exists,
         // just gated on the same deep-git signal.
-        Assert.True(File.Exists(HubPage));
+        Assert.True(SiteRegion.Exists(Site, HubRoute));
     }
 
     [SkippableFact]
@@ -201,7 +201,7 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
         AssertNoErrors(events);
 
         // The commit subject "Implement Story 1.1 foundation" becomes a guarded story link via ApplyReferenceLinks.
-        var allPages = string.Concat(Directory.GetFiles(CommitDir, "*.html").Select(File.ReadAllText));
+        var allPages = string.Concat(SiteRegion.RoutesUnder(Site, "commit/").Select(r => SiteRegion.Read(Site, r)));
         Assert.Contains("class=\"story-ref\" href=\"../epics/story-1-1.html\"", allPages);
     }
 
@@ -225,12 +225,12 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
         static string Stable(string html) =>
             Regex.Replace(html, @"on \w+ \d{1,2}, \d{4} at \d{1,2}:\d{2} [\w+\-:]+", "on <t>");
 
-        var pages1 = Directory.GetFiles(CommitDir, "*.html").OrderBy(p => p, StringComparer.Ordinal).ToList();
-        var pages2 = Directory.GetFiles(Path.Combine(site2, "commit"), "*.html").OrderBy(p => p, StringComparer.Ordinal).ToList();
-        Assert.Equal(pages1.Select(Path.GetFileName), pages2.Select(Path.GetFileName));
+        var pages1 = SiteRegion.RoutesUnder(Site, "commit/").OrderBy(p => p, StringComparer.Ordinal).ToList();
+        var pages2 = SiteRegion.RoutesUnder(site2, "commit/").OrderBy(p => p, StringComparer.Ordinal).ToList();
+        Assert.Equal(pages1, pages2);
         for (var i = 0; i < pages1.Count; i++)
         {
-            Assert.Equal(Stable(File.ReadAllText(pages1[i])), Stable(File.ReadAllText(pages2[i])));
+            Assert.Equal(Stable(SiteRegion.Read(Site, pages1[i])), Stable(SiteRegion.Read(site2, pages2[i])));
         }
     }
 
@@ -252,7 +252,7 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
         var events = new SiteGenerator(options).GenerateAll();
         AssertNoErrors(events);
 
-        var hub = File.ReadAllText(HubPage);
+        var hub = SiteRegion.Read(Site, HubRoute);
         var linkedDays = LinkedDaysOn(hub);
         var generatedDays = GeneratedDayPages();
 
@@ -276,7 +276,7 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
         var events = new SiteGenerator(options).GenerateAll();
         AssertNoErrors(events);
 
-        var linkedDays = LinkedDaysOn(File.ReadAllText(HubPage));
+        var linkedDays = LinkedDaysOn(SiteRegion.Read(Site, HubRoute));
         var generatedDays = GeneratedDayPages();
 
         Assert.NotEmpty(linkedDays);
@@ -301,7 +301,7 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
 
         Assert.Empty(GeneratedDayPages());
 
-        var hub = File.ReadAllText(HubPage);
+        var hub = SiteRegion.Read(Site, HubRoute);
         Assert.Empty(LinkedDaysOn(hub));
         // The designed empty state (UX-DR22), naming the cutoff so the state explains itself.
         Assert.Contains("No commits on or before", hub, StringComparison.Ordinal);
@@ -320,8 +320,8 @@ public class SiteGeneratorCommitDetailsTests : IDisposable
     /// <summary>The <c>commits/{date}.html</c> pages actually written. Tolerates the directory being absent, which
     /// is itself a legitimate outcome under a cutoff that precedes every commit.</summary>
     private HashSet<string> GeneratedDayPages() =>
-        Directory.Exists(CommitsDayDir)
-            ? Directory.GetFiles(CommitsDayDir, "*.html").Select(p => Path.GetFileNameWithoutExtension(p)!).ToHashSet()
+        SiteRegion.HasRoutesUnder(Site, "commits/")
+            ? SiteRegion.RoutesUnder(Site, "commits/").Select(p => Path.GetFileNameWithoutExtension(p)!).ToHashSet()
             : new HashSet<string>();
 
     /// <summary>Probes for a usable git CLI on PATH, independent of fixture setup — callers use this to decide

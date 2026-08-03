@@ -171,8 +171,8 @@ public class FileWatcherServiceTests : IDisposable
 
         File.WriteAllText(Path.Combine(Source, "notes", "guide.md"), "# Guide\n\nEDITED-BODY\n");
 
-        Assert.True(WaitFor(() => File.Exists(SitePath("notes/guide.html"))
-                && File.ReadAllText(SitePath("notes/guide.html")).Contains("EDITED-BODY")),
+        Assert.True(WaitFor(() => SiteRegion.Exists(Site, "notes/guide.html")
+                && SiteRegion.Read(Site, "notes/guide.html").Contains("EDITED-BODY")),
             "an ordinary .md save should regenerate its page");
         Assert.DoesNotContain(Observed(), e => e.Outcome == GenerationOutcome.Error);
     }
@@ -184,7 +184,7 @@ public class FileWatcherServiceTests : IDisposable
         // stale subtree is gone. epics.md sits under planning-artifacts/, so this also proves the .md watcher's
         // Deleted handler reaches the epics route.
         var gen = GeneratedSite();
-        Assert.True(File.Exists(SitePath("epics.html")));
+        Assert.True(SiteRegion.Exists(Site, "epics.html"));
         using var watcher = StartedWatcher(gen);
 
         File.Delete(EpicsPath);
@@ -196,10 +196,10 @@ public class FileWatcherServiceTests : IDisposable
         // while requirements.html has not been reached yet, and a wait that stops at the first two lands the next
         // three assertions inside it. Waiting for the settled state asserts the same thing without racing the wipe.
         Assert.True(WaitFor(() =>
-                !File.Exists(SitePath("epics.html"))
-                && !Directory.Exists(SitePath("epics"))
-                && !File.Exists(SitePath("requirements.html"))
-                && !Directory.Exists(SitePath("requirements"))),
+                !SiteRegion.Exists(Site, "epics.html")
+                && !SiteRegion.HasRoutesUnder(Site, "epics/")
+                && !SiteRegion.Exists(Site, "requirements.html")
+                && !SiteRegion.HasRoutesUnder(Site, "requirements/")),
             "deleting epics.md should remove epics.html, requirements.html, and both subtrees");
         Assert.DoesNotContain(Observed(), e => e.Outcome == GenerationOutcome.Error);
     }
@@ -211,20 +211,20 @@ public class FileWatcherServiceTests : IDisposable
         // IsDataSource route); what was missing was any end-to-end proof that a real yaml event actually drives it —
         // including the REMOVAL case, where the page must disappear rather than strand a board with no source.
         var gen = GeneratedSite();
-        Assert.False(File.Exists(SitePath("sprint.html")), "no sprint page before the yaml exists");
+        Assert.False(SiteRegion.Exists(Site, "sprint.html"), "no sprint page before the yaml exists");
         using var watcher = StartedWatcher(gen);
 
         File.WriteAllText(SprintPath, SprintYaml);
-        Assert.True(WaitFor(() => File.Exists(SitePath("sprint.html"))
-                && File.ReadAllText(SitePath("sprint.html")).Contains("MARKER-V1")),
+        Assert.True(WaitFor(() => SiteRegion.Exists(Site, "sprint.html")
+                && SiteRegion.Read(Site, "sprint.html").Contains("MARKER-V1")),
             "adding sprint-status.yaml should produce the sprint page");
 
         File.WriteAllText(SprintPath, SprintYaml.Replace("MARKER-V1", "MARKER-V2"));
-        Assert.True(WaitFor(() => File.ReadAllText(SitePath("sprint.html")).Contains("MARKER-V2")),
+        Assert.True(WaitFor(() => SiteRegion.Read(Site, "sprint.html").Contains("MARKER-V2")),
             "editing sprint-status.yaml should refresh the board");
 
         File.Delete(SprintPath);
-        Assert.True(WaitFor(() => !File.Exists(SitePath("sprint.html"))),
+        Assert.True(WaitFor(() => !SiteRegion.Exists(Site, "sprint.html")),
             "removing sprint-status.yaml should remove the sprint page");
         Assert.DoesNotContain(Observed(), e => e.Outcome == GenerationOutcome.Error);
     }
@@ -236,14 +236,14 @@ public class FileWatcherServiceTests : IDisposable
         // bare folder name, so this operation produced NO watcher event at all and the page silently stranded at
         // its old path forever.
         var gen = GeneratedSite();
-        Assert.True(File.Exists(SitePath("notes/guide.html")));
+        Assert.True(SiteRegion.Exists(Site, "notes/guide.html"));
         using var watcher = StartedWatcher(gen);
 
         Directory.Move(Path.Combine(Source, "notes"), Path.Combine(Source, "handbook"));
 
-        Assert.True(WaitFor(() => File.Exists(SitePath("handbook/guide.html"))),
+        Assert.True(WaitFor(() => SiteRegion.Exists(Site, "handbook/guide.html")),
             "a folder rename should rebuild the page at its new location");
-        Assert.True(WaitFor(() => !File.Exists(SitePath("notes/guide.html"))),
+        Assert.True(WaitFor(() => !SiteRegion.Exists(Site, "notes/guide.html")),
             "no orphan page may survive at the old location");
 
         AssertEventuallyObserved(
@@ -256,12 +256,12 @@ public class FileWatcherServiceTests : IDisposable
     public void DeletingAWholeDirectory_EscalatesToAFullRebuild()
     {
         var gen = GeneratedSite();
-        Assert.True(File.Exists(SitePath("notes/guide.html")));
+        Assert.True(SiteRegion.Exists(Site, "notes/guide.html"));
         using var watcher = StartedWatcher(gen);
 
         Directory.Delete(Path.Combine(Source, "notes"), recursive: true);
 
-        Assert.True(WaitFor(() => !File.Exists(SitePath("notes/guide.html"))),
+        Assert.True(WaitFor(() => !SiteRegion.Exists(Site, "notes/guide.html")),
             "deleting a folder should remove the pages it produced");
         Assert.DoesNotContain(Observed(), e => e.Outcome == GenerationOutcome.Error);
     }
@@ -296,16 +296,21 @@ public class FileWatcherServiceTests : IDisposable
         }
 
         Assert.True(WaitFor(() => Enumerable.Range(0, 8).All(i =>
-                File.Exists(SitePath($"notes/bulk-{i}.html"))
-                && File.ReadAllText(SitePath($"notes/bulk-{i}.html")).Contains("REPLACED"))),
+                SiteRegion.Exists(Site, $"notes/bulk-{i}.html")
+                && SiteRegion.Read(Site, $"notes/bulk-{i}.html").Contains("REPLACED"))),
             "every file in the burst should end up regenerated");
 
         // Nothing was left mid-write by the overlapping regenerations — the single writer lock's job.
-        foreach (var page in Directory.GetFiles(Site, "*.html", SearchOption.AllDirectories))
+        // [Story 23.6 AC #8] The old form read every written .html and asserted it closed its document
+        // (`</html>`). That token is CHROME and no C# code path emits it now, so the completeness check moved to
+        // the region's own closing landmark: a torn IR write yields an empty or truncated region, and
+        // `SiteRegion.Read` itself fails loudly on a route the manifest names but no chunk carries.
+        Assert.NotEmpty(SiteRegion.Routes(Site));
+        foreach (var page in SiteRegion.Routes(Site))
         {
-            var html = File.ReadAllText(page);
-            Assert.False(string.IsNullOrWhiteSpace(html), $"{page} is empty — a torn write");
-            Assert.Contains("</html>", html);
+            var region = SiteRegion.Read(Site, page);
+            Assert.False(string.IsNullOrWhiteSpace(region), $"{page} is empty — a torn write");
+            Assert.Contains("</main>", region);
         }
         Assert.DoesNotContain(Observed(), e => e.Outcome == GenerationOutcome.Error);
 
@@ -350,12 +355,12 @@ public class FileWatcherServiceTests : IDisposable
             Thread.Sleep(30);
         }
 
-        Assert.True(WaitFor(() => File.ReadAllText(SitePath("notes/guide.html")).Contains("REVISION-9")),
+        Assert.True(WaitFor(() => SiteRegion.Read(Site, "notes/guide.html").Contains("REVISION-9")),
             "the last revision should win");
 
         // A delete would fail with a sharing violation if generation held the file open.
         File.Delete(doc);
-        Assert.True(WaitFor(() => !File.Exists(SitePath("notes/guide.html"))),
+        Assert.True(WaitFor(() => !SiteRegion.Exists(Site, "notes/guide.html")),
             "deleting the source should remove its page");
         Assert.DoesNotContain(Observed(), e => e.Outcome == GenerationOutcome.Error);
     }

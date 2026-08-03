@@ -14,7 +14,7 @@ public class SiteGeneratorChangeLogDateLinkTests : IDisposable
 
     private string Source => Path.Combine(_root, "_bmad-output");
     private string Site => Path.Combine(_root, "site");
-    private string StoryPage => Path.Combine(Site, "epics", "story-1-1.html");
+    private string StoryRoute => "epics/story-1-1.html";
 
     private const string EpicsMd = """
         # Epics
@@ -96,8 +96,8 @@ public class SiteGeneratorChangeLogDateLinkTests : IDisposable
         var events = new SiteGenerator(Options()).GenerateAll();
         AssertNoErrors(events);
 
-        Assert.True(File.Exists(Path.Combine(Site, "commits", "2026-07-16.html")), "expected a day page for the commit date");
-        var html = File.ReadAllText(StoryPage);
+        Assert.True(SiteRegion.Exists(Site, "commits/2026-07-16.html"), "expected a day page for the commit date");
+        var html = SiteRegion.Read(Site, StoryRoute);
         Assert.Contains("href=\"../commits/2026-07-16.html\"", html);
         Assert.Contains(">Jul 16, 2026</a>", html);
     }
@@ -110,7 +110,7 @@ public class SiteGeneratorChangeLogDateLinkTests : IDisposable
         var events = new SiteGenerator(Options()).GenerateAll();
         AssertNoErrors(events);
 
-        var html = File.ReadAllText(StoryPage);
+        var html = SiteRegion.Read(Site, StoryRoute);
         Assert.Contains("Jul 16, 2026", html);
         Assert.DoesNotContain("commits/2026-07-16.html", html);
     }
@@ -124,8 +124,8 @@ public class SiteGeneratorChangeLogDateLinkTests : IDisposable
         var events = new SiteGenerator(Options()).GenerateAll();
         AssertNoErrors(events);
 
-        Assert.False(File.Exists(Path.Combine(Site, "commits", "2026-07-16.html")));
-        var html = File.ReadAllText(StoryPage);
+        Assert.False(SiteRegion.Exists(Site, "commits/2026-07-16.html"));
+        var html = SiteRegion.Read(Site, StoryRoute);
         Assert.Contains("Jul 16, 2026", html);
         Assert.DoesNotContain("commits/2026-07-16.html", html);
     }
@@ -142,8 +142,8 @@ public class SiteGeneratorChangeLogDateLinkTests : IDisposable
         var events = new SiteGenerator(Options()).GenerateAll();
         AssertNoErrors(events);
 
-        Assert.False(File.Exists(Path.Combine(Site, "commits", $"{future}.html")), "a future-dated commit must not get a day page");
-        var html = File.ReadAllText(StoryPage);
+        Assert.False(SiteRegion.Exists(Site, $"commits/{future}.html"), "a future-dated commit must not get a day page");
+        var html = SiteRegion.Read(Site, StoryRoute);
         Assert.DoesNotContain($"commits/{future}.html", html);
     }
 

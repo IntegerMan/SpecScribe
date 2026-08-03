@@ -15,8 +15,8 @@ public class SiteGeneratorSprintTests : IDisposable
     private string Adrs => Path.Combine(_root, "docs", "adrs");
     private string Site => Path.Combine(_root, "site");
     private string SprintYaml => Path.Combine(Source, "implementation-artifacts", "sprint-status.yaml");
-    private string SprintPage => Path.Combine(Site, "sprint.html");
-    private string IndexPage => Path.Combine(Site, "index.html");
+    private string SprintRoute => "sprint.html";
+    private string IndexRoute => "index.html";
 
     private const string EpicsMd = """
         # Epics
@@ -100,8 +100,8 @@ public class SiteGeneratorSprintTests : IDisposable
         File.WriteAllText(SprintYaml, SprintYamlContent);
         GenerateSite();
 
-        Assert.True(File.Exists(SprintPage), "sprint.html should be generated when the tracking file exists");
-        var sprintHtml = File.ReadAllText(SprintPage);
+        Assert.True(SiteRegion.Exists(Site, SprintRoute), "sprint.html should be generated when the tracking file exists");
+        var sprintHtml = SiteRegion.Read(Site, SprintRoute);
         Assert.Contains("Sprint Status", sprintHtml);
         Assert.Contains("class=\"sprint-board\"", sprintHtml);       // Kanban board
         Assert.Contains("sprint-lane active", sprintHtml);           // in-progress lane
@@ -110,20 +110,20 @@ public class SiteGeneratorSprintTests : IDisposable
         Assert.Contains("href=\"epics/story-1-1.html\"", sprintHtml);// drafted story card links
         // The undrafted story 1.2 still links — to its generated placeholder page (never dead text).
         Assert.Contains("href=\"epics/story-1-2.html\"", sprintHtml);
-        Assert.True(File.Exists(Path.Combine(Site, "epics", "story-1-2.html")), "undrafted story gets a placeholder page");
+        Assert.True(SiteRegion.Exists(Site, "epics/story-1-2.html"), "undrafted story gets a placeholder page");
 
-        var index = File.ReadAllText(IndexPage);
+        var index = SiteRegion.Read(Site, IndexRoute);
         // AC #2: with sprint data, the home Now & Next panel becomes the sprint board (tracked view), labeled
         // with its source and linking to the full sprint page. [Story 2.3]
         Assert.Contains("chart-panel sprint-board-panel", index);
         Assert.Contains("from sprint-status.yaml", index);
         Assert.Contains("href=\"sprint.html\"", index);              // CTA + nav item link to the board
 
-        AssertNoBrokenLocalLinks(SprintPage);
-        AssertNoBrokenLocalLinks(IndexPage);
+        SiteRegion.AssertNoBrokenLocalLinks(Site, SprintRoute);
+        SiteRegion.AssertNoBrokenLocalLinks(Site, IndexRoute);
         // The epic page also links the undrafted story to its placeholder (the "epic links you there too").
-        AssertNoBrokenLocalLinks(Path.Combine(Site, "epics", "epic-1.html"));
-        Assert.Contains("href=\"../epics/story-1-2.html\"", File.ReadAllText(Path.Combine(Site, "epics", "epic-1.html")));
+        SiteRegion.AssertNoBrokenLocalLinks(Site, "epics/epic-1.html");
+        Assert.Contains("href=\"../epics/story-1-2.html\"", SiteRegion.Read(Site, "epics/epic-1.html"));
     }
 
     [Fact]
@@ -132,12 +132,12 @@ public class SiteGeneratorSprintTests : IDisposable
         // No sprint-status.yaml written.
         GenerateSite();
 
-        Assert.False(File.Exists(SprintPage), "no sprint.html without a tracking file");
-        var index = File.ReadAllText(IndexPage);
+        Assert.False(SiteRegion.Exists(Site, SprintRoute), "no sprint.html without a tracking file");
+        var index = SiteRegion.Read(Site, IndexRoute);
         Assert.DoesNotContain("from sprint-status.yaml", index);
         Assert.DoesNotContain("href=\"sprint.html\"", index);
 
-        AssertNoBrokenLocalLinks(IndexPage);
+        SiteRegion.AssertNoBrokenLocalLinks(Site, IndexRoute);
     }
 
     /// <summary>Story 8.3 AC #1/#2: when epics.md and sprint-status.yaml agree, dashboard "Stories defined",
@@ -154,9 +154,9 @@ public class SiteGeneratorSprintTests : IDisposable
         Assert.DoesNotContain(events, e =>
             e.Message is { } m && m.Contains("Count divergence", StringComparison.Ordinal));
 
-        var index = File.ReadAllText(IndexPage);
-        var epics = File.ReadAllText(Path.Combine(Site, "epics.html"));
-        var sprint = File.ReadAllText(SprintPage);
+        var index = SiteRegion.Read(Site, IndexRoute);
+        var epics = SiteRegion.Read(Site, "epics.html");
+        var sprint = SiteRegion.Read(Site, SprintRoute);
 
         Assert.Contains("Stories defined", index);
         Assert.Contains("Stories defined", epics);
@@ -208,12 +208,12 @@ public class SiteGeneratorSprintTests : IDisposable
         Assert.Contains("[Unsupported]", notices[0].Message);
         Assert.Contains("9.9", notices[0].Message!);
 
-        var sprint = File.ReadAllText(SprintPage);
+        var sprint = SiteRegion.Read(Site, SprintRoute);
         // Tracked total includes the orphan → 3 stories from sprint-status.yaml.
         Assert.Contains("3 stories", sprint);
         Assert.Contains("from sprint-status.yaml", sprint);
 
-        var index = File.ReadAllText(IndexPage);
+        var index = SiteRegion.Read(Site, IndexRoute);
         var dashStories = Regex.Match(
             index, @"<div class=""stat-number"">(\d+)</div><div class=""stat-label"">Stories defined</div>");
         Assert.True(dashStories.Success);
@@ -254,24 +254,4 @@ public class SiteGeneratorSprintTests : IDisposable
 
     /// <summary>Every local (non-anchor, non-http) href on the page resolves to a file that was actually
     /// generated — the "never a broken link" guarantee (AC#1, NFR2).</summary>
-    private void AssertNoBrokenLocalLinks(string pagePath)
-    {
-        var html = File.ReadAllText(pagePath);
-        var pageDir = Path.GetDirectoryName(pagePath)!;
-        foreach (Match m in Regex.Matches(html, "href=\"([^\"]+)\""))
-        {
-            var raw = m.Groups[1].Value;
-            // Only local page links are checkable: skip anchors and anything with a URI scheme
-            // (http:, data: favicon, mailto:, cursor:// deep links, etc.).
-            if (raw.StartsWith("#", StringComparison.Ordinal)
-                || Regex.IsMatch(raw, "^[a-zA-Z][a-zA-Z0-9+.-]*:"))
-                continue;
-
-            var target = raw.Split('#')[0].Split('?')[0];
-            if (target.Length == 0) continue;
-
-            var resolved = Path.GetFullPath(Path.Combine(pageDir, target.Replace('/', Path.DirectorySeparatorChar)));
-            Assert.True(File.Exists(resolved), $"broken link: {raw} → {resolved}");
-        }
-    }
 }

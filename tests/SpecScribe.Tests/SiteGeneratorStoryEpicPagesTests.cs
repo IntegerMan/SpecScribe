@@ -14,9 +14,9 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
 
     private string Source => Path.Combine(_root, "_bmad-output");
     private string Site => Path.Combine(_root, "site");
-    private string DraftedStoryPage => Path.Combine(Site, "epics", "story-1-1.html");
-    private string PlaceholderPage => Path.Combine(Site, "epics", "story-1-2.html");
-    private string EpicPage => Path.Combine(Site, "epics", "epic-1.html");
+    private string DraftedStoryRoute => "epics/story-1-1.html";
+    private string PlaceholderRoute => "epics/story-1-2.html";
+    private string EpicRoute => "epics/epic-1.html";
 
     private const string EpicsMd = """
         # Epics
@@ -155,7 +155,7 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
 
         GenerateSite();
 
-        var html = File.ReadAllText(DraftedStoryPage);
+        var html = SiteRegion.Read(Site, DraftedStoryRoute);
         Assert.Contains("class=\"evidence-strip\"", html);
         Assert.Contains("&#10003; 1 task", html);
         Assert.Contains("42 passing tests", html);
@@ -170,8 +170,8 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
     {
         GenerateSite();
 
-        Assert.True(File.Exists(PlaceholderPage));
-        var html = File.ReadAllText(PlaceholderPage);
+        Assert.True(SiteRegion.Exists(Site, PlaceholderRoute));
+        var html = SiteRegion.Read(Site, PlaceholderRoute);
         Assert.Contains("Not yet drafted", html);
         Assert.Contains("I want a future story", html);
         // The dead-end reads as a next action (command form or plain fallback, module-dependent).
@@ -183,7 +183,7 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
     {
         GenerateSite();
 
-        var html = File.ReadAllText(PlaceholderPage);
+        var html = SiteRegion.Read(Site, PlaceholderRoute);
         Assert.Contains("class=\"gherkin-kw kw-given\"", html);
         Assert.Contains("class=\"gherkin-kw kw-then\"", html);
     }
@@ -196,7 +196,7 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
         // The epic page must still treat 1.2 as undetailed: guidance note present, no full-plan link.
         // Lone undrafted story → no consolidation banner; per-card note kept (fixture has no create-story
         // catalog → plain fallback; command path covered by EpicsViewBuilder unit tests). [Story 8.6]
-        var html = File.ReadAllText(EpicPage);
+        var html = SiteRegion.Read(Site, EpicRoute);
         Assert.Contains("class=\"not-detailed-note\"", html);
         Assert.DoesNotContain("epic-undrafted-banner", html);
         Assert.Contains("No detailed story plan yet.", html);
@@ -208,7 +208,7 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
         // [Story 10.10 review — patch] no direct test previously exercised EpicsTemplater.BuildStoriesLocalContext.
         GenerateSite();
 
-        var html = File.ReadAllText(EpicPage);
+        var html = SiteRegion.Read(Site, EpicRoute);
         Assert.Contains("site-nav-local-context", html);
         Assert.Contains("Stories in this epic", html);
         Assert.Contains("Story 1.1", html);
@@ -223,7 +223,7 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
         // [Story 10.10 review — patch] no direct test previously exercised the story-page local context.
         GenerateSite();
 
-        var html = File.ReadAllText(DraftedStoryPage);
+        var html = SiteRegion.Read(Site, DraftedStoryRoute);
         Assert.Contains("site-nav-local-context", html);
         Assert.Contains("Stories in <a class=\"epic-ref\" href=\"../epics/epic-1.html\">Epic 1</a>", html);
         // The current story (1.1) renders as plain text, never a self-link.
@@ -289,7 +289,7 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
 
         GenerateSite();
 
-        var html = File.ReadAllText(EpicPage);
+        var html = SiteRegion.Read(Site, EpicRoute);
         Assert.Equal(1, CountOccurrences(html, "class=\"epic-undrafted-banner\""));
         Assert.Contains("2 stories in this epic need task plans.", html);
         Assert.Contains("class=\"not-detailed-note\">No detailed story plan yet.</div>", html);
@@ -308,13 +308,13 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
     public void RegenerateEpics_OverwritesPlaceholderOnceArtifactAppears()
     {
         var gen = GenerateSite();
-        Assert.Contains("Not yet drafted", File.ReadAllText(PlaceholderPage));
+        Assert.Contains("Not yet drafted", SiteRegion.Read(Site, PlaceholderRoute));
 
         File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "1-2-future-story.md"), Story12Md);
         var ev = gen.RegenerateEpics();
 
         Assert.NotEqual(GenerationOutcome.Error, ev.Outcome);
-        var html = File.ReadAllText(PlaceholderPage);
+        var html = SiteRegion.Read(Site, PlaceholderRoute);
         Assert.DoesNotContain("Not yet drafted", html);
         Assert.Contains("I want the placeholder replaced", html);
     }
@@ -335,15 +335,15 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
 
         var gen = GenerateSite();
         // Sanity: all done + retro present ⇒ the epic header badge is "Done", never the retro-gated "In review".
-        Assert.Contains("status-badge done js-tip", File.ReadAllText(EpicPage));
-        Assert.DoesNotContain("status-badge review", File.ReadAllText(EpicPage));
+        Assert.Contains("status-badge done js-tip", SiteRegion.Read(Site, EpicRoute));
+        Assert.DoesNotContain("status-badge review", SiteRegion.Read(Site, EpicRoute));
 
         // A watch edit to a story file triggers an incremental epics regen (retros are NOT re-parsed on this path).
         File.WriteAllText(Path.Combine(impl, "1-1-drafted-story.md"), "# Story 1.1\n" + done + "- [x] Task 2\n");
         Assert.NotEqual(GenerationOutcome.Error, gen.RegenerateEpics().Outcome);
 
         // Still "Done" — before the fix the epic flipped to "In review" on the incremental rebuild.
-        var epicHtml = File.ReadAllText(EpicPage);
+        var epicHtml = SiteRegion.Read(Site, EpicRoute);
         Assert.Contains("status-badge done js-tip", epicHtml);
         Assert.DoesNotContain("status-badge review", epicHtml);
     }
@@ -355,7 +355,7 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
     {
         GenerateSite();
 
-        var html = File.ReadAllText(DraftedStoryPage);
+        var html = SiteRegion.Read(Site, DraftedStoryRoute);
         Assert.Contains("<a class=\"story-ref\" href=\"../epics/story-1-2.html\">Story 1.2</a>", html);
         Assert.Contains("<a class=\"epic-ref\" href=\"../epics/epic-1.html\">Epic 1</a>", html);
     }
@@ -365,7 +365,7 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
     {
         GenerateSite();
 
-        var html = File.ReadAllText(DraftedStoryPage);
+        var html = SiteRegion.Read(Site, DraftedStoryRoute);
         Assert.Contains("Story 9.9", html);
         Assert.DoesNotContain("story-9-9.html", html);
     }
@@ -376,8 +376,8 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
         GenerateSite();
 
         // The story page's own kicker says "Story 1.1"; the epic page's kicker says "Epic 1".
-        Assert.DoesNotContain("class=\"story-ref\" href=\"../epics/story-1-1.html\"", File.ReadAllText(DraftedStoryPage));
-        Assert.DoesNotContain("class=\"epic-ref\" href=\"../epics/epic-1.html\"", File.ReadAllText(EpicPage));
+        Assert.DoesNotContain("class=\"story-ref\" href=\"../epics/story-1-1.html\"", SiteRegion.Read(Site, DraftedStoryRoute));
+        Assert.DoesNotContain("class=\"epic-ref\" href=\"../epics/epic-1.html\"", SiteRegion.Read(Site, EpicRoute));
     }
 
     [Fact]
@@ -387,7 +387,7 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
 
         // The epics index carries the roadmap Mermaid source (node text "Epic 1") and the sunburst SVG
         // (<title>Epic 1: …</title>) — injecting anchors into either corrupts the rendered artifact.
-        var html = File.ReadAllText(Path.Combine(Site, "epics.html"));
+        var html = SiteRegion.Read(Site, "epics.html");
         var mermaidStart = html.IndexOf("<pre class=\"mermaid\"", StringComparison.Ordinal);
         Assert.True(mermaidStart >= 0);
         var mermaidEnd = html.IndexOf("</pre>", mermaidStart, StringComparison.Ordinal);
@@ -401,28 +401,31 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
     {
         GenerateSite();
 
-        var html = File.ReadAllText(Path.Combine(Site, "epic-1-retrospective.html"));
-        var headEnd = html.IndexOf("</head>", StringComparison.Ordinal);
-        Assert.True(headEnd > 0);
-        var head = html[..headEnd];
+        // [Story 23.6 AC #8] Asked of the IR's HEAD PROJECTION rather than of a `</head>` slice — there is no
+        // written document to slice any more, and the projection is the value the renderer actually emits.
+        var (title, description) = SiteRegion.Head(Site, "epic-1-retrospective.html");
 
-        // The <title> and <meta content="…"> mention "Epic 1"/"Story 1.1" — no anchor may be injected there
-        // (its quotes would terminate the content attribute and break the markup).
-        Assert.DoesNotContain("epic-ref", head);
-        Assert.DoesNotContain("story-ref", head);
-        Assert.Contains("<title>Epic 1 Retrospective", head);
+        // The title and description mention "Epic 1"/"Story 1.1" — the linkifier must not have run on either.
+        // The original failure mode (an injected anchor's quotes terminating the `content` attribute and
+        // breaking the markup) can no longer happen now that the value is JSON-projected and escaped by the
+        // renderer, but a linkified TITLE would still be wrong — it would put raw `<a …>` markup into
+        // `document.title` and the og:title — so the invariant is asserted, not retired.
+        Assert.DoesNotContain("epic-ref", title);
+        Assert.DoesNotContain("story-ref", title);
+        Assert.DoesNotContain("epic-ref", description);
+        Assert.DoesNotContain("story-ref", description);
+        Assert.StartsWith("Epic 1 Retrospective", title);
 
         // Positive control: the same mention in the body IS linked, so the head-skip isn't masking a linkifier
         // that simply never ran on this page.
-        var body = html[headEnd..];
-        Assert.Contains("class=\"epic-ref\"", body);
+        Assert.Contains("class=\"epic-ref\"", SiteRegion.Read(Site, "epic-1-retrospective.html"));
     }
 
     [Fact]
     public void RegenerateEpics_PrunesPlaceholderWhenStoryLeavesThePlan()
     {
         var gen = GenerateSite();
-        Assert.True(File.Exists(PlaceholderPage));
+        Assert.True(SiteRegion.Exists(Site, PlaceholderRoute));
 
         // Drop Story 1.2 from epics.md, then regenerate as watch mode would.
         var trimmed = EpicsMd[..EpicsMd.IndexOf("### Story 1.2:", StringComparison.Ordinal)].TrimEnd() + "\n";
@@ -430,8 +433,8 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
         var ev = gen.RegenerateEpics();
 
         Assert.NotEqual(GenerationOutcome.Error, ev.Outcome);
-        Assert.False(File.Exists(PlaceholderPage));
-        Assert.True(File.Exists(DraftedStoryPage));
+        Assert.False(SiteRegion.Exists(Site, PlaceholderRoute));
+        Assert.True(SiteRegion.Exists(Site, DraftedStoryRoute));
     }
 
     // ---- Gherkin styling on the story page's AC panel ----
@@ -441,7 +444,7 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
     {
         GenerateSite();
 
-        var html = File.ReadAllText(DraftedStoryPage);
+        var html = SiteRegion.Read(Site, DraftedStoryRoute);
         Assert.Contains("class=\"gherkin-line\"", html);
         Assert.Contains("class=\"gherkin-kw kw-when\"", html);
         Assert.Contains("class=\"gherkin-kw kw-and\"", html);
@@ -456,7 +459,7 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
         // The fixture criterion carries a trailing "Origin & scope" paragraph, so its body keeps <p>
         // wrappers. Chips must still land per-line inside the clause paragraph, and the note must render
         // as its own untouched paragraph — the exact case that used to degrade to inline chips.
-        var html = File.ReadAllText(DraftedStoryPage);
+        var html = SiteRegion.Read(Site, DraftedStoryRoute);
         Assert.Contains("<p><span class=\"gherkin-line\">", html);
         Assert.Contains("<p><strong>Origin &amp; scope:</strong>", html);
     }
@@ -468,7 +471,7 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
     {
         GenerateSite();
 
-        var html = File.ReadAllText(EpicPage);
+        var html = SiteRegion.Read(Site, EpicRoute);
         Assert.Contains("<span class=\"ac-num\">AC #1</span>", html);
         // The bare "1." lines authored in epics.md used to render as stray empty <ol> fragments.
         Assert.DoesNotContain("<ol>\n<li></li>\n</ol>", html);
@@ -480,7 +483,7 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
     {
         GenerateSite();
 
-        var html = File.ReadAllText(EpicPage);
+        var html = SiteRegion.Read(Site, EpicRoute);
         // The bottom per-story progress bar is gone; the header badge is the single indicator.
         Assert.DoesNotContain("per-story-progress", html);
         // Fixture story 1.1 has 0/1 tasks done → muted count badge, no donut inside it.
@@ -494,7 +497,7 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
     {
         GenerateSite();
 
-        var html = File.ReadAllText(DraftedStoryPage);
+        var html = SiteRegion.Read(Site, DraftedStoryRoute);
         Assert.Contains("class=\"ac-criterion\"", html);
         Assert.Contains("id=\"ac-1\"", html);
         Assert.Contains("ac-panel", html);
@@ -539,7 +542,7 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
             """);
 
         GenerateSite();
-        var html = File.ReadAllText(DraftedStoryPage);
+        var html = SiteRegion.Read(Site, DraftedStoryRoute);
 
         Assert.Contains("<details class=\"collapsible-section\"", html);
         Assert.Contains("id=\"dev-notes-section\"", html);
@@ -573,7 +576,7 @@ public class SiteGeneratorStoryEpicPagesTests : IDisposable
         // Story11Md has Tasks but no Dev Notes / References — NFR8 degrade-to-absent.
         GenerateSite();
 
-        var html = File.ReadAllText(DraftedStoryPage);
+        var html = SiteRegion.Read(Site, DraftedStoryRoute);
         Assert.DoesNotContain("collapsible-section", html);
         Assert.Contains("<h2 id=\"tasks-subtasks\">", html);
     }

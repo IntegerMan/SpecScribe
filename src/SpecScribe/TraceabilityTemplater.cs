@@ -11,9 +11,6 @@ namespace SpecScribe;
 /// freshest precedent) rather than <see cref="HtmlTemplater.RenderPage"/>. [Story 21.1]</summary>
 public static class TraceabilityTemplater
 {
-    public static string RenderPage(RequirementsModel requirements, EpicsModel epics, SiteNav nav, ProjectCounts counts) =>
-        HtmlRenderAdapter.Shared.Render(BuildPage(requirements, epics, nav, counts)).Content;
-
     /// <summary>Builds this page's host-neutral <see cref="PageView"/> — see
     /// <see cref="RiskQuadrantTemplater.BuildPage"/> for why every standalone templater grew one. [Story 23.4 AC #3]</summary>
     public static PageView BuildPage(RequirementsModel requirements, EpicsModel epics, SiteNav nav, ProjectCounts counts)

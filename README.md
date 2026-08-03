@@ -21,9 +21,17 @@ frameworks is planned — see the [Roadmap](#roadmap) for feature-level plans.
 | [BMad Method](https://github.com/bmad-code-org/BMAD-METHOD) | 6.10.0 | ✅ Supported |
 | BMad GDS (Game Dev Studio) | 0.6.0 | ✅ Supported |
 | [GitHub Spec Kit](https://github.com/github/spec-kit) | — | 🧭 Planned |
-| GSD | — | 🧭 Planned |
-| GSD-Pi | — | 🧭 Planned |
+| [GSD](https://docs.opengsd.net/core) | — | 🧭 Planned |
+| [GSD-Pi](https://docs.opengsd.net/pi) | — | 🧭 Planned |
 | Superpowers | — | 🧭 Planned |
+
+> **GSD and GSD-Pi are distinct products, not two versions of one thing.**
+> [GSD Core](https://docs.opengsd.net/core) is a slash-command framework layered on your AI coding runtime; it
+> keeps every artifact as plain Markdown and JSON under `.planning/`, with no database, and decomposes work as
+> Milestone → Phase → Task. [GSD Pi](https://docs.opengsd.net/pi) is an autonomous agent CLI whose single source
+> of truth is a SQLite database at `.gsd/gsd.db`; the Markdown beside it is *rendered from* that database, and
+> work decomposes as Milestone → Slice → Task. The older `gsd-build/gsd-2` repository is retired and continues as
+> GSD Pi. SpecScribe reads Markdown only — never the database.
 
 ### BMad modules
 

@@ -32,7 +32,7 @@ public class SiteGeneratorAdrToleranceTests : IDisposable
     private ForgeOptions Options(string? adrs = null) => ForgeOptions.Resolve(
         source: Source, adrs: adrs ?? Adrs, output: Site, projectName: "SpecScribe", includeReadme: false);
 
-    private string IndexHtml() => File.ReadAllText(Path.Combine(Site, "index.html"));
+    private string IndexHtml() => SiteRegion.Read(Site, "index.html");
 
     [Fact]
     public void GenerateAll_MultipleNumberingSchemes_AllRenderAndUnnumberedSortsLast()
@@ -48,10 +48,10 @@ public class SiteGeneratorAdrToleranceTests : IDisposable
         Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
 
         // Every scheme renders a page — including the unnumbered record (AC #2: not dropped).
-        Assert.True(File.Exists(Path.Combine(Site, "adrs", "ADR-0001-first.html")));
-        Assert.True(File.Exists(Path.Combine(Site, "adrs", "0007-seventh.html")));
-        Assert.True(File.Exists(Path.Combine(Site, "adrs", "adr_3_third.html")));
-        Assert.True(File.Exists(Path.Combine(Site, "adrs", "decision-login.html")));
+        Assert.True(SiteRegion.Exists(Site, "adrs/ADR-0001-first.html"));
+        Assert.True(SiteRegion.Exists(Site, "adrs/0007-seventh.html"));
+        Assert.True(SiteRegion.Exists(Site, "adrs/adr_3_third.html"));
+        Assert.True(SiteRegion.Exists(Site, "adrs/decision-login.html"));
 
         // The tolerated-but-non-standard shape is reported once, categorized, non-fatal (Story 4.2 Task 5).
         var notice = Assert.Single(events, e => e.Outcome == GenerationOutcome.Skipped && e.RelativePath == "adrs/decision-login.md");
@@ -69,7 +69,7 @@ public class SiteGeneratorAdrToleranceTests : IDisposable
         var events = new SiteGenerator(Options()).GenerateAll();
         Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
 
-        var html = File.ReadAllText(Path.Combine(Site, "adrs", "0001-first.html"));
+        var html = SiteRegion.Read(Site, "adrs/0001-first.html");
         Assert.Contains("site-nav-local-context", html);
         Assert.Contains("ADRs", html);
         Assert.Contains("local-context-pill active", html);
@@ -92,12 +92,12 @@ public class SiteGeneratorAdrToleranceTests : IDisposable
 
         // The home index band was removed (spec-declutter-home-dashboard); status derivation is verified on the
         // standalone ADR pages, whose status class is derived from the first word of the derived status.
-        Assert.Contains("status-accepted", File.ReadAllText(Path.Combine(Site, "adrs", "0001-bold.html")));
-        Assert.Contains("status-superseded", File.ReadAllText(Path.Combine(Site, "adrs", "0002-heading.html")));
-        Assert.Contains("status-proposed", File.ReadAllText(Path.Combine(Site, "adrs", "0003-frontmatter.html")));
+        Assert.Contains("status-accepted", SiteRegion.Read(Site, "adrs/0001-bold.html"));
+        Assert.Contains("status-superseded", SiteRegion.Read(Site, "adrs/0002-heading.html"));
+        Assert.Contains("status-proposed", SiteRegion.Read(Site, "adrs/0003-frontmatter.html"));
 
         // The status-less record still renders its page with a title and no status pill (AC #2).
-        var statusless = File.ReadAllText(Path.Combine(Site, "adrs", "0004-statusless.html"));
+        var statusless = SiteRegion.Read(Site, "adrs/0004-statusless.html");
         Assert.Contains("No Status Anywhere", statusless);
         Assert.DoesNotContain("class=\"pill status-", statusless);
     }
@@ -117,10 +117,10 @@ public class SiteGeneratorAdrToleranceTests : IDisposable
         Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
 
         // The nested record keeps its subpath, so its authored relative cross-links survive the .md → .html swap.
-        var nestedPage = Path.Combine(Site, "adrs", "2024", "0007-nested.html");
-        Assert.True(File.Exists(nestedPage));
-        Assert.Contains("href=\"../0001-top.html\"", File.ReadAllText(nestedPage));
-        Assert.Contains("href=\"../index.html\"", File.ReadAllText(nestedPage));
+        var nestedRoute = "adrs/2024/0007-nested.html";
+        Assert.True(SiteRegion.Exists(Site, nestedRoute));
+        Assert.Contains("href=\"../0001-top.html\"", SiteRegion.Read(Site, nestedRoute));
+        Assert.Contains("href=\"../index.html\"", SiteRegion.Read(Site, nestedRoute));
 
         // Watch parity: an edit under the resolved (nested) ADR tree routes to RegenerateAdrs.
         Assert.True(gen.IsAdr(nested));
@@ -139,8 +139,8 @@ public class SiteGeneratorAdrToleranceTests : IDisposable
 
         var events = new SiteGenerator(options).GenerateAll();
         Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
-        Assert.True(File.Exists(Path.Combine(Site, "adrs", "0001-probed.html")));
-        Assert.Contains("Probed Decision", File.ReadAllText(Path.Combine(Site, "adrs", "0001-probed.html")));
+        Assert.True(SiteRegion.Exists(Site, "adrs/0001-probed.html"));
+        Assert.Contains("Probed Decision", SiteRegion.Read(Site, "adrs/0001-probed.html"));
     }
 
     [Fact]
@@ -165,8 +165,8 @@ public class SiteGeneratorAdrToleranceTests : IDisposable
 
         var events = new SiteGenerator(Options()).GenerateAll();
         Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
-        Assert.True(File.Exists(Path.Combine(Site, "adrs", "decision-login.html")));
-        Assert.Contains("Login Decision", File.ReadAllText(Path.Combine(Site, "adrs", "decision-login.html")));
+        Assert.True(SiteRegion.Exists(Site, "adrs/decision-login.html"));
+        Assert.Contains("Login Decision", SiteRegion.Read(Site, "adrs/decision-login.html"));
         // Home keeps a reachability link to the ADRs landing (nav + Explore Key Views pill).
         Assert.Contains("href=\"adrs/index.html\"", IndexHtml());
     }
@@ -182,8 +182,8 @@ public class SiteGeneratorAdrToleranceTests : IDisposable
         Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
 
         // Both pages exist (cross-links resolve) but neither is a record: no card section, no nav gate.
-        Assert.True(File.Exists(Path.Combine(Site, "adrs", "index.html")));
-        Assert.True(File.Exists(Path.Combine(Site, "adrs", "TEMPLATE.html")));
+        Assert.True(SiteRegion.Exists(Site, "adrs/index.html"));
+        Assert.True(SiteRegion.Exists(Site, "adrs/TEMPLATE.html"));
         Assert.DoesNotContain("Architecture Decision Records", IndexHtml());
     }
 
@@ -200,9 +200,9 @@ public class SiteGeneratorAdrToleranceTests : IDisposable
         var events = new SiteGenerator(Options()).GenerateAll();
         Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
 
-        Assert.Contains("class=\"pill status-superseded\"", File.ReadAllText(Path.Combine(Site, "adrs", "0001-superseded.html")));
-        Assert.DoesNotContain("status-superseded-by", File.ReadAllText(Path.Combine(Site, "adrs", "0001-superseded.html")));
-        Assert.Contains("class=\"pill status-deprecated\"", File.ReadAllText(Path.Combine(Site, "adrs", "0002-deprecated.html")));
+        Assert.Contains("class=\"pill status-superseded\"", SiteRegion.Read(Site, "adrs/0001-superseded.html"));
+        Assert.DoesNotContain("status-superseded-by", SiteRegion.Read(Site, "adrs/0001-superseded.html"));
+        Assert.Contains("class=\"pill status-deprecated\"", SiteRegion.Read(Site, "adrs/0002-deprecated.html"));
     }
 
     [Fact]
@@ -218,7 +218,7 @@ public class SiteGeneratorAdrToleranceTests : IDisposable
         var events = new SiteGenerator(Options()).GenerateAll();
         Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
 
-        var landing = File.ReadAllText(Path.Combine(Site, "adrs", "index.html"));
+        var landing = SiteRegion.Read(Site, "adrs/index.html");
         Assert.Contains("data-sort-date=\"2026-07-11\"", landing);
         Assert.Contains("data-sort-date=\"2026-07-12\"", landing);
         Assert.Contains("<span class=\"list-row-chip pill\">Jul 11, 2026</span>", landing);
@@ -238,7 +238,7 @@ public class SiteGeneratorAdrToleranceTests : IDisposable
         var events = new SiteGenerator(Options()).GenerateAll();
         Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
 
-        var landing = File.ReadAllText(Path.Combine(Site, "adrs", "index.html"));
+        var landing = SiteRegion.Read(Site, "adrs/index.html");
         // Story 10.9: js-listable opts the synthesized landing into the client sort/group/filter enhancement.
         Assert.Contains("<ul class=\"adr-landing-list list-rows-list js-listable\">", landing);
         // Story 10.8 (review): the row's left accent reflects the record's real status — "Accepted" → the "done"
@@ -268,7 +268,7 @@ public class SiteGeneratorAdrToleranceTests : IDisposable
         var events = new SiteGenerator(Options()).GenerateAll();
         Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
 
-        var landing = File.ReadAllText(Path.Combine(Site, "adrs", "index.html"));
+        var landing = SiteRegion.Read(Site, "adrs/index.html");
         Assert.Contains("…", landing);
         Assert.DoesNotContain("trailing prose", landing);
         // Either the full ZWJ sequence survived before …, or it was omitted as a whole — never a partial cluster.

@@ -8,20 +8,6 @@ namespace SpecScribe;
 /// near-duplicate notes, and a "Resolve with AI" command. [Story 2.3; Story 9.6]</summary>
 public static class ActionItemsTemplater
 {
-    public static string RenderPage(
-        IReadOnlyList<SprintActionItem> openItems,
-        IReadOnlyDictionary<int, string>? epicRetroMap,
-        CommandCatalog commands,
-        SiteNav nav,
-        string? deferredWorkHref = null,
-        ProjectCounts? counts = null,
-        EpicsModel? epicsModel = null,
-        IReadOnlyDictionary<string, string>? hrefMap = null,
-        IReadOnlyList<SprintActionItem>? allActionItemsForSlugs = null) =>
-        HtmlRenderAdapter.Shared.Render(BuildPage(
-            openItems, epicRetroMap, commands, nav, deferredWorkHref, counts, epicsModel, hrefMap,
-            allActionItemsForSlugs)).Content;
-
     /// <summary>Builds this page's host-neutral <see cref="PageView"/> — see
     /// <see cref="HowToReadTemplater.BuildPage"/> for why the body starts at the doc-header, not the landmark.
     /// [Story 23.4 AC #3]</summary>

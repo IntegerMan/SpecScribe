@@ -2595,7 +2595,7 @@ So that I can track planning progress without switching tools.
 
 ## Epic 12: GSD and GSD-Pi Coverage
 
-Render key GSD and GSD-Pi planning and tracking artifacts coherently through Epic 4's shared adapter contract, so GSD teams keep progress and scope understandable in one portal. Led by an integration spike that scopes the GSD family's mapping and coverage tiers before baseline coverage.
+Render key GSD and GSD-Pi planning and tracking artifacts coherently through Epic 4's shared adapter contract, so GSD teams keep progress and scope understandable in one portal. Led by an integration spike that scopes the GSD family's mapping and coverage tiers before baseline coverage. That spike (Story 12.1) established that GSD and GSD-Pi are **distinct products requiring two adapter surfaces**, not one framework with two variants, so baseline coverage is split one story per framework — GSD Core first.
 
 **FRs covered:** FR4
 
@@ -2619,25 +2619,71 @@ So that baseline coverage starts with a defined scope, declared coverage tiers, 
 **Then** framework-extra data is recorded as candidate projection extensions or explicit non-goals
 **And** deliberately-unsupported conventions are listed with rationale and the non-fatal notice they will emit, giving the coverage story an agreed scope boundary.
 
-### Story 12.2: GSD and GSD-Pi Baseline Adapter Coverage
+<!-- Story 12.2 was SPLIT into 12.2 (GSD Core) + 12.3 (GSD Pi) on 2026-08-02, on Story 12.1's finding and the
+owner's decision. The spike established that GSD and GSD-Pi are DISTINCT products, not two versions of one:
+GSD Core is markdown-native under `.planning/` (no database, Milestone → Phase → Task) while GSD Pi is
+SQLite-authoritative under `.gsd/` (markdown as rendered projections, Milestone → Slice → Task). Their
+`AppliesTo` marker, authority model, mid-level noun, and path grammar all differ — only `STATE.md` overlaps — so
+one story cannot deliver both. GSD Core goes first: it needs none of the projection-reliability machinery.
+See 12-1-gsd-and-gsd-pi-integration-spike.md Completion Notes for the coverage map and the evidence. -->
 
-As a team using GSD workflows,
-I want key GSD and GSD-Pi artifacts rendered coherently,
+### Story 12.2: GSD Core Baseline Adapter Coverage
+
+As a team using GSD Core workflows,
+I want key GSD Core artifacts rendered coherently,
 So that progress and scope remain understandable in one portal.
 
 **Acceptance Criteria:**
 
 1.
-**Given** representative GSD and GSD-Pi repositories
+**Given** a representative current-version GSD Core repository (a `.planning/` directory of plain Markdown and JSON)
 **When** generation runs
 **Then** key planning and tracking artifacts render without fatal errors
 **And** output remains coherent with existing BMad and Spec Kit surfaces.
 
 2.
-**Given** partially supported GSD artifacts
+**Given** partially supported GSD Core artifacts
 **When** they are discovered
-**Then** coverage tier labeling communicates interpretation boundaries clearly
+**Then** coverage tier labeling communicates interpretation boundaries clearly, reusing the existing CoverageTier vocabulary rather than a parallel scale
 **And** unsupported items never block full-site generation.
+
+3.
+**Given** GSD Core's Milestone → Phase → Task hierarchy against the two-level epics/stories model
+**When** artifacts are projected
+**Then** the chosen level mapping and the synthesized story-id form are pinned by a test
+**And** requirements are surfaced without claiming a coverage status GSD Core does not record.
+
+### Story 12.3: GSD Pi Baseline Adapter Coverage
+
+As a team using GSD Pi workflows,
+I want key GSD Pi artifacts rendered coherently,
+So that progress and scope remain understandable in one portal.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a representative current-version GSD Pi repository (a `.gsd/` directory whose markdown is rendered from the authoritative `gsd.db`)
+**When** generation runs
+**Then** key planning and tracking artifacts render without fatal errors
+**And** output remains coherent with existing BMad, Spec Kit, and GSD Core surfaces.
+
+2.
+**Given** a GSD Pi repository whose markdown projections are absent because planning documents are kept local-only
+**When** generation runs
+**Then** a non-fatal notice explains that only the database is current
+**And** generation completes with the remaining surfaces intact, never reading the database.
+
+3.
+**Given** partially supported GSD Pi artifacts
+**When** they are discovered
+**Then** coverage tier labeling communicates interpretation boundaries clearly, reusing the existing CoverageTier vocabulary rather than a parallel scale
+**And** unsupported items never block full-site generation.
+
+4.
+**Given** GSD Pi's Milestone → Slice → Task hierarchy against the two-level epics/stories model
+**When** artifacts are projected
+**Then** the chosen level mapping and the synthesized story-id form (`"{milestone}.{slice}"`) are pinned by a test
+**And** requirements are surfaced without claiming a coverage status GSD Pi does not record.
 
 ## Epic 13: SpecFlow Coverage
 

@@ -14,9 +14,6 @@ namespace SpecScribe;
 /// [Story 3.2; Story 10.2]</summary>
 public static class DeepAnalyticsTemplater
 {
-    public static string RenderPage(DeepGitPulse deep, SiteNav nav, Func<string, string?>? fileHref = null) =>
-        HtmlRenderAdapter.Shared.Render(BuildPage(deep, nav, fileHref)).Content;
-
     /// <summary>Builds this page's host-neutral <see cref="PageView"/> — the AD-2 delivery contract. Story 23.4
     /// moved every standalone templater onto it so the IR's content region can be COMPOSED
     /// (<see cref="JsonSpaRenderAdapter.RenderContent"/>: nav markup + wayfinding + body) instead of sliced back

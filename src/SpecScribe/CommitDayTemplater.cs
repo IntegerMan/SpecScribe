@@ -12,16 +12,6 @@ namespace SpecScribe;
 /// commit-bearing day with no artifact changes renders exactly as it did before. [Story 7.3]</summary>
 public static class CommitDayTemplater
 {
-    public static string RenderPage(
-        DateOnly day,
-        IReadOnlyList<CommitInfo> commits,
-        IReadOnlyList<(string Label, string Href)> artifacts,
-        EntityPager? pager,
-        SiteNav nav,
-        Func<string, string?>? commitHref = null,
-        NavLocalContext? localContext = null) =>
-        HtmlRenderAdapter.Shared.Render(BuildPage(day, commits, artifacts, pager, nav, commitHref, localContext)).Content;
-
     /// <summary>Builds a date page's host-neutral <see cref="PageView"/> — the AD-2 delivery contract. Story 23.4
     /// moved every standalone templater onto it so the IR's content region can be COMPOSED
     /// (<see cref="JsonSpaRenderAdapter.RenderContent"/>: nav markup + wayfinding + body) instead of sliced back

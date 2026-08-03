@@ -17,11 +17,11 @@ public class SiteGeneratorCodePagesTests : IDisposable
     private string SrcDir => Path.Combine(_root, "src", "Lib");
 
     // Referenced by an inline citation; the page must be generated.
-    private string ReferencedPage => Path.Combine(CodeDir, "src", "Lib", "Referenced.cs.html");
+    private string ReferencedRoute => "code/src/Lib/Referenced.cs.html";
     // Referenced by a markdown-link citation (relative to the artifact dir).
-    private string LinkedPage => Path.Combine(CodeDir, "src", "Lib", "Linked.cs.html");
+    private string LinkedRoute => "code/src/Lib/Linked.cs.html";
     // Exists on disk but is never cited; must NOT get a page.
-    private string UnreferencedPage => Path.Combine(CodeDir, "src", "Lib", "Unreferenced.cs.html");
+    private string UnreferencedRoute => "code/src/Lib/Unreferenced.cs.html";
 
     public SiteGeneratorCodePagesTests()
     {
@@ -80,8 +80,8 @@ public class SiteGeneratorCodePagesTests : IDisposable
     {
         Generate();
 
-        Assert.True(File.Exists(ReferencedPage));
-        var html = File.ReadAllText(ReferencedPage);
+        Assert.True(SiteRegion.Exists(Site, ReferencedRoute));
+        var html = SiteRegion.Read(Site, ReferencedRoute);
         Assert.Contains("id=\"L1\"", html);
         Assert.Contains("id=\"L2\"", html);
         Assert.Contains("public class Referenced", html);
@@ -96,7 +96,7 @@ public class SiteGeneratorCodePagesTests : IDisposable
         // Referenced.cs and Linked.cs are siblings in the same src/Lib directory (Unreferenced.cs has no page).
         Generate();
 
-        var html = File.ReadAllText(ReferencedPage);
+        var html = SiteRegion.Read(Site, ReferencedRoute);
         Assert.Contains("site-nav-local-context", html);
         Assert.Contains("Files in", html);
         Assert.Contains("local-context-pill active", html);
@@ -110,8 +110,8 @@ public class SiteGeneratorCodePagesTests : IDisposable
     {
         Generate();
 
-        Assert.True(File.Exists(LinkedPage));
-        Assert.Contains("public class Linked", File.ReadAllText(LinkedPage));
+        Assert.True(SiteRegion.Exists(Site, LinkedRoute));
+        Assert.Contains("public class Linked", SiteRegion.Read(Site, LinkedRoute));
     }
 
     [Fact]
@@ -119,7 +119,7 @@ public class SiteGeneratorCodePagesTests : IDisposable
     {
         Generate();
 
-        Assert.False(File.Exists(UnreferencedPage));
+        Assert.False(SiteRegion.Exists(Site, UnreferencedRoute));
     }
 
     [Fact]
@@ -131,9 +131,9 @@ public class SiteGeneratorCodePagesTests : IDisposable
 
         Generate();
 
-        var page = Path.Combine(CodeDir, "src", "Lib", "Blob.bin.html");
-        Assert.True(File.Exists(page));
-        var html = File.ReadAllText(page);
+        var page = "code/src/Lib/Blob.bin.html";
+        Assert.True(SiteRegion.Exists(Site, page));
+        var html = SiteRegion.Read(Site, page);
         Assert.Contains("code-placeholder", html);
         Assert.DoesNotContain("class=\"code-line\"", html);
     }
@@ -147,9 +147,9 @@ public class SiteGeneratorCodePagesTests : IDisposable
 
         Generate();
 
-        var page = Path.Combine(CodeDir, "src", "Lib", "Big.cs.html");
-        Assert.True(File.Exists(page));
-        var html = File.ReadAllText(page);
+        var page = "code/src/Lib/Big.cs.html";
+        Assert.True(SiteRegion.Exists(Site, page));
+        var html = SiteRegion.Read(Site, page);
         Assert.Contains("code-placeholder", html);
         Assert.DoesNotContain("class=\"code-line\"", html);
     }
@@ -169,13 +169,12 @@ public class SiteGeneratorCodePagesTests : IDisposable
 
             Generate();
 
-            // No page anywhere under code/ for the secret file.
-            if (Directory.Exists(CodeDir))
-            {
-                Assert.DoesNotContain(
-                    Directory.GetFiles(CodeDir, "*", SearchOption.AllDirectories),
-                    f => f.Contains(secretName, StringComparison.OrdinalIgnoreCase));
-            }
+            // No page anywhere under code/ for the secret file. [Story 23.6 AC #8] Asked of the ROUTE SET rather
+            // than of a code/ directory listing: nothing writes that directory now, so the old form would have
+            // gone from "no leaked page" to "no directory to look in" — a pass for the wrong reason.
+            Assert.DoesNotContain(
+                SiteRegion.Routes(Site),
+                r => r.Contains(secretName, StringComparison.OrdinalIgnoreCase));
             // The secret file itself is untouched and was never copied into the site.
             Assert.False(File.Exists(Path.Combine(Site, secretName)));
             Assert.Equal("TOP SECRET", File.ReadAllText(secretFull));
@@ -191,14 +190,14 @@ public class SiteGeneratorCodePagesTests : IDisposable
     {
         var gen = new SiteGenerator(Options());
         AssertNoErrors(gen.GenerateAll());
-        Assert.True(File.Exists(ReferencedPage));
+        Assert.True(SiteRegion.Exists(Site, ReferencedRoute));
 
         // Drop the citations and regenerate — the full rebuild wipes the code/ tree, so no stale page survives.
         WriteArtifact(Referenced: false);
         AssertNoErrors(gen.GenerateAll());
 
-        Assert.False(File.Exists(ReferencedPage));
-        Assert.False(File.Exists(LinkedPage));
+        Assert.False(SiteRegion.Exists(Site, ReferencedRoute));
+        Assert.False(SiteRegion.Exists(Site, LinkedRoute));
     }
 
     [Fact]
@@ -207,14 +206,14 @@ public class SiteGeneratorCodePagesTests : IDisposable
         Generate(codeSourceBaseUrl: "https://github.com/owner/repo/blob/main");
 
         // The external base is additive (Story 7.7): in-portal code pages are still generated…
-        Assert.True(File.Exists(ReferencedPage));
-        Assert.True(File.Exists(LinkedPage));
+        Assert.True(SiteRegion.Exists(Site, ReferencedRoute));
+        Assert.True(SiteRegion.Exists(Site, LinkedRoute));
         // …and each carries an additive "view source online" link to the hosted file (whole-file, no #L anchor).
-        var html = File.ReadAllText(ReferencedPage);
+        var html = SiteRegion.Read(Site, ReferencedRoute);
         Assert.Contains("code-external-link", html);
         Assert.Contains("https://github.com/owner/repo/blob/main/src/Lib/Referenced.cs", html);
         // The rest of the site still generates.
-        Assert.True(File.Exists(Path.Combine(Site, "index.html")));
+        Assert.True(SiteRegion.Exists(Site, "index.html"));
     }
 
     [Fact]
@@ -222,13 +221,13 @@ public class SiteGeneratorCodePagesTests : IDisposable
     {
         var first = new SiteGenerator(Options());
         AssertNoErrors(first.GenerateAll());
-        var firstBody = CodeBody(File.ReadAllText(ReferencedPage));
+        var firstBody = CodeBody(SiteRegion.Read(Site, ReferencedRoute));
 
         // A fresh generator over the same input must produce the identical code region (the footer timestamp aside).
         var secondSite = Path.Combine(_root, "site2");
         var second = new SiteGenerator(ForgeOptions.Resolve(source: Source, output: secondSite, projectName: "SpecScribe", includeReadme: false));
         AssertNoErrors(second.GenerateAll());
-        var secondBody = CodeBody(File.ReadAllText(Path.Combine(secondSite, "code", "src", "Lib", "Referenced.cs.html")));
+        var secondBody = CodeBody(SiteRegion.Read(secondSite, "code/src/Lib/Referenced.cs.html"));
 
         Assert.Equal(firstBody, secondBody);
     }

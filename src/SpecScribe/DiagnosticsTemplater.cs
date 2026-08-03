@@ -193,9 +193,6 @@ public sealed record DiagnosticsConfig
     /// site-wide Help nav group and the footer → About path. [Story 4.8 Task 4; Help nav]</summary>
 public static class DiagnosticsTemplater
 {
-    public static string RenderPage(IReadOnlyList<DiagnosticNotice> notices, DiagnosticsConfig config, SiteNav nav) =>
-        HtmlRenderAdapter.Shared.Render(BuildPage(notices, config, nav)).Content;
-
     /// <summary>Builds this page's host-neutral <see cref="PageView"/> — see
     /// <see cref="HowToReadTemplater.BuildPage"/> for why the body starts at the doc-header, not the landmark.
     /// [Story 23.4 AC #3]</summary>

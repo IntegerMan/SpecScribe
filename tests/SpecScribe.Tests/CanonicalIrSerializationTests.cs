@@ -98,11 +98,23 @@ public class CanonicalIrSerializationTests : IDisposable
         IReadOnlyList<IrIsland> ScriptIslands,
         string ContentHash,
         int Bytes);
+    /// <summary>The site-level chrome projection added by Story 23.6 — the values the Nuxt renderer used to
+    /// scrape out of the generated <c>index.html</c>, which stops existing when the C# writer is deleted.
+    /// Purely ADDITIVE, so <see cref="SpaDelivery.SchemaVersion"/> is deliberately NOT bumped (the field's own
+    /// compatibility rule: bump only for a removal, rename, type change or meaning change).</summary>
+    private sealed record IrChrome(
+        string AssetVersion,
+        string FaviconDataUri,
+        string HierarchyBootScript,
+        string GraphBootScript,
+        string MermaidInitScript,
+        string TocActiveSectionScript);
     private sealed record IrManifest(
         int SchemaVersion,
         string SiteTitle,
         string Entry,
         IReadOnlyList<IrNavItem> Nav,
+        IrChrome Chrome,
         IReadOnlyList<IrOversizedPage> OversizedPages,
         IReadOnlyDictionary<string, IrEntry> Pages);
 

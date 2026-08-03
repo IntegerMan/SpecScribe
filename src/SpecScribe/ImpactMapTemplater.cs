@@ -18,9 +18,6 @@ namespace SpecScribe;
 /// [Story 21.3]</summary>
 public static class ImpactMapTemplater
 {
-    public static string RenderPage(EpicsModel epics, PlanningCodeImpactData data, SiteNav nav) =>
-        HtmlRenderAdapter.Shared.Render(BuildPage(epics, data, nav)).Content;
-
     /// <summary>Builds this page's host-neutral <see cref="PageView"/> — see
     /// <see cref="RiskQuadrantTemplater.BuildPage"/> for why every standalone templater grew one. This page is why
     /// <see cref="AssetManifest.ExtraHead"/> and <see cref="AssetManifest.HierarchyBootInline"/> are separate

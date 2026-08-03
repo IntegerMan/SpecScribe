@@ -86,13 +86,13 @@ public class SiteGeneratorStatusStylesTests : IDisposable
         Assert.Equal(GenerationOutcome.Skipped, notice.Outcome); // Unsupported → Skipped, not Error
         Assert.Contains("[Unsupported]", notice.Message);
 
-        var oddPage = File.ReadAllText(Path.Combine(Site, "epics", "story-1-1.html"));
+        var oddPage = SiteRegion.Read(Site, "epics/story-1-1.html");
         Assert.Contains("status-badge unrecognized", oddPage);
         Assert.Contains("frobnicated", oddPage);
         Assert.Contains("class=\"status-legend\"", oddPage);
         Assert.Contains("Show status legend", oddPage);
 
-        var placeholder = File.ReadAllText(Path.Combine(Site, "epics", "story-1-2.html"));
+        var placeholder = SiteRegion.Read(Site, "epics/story-1-2.html");
         Assert.DoesNotContain("status-badge unrecognized", placeholder);
         // Placeholder uses "Not yet drafted" with drafted stage — no unmapped notice for absent status.
         Assert.Contains("status-badge drafted", placeholder);
@@ -103,13 +103,13 @@ public class SiteGeneratorStatusStylesTests : IDisposable
     {
         var gen = new SiteGenerator(Options());
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
-        var first = File.ReadAllText(Path.Combine(Site, "epics", "story-1-1.html"));
+        var first = SiteRegion.Read(Site, "epics/story-1-1.html");
 
         // Wipe and regenerate from the same inputs — badges, legend, and notice text must be byte-stable
         // aside from the volatile footer clock (already covered by golden normalization elsewhere).
         Directory.Delete(Site, recursive: true);
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
-        var second = File.ReadAllText(Path.Combine(Site, "epics", "story-1-1.html"));
+        var second = SiteRegion.Read(Site, "epics/story-1-1.html");
 
         static string StripFooterClock(string html) =>
             System.Text.RegularExpressions.Regex.Replace(

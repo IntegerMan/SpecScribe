@@ -17,9 +17,9 @@ public class SiteGeneratorCodeMapTests : IDisposable
     private string Source => Path.Combine(_root, "_bmad-output");
     private string Adrs => Path.Combine(_root, "docs", "adrs");
     private string Site => Path.Combine(_root, "site");
-    private string CodeMapPage => Path.Combine(Site, "code-map.html");
-    private string RiskQuadrantPage => Path.Combine(Site, "risk-quadrant.html");
-    private string IndexPage => Path.Combine(Site, "index.html");
+    private string CodeMapRoute => "code-map.html";
+    private string RiskQuadrantRoute => "risk-quadrant.html";
+    private string IndexRoute => "index.html";
 
     private const string EpicsMd = """
         # Epics
@@ -91,8 +91,8 @@ public class SiteGeneratorCodeMapTests : IDisposable
     {
         GenerateSite();
 
-        Assert.True(File.Exists(CodeMapPage), "code-map.html should be generated when readable source files exist");
-        var html = File.ReadAllText(CodeMapPage);
+        Assert.True(SiteRegion.Exists(Site, CodeMapRoute), "code-map.html should be generated when readable source files exist");
+        var html = SiteRegion.Read(Site, CodeMapRoute);
 
         // The standard standalone-page shell: single main landmark, nav, breadcrumb.
         Assert.Contains("<main id=\"main-content\"", html);
@@ -107,10 +107,15 @@ public class SiteGeneratorCodeMapTests : IDisposable
         Assert.DoesNotContain("class=\"codemap\"", html);
         Assert.Contains("codemap-table", html);
         Assert.Contains("src/Sample/Widget.cs", html);
-        // The vendored engine is referenced from THIS page. It has to be: this page builds its own document, so
-        // the AssetManifest flag never reaches it - the exact miss that left four of Story 20.7's surfaces
-        // rendering a correct payload and mounting nothing.
-        Assert.Contains(ForgeOptions.HierarchyEngineScriptName + "\"></script>", html);
+        // The vendored engine reaches THIS page. [Story 23.6 AC #8] The `<script src>` tag is chrome and no C#
+        // code path emits it now, but the invariant it stood for survives intact and is asserted in the two
+        // places it actually lives: the region carries the host marker (above), which is precisely what makes
+        // `chromeNeeds().needsHierarchyEngine` true on the renderer side, and the engine file is on disk
+        // (below). Story 20.7's miss — a correct payload mounting nothing because the flag never reached the
+        // page — is caught by the host-marker assertion, since the renderer derives from that marker rather
+        // than from any flag a templater might forget to set.
+        Assert.True(HierarchyExplorer.ContainsHost(html),
+            "the code map must host a hierarchy chart — that host is what makes the renderer ship the engine");
         Assert.True(File.Exists(Path.Combine(Site, ForgeOptions.HierarchyEngineScriptName)),
             "the hierarchy engine must be on disk for a source-only repo, not only when a dashboard chart copied it");
         // Non-git temp repo → no deep-git metrics → sized-by-LOC with the graceful-degradation notice.
@@ -123,12 +128,12 @@ public class SiteGeneratorCodeMapTests : IDisposable
         Assert.Contains("\"key\":\"full\"", FullIsland(html));
 
         // Code Map is reachable from the global journey nav menu (the Codebase group), pointing at the page.
-        var index = File.ReadAllText(IndexPage);
+        var index = SiteRegion.Read(Site, IndexRoute);
         Assert.Contains("href=\"code-map.html\"", index);
         Assert.Contains(">Code Map</a>", index);
 
-        AssertNoBrokenLocalLinks(CodeMapPage);
-        AssertNoBrokenLocalLinks(IndexPage);
+        SiteRegion.AssertNoBrokenLocalLinks(Site, CodeMapRoute);
+        SiteRegion.AssertNoBrokenLocalLinks(Site, IndexRoute);
     }
 
     [Fact]
@@ -139,8 +144,8 @@ public class SiteGeneratorCodeMapTests : IDisposable
         // chart itself degrades to its empty state (only 1 file here).
         GenerateSite();
 
-        Assert.True(File.Exists(RiskQuadrantPage), "risk-quadrant.html should be generated when readable source files exist");
-        var html = File.ReadAllText(RiskQuadrantPage);
+        Assert.True(SiteRegion.Exists(Site, RiskQuadrantRoute), "risk-quadrant.html should be generated when readable source files exist");
+        var html = SiteRegion.Read(Site, RiskQuadrantRoute);
 
         Assert.Contains("<main id=\"main-content\"", html);
         Assert.Contains("class=\"breadcrumb\"", html);
@@ -148,11 +153,11 @@ public class SiteGeneratorCodeMapTests : IDisposable
         Assert.Contains("chart-empty", html);
         Assert.DoesNotContain("<svg class=\"risk-quadrant\"", html);
 
-        var index = File.ReadAllText(IndexPage);
+        var index = SiteRegion.Read(Site, IndexRoute);
         Assert.Contains("href=\"risk-quadrant.html\"", index);
         Assert.Contains(">Risk Quadrant</a>", index);
 
-        AssertNoBrokenLocalLinks(RiskQuadrantPage);
+        SiteRegion.AssertNoBrokenLocalLinks(Site, RiskQuadrantRoute);
     }
 
     [Fact]
@@ -166,7 +171,7 @@ public class SiteGeneratorCodeMapTests : IDisposable
             codeSourceBaseUrl: "https://github.com/example/repo/blob/main"));
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
-        var html = File.ReadAllText(CodeMapPage);
+        var html = SiteRegion.Read(Site, CodeMapRoute);
         var expectedHref = "https://github.com/example/repo/blob/main/src/Sample/Widget.cs";
 
         // Both the SVG rect's <a> and the text-equivalent table's row link to the SAME resolved target.
@@ -185,13 +190,13 @@ public class SiteGeneratorCodeMapTests : IDisposable
 
         GenerateSite();
 
-        Assert.False(File.Exists(CodeMapPage), "no code-map.html without any readable source files");
-        Assert.False(File.Exists(RiskQuadrantPage), "no risk-quadrant.html without any readable source files (shared gating signal)");
-        var index = File.ReadAllText(IndexPage);
+        Assert.False(SiteRegion.Exists(Site, CodeMapRoute), "no code-map.html without any readable source files");
+        Assert.False(SiteRegion.Exists(Site, RiskQuadrantRoute), "no risk-quadrant.html without any readable source files (shared gating signal)");
+        var index = SiteRegion.Read(Site, IndexRoute);
         Assert.DoesNotContain("href=\"code-map.html\"", index);
         Assert.DoesNotContain("href=\"risk-quadrant.html\"", index);
 
-        AssertNoBrokenLocalLinks(IndexPage);
+        SiteRegion.AssertNoBrokenLocalLinks(Site, IndexRoute);
     }
 
     [Fact]
@@ -201,7 +206,7 @@ public class SiteGeneratorCodeMapTests : IDisposable
         // no git data, so it becomes the baked-in default colorize dimension instead of a flat neutral fill.
         GenerateSite();
 
-        var html = File.ReadAllText(CodeMapPage);
+        var html = SiteRegion.Read(Site, CodeMapRoute);
         Assert.Contains("value=\"filetype\" selected", html);
         Assert.Contains("codemap-legend-discrete", html);
         // The default ("full") view's discrete legend ships visible; Story 20.10 adds data-hierarchy-legend-view.
@@ -224,11 +229,11 @@ public class SiteGeneratorCodeMapTests : IDisposable
     public void GenerateAll_DeterministicAcrossTwoRuns()
     {
         GenerateSite();
-        var first = File.ReadAllText(CodeMapPage);
+        var first = SiteRegion.Read(Site, CodeMapRoute);
 
         Directory.Delete(Site, recursive: true);
         GenerateSite();
-        var second = File.ReadAllText(CodeMapPage);
+        var second = SiteRegion.Read(Site, CodeMapRoute);
 
         Assert.Equal(first, second);
     }
@@ -243,8 +248,8 @@ public class SiteGeneratorCodeMapTests : IDisposable
 
         GenerateSite();
 
-        Assert.True(File.Exists(CodeMapPage));
-        var html = File.ReadAllText(CodeMapPage);
+        Assert.True(SiteRegion.Exists(Site, CodeMapRoute));
+        var html = SiteRegion.Read(Site, CodeMapRoute);
         Assert.Contains("src/Sample/Huge.cs", html);
         Assert.Contains("src/Sample/Widget.cs", html);
     }
@@ -261,7 +266,7 @@ public class SiteGeneratorCodeMapTests : IDisposable
             source: Source, adrs: Adrs, output: Site, projectName: "SpecScribe", includeReadme: false, deepGitAnalytics: true));
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
-        var html = File.ReadAllText(CodeMapPage);
+        var html = SiteRegion.Read(Site, CodeMapRoute);
         Assert.Contains("value=\"changes\" selected", html);   // unchanged sequential default (AC #3)
         Assert.Contains("value=\"filetype\">File type</option>", html); // 7th option, not selected
         // The default ("full") view's ramp legend ships visible; its discrete legend ships hidden.
@@ -299,10 +304,10 @@ public class SiteGeneratorCodeMapTests : IDisposable
             source: Source, adrs: Adrs, output: Site, projectName: "SpecScribe", includeReadme: false, deepGitAnalytics: true));
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
-        var html = File.ReadAllText(RiskQuadrantPage);
+        var html = SiteRegion.Read(Site, RiskQuadrantRoute);
         Assert.Contains("<svg class=\"risk-quadrant\"", html);
         Assert.Contains("risk-point", html);
-        AssertNoBrokenLocalLinks(RiskQuadrantPage);
+        SiteRegion.AssertNoBrokenLocalLinks(Site, RiskQuadrantRoute);
     }
 
     [Fact]
@@ -339,7 +344,7 @@ public class SiteGeneratorCodeMapTests : IDisposable
             source: Source, adrs: Adrs, output: Site, projectName: "SpecScribe", includeReadme: false, deepGitAnalytics: true));
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
-        var codeMapHtml = File.ReadAllText(CodeMapPage);
+        var codeMapHtml = SiteRegion.Read(Site, CodeMapRoute);
         // The text-equivalent table links each file's row header — sprint-status.yaml and epics.md must route to
         // their real rendered pages, never a code/…html raw view.
         Assert.Contains("<a href=\"sprint.html\">", codeMapHtml);
@@ -347,7 +352,7 @@ public class SiteGeneratorCodeMapTests : IDisposable
         Assert.DoesNotContain("code/_bmad-output/implementation-artifacts/sprint-status.yaml.html", codeMapHtml);
         Assert.DoesNotContain("code/_bmad-output/planning-artifacts/epics.md.html", codeMapHtml);
 
-        AssertNoBrokenLocalLinks(CodeMapPage);
+        SiteRegion.AssertNoBrokenLocalLinks(Site, CodeMapRoute);
     }
 
     [Fact]
@@ -358,14 +363,14 @@ public class SiteGeneratorCodeMapTests : IDisposable
         // the treemap's own non-git degrade), never omitted.
         GenerateSite();
 
-        var html = File.ReadAllText(CodeMapPage);
+        var html = SiteRegion.Read(Site, CodeMapRoute);
         // One payload now serves BOTH shapes, so parity between them is structural rather than something two
         // renderers have to agree on: there is only one set of nodes and one dimension rule.
         Assert.Contains(HierarchyExplorer.HostMarker, html);
         Assert.DoesNotContain("class=\"codemap-sunburst\"", html);
         Assert.Contains("\"colorClass\":\"codemap-cell\"", FullIsland(html));
         Assert.Contains("\"filetype\":\"csharp\"", FullIsland(html));
-        AssertNoBrokenLocalLinks(CodeMapPage);
+        SiteRegion.AssertNoBrokenLocalLinks(Site, CodeMapRoute);
     }
 
     [Fact]
@@ -377,7 +382,7 @@ public class SiteGeneratorCodeMapTests : IDisposable
             source: Source, adrs: Adrs, output: Site, projectName: "SpecScribe", includeReadme: false, deepGitAnalytics: true));
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
-        var html = File.ReadAllText(CodeMapPage);
+        var html = SiteRegion.Read(Site, CodeMapRoute);
         // Real git history means the ramp has something to quantize. The LEVEL is resolved client-side per
         // dimension now (that is what makes a free staleness threshold and an arbitrary contributor possible at
         // all), so what the server can honestly assert is that the raw metric the ramp reads actually arrived -
@@ -386,7 +391,7 @@ public class SiteGeneratorCodeMapTests : IDisposable
         Assert.Contains(HierarchyExplorer.HostMarker, html);
         Assert.Matches(new Regex("\"changes\":\"[1-9][0-9]*\""), island);
         Assert.Matches(new Regex("\"href\":\"code/[^\"]+\\.html\""), island);
-        AssertNoBrokenLocalLinks(CodeMapPage);
+        SiteRegion.AssertNoBrokenLocalLinks(Site, CodeMapRoute);
     }
 
     /// <summary>Initializes a real git repo in the fixture root with one commit, so <c>hasMetrics</c> is true —
@@ -433,22 +438,4 @@ public class SiteGeneratorCodeMapTests : IDisposable
 
     /// <summary>Every local (non-anchor, non-scheme) href on the page resolves to a file that was actually
     /// generated — the "never a broken link" guarantee (AC #3, NFR2).</summary>
-    private void AssertNoBrokenLocalLinks(string pagePath)
-    {
-        var html = File.ReadAllText(pagePath);
-        var pageDir = Path.GetDirectoryName(pagePath)!;
-        foreach (Match m in Regex.Matches(html, "href=\"([^\"]+)\""))
-        {
-            var raw = m.Groups[1].Value;
-            if (raw.StartsWith("#", StringComparison.Ordinal)
-                || Regex.IsMatch(raw, "^[a-zA-Z][a-zA-Z0-9+.-]*:"))
-                continue;
-
-            var target = raw.Split('#')[0].Split('?')[0];
-            if (target.Length == 0) continue;
-
-            var resolved = Path.GetFullPath(Path.Combine(pageDir, target.Replace('/', Path.DirectorySeparatorChar)));
-            Assert.True(File.Exists(resolved), $"broken link: {raw} → {resolved}");
-        }
-    }
 }

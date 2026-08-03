@@ -18,7 +18,7 @@ public class SiteGeneratorCodeInsightsTests : IDisposable
     private string Site => Path.Combine(_root, "site");
     private string ArtifactsDir => Path.Combine(Source, "implementation-artifacts");
     private string SrcDir => Path.Combine(_root, "src", "Lib");
-    private string ReferencedPage => Path.Combine(Site, "code", "src", "Lib", "Referenced.cs.html");
+    private string ReferencedRoute => "code/src/Lib/Referenced.cs.html";
 
     private const string EpicsMd = """
         # Epics
@@ -75,10 +75,10 @@ public class SiteGeneratorCodeInsightsTests : IDisposable
         var events = new SiteGenerator(Options(deepGit: false)).GenerateAll();
 
         AssertNoErrors(events);
-        Assert.True(File.Exists(ReferencedPage));
-        Assert.DoesNotContain("code-insights", File.ReadAllText(ReferencedPage));
+        Assert.True(SiteRegion.Exists(Site, ReferencedRoute));
+        Assert.DoesNotContain("code-insights", SiteRegion.Read(Site, ReferencedRoute));
         // The deep pass never ran → no deep-analytics page.
-        Assert.False(File.Exists(Path.Combine(Site, "deep-analytics.html")));
+        Assert.False(SiteRegion.Exists(Site, "deep-analytics.html"));
     }
 
     [Fact]
@@ -88,8 +88,8 @@ public class SiteGeneratorCodeInsightsTests : IDisposable
         var events = new SiteGenerator(Options(deepGit: true)).GenerateAll();
 
         AssertNoErrors(events);
-        Assert.True(File.Exists(ReferencedPage));
-        Assert.DoesNotContain("code-insights", File.ReadAllText(ReferencedPage));
+        Assert.True(SiteRegion.Exists(Site, ReferencedRoute));
+        Assert.DoesNotContain("code-insights", SiteRegion.Read(Site, ReferencedRoute));
     }
 
     [Fact]
@@ -100,8 +100,8 @@ public class SiteGeneratorCodeInsightsTests : IDisposable
         var events = new SiteGenerator(Options(deepGit: true)).GenerateAll();
 
         AssertNoErrors(events);
-        Assert.True(File.Exists(ReferencedPage));
-        var html = File.ReadAllText(ReferencedPage);
+        Assert.True(SiteRegion.Exists(Site, ReferencedRoute));
+        var html = SiteRegion.Read(Site, ReferencedRoute);
 
         Assert.Contains("class=\"code-insights\"", html);
         Assert.Contains("Advanced coverage", html);
@@ -147,13 +147,13 @@ public class SiteGeneratorCodeInsightsTests : IDisposable
         var events = new SiteGenerator(Options(deepGit: true)).GenerateAll();
 
         AssertNoErrors(events);
-        var html = File.ReadAllText(ReferencedPage);
+        var html = SiteRegion.Read(Site, ReferencedRoute);
 
         // The uncited coupled file is drawn as a node with a NULL href — the client renders it non-activatable —
         // rather than as a link to a page that does not exist.
         Assert.Contains("\"p\":\"src/Lib/Uncited.cs\"", html);
         Assert.Contains("src/Lib/Uncited.cs", html);           // still surfaced (tooltip + sr-only text)
-        Assert.False(File.Exists(Path.Combine(Site, "code", "src", "Lib", "Uncited.cs.html")));
+        Assert.False(SiteRegion.Exists(Site, "code/src/Lib/Uncited.cs.html"));
         Assert.DoesNotContain("code/src/Lib/Uncited.cs.html", html);   // never a link to a page that does not exist
     }
 
@@ -172,9 +172,9 @@ public class SiteGeneratorCodeInsightsTests : IDisposable
         var events = new SiteGenerator(Options(deepGit: true)).GenerateAll();
 
         AssertNoErrors(events);
-        Assert.True(File.Exists(Path.Combine(Site, "code", "src", "Lib", "Helper.cs.html")),
+        Assert.True(SiteRegion.Exists(Site, "code/src/Lib/Helper.cs.html"),
             "an uncited but on-disk coupled file should now get an in-portal code page");
-        var html = File.ReadAllText(ReferencedPage);
+        var html = SiteRegion.Read(Site, ReferencedRoute);
         Assert.Contains("code/src/Lib/Helper.cs.html", html);   // linked on the reference graph, not a chip
     }
 
@@ -197,11 +197,11 @@ public class SiteGeneratorCodeInsightsTests : IDisposable
         var events = new SiteGenerator(Options(deepGit: true, codeSourceBaseUrl: "https://example.com/blob/main")).GenerateAll();
 
         AssertNoErrors(events);
-        Assert.False(File.Exists(Path.Combine(Site, "code", "src", "Lib", "Gone.cs.html")));   // deleted → no page
+        Assert.False(SiteRegion.Exists(Site, "code/src/Lib/Gone.cs.html"));   // deleted → no page
         // No surface (dashboard Git Pulse, deep-analytics, git-insights, code map) may link the vanished file out.
-        foreach (var page in Directory.EnumerateFiles(Site, "*.html", SearchOption.AllDirectories))
+        foreach (var page in SiteRegion.Routes(Site))
         {
-            Assert.DoesNotContain("example.com/blob/main/src/Lib/Gone.cs", File.ReadAllText(page));
+            Assert.DoesNotContain("example.com/blob/main/src/Lib/Gone.cs", SiteRegion.Read(Site, page));
         }
     }
 
@@ -215,8 +215,8 @@ public class SiteGeneratorCodeInsightsTests : IDisposable
         var events = new SiteGenerator(Options(deepGit: true, codeSourceBaseUrl: "https://example.com/blob/main")).GenerateAll();
 
         AssertNoErrors(events);
-        Assert.True(File.Exists(ReferencedPage));
-        var html = File.ReadAllText(ReferencedPage);
+        Assert.True(SiteRegion.Exists(Site, ReferencedRoute));
+        var html = SiteRegion.Read(Site, ReferencedRoute);
         Assert.Contains("code-external-link", html);
         Assert.Contains("class=\"code-insights\"", html);
     }
@@ -235,8 +235,8 @@ public class SiteGeneratorCodeInsightsTests : IDisposable
         static string Stable(string html) =>
             Regex.Replace(html, @"on \w+ \d{1,2}, \d{4} at \d{1,2}:\d{2} UTC[+-]\d{2}:\d{2}", "on <t>");
 
-        var page2 = Path.Combine(site2, "code", "src", "Lib", "Referenced.cs.html");
-        Assert.Equal(Stable(File.ReadAllText(ReferencedPage)), Stable(File.ReadAllText(page2)));
+        var page2 = "code/src/Lib/Referenced.cs.html";
+        Assert.Equal(Stable(SiteRegion.Read(Site, ReferencedRoute)), Stable(SiteRegion.Read(site2, page2)));
     }
 
     // ---- reference-graph epic grouping + relationships (wiring through SiteGenerator) ----
@@ -249,7 +249,7 @@ public class SiteGeneratorCodeInsightsTests : IDisposable
         var events = new SiteGenerator(Options(deepGit: true)).GenerateAll();
 
         AssertNoErrors(events);
-        var html = File.ReadAllText(ReferencedPage);
+        var html = SiteRegion.Read(Site, ReferencedRoute);
 
         // Story 1.1 cites Referenced.cs and belongs to Epic 1 (per the fixture's epics.md) — so the graph carries an
         // "Epic 1" hub node and a membership edge governed by the "Group by epic" filter; the sr-only twin discloses
@@ -268,7 +268,7 @@ public class SiteGeneratorCodeInsightsTests : IDisposable
         var events = new SiteGenerator(Options(deepGit: true)).GenerateAll();
 
         AssertNoErrors(events);
-        var html = File.ReadAllText(ReferencedPage);
+        var html = SiteRegion.Read(Site, ReferencedRoute);
 
         // Story 1.1's notes cite BOTH Referenced.cs (the center file) and Sibling.cs (a related/coupled file) — so
         // the graph carries a story<->related-file cross edge governed by "Show relationships", and the sr-only
@@ -288,7 +288,7 @@ public class SiteGeneratorCodeInsightsTests : IDisposable
         var events = new SiteGenerator(Options(deepGit: false)).GenerateAll();
 
         AssertNoErrors(events);
-        var html = File.ReadAllText(ReferencedPage);
+        var html = SiteRegion.Read(Site, ReferencedRoute);
 
         Assert.Contains("data-relgraph-filter=\"epic\"", html);
         Assert.DoesNotContain("data-relgraph-filter=\"cross\"", html);
@@ -315,7 +315,7 @@ public class SiteGeneratorCodeInsightsTests : IDisposable
         Assert.True(TryCreateGitHistory(), "git CLI unavailable on this host — cannot exercise the deep-git graph payload; install git rather than silently skipping this test");
 
         AssertNoErrors(new SiteGenerator(Options(deepGit: true)).GenerateAll());
-        var html = File.ReadAllText(ReferencedPage);
+        var html = SiteRegion.Read(Site, ReferencedRoute);
 
         var island = Between(html, "<script type=\"application/json\" id=\"relgraph-", "</script>");
         Assert.NotEqual("", island);
@@ -342,7 +342,7 @@ public class SiteGeneratorCodeInsightsTests : IDisposable
         Assert.True(TryCreateGitHistory(), "git CLI unavailable on this host — cannot exercise the deep-git graph payload; install git rather than silently skipping this test");
 
         AssertNoErrors(new SiteGenerator(Options(deepGit: true)).GenerateAll());
-        var html = File.ReadAllText(ReferencedPage);
+        var html = SiteRegion.Read(Site, ReferencedRoute);
         var island = Between(html, "<script type=\"application/json\" id=\"relgraph-", "</script>");
 
         // The configuration half of ADR 0013 §5: the island carries what the component needs to draw itself.
@@ -358,10 +358,21 @@ public class SiteGeneratorCodeInsightsTests : IDisposable
         Assert.Contains("\"styles\":[", island);
         Assert.Contains("\"dash\":", island);
 
-        // The host, the boot handshake and the engine are all present and all DERIVED from the rendered body.
+        // The host is in the REGION; the boot handshake and the engine tag are CHROME.
+        //
+        // [Story 23.6 AC #8] "DERIVED from the rendered body" is still exactly right — it just derives on the
+        // renderer's side now, off this same host marker (`web/ir/adapter.ts` § `chromeNeeds.needsGraphEngine`,
+        // pinned by `web/test/chrome-needs.test.ts`). What C# still owns, and what is asserted here, is that the
+        // IR SHIPS the boot script at all.
+        //
+        // ⚠️ This pair is why the audit happened: before Story 23.6 the Nuxt renderer had no graph handling
+        // whatsoever, so a `data-relgraph` page on the generated portal carried zero occurrences of BOTH
+        // `data-ss-relgraph-boot` and `plotly-hierarchy.min.js` — the graph could not boot, and no gate saw it.
         Assert.Contains("data-relgraph></div>", html);
-        Assert.Contains("data-ss-relgraph-boot", html);
-        Assert.Contains("plotly-hierarchy.min.js", html);
+        Assert.Contains("data-ss-relgraph-boot", SiteRegion.Chrome(Site).GraphBootScript);
+        Assert.True(File.Exists(Path.Combine(Site, ForgeOptions.HierarchyEngineScriptName)),
+            "the vendored engine must be copied for a page that hosts a relationship graph (ADR 0030 — one "
+            + "bundle serves both chart families)");
     }
 
     [Fact]
@@ -370,7 +381,7 @@ public class SiteGeneratorCodeInsightsTests : IDisposable
         Assert.True(TryCreateGitHistory(), "git CLI unavailable on this host — cannot exercise the deep-git twin; install git rather than silently skipping this test");
 
         AssertNoErrors(new SiteGenerator(Options(deepGit: true)).GenerateAll());
-        var html = File.ReadAllText(ReferencedPage);
+        var html = SiteRegion.Read(Site, ReferencedRoute);
 
         // ADR 0013 §2's four properties, over the surface that just retired its SVG.
         var twin = Between(html, "<ul class=\"ref-list sr-only\">", "</ul>\n<p class=\"chart-frame-why\"");

@@ -548,10 +548,10 @@ public class IdeasTests : IDisposable
         SeedEpics();
         var site = Generate(out var events);
 
-        Assert.False(File.Exists(Path.Combine(site, "ideas.html")));
+        Assert.False(SiteRegion.Exists(site, "ideas.html"));
         Assert.False(Directory.Exists(Path.Combine(site, "ideas")));
         Assert.DoesNotContain(events, e => e.RelativePath.Contains("ideas", StringComparison.OrdinalIgnoreCase));
-        Assert.DoesNotContain("ideas.html", File.ReadAllText(Path.Combine(site, "index.html")));
+        Assert.DoesNotContain("ideas.html", SiteRegion.Read(site, "index.html"));
         // [Story 18.4 review] The test's own name promised this and never asserted it.
         Assert.DoesNotContain(events, e => e.Message != null && e.Message.Contains("unrecognized top-level folder"));
     }
@@ -567,18 +567,18 @@ public class IdeasTests : IDisposable
 
         var site = Generate(out var events);
 
-        Assert.True(File.Exists(Path.Combine(site, "ideas.html")));
-        Assert.True(File.Exists(Path.Combine(site, "ideas", "cache-layer.html")));
-        Assert.True(File.Exists(Path.Combine(site, "ideas", "cache-layer-report.html")));
+        Assert.True(SiteRegion.Exists(site, "ideas.html"));
+        Assert.True(SiteRegion.Exists(site, "ideas/cache-layer.html"));
+        Assert.True(SiteRegion.Exists(site, "ideas/cache-layer-report.html"));
         // The idea's own markdown is consumed by its detail page — no second, orphan generic page for it.
-        Assert.False(File.Exists(Path.Combine(site, "forge", "cache-layer", "forged-idea.html")));
+        Assert.False(SiteRegion.Exists(site, "forge/cache-layer/forged-idea.html"));
         // The carried report is a LEAF: written verbatim, never wrapped in the portal template (which would nest
         // one complete <html> document inside another).
-        var carried = File.ReadAllText(Path.Combine(site, "ideas", "cache-layer-report.html"));
+        var carried = SiteRegion.Read(site, "ideas/cache-layer-report.html");
         Assert.Equal(SafeReport("HARDENED"), carried);
         Assert.DoesNotContain("site-nav", carried);
         // And the nav entry the gate promised actually exists.
-        Assert.Contains("ideas.html", File.ReadAllText(Path.Combine(site, "index.html")));
+        Assert.Contains("ideas.html", SiteRegion.Read(site, "index.html"));
         // [Story 18.4 review] The KnownIndexGroups("Ideas", "forge") registration must actually suppress the
         // generic notice for a REAL forge/ folder with a discovered idea — not just an absent one.
         Assert.DoesNotContain(events, e => e.Message != null && e.Message.Contains("unrecognized top-level folder"));
@@ -604,7 +604,7 @@ public class IdeasTests : IDisposable
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
         var bundle = gen.RenderSpaBundle();
 
-        Assert.True(File.Exists(Path.Combine(site, "ideas", "cache-layer-report.html")));
+        Assert.True(SiteRegion.Exists(site, "ideas/cache-layer-report.html"));
         Assert.DoesNotContain(bundle.Pages, p => p.OutputRelativePath.Contains("-report.html", StringComparison.Ordinal));
         // The idea's own composed pages ARE routes — only the foreign leaf is held out.
         Assert.Contains(bundle.Pages, p => p.OutputRelativePath == SiteNav.IdeasOutputPath);
@@ -627,7 +627,7 @@ public class IdeasTests : IDisposable
             "---\nsources:\n  - forge/cache-layer/forged-idea.md\n---\n\n# A downstream brief\n\nBody.\n");
 
         var site = Generate(out _);
-        var detail = File.ReadAllText(Path.Combine(site, "ideas", "cache-layer.html"));
+        var detail = SiteRegion.Read(site, "ideas/cache-layer.html");
 
         Assert.Contains("A downstream brief", detail);
         Assert.Contains("Declared in this document&#39;s sources", detail);
@@ -644,7 +644,7 @@ public class IdeasTests : IDisposable
             + "Also [a doc that was never written](../../planning-artifacts/ghost.md).\n");
 
         var site = Generate(out var events);
-        var detail = File.ReadAllText(Path.Combine(site, "ideas", "cache-layer.html"));
+        var detail = SiteRegion.Read(site, "ideas/cache-layer.html");
 
         // Resolved: routed to the CURATED epics page, not a generic epics.html-of-the-source guess.
         Assert.Contains("href=\"../epics.html\"", detail);

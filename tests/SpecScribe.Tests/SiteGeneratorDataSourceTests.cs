@@ -16,7 +16,7 @@ public class SiteGeneratorDataSourceTests : IDisposable
     private string Adrs => Path.Combine(_root, "docs", "adrs");
     private string Site => Path.Combine(_root, "site");
     private string SprintPath => Path.Combine(Source, "implementation-artifacts", "sprint-status.yaml");
-    private string SprintHtml => Path.Combine(Site, "sprint.html");
+    private string SprintRoute => "sprint.html";
 
     private const string EpicsMd = """
         # Epics
@@ -102,14 +102,14 @@ public class SiteGeneratorDataSourceTests : IDisposable
     {
         // The defect fix: a sprint-status.yaml edit refreshes the sprint board. Baseline renders MARKER-V1.
         var gen = GeneratedSite();
-        Assert.Contains("MARKER-V1", File.ReadAllText(SprintHtml));
+        Assert.Contains("MARKER-V1", SiteRegion.Read(Site, SprintRoute));
 
         File.WriteAllText(SprintPath, SprintYaml.Replace("MARKER-V1", "MARKER-V2"));
         var ev = gen.RegenerateFromDataSource(SprintPath);
 
         Assert.Equal(GenerationOutcome.Updated, ev.Outcome);
         // _sprint was re-parsed (a full GenerateAll) and the sprint surface rewritten — the board is no longer stale.
-        Assert.Contains("MARKER-V2", File.ReadAllText(SprintHtml));
+        Assert.Contains("MARKER-V2", SiteRegion.Read(Site, SprintRoute));
     }
 
     [Fact]
@@ -119,13 +119,13 @@ public class SiteGeneratorDataSourceTests : IDisposable
         // (what would happen if only the .md filter were widened) never re-parses _sprint, so the board strands the
         // change. This is the "the core side is more than the Filter property" case from the AC.
         var gen = GeneratedSite();
-        Assert.Contains("MARKER-V1", File.ReadAllText(SprintHtml));
+        Assert.Contains("MARKER-V1", SiteRegion.Read(Site, SprintRoute));
 
         File.WriteAllText(SprintPath, SprintYaml.Replace("MARKER-V1", "MARKER-V3"));
         var ev = gen.RegenerateEpics();
 
         Assert.Equal(GenerationOutcome.Updated, ev.Outcome);
-        var html = File.ReadAllText(SprintHtml);
+        var html = SiteRegion.Read(Site, SprintRoute);
         Assert.Contains("MARKER-V1", html);       // still the old value — RegenerateEpics skipped sprint state (AD-5)
         Assert.DoesNotContain("MARKER-V3", html); // the edit was stranded, exactly the bug 6.11 fixes
     }

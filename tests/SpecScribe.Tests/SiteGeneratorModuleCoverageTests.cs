@@ -16,7 +16,7 @@ public class SiteGeneratorModuleCoverageTests : IDisposable
     private string Source => Path.Combine(_root, "_bmad-output");
     private string Adrs => Path.Combine(_root, "docs", "adrs");
     private string Site => Path.Combine(_root, "site");
-    private string IndexPage => Path.Combine(Site, "index.html");
+    private string IndexRoute => "index.html";
 
     // Verbatim upstream rows, pinned exactly as in ModuleContextTests — see the provenance block there for
     // repositories and commit SHAs. Synthetic rows are what let the skill-prefix identity bug hide, so the
@@ -122,7 +122,7 @@ public class SiteGeneratorModuleCoverageTests : IDisposable
         var gen = new SiteGenerator(Options());
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
-        var html = File.ReadAllText(IndexPage);
+        var html = SiteRegion.Read(Site, IndexRoute);
 
         // The WHOLE panel goes (owner decision D2) — not just its missing cards, and not an empty shell.
         Assert.DoesNotContain("coverage-panel", html);
@@ -167,7 +167,7 @@ public class SiteGeneratorModuleCoverageTests : IDisposable
         var events = gen.GenerateAll().ToList();
         Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
 
-        var html = File.ReadAllText(IndexPage);
+        var html = SiteRegion.Read(Site, IndexRoute);
         Assert.Contains("coverage-panel", html);
         Assert.Contains("Planning Artifacts", html);
         foreach (var label in EightBmadMethodFamilies)
@@ -192,7 +192,7 @@ public class SiteGeneratorModuleCoverageTests : IDisposable
         var events = gen.GenerateAll().ToList();
         Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
 
-        var html = File.ReadAllText(IndexPage);
+        var html = SiteRegion.Read(Site, IndexRoute);
         Assert.Contains("coverage-panel", html);
         foreach (var label in EightBmadMethodFamilies)
         {
@@ -225,7 +225,7 @@ public class SiteGeneratorModuleCoverageTests : IDisposable
 
         // The panel stays omitted after the incremental (the detected module persists across rebuilds), and
         // the incremental itself contributes no second notice.
-        Assert.DoesNotContain("coverage-panel", File.ReadAllText(IndexPage));
+        Assert.DoesNotContain("coverage-panel", SiteRegion.Read(Site, IndexRoute));
         Assert.Empty(PanelOmissionDiagnostics(new[] { ev }));
     }
 
@@ -244,7 +244,7 @@ public class SiteGeneratorModuleCoverageTests : IDisposable
         var ev = gen.RegenerateEpics();
         Assert.NotEqual(GenerationOutcome.Error, ev.Outcome);
 
-        Assert.DoesNotContain("coverage-panel", File.ReadAllText(IndexPage));
+        Assert.DoesNotContain("coverage-panel", SiteRegion.Read(Site, IndexRoute));
     }
 
     private static readonly string[] EightBmadMethodFamilies =

@@ -215,7 +215,6 @@ public sealed class SiteGenerator
     // normal run — no capture, no overhead, and the static output stays byte-identical (AC #3/#5). The
     // dashboard/epics families are NOT captured here; the SPA and webview re-render them from their view models
     // (RenderSpaBundle / RenderWebviewSurfaces) for strongest parity. [Story 6.7; spec-webview-doc-page-surfaces]
-    private Dictionary<string, string>? _spaCapture;
 
     /// <summary>One captured page's own <see cref="PageView"/> plus the reference-link skip identity its full-page
     /// linkify pass used — everything needed to recompose its content region WITHOUT slicing a rendered document.
@@ -499,7 +498,6 @@ public sealed class SiteGenerator
             // longer writes a content page, so a run that emitted no IR would emit nothing at all.
             //
             // Capture stays memory-only, exactly as before.
-            _spaCapture = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             // Story 23.4 AC #3: the composed-region capture runs on exactly the same condition, so the two paths
             // are always comparable on any run that produces an IR at all.
             _spaPageViews = new Dictionary<string, CapturedPageView>(StringComparer.OrdinalIgnoreCase);
@@ -1056,8 +1054,7 @@ public sealed class SiteGenerator
                 }
 
                 _docs.Remove(relative);
-                // Drop the removed page from the SPA capture so a stale region can't linger in the next bundle.
-                if (_spaCapture is not null) _spaCapture.Remove(PathUtil.NormalizeSlashes(doc.OutputRelativePath));
+                // Drop the removed page from the IR so a stale region can't linger in the next bundle.
                 _spaPageViews?.Remove(PathUtil.NormalizeSlashes(doc.OutputRelativePath));
                 RefreshCoverage();
                 var nav = _nav ?? BuildNav(Array.Empty<string>());
@@ -1635,98 +1632,60 @@ public sealed class SiteGenerator
         var removed = 0;
         foreach (var page in EpicsFamilyPages)
         {
-            if (DeleteOutputFile(page)) removed++;
+            if (RemoveRoute(page)) removed++;
         }
         foreach (var dir in EpicsFamilyDirectories)
         {
-            removed += DeleteOutputDirectory(dir);
+            removed += RemoveRoutesUnder(dir);
         }
         return removed;
     }
 
-    /// <summary>Deletes one output-relative page if present and evicts it from the SPA capture, so a removed page
-    /// can't linger in the next bundle (the same pairing <see cref="RemoveFor"/> already does). Returns whether a
-    /// file was actually deleted. Best-effort: an IO failure (file held open by a reader) is swallowed so a watch
-    /// pass degrades rather than crashing the loop (NFR2). [Story 5.3]</summary>
-    private bool DeleteOutputFile(string outputRelativePath)
+    /// <summary>Removes one page from the site and reports whether it was there.
+    ///
+    /// <para>[Story 23.6 AC #1] ⚠️ <b>THIS IS A ROUTE OPERATION NOW, NOT A FILE ONE, AND THE DIFFERENCE IS
+    /// LOAD-BEARING.</b> It used to delete <c>&lt;OutputRoot&gt;/&lt;path&gt;</c> and then evict the page from the
+    /// in-memory capture, treating DISK as the truth and the capture as a mirror that had to be reconciled with
+    /// it — including a deliberate "delete failed, so keep the capture entry" branch (Story 5.3's review fix)
+    /// that existed to stop static-site and SPA visitors diverging when a locked file survived.</para>
+    ///
+    /// <para>None of that survives the deletion of the writer. No <c>.html</c> is written during generation, so
+    /// the file either was never there or belongs to a PREVIOUS run's prerender output; either way it is not
+    /// this generator's record of what the site contains. The IR is. Keeping the disk check would have been
+    /// actively wrong rather than merely redundant: <c>File.Exists</c> is false for every page now, so the old
+    /// code took its "already gone" branch every time and returned <c>false</c> — reporting zero removals for a
+    /// removal that did happen.</para>
+    ///
+    /// <para>Stale <c>.html</c> left over from an earlier prerender is not leaked: <see cref="NuxtPrerender"/>
+    /// re-renders from the manifest the IR just emitted, and a full <c>GenerateAll</c> wipes the output root
+    /// before it starts.</para></summary>
+    private bool RemoveRoute(string outputRelativePath)
     {
         var key = PathUtil.NormalizeSlashes(outputRelativePath);
-        var full = Path.Combine(_options.OutputRoot, outputRelativePath.Replace('/', Path.DirectorySeparatorChar));
-        if (!File.Exists(full))
-        {
-            // Already gone from disk (e.g. an earlier partial cleanup) — still converge a stale capture entry.
-            _spaCapture?.Remove(key);
-            _spaPageViews?.Remove(key);
-            return false;
-        }
-        try
-        {
-            File.Delete(full);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // Delete failed — the page is still really on disk, so the capture must keep reflecting that too
-            // (review-fix, Story 5.3: evicting unconditionally here left static-site and --spa visitors diverged
-            // whenever the delete lost a race with a reader holding the file open).
-            return false;
-        }
-        _spaCapture?.Remove(key);
-        _spaPageViews?.Remove(key);
-        return true;
+        return _spaPageViews?.Remove(key) ?? false;
     }
 
-    /// <summary>Recursively deletes one output-relative subdirectory and evicts every captured page beneath it,
-    /// returning the file count removed. Mirrors the existing rebuild-the-whole-subtree pattern
-    /// (<c>GenerateAdrsInternal</c> / <c>RenderEpicsPages</c>) rather than inventing a second one. [Story 5.3]</summary>
-    private int DeleteOutputDirectory(string outputRelativeDir)
+    /// <summary>Removes every route under one output-relative directory, returning how many went.
+    /// <para>[Story 23.6 AC #1] The route-space form of the old recursive directory delete. The three-way
+    /// disk reconciliation it used to do (<c>ReconcileSpaCapturePrefix</c>, called on all of the success,
+    /// already-gone and partial-failure paths) is gone with the disk state it reconciled against — and it had
+    /// become dangerous, not just dead: it evicted any captured route whose file was missing, and after this
+    /// story EVERY route's file is missing, so it would have emptied the IR of whole subtrees on any watch pass
+    /// that touched one.</para></summary>
+    private int RemoveRoutesUnder(string outputRelativeDir)
     {
-        var full = Path.Combine(_options.OutputRoot, outputRelativeDir.Replace('/', Path.DirectorySeparatorChar));
-        if (!Directory.Exists(full))
-        {
-            // Already gone from disk — still converge any stale capture entries left over from an earlier partial
-            // cleanup, rather than leaving them to linger forever. [Story 5.3 review-fix]
-            ReconcileSpaCapturePrefix(outputRelativeDir);
-            return 0;
-        }
-
-        try
-        {
-            var count = Directory.GetFiles(full, "*", SearchOption.AllDirectories).Length;
-            Directory.Delete(full, recursive: true);
-            ReconcileSpaCapturePrefix(outputRelativeDir);
-            return count;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // A partial delete may have removed some files but not all (one locked file mid-tree). Reconcile the
-            // capture against what's genuinely still on disk instead of assuming the whole subtree went — evicting
-            // unconditionally here (the pre-review-fix behavior) could drop capture entries for pages that never
-            // actually left disk. [Story 5.3 review-fix]
-            ReconcileSpaCapturePrefix(outputRelativeDir);
-            return 0;
-        }
-    }
-
-    /// <summary>Evicts every <see cref="_spaCapture"/> entry under <paramref name="outputRelativeDir"/> whose file no
-    /// longer exists on disk, so the capture converges to real disk state even after a partial directory delete
-    /// (some files gone, some not) rather than being evicted or kept as an all-or-nothing block. [Story 5.3
-    /// review-fix]</summary>
-    private void ReconcileSpaCapturePrefix(string outputRelativeDir)
-    {
-        if (_spaCapture is null) return;
-
+        if (_spaPageViews is not { } views) return 0;
         var prefix = PathUtil.NormalizeSlashes(outputRelativeDir) + "/";
-        var fullDir = Path.Combine(_options.OutputRoot, outputRelativeDir.Replace('/', Path.DirectorySeparatorChar));
-        foreach (var key in _spaCapture.Keys.Where(k => k.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToList())
-        {
-            var candidate = Path.Combine(fullDir, key[prefix.Length..].Replace('/', Path.DirectorySeparatorChar));
-            if (!File.Exists(candidate))
-            {
-                _spaCapture.Remove(key);
-                _spaPageViews?.Remove(key);
-            }
-        }
+        var stale = views.Keys.Where(k => k.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToList();
+        foreach (var key in stale) views.Remove(key);
+        return stale.Count;
     }
+
+    // ───────────────────────────────────────────────────────────────────────────────────────────────────────
+    // `ReconcileSpaCapturePrefix` was DELETED here by Story 23.6 (AC #1). See `RemoveRoutesUnder` above, which
+    // replaced it, for why reconciling the in-memory page set against DISK stopped being merely unnecessary and
+    // became a live hazard once nothing writes pages.
+    // ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>Watch-mode route for a topology change under a watched root — the scope escalation itself. Originally
     /// DIRECTORY-level only (a folder created, renamed or deleted — Story 5.3 AC #2/#5), because the per-file
@@ -2123,24 +2082,27 @@ public sealed class SiteGenerator
             }
         }
 
-        // Prune stale SPA-capture entries for any ADR-family page NOT actually (re)written this pass — a
-        // renamed/deleted record, README, or template file, OR a landing page that no longer has anything to
-        // write it (the last ADR was removed and no record occupies the landing slot). The physical adrs/
-        // OUTPUT DIRECTORY is wiped and rebuilt above (self-healing the static site), but _spaCapture is a
-        // separate in-memory map that pass 2 only OVERWRITES for pages still present — using writtenAdrPaths
-        // (every WriteOutput call above, not just _adrs/record entries) rather than _adrs alone avoids evicting
-        // a still-live non-record page (README/template) the SAME pass just wrote it.
-        // [deferred-work: story-6-7 watch-mode _spaCapture drift]
-        if (_spaCapture is { } captureAfterAdrs)
+        // Prune stale IR routes for any ADR-family page NOT actually (re)composed this pass — a renamed/deleted
+        // record, README, or template file, OR a landing page that no longer has anything to write it (the last
+        // ADR was removed and no record occupies the landing slot). Pass 2 only OVERWRITES entries for pages
+        // still present, so a page that vanished from the source keeps its route until evicted here. Using
+        // writtenAdrPaths (every page this pass composed, not just _adrs/record entries) rather than _adrs alone
+        // avoids evicting a still-live non-record page (README/template) the SAME pass just wrote.
+        //
+        // [Story 23.6 AC #1] Re-pointed from `_spaCapture` to `_spaPageViews` — same eviction, same key space,
+        // one map instead of two. The old comment's premise ("the physical adrs/ OUTPUT DIRECTORY is wiped and
+        // rebuilt above, self-healing the static site") no longer holds and is not relied on: there is no static
+        // side to self-heal, so THIS eviction is the only thing keeping a deleted ADR out of the next render.
+        // [deferred-work: story-6-7 watch-mode capture drift]
+        if (_spaPageViews is { } viewsAfterAdrs)
         {
             var stalePrefix = ForgeOptions.AdrOutputSubdir + "/";
-            var staleKeys = captureAfterAdrs.Keys
+            var staleKeys = viewsAfterAdrs.Keys
                 .Where(k => k.StartsWith(stalePrefix, StringComparison.OrdinalIgnoreCase) && !writtenAdrPaths.Contains(k))
                 .ToList();
             foreach (var key in staleKeys)
             {
-                captureAfterAdrs.Remove(key);
-                _spaPageViews?.Remove(key);
+                viewsAfterAdrs.Remove(key);
             }
         }
 
@@ -3388,7 +3350,6 @@ public sealed class SiteGenerator
         return lines;
     }
 
-
     /// pass produced its hub aggregates (<see cref="DeepGitPulse.Insights"/>). A no-op otherwise: with
     /// <c>--deep-git</c> off the deep pass never ran, <c>DeepGit</c> is null, and no hub work (or page)
     /// happens at all — that gate IS the AC #2 performance guarantee. Mirrors the deep-analytics page's
@@ -3490,56 +3451,42 @@ public sealed class SiteGenerator
             // full-gen would diverge from watch-mode RegenerateEpics. Read-only: no _docs mutation, no output.
             var workForFollowUps = ResolveFollowUpWork(files);
 
-            // ⚠️ THE EPICS FAMILY'S STATIC DOCUMENTS ARE THE `WriteStaticPages` SEAM'S LAST HOLDOUT.
+            // ⚠️ THE EPICS FAMILY WAS THE LAST HOLDOUT OF BOTH RAW `File.WriteAllText` AND `WriteStaticPages`.
             //
-            // This block writes `epics.html`, one `epics/epic-N.html` per epic and one
-            // `epics/story-N-M.html` per drafted story with `File.WriteAllText` — it never goes through
-            // `WritePage`, so the flag that turns every OTHER full-document render off did not reach it. On this
-            // repository that left the `webview` path rendering, linkifying and writing ~230 whole documents into
-            // a temp scratch directory the panel abandons: 9,252 ms of the 22,177 ms pass, the single largest
-            // phase, and every millisecond of it in front of first paint.
+            // [Story 23.6 AC #1] This block used to write `epics.html`, one `epics/epic-N.html` per epic and one
+            // `epics/story-N-M.html` per drafted story with `File.WriteAllText` — four of the story's five
+            // content-`.html` write paths, none of which went through `WritePage`. They are now ordinary
+            // `WritePage` calls over the `BuildX` view models Story 23.4 added, so the epics family reaches the
+            // IR the same way every other family does and Nuxt renders it from there.
             //
-            // **The webview cannot observe the difference, and that is structural rather than argued.** The
-            // epics family reaches the panel through `BuildFamilySurfaces`, which re-renders each epic/story
-            // from the SAME cached models and the SAME `BuildStoryPageFragments` pipeline; it reads nothing this
-            // block writes. What this block ALSO does — cache `_storyArtifactsById` / `_referenceMap` /
-            // `_epicsSourcePath`, and write the requirements pages through `WritePage` (which captures the
-            // composed region the panel does read) — is deliberately OUTSIDE the guard and still runs.
-            // `ApplyReferenceLinks` is pure: it mutates no generator state, so skipping it strands nothing.
+            // Two consequences worth stating rather than leaving to be rediscovered:
             //
-            // `generate`, `watch` and the interactive menu leave `WriteStaticPages` on and are byte-unchanged.
-            // [Goal 2, spec-vscode-extension-name-latency-and-webview-sunburst]
-            FollowUpGeometry? followUps = null;
-            UnplannedWorkGeometry? unplanned = null;
-            if (WriteStaticPages)
-            {
-                var deferredModel = ResolveDeferredModel(workForFollowUps, files);
-                var epicsCounts = _counts ?? ProjectCounts.Build(progress, _sprint, workForFollowUps, model, _requirements);
-                followUps = BuildFollowUpGeometry(workForFollowUps, epicsCounts, deferredModel);
-                unplanned = UnplannedWorkGeometry.From(workForFollowUps, followUps, model, retros: _retros);
-                File.WriteAllText(Path.Combine(_options.OutputRoot, "epics.html"), ApplyReferenceLinks(EpicsTemplater.RenderIndex(model, progress, nav, _module.Commands, epicsCounts, followUps, unplanned), "epics.html"));
+            //  · **`WriteStaticPages` is gone from this block**, because the work it was gating is gone. The flag
+            //    existed to spare the webview path ~230 whole-document renders (9,252 ms of a 22,177 ms pass);
+            //    composing a region is what remains, and the webview READS those regions — skipping them would
+            //    now break the panel rather than speed it up.
+            //  · **The `epics/` directory is no longer wiped here.** It was wiped so a renumbered or deleted
+            //    story could not leave a stale `.html` behind on the incremental `RegenerateEpics` path. Nothing
+            //    writes into that directory any more, so staleness is a question about the IR's route set, and
+            //    `RegenerateEpics` already evicts removed routes from `_spaPageViews`.
+            //    `SiteGeneratorEpicsRemovalTests` asserts exactly that, in route space.
+            var deferredModel = ResolveDeferredModel(workForFollowUps, files);
+            var epicsCounts = _counts ?? ProjectCounts.Build(progress, _sprint, workForFollowUps, model, _requirements);
+            FollowUpGeometry? followUps = BuildFollowUpGeometry(workForFollowUps, epicsCounts, deferredModel);
+            UnplannedWorkGeometry? unplanned = UnplannedWorkGeometry.From(workForFollowUps, followUps, model, retros: _retros);
+            WritePage(EpicsTemplater.BuildIndexPage(model, progress, nav, _module.Commands, epicsCounts, followUps, unplanned));
 
-                // Rebuild the epics output dir each pass so a story removed or renumbered in epics.md — or an
-                // undrafted story that got a placeholder and then vanished — can't leave a stale page behind,
-                // mirroring the ADR output dir's rebuild. GenerateAll already wiped OutputRoot (no-op here); this
-                // matters for watch-mode RegenerateEpics, which doesn't wipe the whole tree.
-                var epicsDir = Path.Combine(_options.OutputRoot, "epics");
-                if (Directory.Exists(epicsDir)) Directory.Delete(epicsDir, recursive: true);
-                Directory.CreateDirectory(epicsDir);
-            }
-
-            // UNGATED, and at its original position: the requirements pages go through `WritePage`, so they
-            // populate the composed-region capture the panel DOES read. Their `_spaPageViews` insertion order is
-            // unchanged because nothing above or below this line writes through `WritePage`.
+            // The requirements pages, at their original position — `_spaPageViews` insertion order is part of the
+            // IR's emitter order, so moving this line would move routes between chunks for no reason.
             WriteRequirements(requirements, model, progress, nav, workForFollowUps);
 
-            if (WriteStaticPages)
             {
-                var epicsDir = Path.Combine(_options.OutputRoot, "epics");
                 foreach (var epic in model.Epics)
                 {
                     var epicRetroPath = EpicRetroMap.TryGetValue(epic.Number, out var erp) ? erp : null;
-                    File.WriteAllText(Path.Combine(epicsDir, $"epic-{epic.Number}.html"), ApplyReferenceLinks(EpicsTemplater.RenderEpic(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic), followUps, unplanned, _planningImpact, EpicSubgraph(epic.Number)), $"epics/epic-{epic.Number}.html", skipEpicNumber: epic.Number));
+                    WritePage(
+                        EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, _module.Commands, epicRetroPath, EpicPager(model, epic), followUps, unplanned, _planningImpact, EpicSubgraph(epic.Number)),
+                        skipEpicNumber: epic.Number);
 
                     foreach (var story in epic.Stories)
                     {
@@ -3549,16 +3496,17 @@ public sealed class SiteGenerator
                             // use, so "Story N.M" mentions always have a live target and a later-drafted
                             // artifact overwrites it in place. ArtifactOutputPath stays null — placeholders
                             // must never count as detailed stories anywhere progress is computed.
-                            var placeholderPath = StoryEpicLinkifier.StoryPagePath(story.Id);
-                            var placeholderHtml = EpicsTemplater.RenderStoryPlaceholder(epic, story, nav, _module.Commands, epicRetroPath, StoryPager(model, story));
-                            File.WriteAllText(Path.Combine(_options.OutputRoot, placeholderPath.Replace('/', Path.DirectorySeparatorChar)), ApplyReferenceLinks(placeholderHtml, placeholderPath, skipStoryId: story.Id));
+                            WritePage(
+                                EpicsTemplater.BuildStoryPlaceholderPage(epic, story, nav, _module.Commands, epicRetroPath, StoryPager(model, story)),
+                                skipStoryId: story.Id);
                             continue;
                         }
 
                         // story.Status/TasksDone were filled by ProgressCalculator above — no re-read needed.
                         var f = BuildStoryPageFragments(story, artifactMap[story.Id], referenceMap);
-                        var storyHtml = EpicsTemplater.RenderStory(epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria, f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav, _module.Commands, epicRetroPath, StoryPager(model, story), followUps, _planningImpact, StorySubgraph(epic, story, followUps));
-                        File.WriteAllText(Path.Combine(_options.OutputRoot, "epics", $"story-{story.Id.Replace('.', '-')}.html"), ApplyReferenceLinks(storyHtml, story.ArtifactOutputPath!, skipStoryId: story.Id));
+                        WritePage(
+                            EpicsTemplater.BuildStoryPage(epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria, f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav, _module.Commands, epicRetroPath, StoryPager(model, story), followUps, _planningImpact, StorySubgraph(epic, story, followUps)),
+                            skipStoryId: story.Id);
                     }
                 }
             }
@@ -4368,54 +4316,58 @@ public sealed class SiteGenerator
 
     // ===== Story 6.7: JSON + client-renderer (SPA) delivery form =============================================
 
-    /// <summary>The page write seam for pages the SPA form consolidates: writes <paramref name="html"/> to
-    /// <paramref name="outputRelativePath"/> under the output root (creating parent dirs), and — ONLY when
-    /// <c>--spa</c> is active — captures the finished page string in memory (<see cref="_spaCapture"/>) for the SPA
-    /// bundle. The capture consumes the render pipeline's OWN output at the instant it is produced, one step before
-    /// it becomes a file: it never reads a generated <c>.html</c> back off disk and never re-parses a source
-    /// <c>.md</c>, so AD-1/AD-2 hold (Story 6.7 Dev Notes "Is landmark-slicing scraping?"). The dashboard/epics
-    /// families deliberately do NOT route through here — the SPA re-renders them from their view models (strongest
-    /// parity, see <see cref="BuildSpaBundle"/>). Bytes written are identical to the prior direct
-    /// <c>File.WriteAllText</c>, so the golden gate is unaffected (AC #5). [Story 6.7]</summary>
-    /// <param name="capture">Whether the written page joins <see cref="_spaCapture"/>. True for every page this
-    /// generator COMPOSED — capture slices their universal <c>&lt;main id="main-content"&gt;</c> landmark. False for
-    /// a page carried in verbatim from outside (Story 18.4's <c>forge-report.html</c>): a foreign document has no
-    /// such landmark, and <see cref="SpaDelivery.ExtractContentRegion"/> degrades a landmark-less page to
-    /// nav-markup-only — so capturing it would put a CONTENT-EMPTY route in the SPA/webview bundle while the real
-    /// file sits perfectly readable on disk beside it. Excluded, the link resolves to that static file, which is
-    /// exactly right for a deliberate dead-end leaf. [Story 18.4]</param>
-    private void WriteOutput(string outputRelativePath, string html, bool capture = true)
+    // ───────────────────────────────────────────────────────────────────────────────────────────────────────
+    // `WriteOutput` was DELETED here by Story 23.6 (AC #1), together with the `_spaCapture` dictionary it filled.
+    //
+    // It wrote a composed document to `<OutputRoot>/<path>` and kept the finished string in memory as the SPA's
+    // slice oracle. Both jobs are finished: Nuxt writes every `.html` from the IR (ADR 0022 §Decision 3), and
+    // the region the SPA/webview consume is COMPOSED at the `WritePage` seam from each page's own `PageView`
+    // rather than sliced back out of a rendered document — proven byte-equal across 1,469 pages with 0
+    // unexpected deltas before either producer was removed (Story 23.4).
+    //
+    // The one caller that did not have a `PageView` — Story 18.4's verbatim `forge-report.html`, passed with
+    // `capture: false` — is handled by `WriteVerbatimPage` below. A foreign document has no
+    // `<main id="main-content">` landmark, so it never belonged in the region path either then or now.
+    // ───────────────────────────────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>Copies a document produced OUTSIDE this generator into the output root verbatim.
+    ///
+    /// <para>[Story 23.6 AC #1] The single surviving <c>.html</c> write in <see cref="SiteGenerator"/>, and it is
+    /// deliberately not a content page: Story 18.4's <c>forge-report.html</c> is carried in whole from an
+    /// external tool, so there is nothing for this generator to compose, nothing for the IR to carry, and
+    /// nothing for Nuxt to render. It was already excluded from the region path (<c>capture: false</c>) for
+    /// exactly that reason. Keeping it is not a residue of the deleted writer — deleting it would drop a file
+    /// the portal links to.</para></summary>
+    private void WriteVerbatimPage(string outputRelativePath, string html)
     {
         var full = Path.Combine(_options.OutputRoot, outputRelativePath.Replace('/', Path.DirectorySeparatorChar));
         var dir = Path.GetDirectoryName(full);
         if (dir is { Length: > 0 }) Directory.CreateDirectory(dir);
         File.WriteAllText(full, html);
-        if (capture && _spaCapture is not null)
-        {
-            _spaCapture[PathUtil.NormalizeSlashes(outputRelativePath)] = html;
-        }
     }
 
-    /// <summary>The Story 23.4 write seam: renders one page from its OWN <see cref="PageView"/>, reference-linkifies
-    /// the finished document exactly as the pre-23.4 call sites did, writes it, and captures BOTH forms — the
-    /// finished HTML string (<see cref="_spaCapture"/>, today's slice oracle) and the page view plus its skip
-    /// identity (<see cref="_spaPageViews"/>, the composed-region producer).
-    /// <para><b>Why the full-page linkify stays here.</b> The static page must not change a byte while the region
-    /// path is being proven — the golden fingerprint is the gate and AC #5 inverts only once Task 2 ends. So this
-    /// seam is deliberately NOT "linkify the region and assemble a page from it": it is the old behaviour, plus a
-    /// second capture. The composed region is derived in <see cref="RegionCompositionDeltas"/> and consumed by
-    /// <see cref="CapturedRegions"/>; nothing about the written document depends on it.</para>
-    /// <para>Replaces the <c>WriteOutput(path, ApplyReferenceLinks(SomeTemplater.RenderPage(...), path))</c>
-    /// idiom at every migrated call site. A page that is carried in verbatim from outside (Story 18.4's
-    /// <c>forge-report.html</c>) has no <see cref="PageView"/> and stays on <see cref="WriteOutput"/>.</para>
-    /// [Story 23.4 AC #3]</summary>
+    /// <summary>The page seam: composes one page's CONTENT REGION from its own <see cref="PageView"/>,
+    /// reference-linkifies it, and records it in <see cref="_spaPageViews"/> — the producer every consumer of this
+    /// pass reads (the IR, and through it the rendered site, the SPA and the webview).
+    ///
+    /// <para><b>[Story 23.6 AC #1] It no longer writes anything.</b> Until this story the same seam also composed
+    /// a full document via <c>HtmlRenderAdapter.Render</c>, linkified it whole, wrote it to
+    /// <c>&lt;OutputRoot&gt;/&lt;path&gt;</c> and kept the string in a <c>_spaCapture</c> oracle. All of that is
+    /// gone: Nuxt is the single writer of SpecScribe's HTML now, and it renders from the IR this method fills.
+    /// The <c>.html</c> files still appear in the output root — <see cref="NuxtPrerender"/> puts them there after
+    /// the IR emit, per ADR 0022 §Decision 3.</para>
+    ///
+    /// <para>The name is kept deliberately. "Write" is still what this seam means to its ~38 callers — this is
+    /// where a page becomes part of the site — and renaming it would have churned every one of them inside the
+    /// commit that already changes what it does.</para>
+    ///
+    /// <para>The region is composed HERE rather than derived later, in the same breath as the linkify pass, so
+    /// both observe identical generator state. See <see cref="CapturedPageView.Region"/> for why deferring it is
+    /// a defect and not an optimisation.</para>
+    /// [Story 23.4 AC #3, Story 23.6 AC #1]</summary>
     /// <param name="linkify">False for the pages that deliberately do NOT run through
-    /// <see cref="ApplyReferenceLinks"/> — see <see cref="CapturedPageView.Linkify"/>. The flag is carried into the
-    /// capture so the composed region reproduces the same decision.</param>
-    /// <returns>The finished document exactly as written — so a caller that must inspect its own output
-    /// (<see cref="EnsureHierarchyEngine"/>'s host-marker scan) keeps byte-identical semantics instead of
-    /// re-deriving the question from the view model.</returns>
-    private string WritePage(
+    /// <see cref="ApplyReferenceLinks"/> — see <see cref="CapturedPageView.Linkify"/>.</param>
+    private void WritePage(
         PageView page,
         string? skipRequirementId = null,
         string? skipStoryId = null,
@@ -4424,21 +4376,6 @@ public sealed class SiteGenerator
         bool linkify = true)
     {
         var path = page.OutputRelativePath;
-        // The FULL-DOCUMENT half of this seam — chrome + head + nav + body, linkified whole, written to disk and
-        // kept in the _spaCapture oracle — is skipped when WriteStaticPages is off. The composed-region half below
-        // is NOT: it is the producer every consumer of this pass actually reads. See WriteStaticPages for why the
-        // one caller that turns this off cannot observe the difference.
-        var html = string.Empty;
-        if (WriteStaticPages)
-        {
-            var rendered = HtmlRenderAdapter.Shared.Render(page).Content;
-            html = linkify
-                ? ApplyReferenceLinks(
-                    rendered, path,
-                    skipRequirementId: skipRequirementId, skipStoryId: skipStoryId, skipEpicNumber: skipEpicNumber)
-                : rendered;
-            WriteOutput(path, html, capture);
-        }
         if (capture && _spaPageViews is not null)
         {
             // Composed HERE, in the same breath as the document's own linkify pass, so both observe identical
@@ -4453,75 +4390,39 @@ public sealed class SiteGenerator
             }
             _spaPageViews[PathUtil.NormalizeSlashes(path)] = new CapturedPageView(page, region);
         }
-        return html;
     }
 
-    /// <summary>One page on which the composed region and the sliced region disagree — the unit of AC #1's
-    /// "every non-zero delta enumerated with its cause and attributed".</summary>
-    /// <param name="Path">The page's normalized output-relative path.</param>
-    /// <param name="Composed">What <see cref="JsonSpaRenderAdapter.RenderContent"/> + <see cref="ApplyReferenceLinks"/>
-    /// produce from the page's own view model — the Story 23.4 producer.</param>
-    /// <param name="Sliced">What <see cref="SpaDelivery.ExtractContentRegion"/> produces from the rendered
-    /// document — the pre-23.4 producer, and the oracle.</param>
-    public readonly record struct RegionParityDelta(string Path, string Composed, string Sliced)
-    {
-        /// <summary>The 0-based index of the first differing char, or -1 when one string is a prefix of the
-        /// other. Reported so a delta is diagnosable from the harness output without re-running a generate.</summary>
-        public int FirstDifferenceAt
-        {
-            get
-            {
-                var shared = Math.Min(Composed.Length, Sliced.Length);
-                for (var i = 0; i < shared; i++)
-                {
-                    if (Composed[i] != Sliced[i]) return i;
-                }
-                return Composed.Length == Sliced.Length ? -1 : shared;
-            }
-        }
-    }
+    // `RegionParityDelta` was retired with `RegionCompositionDeltas` above — it was that proof's result type
+    // and had no other consumer. [Story 23.6, owner decision D3]
 
-    /// <summary>Story 23.4 AC #3's byte-equality proof: for every captured page, compares the region COMPOSED from
-    /// its <see cref="PageView"/> against the region SLICED out of its rendered document, and returns only the
-    /// pages that disagree. An empty result is the licence to delete
-    /// <see cref="SpaDelivery.ExtractContentRegion"/> and the full-page capture behind it.
-    /// <para>⚠️ <b>This must be run against a real <c>--deep-git --spa</c> generate, not only the fixture.</b> The
-    /// test fixture cites no real repo files, so it emits no <c>code/</c> page at all and exercises neither the
-    /// 254-page <c>CodeFileTemplater</c> family nor the 300 <c>commit/</c> pages. A green fixture run is a
-    /// necessary condition, never a sufficient one.</para>
-    /// <para>Pages captured as HTML but with no view model are reported as deltas with an empty
-    /// <see cref="RegionParityDelta.Composed"/> — a page still on the un-migrated write path is exactly the kind of
-    /// silent gap this proof exists to catch, so it must not be skipped.</para></summary>
-    public IReadOnlyList<RegionParityDelta> RegionCompositionDeltas()
-    {
-        lock (_gate)
-        {
-            if (_spaCapture is not { } capture || _spaPageViews is not { } views)
-            {
-                throw new InvalidOperationException(
-                    "RegionCompositionDeltas requires a completed GenerateAll() pass with --spa (or CapturePages) "
-                    + "on this generator, so both the sliced and the composed region are available to compare.");
-            }
-            var nav = _nav ?? throw new InvalidOperationException(
-                "RegionCompositionDeltas requires a completed GenerateAll() pass on this generator.");
-
-            var deltas = new List<RegionParityDelta>();
-            foreach (var (path, fullHtml) in capture)
-            {
-                var normalized = PathUtil.NormalizeSlashes(path);
-                var sliced = SpaDelivery.ExtractContentRegion(
-                    fullHtml, CapturedNavMarkup(fullHtml, nav, normalized));
-                var composed = views.TryGetValue(normalized, out var captured)
-                    ? captured.Region
-                    : string.Empty;
-                if (!string.Equals(composed, sliced, StringComparison.Ordinal))
-                {
-                    deltas.Add(new RegionParityDelta(normalized, composed, sliced));
-                }
-            }
-            return deltas.OrderBy(d => d.Path, StringComparer.Ordinal).ToList();
-        }
-    }
+    // ───────────────────────────────────────────────────────────────────────────────────────────────────────
+    // `RegionCompositionDeltas` was RETIRED here by Story 23.6 (owner decision D3, AC #2).
+    //
+    // WHAT IT PROVED. For every captured page it compared the region COMPOSED from that page's `PageView`
+    // against the region SLICED out of the same page's rendered document, and returned the disagreements. It
+    // was Story 23.4 AC #3's byte-equality proof, and an empty result was the stated licence to delete
+    // `SpaDelivery.ExtractContentRegion` and the full-page capture behind it.
+    //
+    // THE EVIDENCE, AND WHERE IT LIVES. Run against a real `--deep-git --spa` generate — never only the
+    // fixture, which cites no repo files and therefore exercises neither the 254-page `CodeFileTemplater`
+    // family nor the 300 `commit/` pages — it reported **1,469 pages, 0 unexpected deltas**. That result is
+    // recorded in Story 23.4's Dev Agent Record and quoted in Story 23.6's Dev Notes.
+    //
+    // WHY IT IS RETIRED RATHER THAN RE-POINTED. Its job is finished, and its subject is gone: one of the two
+    // things it compared was a slice of a rendered document, and this story deletes both the document and the
+    // slicer. Re-pointing it would mean comparing the composed region against itself.
+    //
+    // ⚠️ WHY THIS IS A DELETION AND NOT A DISABLED TEST. With `_spaCapture` removed, the loop it ran had
+    // nothing to iterate: it would have reported ZERO deltas forever and gone on passing — VACUOUS, not red.
+    // Story 23.6 AC #2 names that failure mode explicitly ("a gate that silently passes because its basis is
+    // empty is a failure of this AC, not a pass"), so the method had to go with the basis. The same discipline
+    // was applied when `GoldenIrFingerprint` and `GoldenContentFingerprint` were removed.
+    //
+    // WHAT COVERS THE REGION NOW. `npm run check:parity` renders a frozen 24-route corpus and compares both a
+    // `<main>` digest carrying the C# lineage and a whole-page digest (ADR 0033). Its oracle was re-pinned with
+    // that lineage verified live, 24/24, against the writer while it still existed — the last moment at which
+    // that verification was possible.
+    // ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>Builds the whole-site SPA bundle: the five dashboard/epics families rendered through their view
     /// models (the same strongest-parity path the webview uses), plus EVERY other page's content region sliced from
@@ -4571,24 +4472,15 @@ public sealed class SiteGenerator
         return new SpaBundle(_options.SiteTitle, "index.html", nav.Items, pages);
     }
 
-    /// <summary>The nav markup a CAPTURED page's content region should carry: the page's OWN rendered
-    /// <c>&lt;nav class="site-nav"&gt;</c>, sliced out of the captured string, falling back to a fresh re-render
-    /// only when the page carries none.
-    /// <para>Why the slice and not the re-render (Story 22.2 AC #5): the re-render path calls
-    /// <c>nav.ToNavigationView(path)</c>, which takes no local-context argument, so every captured page lost the
-    /// page-local context band its static twin shows — an ADR page shipped the generic key-views nav instead of
-    /// its <c>aria-label="ADRs"</c> band (Story 23.1's enumerated difference #2). There is no path →
-    /// <see cref="NavLocalContext"/> resolver to re-derive it from: every producer (ADRs, commit days, commits,
-    /// insights, delivery, SDD, epics, requirements) builds one inline at render time and discards it, so
-    /// threading it here would mean ~8 call sites of plumbing for a value the captured string already holds
-    /// verbatim.</para>
-    /// <para>Both callers pass the RESULT into <see cref="SpaDelivery.ExtractContentRegion"/>, which returns that
-    /// same instance when a page carries no <c>&lt;main&gt;</c> landmark — the reference the webview loop's
-    /// <c>ReferenceEquals</c> degrade check depends on. Keep it one instance per page.</para>
-    /// [Story 22.2]</summary>
-    private static string CapturedNavMarkup(string fullPageHtml, SiteNav nav, string normalizedPath) =>
-        SpaDelivery.ExtractNavMarkup(fullPageHtml)
-        ?? HtmlRenderAdapter.Shared.RenderNavMarkup(nav.ToNavigationView(normalizedPath));
+    // ───────────────────────────────────────────────────────────────────────────────────────────────────────
+    // `CapturedNavMarkup` was DELETED here by Story 23.6 (AC #1). It recovered a captured page's nav element by
+    // regex over the RENDERED DOCUMENT, falling back to re-rendering it from the nav model, and existed only to
+    // feed `SpaDelivery.ExtractContentRegion`. Both the document and the slicer are gone: the region is COMPOSED
+    // from each page's own `PageView` at the `WritePage` seam, so the nav markup is produced rather than
+    // recovered — and the page-local context band whose loss motivated the slice (Story 23.1's difference #2) is
+    // present by construction, because the composer renders from the same view model that carries it.
+    // ───────────────────────────────────────────────────────────────────────────────────────────────────────
+
 
     /// <summary>Renders one dashboard/epics family page's SPA content region (nav + breadcrumb + body) through
     /// <see cref="JsonSpaRenderAdapter"/>, reference-linkified with the SAME skip rules the static page uses (a page
@@ -4911,9 +4803,14 @@ public sealed class SiteGenerator
         }
     }
 
+    /// <summary>Composes the dashboard's region into the IR. [Story 23.6 AC #1]
+    /// <para>The fifth and last content-<c>.html</c> write path: this method used to render a whole document and
+    /// put it on disk through <see cref="WriteTextWithRetry"/> (whose retry existed because a watch-mode pass and
+    /// an editor could reach <c>index.html</c> at the same moment). Nuxt writes it now, from the region composed
+    /// here. The method keeps its name for the same reason <see cref="WritePage"/> does — it is still "make the
+    /// dashboard part of the site" to all of its callers.</para></summary>
     private void WriteIndex(SiteNav nav, WorkInventory? work = null)
     {
-        var indexPath = Path.Combine(_options.OutputRoot, "index.html");
         var docs = _docs.Values.ToList();
         var inventory = work ?? WorkInventory.Build(docs);
         // Incremental paths may call WriteIndex without going through GenerateAll's ledger build — rebuild then.
@@ -4925,7 +4822,7 @@ public sealed class SiteGenerator
         // Built once and used twice: the view model feeds both the write below and the asset gate, so the two
         // can no longer disagree about what the page needs. [Story 23.6 Task 5]
         var indexPage = HtmlTemplater.BuildIndexPage(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, _module.Commands, inventory, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts, followUps, unplanned, cadence: _cadence, workGraph: _workGraph, dateCutoff: _today, testArtifacts: _testArtifacts);
-        WriteTextWithRetry(indexPath, ApplyReferenceLinks(HtmlRenderAdapter.Shared.Render(indexPage).Content, "index.html"));
+        WritePage(indexPage);
         EnsureHierarchyEngine(indexPage);
     }
 
@@ -5401,9 +5298,9 @@ public sealed class SiteGenerator
                 // Report FIRST, so a failed carry can never leave the detail page linking a file that isn't there.
                 if (idea is { ReportOutputPath: { } reportPath, CarriedReportHtml: { } reportHtml })
                 {
-                    // capture: false — see WriteOutput's <param>. A foreign document has no <main id="main-content">
-                    // for the SPA/webview slicer to find, so capturing it would ship a content-empty route.
-                    WriteOutput(reportPath, reportHtml, capture: false);
+                    // A foreign document: no <main id="main-content"> to compose a region from, so it is not an
+                    // IR route and Nuxt does not render it. See WriteVerbatimPage. [Story 18.4 / 23.6 AC #1]
+                    WriteVerbatimPage(reportPath, reportHtml);
                 }
 
                 WritePage(IdeasTemplater.BuildDetailPage(idea, nav));
@@ -5967,8 +5864,6 @@ public sealed class SiteGenerator
                 var name = Path.GetFileName(file);
                 if (emitted.Contains(name)) continue;
                 File.Delete(file);
-                if (_spaCapture is not null)
-                    _spaCapture.Remove(PathUtil.NormalizeSlashes(Path.Combine(FollowUpSlug.Folder, name)));
                 _spaPageViews?.Remove(PathUtil.NormalizeSlashes(Path.Combine(FollowUpSlug.Folder, name)));
             }
         }

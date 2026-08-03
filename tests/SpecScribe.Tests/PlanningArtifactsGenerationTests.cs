@@ -16,9 +16,9 @@ public class PlanningArtifactsGenerationTests : IDisposable
     private string Adrs => Path.Combine(_root, "docs", "adrs");
     private string Site => Path.Combine(_root, "site");
 
-    private string IndexPage => Path.Combine(Site, "index.html");
-    private string RubricPage => Path.Combine(Site, "planning-artifacts", "prds", "prd-x", "review-rubric.html");
-    private string PrdPage => Path.Combine(Site, "planning-artifacts", "prds", "prd-x", "prd.html");
+    private string IndexRoute => "index.html";
+    private string RubricRoute => "planning-artifacts/prds/prd-x/review-rubric.html";
+    private string PrdRoute => "planning-artifacts/prds/prd-x/prd.html";
 
     // Output-relative hrefs as they appear in the home index (index.html lives at the site root).
     private const string PrdHref = "planning-artifacts/prds/prd-x/prd.html";
@@ -79,7 +79,7 @@ public class PlanningArtifactsGenerationTests : IDisposable
         // rubric branch link). The planning PAGES are still generated on disk (reachable by direct URL / nav) —
         // only the duplicated home listing is gone.
         GenerateSite();
-        var index = File.ReadAllText(IndexPage);
+        var index = SiteRegion.Read(Site, IndexRoute);
 
         // No home index-band card markup for the planning artifacts anymore.
         Assert.DoesNotContain("index-card--primary", index);
@@ -88,8 +88,8 @@ public class PlanningArtifactsGenerationTests : IDisposable
         Assert.DoesNotContain($"<a class=\"index-card\" href=\"{RubricHref}\">", index);
 
         // Every planning page is still generated on disk (the removal never orphaned a generated page).
-        Assert.True(File.Exists(RubricPage), "review-rubric.html must still be generated");
-        Assert.True(File.Exists(PrdPage), "prd.html must be generated");
+        Assert.True(SiteRegion.Exists(Site, RubricRoute), "review-rubric.html must still be generated");
+        Assert.True(SiteRegion.Exists(Site, PrdRoute), "prd.html must be generated");
     }
 
     [Fact]
@@ -98,10 +98,10 @@ public class PlanningArtifactsGenerationTests : IDisposable
         // The rename/remove scenario from Task 6: no rubric → no rubric page and no dangling reference on home.
         File.Delete(Path.Combine(Source, "planning-artifacts", "prds", "prd-x", "review-rubric.md"));
         GenerateSite();
-        var index = File.ReadAllText(IndexPage);
+        var index = SiteRegion.Read(Site, IndexRoute);
 
         Assert.DoesNotContain("index-card-branch", index);        // no quality-review link on home
         Assert.DoesNotContain(RubricHref, index);                 // no reference to the (absent) rubric page
-        Assert.False(File.Exists(RubricPage));
+        Assert.False(SiteRegion.Exists(Site, RubricRoute));
     }
 }

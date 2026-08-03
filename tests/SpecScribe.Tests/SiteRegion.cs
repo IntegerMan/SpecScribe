@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using SpecScribe;
 
 namespace SpecScribe.Tests;
@@ -75,5 +76,192 @@ internal static class SiteRegion
         using var manifest = JsonDocument.Parse(File.ReadAllText(manifestFile));
         return manifest.RootElement.GetProperty("pages").EnumerateObject()
             .Select(p => p.Name).Order(StringComparer.Ordinal).ToList();
+    }
+
+    /// <summary>True when the IR carries at least one route under <paramref name="routePrefix"/> (e.g.
+    /// <c>"epics/"</c>) — the replacement for <c>Directory.Exists(Path.Combine(Site, "epics"))</c>.
+    ///
+    /// <para><b>Why this is not a directory check any more, and why that matters.</b> Those assertions
+    /// (<c>Assert.False(Directory.Exists(…), "stale epics/ subtree must be deleted")</c>) were checking that a
+    /// removal actually propagated. Once C# writes no pages there is no <c>epics/</c> directory under ANY
+    /// condition, so the negative form would pass without the removal having happened at all — the vacuous-gate
+    /// failure AC #2 exists to prevent. The route set is where the subtree lives now, so that is where the
+    /// question is asked.</para></summary>
+    public static bool HasRoutesUnder(string siteRoot, string routePrefix) =>
+        RoutesUnder(siteRoot, routePrefix).Count > 0;
+
+    /// <summary>Every route under <paramref name="routePrefix"/>, sorted — the replacement for
+    /// <c>Directory.GetFiles(Path.Combine(Site, "commit"), "*.html")</c>. Returns empty rather than throwing when
+    /// no IR exists, mirroring <c>Directory.GetFiles</c> on an absent directory.</summary>
+    public static IReadOnlyList<string> RoutesUnder(string siteRoot, string routePrefix)
+    {
+        var prefix = PathUtil.NormalizeSlashes(routePrefix).TrimEnd('/') + "/";
+        var manifestFile = Path.Combine(siteRoot, SpaDelivery.ManifestPath.Replace('/', Path.DirectorySeparatorChar));
+        if (!File.Exists(manifestFile)) return Array.Empty<string>();
+        using var manifest = JsonDocument.Parse(File.ReadAllText(manifestFile));
+        return manifest.RootElement.GetProperty("pages").EnumerateObject()
+            .Select(p => p.Name)
+            .Where(p => p.StartsWith(prefix, StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal)
+            .ToList();
+    }
+
+    /// <summary>A page's head projection from the IR — the <c>&lt;title&gt;</c> and
+    /// <c>&lt;meta name="description"&gt;</c> the renderer emits for it (Story 22.2 AC #5).
+    /// <para>[Story 23.6 AC #8] The replacement for asserting those two values as substrings of a written
+    /// document. Stronger than the string form it replaces: it checks the projected VALUE, not one rendering
+    /// of it, so an escaping or attribute-order change cannot break the test and a genuinely wrong description
+    /// cannot pass it by appearing somewhere else on the page.</para></summary>
+    public static (string Title, string Description) Head(string siteRoot, string outputRelativePath)
+    {
+        var path = PathUtil.NormalizeSlashes(outputRelativePath);
+        var manifestFile = Path.Combine(siteRoot, SpaDelivery.ManifestPath.Replace('/', Path.DirectorySeparatorChar));
+        using var manifest = JsonDocument.Parse(File.ReadAllText(manifestFile));
+        if (!manifest.RootElement.GetProperty("pages").TryGetProperty(path, out var entry))
+        {
+            throw new InvalidOperationException($"'{path}' is not in the IR manifest — the page was not emitted.");
+        }
+        var head = entry.GetProperty("head");
+        return (head.GetProperty("title").GetString()!, head.GetProperty("description").GetString()!);
+    }
+
+    /// <summary>The IR's site-level CHROME block — the scripts and constants no page's region carries because
+    /// they belong to the document, not to the content. [Story 23.6]
+    ///
+    /// <para><b>This is where the deleted writer's chrome assertions go.</b> A test that used to look for
+    /// <c>mermaid.esm.min.mjs</c> or <c>data-ss-relgraph-boot</c> in a written page is asking two questions at
+    /// once: "does the site carry this script at all?" and "does THIS page get it?". The first is a C# question
+    /// and is answered here. The second is the renderer's, derived structurally from the region
+    /// (<c>web/ir/adapter.ts</c> § <c>chromeNeeds</c>) and pinned by <c>web/test/chrome-needs.test.ts</c>.</para></summary>
+    public static ChromeBlock Chrome(string siteRoot)
+    {
+        var manifestFile = Path.Combine(siteRoot, SpaDelivery.ManifestPath.Replace('/', Path.DirectorySeparatorChar));
+        using var manifest = JsonDocument.Parse(File.ReadAllText(manifestFile));
+        if (!manifest.RootElement.TryGetProperty("chrome", out var chrome))
+        {
+            throw new InvalidOperationException(
+                "the IR manifest carries no 'chrome' block. Since Story 23.6 the renderer reads the favicon, the "
+                + "asset cache-bust and every chrome script from there; without it the rendered pages lose all of "
+                + "them SILENTLY, which is the failure this accessor exists to make loud.");
+        }
+        string Get(string name) => chrome.TryGetProperty(name, out var v) ? v.GetString() ?? string.Empty : string.Empty;
+        return new ChromeBlock(
+            Get("assetVersion"), Get("faviconDataUri"), Get("hierarchyBootScript"),
+            Get("graphBootScript"), Get("mermaidInitScript"), Get("tocActiveSectionScript"));
+    }
+
+    internal sealed record ChromeBlock(
+        string AssetVersion,
+        string FaviconDataUri,
+        string HierarchyBootScript,
+        string GraphBootScript,
+        string MermaidInitScript,
+        string TocActiveSectionScript);
+
+    /// <summary>Overwrites a route's region in the IR with <paramref name="sentinel"/>, so a later read proves
+    /// whether a regeneration actually refreshed that route.
+    ///
+    /// <para><b>The region-side form of the sentinel-clobber proof.</b> Several watch-mode tests wrote
+    /// <c>"STALE-SENTINEL"</c> over a generated <c>.html</c> and then asserted the incremental path replaced it —
+    /// the only way to tell "re-rendered" from "left alone", since a correct re-render is byte-identical to what
+    /// was already there. Story 23.6 leaves no <c>.html</c> to clobber, so the sentinel goes into the chunk the
+    /// route's region lives in.</para>
+    ///
+    /// <para>Written as VALID JSON on purpose: a stale read then returns the sentinel and the assertion fails with
+    /// its own message, rather than throwing a parse error three frames down that says nothing about
+    /// staleness.</para></summary>
+    public static void PoisonRoute(string siteRoot, string route, string sentinel = "STALE-SENTINEL")
+    {
+        var path = PathUtil.NormalizeSlashes(route);
+        var manifestFile = Path.Combine(siteRoot, SpaDelivery.ManifestPath.Replace('/', Path.DirectorySeparatorChar));
+        using var manifest = JsonDocument.Parse(File.ReadAllText(manifestFile));
+        if (!manifest.RootElement.GetProperty("pages").TryGetProperty(path, out var entry))
+        {
+            throw new InvalidOperationException($"cannot poison '{path}' — it is not in the IR manifest");
+        }
+
+        var chunkFile = Path.Combine(
+            siteRoot,
+            entry.GetProperty("chunk").GetString()!.Replace('/', Path.DirectorySeparatorChar));
+        Dictionary<string, string> chunk;
+        using (var doc = JsonDocument.Parse(File.ReadAllText(chunkFile)))
+        {
+            chunk = doc.RootElement.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.GetString()!);
+        }
+        chunk[path] = sentinel;
+        File.WriteAllText(chunkFile, JsonSerializer.Serialize(chunk));
+    }
+
+    /// <summary>Asserts every same-site <c>href</c> in a page's region resolves to something that exists.
+    ///
+    /// <para><b>Consolidates six near-identical private copies</b> that lived in
+    /// <c>SiteGeneratorCadenceTests</c>, <c>…CodeMapTests</c>, <c>…EpicsRemovalTests</c>, <c>…GroupedNavTests</c>,
+    /// <c>…SprintTests</c> and <c>…TraceabilityMatrixTests</c>. Each read the written document and resolved every
+    /// link against the filesystem; Story 23.6 leaves no written document, so all six had to change and there was
+    /// no reason for them to change six different ways.</para>
+    ///
+    /// <para><b>A page link is checked against the IR, an asset link against the disk.</b> That split is the whole
+    /// substance of the change: <c>.html</c> targets are ROUTES now — nothing writes them during a unit-suite
+    /// generate (<see cref="SiteGenerator.PrerenderHtml"/> is off) — while stylesheets, scripts and directories are
+    /// still real files C# places. Resolving a page link on disk would assert the writer still exists, which is
+    /// exactly what this story removes.</para>
+    ///
+    /// <para><b>Coverage note, stated rather than left to be found.</b> The region is nav + wayfinding + body, so
+    /// this sees every in-content and navigation link but NOT links emitted in chrome (the footer). Chrome links
+    /// belong to <c>npm run check:links</c> over the rendered site.</para></summary>
+    public static void AssertNoBrokenLocalLinks(string siteRoot, string route)
+    {
+        var region = Read(siteRoot, route);
+        var routes = Routes(siteRoot).ToHashSet(StringComparer.Ordinal);
+        var routeDir = PathUtil.NormalizeSlashes(Path.GetDirectoryName(route) ?? string.Empty);
+
+        foreach (Match m in Regex.Matches(region, "href=\"(?<href>[^\"]+)\""))
+        {
+            var href = m.Groups["href"].Value;
+            // Anything with a URI scheme (http:, data:, mailto:, vscode:, command:) or a bare fragment is not a
+            // local reference — only same-site relative hrefs can dangle.
+            if (href.StartsWith('#') || Regex.IsMatch(href, @"^[a-zA-Z][a-zA-Z0-9+.\-]*:")) continue;
+
+            var target = href.Split('#')[0].Split('?')[0];
+            if (target.Length == 0) continue;
+
+            // Surrounding markup in the message: a dangling href is only actionable if you can see which widget
+            // emitted it.
+            var from = Math.Max(0, m.Index - 220);
+            var context = region.Substring(from, Math.Min(440, region.Length - from));
+
+            if (target.EndsWith(".html", StringComparison.OrdinalIgnoreCase))
+            {
+                var resolved = ResolveRoute(routeDir, target);
+                Assert.True(routes.Contains(resolved),
+                    $"{route} links to '{href}', which is not a route in the IR (resolved: {resolved})."
+                    + $"\nContext:\n…{context}…");
+            }
+            else
+            {
+                var onDisk = Path.GetFullPath(Path.Combine(
+                    siteRoot,
+                    ResolveRoute(routeDir, target).Replace('/', Path.DirectorySeparatorChar)));
+                Assert.True(File.Exists(onDisk) || Directory.Exists(onDisk),
+                    $"{route} links to '{href}', which does not exist on disk (resolved: {onDisk})."
+                    + $"\nContext:\n…{context}…");
+            }
+        }
+    }
+
+    /// <summary>Resolves a page-relative href against the linking page's directory, collapsing <c>..</c> and
+    /// <c>.</c> segments — the route-space equivalent of <see cref="Path.GetFullPath(string)"/>, done without
+    /// touching the filesystem because routes are not paths any more.</summary>
+    private static string ResolveRoute(string routeDir, string target)
+    {
+        var stack = new List<string>();
+        if (routeDir.Length > 0) stack.AddRange(routeDir.Split('/'));
+        foreach (var segment in target.Split('/'))
+        {
+            if (segment is "" or ".") continue;
+            if (segment == "..") { if (stack.Count > 0) stack.RemoveAt(stack.Count - 1); continue; }
+            stack.Add(segment);
+        }
+        return string.Join('/', stack);
     }
 }

@@ -11,57 +11,29 @@ namespace SpecScribe.Tests;
 /// just this repo's own content) must degrade gracefully, never crash the whole `--spa` emit.</summary>
 public class SpaDeliveryTests
 {
-    private const string NavMarkup = "<nav class=\"site-nav\">NAV</nav>";
-
-    [Fact]
-    public void ExtractContentRegion_IgnoresAnEarlierLiteralClosingTag_BeforeTheRealLandmark()
-    {
-        // A doc whose body legitimately shows the landmark markup as an example (raw HTML passthrough), BEFORE the
-        // real <main id="main-content"> the page itself carries. mainClose must never resolve to an index earlier
-        // than mainOpen — that would make the slice below throw ArgumentOutOfRangeException.
-        var page = "<body>"
-            + "<p>Example: &lt;/main&gt; is not real markup, just a code sample rendered as text</p>"
-            + "</main>" // a raw-HTML passthrough closer that is NOT the real landmark's closer
-            + "<div class=\"breadcrumb\"><a href=\"index.html\">Home</a></div>"
-            + "<main id=\"main-content\"><p>Real body</p></main>"
-            + "</body>";
-
-        var region = SpaDelivery.ExtractContentRegion(page, NavMarkup);
-
-        Assert.Contains("Real body", region);
-        Assert.Contains(NavMarkup, region);
-    }
-
-    [Fact]
-    public void ExtractContentRegion_DegradesToNavOnly_WhenNoLandmarkIsPresent()
-    {
-        var region = SpaDelivery.ExtractContentRegion("<body>no landmark here</body>", NavMarkup);
-        Assert.Equal(NavMarkup, region);
-    }
-
-    [Fact]
-    public void ExtractBreadcrumb_RecoversLabelsAndTargets_FromCapturedHtml()
-    {
-        var page = "<div class=\"breadcrumb\" aria-label=\"Breadcrumb\">\n"
-            + "  <a href=\"../index.html\">Home</a>\n"
-            + "  <span class=\"crumb-sep\">/</span>\n"
-            + "  <span class=\"crumb-current\" aria-current=\"page\">Widget</span>\n"
-            + "</div>\n\n"
-            + "<main id=\"main-content\"></main>";
-
-        var crumbs = SpaDelivery.ExtractBreadcrumb(page, "requirements/widget.html");
-
-        Assert.Equal(2, crumbs.Count);
-        Assert.Equal(("Home", "index.html"), (crumbs[0].Label, crumbs[0].OutputRelativePath));
-        Assert.Equal(("Widget", (string?)null), (crumbs[1].Label, crumbs[1].OutputRelativePath));
-    }
-
-    [Fact]
-    public void ExtractBreadcrumb_IsEmpty_WhenPageCarriesNoBreadcrumb()
-    {
-        var crumbs = SpaDelivery.ExtractBreadcrumb("<main id=\"main-content\"></main>", "index.html");
-        Assert.Empty(crumbs);
-    }
+        // ═══════════════════════════════════════════════════════════════════════════════════════════════════
+    // SIX SLICER TESTS WERE RETIRED HERE by Story 23.6 (AC #1/#2), with the helpers they covered:
+    // `ExtractContentRegion` (x2), `ExtractBreadcrumb` (x2), `ExtractNavMarkup` (x2) and
+    // `ExtractMetaDescription`.
+    //
+    // WHAT THEY COVERED, AND WHY IT NO LONGER EXISTS. All of them read a RENDERED DOCUMENT back apart: cut the
+    // content region out at the `<main id="main-content">` landmark, recover the breadcrumb, recover the nav
+    // element, recover the meta description. That whole direction of travel is gone. The region is COMPOSED
+    // from each page's own `PageView` at the `WritePage` seam (`JsonSpaRenderAdapter.RenderContent`), and the
+    // title and description are projected into the IR's per-page `head` block — nothing is recovered from
+    // markup, so there is no recovery to test.
+    //
+    // ⚠️ THE ADVERSARIAL CASE THEY EXISTED FOR IS NOT MERELY UNTESTED — IT IS UNREACHABLE. The headline test
+    // pinned a page whose body legitimately renders `</main>` as PROSE (Markdig raw-HTML passthrough, reachable
+    // from any user-authored doc) before the real landmark: a naive slice resolved `mainClose` earlier than
+    // `mainOpen` and threw `ArgumentOutOfRangeException`, taking the whole `--spa` emit with it. Composition
+    // cannot hit that class of bug at all, because it never searches a rendered string for its own boundaries.
+    // That is the substance of what this story buys, and it is why these tests are DELETED rather than skipped:
+    // a skipped test implies a gap, and there is none.
+    //
+    // The rest of this file — `BuildDelta`, `BuildDataFiles`, `BuildEntryShell`, `ContentHash`,
+    // `ExtractScriptIslands` — is untouched. Those operate on the REGION, not on a rendered document.
+    // ═══════════════════════════════════════════════════════════════════════════════════════════════════
 
     private static SpaBundle SyntheticBundle(IEnumerable<string> outputRelativePaths, string entryPath = "index.html")
     {
@@ -611,50 +583,6 @@ public class SpaDeliveryTests
         files.Single(f => f.OutputRelativePath == SpaDelivery.ManifestPath).Content;
 
     // ===== Story 22.2: the capture extractors (AC #5) ========================================================
-
-    /// <summary>The nav slice keeps the page's OWN nav — including the page-local context band the re-render
-    /// path cannot reproduce (there is no path → NavLocalContext resolver) — and stops at the nav element's own
-    /// closer, EXCLUDING the inline toggle script that follows it on the HTML surface. [Story 22.2 AC #5]</summary>
-    [Fact]
-    public void ExtractNavMarkup_TakesThePagesOwnNav_AndStopsBeforeTheInlineToggleScript()
-    {
-        var page = "<a class=\"skip-link\" href=\"#main-content\">Skip to content</a>\n"
-            + "<nav class=\"site-nav\" aria-label=\"Document navigation\">\n"
-            + "  <div class=\"site-nav-inner\"><a href=\"index.html\">Home</a></div>\n"
-            + "  <div class=\"site-nav-key-views site-nav-local-context\" aria-label=\"ADRs\">"
-            + "<a href=\"0001-a.html\">ADR 1</a></div>\n"
-            + "</nav>\n"
-            + "<script>NAV_TOGGLE()</script>\n"
-            + "<div class=\"breadcrumb\"><a href=\"../index.html\">Home</a></div>\n"
-            + "<main id=\"main-content\"><p>Body</p></main>\n";
-
-        var nav = SpaDelivery.ExtractNavMarkup(page);
-
-        Assert.NotNull(nav);
-        Assert.StartsWith("<nav class=\"site-nav\"", nav);
-        Assert.EndsWith("</nav>\n", nav);
-        Assert.Contains("site-nav-local-context", nav);
-        Assert.Contains("aria-label=\"ADRs\"", nav);
-        Assert.DoesNotContain("NAV_TOGGLE", nav);
-        Assert.DoesNotContain("<script", nav);
-    }
-
-    [Fact]
-    public void ExtractNavMarkup_IsNull_WhenThePageCarriesNoSiteNav()
-    {
-        Assert.Null(SpaDelivery.ExtractNavMarkup("<main id=\"main-content\">no nav</main>"));
-    }
-
-    [Fact]
-    public void ExtractMetaDescription_RecoversAndDecodes_OrReturnsNullWhenAbsent()
-    {
-        var page = "<head><title>T</title>\n"
-            + "<meta name=\"description\" content=\"Docs &amp; specs for &quot;SpecScribe&quot;\">\n"
-            + "<meta property=\"og:description\" content=\"ignored\">\n</head>";
-
-        Assert.Equal("Docs & specs for \"SpecScribe\"", SpaDelivery.ExtractMetaDescription(page));
-        Assert.Null(SpaDelivery.ExtractMetaDescription("<head><title>T</title></head>"));
-    }
 
     /// <summary>The strip-or-nonce declaration (Story 22.2 AC #5). Both kinds that exist in SpecScribe output are
     /// pinned here: the inert <c>application/json</c> islands (the sunburst/hierarchy/impact-map payloads), and an

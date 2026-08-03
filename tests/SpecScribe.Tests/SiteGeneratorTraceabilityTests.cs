@@ -13,8 +13,8 @@ public class SiteGeneratorTraceabilityTests : IDisposable
     private string Source => Path.Combine(_root, "_bmad-output");
     private string Adrs => Path.Combine(_root, "docs", "adrs");
     private string Site => Path.Combine(_root, "site");
-    private string StoryPage => Path.Combine(Site, "epics", "story-1-1.html");
-    private string HomeIndex => Path.Combine(Site, "index.html");
+    private string StoryRoute => "epics/story-1-1.html";
+    private string HomeIndexRoute => "index.html";
 
     private const string EpicsMd = """
         # Epics
@@ -160,7 +160,7 @@ public class SiteGeneratorTraceabilityTests : IDisposable
     {
         GenerateSite();
 
-        var html = File.ReadAllText(StoryPage);
+        var html = SiteRegion.Read(Site, StoryRoute);
         Assert.Contains("class=\"req-ref\"", html);
         Assert.Contains("requirements/fr6.html", html);
     }
@@ -170,7 +170,7 @@ public class SiteGeneratorTraceabilityTests : IDisposable
     {
         GenerateSite();
 
-        var html = File.ReadAllText(StoryPage);
+        var html = SiteRegion.Read(Site, StoryRoute);
         Assert.Contains("FR99", html);
         Assert.DoesNotContain("requirements/fr99.html", html);
         // Positive control: FR99 must remain plain text, not become the visible label of ANY anchor (a
@@ -183,7 +183,7 @@ public class SiteGeneratorTraceabilityTests : IDisposable
     {
         GenerateSite();
 
-        var html = File.ReadAllText(Path.Combine(Site, "requirements", "fr6.html"));
+        var html = SiteRegion.Read(Site, "requirements/fr6.html");
         // Positive control first: FR6 must actually appear on its own detail page, otherwise the self-link
         // negative below passes vacuously (page could simply never mention FR6).
         Assert.Contains("FR6", html);
@@ -198,7 +198,7 @@ public class SiteGeneratorTraceabilityTests : IDisposable
     {
         GenerateSite();
 
-        var html = File.ReadAllText(StoryPage);
+        var html = SiteRegion.Read(Site, StoryRoute);
         // Blurb slice. epics.md is special-cased to the generated epics.html, never its mirrored render.
         Assert.Contains("href=\"../epics.html\"", html);
         Assert.DoesNotContain("planning-artifacts/epics.html", html);
@@ -209,7 +209,7 @@ public class SiteGeneratorTraceabilityTests : IDisposable
     {
         GenerateSite();
 
-        var html = File.ReadAllText(StoryPage);
+        var html = SiteRegion.Read(Site, StoryRoute);
         // Acceptance-criteria slice → generic mirrored render.
         Assert.Contains("planning-artifacts/prd.html", html);
     }
@@ -219,7 +219,7 @@ public class SiteGeneratorTraceabilityTests : IDisposable
     {
         GenerateSite();
 
-        var html = File.ReadAllText(StoryPage);
+        var html = SiteRegion.Read(Site, StoryRoute);
         // Remainder slice (the Tasks/Subtasks body) must receive source-link processing too.
         Assert.Contains("planning-artifacts/rendering.html", html);
     }
@@ -229,7 +229,7 @@ public class SiteGeneratorTraceabilityTests : IDisposable
     {
         GenerateSite();
 
-        var html = File.ReadAllText(StoryPage);
+        var html = SiteRegion.Read(Site, StoryRoute);
         // Dev-agent-record slice.
         Assert.Contains("specs/architecture.html", html);
     }
@@ -239,7 +239,7 @@ public class SiteGeneratorTraceabilityTests : IDisposable
     {
         GenerateSite();
 
-        var html = File.ReadAllText(StoryPage);
+        var html = SiteRegion.Read(Site, StoryRoute);
         // Review-findings slice.
         Assert.Contains("planning-artifacts/brief.html", html);
     }
@@ -249,7 +249,7 @@ public class SiteGeneratorTraceabilityTests : IDisposable
     {
         GenerateSite();
 
-        var html = File.ReadAllText(StoryPage);
+        var html = SiteRegion.Read(Site, StoryRoute);
         // The change-log citation to the 1.2 artifact must resolve to its story detail page, proving both
         // consumed-artifact routing and change-log slice processing.
         Assert.Contains("epics/story-1-2.html", html);
@@ -260,7 +260,7 @@ public class SiteGeneratorTraceabilityTests : IDisposable
     {
         GenerateSite();
 
-        var html = File.ReadAllText(StoryPage);
+        var html = SiteRegion.Read(Site, StoryRoute);
         // Only the .md path is linked; a trailing "#Fragment" names prose, not a real id, so it must stay as
         // plain text OUTSIDE the anchor's href.
         Assert.Contains("specs/architecture.html", html);
@@ -275,7 +275,7 @@ public class SiteGeneratorTraceabilityTests : IDisposable
     {
         GenerateSite();
 
-        var adrHtml = File.ReadAllText(Path.Combine(Site, "adrs", "0001-first.html"));
+        var adrHtml = SiteRegion.Read(Site, "adrs/0001-first.html");
         Assert.Contains("href=\"0002-second.html\"", adrHtml);
         Assert.Contains("href=\"index.html\"", adrHtml);
 
@@ -289,7 +289,7 @@ public class SiteGeneratorTraceabilityTests : IDisposable
     {
         GenerateSite();
 
-        var adrHtml = File.ReadAllText(Path.Combine(Site, "adrs", "0001-first.html"));
+        var adrHtml = SiteRegion.Read(Site, "adrs/0001-first.html");
         // Markdown ADR links carry their fragment through the .md → .html rewrite unchanged.
         Assert.Contains("href=\"0002-second.html#Context\"", adrHtml);
     }
@@ -298,29 +298,29 @@ public class SiteGeneratorTraceabilityTests : IDisposable
     public void RegenerateAdrs_RemovesStalePage_WhenAdrDeleted()
     {
         var gen = GenerateSite();
-        Assert.True(File.Exists(Path.Combine(Site, "adrs", "0002-second.html")));
+        Assert.True(SiteRegion.Exists(Site, "adrs/0002-second.html"));
 
         File.Delete(Path.Combine(Adrs, "0002-second.md"));
         Assert.NotEqual(GenerationOutcome.Error, gen.RegenerateAdrs().Outcome);
 
         // The stale ADR page is removed; the untouched ADR 0001 page survives the regeneration intact.
-        Assert.False(File.Exists(Path.Combine(Site, "adrs", "0002-second.html")));
-        Assert.True(File.Exists(Path.Combine(Site, "adrs", "0001-first.html")));
+        Assert.False(SiteRegion.Exists(Site, "adrs/0002-second.html"));
+        Assert.True(SiteRegion.Exists(Site, "adrs/0001-first.html"));
     }
 
     [Fact]
     public void RegenerateAdrs_HandlesRename_WithoutLeavingStalePage()
     {
         var gen = GenerateSite();
-        Assert.True(File.Exists(Path.Combine(Site, "adrs", "0002-second.html")));
+        Assert.True(SiteRegion.Exists(Site, "adrs/0002-second.html"));
 
         File.Move(Path.Combine(Adrs, "0002-second.md"), Path.Combine(Adrs, "0002-renamed.md"));
         Assert.NotEqual(GenerationOutcome.Error, gen.RegenerateAdrs().Outcome);
 
-        Assert.False(File.Exists(Path.Combine(Site, "adrs", "0002-second.html")));
-        Assert.True(File.Exists(Path.Combine(Site, "adrs", "0002-renamed.html")));
+        Assert.False(SiteRegion.Exists(Site, "adrs/0002-second.html"));
+        Assert.True(SiteRegion.Exists(Site, "adrs/0002-renamed.html"));
         // The untouched ADR 0001 page must still exist after a sibling rename.
-        Assert.True(File.Exists(Path.Combine(Site, "adrs", "0001-first.html")));
+        Assert.True(SiteRegion.Exists(Site, "adrs/0001-first.html"));
     }
 
     [Fact]
@@ -334,7 +334,7 @@ public class SiteGeneratorTraceabilityTests : IDisposable
 
         // The changed status is reflected on the regenerated ADR page (the home index card was removed by
         // spec-declutter-home-dashboard). The page was REPLACED, not appended to: the old status is gone.
-        var adrPage = File.ReadAllText(Path.Combine(Site, "adrs", "0002-second.html"));
+        var adrPage = SiteRegion.Read(Site, "adrs/0002-second.html");
         Assert.Contains("status-superseded", adrPage);
         Assert.DoesNotContain("Proposed", adrPage);
     }

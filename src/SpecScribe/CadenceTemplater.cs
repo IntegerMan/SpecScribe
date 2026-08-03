@@ -13,13 +13,6 @@ namespace SpecScribe;
 /// dates each chart shows its own empty state — the page is still written (shared <c>hasEpics</c> gate). [Story 21.2]</summary>
 public static class CadenceTemplater
 {
-    /// <summary>Renders the whole page. <paramref name="today"/> is the single per-run "today" (FR31) used to bound
-    /// the heatmap grid and the strip's recent-window so a from-scratch regen on unchanged inputs is byte-identical.
-    /// <paramref name="data"/> is <see cref="DeliveryCadenceData.Empty"/> (not null) when there is simply nothing to
-    /// chart yet.</summary>
-    public static string RenderPage(DeliveryCadenceData data, SiteNav nav, DateOnly today) =>
-        HtmlRenderAdapter.Shared.Render(BuildPage(data, nav, today)).Content;
-
     /// <summary>Builds this page's host-neutral <see cref="PageView"/> — see
     /// <see cref="RiskQuadrantTemplater.BuildPage"/> for why every standalone templater grew one. [Story 23.4 AC #3]</summary>
     public static PageView BuildPage(DeliveryCadenceData data, SiteNav nav, DateOnly today)

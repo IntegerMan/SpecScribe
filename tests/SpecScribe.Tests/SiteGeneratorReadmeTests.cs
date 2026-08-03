@@ -29,7 +29,7 @@ public class SiteGeneratorReadmeTests : IDisposable
         Assert.True(File.Exists(readmePath));
         Assert.Contains("Welcome to the project overview.", File.ReadAllText(readmePath));
 
-        var index = File.ReadAllText(Path.Combine(_root, "site", "index.html"));
+        var index = SiteRegion.Read(_root, "site/index.html");
         Assert.Contains("href=\"readme.html\"", index);
     }
 
@@ -38,9 +38,9 @@ public class SiteGeneratorReadmeTests : IDisposable
     {
         new SiteGenerator(Options(includeReadme: false)).GenerateAll();
 
-        Assert.False(File.Exists(Path.Combine(_root, "site", "readme.html")));
+        Assert.False(SiteRegion.Exists(_root, "site/readme.html"));
 
-        var index = File.ReadAllText(Path.Combine(_root, "site", "index.html"));
+        var index = SiteRegion.Read(_root, "site/index.html");
         Assert.DoesNotContain("href=\"readme.html\"", index);
     }
 
@@ -51,7 +51,7 @@ public class SiteGeneratorReadmeTests : IDisposable
 
         new SiteGenerator(Options(includeReadme: true)).GenerateAll();
 
-        Assert.False(File.Exists(Path.Combine(_root, "site", "readme.html")));
+        Assert.False(SiteRegion.Exists(_root, "site/readme.html"));
     }
 
     [Fact]
@@ -62,7 +62,7 @@ public class SiteGeneratorReadmeTests : IDisposable
         // The tooltip/copy script is copied to the output root the same way the stylesheet is, and pages link
         // it — so the site stays self-contained on a static host. [Story 1.5 Task 3]
         Assert.True(File.Exists(Path.Combine(_root, "site", ForgeOptions.ScriptName)));
-        var index = File.ReadAllText(Path.Combine(_root, "site", "index.html"));
+        var index = SiteRegion.Read(_root, "site/index.html");
         // Linked with a build-versioned cache-busting query so a cached copy can't mask a redeployed script.
         Assert.Contains($"<script src=\"{ForgeOptions.ScriptName}?v=", index);
         Assert.Contains("\" defer></script>", index);

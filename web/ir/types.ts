@@ -101,6 +101,33 @@ export interface IrPage {
    */
   needsHierarchyEngine: boolean
   /**
+   * The page carries a relationship-graph mount point (Story 24.2's `data-relgraph`), so it needs the SAME
+   * vendored plotly bundle the Hierarchy Explorer uses (ADR 0030 — `scatter` was already registered in it) plus
+   * its own anti-flash boot marker, which is a distinct marker family so the two components' boot state cannot
+   * be confused. [Story 23.6]
+   *
+   * ⚠️ Before this existed, a graph-only page rendered by Nuxt shipped NEITHER the engine nor the marker: the
+   * C# writer emitted both from `page.Assets.GraphEngineNeeded`/`GraphBootInline`, and nothing on this side
+   * reproduced them. Verified on the generated portal before the fix — a `data-relgraph` page carried zero
+   * occurrences of `data-ss-relgraph-boot` and zero of `plotly-hierarchy.min.js`.
+   */
+  needsGraphEngine: boolean
+  /**
+   * The page carries at least one rendered mermaid diagram, so it needs the client-side init module.
+   *
+   * ⚠️ Nuxt had NO mermaid support at all before this. `HtmlRenderAdapter.Render` was the only emitter of
+   * `Mermaid.InitScript()`, so every diagram on the Nuxt-rendered portal was already shipping as an inert
+   * `<pre class="mermaid">` block — a live regression from the moment the prerender took over page writing,
+   * found while auditing what Story 23.6's deletion would remove. [Story 23.6]
+   */
+  needsMermaid: boolean
+  /**
+   * The page carries a TOC sidebar, so it needs the active-section tracking script. Chrome-level in the golden
+   * page for the same reason the boot markers are: the webview and SPA consume the body directly and must carry
+   * no script, so it degrades there to the static TOC (NFR8). [Story 23.6]
+   */
+  needsToc: boolean
+  /**
    * The page needs the Prism pair that `CodeFileTemplater` adds through `RenderHeadOpen`'s `extraHead`.
    *
    * ⚠️ DERIVED, not read: the IR carries a page's title and description but no structured `extraHead`
@@ -120,19 +147,34 @@ export interface IrSite {
   /** Every page path in the manifest, in emitter order. This IS the prerender route table. [AC #4] */
   paths: string[]
   schemaVersion: number
-  /** The `?v=` cache-bust token the golden head carries on both shared assets. */
+  /**
+   * The site-level chrome below is READ FROM THE MANIFEST (`SpaDelivery.ManifestChrome`) since Story 23.6.
+   *
+   * ⚠️ It was previously SCRAPED out of the generated `index.html`, which made the renderer depend on the C#
+   * HTML writer that Story 23.6 deletes — silently, since the scrape swallowed its own failure. Each value is
+   * empty only when reading a manifest emitted before the field existed, and an empty value omits its tag.
+   */
+
+  /** The `?v=` cache-bust token both shared assets carry. */
   assetVersion: string
-  /** The favicon `data:` URI, COPIED off the generated site rather than re-typed here. */
+  /** The favicon `data:` URI — a 1 KB constant that would be free to drift if re-typed on this side. */
   faviconDataUri: string
   /**
-   * The anti-flash boot marker's inline script body, COPIED off the generated site. [AC #7]
+   * The Hierarchy Explorer anti-flash boot marker's inline script body. [AC #7]
    *
    * It sets `data-ss-hierarchy-boot` on `<html>` and clears it on a timeout, which is what lets
    * `specscribe.css` hide the server-rendered fallback SVG only while a mount is actually in flight. It is
    * emitted at CHROME level, deliberately outside the content region the IR captures, so it is missing
    * under Nuxt unless we re-emit it — and its absence degrades silently to a visible flash-then-swap.
-   * Empty when the static site was not generated alongside the IR.
    */
   hierarchyBootScript: string
+  /** The relationship graph's own anti-flash boot marker (`data-ss-relgraph-boot`) — same seam, same reason,
+   * its own marker family so the two components' boot state cannot be confused. [Story 23.6/24.2] */
+  graphBootScript: string
+  /** The mermaid init module's body. Injected as `type="module"`: it is an ES-module import of mermaid from
+   * the CDN, so it does not run as a classic script. [Story 23.6] */
+  mermaidInitScript: string
+  /** The TOC active-section tracker's body — an IntersectionObserver over `.toc-sidebar` links. [Story 23.6] */
+  tocActiveSectionScript: string
 }
 

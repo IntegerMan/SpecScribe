@@ -16,8 +16,8 @@ public class SiteGeneratorGitInsightsTests : IDisposable
 
     private string Source => Path.Combine(_root, "_bmad-output");
     private string Site => Path.Combine(_root, "site");
-    private string HubPage => Path.Combine(Site, "git-insights.html");
-    private string IndexPage => Path.Combine(Site, "index.html");
+    private string HubRoute => "git-insights.html";
+    private string IndexRoute => "index.html";
 
     private const string EpicsMd = """
         # Epics
@@ -66,8 +66,8 @@ public class SiteGeneratorGitInsightsTests : IDisposable
         var events = new SiteGenerator(Options(deepGit: false)).GenerateAll();
 
         AssertNoErrors(events);
-        Assert.False(File.Exists(HubPage), "git-insights.html must not exist when --deep-git is off");
-        var index = File.ReadAllText(IndexPage);
+        Assert.False(SiteRegion.Exists(Site, HubRoute), "git-insights.html must not exist when --deep-git is off");
+        var index = SiteRegion.Read(Site, IndexRoute);
         Assert.DoesNotContain("git-insights.html", index);
         Assert.DoesNotContain("View all git insights", index);
     }
@@ -80,8 +80,8 @@ public class SiteGeneratorGitInsightsTests : IDisposable
         var events = new SiteGenerator(Options(deepGit: true)).GenerateAll();
 
         AssertNoErrors(events);
-        Assert.False(File.Exists(HubPage));
-        Assert.True(File.Exists(Path.Combine(Site, "epics.html")), "baseline generation must still succeed");
+        Assert.False(SiteRegion.Exists(Site, HubRoute));
+        Assert.True(SiteRegion.Exists(Site, "epics.html"), "baseline generation must still succeed");
     }
 
     [Fact]
@@ -92,9 +92,9 @@ public class SiteGeneratorGitInsightsTests : IDisposable
         var events = new SiteGenerator(Options(deepGit: true)).GenerateAll();
 
         AssertNoErrors(events);
-        Assert.True(File.Exists(HubPage), "git-insights.html must be generated when --deep-git has data");
+        Assert.True(SiteRegion.Exists(Site, HubRoute), "git-insights.html must be generated when --deep-git has data");
 
-        var hub = File.ReadAllText(HubPage);
+        var hub = SiteRegion.Read(Site, HubRoute);
         Assert.Contains(">Code Ownership &amp; Bus-Factor</h2>", hub); // Story 7.11: renders whenever the hub does — no separate gate
         Assert.Contains(">Activity Over Time</h2>", hub);
         Assert.Contains("tracked.txt", hub);           // a known committed file appears in the chart AND its twin
@@ -102,7 +102,7 @@ public class SiteGeneratorGitInsightsTests : IDisposable
         Assert.Contains("<details class=\"ss-hierarchy-twin\"", hub); // ...and the twin AC#3 required it to gain
         Assert.Contains("Insight Tester", hub);         // the committing author appears as a file contributor
 
-        var index = File.ReadAllText(IndexPage);
+        var index = SiteRegion.Read(Site, IndexRoute);
         Assert.Contains("href=\"git-insights.html\"", index);
         Assert.Contains("View all git insights", index);
     }
@@ -116,13 +116,13 @@ public class SiteGeneratorGitInsightsTests : IDisposable
         Assert.True(TryCreateGitHistory(), "git CLI unavailable on this host — cannot exercise gated hub removal; install git rather than silently skipping this test");
 
         AssertNoErrors(new SiteGenerator(Options(deepGit: true)).GenerateAll());
-        Assert.True(File.Exists(HubPage), "hub must exist after the deep-git run");
+        Assert.True(SiteRegion.Exists(Site, HubRoute), "hub must exist after the deep-git run");
 
         var events = new SiteGenerator(Options(deepGit: false)).GenerateAll();
 
         AssertNoErrors(events);
-        Assert.False(File.Exists(HubPage), "a stale hub from a prior deep-git run must not survive a later run with --deep-git off");
-        var index = File.ReadAllText(IndexPage);
+        Assert.False(SiteRegion.Exists(Site, HubRoute), "a stale hub from a prior deep-git run must not survive a later run with --deep-git off");
+        var index = SiteRegion.Read(Site, IndexRoute);
         Assert.DoesNotContain("git-insights.html", index);
     }
 
@@ -139,8 +139,8 @@ public class SiteGeneratorGitInsightsTests : IDisposable
 
         // The footer carries the generation timestamp — strip it, then the hub must be byte-identical.
         static string Stable(string html) => Regex.Replace(html, @"on \w+ \d{1,2}, \d{4} at \d{1,2}:\d{2} UTC[+-]\d{2}:\d{2}", "on <t>");
-        var first = Stable(File.ReadAllText(HubPage));
-        var second = Stable(File.ReadAllText(Path.Combine(site2, "git-insights.html")));
+        var first = Stable(SiteRegion.Read(Site, HubRoute));
+        var second = Stable(SiteRegion.Read(site2, "git-insights.html"));
         Assert.Equal(first, second);
     }
 

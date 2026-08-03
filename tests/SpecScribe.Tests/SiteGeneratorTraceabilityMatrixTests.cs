@@ -15,9 +15,9 @@ public class SiteGeneratorTraceabilityMatrixTests : IDisposable
     private string Source => Path.Combine(_root, "_bmad-output");
     private string Adrs => Path.Combine(_root, "docs", "adrs");
     private string Site => Path.Combine(_root, "site");
-    private string TraceabilityPage => Path.Combine(Site, "traceability.html");
-    private string RequirementsPage => Path.Combine(Site, "requirements.html");
-    private string IndexPage => Path.Combine(Site, "index.html");
+    private string TraceabilityRoute => "traceability.html";
+    private string RequirementsRoute => "requirements.html";
+    private string IndexRoute => "index.html";
 
     private const string EpicsMd = """
         # Epics
@@ -96,8 +96,8 @@ public class SiteGeneratorTraceabilityMatrixTests : IDisposable
     {
         GenerateSite(EpicsMd);
 
-        Assert.True(File.Exists(TraceabilityPage), "traceability.html should be generated when epics.md exists");
-        var html = File.ReadAllText(TraceabilityPage);
+        Assert.True(SiteRegion.Exists(Site, TraceabilityRoute), "traceability.html should be generated when epics.md exists");
+        var html = SiteRegion.Read(Site, TraceabilityRoute);
 
         Assert.Contains("<main id=\"main-content\"", html);
         Assert.Contains("class=\"site-nav\"", html);
@@ -117,7 +117,7 @@ public class SiteGeneratorTraceabilityMatrixTests : IDisposable
     {
         GenerateSite(EpicsMd);
 
-        var index = File.ReadAllText(IndexPage);
+        var index = SiteRegion.Read(Site, IndexRoute);
         Assert.Contains("href=\"traceability.html\"", index);
         Assert.Contains(">Traceability</a>", index);
     }
@@ -130,8 +130,8 @@ public class SiteGeneratorTraceabilityMatrixTests : IDisposable
         var gen = new SiteGenerator(Options());
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
-        Assert.False(File.Exists(TraceabilityPage), "no traceability.html without epics.md (shared hasEpics gate)");
-        var index = File.ReadAllText(IndexPage);
+        Assert.False(SiteRegion.Exists(Site, TraceabilityRoute), "no traceability.html without epics.md (shared hasEpics gate)");
+        var index = SiteRegion.Read(Site, IndexRoute);
         Assert.DoesNotContain("href=\"traceability.html\"", index);
         Assert.DoesNotContain(">Traceability<", index);
     }
@@ -142,8 +142,8 @@ public class SiteGeneratorTraceabilityMatrixTests : IDisposable
         // epics.md with no "## Requirements Inventory" section at all — RequirementsModel.Everything is empty.
         GenerateSite(EpicsMdNoCoverage);
 
-        Assert.True(File.Exists(TraceabilityPage), "the page still writes (hasEpics), degrading honestly inside");
-        var html = File.ReadAllText(TraceabilityPage);
+        Assert.True(SiteRegion.Exists(Site, TraceabilityRoute), "the page still writes (hasEpics), degrading honestly inside");
+        var html = SiteRegion.Read(Site, TraceabilityRoute);
         Assert.Contains("chart-empty", html);
         Assert.DoesNotContain("<table", html);
     }
@@ -153,7 +153,7 @@ public class SiteGeneratorTraceabilityMatrixTests : IDisposable
     {
         GenerateSite(EpicsMd);
 
-        AssertNoBrokenLocalLinks(TraceabilityPage);
+        SiteRegion.AssertNoBrokenLocalLinks(Site, TraceabilityRoute);
     }
 
     [Fact]
@@ -161,7 +161,7 @@ public class SiteGeneratorTraceabilityMatrixTests : IDisposable
     {
         GenerateSite(EpicsMd);
 
-        var html = File.ReadAllText(RequirementsPage);
+        var html = SiteRegion.Read(Site, RequirementsRoute);
         Assert.Contains("trace-strip", html);
         Assert.Contains("href=\"traceability.html\"", html);
         Assert.Contains("View full traceability matrix", html);
@@ -172,7 +172,7 @@ public class SiteGeneratorTraceabilityMatrixTests : IDisposable
     {
         GenerateSite(EpicsMd);
 
-        var html = File.ReadAllText(IndexPage);
+        var html = SiteRegion.Read(Site, IndexRoute);
         Assert.Contains("trace-panel", html);
         Assert.Contains("trace-strip", html);
         Assert.Contains("href=\"traceability.html\"", html);
@@ -185,7 +185,7 @@ public class SiteGeneratorTraceabilityMatrixTests : IDisposable
         // ProjectCounts.RequirementsOverall source (AC #2).
         GenerateSite(EpicsMd);
 
-        var html = File.ReadAllText(RequirementsPage);
+        var html = SiteRegion.Read(Site, RequirementsRoute);
         var bandCovered = Regex.Match(html, "satisfaction-chip-count\">(\\d+)</span>").Groups[1].Value;
         Assert.False(string.IsNullOrEmpty(bandCovered));
         // Both the satisfaction band's "Satisfied" chip and the trace-strip's "Covered" chip read count 1
@@ -195,22 +195,4 @@ public class SiteGeneratorTraceabilityMatrixTests : IDisposable
         Assert.Equal("1", stripMatch.Groups[1].Value);
     }
 
-    private void AssertNoBrokenLocalLinks(string pagePath)
-    {
-        var html = File.ReadAllText(pagePath);
-        var pageDir = Path.GetDirectoryName(pagePath)!;
-        foreach (Match m in Regex.Matches(html, "href=\"([^\"]+)\""))
-        {
-            var raw = m.Groups[1].Value;
-            if (raw.StartsWith("#", StringComparison.Ordinal)
-                || Regex.IsMatch(raw, "^[a-zA-Z][a-zA-Z0-9+.-]*:"))
-                continue;
-
-            var target = raw.Split('#')[0].Split('?')[0];
-            if (target.Length == 0) continue;
-
-            var resolved = Path.GetFullPath(Path.Combine(pageDir, target.Replace('/', Path.DirectorySeparatorChar)));
-            Assert.True(File.Exists(resolved), $"broken link: {raw} -> {resolved}");
-        }
-    }
 }

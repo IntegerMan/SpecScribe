@@ -111,6 +111,13 @@ public static class PathUtil
     // href can break the icon in stricter browsers/validators (only '#' was encoded before). [Story 1.5 G1 review]
     private static readonly string FaviconDataUri = "data:image/svg+xml," + Uri.EscapeDataString(FaviconSvg);
 
+    /// <summary>The favicon <c>data:</c> URI, for the IR's site-level chrome projection. [Story 23.6]
+    /// <para>Exposed because the renderer used to SCRAPE this value out of the generated <c>index.html</c>
+    /// (<c>web/ir/adapter.ts</c> § <c>readGoldenChrome</c>) — a read this story's deletion makes impossible. The IR
+    /// carries it now, which is also what closes the "chrome is a named gap for Epic 22" note that scrape
+    /// carried.</para></summary>
+    public static string CurrentFaviconDataUri => FaviconDataUri;
+
     // A short cache-busting token appended to the shared css/js hrefs so a redeployed stylesheet/script is
     // never masked by a browser- or CDN-cached copy of the previous build (the failure mode behind stale-CSS
     // "unstyled new elements + old colors" artifacts). Deterministic builds (SDK default) make the module

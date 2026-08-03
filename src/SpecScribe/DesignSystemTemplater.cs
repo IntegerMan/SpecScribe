@@ -66,9 +66,6 @@ public static class DesignSystemTemplater
             ["drafted"] = "--status-ready-bg",
         };
 
-    public static string RenderPage(SiteNav nav) =>
-        HtmlRenderAdapter.Shared.Render(BuildPage(nav)).Content;
-
     /// <summary>Builds this page's host-neutral <see cref="PageView"/> — see
     /// <see cref="HowToReadTemplater.BuildPage"/> for why the body starts at the doc-header, not the landmark.
     /// [Story 23.4 AC #3]</summary>

@@ -78,10 +78,6 @@ public static class SprintTemplater
     public static IReadOnlyList<(string Label, int Count, string CssClass)> StoryStageCounts(SprintStatus sprint) =>
         StoryStageCounts(ProjectCounts.Build(ProgressModel.Empty, sprint, WorkInventory.Empty));
 
-    public static string RenderIndex(SprintStatus sprint, EpicsModel? epics, SiteNav nav, CommandCatalog commands,
-        IReadOnlyList<RetroModel>? retros = null, ProjectCounts? counts = null, UnplannedWorkGeometry? unplanned = null) =>
-        HtmlRenderAdapter.Shared.Render(BuildIndexPage(sprint, epics, nav, commands, retros, counts, unplanned)).Content;
-
     /// <summary>Builds this page's host-neutral <see cref="PageView"/> — see
     /// <see cref="RiskQuadrantTemplater.BuildPage"/> for why every standalone templater grew one. [Story 23.4 AC #3]</summary>
     public static PageView BuildIndexPage(SprintStatus sprint, EpicsModel? epics, SiteNav nav, CommandCatalog commands,
@@ -292,7 +288,6 @@ public static class SprintTemplater
     private static string FilteredEmptyLaneCopy() =>
         "No stories from the selected epics in this column.";
 
-
     /// <summary>The epic-grouped board view: one swimlane section per epic (file order) with the epic header
     /// (linked, tracked badge, retrospective note) and its stories as status-colored cards in a wrap row.
     /// Non-default epics start <c>hidden</c> for the epic filter default. Trailing Unplanned / Direct work
@@ -448,7 +443,6 @@ public static class SprintTemplater
 
     private static void AppendEpicFilterClose(StringBuilder sb) => sb.Append(CloseEpicFilterable());
 
-
     /// <summary>The control-row buttons that link to the retrospectives index and the open-action-items page.
     /// "Retros" shows when any retro exists (rich tooltip: count + latest); the flag "⚑ N" shows only when there
     /// are open action items. Both are plain links to real pages (no modal). [Story 2.3 polish #5; Story 8.3]</summary>
@@ -509,7 +503,6 @@ public static class SprintTemplater
     /// <see cref="RenderProgressWheel(ProjectCounts)"/> when the shared generation ledger is available. [Story 8.3]</summary>
     public static string RenderProgressWheel(SprintStatus sprint) =>
         RenderProgressWheel(ProjectCounts.Build(ProgressModel.Empty, sprint, WorkInventory.Empty));
-
 
     /// <summary>One board card for a story: the whole card is a link to the story's generated page (real or
     /// placeholder — always exists for a model story), colored by its tracked lifecycle stage. Falls back to a

@@ -9,11 +9,6 @@ namespace SpecScribe;
 /// shared nav/breadcrumb/footer. [Story 2.3 retro pages]</summary>
 public static class RetroTemplater
 {
-    /// <summary>The retrospectives index page (<c>retros.html</c>): one card per retro (title, date, epic),
-    /// each linking to its dedicated page. Mirrors the shared index-page shell. [Story 2.3 retro pages]</summary>
-    public static string RenderIndex(IReadOnlyList<RetroModel> retros, SiteNav nav) =>
-        HtmlRenderAdapter.Shared.Render(BuildIndexPage(retros, nav)).Content;
-
     /// <summary>Builds the index page's host-neutral <see cref="PageView"/> — see
     /// <see cref="BuildPage"/> for why Story 23.4 moved every templater onto this contract.
     /// ⚠️ <b>The body starts at <c>&lt;header class="doc-header"&gt;</c>, not at <c>&lt;main&gt;</c></b>: this page
@@ -64,9 +59,6 @@ public static class RetroTemplater
             BodyHtml = sb.ToString(),
         };
     }
-
-    public static string RenderPage(RetroModel retro, EpicsModel? epics, SiteNav nav, EntityPager? pager = null) =>
-        HtmlRenderAdapter.Shared.Render(BuildPage(retro, epics, nav, pager)).Content;
 
     /// <summary>Builds a retro page's host-neutral <see cref="PageView"/> — the AD-2 delivery contract. Story 23.4
     /// moved every standalone templater onto it so the IR's content region can be COMPOSED

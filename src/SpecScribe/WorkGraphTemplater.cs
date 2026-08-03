@@ -11,9 +11,6 @@ namespace SpecScribe;
 /// query results are static HTML, so the page is fully usable with JS off. [Story 19.2]</summary>
 public static class WorkGraphTemplater
 {
-    public static string RenderPage(WorkGraphModel model, SiteNav nav) =>
-        HtmlRenderAdapter.Shared.Render(BuildPage(model, nav)).Content;
-
     /// <summary>Builds this page's host-neutral <see cref="PageView"/> — see
     /// <see cref="RiskQuadrantTemplater.BuildPage"/> for why every standalone templater grew one. [Story 23.4 AC #3]</summary>
     public static PageView BuildPage(WorkGraphModel model, SiteNav nav)
