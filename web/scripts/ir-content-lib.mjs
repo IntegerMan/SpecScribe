@@ -212,6 +212,24 @@ export const CONDITIONAL_CLASSES = [
   'sb-followup-open', //   follow-up wedge, open
   'sb-followup-done', //   follow-up wedge, done
   'sb-unplanned', //       unplanned/direct-change wedge
+  // Ownership dimension's top-author palette (Charts.OwnershipTopAuthorsLegend /
+  // HierarchyExplorer.Projectors's `owner-author-%d` ClassPrefix). `owner-author-{i}` DOES appear on real
+  // markup (`ownership-wedge`/`ownership-legend-swatch`), but which indices render depends on
+  // `GitMetrics.BuildTopAuthors`'s live `--deep-git` commit history — the exact "FALSE DRIFT / SILENT STYLE
+  // LOSS" class this file's banner comment warns about for project-DATA-driven classes, and observed here:
+  // `owner-author-2`'s rule was dropped when a harvest ran one commit short of the count that would include
+  // a second author in the top-N window. `Charts.OwnershipTopAuthorPaletteSize` bounds the palette to 7
+  // slots (0-6) regardless of how many distinct authors exist, so seeding the whole bound — not just
+  // whatever the harvest happened to observe — is closed-domain, same as STAGES. [incident: check:ir-content
+  // failed in CI with `+.ir-content .ownership-legend-swatch.owner-author-2`, absent from a local harvest run
+  // one commit behind]
+  'owner-author-0',
+  'owner-author-1',
+  'owner-author-2',
+  'owner-author-3',
+  'owner-author-4',
+  'owner-author-5',
+  'owner-author-6',
 ]
 
 /** Every class name the seeding above contributes, flattened. */

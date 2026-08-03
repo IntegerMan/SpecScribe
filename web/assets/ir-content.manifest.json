@@ -10,11 +10,11 @@
     "epics/story-{id}.html"
   ],
   "stats": {
-    "carriedRules": 1445,
-    "carriedSelectors": 1661,
+    "carriedRules": 1450,
+    "carriedSelectors": 1666,
     "carriedKeyframes": 4,
     "droppedRoot": 4,
-    "generatedBytes": 182616,
+    "generatedBytes": 183034,
     "sharedRules": 1
   },
   "rules": [
@@ -5018,6 +5018,26 @@
     },
     {
       "selector": ".ownership-legend-swatch.owner-author-1",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-author-2",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-author-3",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-author-4",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-author-5",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-author-6",
       "carried": true
     },
     {
