@@ -14,6 +14,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
+  CONDITIONAL_CLASSES,
   isMigrated,
   isSharedPrimitive,
   MIGRATED,
@@ -21,6 +22,8 @@ import {
   selectorAttributes,
   selectorTokens,
   SHARED_PRIMITIVES,
+  STAGE_CLASS_TEMPLATES,
+  STAGES,
   stripComments,
 } from '../scripts/ir-content-lib.mjs'
 
@@ -317,5 +320,37 @@ describe('shared-primitives.css (generated, UNSCOPED)', () => {
   it('publishes the allowlist, because the allowlist IS the boundary', () => {
     expect(manifest.sharedPrimitives.allowlist).toEqual(SHARED_PRIMITIVES)
     expect(manifest.sharedPrimitives.unscoped).toBe(true)
+  })
+})
+
+describe('sunburst wedge classes stay seeded (probe-only, never on real markup)', () => {
+  // `specscribe.js` colors sunburst/treemap wedges by resolving `getComputedStyle` on a hidden probe element
+  // carrying the node's class list — never on a real, server-rendered element. A static-HTML harvest can never
+  // find `.sb-done`/`.sb-seg`/etc. on its own, so these MUST stay in the seed lists or the wedge fill/stroke
+  // rules silently drop out of `ir-content.css` again and every chart renders black. [incident: sunburst
+  // rendered all-black]
+  const scopedCss = readFileSync(new URL('../assets/ir-content.css', import.meta.url), 'utf8')
+
+  it('STAGE_CLASS_TEMPLATES still seeds the bare wedge class, not just the legend forms', () => {
+    expect(STAGE_CLASS_TEMPLATES).toContain('sb-%s')
+  })
+
+  it('CONDITIONAL_CLASSES still seeds every non-stage sunburst token', () => {
+    for (const cls of ['sb-seg', 'sb-noplan', 'sb-followup-open', 'sb-followup-done', 'sb-unplanned']) {
+      expect(CONDITIONAL_CLASSES).toContain(cls)
+    }
+  })
+
+  it('carries a fill/stroke rule for every seeded wedge class into the generated sheet', () => {
+    // Not every STAGES token has its own `.sb-<stage>` rule — `deferred`/`unmapped` have no sunburst wedge
+    // (retired reuses deferred's grey, per the comment beside `.sb-retired` in specscribe.css) — so this checks
+    // the stages specscribe.css actually declares a wedge for, not the full STAGES list.
+    for (const stage of ['done', 'active', 'review', 'ready', 'drafted', 'pending', 'retired', 'unrecognized']) {
+      expect(STAGES, stage).toContain(stage)
+      expect(scopedCss, `.sb-${stage} must be carried`).toMatch(new RegExp(`\\.ir-content \\.sb-${stage}\\s*\\{`))
+    }
+    for (const cls of CONDITIONAL_CLASSES.filter((c) => c.startsWith('sb-'))) {
+      expect(scopedCss, `.${cls} must be carried`).toMatch(new RegExp(`\\.ir-content \\.${cls}\\s*\\{`))
+    }
   })
 })

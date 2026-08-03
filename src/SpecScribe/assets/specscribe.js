@@ -1212,7 +1212,12 @@
     var probeHost = document.createElement("div");
     probeHost.setAttribute("aria-hidden", "true");
     probeHost.style.cssText = "position:absolute;left:-9999px;width:0;height:0;overflow:hidden";
-    document.body.appendChild(probeHost);
+    // Appended under `panel` (a real descendant of the page's `.ir-content` wrapper), NOT `document.body`.
+    // `web/assets/ir-content.css` nests every rule under `.ir-content` (ADR 0029); a probe hung directly off
+    // `document.body` sits OUTSIDE that ancestor and no scoped selector — `.ir-content .sb-done`, etc. — can
+    // ever match it, so every resolved fill/stroke silently falls back to the SVG default (black). [incident:
+    // sunburst rendered all-black even after the CSS rules themselves were restored]
+    panel.appendChild(probeHost);
     var tokenCache = Object.create(null);
     var DEFAULT_COLOR_CLASS = "sb-seg sb-unrecognized";
     function tokenFor(classList) {

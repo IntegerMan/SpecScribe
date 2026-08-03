@@ -179,6 +179,13 @@ export const STAGE_CLASS_TEMPLATES = [
   'dn-%s-item', //        Charts.cs — donut legend row
   'sb-%s-item', //        Charts.cs — stacked-bar legend row
   'sb-%s-sw', //          Charts.cs — stacked-bar legend swatch
+  // `sb-%s` (bare) is the wedge FILL itself (`.sb-done { fill: var(--status-done); } …`, specscribe.css
+  // ~3237-3247) — distinct from the `-item`/`-sw` legend forms above. Story 20.7 deleted the server-rendered
+  // `<svg class="sunburst">` that used to carry this class on a real element; since then it is applied ONLY
+  // to a JS-only hidden probe node (`specscribe.js` `tokenFor()` / `.ss-hierarchy-probe`) that `getComputedStyle`
+  // reads back out of the cascade. No harvest of real markup will ever find it — without this seed the rule is
+  // dropped and every wedge falls back to the SVG default fill, black. [incident: sunburst rendered all-black]
+  'sb-%s',
   'list-row-accent-%s', // StatusStyles.AdrAccentToken — list-row left accent bar
 ]
 
@@ -197,6 +204,14 @@ export const CONDITIONAL_CLASSES = [
   'sprint-lane-more', //    SprintTemplater — per-column cap overflow
   'unplanned-card', //      SprintTemplater — ledger entries with no story artifact
   'chart-empty', //         Charts — a chart with nothing to plot
+  // Sunburst-only wedge tokens, not part of `StatusStyles.LegendStages` so not covered by `STAGES`/
+  // `sb-%s` above. Same probe-only visibility gap as `sb-%s`: never on real markup, only on the hidden
+  // `.ss-hierarchy-probe` node `specscribe.js` reads colors back from. [same incident as `sb-%s`]
+  'sb-seg', //            base wedge stroke/hover rule
+  'sb-noplan', //          middle-ring story with no task plan (dashed, transparent fill)
+  'sb-followup-open', //   follow-up wedge, open
+  'sb-followup-done', //   follow-up wedge, done
+  'sb-unplanned', //       unplanned/direct-change wedge
 ]
 
 /** Every class name the seeding above contributes, flattened. */
