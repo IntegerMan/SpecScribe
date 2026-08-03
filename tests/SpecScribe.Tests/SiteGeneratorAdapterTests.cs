@@ -164,57 +164,67 @@ public class SiteGeneratorAdapterTests : IDisposable
         var events = gen.GenerateAll();
         Assert.DoesNotContain(events, e => e.Outcome == GenerationOutcome.Error);
 
-        // The activity timeline + date pages are now git-derived (Story 7.3 bug fix): they no longer fire on the
-        // filesystem-mtime signal, so this NON-git fixture yields NEITHER timeline.html NOR any commits/ date page —
-        // the honest degradation of "drop the claim when git can't verify it" (the mtime signal collapsed every
-        // artifact onto the checkout day). The date-fold is kept defensively in case any surface still stamps today.
+        // The activity timeline + date pages are git-derived (Story 7.3 bug fix): they no longer fire on the
+        // filesystem-mtime signal, so this NON-git fixture yields NEITHER timeline.html NOR any commits/ date page.
+        //
+        // ⚠️ [Story 23.6 AC #2, dependent #3] THIS TEST IS RE-PINNED, NOT SUPERSEDED — and the inventory is now
+        // TWO lists, because the output root stopped being one thing.
+        //
+        //   · ROUTES — the page set, read from the IR. This is the half that carries the original intent: "a new,
+        //     missing, or relocated PAGE is a rendering-behaviour change and must be a deliberate decision."
+        //     Pages are IR routes now, so that question is asked of the manifest.
+        //   · FILES — what actually lands on disk: the shared runtime assets C# still owns (ADR 0034 §Decision 5),
+        //     the IR's own files, and the SPA entry shell. No `.html` page appears here, and that absence is the
+        //     assertion: a C# code path that started writing one again would fail this list.
+        //
+        // Keeping both matters. A single merged list would let a page family vanish from the IR while its assets
+        // stayed put, and `check:parity` cannot cover the gap either — that gate renders a deliberately FROZEN
+        // 24-route corpus, so it is structurally blind to a whole family ceasing to be emitted by a live generate.
+        // This test pins the SET a real generate produces; check:parity pins the CONTENT a fixed input renders to.
         var todayIso = Charts.D(DateOnly.FromDateTime(DateTime.Now));
-        var actual = Directory.EnumerateFiles(Site, "*", SearchOption.AllDirectories)
+
+        var actualFiles = Directory.EnumerateFiles(Site, "*", SearchOption.AllDirectories)
             .Select(p => PathUtil.NormalizeSlashes(Path.GetRelativePath(Site, p)).Replace(todayIso, "<date>"))
             .OrderBy(p => p, StringComparer.Ordinal)
             .ToList();
 
-        // The exact page set the pre-adapter pipeline produced for this fixture — a new, missing, or
-        // relocated output file is a rendering-behavior change and must be a deliberate decision, never a
-        // side effect of adapter work (AC #1: rendering stays framework-agnostic and unchanged).
-        var expected = new[]
+        var expectedFiles = new[]
         {
-            // about.html + diagnostics.html are the Story 4.8 additions to the page set — deliberate output
-            // change (this story adds pages + a site-wide footer link), unlike the byte-parity 4.1/4.2 stories.
-            "about.html",
-            "adrs/index.html",
-            // ── Story 23.6 AC #6: the IR is now emitted UNCONDITIONALLY, so its files join this inventory. ──
-            //
-            // These four are not new artifacts — they are the same `spa/` delivery form this project has
-            // emitted since Story 6.7. What changed is that they used to require `--spa`, and this fixture does
-            // not pass it. The IR is now the canonical output (ADR 0016) and the static pages are rendered FROM
-            // it (ADR 0022 §Decision 3), so a run that emitted none of these would emit nothing at all.
-            //
-            // ⚠️ THIS TEST IS RE-PINNED, NOT SUPERSEDED — the AC #2 disposition for dependent #3.
-            // `check:parity` does NOT cover it: that gate renders a deliberately FROZEN 24-route corpus, so it
-            // is structurally blind to a whole page family silently ceasing to be emitted by a real generate.
-            // This test is exactly that check, and the two are complementary rather than redundant: this one
-            // pins the SET a live generate produces, check:parity pins the CONTENT a fixed input renders to.
             "app.html",
-            "specscribe-spa.js",
+            "plotly-hierarchy.min.js",
             "spa/manifest.json",
-            // One chunk per top-level content group — the bounded grouping Story 6.7 chose over one file per
-            // page. A NEW chunk name appearing here means a new content group reached the IR, which is exactly
-            // the kind of deliberate output change this inventory exists to make visible.
             "spa/pages-adrs.json",
             "spa/pages-epics.json",
             "spa/pages-implementation-artifacts.json",
             "spa/pages-requirements.json",
             "spa/pages-root.json",
-            // Story 7.6: code-map.html replaced the retired Story 3.4 structure.html (source-code treemap; the
-            // fixture's repo-root walk finds its markdown files, so the surface generates).
+            "specscribe-spa.js",
+            "specscribe.css",
+            "specscribe.js",
+        }.OrderBy(p => p, StringComparer.Ordinal).ToList();
+
+        Assert.Equal(expectedFiles, actualFiles);
+
+        // The page set — every route a real generate emitted, which is what the renderer turns into .html.
+        var actualRoutes = SiteRegion.Routes(Site)
+            .Select(r => r.Replace(todayIso, "<date>"))
+            .OrderBy(r => r, StringComparer.Ordinal)
+            .ToList();
+
+        var expectedRoutes = new[]
+        {
+            "about-sdd-bmad.html",
+            "about-sdd-gds.html",
+            "about-sdd-gsd-pi.html",
+            "about-sdd-gsd.html",
+            "about-sdd-speckit.html",
+            "about-sdd-superpowers.html",
+            "about-sdd.html",
+            "about.html",
+            "adrs/index.html",
+            "cadence.html",
             "code-map.html",
-            // Story 7.10 (review pass): the refactor-target risk quadrant moved off code-map.html onto its own
-            // Insights page — rides the same source-code-walk gating signal, so it generates whenever code-map.html
-            // does.
-            "risk-quadrant.html",
-            // Story 7.3 bug fix: timeline.html + commits/ date pages are git-derived now, so this non-git fixture
-            // emits none of them (previously the mtime signal produced a today-stamped date page + timeline here).
+            "design-system.html",
             "diagnostics.html",
             "epics.html",
             "epics/epic-1.html",
@@ -222,37 +232,25 @@ public class SiteGeneratorAdapterTests : IDisposable
             "epics/story-1-1.html",
             "epics/story-1-2.html",
             "epics/story-2-1.html",
-            // Story 10.3: the how-to-read orientation page is written on every full run, like about.html/diagnostics.html.
             "how-to-read.html",
-            // Story 23.2: the design-system reference — same always-written guarantee, so its Help link never dangles.
-            "design-system.html",
-            // About Spec-Driven Development hub + per-framework sub-pages (always written).
-            "about-sdd.html",
-            "about-sdd-bmad.html",
-            "about-sdd-gds.html",
-            "about-sdd-speckit.html",
-            "about-sdd-gsd.html",
-            "about-sdd-gsd-pi.html",
-            "about-sdd-superpowers.html",
-            "cadence.html",
             "implementation-artifacts/epic-1-retro-2026-07-06.html",
             "index.html",
-            // Story 20.5: the vendored plotly.js hierarchy engine. Present because this fixture HAS epics, so its
-            // dashboard hosts a Hierarchy Explorer — the conditional-emission guard is what keeps it out of a
-            // fixture without one (SiteGeneratorSpaTests.HierarchyEngineBundle_ShipsOnlyWhereAHierarchyChartWasRendered
-            // pins both directions).
-            "plotly-hierarchy.min.js",
             "requirements.html",
             "requirements/fr1.html",
             "requirements/nfr1.html",
             "retros.html",
-            "specscribe.css",
-            "specscribe.js",
+            "risk-quadrant.html",
             "sprint.html",
             "traceability.html",
-        }.OrderBy(p => p, StringComparer.Ordinal).ToList();
+        }.OrderBy(r => r, StringComparer.Ordinal).ToList();
 
-        Assert.Equal(expected, actual);
+        Assert.Equal(expectedRoutes, actualRoutes);
+
+        // No C# code path writes a content page any more (AC #1). Asserted directly rather than left implicit in
+        // the file list above, so the failure names the cause instead of showing a diff of forty paths.
+        Assert.DoesNotContain(
+            actualFiles,
+            f => f.EndsWith(".html", StringComparison.Ordinal) && f != SpaDelivery.EntryFileName);
     }
 
     // ── RETIRED: GenerateAll_GoldenContentFingerprint_IsStableAfterNormalizingVolatileTokens ────────────

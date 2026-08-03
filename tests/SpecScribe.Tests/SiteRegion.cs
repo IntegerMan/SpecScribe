@@ -41,7 +41,7 @@ internal static class SiteRegion
                 manifestFile);
         }
 
-        using var manifest = JsonDocument.Parse(File.ReadAllText(manifestFile));
+        using var manifest = JsonDocument.Parse(ReadShared(manifestFile));
         if (!manifest.RootElement.GetProperty("pages").TryGetProperty(path, out var entry))
         {
             var known = manifest.RootElement.GetProperty("pages").EnumerateObject()
@@ -53,7 +53,7 @@ internal static class SiteRegion
 
         var chunkRel = entry.GetProperty("chunk").GetString()!;
         var chunkFile = Path.Combine(siteRoot, chunkRel.Replace('/', Path.DirectorySeparatorChar));
-        using var chunk = JsonDocument.Parse(File.ReadAllText(chunkFile));
+        using var chunk = JsonDocument.Parse(ReadShared(chunkFile));
         return chunk.RootElement.GetProperty(path).GetString()!;
     }
 
@@ -63,7 +63,7 @@ internal static class SiteRegion
     {
         var manifestFile = Path.Combine(siteRoot, SpaDelivery.ManifestPath.Replace('/', Path.DirectorySeparatorChar));
         if (!File.Exists(manifestFile)) return false;
-        using var manifest = JsonDocument.Parse(File.ReadAllText(manifestFile));
+        using var manifest = JsonDocument.Parse(ReadShared(manifestFile));
         return manifest.RootElement.GetProperty("pages")
             .TryGetProperty(PathUtil.NormalizeSlashes(outputRelativePath), out _);
     }
@@ -73,7 +73,7 @@ internal static class SiteRegion
     public static IReadOnlyList<string> Routes(string siteRoot)
     {
         var manifestFile = Path.Combine(siteRoot, SpaDelivery.ManifestPath.Replace('/', Path.DirectorySeparatorChar));
-        using var manifest = JsonDocument.Parse(File.ReadAllText(manifestFile));
+        using var manifest = JsonDocument.Parse(ReadShared(manifestFile));
         return manifest.RootElement.GetProperty("pages").EnumerateObject()
             .Select(p => p.Name).Order(StringComparer.Ordinal).ToList();
     }
@@ -98,7 +98,7 @@ internal static class SiteRegion
         var prefix = PathUtil.NormalizeSlashes(routePrefix).TrimEnd('/') + "/";
         var manifestFile = Path.Combine(siteRoot, SpaDelivery.ManifestPath.Replace('/', Path.DirectorySeparatorChar));
         if (!File.Exists(manifestFile)) return Array.Empty<string>();
-        using var manifest = JsonDocument.Parse(File.ReadAllText(manifestFile));
+        using var manifest = JsonDocument.Parse(ReadShared(manifestFile));
         return manifest.RootElement.GetProperty("pages").EnumerateObject()
             .Select(p => p.Name)
             .Where(p => p.StartsWith(prefix, StringComparison.Ordinal))
@@ -116,7 +116,7 @@ internal static class SiteRegion
     {
         var path = PathUtil.NormalizeSlashes(outputRelativePath);
         var manifestFile = Path.Combine(siteRoot, SpaDelivery.ManifestPath.Replace('/', Path.DirectorySeparatorChar));
-        using var manifest = JsonDocument.Parse(File.ReadAllText(manifestFile));
+        using var manifest = JsonDocument.Parse(ReadShared(manifestFile));
         if (!manifest.RootElement.GetProperty("pages").TryGetProperty(path, out var entry))
         {
             throw new InvalidOperationException($"'{path}' is not in the IR manifest — the page was not emitted.");
@@ -136,7 +136,7 @@ internal static class SiteRegion
     public static ChromeBlock Chrome(string siteRoot)
     {
         var manifestFile = Path.Combine(siteRoot, SpaDelivery.ManifestPath.Replace('/', Path.DirectorySeparatorChar));
-        using var manifest = JsonDocument.Parse(File.ReadAllText(manifestFile));
+        using var manifest = JsonDocument.Parse(ReadShared(manifestFile));
         if (!manifest.RootElement.TryGetProperty("chrome", out var chrome))
         {
             throw new InvalidOperationException(
@@ -174,7 +174,7 @@ internal static class SiteRegion
     {
         var path = PathUtil.NormalizeSlashes(route);
         var manifestFile = Path.Combine(siteRoot, SpaDelivery.ManifestPath.Replace('/', Path.DirectorySeparatorChar));
-        using var manifest = JsonDocument.Parse(File.ReadAllText(manifestFile));
+        using var manifest = JsonDocument.Parse(ReadShared(manifestFile));
         if (!manifest.RootElement.GetProperty("pages").TryGetProperty(path, out var entry))
         {
             throw new InvalidOperationException($"cannot poison '{path}' — it is not in the IR manifest");
@@ -184,7 +184,7 @@ internal static class SiteRegion
             siteRoot,
             entry.GetProperty("chunk").GetString()!.Replace('/', Path.DirectorySeparatorChar));
         Dictionary<string, string> chunk;
-        using (var doc = JsonDocument.Parse(File.ReadAllText(chunkFile)))
+        using (var doc = JsonDocument.Parse(ReadShared(chunkFile)))
         {
             chunk = doc.RootElement.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.GetString()!);
         }
@@ -263,5 +263,21 @@ internal static class SiteRegion
             stack.Add(segment);
         }
         return string.Join('/', stack);
+    }
+
+    /// <summary>Reads a file the GENERATOR may be writing concurrently, without blocking it.
+    ///
+    /// <para>[Story 23.6] <c>File.ReadAllText</c> opens with <c>FileShare.Read</c>, which denies a concurrent
+    /// WRITER. That is harmless when each test reads its own settled output, but the watch-mode tests read the
+    /// live output root while the watcher is still regenerating — and once pages became IR routes, every one of
+    /// those reads targets the same handful of chunk files instead of a page each. <c>BurstOfSaves</c> duly
+    /// failed with "the process cannot access the file … because it is being used by another process", reported
+    /// as a GENERATOR error: the test had locked the chunk the generator was trying to write. Sharing the handle
+    /// keeps a read-only assertion from perturbing the thing it is asserting about.</para></summary>
+    private static string ReadShared(string path)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
     }
 }

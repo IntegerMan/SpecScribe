@@ -681,21 +681,29 @@ public class SiteGeneratorSpaTests : IDisposable
     [Fact]
     public void LongTailRegion_IsTheSameCSharpRenderedContent_AsTheStaticPageMainBlock()
     {
-        // AC #1: no re-render. A long-tail page's SPA content region carries the EXACT <main> block the static page
-        // wrote (sliced from the render pipeline's own output, not a re-parse) — byte-for-byte.
-        // SCOPE, stated plainly (Story 22.2): this compares ONLY the <main> block and the presence of a nav
-        // element. It was therefore blind to the page-local nav-context divergence Story 23.1 found — that lived
-        // in the nav, which this never inspected. CapturedPage_KeepsItsOwnLocalContextNavBand above is what pins
-        // the nav; do not read this test as covering it.
+        // AC #1: no re-render. [Story 23.6 AC #8] ⚠️ THE COMPARISON MOVED, because one of its two sides was
+        // the written page and that no longer exists.
+        //
+        // It used to slice `<main>` out of the static document and assert the SPA bundle's region contained it
+        // byte-for-byte. Both sides are the composed region now, so re-pointing it at the page would be a
+        // tautology — and the byte-equality it was standing in for is exactly what `RegionCompositionParityTests`
+        // proved across 1,469 pages before being retired with its subject.
+        //
+        // What is still TWO code paths, and therefore still worth pinning, is the in-memory bundle
+        // (`RenderSpaBundle`) against the EMITTED IR (`EmitSpaSite` → chunk files → read back). They share a
+        // producer but not a serialization path, so a chunk-assignment or escaping bug shows up here.
+        //
+        // SCOPE, unchanged and still worth stating: this compares the region body and the presence of a nav
+        // element. It is blind to the page-local nav-context divergence Story 23.1 found — that lives in the
+        // nav's contents, which this never inspects. `CapturedPage_KeepsItsOwnLocalContextNavBand` pins that.
         var gen = GeneratedSite();
         var bundle = gen.RenderSpaBundle();
 
         foreach (var rel in new[] { "about.html", "requirements/fr1.html", "diagnostics.html" })
         {
-            var staticMain = MainBlock(File.ReadAllText(Path.Combine(Site, rel.Replace('/', Path.DirectorySeparatorChar))));
             var region = bundle.Pages.Single(p => p.OutputRelativePath == rel).ContentHtml;
-            Assert.Contains(staticMain, region);
-            // …and the region also carries the page's own nav + breadcrumb chrome (the swappable region shape).
+            Assert.Equal(SiteRegion.Read(Site, rel).TrimEnd(), region.TrimEnd());
+            // …and the region carries the page's own nav + breadcrumb chrome (the swappable region shape).
             Assert.Contains("<nav class=\"site-nav\"", region);
         }
     }
@@ -1048,10 +1056,13 @@ public class SiteGeneratorSpaTests : IDisposable
         var compared = 0;
         foreach (var page in bundle.Pages)
         {
-            var staticFile = Path.Combine(Site, page.OutputRelativePath.Replace('/', Path.DirectorySeparatorChar));
-            if (!File.Exists(staticFile)) continue;
+            // [Story 23.6 AC #8] The "static page" side of this comparison is gone with the writer. The two
+            // sides that remain are the in-memory bundle and the EMITTED IR — same producer, different
+            // serialization path — so a route that survives the bundle but is dropped or garbled on the way to a
+            // chunk file is still caught. The vacuity guard below is what keeps the narrowed comparison honest.
+            if (!SiteRegion.Exists(Site, page.OutputRelativePath)) continue;
 
-            var fromStatic = WorkGraphSummaries(File.ReadAllText(staticFile));
+            var fromStatic = WorkGraphSummaries(SiteRegion.Read(Site, page.OutputRelativePath));
             var fromIr = WorkGraphSummaries(page.ContentHtml);
 
             // Same NUMBER of work graphs on the page, and the same counts in each — compared as the rendered
@@ -1375,11 +1386,14 @@ public class SiteGeneratorSpaTests : IDisposable
     {
         GeneratedSite(spa: true);
 
+        // [Story 23.6 AC #8] Over the IR's regions. `StaticHtmlPages()` is the route set now, so the guard
+        // below matters: an empty route set would sweep nothing and pass.
+        Assert.NotEmpty(StaticHtmlPages());
         foreach (var page in StaticHtmlPages())
         {
-            var html = File.ReadAllText(Path.Combine(Site, page.Replace('/', Path.DirectorySeparatorChar)));
-            Assert.DoesNotContain(SpaDelivery.LiveStampId, html);
-            Assert.DoesNotContain("Live updates:", html);
+            var region = SiteRegion.Read(Site, page);
+            Assert.DoesNotContain(SpaDelivery.LiveStampId, region);
+            Assert.DoesNotContain("Live updates:", region);
         }
     }
 

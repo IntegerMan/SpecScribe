@@ -10,11 +10,11 @@
     "epics/story-{id}.html"
   ],
   "stats": {
-    "carriedRules": 1270,
-    "carriedSelectors": 1470,
+    "carriedRules": 1431,
+    "carriedSelectors": 1626,
     "carriedKeyframes": 4,
     "droppedRoot": 4,
-    "generatedBytes": 161956,
+    "generatedBytes": 179519,
     "sharedRules": 1
   },
   "rules": [
@@ -1074,9 +1074,8 @@
       "carried": true
     },
     {
-      "selector": ".code-tabs:has(.code-tab--relationships .code-tab-input:checked) .code-tabpanel--relationships, .code-tabs:has(.code-tab--source .code-tab-input:checked) .code-tabpanel--source",
-      "carried": true,
-      "note": "2 unused selector(s) in the source rule were not carried"
+      "selector": ".code-tabs:has(.code-tab--insights .code-tab-input:checked) .code-tabpanel--insights, .code-tabs:has(.code-tab--relationships .code-tab-input:checked) .code-tabpanel--relationships, .code-tabs:has(.code-tab--history .code-tab-input:checked) .code-tabpanel--history, .code-tabs:has(.code-tab--source .code-tab-input:checked) .code-tabpanel--source",
+      "carried": true
     },
     {
       "selector": ".code-tabs:not(.code-tabs--released):has(.code-tabpanel--source .code-line:target) .code-tabpanel",
@@ -1092,6 +1091,18 @@
     },
     {
       "selector": ".insight-panels",
+      "carried": true
+    },
+    {
+      "selector": ".insight-panel",
+      "carried": true
+    },
+    {
+      "selector": ".insight-panel > h2, .insight-panel > h3",
+      "carried": true
+    },
+    {
+      "selector": ".code-insight-history",
       "carried": true
     },
     {
@@ -1164,6 +1175,26 @@
     },
     {
       "selector": ".ss-relgraph-swatch-epic",
+      "carried": true
+    },
+    {
+      "selector": ".ss-relgraph-swatch-coupled",
+      "carried": true
+    },
+    {
+      "selector": ".ss-relgraph-swatch-band",
+      "carried": true
+    },
+    {
+      "selector": ".ss-relgraph-swatch-boundary",
+      "carried": true
+    },
+    {
+      "selector": ".ss-relgraph-swatch-process",
+      "carried": true
+    },
+    {
+      "selector": ".ss-relgraph-swatch-cross",
       "carried": true
     },
     {
@@ -1376,6 +1407,62 @@
     },
     {
       "selector": ".code-external-link:hover, .code-external-link:focus-visible",
+      "carried": true
+    },
+    {
+      "selector": ".code-insights",
+      "carried": true
+    },
+    {
+      "selector": ".code-insights > h2",
+      "carried": true
+    },
+    {
+      "selector": ".code-insight-frequency",
+      "carried": true
+    },
+    {
+      "selector": ".code-insight-contributors",
+      "carried": true
+    },
+    {
+      "selector": ".code-insight-contributors li",
+      "carried": true
+    },
+    {
+      "selector": ".code-insight-contributors .contributor-name",
+      "carried": true
+    },
+    {
+      "selector": ".code-insight-contributors .contributor-count",
+      "carried": true
+    },
+    {
+      "selector": ".code-insight-history > h2",
+      "carried": true
+    },
+    {
+      "selector": ".code-history-table",
+      "carried": true
+    },
+    {
+      "selector": ".code-history-table caption",
+      "carried": true
+    },
+    {
+      "selector": ".code-history-table th, .code-history-table td",
+      "carried": true
+    },
+    {
+      "selector": ".code-history-table th",
+      "carried": true
+    },
+    {
+      "selector": ".code-history-date",
+      "carried": true
+    },
+    {
+      "selector": ".code-history-author",
       "carried": true
     },
     {
@@ -1913,63 +2000,11 @@
       "carried": true
     },
     {
-      "selector": ".sb-seg",
-      "carried": true
-    },
-    {
-      "selector": ".sb-done",
-      "carried": true
-    },
-    {
-      "selector": ".sb-active",
-      "carried": true
-    },
-    {
-      "selector": ".sb-review",
-      "carried": true
-    },
-    {
-      "selector": ".sb-ready",
-      "carried": true
-    },
-    {
-      "selector": ".sb-drafted",
-      "carried": true
-    },
-    {
-      "selector": ".sb-pending",
-      "carried": true
-    },
-    {
-      "selector": ".sb-retired",
-      "carried": true
-    },
-    {
-      "selector": ".sb-unrecognized",
-      "carried": true
-    },
-    {
-      "selector": ".sb-noplan",
-      "carried": true
-    },
-    {
-      "selector": ".sb-followup-open",
-      "carried": true
-    },
-    {
-      "selector": ".sb-followup-done",
-      "carried": true
-    },
-    {
       "selector": ".sunburst-legend .sb-followup-open-sw",
       "carried": true
     },
     {
       "selector": ".sunburst-legend .sb-followup-done-sw",
-      "carried": true
-    },
-    {
-      "selector": ".sb-unplanned",
       "carried": true
     },
     {
@@ -2022,10 +2057,6 @@
     },
     {
       "selector": ".sunburst-legend .sb-legend-item:focus-visible",
-      "carried": true
-    },
-    {
-      "selector": ".sunburst-panel:has(.sb-pending-item:hover) .sb-seg:not(.sb-pending), .sunburst-panel:has(.sb-pending-item:focus-visible) .sb-seg:not(.sb-pending), .sunburst-panel:has(.sb-drafted-item:hover) .sb-seg:not(.sb-drafted), .sunburst-panel:has(.sb-drafted-item:focus-visible) .sb-seg:not(.sb-drafted), .sunburst-panel:has(.sb-ready-item:hover) .sb-seg:not(.sb-ready), .sunburst-panel:has(.sb-ready-item:focus-visible) .sb-seg:not(.sb-ready), .sunburst-panel:has(.sb-active-item:hover) .sb-seg:not(.sb-active), .sunburst-panel:has(.sb-active-item:focus-visible) .sb-seg:not(.sb-active), .sunburst-panel:has(.sb-review-item:hover) .sb-seg:not(.sb-review), .sunburst-panel:has(.sb-review-item:focus-visible) .sb-seg:not(.sb-review), .sunburst-panel:has(.sb-done-item:hover) .sb-seg:not(.sb-done), .sunburst-panel:has(.sb-done-item:focus-visible) .sb-seg:not(.sb-done), .sunburst-panel:has(.sb-retired-item:hover) .sb-seg:not(.sb-retired), .sunburst-panel:has(.sb-retired-item:focus-visible) .sb-seg:not(.sb-retired), .sunburst-panel:has(.sb-followup-open-item:hover) .sb-seg:not(.sb-followup-open), .sunburst-panel:has(.sb-followup-open-item:focus-visible) .sb-seg:not(.sb-followup-open), .sunburst-panel:has(.sb-followup-done-item:hover) .sb-seg:not(.sb-followup-done), .sunburst-panel:has(.sb-followup-done-item:focus-visible) .sb-seg:not(.sb-followup-done), .sunburst-panel:has(.sb-unplanned-item:hover) .sb-seg:not(.sb-unplanned), .sunburst-panel:has(.sb-unplanned-item:focus-visible) .sb-seg:not(.sb-unplanned), .sunburst-panel:has(.sb-noplan-item:hover) .sb-seg:not(.sb-noplan), .sunburst-panel:has(.sb-noplan-item:focus-visible) .sb-seg:not(.sb-noplan)",
       "carried": true
     },
     {
@@ -2836,14 +2867,6 @@
       "carried": true
     },
     {
-      "selector": ".mini-donut",
-      "carried": true
-    },
-    {
-      "selector": ".mini-donut .donut-track, .mini-donut .donut-seg",
-      "carried": true
-    },
-    {
       "selector": ".chart-empty",
       "carried": true
     },
@@ -3134,14 +3157,6 @@
       "carried": true
     },
     {
-      "selector": ".codemap-notice",
-      "carried": true
-    },
-    {
-      "selector": ".codemap-notice-secondary",
-      "carried": true
-    },
-    {
       "selector": ".codemap-table",
       "carried": true
     },
@@ -3202,7 +3217,252 @@
       "carried": true
     },
     {
-      "selector": ".risk-quadrant-empty",
+      "selector": ".risk-quadrant",
+      "carried": true
+    },
+    {
+      "selector": ".risk-axis-line",
+      "carried": true
+    },
+    {
+      "selector": ".risk-median-line",
+      "carried": true
+    },
+    {
+      "selector": ".risk-axis-label",
+      "carried": true
+    },
+    {
+      "selector": ".risk-tick-label",
+      "carried": true
+    },
+    {
+      "selector": ".risk-median-tick-label",
+      "carried": true
+    },
+    {
+      "selector": ".risk-quadrant-elevated",
+      "carried": true
+    },
+    {
+      "selector": ".risk-quadrant-shade-label",
+      "carried": true
+    },
+    {
+      "selector": ".risk-point",
+      "carried": true
+    },
+    {
+      "selector": ".risk-point.level-0",
+      "carried": true
+    },
+    {
+      "selector": ".risk-point.level-1",
+      "carried": true
+    },
+    {
+      "selector": ".risk-point.level-2",
+      "carried": true
+    },
+    {
+      "selector": ".risk-point.level-3",
+      "carried": true
+    },
+    {
+      "selector": ".risk-point.level-4",
+      "carried": true
+    },
+    {
+      "selector": ".risk-point-elevated",
+      "carried": true
+    },
+    {
+      "selector": ".risk-point-link:focus-visible .risk-point, .risk-point-link:hover .risk-point, .risk-point:focus-visible, .risk-point:hover",
+      "carried": true
+    },
+    {
+      "selector": ".risk-pager",
+      "carried": true
+    },
+    {
+      "selector": ".risk-pager[hidden]",
+      "carried": true
+    },
+    {
+      "selector": ".risk-pager-prev, .risk-pager-next",
+      "carried": true
+    },
+    {
+      "selector": ".risk-pager-prev:hover:not(:disabled), .risk-pager-next:hover:not(:disabled)",
+      "carried": true
+    },
+    {
+      "selector": ".risk-pager-prev:disabled, .risk-pager-next:disabled",
+      "carried": true
+    },
+    {
+      "selector": ".risk-pager-status",
+      "carried": true
+    },
+    {
+      "selector": ".risk-grid",
+      "carried": true
+    },
+    {
+      "selector": ".risk-grid-item",
+      "carried": true
+    },
+    {
+      "selector": ".risk-grid-item[hidden]",
+      "carried": true
+    },
+    {
+      "selector": ".risk-grid-path",
+      "carried": true
+    },
+    {
+      "selector": ".risk-grid-path a",
+      "carried": true
+    },
+    {
+      "selector": ".risk-grid-path a:hover",
+      "carried": true
+    },
+    {
+      "selector": ".risk-grid-meta",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-graph",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-edge",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-edge.process-edge",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-node",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-label",
+      "carried": true
+    },
+    {
+      "selector": ".deep-page-section",
+      "carried": true
+    },
+    {
+      "selector": ".deep-page-section > h2",
+      "carried": true
+    },
+    {
+      "selector": ".deep-page-lower",
+      "carried": true
+    },
+    {
+      "selector": ".deep-page-lower",
+      "carried": true,
+      "within": "@media (min-width: 860px)"
+    },
+    {
+      "selector": ".deep-page-graph-panel",
+      "carried": true
+    },
+    {
+      "selector": ".deep-page-list-panel",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-expand",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-expand:hover, .coupling-expand:focus-visible",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-legend",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-table",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-table th",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-table td",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-table tr:last-child td",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-table .coupling-file",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-table .coupling-num",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-table th.coupling-num",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-table .coupling-kind",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-table th.coupling-kind",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-kind-badge, .coupling-boundary-badge",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-kind-badge",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-boundary-badge",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-lightbox",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-lightbox:target",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-lightbox-backdrop",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-lightbox-panel",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-lightbox-panel .coupling-graph",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-lightbox-close",
+      "carried": true
+    },
+    {
+      "selector": ".coupling-lightbox-close:hover, .coupling-lightbox-close:focus-visible",
       "carried": true
     },
     {
@@ -3384,6 +3644,54 @@
       "within": "@media (max-width: 640px)"
     },
     {
+      "selector": ".commit-hash-link",
+      "carried": true
+    },
+    {
+      "selector": ".commit-hash-link:hover .commit-hash",
+      "carried": true
+    },
+    {
+      "selector": ".commit-hash-link:focus-visible",
+      "carried": true
+    },
+    {
+      "selector": ".artifacts-updated",
+      "carried": true
+    },
+    {
+      "selector": ".artifacts-updated h2",
+      "carried": true
+    },
+    {
+      "selector": ".artifact-update-list",
+      "carried": true
+    },
+    {
+      "selector": ".artifact-update-list li",
+      "carried": true
+    },
+    {
+      "selector": ".artifact-update-list li:last-child",
+      "carried": true
+    },
+    {
+      "selector": ".artifact-update-list a",
+      "carried": true
+    },
+    {
+      "selector": ".artifact-update-list a:hover",
+      "carried": true
+    },
+    {
+      "selector": ".artifact-update-list a:focus-visible",
+      "carried": true
+    },
+    {
+      "selector": ".artifact-update-path",
+      "carried": true
+    },
+    {
       "selector": ".timeline-heatmap",
       "carried": true
     },
@@ -3405,6 +3713,70 @@
     },
     {
       "selector": ".timeline-summary",
+      "carried": true
+    },
+    {
+      "selector": ".commit-message",
+      "carried": true
+    },
+    {
+      "selector": ".commit-message p",
+      "carried": true
+    },
+    {
+      "selector": ".commit-message p:last-child",
+      "carried": true
+    },
+    {
+      "selector": ".commit-files",
+      "carried": true
+    },
+    {
+      "selector": ".commit-files > h2",
+      "carried": true
+    },
+    {
+      "selector": ".commit-files-empty",
+      "carried": true
+    },
+    {
+      "selector": ".commit-files-table",
+      "carried": true
+    },
+    {
+      "selector": ".commit-files-table caption",
+      "carried": true
+    },
+    {
+      "selector": ".commit-files-table th, .commit-files-table td",
+      "carried": true
+    },
+    {
+      "selector": ".commit-files-table thead th",
+      "carried": true
+    },
+    {
+      "selector": ".commit-files-table th.commit-num, .commit-files-table td.commit-num",
+      "carried": true
+    },
+    {
+      "selector": ".commit-files-table td code",
+      "carried": true
+    },
+    {
+      "selector": ".commit-files-table tbody tr:hover",
+      "carried": true
+    },
+    {
+      "selector": ".commit-files-table .commit-added",
+      "carried": true
+    },
+    {
+      "selector": ".commit-files-table .commit-deleted",
+      "carried": true
+    },
+    {
+      "selector": ".commit-file-binary",
       "carried": true
     },
     {
@@ -3880,6 +4252,118 @@
       "selector": ":root",
       "carried": false,
       "reason": "root-level rule — no descendant to scope under .ir-content; see web/assets/base.css"
+    },
+    {
+      "selector": ".impact-epic",
+      "carried": true
+    },
+    {
+      "selector": ".impact-epic:last-child",
+      "carried": true
+    },
+    {
+      "selector": ".impact-epic-head",
+      "carried": true
+    },
+    {
+      "selector": ".impact-epic-head a",
+      "carried": true
+    },
+    {
+      "selector": ".impact-epic-head a:hover",
+      "carried": true
+    },
+    {
+      "selector": ".impact-file-list",
+      "carried": true
+    },
+    {
+      "selector": ".impact-file-list li",
+      "carried": true
+    },
+    {
+      "selector": ".impact-file-meta",
+      "carried": true
+    },
+    {
+      "selector": ".code-areas-panel .impact-file-list",
+      "carried": true
+    },
+    {
+      "selector": ".impact-more",
+      "carried": true
+    },
+    {
+      "selector": ".impact-map-link",
+      "carried": true
+    },
+    {
+      "selector": ".impact-fallback > summary",
+      "carried": true
+    },
+    {
+      "selector": ".impact-epic-filter .impact-select-actions",
+      "carried": true
+    },
+    {
+      "selector": ".impact-legend",
+      "carried": true
+    },
+    {
+      "selector": ".impact-legend-item",
+      "carried": true
+    },
+    {
+      "selector": ".impact-legend-size",
+      "carried": true
+    },
+    {
+      "selector": ".impact-legend-ramp",
+      "carried": true
+    },
+    {
+      "selector": ".impact-legend-ramp i",
+      "carried": true
+    },
+    {
+      "selector": ".impact-level-1",
+      "carried": true
+    },
+    {
+      "selector": ".impact-legend-ramp i.impact-level-1",
+      "carried": true
+    },
+    {
+      "selector": ".impact-level-2",
+      "carried": true
+    },
+    {
+      "selector": ".impact-legend-ramp i.impact-level-2",
+      "carried": true
+    },
+    {
+      "selector": ".impact-level-3",
+      "carried": true
+    },
+    {
+      "selector": ".impact-legend-ramp i.impact-level-3",
+      "carried": true
+    },
+    {
+      "selector": ".impact-level-4",
+      "carried": true
+    },
+    {
+      "selector": ".impact-legend-ramp i.impact-level-4",
+      "carried": true
+    },
+    {
+      "selector": ".impact-level-5",
+      "carried": true
+    },
+    {
+      "selector": ".impact-legend-ramp i.impact-level-5",
+      "carried": true
     },
     {
       "selector": ".status-legend",
@@ -4409,6 +4893,94 @@
       "carried": true
     },
     {
+      "selector": ".ownership-panel",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-controls",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-controls[hidden]",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-controls select, .ownership-controls input",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-controls input[type=\"number\"]",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-controls select:focus-visible, .ownership-controls input:focus-visible",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend[hidden]",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-dim",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.level-1",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.level-2",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.level-3",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.level-4",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.level-none",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-label",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-author-0",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-author-1",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-author-other",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-spotlight-off",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-fresh",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-stale",
+      "carried": true
+    },
+    {
       "selector": ".git-pulse-header-links",
       "carried": true
     },
@@ -4556,7 +5128,79 @@
       "carried": true
     },
     {
+      "selector": ".sprint-board-header-aside .sprint-epic-filter",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-board-header-aside .sprint-epic-filter-panel",
+      "carried": true
+    },
+    {
       "selector": ".sprint-filterable",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter-summary",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter-summary::-webkit-details-marker",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter-summary::marker",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter-summary::after",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter[open] > .sprint-epic-filter-summary",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter-summary:focus-visible",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter-label",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter-count",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter-panel",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter-all",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter-all:hover",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter-all:focus-visible",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter-opt",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter-opt:hover",
+      "carried": true
+    },
+    {
+      "selector": ".sprint-epic-filter-opt input",
       "carried": true
     },
     {

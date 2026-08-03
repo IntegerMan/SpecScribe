@@ -17,16 +17,37 @@
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { assertFullRun, MEASUREMENTS_DIR, PUBLIC_DIR, readOrNull, walk } from './harness-lib.mjs'
+import { assertFullRun, MEASUREMENTS_DIR, readOrNull, walk } from './harness-lib.mjs'
 
 assertFullRun('check:a11y')
 
+const ir = await import('../ir/adapter.ts')
+
+/**
+ * ⚠️ [Story 23.6] THIS GATE READ `.output/public` AND WENT VACUOUS. It now reads the GENERATED SITE.
+ *
+ * `.output/public` holds the pages a `nuxt build` PRERENDERS into the artefact. Both CI workflows and the
+ * documented local flow build the artefact with `build:package`, which sets `SPECSCRIBE_PACKAGE_BUILD=1` and
+ * deliberately empties the route table — a package artefact must carry no prerendered HTML, because Nitro
+ * serves `public/` AHEAD of the SSR route and would otherwise return the BUILDING project's pages when pointed
+ * at another project's IR (Story 23.5 hit exactly that: a wrong answer with HTTP 200).
+ *
+ * So on every standard build this directory holds zero `.html`, this gate walked an empty set, and it reported
+ * `failures 0` over `pages checked 0` — passing while measuring nothing. Caught by reading the committed
+ * measurement diff, not by the gate: it had been green throughout. The last honest run recorded 1,474 pages.
+ *
+ * `ir.IR_DIR` is the site a real `specscribe generate` produces — Nuxt-rendered since Story 23.6, so it IS the
+ * emitted HTML this gate exists to check, and it cannot be emptied by a build-mode flag. The empty-set guard
+ * below is the second half of the fix: a basis that vanishes must be a hard failure, never a pass.
+ */
 let files
 try {
-  files = walk(PUBLIC_DIR)
+  files = walk(ir.IR_DIR)
 } catch (err) {
   if (err.code === 'ENOENT') {
-    console.error('check:a11y — .output/public not found. Run `npm run generate` first.')
+    console.error(
+      `check:a11y — no generated site at ${ir.IR_DIR}. Run \`dotnet run --project src/SpecScribe -- generate\` first.`,
+    )
     process.exit(1)
   }
   throw err
@@ -48,6 +69,16 @@ const FALLBACK_SHELLS = new Set(['200.html', '404.html'])
 
 const allHtml = files.filter((f) => f.endsWith('.html'))
 const pages = allHtml.filter((f) => !FALLBACK_SHELLS.has(f))
+
+// The anti-vacuity guard. See the note above: this gate spent a whole story reporting "failures 0" over an
+// empty page set. A floor rather than `> 0` because a handful of stray files is as unlike a real site as none.
+if (pages.length < 50) {
+  console.error(
+    `check:a11y — VACUOUS: only ${pages.length} page(s) found under ${ir.IR_DIR}, so "0 failures" would prove `
+      + 'nothing. A real generate emits well over a thousand. Re-run the generate before trusting this gate.',
+  )
+  process.exit(1)
+}
 const excluded = allHtml.filter((f) => FALLBACK_SHELLS.has(f))
 const failures = []
 let statusChips = 0
@@ -57,7 +88,7 @@ const fail = (page, rule, detail) => failures.push({ page, rule, detail })
 const FOCUSABLE = /<(a\b[^>]*\shref|button\b|input\b|select\b|textarea\b|[a-z]+\b[^>]*\stabindex\s*=\s*"0")/i
 
 for (const page of pages) {
-  const html = readFileSync(join(PUBLIC_DIR, page), 'utf8')
+  const html = readFileSync(join(ir.IR_DIR, page), 'utf8')
   const body = html.slice(html.indexOf('<body'))
 
   // 1 — exactly one main landmark, and exactly one element with that id.
@@ -120,7 +151,7 @@ for (const page of pages) {
 // 5 — the reduced-motion contract is global, declared once. Checked against the emitted stylesheets rather
 //     than the sources, because that is what a browser actually receives.
 const cssFiles = files.filter((f) => f.endsWith('.css'))
-const allCss = cssFiles.map((f) => readOrNull(join(PUBLIC_DIR, f)) ?? '').join('\n')
+const allCss = cssFiles.map((f) => readOrNull(join(ir.IR_DIR, f)) ?? '').join('\n')
 const reduceBlocks = allCss.match(/@media\s*\(prefers-reduced-motion:\s*reduce\)/g) ?? []
 if (reduceBlocks.length === 0) {
   fail('(stylesheets)', 'reduced-motion', 'no `prefers-reduced-motion: reduce` block in the emitted CSS')

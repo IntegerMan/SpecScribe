@@ -125,11 +125,9 @@ public sealed class WebviewCommand : Command<SiteSettings>
         // Story 23.6 / ADR 0022 the IR is the only artifact they produce). [Goal 2,
         // spec-vscode-extension-name-latency-and-webview-sunburst]
         generator.EmitIr = false;
-        // Same reasoning, one layer lower: the panel reads composed REGIONS, so the full static documents this pass
-        // would otherwise render, linkify and write into the scratch directory are discarded unread. Measured at
-        // ~12 s of the pass on this repository. Proven lossless by hashing the whole 53 MB payload with it on and
-        // off. [Goal 2, spec-vscode-extension-name-latency-and-webview-sunburst]
-        generator.WriteStaticPages = false;
+        // [Story 23.6] The sibling `generator.WriteStaticPages = false` that used to sit here is gone with the
+        // property. It skipped rendering ~230 full documents (~12 s) that this panel discards unread — a saving
+        // that is now unconditional, because no code path renders a document at all.
 
         // Resolved roots come from the PRE-redirect project options (the project's real roots), never the scratch-redirected
         // `options`, exactly like configuredOutputRoot. [Story 6.11]

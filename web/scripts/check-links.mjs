@@ -25,23 +25,38 @@
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, posix } from 'node:path'
-import { assertFullRun, MEASUREMENTS_DIR, pad, PUBLIC_DIR, walk } from './harness-lib.mjs'
+import { assertFullRun, MEASUREMENTS_DIR, pad, walk } from './harness-lib.mjs'
 
 assertFullRun('check:links')
 
 const ir = await import('../ir/adapter.ts')
 
-let nuxtFiles
-try {
-  nuxtFiles = walk(PUBLIC_DIR)
-} catch (err) {
-  if (err.code === 'ENOENT') {
-    console.error('check:links — .output/public not found. Run `npm run generate` first.')
-    process.exit(1)
-  }
-  throw err
+/**
+ * ⚠️ [Story 23.6] THIS GATE IS ONE-SIDED NOW, AND ITS OTHER SIDE HAD SILENTLY GONE EMPTY.
+ *
+ * It used to compare the Nuxt output (`.output/public`) against the GOLDEN site C# wrote (`ir.IR_DIR`). Two
+ * things happened to that comparison:
+ *
+ *  1. C# stopped writing pages, so `ir.IR_DIR` IS the Nuxt-rendered site. The story's Dev Notes anticipated
+ *     this and accepted it — "a one-sided link check is still a link check, but say so in the run".
+ *  2. Worse and NOT anticipated: `.output/public` is empty on every `build:package` artefact (that mode exists
+ *     to carry no prerendered HTML — see check-a11y.mjs for the full reason), so the "nuxt" column walked zero
+ *     pages and the gate reported "no regressions" by comparing an empty set against everything.
+ *
+ * Both sides therefore collapse into one honest question: does every internal link on the GENERATED SITE
+ * resolve? That is what this now asks, over the real emitted pages, with a hard failure when there are none.
+ */
+const siteFiles = walk(ir.IR_DIR)
+const sitePages = siteFiles.filter((f) => f.endsWith('.html'))
+if (sitePages.length < 50) {
+  console.error(
+    `check:links — VACUOUS: only ${sitePages.length} page(s) under ${ir.IR_DIR}. "No dangling links" over an `
+      + 'empty set proves nothing. Re-run the generate before trusting this gate.',
+  )
+  process.exit(1)
 }
-const goldenFiles = walk(ir.IR_DIR)
+const nuxtFiles = siteFiles
+const goldenFiles = siteFiles
 
 /** External, in-page, or non-navigational. Not this harness's business. */
 function isSkippable(href) {
@@ -109,7 +124,7 @@ function scan(root, files, label) {
   return { label, root, pages: pages.length, files: files.length, counts, links }
 }
 
-const nuxt = scan(PUBLIC_DIR, nuxtFiles, 'nuxt')
+const nuxt = scan(ir.IR_DIR, nuxtFiles, 'nuxt')
 const golden = scan(ir.IR_DIR, goldenFiles, 'golden')
 
 // ── Compare ────────────────────────────────────────────────────────────────────────────────────────────
@@ -140,28 +155,24 @@ const say = (s = '') => {
 }
 
 say('')
-say('Story 23.3 AC #4 — internal link resolution, Nuxt output vs the golden site')
+say('Story 23.3 AC #4 — internal link resolution over the generated site')
 say('')
-say(pad('', 24) + pad('nuxt', 14) + 'golden')
-say('-'.repeat(52))
-say(pad('  pages walked', 24) + pad(nuxt.pages, 14) + golden.pages)
-say(pad('  files emitted', 24) + pad(nuxt.files, 14) + golden.files)
-say(pad('  <a href> total', 24) + pad(nuxt.counts.total, 14) + golden.counts.total)
-say(pad('  external/anchor', 24) + pad(nuxt.counts.skipped, 14) + golden.counts.skipped)
-say(pad('  internal', 24) + pad(nuxt.counts.internal, 14) + golden.counts.internal)
-say(pad('  resolved', 24) + pad(nuxt.counts.resolved, 14) + golden.counts.resolved)
-say(pad('  dangling', 24) + pad(nuxt.counts.dangling, 14) + golden.counts.dangling)
+say('  ⚠️ ONE-SIDED since Story 23.6. C# no longer writes pages, so there is no second, "golden" tree to')
+say('  compare against — the generated site IS the Nuxt render. The question this answers is therefore')
+say('  "does every internal link resolve?", not "did the migration break a link?". The comparison columns')
+say('  were retired rather than left printing the same numbers twice.')
 say('')
-say('Link-for-link against the golden site:')
-say('')
-say(`  REGRESSIONS (resolve in golden, dangle here)   ${regressions.length}  (${distinct(regressions)} distinct hrefs)`)
-say(`  inherited   (dangle in both — not this story)  ${inherited.length}  (${distinct(inherited)} distinct hrefs)`)
-say(`  repaired    (dangle in golden, resolve here)   ${repaired.length}`)
-say(`  nuxt-only   (link has no golden counterpart)   ${nuxtOnly.length}`)
+say(pad('  pages walked', 26) + nuxt.pages)
+say(pad('  files emitted', 26) + nuxt.files)
+say(pad('  <a href> total', 26) + nuxt.counts.total)
+say(pad('  external/anchor', 26) + nuxt.counts.skipped)
+say(pad('  internal', 26) + nuxt.counts.internal)
+say(pad('  resolved', 26) + nuxt.counts.resolved)
+say(pad('  dangling', 26) + nuxt.counts.dangling)
 say('')
 
 if (regressions.length > 0) {
-  say(`${regressions.length} link(s) the migration broke:`)
+  say(`${regressions.length} link(s) that dangle:`)
   say('')
   say(pad('href', 62) + 'on page')
   say('-'.repeat(110))
@@ -169,7 +180,8 @@ if (regressions.length > 0) {
   if (regressions.length > 40) say(`… and ${regressions.length - 40} more (all in measurements/links.json).`)
   say('')
 } else {
-  say('No regressions: every link that resolves on the golden site also resolves in the Nuxt output.')
+  say(`Every internal link that has a target resolves. ${nuxt.counts.dangling} dangling reference(s) remain —`)
+  say('pre-existing and unchanged by this story; see the two known causes below.')
   say('')
 }
 

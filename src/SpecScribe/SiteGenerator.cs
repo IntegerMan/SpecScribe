@@ -295,28 +295,18 @@ public sealed class SiteGenerator
     /// surface that event guards, is unaffected: it never runs with this off.</para></summary>
     public bool EmitIr { get; set; } = true;
 
-    /// <summary>Render each page's FULL static document at the <see cref="WritePage"/> seam — the finished
-    /// <c>&lt;html&gt;</c> chrome, linkified whole, written to <see cref="ForgeOptions.OutputRoot"/> and kept in the
-    /// <see cref="_spaCapture"/> oracle. <b>ON by default</b>; every route except <c>webview</c> keeps it on.
-    ///
-    /// <para><b>Why <c>webview</c> can turn it off without losing anything.</b> That path consumes exactly one
-    /// producer — the composed region in <see cref="_spaPageViews"/>, which <see cref="CapturedRegions"/> iterates
-    /// and <see cref="RenderWebviewSurfaces"/> filters — and that half of <see cref="WritePage"/> still runs. The
-    /// full document it also built is written into a per-project temp scratch directory the panel abandons, and
-    /// <see cref="_spaCapture"/>'s only remaining reader is <see cref="RegionCompositionDeltas"/>, a test-suite
-    /// oracle no CLI route calls. No <see cref="WritePage"/> call site uses the returned string.</para>
-    ///
-    /// <para><b>Scope, stated exactly: this is the <see cref="WritePage"/> seam and only that seam.</b>
-    /// <see cref="WriteIndex"/> renders and writes <c>index.html</c> through <see cref="WriteTextWithRetry"/>
-    /// directly and is deliberately NOT gated here — it is one page, and its write is entangled with
-    /// <see cref="EnsureHierarchyEngine"/>'s conditional-asset gate. So a run with this off still leaves
-    /// <c>index.html</c> and the embedded stylesheet/script in the output root.</para>
-    ///
-    /// <para><b>The verification that this loses nothing is a byte comparison, not an argument.</b> The `webview`
-    /// payload was captured with this ON and with it OFF and the two 53 MB JSON documents hash identically
-    /// (SHA-256), which is the same oracle used for the concurrent first-touch resolver. Any future change here
-    /// should be re-proved the same way rather than reasoned about.</para></summary>
-    public bool WriteStaticPages { get; set; } = true;
+    // ───────────────────────────────────────────────────────────────────────────────────────────────────
+    // `WriteStaticPages` was DELETED here by Story 23.6 (AC #1).
+    //
+    // It gated the FULL-DOCUMENT half of the `WritePage` seam, and existed for one caller: the `webview` route
+    // turned it off to skip rendering, linkifying and writing ~230 whole documents into a scratch directory the
+    // panel abandons — ~12 s of that pass, proven lossless by hashing the 53 MB payload with it on and off.
+    //
+    // The work it gated no longer exists, so the flag became a property nothing read. Deleting it is the point
+    // rather than tidying: a switch named "write static pages" that silently does nothing is worse than no
+    // switch, and the saving it bought is now unconditional — composing a region is all that seam does, and the
+    // webview READS those regions, so there is nothing left that a caller could usefully skip.
+    // ───────────────────────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>Opt-in FIRST-PAINT CHECKPOINT: invoked exactly once per <see cref="GenerateAll"/> pass, at the
     /// moment every model the dashboard reads is built and BEFORE the long-tail page phases that the dashboard
@@ -3465,11 +3455,20 @@ public sealed class SiteGenerator
             //    existed to spare the webview path ~230 whole-document renders (9,252 ms of a 22,177 ms pass);
             //    composing a region is what remains, and the webview READS those regions — skipping them would
             //    now break the panel rather than speed it up.
-            //  · **The `epics/` directory is no longer wiped here.** It was wiped so a renumbered or deleted
-            //    story could not leave a stale `.html` behind on the incremental `RegenerateEpics` path. Nothing
-            //    writes into that directory any more, so staleness is a question about the IR's route set, and
-            //    `RegenerateEpics` already evicts removed routes from `_spaPageViews`.
-            //    `SiteGeneratorEpicsRemovalTests` asserts exactly that, in route space.
+            //  · **The `epics/` DIRECTORY wipe became a ROUTE eviction.** The old code deleted and recreated
+            //    `<OutputRoot>/epics/` on every pass, so a story renumbered or dropped from epics.md could not
+            //    leave a stale page behind on the incremental `RegenerateEpics` path — `GenerateAll` already
+            //    wipes the whole output root, so the wipe existed for watch mode alone.
+            //
+            //    ⚠️ That eviction is NOT free once nothing writes the directory, and assuming it was is a bug
+            //    this story shipped and a test caught: `RegenerateEpics` evicts a route when the DOCUMENT behind
+            //    it disappears, but an undrafted story's placeholder has no document — it exists only because
+            //    epics.md lists the story. Drop the story and nothing tells `_spaPageViews` the route is gone, so
+            //    the placeholder survived in the IR and `RegenerateEpics_PrunesPlaceholderWhenStoryLeavesThePlan`
+            //    went red. The subtree is cleared here, immediately before the loop below re-composes exactly the
+            //    stories that still exist — the same rebuild-the-whole-subtree shape the directory wipe had.
+            RemoveRoutesUnder("epics");
+
             var deferredModel = ResolveDeferredModel(workForFollowUps, files);
             var epicsCounts = _counts ?? ProjectCounts.Build(progress, _sprint, workForFollowUps, model, _requirements);
             FollowUpGeometry? followUps = BuildFollowUpGeometry(workForFollowUps, epicsCounts, deferredModel);

@@ -6,6 +6,8 @@ public class SiteGeneratorReadmeTests : IDisposable
 {
     private readonly string _root = Directory.CreateTempSubdirectory("specscribe-readme-").FullName;
 
+    private string Site => Path.Combine(_root, "site");
+
     public SiteGeneratorReadmeTests()
     {
         Directory.CreateDirectory(Path.Combine(_root, "_bmad-output"));
@@ -25,11 +27,10 @@ public class SiteGeneratorReadmeTests : IDisposable
     {
         new SiteGenerator(Options(includeReadme: true)).GenerateAll();
 
-        var readmePath = Path.Combine(_root, "site", "readme.html");
-        Assert.True(File.Exists(readmePath));
-        Assert.Contains("Welcome to the project overview.", File.ReadAllText(readmePath));
+        Assert.True(SiteRegion.Exists(Site, "readme.html"));
+        Assert.Contains("Welcome to the project overview.", SiteRegion.Read(Site, "readme.html"));
 
-        var index = SiteRegion.Read(_root, "site/index.html");
+        var index = SiteRegion.Read(Site, "index.html");
         Assert.Contains("href=\"readme.html\"", index);
     }
 
@@ -38,9 +39,9 @@ public class SiteGeneratorReadmeTests : IDisposable
     {
         new SiteGenerator(Options(includeReadme: false)).GenerateAll();
 
-        Assert.False(SiteRegion.Exists(_root, "site/readme.html"));
+        Assert.False(SiteRegion.Exists(Site, "readme.html"));
 
-        var index = SiteRegion.Read(_root, "site/index.html");
+        var index = SiteRegion.Read(Site, "index.html");
         Assert.DoesNotContain("href=\"readme.html\"", index);
     }
 
@@ -51,7 +52,7 @@ public class SiteGeneratorReadmeTests : IDisposable
 
         new SiteGenerator(Options(includeReadme: true)).GenerateAll();
 
-        Assert.False(SiteRegion.Exists(_root, "site/readme.html"));
+        Assert.False(SiteRegion.Exists(Site, "readme.html"));
     }
 
     [Fact]
@@ -61,10 +62,15 @@ public class SiteGeneratorReadmeTests : IDisposable
 
         // The tooltip/copy script is copied to the output root the same way the stylesheet is, and pages link
         // it — so the site stays self-contained on a static host. [Story 1.5 Task 3]
-        Assert.True(File.Exists(Path.Combine(_root, "site", ForgeOptions.ScriptName)));
-        var index = SiteRegion.Read(_root, "site/index.html");
-        // Linked with a build-versioned cache-busting query so a cached copy can't mask a redeployed script.
-        Assert.Contains($"<script src=\"{ForgeOptions.ScriptName}?v=", index);
-        Assert.Contains("\" defer></script>", index);
+        Assert.True(File.Exists(Path.Combine(Site, ForgeOptions.ScriptName)));
+
+        // [Story 23.6 AC #8] The <script src> TAG is chrome and no C# code path emits one. The two halves of
+        // this assertion split accordingly and both survive: C# still writes the asset (above) and still owns
+        // the cache-bust token the renderer stamps onto it (below, from the IR's chrome block —
+        // `web/components/surfaces/IrSurface.vue` builds the tag). The tag itself is covered end-to-end by
+        // `check:parity`'s `pageSha`, which hashes the whole rendered page.
+        Assert.False(string.IsNullOrEmpty(SiteRegion.Chrome(Site).AssetVersion),
+            "the IR must carry the asset cache-bust — it is the renderer's only source for it, and an empty "
+            + "value silently drops the ?v= query from every asset link");
     }
 }

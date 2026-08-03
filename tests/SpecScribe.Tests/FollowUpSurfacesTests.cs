@@ -189,15 +189,18 @@ public class FollowUpSurfacesTests : IDisposable
 
         Assert.DoesNotContain(new SiteGenerator(Options()).GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
-        var followUpsDir = Path.Combine(Site, "follow-ups");
-        Assert.True(Directory.Exists(followUpsDir));
-        var actionPages = Directory.GetFiles(followUpsDir, "action-*.html");
-        var deferredPages = Directory.GetFiles(followUpsDir, "deferred-*.html");
-        Assert.Equal(3, actionPages.Length);
-        Assert.Equal(2, deferredPages.Length);
+        // [Story 23.6 AC #8] Asked of the IR route set. A `Directory.GetFiles` walk returns EMPTY once nothing
+        // writes pages, so `Assert.Equal(3, …)` would have failed loudly here but the `.Where(…)` filters below
+        // would have passed over an empty list — the vacuous half is the reason this moved rather than being
+        // deleted.
+        Assert.True(SiteRegion.HasRoutesUnder(Site, "follow-ups/"));
+        var actionPages = FollowUpRoutes("action-");
+        var deferredPages = DeferredDetailRoutes();
+        Assert.Equal(3, actionPages.Count);
+        Assert.Equal(2, deferredPages.Count);
 
         var schedulePage = actionPages
-            .Select(p => (Path: p, Html: File.ReadAllText(p)))
+            .Select(r => (Path: r, Html: SiteRegion.Read(Site, r)))
             .First(t => t.Html.Contains("Schedule retros promptly", StringComparison.Ordinal));
         Assert.Contains("main id=\"main-content\" class=\"followup-detail\"", schedulePage.Html);
         Assert.Contains("Where it came from", schedulePage.Html);
@@ -206,23 +209,24 @@ public class FollowUpSurfacesTests : IDisposable
 
         // Cross-link pair on detail pages.
         var debtPages = actionPages
-            .Select(File.ReadAllText)
+            .Select(r => SiteRegion.Read(Site, r))
             .Where(h => h.Contains("heatmap", StringComparison.OrdinalIgnoreCase))
             .ToList();
         Assert.True(debtPages.Count >= 2);
         Assert.Contains(debtPages, h => h.Contains("also raised in Epic 2 retrospective"));
         Assert.Contains(debtPages, h => h.Contains("also raised in Epic 1 retrospective"));
 
-        var deferredHtml = File.ReadAllText(deferredPages.First(p => File.ReadAllText(p).Contains("Open casing mismatch")));
+        var deferredHtml = SiteRegion.Read(
+            Site, deferredPages.First(r => SiteRegion.Read(Site, r).Contains("Open casing mismatch")));
         Assert.Contains("main id=\"main-content\" class=\"followup-detail\"", deferredHtml);
         Assert.Contains("story-kicker\">Deferred work", deferredHtml);
         Assert.Contains("Where it came from", deferredHtml);
         Assert.Contains("Deferred from:", deferredHtml);
 
         // Slug stability under regeneration.
-        var names1 = Directory.GetFiles(followUpsDir).Select(Path.GetFileName).OrderBy(n => n).ToArray();
+        var names1 = SiteRegion.RoutesUnder(Site, "follow-ups/").ToArray();
         Assert.DoesNotContain(new SiteGenerator(Options()).GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
-        var names2 = Directory.GetFiles(followUpsDir).Select(Path.GetFileName).OrderBy(n => n).ToArray();
+        var names2 = SiteRegion.RoutesUnder(Site, "follow-ups/").ToArray();
         Assert.Equal(names1, names2);
     }
 
@@ -234,11 +238,10 @@ public class FollowUpSurfacesTests : IDisposable
         File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "sprint-status.yaml"), SprintWithDupes);
         Assert.DoesNotContain(new SiteGenerator(Options()).GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
-        var followUpsDir = Path.Combine(Site, "follow-ups");
         // The item's own detail page is the one whose file name matches its slug — several pages in this
         // group MENTION "Schedule retros promptly" (as a local-context sibling link), so match on the
         // generated slug rather than a raw text search across all pages.
-        var schedulePage = SiteRegion.Read(followUpsDir, "action-schedule-retros-promptly.html");
+        var schedulePage = SiteRegion.Read(Site, "follow-ups/action-schedule-retros-promptly.html");
 
         Assert.Contains("site-nav-local-context", schedulePage);
         Assert.Contains("Epic 1 follow-ups", schedulePage);
@@ -418,12 +421,11 @@ public class FollowUpSurfacesTests : IDisposable
         Assert.Contains("href=\"../follow-ups/deferred-", html);
         Assert.Contains("Parked item A", html);
 
-        var followUpsDir = Path.Combine(Site, "follow-ups");
-        Assert.True(Directory.Exists(followUpsDir));
-        var deferredPages = Directory.GetFiles(followUpsDir, "deferred-*.html");
-        Assert.Equal(2, deferredPages.Length);
-        Assert.Contains(deferredPages, p => File.ReadAllText(p).Contains("Parked item A", StringComparison.Ordinal));
-        Assert.Contains(deferredPages, p => File.ReadAllText(p).Contains("Parked item B", StringComparison.Ordinal));
+        Assert.True(SiteRegion.HasRoutesUnder(Site, "follow-ups/"));
+        var deferredPages = DeferredDetailRoutes();
+        Assert.Equal(2, deferredPages.Count);
+        Assert.Contains(deferredPages, r => SiteRegion.Read(Site, r).Contains("Parked item A", StringComparison.Ordinal));
+        Assert.Contains(deferredPages, r => SiteRegion.Read(Site, r).Contains("Parked item B", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -463,7 +465,9 @@ public class FollowUpSurfacesTests : IDisposable
 
         Assert.DoesNotContain(new SiteGenerator(Options()).GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
         Assert.False(SiteRegion.Exists(Site, "action-items.html"));
-        Assert.False(Directory.Exists(Path.Combine(Site, "follow-ups")));
+        // [Story 23.6 AC #8] Route space, not the filesystem: nothing writes a follow-ups/ directory now, so
+        // the disk form of this negative would pass without the surface having been suppressed.
+        Assert.False(SiteRegion.HasRoutesUnder(Site, "follow-ups/"));
     }
 
     [Fact]
@@ -554,21 +558,20 @@ public class FollowUpSurfacesTests : IDisposable
 
         Assert.DoesNotContain(new SiteGenerator(Options()).GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
 
-        var followUpsDir = Path.Combine(Site, "follow-ups");
-        var followUpsGroup = Path.Combine(followUpsDir, "group-follow-ups.html");
-        var epic1Group = Path.Combine(followUpsDir, "group-epic-1.html");
-        var epic2Group = Path.Combine(followUpsDir, "group-epic-2.html");
-        var unplannedGroup = Path.Combine(followUpsDir, "group-unplanned.html");
+        const string followUpsGroup = "follow-ups/group-follow-ups.html";
+        const string epic1Group = "follow-ups/group-epic-1.html";
+        const string epic2Group = "follow-ups/group-epic-2.html";
+        const string unplannedGroup = "follow-ups/group-unplanned.html";
 
-        Assert.True(File.Exists(followUpsGroup));
-        Assert.True(File.Exists(epic1Group));
+        Assert.True(SiteRegion.Exists(Site, followUpsGroup));
+        Assert.True(SiteRegion.Exists(Site, epic1Group));
         // Epic 2 has only a resolved deferred item → still a deferred member → page exists.
-        Assert.True(File.Exists(epic2Group));
+        Assert.True(SiteRegion.Exists(Site, epic2Group));
         // Unattributable deferred from StructuredDeferred? Groups are attributed via story ids 1.1 / 2.1.
         // No unattributable deferred → no Unplanned page unless quick-dev exists.
-        Assert.False(File.Exists(unplannedGroup));
+        Assert.False(SiteRegion.Exists(Site, unplannedGroup));
 
-        var orphanHtml = File.ReadAllText(followUpsGroup);
+        var orphanHtml = SiteRegion.Read(Site, followUpsGroup);
         Assert.Contains("Unscoped cleanup orphan", orphanHtml);
         Assert.DoesNotContain("Schedule retros promptly", orphanHtml);
         Assert.Contains("followup-rows-list", orphanHtml);
@@ -580,7 +583,7 @@ public class FollowUpSurfacesTests : IDisposable
         Assert.Contains("followup-rows-list js-listable", orphanHtml);
         Assert.Contains("data-sort-name=", orphanHtml);
 
-        var epic1Html = File.ReadAllText(epic1Group);
+        var epic1Html = SiteRegion.Read(Site, epic1Group);
         Assert.Contains("Schedule retros promptly", epic1Html);
         Assert.Contains("Open casing mismatch", epic1Html);
         Assert.DoesNotContain("Unscoped cleanup orphan", epic1Html);
@@ -958,8 +961,12 @@ public class FollowUpSurfacesTests : IDisposable
     /// <para>Counting these on disk stops being possible once nothing writes pages, and — worse — a walk of a
     /// directory that no longer exists returns EMPTY, so <c>Assert.DoesNotContain</c> over it would pass while
     /// asserting nothing.</para></summary>
-    private IReadOnlyList<string> DeferredDetailRoutes() =>
+    private IReadOnlyList<string> DeferredDetailRoutes() => FollowUpRoutes("deferred-");
+
+    /// <summary>The follow-up detail routes whose file name starts with <paramref name="prefix"/> — the
+    /// replacement for <c>Directory.GetFiles(Path.Combine(Site, "follow-ups"), "{prefix}*.html")</c>.</summary>
+    private IReadOnlyList<string> FollowUpRoutes(string prefix) =>
         SiteRegion.RoutesUnder(Site, "follow-ups/")
-            .Where(r => Path.GetFileName(r).StartsWith("deferred-", StringComparison.Ordinal))
+            .Where(r => Path.GetFileName(r).StartsWith(prefix, StringComparison.Ordinal))
             .ToList();
 }

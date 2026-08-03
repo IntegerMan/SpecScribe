@@ -3228,11 +3228,6 @@
 
 .ir-content .donut-center-text.donut-center-fraction { font-size: 1.05rem; }
 
-.ir-content .mini-donut { vertical-align: middle; }
-
-.ir-content .mini-donut .donut-track,
-.ir-content .mini-donut .donut-seg { stroke-width: 4; }
-
 .ir-content .chart-empty { font-size: 0.82rem; color: var(--ink-light); font-style: italic; }
 
 .ir-content .git-pulse { display: flex; flex-direction: column; gap: 1.2rem; }

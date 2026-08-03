@@ -549,7 +549,9 @@ public class IdeasTests : IDisposable
         var site = Generate(out var events);
 
         Assert.False(SiteRegion.Exists(site, "ideas.html"));
-        Assert.False(Directory.Exists(Path.Combine(site, "ideas")));
+        // [Story 23.6 AC #8] Route space: nothing writes an ideas/ directory now, so the disk form would
+        // pass without the surface having been suppressed.
+        Assert.False(SiteRegion.HasRoutesUnder(site, "ideas/"));
         Assert.DoesNotContain(events, e => e.RelativePath.Contains("ideas", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain("ideas.html", SiteRegion.Read(site, "index.html"));
         // [Story 18.4 review] The test's own name promised this and never asserted it.
@@ -569,12 +571,17 @@ public class IdeasTests : IDisposable
 
         Assert.True(SiteRegion.Exists(site, "ideas.html"));
         Assert.True(SiteRegion.Exists(site, "ideas/cache-layer.html"));
-        Assert.True(SiteRegion.Exists(site, "ideas/cache-layer-report.html"));
+        // [Story 23.6] Deliberately a FILE check, not a route check — and the distinction is the point of the
+        // test. The carried report is the one page this generator does not compose (it is carried in verbatim
+        // from the forge), so it has no `<main id="main-content">`, never enters the IR, and is written by
+        // `SiteGenerator.WriteVerbatimPage`. Converting this to `SiteRegion.Exists` would assert the opposite of
+        // what the surrounding test is named for.
+        Assert.True(File.Exists(Path.Combine(site, "ideas", "cache-layer-report.html")));
         // The idea's own markdown is consumed by its detail page — no second, orphan generic page for it.
         Assert.False(SiteRegion.Exists(site, "forge/cache-layer/forged-idea.html"));
         // The carried report is a LEAF: written verbatim, never wrapped in the portal template (which would nest
         // one complete <html> document inside another).
-        var carried = SiteRegion.Read(site, "ideas/cache-layer-report.html");
+        var carried = File.ReadAllText(Path.Combine(site, "ideas", "cache-layer-report.html"));
         Assert.Equal(SafeReport("HARDENED"), carried);
         Assert.DoesNotContain("site-nav", carried);
         // And the nav entry the gate promised actually exists.
@@ -604,7 +611,12 @@ public class IdeasTests : IDisposable
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
         var bundle = gen.RenderSpaBundle();
 
-        Assert.True(SiteRegion.Exists(site, "ideas/cache-layer-report.html"));
+        // [Story 23.6] Deliberately a FILE check, not a route check — and the distinction is the point of the
+        // test. The carried report is the one page this generator does not compose (it is carried in verbatim
+        // from the forge), so it has no `<main id="main-content">`, never enters the IR, and is written by
+        // `SiteGenerator.WriteVerbatimPage`. Converting this to `SiteRegion.Exists` would assert the opposite of
+        // what the surrounding test is named for.
+        Assert.True(File.Exists(Path.Combine(site, "ideas", "cache-layer-report.html")));
         Assert.DoesNotContain(bundle.Pages, p => p.OutputRelativePath.Contains("-report.html", StringComparison.Ordinal));
         // The idea's own composed pages ARE routes — only the foreign leaf is held out.
         Assert.Contains(bundle.Pages, p => p.OutputRelativePath == SiteNav.IdeasOutputPath);
@@ -667,10 +679,10 @@ public class IdeasTests : IDisposable
         File.WriteAllText(Path.Combine(Source, ".memlog.md"),
             "---\ntopic: the project journal\nupdated: 2026-07-19T10:00\n---\n\n- (note) seeded\n");
 
-        var before = File.ReadAllText(Path.Combine(Generate(out _), "index.html"));
+        var before = SiteRegion.Read(Generate(out _), "index.html");
 
         WriteMemlog(Path.Combine(Source, "forge", "an-idea"), "idea: something", "updated: 2026-07-26T10:00");
-        var after = File.ReadAllText(Path.Combine(Generate(out _), "index.html"));
+        var after = SiteRegion.Read(Generate(out _), "index.html");
 
         // The coverage panel's journal-derived freshness is unchanged by the forge run.
         Assert.Equal(CoverageFreshnessSignature(before), CoverageFreshnessSignature(after));
@@ -686,11 +698,11 @@ public class IdeasTests : IDisposable
         SeedEpics();
         File.WriteAllText(Path.Combine(Source, ".memlog.md"),
             "---\ntopic: the project journal\nupdated: 2026-07-19T10:00\n---\n\n- (note) seeded\n");
-        var before = File.ReadAllText(Path.Combine(Generate(out _), "index.html"));
+        var before = SiteRegion.Read(Generate(out _), "index.html");
 
         WriteMemlog(Path.Combine(Source, "forge", "a-idea"), "idea: first", "updated: 2026-07-20T09:00");
         WriteMemlog(Path.Combine(Source, "forge", "A Idea"), "idea: second (slug collision loser)", "updated: 2026-07-21T09:00");
-        var after = File.ReadAllText(Path.Combine(Generate(out _), "index.html"));
+        var after = SiteRegion.Read(Generate(out _), "index.html");
 
         Assert.Equal(CoverageFreshnessSignature(before), CoverageFreshnessSignature(after));
     }

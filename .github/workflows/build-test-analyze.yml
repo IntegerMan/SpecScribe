@@ -273,10 +273,24 @@ jobs:
         # `--spa` is a deprecated no-op since Story 23.6 (the IR is emitted unconditionally) and is dropped
         # here rather than left to print a deprecation notice on every CI run.
         #
-        # This step now does TWO things: it emits spa/manifest.json + spa/pages-*.json (the canonical IR,
+        # This step does TWO things: it emits spa/manifest.json + spa/pages-*.json (the canonical IR,
         # ADR 0016) and then boots the artefact above to render one .html per manifest route. --no-build
         # reuses the Build step's output.
-        run: dotnet run --project src/SpecScribe --no-build -- generate
+        #
+        # ⚠️ `--deep-git` IS REQUIRED, and the reason is `check:ir-content` below — not analytics.
+        #
+        # `extract:ir-content` PRUNES any rule whose selector names a class it cannot find in the IR, so the
+        # generated layer is only ever correct for the corpus it was extracted from. A deep-git run emits
+        # surfaces a shallow one does not — the code-insights history/relationships tabs, the relationship-graph
+        # swatches, the deep-analytics insight panels — and `publish-docs-live-pages.yml` publishes WITH
+        # `--deep-git`, so those surfaces are on the real site and their rules must survive extraction.
+        #
+        # Without this flag the gate validated a NARROWER corpus than the one that ships: it pruned 182 rules
+        # and went red against a layer that is correct for the published site. Measured, not inferred —
+        # reproduced locally as `+4 / -182` without the flag and `+0 / -0` with it. Aligning the gate's corpus
+        # with the published one is the fix; regenerating the layer to match a shallow CI run would have
+        # stripped styling from surfaces the deployed portal actually renders.
+        run: dotnet run --project src/SpecScribe --no-build -- generate --deep-git
 
       - name: Check web drift gates
         working-directory: web

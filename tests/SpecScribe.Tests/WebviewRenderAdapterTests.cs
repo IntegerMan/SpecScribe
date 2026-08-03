@@ -69,35 +69,22 @@ public class WebviewRenderAdapterTests
         Assert.True(divergences.Count == 0, "expected parity, got: " + string.Join(" | ", divergences));
     }
 
-    [Fact]
-    public void Render_WithoutTheRegistry_TheAssetDivergencesSurface()
-    {
-        // Proves the registered exceptions are load-bearing, not vacuous: unfiltered, the webview's inlined-CSS
-        // and absent-script deltas ARE divergences the harness catches.
-        var page = EpicPage(Nav());
-        var doc = WebviewRenderAdapter.Shared.Render(page).Content;
+    // ── RETIRED BY STORY 23.6 (AC #1/#8) ─────────────────────────────────────────────────────────────────
+    //
+    // `Render_WithoutTheRegistry_TheAssetDivergencesSurface` and `Render_MermaidPage_DegradesUnderTheRegisteredException`
+    // existed to prove the webview's registered exceptions were LOAD-BEARING rather than vacuous: run the parity
+    // harness with an empty registry and the `asset.css` / `asset.js` / `mermaid` divergences really did surface.
+    //
+    // Those three registry entries are retired (see `HostRenderExceptions.Registry`), so the tests have no
+    // subject: with the facts removed the unfiltered call returns an empty collection, which is exactly how they
+    // failed when the writer was deleted. There is no way to re-point them — proving an exception is load-bearing
+    // requires a divergence to except, and every C# surface now emits the identical region by construction
+    // (ADR 0024).
+    //
+    // The discipline they enforced is NOT abandoned: `RenderSpaParityTests` still runs the same "empty registry
+    // vs real registry" pair over the SPA's surviving `mermaid` exception, which is now the only sanctioned
+    // divergence left in the registry.
 
-        var unfiltered = RenderParity.FindDivergences(page, doc, "webview", Array.Empty<HostRenderException>());
-        Assert.Contains(unfiltered, d => d.StartsWith("asset.css", StringComparison.Ordinal));
-        Assert.Contains(unfiltered, d => d.StartsWith("asset.js", StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public void Render_MermaidPage_DegradesUnderTheRegisteredException()
-    {
-        // A page that NEEDS Mermaid (the epics index always does) renders no init script under the webview CSP —
-        // a divergence without the registry, sanctioned with it (ADR 0005's accepted text fallback).
-        var page = EpicPage(Nav(), mermaidNeeded: true);
-        var doc = WebviewRenderAdapter.Shared.Render(page).Content;
-
-        Assert.DoesNotContain("mermaid.initialize", doc);
-        Assert.Contains(
-            RenderParity.FindDivergences(page, doc, "webview", Array.Empty<HostRenderException>()),
-            d => d.StartsWith("mermaid", StringComparison.Ordinal));
-        Assert.DoesNotContain(
-            RenderParity.FindDivergences(page, doc, "webview"),
-            d => d.StartsWith("mermaid", StringComparison.Ordinal));
-    }
 
     [Fact]
     public void FindDivergences_StillCatchesAnUnregisteredWebviewDivergence()
@@ -485,46 +472,27 @@ public class WebviewRenderAdapterTests
     // ----- Registry hygiene (AC #4: every entry justified, none blanket) --------------------------------------
 
     [Fact]
-    public void Registry_CarriesExactlyTheJustifiedWebviewChromeExceptions()
+    public void Registry_CarriesNoWebviewException_BecauseThisSurfaceDivergesOnNothing()
     {
-        // The three ADR 0005 measured, plus `data-island`, plus Story 20.7's `hierarchy-chart` — all
-        // webview-scoped, all chrome/asset facts, each with a real reason. No html-surface entry (the HTML adapter
-        // still diverges on nothing) and no section.* entry (the body facts hold FULL parity).
-        // Story 6.7's SPA surface adds its own single (mermaid) entry, asserted separately in RenderSpaParityTests.
+        // [Story 23.6 AC #1] ⚠️ THIS TEST INVERTED, and the inversion is the finding.
         //
-        // `data-island`: the webview strips inline JSON data islands — an ASSET-WEIGHT divergence, because the
-        // island is unreadable here (this surface ships no specscribe.js; see asset.js).
+        // It used to pin exactly three justified webview entries — `asset.css`, `asset.js`, `mermaid` — each a
+        // chrome/asset fact measured against the C#-rendered page. That page is gone, and with it every fact
+        // those entries excepted. The retirement note in `HostRenderExceptions.Registry` carries the reasoning
+        // per entry; what matters here is that the registry's OWN contract ("a registered divergence that no
+        // longer exists is a bug") is now enforced in the direction that can actually catch a mistake: if
+        // someone re-adds a webview exception without a divergence to justify it, this fails.
         //
-        // `hierarchy-chart` [Story 20.7, owner decision D3]: with no script there is no Plotly, and Story 20.7
-        // retired the server-rendered SVG that used to stand in its place — so this surface shows the TEXT TWIN and
-        // no chart picture. It is the fallback ADR 0012 §5 and ADR 0013 §7 both pre-authorize, and it is REGISTERED
-        // rather than left silent precisely because the thing that makes it a documented degradation instead of a
-        // hole is that the twin survives with its links. The ADR 0005 CSP amendment that would let Plotly load here
-        // lands once, with Story 23.4.
-        // ADR 0036 retired TWO of the five — `data-island` (regions ship verbatim; the island is live chart data
-        // now, not dead weight) and `hierarchy-chart` (charts mount here, so there is no missing picture) — and
-        // NARROWED `asset.js`. What remains is two CARRIER differences plus one CSP casualty.
-        //
-        // `asset.js` stays because the parity fact is the `<script src="..." defer>` TAG, not the behaviour: the
-        // webview inlines specscribe.js instead of referencing it, so the fact genuinely still differs even though
-        // nothing is missing any more. Exactly the shape asset.css has always had.
-        //
-        // Pinned as an exact set, not a count: a registry that keeps entries for divergences that no longer exist
-        // is as misleading as one missing an entry that does, and only an exact-set assertion catches both.
-        var webview = HostRenderExceptions.Registry.Where(e => e.SurfaceId == "webview").ToList();
-        Assert.Equal(3, webview.Count);
-        Assert.All(webview, e => Assert.False(string.IsNullOrWhiteSpace(e.Reason)));
-        Assert.Equal(
-            new[] { "asset.css", "asset.js", "mermaid" },
-            webview.Select(e => e.FactId).OrderBy(f => f, StringComparer.Ordinal).ToList());
-        // The narrowed asset.js reason must state that the script is INLINED. Asserted positively rather than as
-        // "does not say absent": the reason deliberately quotes its own superseded wording to explain the change,
-        // so a negative check on that phrase would fail on the very text that documents it correctly.
-        var assetJs = webview.Single(e => e.FactId == "asset.js");
-        Assert.Contains("inlines", assetJs.Reason, StringComparison.OrdinalIgnoreCase);
-        // Global hygiene across every surface: a section.* fact may never be excepted (a body divergence is
-        // always a bug).
+        // The webview has NOT gained capabilities it lacks — it still cannot run Mermaid under its CSP. That gap
+        // is a rendering-capability fact recorded in ADR 0005 / ADR 0032, not a C#-side parity divergence, and
+        // ADR 0024 is why: every surface projects one composed region, so they agree by construction.
+        Assert.Empty(HostRenderExceptions.Registry.Where(e => e.SurfaceId == "webview"));
+
+        // Registry hygiene, unchanged: every surviving entry carries a real reason, and no entry excepts a BODY
+        // fact — section parity must hold on every surface, with no sanctioned escape.
+        Assert.All(HostRenderExceptions.Registry, e => Assert.False(string.IsNullOrWhiteSpace(e.Reason)));
         Assert.DoesNotContain(HostRenderExceptions.Registry, e => e.FactId.StartsWith("section.", StringComparison.Ordinal));
+        Assert.DoesNotContain(HostRenderExceptions.Registry, e => e.SurfaceId == "html");
     }
 
     private static int Count(string haystack, string needle)

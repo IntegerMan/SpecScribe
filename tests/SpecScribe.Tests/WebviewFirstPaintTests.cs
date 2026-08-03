@@ -103,11 +103,13 @@ public class WebviewFirstPaintTests : IDisposable
     private ForgeOptions Options() => ForgeOptions.Resolve(
         source: Source, adrs: Adrs, output: Site, projectName: "SpecScribe", includeReadme: false);
 
-    /// <summary>A generator run exactly as the <c>webview</c> command runs it, with the two skips under test
-    /// individually settable so a test can compare an optimised run against the un-optimised one.</summary>
-    private SiteGenerator Generated(bool emitIr, bool writeStaticPages)
+    /// <summary>A generator run exactly as the <c>webview</c> command runs it, with the skip under test settable
+    /// so a test can compare an optimised run against the un-optimised one.
+    /// <para>[Story 23.6] <c>writeStaticPages</c> is gone from the signature with the property — see the
+    /// retirement note above. <c>EmitIr</c> is the one remaining two-state skip.</para></summary>
+    private SiteGenerator Generated(bool emitIr)
     {
-        var gen = new SiteGenerator(Options()) { CapturePages = true, EmitIr = emitIr, WriteStaticPages = writeStaticPages };
+        var gen = new SiteGenerator(Options()) { CapturePages = true, EmitIr = emitIr };
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
         return gen;
     }
@@ -129,17 +131,16 @@ public class WebviewFirstPaintTests : IDisposable
         var gen = new SiteGenerator(Options());
 
         Assert.True(gen.EmitIr);
-        Assert.True(gen.WriteStaticPages);
     }
 
     [Fact]
     public void EmitIr_Off_WritesNoIr_ButTheWebviewBundleIsUnchanged()
     {
-        var withIr = Fingerprint(Generated(emitIr: true, writeStaticPages: true).RenderWebviewSurfaces());
+        var withIr = Fingerprint(Generated(emitIr: true).RenderWebviewSurfaces());
 
         // A second, independent run of the SAME fixture with the emit skipped.
         Directory.Delete(Site, recursive: true);
-        var withoutIr = Generated(emitIr: false, writeStaticPages: true);
+        var withoutIr = Generated(emitIr: false);
 
         Assert.False(Directory.Exists(Path.Combine(Site, "spa")));
         Assert.False(File.Exists(Path.Combine(Site, "app.html")));
@@ -148,24 +149,17 @@ public class WebviewFirstPaintTests : IDisposable
 
     // ===== WriteStaticPages ===================================================================================
 
-    [Fact]
-    public void WriteStaticPages_Off_WritesNoPageHtml_ButTheWebviewBundleIsUnchanged()
-    {
-        var withPages = Fingerprint(Generated(emitIr: false, writeStaticPages: true).RenderWebviewSurfaces());
-        Assert.True(File.Exists(Path.Combine(Site, "about.html")), "the default run must still write its pages");
-
-        Directory.Delete(Site, recursive: true);
-        var withoutPages = Generated(emitIr: false, writeStaticPages: false);
-
-        Assert.False(File.Exists(Path.Combine(Site, "about.html")));
-        Assert.False(File.Exists(Path.Combine(Site, "adrs", "0001-a-decision.html")));
-        // The two DOCUMENTED exceptions, pinned so a later "tidy-up" does not silently widen the switch: the
-        // embedded assets are not page writes (EnsureScaffold), and index.html is written by WriteIndex, which is
-        // not the WritePage seam this switch gates. See SiteGenerator.WriteStaticPages.
-        Assert.True(File.Exists(Path.Combine(Site, ForgeOptions.StylesheetName)));
-        Assert.True(File.Exists(Path.Combine(Site, "index.html")));
-        Assert.Equal(withPages, Fingerprint(withoutPages.RenderWebviewSurfaces()));
-    }
+    // ── RETIRED BY STORY 23.6 (AC #1) ────────────────────────────────────────────────────────────────────
+    //
+    // `WriteStaticPages_Off_WritesNoPageHtml_ButTheWebviewBundleIsUnchanged` pinned the `WriteStaticPages`
+    // switch: with it off, no page `.html` was written, while the webview bundle stayed byte-identical. Both the
+    // switch and the property are deleted — the full-document render it gated no longer exists anywhere, so
+    // "off" is the only behaviour and there is no second state to compare against.
+    //
+    // The invariant it protected — that the webview payload does NOT depend on any page being written — is now
+    // structural rather than tested: the panel consumes composed regions, and nothing writes a page under any
+    // configuration. `Ir_Off_LeavesTheWebviewBundleUnchanged` above still pins the analogous claim for the IR
+    // switch, which does still have two states.
 
     // ===== The prelude / delta split ==========================================================================
 
@@ -175,7 +169,7 @@ public class WebviewFirstPaintTests : IDisposable
     [Fact]
     public void RenderWebviewSurfaces_PreludeOnly_CarriesTheFamiliesAndNoLongTail()
     {
-        var prelude = Generated(emitIr: false, writeStaticPages: false).RenderWebviewSurfaces(includeLongTail: false);
+        var prelude = Generated(emitIr: false).RenderWebviewSurfaces(includeLongTail: false);
 
         Assert.Equal("index.html", prelude.EntryPath);
         Assert.Equal(
@@ -184,7 +178,7 @@ public class WebviewFirstPaintTests : IDisposable
         // The long tail the CapturePages run produced is provably present in the complete bundle, so its absence
         // above is the split doing its job rather than the fixture having nothing to omit.
         Assert.Contains(
-            Generated(emitIr: false, writeStaticPages: false).RenderWebviewSurfaces().Surfaces,
+            Generated(emitIr: false).RenderWebviewSurfaces().Surfaces,
             s => s.OutputRelativePath.StartsWith("adrs/", StringComparison.Ordinal));
     }
 
@@ -194,7 +188,7 @@ public class WebviewFirstPaintTests : IDisposable
     [Fact]
     public void WithLongTailSurfaces_CompletesThePrelude_ToExactlyTheUnsplitBundle()
     {
-        var gen = Generated(emitIr: false, writeStaticPages: false);
+        var gen = Generated(emitIr: false);
 
         var unsplit = gen.RenderWebviewSurfaces();
         var completed = gen.WithLongTailSurfaces(gen.RenderWebviewSurfaces(includeLongTail: false));
@@ -226,7 +220,7 @@ public class WebviewFirstPaintTests : IDisposable
     [Fact]
     public void RenderWebviewSurfaces_EntryOnly_CarriesTheDashboardAndNothingElse()
     {
-        var prelude = Generated(emitIr: false, writeStaticPages: false)
+        var prelude = Generated(emitIr: false)
             .RenderWebviewSurfaces(includeLongTail: false, includeEpicsFamily: false);
 
         Assert.Equal("index.html", prelude.EntryPath);
@@ -242,7 +236,7 @@ public class WebviewFirstPaintTests : IDisposable
     [Fact]
     public void WithLongTailSurfaces_AddEpicsFamily_CompletesAnEntryOnlyPrelude_LosingNoSurface()
     {
-        var gen = Generated(emitIr: false, writeStaticPages: false);
+        var gen = Generated(emitIr: false);
 
         var unsplit = gen.RenderWebviewSurfaces();
         var completed = gen.WithLongTailSurfaces(
@@ -266,7 +260,7 @@ public class WebviewFirstPaintTests : IDisposable
     {
         Assert.Null(new SiteGenerator(Options()).OnFirstPaintReady);
 
-        var gen = new SiteGenerator(Options()) { CapturePages = true, EmitIr = false, WriteStaticPages = false };
+        var gen = new SiteGenerator(Options()) { CapturePages = true, EmitIr = false };
         var calls = 0;
         WebviewBundle? atCheckpoint = null;
         gen.OnFirstPaintReady = g =>
