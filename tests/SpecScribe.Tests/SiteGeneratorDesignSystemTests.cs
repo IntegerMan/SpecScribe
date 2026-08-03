@@ -36,7 +36,7 @@ public class SiteGeneratorDesignSystemTests : IDisposable
     private string Generate()
     {
         new SiteGenerator(Options()).GenerateAll();
-        return File.ReadAllText(Path.Combine(Site, SiteNav.DesignSystemOutputPath));
+        return SiteRegion.Read(Site, SiteNav.DesignSystemOutputPath);
     }
 
     [Fact]
@@ -44,7 +44,7 @@ public class SiteGeneratorDesignSystemTests : IDisposable
     {
         var html = Generate();
 
-        Assert.True(File.Exists(Path.Combine(Site, SiteNav.DesignSystemOutputPath)));
+        Assert.True(SiteRegion.Exists(Site, SiteNav.DesignSystemOutputPath));
         Assert.Contains("<h1>Design System</h1>", html);
 
         // The Help nav group + the dashboard's Help quick-links band both carry it, on every page.
@@ -56,14 +56,16 @@ public class SiteGeneratorDesignSystemTests : IDisposable
     [Fact]
     public void DesignSystem_NavEntry_ResolvesToAWrittenFile()
     {
-        // Nav coherence: every Help child must point at a file this run actually produced. A dangling Help
+        // Nav coherence: every Help child must point at a page this run actually produced. A dangling Help
         // link is the exact failure the always-written guarantee exists to prevent.
+        // [Story 23.6 AC #8] "a file this run produced" is now "a ROUTE this run emitted" — the IR is what a
+        // completed generate produces, and it is what the renderer turns into the file the link resolves to.
         new SiteGenerator(Options()).GenerateAll();
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe");
 
         var entry = Assert.Single(nav.Items, i => i.Label == "Design System");
         Assert.Equal(SiteNav.DesignSystemOutputPath, entry.OutputRelativePath);
-        Assert.True(File.Exists(Path.Combine(Site, entry.OutputRelativePath)));
+        Assert.True(SiteRegion.Exists(Site, entry.OutputRelativePath));
         Assert.Contains(nav.QuickLinks, q => q.OutputRelativePath == SiteNav.DesignSystemOutputPath && q.Group == "Help");
     }
 

@@ -231,9 +231,21 @@ public class IncrementalOracleParityTests : IDisposable
     /// <summary>Floor on the oracle's file count, below which a "clean" diff means the harness produced nothing
     /// rather than that the routes agreed. Without it every assertion here passes vacuously the moment a fixture or
     /// option change stops the generator emitting — the failure mode Story 22.4's equivalent test guards with its own
-    /// VACUOUS assertion and this file originally shipped without. The fixture emits ~40 files. [code review
-    /// 2026-07-29]</summary>
-    private const int OracleFileFloor = 20;
+    /// VACUOUS assertion and this file originally shipped without. [code review 2026-07-29]
+    ///
+    /// <para>[Story 23.6] ⚠️ <b>This guard did its job and that is why the number moved.</b> The fixture used to
+    /// emit ~40 files, most of them <c>.html</c>; now that no C# code path writes a page, a generate leaves the
+    /// IR (<c>spa/manifest.json</c> + the chunk files), the shared assets and the SPA shell — 13 in this fixture.
+    /// The floor is lowered to match, and <see cref="OracleRouteFloor"/> is added BESIDE it rather than instead
+    /// of it, because file count alone no longer measures whether pages were produced: the IR could hold zero
+    /// routes and still put a dozen files on disk. The route floor is the one that now carries the original
+    /// intent.</para></summary>
+    private const int OracleFileFloor = 10;
+
+    /// <summary>Floor on the oracle's ROUTE count — the Story 23.6 successor to <see cref="OracleFileFloor"/>.
+    /// Pages are IR routes now, so this is where "the generator actually emitted the site" is asserted. The
+    /// fixture emits ~25 routes.</summary>
+    private const int OracleRouteFloor = 15;
 
     // ── the harness ─────────────────────────────────────────────────────────────────────────────────────────
 
@@ -290,6 +302,16 @@ public class IncrementalOracleParityTests : IDisposable
             oracle.Count >= OracleFileFloor,
             $"VACUOUS: the oracle produced only {oracle.Count} files (floor {OracleFileFloor}), so a clean diff "
             + "would prove nothing. The fixture or the generate options stopped producing output.");
+
+        // [Story 23.6] The file floor above can be met by the IR, the assets and the SPA shell alone, so the
+        // question it was written to ask — "did the generator actually emit the site?" — is asked here, of the
+        // ROUTE set. A run that emits an empty manifest still writes a dozen files.
+        var oracleRoutes = SiteRegion.Routes(oracleRoot);
+        Assert.True(
+            oracleRoutes.Count >= OracleRouteFloor,
+            $"VACUOUS: the oracle emitted only {oracleRoutes.Count} route(s) (floor {OracleRouteFloor}), so a "
+            + "clean diff would prove nothing. Pages are IR routes since Story 23.6 — a populated output "
+            + "directory is no longer evidence that any page was produced.");
 
         var stale = new List<string>();
         var missing = new List<string>();
@@ -592,10 +614,11 @@ public class IncrementalOracleParityTests : IDisposable
             @"Work graph for (?<epic>[^:<]+): (?<nodes>\d+) work items and (?<edges>\d+) provenance links",
             RegexOptions.CultureInvariant);
 
-        foreach (var path in Directory.EnumerateFiles(root, "*.html", SearchOption.AllDirectories))
+        // [Story 23.6] Over the IR's routes, not a *.html walk — which would find nothing now and report
+        // "the narrow route's counts match the full rebuild's" from two empty dictionaries.
+        foreach (var relative in SiteRegion.Routes(root))
         {
-            var relative = PathUtil.NormalizeSlashes(Path.GetRelativePath(root, path));
-            foreach (var match in pattern.Matches(File.ReadAllText(path)).Cast<Match>())
+            foreach (var match in pattern.Matches(SiteRegion.Read(root, relative)).Cast<Match>())
             {
                 // Keyed by page AND bucket: the same epic's graph can appear on more than one surface, and a route
                 // that refreshed one of them but not another is precisely the divergence class being guarded.

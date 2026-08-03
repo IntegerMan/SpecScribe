@@ -21,34 +21,39 @@ public static class HostRenderExceptions
     /// <summary>The sanctioned divergences — every entry names its surface and carries a reviewable reason. An
     /// unregistered divergence is a bug, and so is a registered one that no longer exists.
     /// <para>ADR 0036 removed two webview entries (<c>data-island</c>, <c>hierarchy-chart</c>) when the shell
-    /// began supplying the chart engine and mount code, and NARROWED <c>asset.js</c> from "absent" to "inlined
-    /// rather than linked". The three that remain — <c>asset.css</c>, <c>asset.js</c>, <c>mermaid</c> — are now
-    /// two carrier differences and one CSP casualty; none is a missing capability.</para></summary>
-    public static readonly IReadOnlyList<HostRenderException> Registry = new[]
+    /// began supplying the chart engine and mount code. Story 23.6 then removed the webview's remaining three
+    /// (<c>asset.css</c>, <c>asset.js</c>, <c>mermaid</c>): each registered a difference against the C#-rendered
+    /// PAGE, and no C# code path renders one any more — see the note in <see cref="Registry"/>. What survives is
+    /// the SPA's single <c>mermaid</c> entry.</para></summary>
+    public static readonly IReadOnlyList<HostRenderException> Registry = new HostRenderException[]
     {
-        new HostRenderException("webview", "asset.css",
-            "The webview inlines the production stylesheet into its <style> block (no <link rel=\"stylesheet\"> "
-            + "is emitted): under the webview CSP local resources only load via asWebviewUri, and ADR 0005 "
-            + "ratified inlining so the shim ships no loose asset files. Same bytes of CSS, different carrier."),
-        new HostRenderException("webview", "asset.js",
-            "NARROWED BY ADR 0036, and the narrowing matters: this used to read \"the specscribe.js enhancement "
-            + "script is deliberately absent\". It is no longer absent. WrapDocument inlines the production "
-            + "specscribe.js — the SAME file, whole and unforked (ADR 0036 §2) — together with the vendored chart "
-            + "engine, both under the document nonce, which is how charts mount here at all. What survives as a "
-            + "divergence is purely the CARRIER, exactly like asset.css above: the parity fact is a "
-            + "<script src=\"...\" defer> tag, and this surface has no such tag because `localResourceRoots` is "
-            + "empty and nothing may load from disk. Same bytes of JavaScript, different delivery. The webview is "
-            + "NOT missing behaviour here any more, and reading this entry as though it were would be the mistake "
-            + "it previously described."),
-        new HostRenderException("webview", "mermaid",
-            "No Mermaid script can load under the webview CSP (script-src is nonce-locked, remote loads are "
-            + "blocked), so any <pre class=\"mermaid\"> — the epics roadmap AND, since the whole-site captured "
-            + "surfaces (spec-webview-doc-page-surfaces), any doc/ADR page carrying a diagram — degrades to "
-            + "readable preformatted text — ADR 0005's accepted fallback. Unchanged by ADR 0036: that decision put "
-            + "the CHART engine and specscribe.js on the shell, and neither carries Mermaid, so this stays the one "
-            + "CSP casualty ADR 0032 also names. The content region remains free of EXECUTABLE script either way "
-            + "(an innerHTML swap would never run one). Bundling Mermaid with a nonce remains an option, and is now "
-            + "a smaller step than it was — the shell already proves a nonce'd vendored bundle works here."),
+        // ── RETIRED BY STORY 23.6 (AC #1/#2): the webview's `asset.css`, `asset.js` and `mermaid` entries ──
+        //
+        // This registry's own contract is that "an unregistered divergence is a bug, and so is a REGISTERED one
+        // that no longer exists". All three of these registered a difference against the C#-rendered PAGE, and
+        // C# no longer renders one.
+        //
+        //   · `asset.css` / `asset.js` described a CARRIER difference: the golden page emitted
+        //     `<link rel="stylesheet">` and `<script src=… defer>`, the webview inlined both under its CSP. The
+        //     golden side of that comparison is gone — the renderer builds the head from the IR — and the parity
+        //     facts those entries excepted (`SemanticFacts.Stylesheet` / `.Script`) were removed with it, because
+        //     no C# surface evidences a head tag any more.
+        //   · `mermaid` described the webview shipping no `mermaid.initialize`. Neither does anything else in C#:
+        //     `Mermaid.InitScript()` was emitted only by the deleted `HtmlRenderAdapter.Render`, and the init is
+        //     the renderer's now (`chromeNeeds().needsMermaid` → `IrSurface.vue`). `MermaidPresent` SURVIVES as a
+        //     region-level fact — "this page carries a diagram", so a surface that DROPS the block is still
+        //     caught — but every C# surface emits the same region, so it cannot diverge and the exception has
+        //     nothing left to except.
+        //
+        // ⚠️ NONE OF THIS MEANS THE WEBVIEW GAINED MERMAID. It still cannot run it under its CSP. What changed is
+        // that the difference is no longer expressible as a C#-side PARITY fact: ADR 0024 makes every surface a
+        // filtered projection of one region, so the surfaces agree by construction and the only remaining
+        // differences live in chrome — which belongs to the renderer, not to this harness. The capability gap is
+        // recorded in ADR 0005 and ADR 0032, which is where it always belonged.
+        //
+        // Deleted rather than reworded, following the precedent set two entries down by ADR 0036: a registry that
+        // keeps retired entries stops being readable as "what differs today".
+
         // The SPA surface (Story 6.7) is a REAL browser, so — unlike the webview — it keeps the production
         // specscribe.css and specscribe.js: those chrome/asset facts MATCH the html surface (the shared entry shell
         // loads them), which is why the SPA registers NO asset.css / asset.js exception. Its ONE sanctioned
@@ -75,11 +80,18 @@ public static class HostRenderExceptions
         //
         // Both entries are DELETED rather than reworded: there is no residual divergence left to describe, and a
         // registry that keeps retired entries for history stops being readable as "what differs today".
-        new HostRenderException("spa", "mermaid",
-            "The SPA swaps content regions via innerHTML, where an injected Mermaid init script never executes and "
-            + "is not re-run across swaps, so the epics roadmap's <pre class=\"mermaid\"> degrades to readable "
-            + "preformatted text — the same accepted fallback as the webview. Unlike the webview, the SPA keeps "
-            + "specscribe.css/specscribe.js (real browser), so it registers no asset.css/asset.js exception. Full "
-            + "Mermaid-in-SPA re-init is a deferred enhancement (Story 6.7 Completion Notes)."),
+        // The SPA's `mermaid` entry is retired for the SAME reason as the webview's three above, and its
+        // absence completes the pattern rather than being a separate judgement. It registered that an injected
+        // init script never executes across an innerHTML swap, so the SERVED PAGE carried no `mermaid.initialize`
+        // where the static page did. There is no static page, and no C# surface emits an init at all.
+        //
+        // ⚠️ THE REGISTRY IS NOW EMPTY, AND THAT IS THE HONEST STATE — not an oversight to be filled back in.
+        // ADR 0024 makes every C# surface a filtered projection of ONE composed region, so the surfaces cannot
+        // disagree on a region fact by construction, and every difference that remains between them lives in
+        // chrome — which Story 23.6 moved to the renderer. An empty registry says exactly that: nothing C#
+        // produces diverges today.
+        //
+        // The type and this list stay. `FindSectionDivergences` shares the mechanism, and the next real
+        // divergence should be registered here rather than rediscovering the need for a registry.
     };
 }

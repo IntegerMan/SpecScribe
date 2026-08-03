@@ -320,7 +320,10 @@ public class WebviewThemingTests
         // until ADR 0036 retired `data-island` and `hierarchy-chart`; the count is back to the original three, and
         // asset.js now records a CARRIER difference (specscribe.js is inlined, not linked) rather than an absence.
         // Other surfaces' entries — e.g. Story 6.7's single spa mermaid exception — are out of scope here.
-        Assert.Equal(3, HostRenderExceptions.Registry.Count(e => e.SurfaceId == "webview"));
+        // [Story 23.6 AC #1] Was 3. The webview's asset.css / asset.js / mermaid entries each registered a
+        // difference against the C#-rendered PAGE, and no C# code path renders one — see the retirement note in
+        // HostRenderExceptions.Registry. Zero is the assertion now: this surface diverges on nothing.
+        Assert.Equal(0, HostRenderExceptions.Registry.Count(e => e.SurfaceId == "webview"));
         Assert.DoesNotContain(HostRenderExceptions.Registry,
             e => e.SurfaceId == "webview" && e.FactId.Contains("theme", StringComparison.OrdinalIgnoreCase));
     }

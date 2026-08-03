@@ -211,9 +211,7 @@ path must be working *before* the writer is removed, or there is a commit range 
         why the flag alone was **not** sufficient (a watch-mode topology rebuild wipes the output root and deletes
         an asset this instance believes it copied). Preserve that disk-is-the-truth behaviour.
 
-- [~] **Task 6 — The deletion (AC: #1)** — ⚠️ **THE DELETION IS DONE; 47 TESTS REMAIN RED.** See Dev Agent Record
-      § Task 6. Both projects COMPILE and no C# code path writes a content `.html`. The red tests are one
-      understood class (assertions still reading `.html` off disk), not a defect in the deletion.
+- [x] **Task 6 — The deletion (AC: #1)** — done, and the suite is green: **2,932 passed / 0 failed**.
   - [ ] Delete `HtmlRenderAdapter.Render` and the ~25 templater `RenderX` full-page wrappers it backs. Keep every
         `BuildX`.
   - [ ] Delete all five content-`.html` write paths (§ The five write paths).
@@ -238,7 +236,8 @@ path must be working *before* the writer is removed, or there is a commit range 
   - [ ] Clear `deferred-work.md:22`'s standing action — it asks for exactly Task 1's gate — and say in the entry
         which of its two offered options was taken.
 
-- [ ] **Task 8 — Live-browser verification (CLAUDE.md § Verification)** — ⚠️ **NOT DONE**
+- [~] **Task 8 — Live-browser verification (CLAUDE.md § Verification)** — ⚠️ **PARTIAL: the mechanically
+      checkable half is verified; the VISUAL half still needs a real browser.** See Dev Agent Record § Task 8.
   - [ ] Generate to `SpecScribeOutput/` and open the result in a real browser at depth 0 and depth 3. The suite
         structurally cannot see CSS containment leaks, sub-pixel collapse, or DOM corruption from markup splicing;
         all three have shipped in this epic and were caught only by looking.
@@ -669,7 +668,7 @@ what the story bought. The headline one pinned a page whose body renders `</main
 passthrough, reachable from any user doc): a naive slice resolved `mainClose` before `mainOpen` and threw,
 taking the whole emit down. Composition never searches a rendered string for its own boundaries.
 
-### ⚠️ 47 TESTS ARE RED, and they are ONE class — the honest state at hand-off
+### ~~47 TESTS ARE RED~~ — RESOLVED. Suite green at 2,932 passed / 0 failed
 
 **2,888 passed / 47 failed / 2,935 total.** Both projects compile; `src/` has zero warnings-as-errors. The
 failures are **not** a defect in the deletion — every one is a test still asking the DISK about a page:
@@ -716,15 +715,121 @@ wiped output root: **1,513 routes prerendered in 5,194 ms (3.4 ms/route), errors
    The omission would never have failed loudly — `web/`-only pushes would simply not republish, and the live
    site would drift behind `main` until an unrelated commit happened to trigger a rebuild.
 
+### Closing out the 47 — three were REAL BUGS, not stale assertions
+
+The class held: every failure was a test still asking the disk about a page. But working through them surfaced
+three defects in the deletion itself, which is the argument for re-pointing the assertions rather than deleting
+them.
+
+**1. The `epics/` directory wipe was load-bearing, and I removed it on a false premise.** Task 6's first pass
+dropped the wipe with the note "`RegenerateEpics` already evicts removed routes from `_spaPageViews`". It does —
+but only when the DOCUMENT behind a route disappears. An undrafted story's placeholder has no document; it exists
+because epics.md lists the story. Drop the story and nothing told the IR the route was gone, so the placeholder
+survived. `RegenerateEpics_PrunesPlaceholderWhenStoryLeavesThePlan` caught it, and so did a watch-mode sprint
+test. Fixed with `RemoveRoutesUnder("epics")` immediately before the re-compose loop — the route-space form of
+the wipe, same rebuild-the-whole-subtree shape.
+
+**2. A test-side lock that broke the GENERATOR.** `BurstOfSaves_CoalescesAndLeavesCoherentOutput` began failing
+with a generator error: *"the process cannot access the file `spa\pages-notes.json` because it is being used by
+another process."* `File.ReadAllText` opens with `FileShare.Read`, which denies a concurrent WRITER. Harmless
+when each test read its own settled page; once pages became IR routes, every watch-mode read targets the same
+few chunk files and the assertions were locking the chunk the watcher was writing. `SiteRegion` now reads with
+`FileShare.ReadWrite` — a read-only assertion must not perturb what it observes.
+
+**3. `WriteStaticPages` became a switch that silently did nothing.** With the full-document render gone, the
+property had no readers, yet `Commands.cs` still set it to `false` for the webview path. Deleted rather than
+left: a flag named "write static pages" that does nothing is worse than no flag, and the ~12 s it used to buy is
+unconditional now.
+
+**The sanctioned-divergence registry is now EMPTY, and that is the honest state.** Retiring `SemanticFacts`'
+chrome axis took the subject of every registered exception with it — the webview's `asset.css`, `asset.js` and
+`mermaid`, and the SPA's `mermaid`. Each registered a difference against the C#-rendered PAGE, and no C# code
+path renders one. The registry's own contract ("a registered divergence that no longer exists is a bug") forced
+the cleanup. ⚠️ **This does not mean the webview gained Mermaid** — it still cannot run it under its CSP. What
+changed is that the difference stopped being expressible as a C#-side parity fact: ADR 0024 makes every surface
+a projection of one composed region, so they agree by construction and every remaining difference lives in
+chrome, which is the renderer's. The capability gap is recorded in ADR 0005/0032, where it belongs. The two
+tests that proved those exceptions were load-bearing are inverted rather than deleted, so re-adding an exception
+without a divergence to justify it now fails.
+
+`MermaidPresent` survives, re-derived from the region (`Mermaid.BlockMarker`) rather than from the deleted
+head's `mermaid.initialize`. ⚠️ I removed it first and a test caught that: it still catches a page whose
+`AssetManifest` claims a diagram the body does not carry.
+
+**`GoldenOutputInventory` re-pinned as TWO lists** (AC #2, dependent #3): the FILE set on disk (11 — assets, the
+IR, the SPA shell, and no `.html`) and the ROUTE set in the IR (29 — the page inventory). A single merged list
+would let a page family vanish from the IR while its assets stayed put. Plus a direct assertion that no C# path
+writes a `.html`, so the failure names the cause instead of diffing forty paths.
+
+### ⚠️ TWO GATES WERE VACUOUS AND I REPORTED THEM GREEN — corrected
+
+I ran `check:a11y` and `check:links`, saw them exit 0, and told the owner "all gates green". That was wrong,
+and only reading the committed **measurement diff** before staging caught it:
+
+```
+-  pages checked        1474            -  pages walked   1476   (nuxt)
++  pages checked        0               +  pages walked   0      (nuxt)
+```
+
+Both walk `web/.output/public` — the pages a `nuxt build` PRERENDERS into the artefact. Every workflow now
+builds with **`build:package`**, which sets `SPECSCRIBE_PACKAGE_BUILD=1` and **deliberately empties the route
+table**: a package artefact must carry no prerendered HTML, because Nitro serves `public/` ahead of the SSR
+route and would otherwise return the BUILDING project's pages when pointed at another project's IR (the
+HTTP-200-wrong-answer trap from Story 23.5). So that directory is empty by design, both gates walked nothing,
+and both reported success — `failures 0` over `pages checked 0`, and "no regressions" from comparing an empty
+set against everything.
+
+This is the exact failure AC #2 names, in the harness rather than the code, and **it was already live in CI**
+before this session — `build:package` has been the CI path since Task 1. It is not a regression I introduced;
+it is one the deletion made visible, because `.output/public` used to be populated back when the documented
+local flow ran a plain `npm run build`.
+
+**Fixed:** both now walk `ir.IR_DIR` — the site a real generate produces, which since this story IS the
+Nuxt-rendered output, and which no build-mode flag can empty — plus a hard `< 50 pages` failure so a vanished
+basis can never read as a pass again. `check:a11y`: **1,515 pages, 3,800 status chips, 0 failures.**
+`check:links` is now honestly ONE-SIDED (the story's Dev Notes anticipated this half): there is no second tree
+to compare against, so it asks "does every internal link resolve?" and reports 1,229 pre-existing dangling
+references instead of printing two identical columns under a "nuxt vs golden" heading.
+
+### ⚠️ One intermittent watcher test — flagged, not dismissed
+
+`FileWatcherServiceTests.SprintStatusYaml_AddedThenEditedThenRemoved_RefreshesTheSprintSurfaceEachTime` failed
+once in **four** full-suite runs and passes **3/3 in isolation**. The other three full runs were clean at
+2,932/0.
+
+I am flagging rather than filing it under the documented spawn-starvation flake, because I do not have the
+evidence to claim that: this is a watch-mode timing test in exactly the family this story re-pointed, and the
+honest statement is "intermittent, cause unconfirmed". Two things make a genuine regression less likely — the
+`FileShare.ReadWrite` fix above removed a real test/generator contention in this same family, and the failure
+mode is a `WaitFor` timeout rather than a wrong assertion — but neither is proof. Worth a second look if it
+recurs on CI.
+
+### Task 8 — the mechanically checkable half is VERIFIED; the visual half is not
+
+Ran against a clean `--deep-git` generate (784 pages, `errors=0`, 1,513 routes prerendered).
+
+| check | result |
+| --- | --- |
+| **ADR 0022 §Decision 6 page-relative rewrite** — the first generate where C# does NOT emit these paths | ✅ **1,240 references across depths 0–5, every one page-relative and resolving on disk.** No root-relative or protocol-relative reference anywhere (either would 404 from `file://`). |
+| Hierarchy Explorer boots | ✅ anti-flash marker + engine, correct depth prefix |
+| Story 24.2 relationship graph boots | ✅ both halves at depth 4 with `../../../../` — the regression this session fixed |
+| Mermaid init | ✅ present as `type="module"` |
+| **The escaped-prose guard, on a real page** | ✅ ADR 0034's own page mentions `data-relgraph` and `plotly-hierarchy.min.js` in prose and correctly ships **zero** real script tags. This is the trap the Dev Notes say has bitten three separate stories. |
+| `check:parity` / `check:ir-content` / `check:a11y` / `check:links` | ✅ all green |
+
+❌ **NOT done, and it is the half CLAUDE.md § Verification actually insists on**: opening the rendered site in a
+real browser at depth 0 and depth 3 to look for CSS containment leaks, sub-pixel layout collapse, and DOM
+corruption. All three have shipped in this epic and were caught only by looking; grepping emitted HTML cannot
+see any of them. Chrome automation was not connected in this session. **This is the one outstanding item, and
+it should gate the story's move to `review`.**
+
 ### What remains (updated 2026-08-02)
 
-1. **The 47 red tests** above — one class, fully characterized, `SiteRegion` already has the accessors.
-2. **Task 8 — live-browser verification. NOT DONE**, and it is now the highest-value remaining step: this
-   session changed what every page's `<head>` contains. A portal IS generated and Nuxt-rendered, and the four
-   chrome fixes were verified by grepping the emitted HTML, but not by looking at a rendered page.
-3. **Re-measure the prerender.** Task 3 recorded 9.1 ms/route with C# still writing every page in parallel and
-   said to re-measure after Task 6. The last full generate this session ran **1,213 routes in 4,492 ms =
-   3.7 ms/route** — a 2.5x improvement, and now in line with Story 23.5's ~4 ms/route. Confirm on a cold run.
+1. ~~The 47 red tests.~~ **DONE** — suite green at 2,932 / 0. Three real bugs found in the process; see above.
+2. **Task 8's VISUAL half** — a real browser at depth 0 and depth 3. Everything else in Task 8 is verified
+   (see the table above). This is the only thing standing between the story and `review`.
+3. ~~Re-measure the prerender.~~ **DONE.** 9.1 ms/route with C# still writing → **3.4–3.7 ms/route** after
+   the deletion, confirming the gap was the duplicated write rather than the transport. Recorded in ADR 0034.
 4. **Read the `portability-probe` CI run** to discharge ADR 0033 §Decision 4 for `check:parity` on Ubuntu.
 5. ~~ADR 0034 needs amending~~ — **DONE 2026-08-02.** Amended with a new **Decision 6** (the IR carries the
    site-level `chrome` block; per-page need stays DERIVED from the region, never read from a flag; purely
@@ -860,4 +965,6 @@ re-pinned (lineage re-verified 24/24), 5 new unit tests.
 | 2026-08-02 | `check:parity` re-pinned with the C# lineage re-verified live 24/24 — done deliberately BEFORE the deletion, the last moment it was possible. |
 | 2026-08-02 | **CI fix #2**: `publish-docs-live-pages.yml` had no Node/artefact steps at all — survivable before Task 6, an empty publish after it. Mirrored the proven sequence; added a rendered-page-count gate and `web/**` to the paths trigger. |
 | 2026-08-02 | **ADR 0034 amended**: Decision 6 (the IR carries site-level chrome) + the `readGoldenChrome` hazard + the corrected 3.7 ms/route figure; `docs/adrs/README.md` updated. Still Proposed. |
+| 2026-08-03 | Task 6 CLOSED: all 47 red tests resolved. **Three real bugs found doing it** — the `epics/` wipe was load-bearing (placeholder routes survived a story leaving the plan), test reads were locking the generator out of its own chunk files, and `WriteStaticPages` had become a switch that silently did nothing. The sanctioned-divergence registry is now empty, its whole chrome axis having lost its subject. `GoldenOutputInventory` re-pinned as files + routes. |
+| 2026-08-03 | Task 8 PARTIAL: page-relative rewrite verified across depths 0–5 (1,240 refs), all four chrome fixes verified at depth, escaped-prose guard confirmed on a real page, all web gates green. The VISUAL browser pass remains. |
 | 2026-08-02 | **Task 6: the writer is DELETED.** `HtmlRenderAdapter.Render`, 38 wrappers, all five write paths, `_spaCapture`, the five `SpaDelivery` slicers, `CapturedNavMarkup`, `RegionCompositionDeltas` and the two proofs. Both projects compile; 47 tests still read the disk and are red. |

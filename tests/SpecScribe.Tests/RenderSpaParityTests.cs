@@ -89,16 +89,25 @@ public class RenderSpaParityTests
     [Fact]
     public void MermaidPage_DegradesUnderTheOneRegisteredException()
     {
-        // A page that NEEDS Mermaid renders no inline `mermaid.initialize` in the SPA (innerHTML swaps can't run an
-        // injected init) — a divergence without the registry, sanctioned with it (the accepted text fallback).
+        // [Story 23.6 AC #1/#8] ⚠️ THIS NO LONGER PROVES AN EXCEPTION IS LOAD-BEARING, BECAUSE THERE IS NO
+        // EXCEPTION LEFT — and the reason is worth keeping rather than deleting the test.
+        //
+        // It used to assert that the SPA's served page carried no `mermaid.initialize` where the static page did,
+        // and that the registry silenced exactly that. No C# surface emits an init now (the deleted
+        // `HtmlRenderAdapter.Render` was the only one; it is the renderer's, keyed on `chromeNeeds().needsMermaid`),
+        // so the divergence cannot arise and the SPA's registry entry was retired with the webview's three.
+        //
+        // What survives, and is asserted here, is the invariant that ACTUALLY matters to a reader: the SPA serves
+        // a page that carries the diagram SOURCE and no executable init, and it holds FULL parity with its page
+        // view — no divergence at all, sanctioned or otherwise. That last line is the strongest form of this
+        // test's original claim, since it now passes against an EMPTY registry rather than one tuned to excuse a
+        // known gap.
         var page = EpicPage(Nav(), mermaidNeeded: true);
         var served = ServedPage(page);
 
         Assert.DoesNotContain("mermaid.initialize", served);
-        Assert.Contains(
-            RenderParity.FindDivergences(page, served, "spa", Array.Empty<HostRenderException>()),
-            d => d.StartsWith("mermaid", StringComparison.Ordinal));
-        // With the registry, mermaid is the ONLY candidate divergence and it is silenced — full parity.
+        Assert.Contains(Mermaid.BlockMarker, served);
+        Assert.Empty(RenderParity.FindDivergences(page, served, "spa", Array.Empty<HostRenderException>()));
         Assert.Empty(RenderParity.FindDivergences(page, served, "spa"));
     }
 
@@ -194,15 +203,20 @@ public class RenderSpaParityTests
     // ----- Registry hygiene (AC #4: the SPA adds exactly one justified chrome exception) ----------------------
 
     [Fact]
-    public void Registry_CarriesExactlyOneJustifiedSpaException_Mermaid()
+    public void Registry_CarriesNoSpaException_BecauseTheServedRegionMatchesItsPageView()
     {
-        // The SPA is a real browser, so it keeps css/js — no asset.css/asset.js exception (its advantage over the
-        // webview's three). Its ONE sanctioned divergence is mermaid, with a real reason and never a section fact.
-        var spa = HostRenderExceptions.Registry.Where(e => e.SurfaceId == "spa").ToList();
-        var single = Assert.Single(spa);
-        Assert.Equal("mermaid", single.FactId);
-        Assert.False(string.IsNullOrWhiteSpace(single.Reason));
-        Assert.DoesNotContain(spa, e => e.FactId is "asset.css" or "asset.js");
-        Assert.DoesNotContain(spa, e => e.FactId.StartsWith("section.", StringComparison.Ordinal));
+        // [Story 23.6 AC #1] ⚠️ INVERTED. This pinned the SPA's single justified `mermaid` exception: the served
+        // page carried no `mermaid.initialize` where the static page did, so the roadmap degraded to readable
+        // preformatted text.
+        //
+        // No C# surface emits that init any more — it was `HtmlRenderAdapter.Render`'s, and it is the renderer's
+        // now — so the divergence cannot arise and the entry was retired. The registry is empty, which is the
+        // honest consequence of ADR 0024: every C# surface projects ONE composed region, so they cannot disagree
+        // on a region fact, and every remaining difference lives in chrome, which C# no longer produces.
+        //
+        // Asserted as emptiness rather than deleted, so that re-adding an exception without a divergence to
+        // justify it fails here — the direction the registry's own "a registered divergence that no longer
+        // exists is a bug" contract can actually catch.
+        Assert.Empty(HostRenderExceptions.Registry.Where(e => e.SurfaceId == "spa"));
     }
 }
