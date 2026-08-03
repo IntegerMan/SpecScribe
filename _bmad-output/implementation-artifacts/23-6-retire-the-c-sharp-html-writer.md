@@ -686,6 +686,36 @@ substitution or, for the output-tree comparisons, a route-set comparison. `SiteR
 accessor needed (`Read`, `Exists`, `Routes`, `RoutesUnder`, `HasRoutesUnder`, `Head`, `Chrome`, `PoisonRoute`,
 `AssertNoBrokenLocalLinks`).
 
+### ⚠️ CI regression: the SECOND workflow was never given the artefact (2026-08-02)
+
+`publish-docs-live-pages.yml` — the GitHub Pages job — failed after the deletion with
+`errors=1` and *"The SpecScribe renderer artefact could not be found, so no HTML can be produced."*
+
+**Why it was missed.** The identical ordering fix was applied to `build-test-analyze.yml` when Task 3 landed
+and is documented there at length — but this workflow had **no Node steps at all**, so nothing in it *looked*
+like it depended on the artefact. And before Task 6 a missing artefact was survivable here: C# still wrote every
+page, so the generate reported an error while the output root was fully populated and Pages published anyway.
+Task 6 turned a degraded run into an empty one.
+
+That is the SAME lesson the first CI failure produced, arriving from the other side. Then it was "when a step
+acquires a new dependency, re-read the steps *before* it." Now it is **"…and audit every workflow that runs it,
+not only the one whose failure you happened to see."**
+
+**Fixed** by mirroring `build-test-analyze.yml`'s proven sequence: `Setup Node` (`web/.nvmrc`) →
+`npm ci` with `SPECSCRIBE_PACKAGE_BUILD=1` → `sync:assets` → `build:package` → generate. Verified locally from a
+wiped output root: **1,513 routes prerendered in 5,194 ms (3.4 ms/route), errors=0, 1,514 `.html` on disk**, and
+`index.html` carries `data-ir-family` (so it is the Nuxt render, not a leftover).
+
+**Two hardening changes made alongside it, both because the failure mode here is silence rather than noise:**
+
+1. **The validate step now counts rendered pages** (`> 100`), not just `test -d SpecScribeOutput`. A run that
+   emits the IR but renders nothing still leaves the output root populated with `spa/` and the shared assets, so
+   the directory check alone passes on an unbrowsable site.
+2. **`web/**` added to the workflow's `paths` trigger.** Nuxt renders every published page now, so a Vue
+   component or `ir-content.css` edit changes what Pages serves exactly as directly as a `src/SpecScribe/` edit.
+   The omission would never have failed loudly — `web/`-only pushes would simply not republish, and the live
+   site would drift behind `main` until an unrelated commit happened to trigger a rebuild.
+
 ### What remains (updated 2026-08-02)
 
 1. **The 47 red tests** above — one class, fully characterized, `SiteRegion` already has the accessors.
@@ -828,5 +858,6 @@ re-pinned (lineage re-verified 24/24), 5 new unit tests.
 | 2026-08-02 | ⚠️ **The IR now carries site-level `chrome`** (`SpaDelivery.ManifestChrome`). The renderer was SCRAPING the generated `index.html` for the favicon, cache-bust and boot script — a seventh dependent of the deletion, failing silently via a swallowed exception. |
 | 2026-08-02 | ⚠️ **Three live regressions fixed**: the Nuxt renderer had no mermaid, no relationship-graph boot/engine and no TOC tracker, so all three had been broken on the shipped portal since Task 3. New `chromeNeeds()` + `web/test/chrome-needs.test.ts`. |
 | 2026-08-02 | `check:parity` re-pinned with the C# lineage re-verified live 24/24 — done deliberately BEFORE the deletion, the last moment it was possible. |
+| 2026-08-02 | **CI fix #2**: `publish-docs-live-pages.yml` had no Node/artefact steps at all — survivable before Task 6, an empty publish after it. Mirrored the proven sequence; added a rendered-page-count gate and `web/**` to the paths trigger. |
 | 2026-08-02 | **ADR 0034 amended**: Decision 6 (the IR carries site-level chrome) + the `readGoldenChrome` hazard + the corrected 3.7 ms/route figure; `docs/adrs/README.md` updated. Still Proposed. |
 | 2026-08-02 | **Task 6: the writer is DELETED.** `HtmlRenderAdapter.Render`, 38 wrappers, all five write paths, `_spaCapture`, the five `SpaDelivery` slicers, `CapturedNavMarkup`, `RegionCompositionDeltas` and the two proofs. Both projects compile; 47 tests still read the disk and are red. |

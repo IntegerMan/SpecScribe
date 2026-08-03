@@ -9,6 +9,17 @@ on:
       - "src/SpecScribe/**"
       - "SpecScribe.slnx"
       - "src/SpecScribe/SpecScribe.csproj"
+      # ⚠️ `web/**` IS A PUBLISHED-OUTPUT INPUT NOW. [Story 23.6]
+      #
+      # Nuxt renders every page of the published site (ADR 0034), so a change to a Vue component, to
+      # `web/assets/ir-content.css`, or to the IR adapter changes what Pages serves just as directly as a change
+      # under `src/SpecScribe/`. Before the C# writer was deleted this filter was correct — `web/` affected only
+      # the experimental renderer and nothing it produced reached this artifact.
+      #
+      # Omitting it would not have failed loudly: pushes touching only `web/` would simply never republish, and
+      # the live site would quietly drift behind main until some unrelated commit under one of the other paths
+      # happened to trigger a rebuild. That is the same silent-degrade shape as the missing artefact below.
+      - "web/**"
       - ".github/workflows/publish-docs-live-pages.yml"
   workflow_dispatch:
 
@@ -43,6 +54,53 @@ jobs:
           cache: true
           cache-dependency-path: src/SpecScribe/SpecScribe.csproj
 
+      # ── The renderer artefact must exist BEFORE the generate. [Story 23.6] ──────────────────────────────
+      #
+      # Since Story 23.6 no C# code path writes a content `.html`. `generate` emits the IR and then boots the
+      # prebuilt Nitro artefact, issuing one request per manifest route (ADR 0022 §Decision 3, ADR 0034). With
+      # no artefact present every route errors, `errors=1`, and the run exits non-zero having published nothing.
+      #
+      # ⚠️ THIS JOB REGRESSED EXACTLY THAT WAY AND IT IS WORTH RECORDING WHY IT WAS MISSED. The same ordering
+      # fix was applied to `build-test-analyze.yml` when Task 3 landed, but this workflow was not: it had no
+      # Node steps at all, so nothing here LOOKED like it depended on the artefact. Before the writer was
+      # deleted a missing artefact was survivable — C# still wrote every page, so the generate reported an
+      # error but the output root was populated and Pages published anyway. Task 6 turned a degraded run into
+      # an empty one. The lesson generalizes past this file: when a step acquires a new dependency, audit
+      # EVERY workflow that runs it, not just the one whose failure you happened to see.
+      #
+      # Do NOT reorder these back, and do not "fix" a future failure here by relaxing the generate's error
+      # handling — a missing renderer being a hard failure rather than a silently empty output root is AC #4.
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web dependencies
+        working-directory: web
+        # `npm ci`, not `npm install`: the lockfile is the pin.
+        env:
+          # `postinstall: nuxt prepare` loads nuxt.config.ts, which hard-fails without an IR — and this job has
+          # not generated one yet. The flag stubs the manifest empty, which is precisely what it exists for, and
+          # is what breaks the install-needs-IR / IR-needs-artefact cycle.
+          SPECSCRIBE_PACKAGE_BUILD: "1"
+        run: npm ci
+
+      - name: Sync runtime assets into web/public
+        working-directory: web
+        # web/public/ is gitignored (copies whose authoritative source is src/SpecScribe/assets/), so it does
+        # not exist on a fresh checkout. Must precede build:package, which bakes it into .output/public.
+        run: npm run sync:assets
+
+      - name: Build the project-independent renderer artefact
+        working-directory: web
+        # MUST be `build:package`, never `build`: a plain `nuxt build` bakes the building project's pages into
+        # .output/public, and Nitro serves public/ AHEAD of the SSR route — pointed at another IR it returns
+        # the baked project's page with HTTP 200, a wrong answer with a success status (Story 23.5).
+        run: npm run build:package
+
       - name: Build static files
         id: build
         run: |
@@ -54,9 +112,16 @@ jobs:
             --deep-git
 
       - name: Validate generated output
+        # `index.html` is now written by the PRERENDER, not by C#, so this check doubles as proof the artefact
+        # actually rendered. The route-count assertion is the part that would have caught the regression this
+        # job just hit: a run that emits the IR but renders nothing still leaves SpecScribeOutput/ populated
+        # with spa/ and the shared assets, so `test -d` alone passes on an unbrowsable site.
         run: |
           test -d SpecScribeOutput
           test -s SpecScribeOutput/index.html
+          pages=$(find SpecScribeOutput -name '*.html' -not -path 'SpecScribeOutput/spa/*' | wc -l)
+          echo "rendered $pages .html page(s)"
+          test "$pages" -gt 100
 
       - name: Upload static files as artifact
         id: upload
