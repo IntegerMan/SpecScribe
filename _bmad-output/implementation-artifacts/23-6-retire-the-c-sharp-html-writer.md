@@ -761,6 +761,25 @@ IR, the SPA shell, and no `.html`) and the ROUTE set in the IR (29 — the page 
 would let a page family vanish from the IR while its assets stayed put. Plus a direct assertion that no C# path
 writes a `.html`, so the failure names the cause instead of diffing forty paths.
 
+### CI is GREEN on main, and ADR 0033 §Decision 4 is discharged
+
+`build-test-analyze` **✓** (both jobs) and `Publish Docs Live to GitHub Pages` **✓** on `main` at `f7e812f`.
+
+⚠️ **`check:ir-content` cannot be stably green on a PULL REQUEST, by construction.** Its corpus is derived from
+git history, and `actions/checkout` on a `pull_request` event checks out `refs/pull/N/merge` — a **synthetic
+merge commit that exists nowhere else** (`7698912 Merge f7e812f into e48070f`). That phantom commit changes the
+author set the deep-git pass sees, which pulled in `.ownership-legend-swatch.owner-author-2`, a rule that is
+absent from the layer extracted against real history and would be WRONG to commit. Adding it would have gone
+red again on the next PR with a different merge SHA. Landed on `main` instead, where the gate validates the
+history that actually exists — and where every previously-green run of this workflow had run.
+
+**ADR 0033 §Decision 4 is now DISCHARGED for `check:parity`.** The Ubuntu `portability-probe` job had been
+failing at its Test step every run since Task 1, so the cross-OS step never executed and the story's "the Linux
+proof lands on the next CI run; it is not yet observed" caveat stood unresolved. With the suite green the job
+completed and reported **✓ 24 pinned route(s) across 14 families render byte-identically** on Linux. The
+pinned oracle is now proven deterministic across both CI operating systems, which is what that decision
+requires before pinning.
+
 ### ⚠️ CI fix #3 — `check:ir-content` was validating a NARROWER corpus than the one that ships
 
 CI went red at `check:ir-content` with **+4 / −182 rules**. That is a mass prune, not incidental drift, so per
@@ -862,7 +881,7 @@ it should gate the story's move to `review`.**
    (see the table above). This is the only thing standing between the story and `review`.
 3. ~~Re-measure the prerender.~~ **DONE.** 9.1 ms/route with C# still writing → **3.4–3.7 ms/route** after
    the deletion, confirming the gap was the duplicated write rather than the transport. Recorded in ADR 0034.
-4. **Read the `portability-probe` CI run** to discharge ADR 0033 §Decision 4 for `check:parity` on Ubuntu.
+4. ~~Read the `portability-probe` CI run to discharge ADR 0033 §Decision 4.~~ **DONE** — see above; 24/24 byte-identical on Ubuntu.
 5. ~~ADR 0034 needs amending~~ — **DONE 2026-08-02.** Amended with a new **Decision 6** (the IR carries the
    site-level `chrome` block; per-page need stays DERIVED from the region, never read from a flag; purely
    additive so `SchemaVersion` is not bumped), a second § Context hazard recording the `readGoldenChrome`
@@ -883,7 +902,7 @@ it should gate the story's move to `review`.**
    confirms § The five write paths independently.
 3. **Task 8 — live-browser verification.** A portal IS currently generated and Nuxt-rendered
    (`SpecScribeOutput/`, 1,188 pages, `data-ir-family` present, `_nuxt/` assets copied), so this is doable now.
-4. **Read the `portability-probe` CI run** to discharge ADR 0033 §Decision 4 for `check:parity` on Ubuntu.
+4. ~~Read the `portability-probe` CI run to discharge ADR 0033 §Decision 4.~~ **DONE** — see above; 24/24 byte-identical on Ubuntu.
 
 ### ⚠️ CI failed on the first push, and BOTH causes are recorded here
 
