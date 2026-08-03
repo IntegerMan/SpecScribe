@@ -10,11 +10,11 @@
     "epics/story-{id}.html"
   ],
   "stats": {
-    "carriedRules": 1431,
-    "carriedSelectors": 1626,
+    "carriedRules": 1450,
+    "carriedSelectors": 1666,
     "carriedKeyframes": 4,
     "droppedRoot": 4,
-    "generatedBytes": 179519,
+    "generatedBytes": 183034,
     "sharedRules": 1
   },
   "rules": [
@@ -2000,11 +2000,63 @@
       "carried": true
     },
     {
+      "selector": ".sb-seg",
+      "carried": true
+    },
+    {
+      "selector": ".sb-done",
+      "carried": true
+    },
+    {
+      "selector": ".sb-active",
+      "carried": true
+    },
+    {
+      "selector": ".sb-review",
+      "carried": true
+    },
+    {
+      "selector": ".sb-ready",
+      "carried": true
+    },
+    {
+      "selector": ".sb-drafted",
+      "carried": true
+    },
+    {
+      "selector": ".sb-pending",
+      "carried": true
+    },
+    {
+      "selector": ".sb-retired",
+      "carried": true
+    },
+    {
+      "selector": ".sb-unrecognized",
+      "carried": true
+    },
+    {
+      "selector": ".sb-noplan",
+      "carried": true
+    },
+    {
+      "selector": ".sb-followup-open",
+      "carried": true
+    },
+    {
+      "selector": ".sb-followup-done",
+      "carried": true
+    },
+    {
       "selector": ".sunburst-legend .sb-followup-open-sw",
       "carried": true
     },
     {
       "selector": ".sunburst-legend .sb-followup-done-sw",
+      "carried": true
+    },
+    {
+      "selector": ".sb-unplanned",
       "carried": true
     },
     {
@@ -2057,6 +2109,10 @@
     },
     {
       "selector": ".sunburst-legend .sb-legend-item:focus-visible",
+      "carried": true
+    },
+    {
+      "selector": ".sunburst-panel:has(.sb-pending-item:hover) .sb-seg:not(.sb-pending), .sunburst-panel:has(.sb-pending-item:focus-visible) .sb-seg:not(.sb-pending), .sunburst-panel:has(.sb-drafted-item:hover) .sb-seg:not(.sb-drafted), .sunburst-panel:has(.sb-drafted-item:focus-visible) .sb-seg:not(.sb-drafted), .sunburst-panel:has(.sb-ready-item:hover) .sb-seg:not(.sb-ready), .sunburst-panel:has(.sb-ready-item:focus-visible) .sb-seg:not(.sb-ready), .sunburst-panel:has(.sb-active-item:hover) .sb-seg:not(.sb-active), .sunburst-panel:has(.sb-active-item:focus-visible) .sb-seg:not(.sb-active), .sunburst-panel:has(.sb-review-item:hover) .sb-seg:not(.sb-review), .sunburst-panel:has(.sb-review-item:focus-visible) .sb-seg:not(.sb-review), .sunburst-panel:has(.sb-done-item:hover) .sb-seg:not(.sb-done), .sunburst-panel:has(.sb-done-item:focus-visible) .sb-seg:not(.sb-done), .sunburst-panel:has(.sb-retired-item:hover) .sb-seg:not(.sb-retired), .sunburst-panel:has(.sb-retired-item:focus-visible) .sb-seg:not(.sb-retired), .sunburst-panel:has(.sb-followup-open-item:hover) .sb-seg:not(.sb-followup-open), .sunburst-panel:has(.sb-followup-open-item:focus-visible) .sb-seg:not(.sb-followup-open), .sunburst-panel:has(.sb-followup-done-item:hover) .sb-seg:not(.sb-followup-done), .sunburst-panel:has(.sb-followup-done-item:focus-visible) .sb-seg:not(.sb-followup-done), .sunburst-panel:has(.sb-unplanned-item:hover) .sb-seg:not(.sb-unplanned), .sunburst-panel:has(.sb-unplanned-item:focus-visible) .sb-seg:not(.sb-unplanned), .sunburst-panel:has(.sb-noplan-item:hover) .sb-seg:not(.sb-noplan), .sunburst-panel:has(.sb-noplan-item:focus-visible) .sb-seg:not(.sb-noplan)",
       "carried": true
     },
     {
@@ -4962,6 +5018,26 @@
     },
     {
       "selector": ".ownership-legend-swatch.owner-author-1",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-author-2",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-author-3",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-author-4",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-author-5",
+      "carried": true
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-author-6",
       "carried": true
     },
     {
