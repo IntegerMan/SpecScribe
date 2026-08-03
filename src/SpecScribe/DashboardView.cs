@@ -162,4 +162,35 @@ public sealed record DashboardView
     /// name Test Architect — so a second covered module drops in by producing the same model. No second module is
     /// implemented in this story.</para> [Story 18.5 D1]</summary>
     public string ModuleCoverageHtml { get; init; } = string.Empty;
+
+    /// <summary>Pre-rendered <em>Explore this codebase</em> card grid — the insight surfaces
+    /// (<see cref="SiteNav.CodeMapOutputPath"/>, <see cref="SiteNav.RiskQuadrantOutputPath"/>, Git Insights, Deep
+    /// Analytics) as link cards with their descriptions, projected from the <c>Insights</c> group of
+    /// <see cref="QuickLinks"/>. Empty when the run produced no insight surface at all, which omits the panel.
+    ///
+    /// <para><b>Why the home page needed this.</b> The white key-views band that carries quick links on every other
+    /// page is deliberately replaced by the work-mode strip on Home
+    /// (<see cref="HtmlRenderAdapter"/>'s <c>AppendKeyViewsBand</c> returns early there), so Home carried NO quick
+    /// links at all and the insight surfaces were reachable only from the dark nav's Insights dropdown. Field
+    /// feedback, 2026-08-01: a project with a PRD but no epics — where those surfaces are the only ones with
+    /// anything to say — read as an empty tool. The gate is <c>hasCodeMap</c>, which is the presence of tracked
+    /// source files and NOT the presence of epics, so this panel is exactly the part of the portal that survives an
+    /// epic-free repository.</para>
+    ///
+    /// <para>Built in <see cref="DashboardViewBuilder"/> rather than the adapter, for the AD-2 reason every sibling
+    /// fragment above is.</para></summary>
+    public string ExploreHtml { get; init; } = string.Empty;
+
+    /// <summary>Pre-rendered "you have no epics yet — here is how to create them" call to action. Non-empty ONLY
+    /// when there is no epics model at all.
+    ///
+    /// <para><b>Why it cannot live on <c>epics.html</c>.</b> That page already carries the equivalent guidance
+    /// (<c>AppendEmptyEpicsGuidance</c>) — but it is never written when <c>epics.md</c> is absent
+    /// (<see cref="SiteGenerator"/> gates the whole page), so the guidance existed and was unreachable by precisely
+    /// the project that needed it. The two surfaces answer different questions and keep their own sentences: the
+    /// epics page explains an empty list, this explains an empty project. What they share — the
+    /// <c>create-epics-and-stories</c> slug — is shared as
+    /// <see cref="DashboardViewBuilder.CreateEpicsCommandSlug"/>, which is the part that must never drift.</para>
+    /// [field feedback 2026-08-01]</summary>
+    public string NoEpicsGuidanceHtml { get; init; } = string.Empty;
 }

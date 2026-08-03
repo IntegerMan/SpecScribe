@@ -12,8 +12,8 @@ public class WebviewCommandTests
     [Fact]
     public void ResolveConfiguredOutputRoot_DefaultsToSpecScribeOutput_RelativeToRepoRoot()
     {
-        // The shim spawns `webview` without --output and never consults .specscribe (R5.3), so the resolved
-        // output is always the default SpecScribeOutput under the repo root — expressed relative, forward-slashed.
+        // The shim still spawns `webview` without --output; absent an explicit/saved output override the resolved
+        // output stays the default SpecScribeOutput under the repo root — expressed relative, forward-slashed.
         var repoRoot = Path.Combine(Path.GetTempPath(), "specscribe-cor-default");
         var options = new ForgeOptions
         {
@@ -108,6 +108,73 @@ public class WebviewCommandTests
         Assert.Equal("../..", WebviewCommand.ResolveRepoRootOffset(RootedOptions(repoRoot), workingDirectory));
     }
 
+    // ===== The settings DOCUMENT the shim opens (C0) ==============================================================
+    //
+    // This resolver exists because the shim was deriving the path itself and got it wrong: it did
+    // `existsSync('.specscribe')` then opened the result as a text document, which since ADR 0014 is a FOLDER — so
+    // "Open Project Settings" failed on every project a current CLI had configured. Three states, and the old code
+    // could express only two. Each gets a case here.
+
+    /// <summary>Builds a temp repo and runs the resolver against it, always cleaning up.</summary>
+    private static void WithRepo(string label, Action<string> arrange, Action<string?> assert)
+    {
+        var repoRoot = Directory.CreateTempSubdirectory($"specscribe-settingspath-{label}-").FullName;
+        try
+        {
+            arrange(repoRoot);
+            assert(WebviewCommand.ResolveSettingsPath(RootedOptions(repoRoot), workingDirectory: repoRoot));
+        }
+        finally
+        {
+            try { Directory.Delete(repoRoot, recursive: true); } catch { /* best effort */ }
+        }
+    }
+
+    [Fact]
+    public void ResolveSettingsPath_FolderFormat_PointsAtConfigJsonRatherThanTheFolder()
+    {
+        // The headline case and the whole reason this exists: the answer must be the DOCUMENT inside the container,
+        // never the container. Forward-slashed, because the shim path.resolve()s it.
+        WithRepo(
+            "folder",
+            repoRoot =>
+            {
+                var dir = Directory.CreateDirectory(Path.Combine(repoRoot, SettingsStore.FileName));
+                File.WriteAllText(Path.Combine(dir.FullName, SettingsStore.ConfigFileName), "{}");
+            },
+            actual => Assert.Equal(".specscribe/config.json", actual));
+    }
+
+    [Fact]
+    public void ResolveSettingsPath_LegacyFlatFile_IsItselfTheDocument()
+    {
+        // Pre-ADR-0014 projects still exist and SettingsStore.ReadConfigJson still reads them directly, so the
+        // resolver must not assume the folder shape and append config.json to a file path.
+        WithRepo(
+            "legacy",
+            repoRoot => File.WriteAllText(Path.Combine(repoRoot, SettingsStore.FileName), "{}"),
+            actual => Assert.Equal(".specscribe", actual));
+    }
+
+    [Fact]
+    public void ResolveSettingsPath_ContainerWithoutConfigJson_IsNullNotTheFolder()
+    {
+        // The state the old shim code could not express. ADR 0014 made `.specscribe` a container explicitly so
+        // other per-directory state could live there; such a folder can exist with no config.json in it. That is
+        // "no settings yet" — reporting it as found is precisely the bug being fixed, because the caller then
+        // tries to open a directory.
+        WithRepo(
+            "empty-container",
+            repoRoot => Directory.CreateDirectory(Path.Combine(repoRoot, SettingsStore.FileName)),
+            Assert.Null);
+    }
+
+    [Fact]
+    public void ResolveSettingsPath_NoSettingsAnywhere_IsNull()
+    {
+        WithRepo("absent", _ => { }, Assert.Null);
+    }
+
     // ===== Deferred item, Story 6.4 review: the scratch-dir key folds case only where the OS filesystem does ======
 
     [Fact]
@@ -186,7 +253,7 @@ public class WebviewCommandTests
     // ===== Story 22.6: delta frames on the NDJSON channel ===================================================
 
     private static readonly ProjectOutline EmptyOutline =
-        new(Array.Empty<OutlineEpic>(), new OutlineSummary(0, 0, 0, 0));
+        new(Array.Empty<OutlineEpic>(), new OutlineSummary(0, 0, 0, 0), Array.Empty<OutlineShortcut>());
 
     private static WebviewBundle Bundle(string entryDocument, params WebviewSurface[] surfaces) =>
         new("Test Site", "index.html", entryDocument, surfaces, EmptyOutline);
@@ -215,6 +282,25 @@ public class WebviewCommandTests
         Assert.False(JsonDocument.Parse(delta).RootElement.TryGetProperty("frame", out _));
     }
 
+    [Fact]
+    public void SerializePayload_EmitsRenderProgress_ForPreludeAndCompleteFrames()
+    {
+        var bundle = Bundle("<html>dash</html>", Surface("index.html", "<p>A</p>"));
+
+        var prelude = JsonDocument.Parse(WebviewCommand.SerializePayload(bundle, "SpecScribeOutput", partial: true)).RootElement;
+        var complete = JsonDocument.Parse(WebviewCommand.SerializePayload(bundle, "SpecScribeOutput")).RootElement;
+
+        Assert.Equal("entry-ready", prelude.GetProperty("progress").GetProperty("key").GetString());
+        Assert.Equal(2, prelude.GetProperty("progress").GetProperty("step").GetInt32());
+        Assert.Equal(3, prelude.GetProperty("progress").GetProperty("total").GetInt32());
+        Assert.False(prelude.GetProperty("progress").GetProperty("complete").GetBoolean());
+
+        Assert.Equal("complete", complete.GetProperty("progress").GetProperty("key").GetString());
+        Assert.Equal(3, complete.GetProperty("progress").GetProperty("step").GetInt32());
+        Assert.Equal(3, complete.GetProperty("progress").GetProperty("total").GetInt32());
+        Assert.True(complete.GetProperty("progress").GetProperty("complete").GetBoolean());
+    }
+
     /// <summary>The defect this story closes, stated as a test: a one-surface change must ship ONE surface, not
     /// the whole site. The extension's own guard comment measures today's cost as a ~8 MB whole-site payload per
     /// push.</summary>
@@ -235,6 +321,8 @@ public class WebviewCommandTests
         Assert.Equal(1, changed.EnumerateObject().Count());
         Assert.Equal("<p>B EDITED</p>", changed.GetProperty("docs/a.html").GetProperty("content").GetString());
         Assert.Empty(frame.GetProperty("removedSurfaces").EnumerateArray());
+        Assert.Equal("complete", frame.GetProperty("progress").GetProperty("key").GetString());
+        Assert.True(frame.GetProperty("progress").GetProperty("complete").GetBoolean());
     }
 
     /// <summary>Hashing CONTENT alone would report a retitled or re-sourced surface as unchanged — the panel title

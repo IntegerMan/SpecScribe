@@ -77,6 +77,8 @@ public sealed class GenerateCommand : Command<SiteSettings>
 /// behavior is unchanged, and the pending Story 5.x CLI scope is untouched.</para></summary>
 public sealed class WebviewCommand : Command<SiteSettings>
 {
+    public sealed record RenderProgress(string Key, string Label, int Step, int Total, bool Complete = false);
+
     /// <summary>Serializer options for the stdout payload: camelCase property names so the C# records read the
     /// same as the hand-named camelCase fields on the TS side. [Story 6.9]
     /// <para>Relaxed escaping: the payload is now dominated by surface HTML (whole-site surfaces —
@@ -89,17 +91,27 @@ public sealed class WebviewCommand : Command<SiteSettings>
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
+    /// <summary>The same serializer <see cref="ConfigCommand"/> writes its stdout/stderr JSON with, so every wire
+    /// the extension reads — payload, delta frame, diagnostics, config — is camelCase under one policy. Exposed
+    /// rather than duplicated: a second options object is how two wires drift into two naming conventions.
+    /// [ADR 0037]</summary>
+    internal static JsonSerializerOptions CamelCaseOptions => CamelCase;
+
     protected override int Execute(CommandContext context, SiteSettings settings, CancellationToken cancellationToken)
     {
-        // Tolerant resolution: the extension must render in ANY workspace, so a folder with no `_bmad-output` marker
-        // must NOT throw the CLI's "run from inside a BMad project" error — it falls back to the cwd as the repo root
-        // and lets the Directory.Exists-guarded generation degrade to README + Code Map + git-if-present. The
-        // interactive/CLI generate/watch commands keep the throwing Resolve() (CLI honesty).
-        // [spec-vscode-any-workspace-and-processing-indicators]
-        var resolved = settings.ResolveTolerant();
-        var options = settings.Output is { Length: > 0 }
-            ? resolved
-            : RedirectOutputToScratch(resolved);
+        // Tolerant resolution AND settings parity: webview inherits `.specscribe` exactly like generate/watch,
+        // but still keeps tolerant repo-root discovery (no `_bmad-output` marker never throws here).
+        // [Story 5.2 parity follow-up, spec-vscode-any-workspace-and-processing-indicators]
+        var resolved = SettingsResolver.ResolveTolerant(settings);
+        var projectOptions = resolved.Options;
+
+        // Read-only contract: a saved/default output root never receives writes from `webview`; only an explicit
+        // command-line `--output` opts this command out of scratch redirection.
+        var outputFromCommandLine =
+            resolved.For(SettingsResolver.Fields.Output)?.Source == ConfigSource.CommandLine;
+        var options = outputFromCommandLine
+            ? projectOptions
+            : RedirectOutputToScratch(projectOptions);
 
         var generator = new SiteGenerator(options);
         // Capture every long-tail page at the write seam so RenderWebviewSurfaces can turn docs/ADRs/requirements
@@ -119,13 +131,14 @@ public sealed class WebviewCommand : Command<SiteSettings>
         // off. [Goal 2, spec-vscode-extension-name-latency-and-webview-sunburst]
         generator.WriteStaticPages = false;
 
-        // Resolved roots come from the PRE-redirect `resolved` (the project's real roots), never the scratch-redirected
+        // Resolved roots come from the PRE-redirect project options (the project's real roots), never the scratch-redirected
         // `options`, exactly like configuredOutputRoot. [Story 6.11]
         // Resolved BEFORE GenerateAll because the first-paint checkpoint below writes a payload from inside it.
-        var outputRoot = ResolveConfiguredOutputRoot(resolved);
-        var sourceRoot = ResolveSourceRoot(resolved);
-        var adrRoot = ResolveAdrRoot(resolved);
-        var repoRootOffset = ResolveRepoRootOffset(resolved);
+        var outputRoot = ResolveConfiguredOutputRoot(projectOptions);
+        var sourceRoot = ResolveSourceRoot(projectOptions);
+        var adrRoot = ResolveAdrRoot(projectOptions);
+        var repoRootOffset = ResolveRepoRootOffset(projectOptions);
+        var settingsPath = ResolveSettingsPath(projectOptions);
 
         // ── THE FIRST-PAINT CHECKPOINT (Goal 2) ───────────────────────────────────────────────────────────────
         //
@@ -149,7 +162,8 @@ public sealed class WebviewCommand : Command<SiteSettings>
             {
                 prelude = g.RenderWebviewSurfaces(includeLongTail: false, includeEpicsFamily: false);
                 Console.Out.WriteLine(SerializePayload(
-                    prelude, outputRoot, sourceRoot, adrRoot, repoRootOffset, partial: true));
+                    prelude, outputRoot, sourceRoot, adrRoot, repoRootOffset, partial: true,
+                    settingsPath: settingsPath));
                 Console.Out.Flush();
             };
         }
@@ -169,10 +183,10 @@ public sealed class WebviewCommand : Command<SiteSettings>
         // The run's non-fatal notices as structured JSON lines on stderr — the SAME DiagnosticNotice.FromEvents
         // projection the Story 4.8 diagnostics page renders (coherence: the two surfaces can never disagree). This
         // covers BOTH Error and Skipped (the pre-6.12 human loop missed Skipped) and emits nothing on a clean run
-        // (degrade-clean). Path roots come from the PRE-redirect `resolved`, not the scratch-redirected `options`,
+        // (degrade-clean). Path roots come from the PRE-redirect project options, not the scratch-redirected `options`,
         // so an anchored path points at the project's real source. [Story 6.12]
         var notices = DiagnosticNotice.FromEvents(events);
-        Console.Error.Write(SerializeDiagnostics(notices, resolved));
+        Console.Error.Write(SerializeDiagnostics(notices, projectOptions));
 
         // ── The one-shot path is UNSPLIT, deliberately ────────────────────────────────────────────────────────
         // Without a live channel there is no second frame to carry the remainder, so a split here would lose the
@@ -180,7 +194,8 @@ public sealed class WebviewCommand : Command<SiteSettings>
         if (!settings.Serve)
         {
             Console.Out.Write(SerializePayload(
-                generator.RenderWebviewSurfaces(), outputRoot, sourceRoot, adrRoot, repoRootOffset));
+                generator.RenderWebviewSurfaces(), outputRoot, sourceRoot, adrRoot, repoRootOffset,
+                settingsPath: settingsPath));
             return 0;
         }
 
@@ -215,7 +230,8 @@ public sealed class WebviewCommand : Command<SiteSettings>
             {
                 prelude = generator.RenderWebviewSurfaces(includeLongTail: false, includeEpicsFamily: false);
                 Console.Out.WriteLine(SerializePayload(
-                    prelude, outputRoot, sourceRoot, adrRoot, repoRootOffset, partial: true));
+                    prelude, outputRoot, sourceRoot, adrRoot, repoRootOffset, partial: true,
+                    settingsPath: settingsPath));
                 Console.Out.Flush();
             }
 
@@ -230,10 +246,11 @@ public sealed class WebviewCommand : Command<SiteSettings>
         else
         {
             bundle = generator.RenderWebviewSurfaces();
-            Console.Out.WriteLine(SerializePayload(bundle, outputRoot, sourceRoot, adrRoot, repoRootOffset));
+            Console.Out.WriteLine(SerializePayload(
+                bundle, outputRoot, sourceRoot, adrRoot, repoRootOffset, settingsPath: settingsPath));
             Console.Out.Flush();
         }
-        return RunServeLoop(options, resolved, generator, settings.ServeDelta, bundle, sequence);
+        return RunServeLoop(options, projectOptions, generator, settings.ServeDelta, bundle, sequence);
     }
 
     /// <summary>The persistent-mode loop: rewrites and re-streams the webview payload after every debounced
@@ -307,7 +324,8 @@ public sealed class WebviewCommand : Command<SiteSettings>
                         ResolveConfiguredOutputRoot(resolved),
                         ResolveSourceRoot(resolved),
                         ResolveAdrRoot(resolved),
-                        ResolveRepoRootOffset(resolved));
+                        ResolveRepoRootOffset(resolved),
+                        settingsPath: ResolveSettingsPath(resolved));
                 previousBundle = bundle;
                 Console.Out.WriteLine(payload);
                 Console.Out.Flush();
@@ -336,14 +354,32 @@ public sealed class WebviewCommand : Command<SiteSettings>
     /// during that window would be a lie. ADDITIVE: the field is always present, always <c>false</c> on every path
     /// that existed before, and an older VSIX ignores an unknown field. [Goal 2,
     /// spec-vscode-extension-name-latency-and-webview-sunburst]</param>
+    /// <param name="bundle">The rendered entry document and navigable surface set for this push.</param>
+    /// <param name="configuredOutputRoot">Workspace-relative configured output root from the PRE-redirect project options.</param>
+    /// <param name="sourceRoot">Repo-relative source-artifact root for watcher anchoring in the extension host.</param>
+    /// <param name="adrRoot">Repo-relative ADR root for watcher anchoring in the extension host.</param>
+    /// <param name="repoRoot">Workspace-relative offset from the spawn cwd to the resolved repo root.</param>
+    /// <param name="progress">Optional render-stage metadata (label + step counts). Null emits the default stage for
+    /// this frame (<c>entry-ready</c> for prelude, <c>complete</c> otherwise).</param>
+    /// <param name="settingsPath">Workspace-relative settings document (<see cref="ResolveSettingsPath"/>), or null
+    /// when the project has none. Serialized as JSON <c>null</c> (this serializer sets no null-ignore policy, and
+    /// adding one here would silently change every other field's wire shape); the shim's <c>??</c> treats a null
+    /// and an absent field identically, so "no settings yet" and "older core that never sent it" take the same
+    /// fallback path.</param>
     public static string SerializePayload(
         WebviewBundle bundle,
         string configuredOutputRoot,
         string sourceRoot = SourceDirDefault,
         string adrRoot = AdrDirDefault,
         string repoRoot = ".",
-        bool partial = false)
+        bool partial = false,
+        RenderProgress? progress = null,
+        string? settingsPath = null)
     {
+        var progressPayload = progress
+            ?? (partial
+                ? new RenderProgress("entry-ready", "Dashboard ready; loading remaining surfaces", 2, 3)
+                : new RenderProgress("complete", "Rendering complete", 3, 3, Complete: true));
         var payload = new
         {
             siteTitle = bundle.SiteTitle,
@@ -352,6 +388,7 @@ public sealed class WebviewCommand : Command<SiteSettings>
             // See the parameter doc: "this payload is not the whole surface set yet". Never true off the
             // `--serve --serve-delta` first frame.
             partial,
+            progress = progressPayload,
             // Host-delivery of a core-resolved DATUM (not rendering — ADR 0005 §1): the workspace-relative
             // root a plain `generate` would write to. Sourced from the PRE-redirect resolved options so it is
             // the project's real configured output, never the temp scratch dir this command actually renders
@@ -366,6 +403,11 @@ public sealed class WebviewCommand : Command<SiteSettings>
             sourceRoot,
             adrRoot,
             repoRoot,
+            // The settings document the shim's "Open Project Settings" opens — same host-delivery-of-a-core-datum
+            // pattern as the roots above, and for a concrete reason: the shim used to derive it and opened a
+            // DIRECTORY (ADR 0014 made `.specscribe` a folder). Null when the project has none; the shim reads
+            // null and absent alike, so it needs one fallback rather than two. [C0]
+            settingsPath,
             // `sourcePath` (Story 6.10): the repo-relative artifact each surface was rendered from, so the webview's
             // "Open source" control can post `revealSource` and the shim opens it read-only. Null (dashboard) omits
             // the button host-side. A per-surface datum, not rendering — the generated site is unaffected.
@@ -416,6 +458,14 @@ public sealed class WebviewCommand : Command<SiteSettings>
     /// payload instead.</param>
     /// <param name="sequence">Monotonic within one serve session. A consumer seeing a gap knows it missed a frame
     /// and can ask for a full reload rather than silently rendering a half-applied state.</param>
+    /// <param name="current">The complete current bundle this delta was computed from.</param>
+    /// <param name="configuredOutputRoot">Workspace-relative configured output root from the PRE-redirect project options.</param>
+    /// <param name="sourceRoot">Repo-relative source-artifact root for watcher anchoring in the extension host.</param>
+    /// <param name="adrRoot">Repo-relative ADR root for watcher anchoring in the extension host.</param>
+    /// <param name="repoRoot">Workspace-relative offset from the spawn cwd to the resolved repo root.</param>
+    /// <param name="settingsPath">Carried only on the no-previous fallback below, which emits a FULL payload. A
+    /// genuine delta frame deliberately omits it, exactly as it omits the roots: the shim folds a delta onto the
+    /// full frame it already holds, and its <c>??</c> keeps the last non-null value.</param>
     public static string SerializeDeltaPayload(
         WebviewBundle? previous,
         WebviewBundle current,
@@ -423,11 +473,13 @@ public sealed class WebviewCommand : Command<SiteSettings>
         string configuredOutputRoot,
         string sourceRoot = SourceDirDefault,
         string adrRoot = AdrDirDefault,
-        string repoRoot = ".")
+        string repoRoot = ".",
+        string? settingsPath = null)
     {
         if (previous is null)
         {
-            return SerializePayload(current, configuredOutputRoot, sourceRoot, adrRoot, repoRoot);
+            return SerializePayload(
+                current, configuredOutputRoot, sourceRoot, adrRoot, repoRoot, settingsPath: settingsPath);
         }
 
         var before = previous.Surfaces.ToDictionary(s => s.OutputRelativePath, SurfaceHash, StringComparer.Ordinal);
@@ -452,6 +504,7 @@ public sealed class WebviewCommand : Command<SiteSettings>
             sequence,
             siteTitle = current.SiteTitle,
             entry = current.EntryPath,
+            progress = new RenderProgress("complete", "Rendering complete", 3, 3, Complete: true),
             // Every caller passes a COMPLETE `current` bundle, so folding this frame always yields a complete
             // payload — including the frame that completes a first-paint prelude. Stated on the wire rather than
             // inferred, so the consumer never has to guess when the "still loading" answer stops being true.
@@ -598,6 +651,40 @@ public sealed class WebviewCommand : Command<SiteSettings>
     /// (defaults to the real cwd). Pure. [Story 6.11]</summary>
     public static string ResolveRepoRootOffset(ForgeOptions resolved, string? workingDirectory = null)
         => Path.GetRelativePath(workingDirectory ?? Directory.GetCurrentDirectory(), resolved.RepoRoot).Replace('\\', '/');
+
+    /// <summary>The directory-scoped settings DOCUMENT — the file a user edits — expressed relative to the process
+    /// working directory with forward slashes, or null when there is none anywhere above it.
+    /// <para>Same host-delivery-of-a-core-datum pattern as <see cref="ResolveConfiguredOutputRoot"/> and the
+    /// Story 6.11 roots (ADR 0005 §1 — data, not rendering). It exists because the shim had been re-deriving this
+    /// itself and got it wrong: since ADR 0014 <c>.specscribe</c> is a FOLDER containing
+    /// <see cref="SettingsStore.ConfigFileName"/>, so the shim's <c>existsSync</c> + open-as-text-document opened a
+    /// DIRECTORY and failed on every project a current CLI had configured. Resolving it here means the editor and
+    /// the CLI can never disagree about which document is in force, and the shim stops re-typing SpecScribe
+    /// filenames.</para>
+    /// <para>Returns the document, not the container: <see cref="SettingsStore.FindExisting"/> answers with the
+    /// <c>.specscribe</c> ENTRY, which is a folder in the current format and a flat file in the legacy one. A
+    /// folder that exists but holds no <c>config.json</c> is reported as null — it is a container of sibling state,
+    /// not settings, and calling it "found" is exactly the bug this replaces. Relative to the working directory
+    /// (like <see cref="ResolveRepoRootOffset"/>, and unlike the repo-relative watch roots) because the walk-up
+    /// starts at the repo root and can legitimately end ABOVE it. Injected working directory for testability;
+    /// pure apart from the filesystem probe the walk-up inherently is.</para></summary>
+    public static string? ResolveSettingsPath(ForgeOptions resolved, string? workingDirectory = null)
+    {
+        if (SettingsStore.FindExisting(resolved.RepoRoot) is not { } entry) return null;
+
+        string document;
+        if (Directory.Exists(entry))
+        {
+            document = Path.Combine(entry, SettingsStore.ConfigFileName);
+            if (!File.Exists(document)) return null;
+        }
+        else
+        {
+            document = entry;
+        }
+
+        return Path.GetRelativePath(workingDirectory ?? Directory.GetCurrentDirectory(), document).Replace('\\', '/');
+    }
 
     /// <summary>The stable per-project scratch-dir key: a hash of the repo root, folded to a canonical case only
     /// on a case-INSENSITIVE filesystem (Windows — this project's primary target OS) so the same physical repo
@@ -856,8 +943,16 @@ public sealed class InteractiveCommand : Command<SiteSettings>
         // Deep git analytics is a configurable feature, so NFR7 (menu/CLI parity) requires it be reachable from
         // the interactive menu too, not just the --deep-git flag. Defaults to the current value so re-running
         // Configure paths doesn't silently flip it. [Story 3.2 Subtask 4.1]
+        //
+        // FIRST configure only (load.Saved is null — no settings document exists yet) defaults to YES: the flag's
+        // own default is off for baseline generation performance, but a user who has walked into the interactive
+        // setup is choosing their project's settings deliberately, and the coupling/hotspot surfaces are the ones
+        // they came for. This does NOT change --deep-git's default, SettingsStore.Capture, or ApplyTo. The
+        // no-silent-flip invariant above is preserved BECAUSE ConfigurePaths writes the document: on every
+        // subsequent run Saved is non-null, so the prompt offers the value in effect and answering "n" sticks.
         settings.DeepGit = AnsiConsole.Confirm(
-            "Enable deep git analytics (change coupling and hotspots)?", defaultValue: settings.DeepGit);
+            "Enable deep git analytics (change coupling and hotspots)?",
+            defaultValue: settings.DeepGit || load.Saved is null);
 
         // External source base for "view source online" links — a configurable setting, so NFR7 (menu/CLI parity)
         // requires it in the menu too, not just --code-url. Only an already-EXPLICIT settings.CodeUrl pre-fills the

@@ -24,8 +24,10 @@ async function loadIr() {
   return import('../ir/adapter.ts')
 }
 
-/** Class names, ids, attribute names and element names present in a run of markup. */
-function harvest(html, into) {
+/** Class names, ids, attribute names and element names present in a run of markup.
+ * Exported for `test/ir-content-harvest.test.mjs` — see the braces note below for why this one needs a unit test
+ * of its own rather than relying on `check:ir-content`, which shares this function and so cannot disagree with it. */
+export function harvest(html, into) {
   for (const m of html.matchAll(/<([a-zA-Z][\w-]*)((?:"[^"]*"|'[^']*'|[^>"'])*)>/g)) {
     into.elements.add(m[1].toLowerCase())
     const attrs = m[2]
@@ -33,8 +35,24 @@ function harvest(html, into) {
       const name = a[1].toLowerCase()
       into.attributes.add(name)
       const value = a[2] ?? a[3] ?? ''
-      if (name === 'class') for (const c of value.split(/\s+/)) if (c) into.classes.add(c)
-      else if (name === 'id' && value) into.ids.add(value)
+      // ⚠️ BRACES ARE LOAD-BEARING. This was written brace-free as
+      //     if (name === 'class') for (…) if (c) into.classes.add(c)
+      //     else if (name === 'id' && value) into.ids.add(value)
+      // where the `else` binds to the INNER `if (c)`, not to `if (name === 'class')` — the dangling-else. The id
+      // branch therefore ran only when the attribute was `class` AND a split token was falsy, i.e. never, so
+      // `into.ids` stayed EMPTY for the whole site and `selectorIsUsed` dropped every rule naming an id.
+      //
+      // What that silently killed: the Code Map's pure-CSS spec/test filter
+      // (`#cm-exclude-spec:checked ~ …`, 14 rules) never reached `ir-content.css`, so the two checkboxes on the
+      // shipped page did nothing at all — the no-JS filter guarantee of Story 20.9 D2/D3, absent from the
+      // rendered site while every gate stayed green. Found 2026-08-01 by inspecting computed styles in a live
+      // browser after the filter failed to hide anything; no test could see it, because the extractor and the
+      // gate that checks it share this function.
+      if (name === 'class') {
+        for (const c of value.split(/\s+/)) if (c) into.classes.add(c)
+      } else if (name === 'id' && value) {
+        into.ids.add(value)
+      }
     }
   }
 }

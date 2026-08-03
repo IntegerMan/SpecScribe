@@ -1030,18 +1030,32 @@ public class StylesheetTests
     }
 
     [Fact]
-    public void SiteNavMark_HasSizingRule_AndInheritsCurrentColor()
+    public void SpecScribeBadgeMark_HasSizingRule_AndInheritsCurrentColor()
     {
-        // The Scribe's Nib header mark: sized relative to the wordmark and colored ONLY via currentColor
-        // (token-system rule; the brand span's color drives it on every surface, including whatever the
-        // webview bridge re-values that color to). Anchored on the exact rule opener — MediaBlock is for
-        // unique @media headers and would mis-anchor on a comment mention of the selector.
+        // The Scribe's Nib, on the attribution badge — the ONE place the tool's mark appears in the nav since the
+        // brand-span copy was removed (owner feedback 2026-08-01: the upper-left names the project, so SpecScribe's
+        // mark does not belong there). This test moved from `.site-nav-mark` to its surviving sibling rather than
+        // being deleted: the property it pins — sized relative to its text and colored ONLY via currentColor, so
+        // the webview bridge's re-valued brand color carries — is exactly as load-bearing here.
+        //
+        // Anchored on the exact rule opener; MediaBlock is for unique @media headers and would mis-anchor on the
+        // comment above that mentions this selector by name.
         var css = ReadStylesheet();
-        var ruleStart = css.IndexOf(".site-nav-mark {", StringComparison.Ordinal);
-        Assert.True(ruleStart >= 0, "stylesheet carries the .site-nav-mark rule");
+        var ruleStart = css.IndexOf(".specscribe-badge-mark {", StringComparison.Ordinal);
+        Assert.True(ruleStart >= 0, "stylesheet carries the .specscribe-badge-mark rule");
         var rule = css[ruleStart..css.IndexOf('}', ruleStart)];
         Assert.Contains("fill: currentColor", rule);
         Assert.DoesNotContain("#", rule);
+    }
+
+    [Fact]
+    public void SiteNavMark_RuleIsGone_NotMerelyUnused()
+    {
+        // Guards the other half of the same change. Removing the markup and leaving the rule behind would leave a
+        // dead selector that a future reader restores markup for; `check:ir-content` would also keep deriving it
+        // into web/assets/ir-content.css. Anchored on the rule OPENER so the retirement comment that names the
+        // selector does not read as the rule still existing.
+        Assert.DoesNotContain(".site-nav-mark {", ReadStylesheet(), StringComparison.Ordinal);
     }
 
     [Fact]

@@ -15,9 +15,15 @@
 // every tree label, status word, icon stage, count, and helper command — is decided by the C# core; the tree maps
 // the core's `outline` records to TreeItems with a single pure lookup (stage → {icon, colorId}) and nothing else.
 // If this file grows a rendering brain, the architecture decision was wrong.
-// Read-only end to end (AD-6): nothing here writes a project artifact or mutates settings. Generate/Watch/scaffold
-// are STAGED into a terminal for the user to run — SpecScribe never presses Enter. Tree actions only reveal a
-// surface, open a `.md` read-only, or copy a prompt to the clipboard.
+// Read-only over PROJECT ARTIFACTS (AD-6, as amended by ADR 0037). Nothing here writes a source artifact, an
+// `_bmad-output` file or the output tree. Generate/Watch/scaffold are STAGED into a terminal for the user to run —
+// SpecScribe never presses Enter. Tree actions only reveal a surface, open a `.md` read-only, or copy a prompt.
+//
+// ONE exception, and it is scoped to one file: the settings form (`openProjectSettings`) writes
+// `.specscribe/config.json` — and even then the shim does not write it. Save spawns `specscribe config --save`, so
+// `SettingsStore` stays the single writer and the tri-state/persist rules are never re-implemented here. ADR 0037
+// re-reads AD-6's "explicit external choice" as "an explicit, user-initiated action that writes only the settings
+// document", on the grounds that pressing Save is no less deliberate than pressing Enter on a staged command.
 // ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 import * as vscode from 'vscode';
@@ -34,6 +40,14 @@ interface SurfaceContent {
    * 6.10). Forward-slashed, host-joined to the workspace folder (the ONE convention — no `_bmad-output` literal
    * here). Absent/empty for a source-less surface (the dashboard) → the reveal button stays hidden. [Story 6.10] */
   sourcePath?: string;
+}
+
+interface WebviewProgress {
+  key: string;
+  label: string;
+  step: number;
+  total: number;
+  complete?: boolean;
 }
 
 /** One next-step command for a story (mirrors the C# `OutlineStoryCommand`): the literal command string the
@@ -83,10 +97,25 @@ interface OutlineSummary {
   total: number;
 }
 
+/** One Shortcuts-pane entry, projected core-side from `SiteNav.QuickLinks` (mirrors the C# `OutlineShortcut`) —
+ * a surface this run actually produced, with the description the portal already shows for it. Data, not rendering:
+ * `iconKey` is the CORE's icon vocabulary and the shim maps it to a codicon via {@link CONCEPT_ICON}, the same way
+ * it maps story stages. [field feedback 2026-08-01] */
+interface OutlineShortcut {
+  label: string;
+  description: string;
+  surfacePath: string;
+  group: string;
+  iconKey: string;
+}
+
 /** The whole project outline (mirrors the C# `ProjectOutline`) — data, not rendering (ADR 0005 §1). [Story 6.9] */
 interface ProjectOutline {
   epics: OutlineEpic[];
   summary: OutlineSummary;
+  /** Optional so a payload from an older core still parses — the pane then shows only its two pinned entries,
+   * which is exactly the pre-change behaviour. */
+  shortcuts?: OutlineShortcut[];
 }
 
 /** One `specscribe webview` spawn's stdout: the full entry document (placeholders unsubstituted) plus every
@@ -108,6 +137,12 @@ interface WebviewPayload {
   sourceRoot?: string;
   adrRoot?: string;
   repoRoot?: string;
+  /** Workspace-relative path (forward-slashed) of the settings DOCUMENT the core would read or write — i.e.
+   * `.specscribe/config.json` for the current folder format, or a bare `.specscribe` for a not-yet-migrated flat
+   * file (ADR 0014). Core-derived so the shim never re-types a SpecScribe filename or re-implements the walk-up in
+   * `SettingsStore.FindExisting`. Absent when the core found no settings anywhere above the repo root, and absent
+   * on an older core — in both cases the shim falls back to its own walk-up. [C0] */
+  settingsPath?: string;
   surfaces: Record<string, SurfaceContent>;
   /** The activity-bar tree + status-bar data. Optional so an older core (pre-6.9) still parses. [Story 6.9] */
   outline?: ProjectOutline;
@@ -122,6 +157,9 @@ interface WebviewPayload {
    * exactly today's behaviour. Mirrors the C# `partial` field. [spec-vscode-extension-name-latency-and-webview-sunburst
    * Goal 2]</p> */
   partial?: boolean;
+  /** Optional render-stage metadata from the core to power host progress text (phase labels + step counts).
+   * Absent on older cores; host falls back to generic progress wording. */
+  progress?: WebviewProgress;
 }
 
 /** The literal `frame` value a Story 22.6 DELTA frame carries. A full payload deliberately carries no `frame`
@@ -164,6 +202,8 @@ interface DeltaFrame {
    * worst case is the honest-but-permanent "isn't available" toast, never a surface stuck reporting "loading"
    * forever. [spec-vscode-extension-name-latency-and-webview-sunburst Goal 2] */
   partial?: boolean;
+  /** Optional render-stage metadata for this frame; carried forward by merge if omitted. */
+  progress?: WebviewProgress;
 }
 
 function isDeltaFrame(value: WebviewPayload | DeltaFrame): value is DeltaFrame {
@@ -202,6 +242,7 @@ function applyDeltaFrame(base: WebviewPayload, frame: DeltaFrame): WebviewPayloa
     // basis was the first-paint prelude. Inheriting `base.partial` would leave the panel answering "still loading"
     // for the rest of the session. [spec-vscode-extension-name-latency-and-webview-sunburst Goal 2]
     partial: frame.partial ?? false,
+    progress: frame.progress ?? base.progress,
   };
 }
 
@@ -228,6 +269,18 @@ interface RendererResult {
   diagnostics: RawDiagnostic[];
 }
 
+interface HostStatusAction {
+  id: 'openProjectSettings' | 'refresh' | 'openToolPathSettings';
+  label: string;
+}
+
+interface HostStatusPayload {
+  type: 'hostStatus';
+  level: 'progress' | 'info' | 'warning' | 'error';
+  text: string;
+  actions?: HostStatusAction[];
+}
+
 /** The direct-open target an entry point asks for. Resolved against the loaded payload's surface keys — never a
  * hard-coded path — so a renamed epics-index key can't silently open the dashboard instead. [Story 6.8] */
 type SurfaceTarget = 'dashboard' | 'epics';
@@ -249,7 +302,18 @@ interface PanelController {
  * dir is `SpecScribeOutput`, never `docs/live`). */
 const DEFAULT_OUTPUT_ROOT = 'SpecScribeOutput';
 
+/** The settings entry name and the config document inside it — mirroring `SettingsStore.FileName` and
+ * `SettingsStore.ConfigFileName`. Used ONLY on the fallback walk-up in {@link resolveSettingsDocument}; when the
+ * core has supplied `settingsPath` on the payload, that wins and these are not consulted. Kept as named constants
+ * rather than inline literals so the two places the shim knows a SpecScribe filename are greppable. */
+const SETTINGS_ENTRY_NAME = '.specscribe';
+const SETTINGS_CONFIG_NAME = 'config.json';
+
 let panel: vscode.WebviewPanel | undefined;
+/** The settings form's panel (ADR 0037) — a SECOND singleton, deliberately separate from the portal's. The portal
+ * panel is live-pushed by `PersistentRenderer` and anything spliced into its surface container is destroyed by the
+ * next `push()`, so the form cannot live there. */
+let settingsPanel: vscode.WebviewPanel | undefined;
 let active: PanelController | undefined;
 /** Last payload's configured output root, so "Open Generated Site" needn't re-spawn just to learn the path. */
 let lastConfiguredOutputRoot: string | undefined;
@@ -259,6 +323,11 @@ let lastConfiguredOutputRoot: string | undefined;
  * folder) watches and reveals the right paths. Undefined until the first payload lands → callers fall back to the
  * workspace folder (today's behavior, correct at the common repo-root open). [Story 6.11] */
 let lastRepoRoot: string | undefined;
+
+/** Last payload's core-emitted settings-document path, workspace-relative and forward-slashed (see
+ * `WebviewPayload.settingsPath`). Undefined until a payload lands, or when the core found no settings at all —
+ * `resolveSettingsDocument` then walks up itself. [C0] */
+let lastSettingsPath: string | undefined;
 
 /** Whether a workspace folder is open — the ONLY gate on the status bar, the tree's lazy load, and the manifest
  * `when` clauses (via the `specscribe.available` context key). Deliberately NOT a bmad/git detection: the extension
@@ -291,6 +360,9 @@ let multiRootNoticeShownForFolder: string | undefined;
 
 let statusBar: vscode.StatusBarItem | undefined;
 let treeProvider: OutlineTreeProvider | undefined;
+/** The Shortcuts pane's provider — at module scope so the `dataChanged` fan-out can refresh it. It became
+ * refreshable when its entries stopped being a static array and started coming from `outline.shortcuts`. */
+let shortcutsProvider: ShortcutsTreeProvider | undefined;
 /** The outline TreeView handle — kept at module scope (not just pushed to subscriptions) so the visibility-aware
  * refresh can read `treeView.visible` and subscribe to `onDidChangeVisibility` (Story 6.11 R6.3). */
 let treeView: vscode.TreeView<OutlineNode> | undefined;
@@ -300,6 +372,24 @@ let treeView: vscode.TreeView<OutlineNode> | undefined;
  * later run resolves); left untouched on a failed load so a transient spawn error doesn't drop last-good
  * diagnostics. Pure host-UI transport — nothing here writes a project artifact (read-only, AD-6). [Story 6.12] */
 let diagnosticCollection: vscode.DiagnosticCollection | undefined;
+
+/** Shared output channel for host-side diagnostics/progress notes that complement Problems entries. */
+let outputChannel: vscode.OutputChannel | undefined;
+
+function logHost(message: string): void {
+  const stamp = new Date().toLocaleTimeString();
+  outputChannel?.appendLine(`[${stamp}] ${message}`);
+}
+
+function asError(err: unknown, fallbackMessage = 'Unknown error'): Error {
+  if (err instanceof Error) return err;
+  if (typeof err === 'string' && err.trim().length > 0) return new Error(err);
+  return new Error(fallbackMessage);
+}
+
+function describeError(err: unknown): string {
+  return asError(err).message;
+}
 
 export function activate(context: vscode.ExtensionContext) {
   const register = (id: string, handler: (...args: unknown[]) => unknown) =>
@@ -325,14 +415,20 @@ export function activate(context: vscode.ExtensionContext) {
   register('specscribe.openSource', (node: unknown) => void openSource(node));
   register('specscribe.copyStoryCommand', (node: unknown) => void copyStoryCommand(node));
 
-  // Shortcuts: a static host-chrome section pinned above the outline (labels/icons are the same class of host
-  // chrome as the manifest command titles; no project content is authored here). The view itself is gated on
-  // `specscribe.available` (a folder is open) via its manifest `when`.
+  // Shortcuts: two pinned host-chrome entries (labels are the same class of host chrome as the manifest command
+  // titles), followed by this project's own surfaces from the core-emitted `outline.shortcuts`. The view itself is
+  // gated on `specscribe.available` (a folder is open) via its manifest `when`.
+  shortcutsProvider = new ShortcutsTreeProvider();
   context.subscriptions.push(
-    vscode.window.registerTreeDataProvider('specscribe.shortcuts', new ShortcutsTreeProvider()));
+    vscode.window.registerTreeDataProvider('specscribe.shortcuts', shortcutsProvider));
 
   // Status bar: a summary count that opens the panel; hidden until a detected repo has data (Story 6.9 R3.2).
-  statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+  // RIGHT-aligned. It was Left, where it sat among the source-control/branch cluster and — per owner feedback
+  // 2026-08-02 — was simply not where anyone looks for "is the tool busy". The right group is where VS Code's own
+  // language servers and background tasks report, which is the convention this item is participating in.
+  // Priority 100 keeps it left-most within that group (higher = further left), so it holds a stable position
+  // rather than jumping as other extensions come and go.
+  statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   statusBar.command = 'specscribe.openStatus';
   context.subscriptions.push(statusBar);
 
@@ -340,6 +436,9 @@ export function activate(context: vscode.ExtensionContext) {
   // with the extension; rebuilt on every successful store load. [Story 6.12]
   diagnosticCollection = vscode.languages.createDiagnosticCollection('SpecScribe');
   context.subscriptions.push(diagnosticCollection);
+
+  outputChannel = vscode.window.createOutputChannel('SpecScribe');
+  context.subscriptions.push(outputChannel);
 
   // Tree: a TreeDataProvider mapping the core outline 1:1. getChildren lazily triggers the first spawn on reveal.
   treeProvider = new OutlineTreeProvider();
@@ -349,8 +448,13 @@ export function activate(context: vscode.ExtensionContext) {
   // was hidden. The tree's own lazy FIRST load stays in getChildren (visibility-appropriate already). [Story 6.11]
   context.subscriptions.push(treeView.onDidChangeVisibility((e) => { if (e.visible) store?.flushIfDirty(); }));
 
-  // All three consumers subscribe ONCE to the fan-out; the store fires it on every (re)load.
-  context.subscriptions.push(dataChanged.event(() => { renderStatusBar(); treeProvider?.refresh(); }));
+  // All consumers subscribe ONCE to the fan-out; the store fires it on every (re)load. The shortcuts pane joined
+  // them when its entries stopped being static — without this it would sit at its two pinned entries forever.
+  context.subscriptions.push(dataChanged.event(() => {
+    renderStatusBar();
+    treeProvider?.refresh();
+    shortcutsProvider?.refresh();
+  }));
 
   // Terminal busy-tracking for getOrCreateTerminal's reuse guard. Feature-detected, NOT assumed present: this API
   // graduated to stable after the `engines.vscode` floor this extension declares, so an older-but-still-satisfying
@@ -393,6 +497,12 @@ function bindWorkspace(context: vscode.ExtensionContext) {
   // [spec-vscode-any-workspace-and-processing-indicators]
   folderOpen = !!folder;
   void vscode.commands.executeCommand('setContext', 'specscribe.available', folderOpen);
+  // Distinct from `available`, and the distinction is the whole point (owner feedback 2026-08-02). The extension
+  // activates on `onStartupFinished`, so for the first seconds of a session NEITHER key is set — and a welcome
+  // gated on `!specscribe.available` alone therefore reads "Open a folder to see its SpecScribe insights" to a
+  // user who has a folder open and is simply waiting. The manifest's two `viewsWelcome` entries are gated on
+  // `!activated` and `activated && !available` respectively, which are mutually exclusive, so exactly one shows.
+  void vscode.commands.executeCommand('setContext', 'specscribe.activated', true);
 
   // Multi-root support stays out of scope, but a silent folder[0]-only pick is confusing when there's more than
   // one root — tell the user which folder is bound instead of leaving them to guess. Purely informational (no
@@ -508,6 +618,7 @@ function createController(
    * overwritten (not queued) by a later click: only the most recent intent is worth honoring.
    * [spec-vscode-extension-name-latency-and-webview-sunburst Goal 2] */
   let awaitingSurface: string | undefined;
+  let lastHostStatusKey = '';
 
   // Read `store` fresh on every use rather than capturing it once: a workspace-folder change (bindWorkspace)
   // disposes the old store and rebinds the module-level `store` to a new one, and this panel must follow that
@@ -556,7 +667,111 @@ function createController(
     });
   }
 
-  p.webview.onDidReceiveMessage(async (msg: { type?: string; target?: string; fragment?: string; href?: string; text?: string; label?: string; path?: string; line?: number }) => {
+  function postHostStatus(payload: HostStatusPayload): void {
+    p.webview.postMessage(payload);
+    const key = `${payload.level}|${payload.text}|${(payload.actions ?? []).map((a) => a.id).join(',')}`;
+    if (key !== lastHostStatusKey) {
+      lastHostStatusKey = key;
+      logHost(`status ${payload.level}: ${payload.text}`);
+    }
+  }
+
+  function clearHostStatus(): void {
+    p.webview.postMessage({ type: 'hostStatus', text: '' });
+    if (lastHostStatusKey !== '') {
+      lastHostStatusKey = '';
+      logHost('status cleared');
+    }
+  }
+
+  function pushHostStatus(): void {
+    const s = currentStore();
+    const cache = s.payload;
+    const stageText = (progress?: WebviewProgress): string | undefined => {
+      if (!progress?.total || progress.total <= 0) return undefined;
+      const step = Math.min(Math.max(progress.step, 0), progress.total);
+      return `Stage ${step}/${progress.total}: ${progress.label}`;
+    };
+    if (s.isLoading) {
+      const progressText = stageText(cache?.progress);
+      postHostStatus({
+        type: 'hostStatus',
+        level: 'progress',
+        text: progressText
+          ? `${progressText} (${Object.keys(cache?.surfaces ?? {}).length} surfaces ready)`
+          : 'Stage 1/3: Starting render and scanning project content…',
+      });
+      return;
+    }
+    if (!cache) {
+      postHostStatus({
+        type: 'hostStatus',
+        level: 'progress',
+        text: 'Stage 1/3: Waiting for initial SpecScribe payload…',
+      });
+      return;
+    }
+    if (s.lastError) {
+      postHostStatus({
+        type: 'hostStatus',
+        level: 'warning',
+        text: `Last refresh failed; showing cached data. ${describeError(s.lastError)}`,
+        actions: [{ id: 'refresh', label: 'Retry' }],
+      });
+      return;
+    }
+    if (cache.partial) {
+      const progressText = stageText(cache.progress) ?? 'Stage 2/3: Dashboard ready; loading remaining surfaces…';
+      postHostStatus({
+        type: 'hostStatus',
+        level: 'progress',
+        text: `${progressText} (${Object.keys(cache.surfaces).length} surfaces currently available)`,
+      });
+      return;
+    }
+
+    const sourceRoot = cache.sourceRoot ?? '_bmad-output';
+    const sourceAbs = path.resolve(lastRepoRoot ?? folder.uri.fsPath, sourceRoot);
+    if (!fs.existsSync(sourceAbs)) {
+      postHostStatus({
+        type: 'hostStatus',
+        level: 'warning',
+        text: `No artifact source folder found at ${sourceRoot}. Configure project paths to load planning content.`,
+        actions: [
+          { id: 'openProjectSettings', label: 'Configure Paths' },
+          { id: 'refresh', label: 'Retry' },
+        ],
+      });
+      return;
+    }
+
+    const errors = s.diagnostics.filter((d) => d.severity === 'error').length;
+    const warnings = s.diagnostics.filter((d) => d.severity === 'warning').length;
+    if (errors > 0 || warnings > 0) {
+      const summary = `${errors} error${errors === 1 ? '' : 's'} and ${warnings} warning${warnings === 1 ? '' : 's'} detected while rendering.`;
+      postHostStatus({
+        type: 'hostStatus',
+        level: errors > 0 ? 'error' : 'warning',
+        text: summary,
+        actions: [{ id: 'refresh', label: 'Refresh' }],
+      });
+      return;
+    }
+
+    if ((cache.outline?.epics.length ?? 0) === 0) {
+      postHostStatus({
+        type: 'hostStatus',
+        level: 'info',
+        text: 'No epics were detected in this workspace yet. Dashboard code-map and README views are still available.',
+        actions: [{ id: 'openProjectSettings', label: 'Configure Paths' }],
+      });
+      return;
+    }
+
+    clearHostStatus();
+  }
+
+  p.webview.onDidReceiveMessage(async (msg: { type?: string; target?: string; fragment?: string; href?: string; text?: string; label?: string; path?: string; line?: number; action?: string }) => {
     if (msg?.type === 'copyHelperText' && typeof msg.text === 'string') {
       // Read-only helper handoff (AD-6/NFR-5): the webview generated a prompt; the only thing the host does is put
       // it on the clipboard. NOTHING here writes a project artifact, edits a file, or mutates settings. [Story 6.5]
@@ -583,6 +798,16 @@ function createController(
         await vscode.window.showTextDocument(vscode.Uri.file(target), options);
       } catch (err) {
         void vscode.window.showErrorMessage(`SpecScribe: couldn't open ${msg.path}: ${String(err)}`);
+      }
+      return;
+    }
+    if (msg?.type === 'hostAction' && typeof msg.action === 'string') {
+      if (msg.action === 'openProjectSettings') {
+        void vscode.commands.executeCommand('specscribe.openProjectSettings');
+      } else if (msg.action === 'refresh') {
+        refreshCommand(context);
+      } else if (msg.action === 'openToolPathSettings') {
+        void vscode.commands.executeCommand('workbench.action.openSettings', 'specscribe.toolPath');
       }
       return;
     }
@@ -625,6 +850,7 @@ function createController(
   // (fired as the initial load settles) never posts into a webview whose bridge script isn't installed yet.
   const sub = dataChanged.event(() => {
     if (disposed || !painted) return;
+    pushHostStatus();
     // Only re-push on a SETTLED load (fresh payload), never on the load-START fire. Goal B added a start-fire purely
     // to light the status-bar spinner; if the panel also reacted to it, it would swap the surface with the STALE
     // pre-refresh payload at start and again with fresh content at settle — a double swap that resets in-surface
@@ -684,6 +910,15 @@ function createController(
     p.title = `SpecScribe: ${cache.siteTitle}`;
     p.webview.html = composeEntryHtml(p.webview, cache);
     painted = true;
+    const progressTag = cache.progress
+      ? `${cache.progress.step}/${cache.progress.total}:${cache.progress.key}`
+      : 'n/a';
+    logHost(
+      `payload loaded: surfaces=${Object.keys(cache.surfaces).length}, partial=${cache.partial === true}, ` +
+      `diagnostics=${currentStore().diagnostics.length}, sourceRoot=${cache.sourceRoot ?? '_bmad-output'}, ` +
+      `progress=${progressTag}`,
+    );
+    pushHostStatus();
     // Apply the initial reveal (dashboard is already the entry; epics/a tree surface swaps in place once).
     const initialKey = resolveReveal(cache, pendingReveal);
     if (initialKey !== cache.entry) push(initialKey, 'navigate');
@@ -716,10 +951,11 @@ function createController(
 class SpecScribeStore {
   private cache: WebviewPayload | undefined;
   private loading: Promise<WebviewPayload> | undefined; // coalesces concurrent spawns (rapid saves, nav during load)
-  private error: unknown | undefined;
+  private error: Error | undefined;
   private readonly watchers: vscode.Disposable[] = [];
   private dirty = false;                 // a watcher fired while no consumer was visible — reload on next reveal (R6.3)
   private rootsKey: string | undefined;  // the resolved-roots signature the current watchers were built from (R6.2)
+  private lastDiagnostics: RawDiagnostic[] = [];
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -728,7 +964,7 @@ class SpecScribeStore {
 
   get payload(): WebviewPayload | undefined { return this.cache; }
   get outline(): ProjectOutline | undefined { return this.cache?.outline; }
-  get lastError(): unknown | undefined { return this.error; }
+  get lastError(): Error | undefined { return this.error; }
   get isLoaded(): boolean { return this.cache !== undefined; }
   /** True while the cached payload is still the first-paint PRELUDE — the entry surface alone, with the epics
    * family and the long tail arriving on the next delta frame. The tree reads this so an outline that is merely
@@ -738,6 +974,7 @@ class SpecScribeStore {
   /** True while a spawn is in flight — drives the status bar's "rendering…" busy indicator so an in-progress
    * render never looks inert (Goal B). [spec-vscode-any-workspace-and-processing-indicators] */
   get isLoading(): boolean { return this.loading !== undefined; }
+  get diagnostics(): readonly RawDiagnostic[] { return this.lastDiagnostics; }
 
   /** A live `specscribe webview --serve` connection, once one has started successfully. Undefined before the first
    * attempt, after a permanent fallback ({@link persistentUnavailable}), or after {@link dispose}.
@@ -768,7 +1005,7 @@ class SpecScribeStore {
     const attempt = this.persistentUnavailable ? this.loadViaSpawn() : this.loadViaPersistent();
     this.loading = attempt
       .catch((err) => {
-        this.error = err; // keep this.cache as the last-good snapshot
+        this.error = asError(err); // keep this.cache as the last-good snapshot
         throw err;
       })
       .finally(() => {
@@ -788,10 +1025,12 @@ class SpecScribeStore {
   private applyPayload(payload: WebviewPayload, diagnostics: RawDiagnostic[]): WebviewPayload {
     this.cache = payload;
     this.error = undefined;
+    this.lastDiagnostics = diagnostics;
     lastConfiguredOutputRoot = payload.configuredOutputRoot ?? lastConfiguredOutputRoot;
     // Resolve the absolute repo root ONCE (workspace folder + core-emitted offset) and share it for the watchers
     // AND the reveal-source join, then (re)build the watchers from the payload's resolved roots. [Story 6.11]
     lastRepoRoot = path.resolve(this.folder.uri.fsPath, payload.repoRoot ?? '.');
+    lastSettingsPath = payload.settingsPath ?? lastSettingsPath;
     this.rebuildWatchersFromRoots(payload);
     // Rebuild the Problems panel from this run's notices (clearing any a later run resolved). Only on success —
     // a failed load leaves the collection as last-good, mirroring the tree/status-bar stale behavior. [Story 6.12]
@@ -815,7 +1054,9 @@ class SpecScribeStore {
       // Already running: a running `--serve` connection only pushes on its OWN debounce; there is no
       // "give me the current state now" request in the NDJSON protocol, so a manual reload while persistent
       // mode is live just re-resolves the last-pushed cache (or the last error, if none has landed yet).
-      return this.cache ? Promise.resolve(this.cache) : Promise.reject(this.error ?? new Error('SpecScribe --serve has not produced a payload yet.'));
+      return this.cache
+        ? Promise.resolve(this.cache)
+        : Promise.reject(this.error ?? new Error('SpecScribe --serve has not produced a payload yet.'));
     }
     return new Promise<WebviewPayload>((resolve, reject) => {
       let initialSettled = false;
@@ -845,7 +1086,7 @@ class SpecScribeStore {
             // "unsupported"; `persistentUnavailable` stays false so the next load() retries `--serve`. This
             // call's own promise already resolved, so recover by triggering a fresh load() now instead of
             // leaving the panel silently stale until an unrelated save/manual refresh. [Review][Patch]
-            this.error = err;
+            this.error = asError(err);
             void this.load().catch(() => { /* stale UI covers it */ });
           }
         },
@@ -1068,34 +1309,104 @@ function messageNode(label: string, icon?: string): OutlineNode {
 
 // ===== Sidebar shortcuts (host chrome) =======================================================================
 
-/** One shortcut node: an already-registered host command with a codicon. Pure host chrome — the labels mirror
- * the manifest command titles (the one sanctioned class of shim-authored text); no project content and no core
- * data is interpreted here, so AD-1/AD-2 hold. [spec-vscode-sidebar-shortcuts-…-quickpick] */
-interface Shortcut { label: string; icon: string; command: string; tooltip: string }
+/** One shortcut node. Either a HOST-CHROME entry — an already-registered command whose label mirrors the manifest
+ * command title, the one sanctioned class of shim-authored text — or a PROJECT entry projected from the core's
+ * `outline.shortcuts`, which reveals a surface this run actually produced.
+ * [spec-vscode-sidebar-shortcuts-…-quickpick] */
+interface Shortcut { label: string; icon: string; command: string; tooltip: string; arguments?: unknown[] }
 
-// Deliberately just the view-opening entries (owner decision, 2026-07-12 F5 review): Refresh already lives on
-// the outline's title bar, and Generated Site / Generate / Watch / Project Settings are occasional operations
-// that belong in the Command Palette, not permanent sidebar real estate.
+// The two view-opening entries stay PINNED AT THE TOP (owner decision, 2026-07-12 F5 review, unchanged): Refresh
+// lives on the outline's title bar, and Generate / Watch stay Command-Palette operations rather than permanent
+// sidebar real estate. What changed is only what follows them.
 const SHORTCUTS: readonly Shortcut[] = [
   { label: 'Open Dashboard', icon: 'dashboard', command: 'specscribe.openDashboard', tooltip: 'Open the SpecScribe status panel on the dashboard' },
   { label: 'Open Epics', icon: 'list-tree', command: 'specscribe.openEpics', tooltip: 'Open the SpecScribe status panel on the epics index' },
+  // Promoted from Palette-only when it stopped being "open a file in an editor" and became a form that can
+  // actually fix a misconfigured project (ADR 0037). It is the first thing a user needs when the portal is empty
+  // because the paths are wrong, which is precisely when they will not think to search the Command Palette.
+  { label: 'Project Settings', icon: 'settings-gear', command: 'specscribe.openProjectSettings', tooltip: 'Configure this project’s SpecScribe settings (source, ADR and output roots, deep-git, dates)' },
 ];
 
-/** The static Shortcuts section pinned above the Project Outline: one-click nodes for the existing SpecScribe
- * commands, so every surface is reachable from the sidebar without command-palette digging. Read-only by
- * construction — each node only invokes an already-registered command (Generate/Watch stay staged-terminal
- * handoffs; nothing executes on the user's behalf, AD-6). [spec-vscode-sidebar-shortcuts-…-quickpick] */
+/** Core icon-vocabulary key → codicon. The SAME shape as {@link STAGE_ICON} and for the same AD-2 reason: the core
+ * emits its own concept keys (the labels `Icons.ForConcept` is keyed on) and the shim decides only how VS Code
+ * draws them. Emitting codicon names from C# would put host vocabulary in the core; emitting SVG would be
+ * rendering (ADR 0005 §1). An unmapped key falls back to a neutral glyph rather than breaking the row. */
+const CONCEPT_ICON: Readonly<Record<string, string>> = {
+  'Code Map': 'symbol-structure',
+  'Risk Quadrant': 'warning',
+  'Git Insights': 'git-commit',
+  'Deep Analytics': 'graph',
+  'Activity Timeline': 'history',
+  Epics: 'list-tree',
+  Requirements: 'checklist',
+  Traceability: 'references',
+  Sprint: 'project',
+  Cadence: 'pulse',
+  'Impact Map': 'type-hierarchy',
+  'Work Graph': 'type-hierarchy-sub',
+  'Deferred Work': 'circle-slash',
+  'Action Items': 'tasklist',
+  'Follow-ups': 'tasklist',
+  Readme: 'book',
+  PRD: 'file-text',
+  'Product Brief': 'file-text',
+  Architecture: 'symbol-namespace',
+  ADRs: 'law',
+  'Design System': 'symbol-color',
+  'Test Artifacts': 'beaker',
+  About: 'info',
+  Logs: 'output',
+};
+
+/** The Shortcuts section pinned above the Project Outline.
+ *
+ * <p><b>Was:</b> two hard-coded entries, identical in every workspace. Field feedback 2026-08-01, from a project
+ * with a PRD and no epics: "Open Epics" led to an empty page and nothing led to the Code Map — the one surface that
+ * repository had. The entries below the two pinned ones now come from `outline.shortcuts`, which the core projects
+ * from `SiteNav.QuickLinks` — the same list that decides which pages the run writes. The pane therefore cannot
+ * offer a link to a page that does not exist, and the shim holds no project knowledge (AD-1/AD-2): it maps a
+ * concept key to a codicon and nothing else.</p>
+ *
+ * <p>Read-only by construction — every node either invokes an already-registered command or reveals a rendered
+ * surface in the panel; nothing executes on the user's behalf (AD-6).</p> */
 class ShortcutsTreeProvider implements vscode.TreeDataProvider<Shortcut> {
+  private readonly emitter = new vscode.EventEmitter<void>();
+  readonly onDidChangeTreeData = this.emitter.event;
+
+  /** Re-read `outline.shortcuts` — wired to the same store change event the outline tree uses, so the pane
+   * repopulates when the first payload lands rather than staying at its two pinned entries. */
+  refresh(): void {
+    this.emitter.fire();
+  }
+
   getTreeItem(s: Shortcut): vscode.TreeItem {
     const item = new vscode.TreeItem(s.label, vscode.TreeItemCollapsibleState.None);
     item.iconPath = new vscode.ThemeIcon(s.icon);
     item.tooltip = s.tooltip;
-    item.command = { command: s.command, title: s.label };
+    item.command = { command: s.command, title: s.label, arguments: s.arguments };
     return item;
   }
 
   getChildren(element?: Shortcut): Shortcut[] {
-    return element ? [] : [...SHORTCUTS];
+    if (element) return [];
+
+    const nodes = [...SHORTCUTS];
+    // `Home` and `Epics` would duplicate the two pinned entries above; `Delivery`-grouped Epics is the same page
+    // "Open Epics" opens. Filtered by PATH, not by label, so a relabelled nav entry cannot slip a duplicate in.
+    const pinned = new Set(['index.html', 'epics.html']);
+    for (const s of store?.outline?.shortcuts ?? []) {
+      if (pinned.has(s.surfacePath)) continue;
+      nodes.push({
+        label: s.label,
+        icon: CONCEPT_ICON[s.iconKey] ?? 'file',
+        // Description first: it is the sentence the portal itself uses for this link, and it says more than the
+        // group does. The group follows so the pane still conveys the portal's own taxonomy without nesting.
+        tooltip: `${s.description} (${s.group})`,
+        command: 'specscribe.revealSurface',
+        arguments: [s.surfacePath],
+      });
+    }
+    return nodes;
   }
 }
 
@@ -1129,15 +1440,26 @@ function renderStatusBar(): void {
     // first-ever failure (isLoaded false, no cache exists yet) than on a refresh failure with a last-good cache.
     item.text = '$(warning) SpecScribe: data stale';
     item.tooltip = store.isLoaded
-      ? `SpecScribe: last refresh failed — showing cached data.\n${String(store.lastError)}`
-      : `SpecScribe: could not load data.\n${String(store.lastError)}`;
+      ? `SpecScribe: last refresh failed — showing cached data.\n${describeError(store.lastError)}`
+      : `SpecScribe: could not load data.\n${describeError(store.lastError)}`;
     item.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
     item.show();
     return;
   }
 
   const summary = store.outline?.summary;
-  if (!summary) { item.hide(); return; } // detected but no data yet — the tree reveal / panel open will load it
+  if (!summary) {
+    // Bound to a folder but nothing loaded yet (the tree reveal or a panel open triggers the first spawn). This
+    // used to `hide()`, which — with the item now in the right-hand group where users look for background
+    // activity — read as "the extension isn't running" during exactly the window when they are waiting for it.
+    // An idle, clickable affordance is the honest answer: SpecScribe is here, it has no counts yet, and clicking
+    // asks for them. [owner feedback 2026-08-02]
+    item.text = '$(telescope) SpecScribe';
+    item.tooltip = 'SpecScribe is ready. Click to open the status panel and load this project.';
+    item.backgroundColor = undefined;
+    item.show();
+    return;
+  }
 
   item.text = `$(checklist) SpecScribe: ${summary.active} active · ${summary.review} review`;
   item.tooltip = `SpecScribe — ${summary.done}/${summary.total} stories done · ` +
@@ -1358,27 +1680,266 @@ function getOrCreateTerminal(folder: vscode.WorkspaceFolder): vscode.Terminal {
   return existing ?? vscode.window.createTerminal({ name: 'SpecScribe', cwd: folder.uri.fsPath });
 }
 
-/** Reveal the directory-scoped `.specscribe` settings file (R5.2), or — if absent — offer to stage the CLI's own
- * interactive "Configure paths" flow in a terminal. The extension itself performs NO write to `.specscribe`
- * (ADR 0003): any creation is done by the user running the CLI, never by us. */
+/** Locate the directory-scoped settings DOCUMENT — the file a user would actually edit — mirroring the core's
+ * `SettingsStore.FindExisting` walk-up.
+ *
+ * <p><b>Why this is not a one-line `existsSync`.</b> Since ADR 0014 `.specscribe` is a FOLDER containing
+ * `config.json`, not a flat file. The previous implementation did `existsSync('.specscribe')` and then
+ * `showTextDocument` on the result — which, on every project a current CLI has configured, asked VS Code to open a
+ * DIRECTORY as a text document and failed. Three states have to be distinguished, and the old code could express
+ * only two:</p>
+ * <ul>
+ *   <li>a folder holding `config.json` → the document is `<dir>/config.json`;</li>
+ *   <li>a flat file (pre-ADR-0014, still read directly by `SettingsStore.ReadConfigJson`) → that file IS the
+ *       document;</li>
+ *   <li>a folder with NO `config.json` — an ADR 0014 container holding only sibling state. The old code saw
+ *       `existsSync → true` here and failed; it is genuinely "no settings yet".</li>
+ * </ul>
+ *
+ * <p>Anchors on the resolved REPO ROOT (`lastRepoRoot`), not the workspace folder: a subdirectory-open would
+ * otherwise miss the settings the core itself walks up to and reads, so the editor and the CLI would disagree
+ * about which file is in force. Prefers the core's own `settingsPath` when a payload has supplied one, so the shim
+ * re-types a SpecScribe filename only on the fallback path.</p>
+ *
+ * <p>Returns the real, symlink-followed path of an existing regular file, or undefined. Callers must open the
+ * RETURNED path — {@link resolveOpenableFile} is what makes "opened a directory" structurally impossible here.</p> */
+function resolveSettingsDocument(folder: vscode.WorkspaceFolder): string | undefined {
+  const anchor = lastRepoRoot ?? folder.uri.fsPath;
+
+  if (lastSettingsPath) {
+    const fromCore = resolveOpenableFile(path.resolve(anchor, lastSettingsPath));
+    if (fromCore) return fromCore;
+    // Fall through rather than give up: the payload may predate a file the user has since created by hand.
+  }
+
+  let dir = anchor;
+  for (;;) {
+    const entry = path.join(dir, SETTINGS_ENTRY_NAME);
+    try {
+      const stat = fs.statSync(entry);
+      // A folder is a container: the document is inside it. A file is the legacy flat form and IS the document.
+      const found = resolveOpenableFile(stat.isDirectory() ? path.join(entry, SETTINGS_CONFIG_NAME) : entry);
+      if (found) return found;
+    } catch {
+      // Absent or unreadable at this level — keep walking, exactly as the core's walk-up does.
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) return undefined;
+    dir = parent;
+  }
+}
+
+/** Open the settings FORM — the extension's one authoring affordance (ADR 0037).
+ *
+ * <p>The form's HTML is rendered by the core (`specscribe config --form`), the shim substitutes the same two
+ * placeholders it substitutes for the portal document, and Save spawns `specscribe config --save`. The shim writes
+ * nothing itself: `SettingsStore` stays the single writer, so the persist-only-when-set rules, the date-token
+ * vocabulary and the ADR 0014 migration are not re-implemented in TypeScript.</p>
+ *
+ * <p>Its own panel, not the portal's. The portal panel is live-pushed by `PersistentRenderer` and anything spliced
+ * into `#specscribe-surface` is destroyed by the next `push()`. After a successful save this calls `refreshCommand`,
+ * which re-renders the portal under the new settings — the two panels stay coherent without either knowing the
+ * other exists.</p> */
 async function openProjectSettings(context: vscode.ExtensionContext) {
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (!folder) {
     void vscode.window.showErrorMessage('SpecScribe: open a project folder first.');
     return;
   }
-  const settingsPath = path.join(folder.uri.fsPath, '.specscribe');
-  if (fs.existsSync(settingsPath)) {
-    void vscode.window.showTextDocument(vscode.Uri.file(settingsPath));
+
+  if (settingsPanel) {
+    settingsPanel.reveal();
+    return;
+  }
+
+  let document: string;
+  try {
+    document = await runConfig(context, folder.uri.fsPath, ['--form']);
+  } catch (err) {
+    // The form is what a user reaches for when generation is broken, so its OWN failure has to stay actionable
+    // rather than silent — and the pre-form behaviour (open the file, or stage the interactive setup) is the
+    // honest fallback.
+    await settingsFallback(context, folder, String(err));
+    return;
+  }
+
+  settingsPanel = createSettingsPanel(context);
+  settingsPanel.webview.html = substituteHostTokens(settingsPanel.webview, document);
+  bindSettingsBridge(context, settingsPanel, folder);
+}
+
+/** The pre-ADR-0037 behaviour, kept as the degrade path: reveal the settings document if there is one, else offer
+ * the CLI's interactive setup in a terminal. Reached only when the core could not render the form. */
+async function settingsFallback(
+  context: vscode.ExtensionContext, folder: vscode.WorkspaceFolder, reason: string,
+): Promise<void> {
+  const document = resolveSettingsDocument(folder);
+  if (document) {
+    void vscode.window.showWarningMessage(`SpecScribe: could not open the settings form (${reason}) — opening the file instead.`);
+    void vscode.window.showTextDocument(vscode.Uri.file(document));
     return;
   }
   const choice = await vscode.window.showInformationMessage(
-    'SpecScribe: no “.specscribe” settings file here yet. SpecScribe won’t create one for you — run the ' +
-    'interactive setup and choose “Configure paths” to write it.',
+    `SpecScribe: could not open the settings form (${reason}). Run the interactive setup and choose ` +
+    '“Configure paths” to create the settings.',
     'Open Setup in Terminal');
   if (choice === 'Open Setup in Terminal') {
     stageCommandLine(getOrCreateTerminal(folder), toolCommandLine(resolveTool(context))); // bare tool → interactive menu
   }
+}
+
+function createSettingsPanel(context: vscode.ExtensionContext): vscode.WebviewPanel {
+  const p = vscode.window.createWebviewPanel(
+    'specscribeSettings',
+    'SpecScribe Settings',
+    vscode.ViewColumn.Active,
+    {
+      enableScripts: true,           // the one nonce'd bridge script the core emitted
+      retainContextWhenHidden: true, // half-filled fields must survive a tab hide
+      localResourceRoots: [],        // nothing loads from disk: all CSS is inlined by the C# renderer
+    },
+  );
+  p.iconPath = vscode.Uri.joinPath(context.extensionUri, 'media', 'specscribe.svg');
+  p.onDidDispose(() => { settingsPanel = undefined; });
+  return p;
+}
+
+/** Wire the settings form's message channel. A SECOND `onDidReceiveMessage`, on its own panel — deliberately not
+ * an extension of the portal panel's handler, whose messages (`navigate`, `revealSource`, host status) mean
+ * nothing here and whose surface state this form has none of. */
+function bindSettingsBridge(
+  context: vscode.ExtensionContext, p: vscode.WebviewPanel, folder: vscode.WorkspaceFolder,
+): void {
+  p.webview.onDidReceiveMessage(async (msg: unknown) => {
+    if (!msg || typeof msg !== 'object') return;
+    const message = msg as { type?: unknown; field?: unknown; values?: unknown; cleared?: unknown };
+    if (typeof message.type !== 'string') return;
+
+    switch (message.type) {
+      case 'settingsPick': {
+        if (typeof message.field !== 'string') return;
+        const picked = await vscode.window.showOpenDialog({
+          canSelectFolders: true,
+          canSelectFiles: false,
+          canSelectMany: false,
+          defaultUri: vscode.Uri.file(lastRepoRoot ?? folder.uri.fsPath),
+          openLabel: 'Use this folder',
+        });
+        if (!picked?.[0]) return;
+        // Relative to the anchor and forward-slashed: `SavedSettings` stores the string verbatim, so a relative
+        // path must STAY relative or the settings stop being portable across checkouts. An absolute path is kept
+        // as-is when the pick lands outside the repo, which is a legitimate `--output` case.
+        const anchor = lastRepoRoot ?? folder.uri.fsPath;
+        const rel = path.relative(anchor, picked[0].fsPath).split(path.sep).join('/');
+        const value = rel && !rel.startsWith('..') ? rel : picked[0].fsPath.split(path.sep).join('/');
+        void p.webview.postMessage({ type: 'settingsPicked', field: message.field, value });
+        return;
+      }
+
+      case 'settingsSave': {
+        const args = buildSaveArgs(message.values, message.cleared);
+        try {
+          const stdout = await runConfig(context, folder.uri.fsPath, args);
+          const savedTo = parseSavedTo(stdout);
+          void p.webview.postMessage({ type: 'settingsResult', ok: true, savedTo });
+          lastSettingsPath = undefined; // the next payload re-supplies it; the old one may now be wrong
+          // Re-render the portal under the settings just written — the whole point of configuring.
+          refreshCommand(context);
+        } catch (err) {
+          void p.webview.postMessage({
+            type: 'settingsResult',
+            ok: false,
+            errors: parseFieldErrors(err),
+          });
+        }
+        return;
+      }
+
+      case 'settingsRevealFile': {
+        const document = resolveSettingsDocument(folder);
+        if (document) void vscode.window.showTextDocument(vscode.Uri.file(document));
+        else void vscode.window.showInformationMessage('SpecScribe: no settings file yet — save the form to create one.');
+        return;
+      }
+
+      case 'settingsCancel':
+        p.dispose();
+    }
+  }, undefined, context.subscriptions);
+}
+
+/** Turn the form's `{values, cleared}` into `config --save` arguments.
+ *
+ * <p>An ARGS ARRAY, never a shell string. `toolCommandLine` builds a display string for the terminal handoff and
+ * must not be reused here: a project name or path containing a space or a quote would be re-parsed by the shell.
+ * `spawn` with an array passes each argument through untouched.</p>
+ *
+ * <p>Shape-defensive because it reads a webview message: a hostile or stale page cannot make this build an
+ * argument out of a non-string.</p> */
+function buildSaveArgs(values: unknown, cleared: unknown): string[] {
+  const args = ['config', '--save'];
+  const optionFor: Readonly<Record<string, string>> = {
+    project: '--project-name',
+    source: '--source',
+    adrs: '--adrs',
+    output: '--output',
+    code_url: '--code-url',
+    today_policy: '--today-policy',
+  };
+
+  if (values && typeof values === 'object') {
+    for (const [field, raw] of Object.entries(values as Record<string, unknown>)) {
+      if (typeof raw !== 'string' || raw.trim() === '') continue;
+      const value = raw.trim();
+      if (field === 'deep_git') { if (value === 'true') args.push('--deep-git'); continue; }
+      // `readme` is posted positively ("include the README?") and maps onto the negative flag, exactly as the
+      // interactive prompt does. `true` is the default, so it needs no argument — and passing one is impossible,
+      // there being no `--readme`. Clearing is how it goes back to unset.
+      if (field === 'readme') { if (value === 'false') args.push('--no-readme'); continue; }
+      const option = optionFor[field];
+      if (option) args.push(option, value);
+    }
+  }
+
+  if (Array.isArray(cleared)) {
+    for (const field of cleared) {
+      if (typeof field === 'string' && field.trim()) args.push('--clear', field.trim());
+    }
+  }
+  return args;
+}
+
+/** `savedTo` from a successful `config --save`, or undefined when the shape is not what we expect — the status
+ * line degrades to a generic confirmation rather than printing "undefined". */
+function parseSavedTo(stdout: string): string | undefined {
+  try {
+    const parsed = JSON.parse(stdout.trim()) as { savedTo?: unknown };
+    return typeof parsed.savedTo === 'string' ? parsed.savedTo : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Field-attributed errors from a failed `config --save`. The core emits one JSON object per line on stderr — the
+ * same convention the Problems-panel wire uses — precisely so the form can attach a message to the offending
+ * control instead of screen-scraping a human sentence. A line that is not JSON becomes an unattached message
+ * rather than being dropped. */
+function parseFieldErrors(err: unknown): { field: string; message: string }[] {
+  const text = err instanceof Error ? err.message : String(err);
+  const errors: { field: string; message: string }[] = [];
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      const parsed = JSON.parse(trimmed) as { field?: unknown; message?: unknown };
+      if (typeof parsed.message === 'string') {
+        errors.push({ field: typeof parsed.field === 'string' ? parsed.field : '', message: parsed.message });
+        continue;
+      }
+    } catch { /* not a diagnostic line — fall through */ }
+    errors.push({ field: '', message: trimmed });
+  }
+  return errors.length > 0 ? errors : [{ field: '', message: 'Could not save the settings.' }];
 }
 
 /** Raise an actionable failure notification with native buttons (R7.2). The error page stays script-free, so the
@@ -1397,6 +1958,15 @@ async function showActionableError(context: vscode.ExtensionContext, err: unknow
  * nonce) into the C# shell ONLY, never the rendered content region. The content is lifted out before substitution
  * and spliced back verbatim after, so page content that literally contains the (publicly documented)
  * `__NONCE__`/`__CSP_SOURCE__` tokens can neither be corrupted nor forge a valid script nonce to defeat the CSP. */
+/** Substitute the two host-runtime placeholders in a core-rendered document that has NO separately-known content
+ * region to lift out — the settings form. `composeEntryHtml` below does the same substitution for the portal
+ * document, but must first lift the rendered content so page content can never forge a shell token; here the whole
+ * document is the shell (the core authored every byte of it), so there is nothing to protect it from. */
+function substituteHostTokens(webview: vscode.Webview, document: string): string {
+  const nonce = crypto.randomBytes(16).toString('base64');
+  return document.split('__CSP_SOURCE__').join(webview.cspSource).split('__NONCE__').join(nonce);
+}
+
 function composeEntryHtml(webview: vscode.Webview, payload: WebviewPayload): string {
   const nonce = crypto.randomBytes(16).toString('base64');
   const content = payload.surfaces[payload.entry]?.content ?? '';
@@ -1466,6 +2036,48 @@ function usesPosixStyleQuoting(): boolean {
 function quoteCommandArg(a: string): string {
   if (!/[\s"]/.test(a)) return a;
   return usesPosixStyleQuoting() ? `"${a.replace(/"/g, '\\"')}"` : `"${a.replace(/"/g, '""')}"`;
+}
+
+/** Spawn `specscribe config …` and resolve its stdout, or reject with its stderr. [ADR 0037]
+ *
+ * <p>Separate from {@link runRenderer} rather than a parameter on it: that one carries a 60 s timeout and a
+ * stdout-size cap sized for a multi-megabyte portal payload, streams NDJSON, and rejects on a partial frame — none
+ * of which fits a command whose output is a few kilobytes and whose failures are field-attributed JSON lines the
+ * caller must see verbatim.</p>
+ *
+ * <p>REJECTS WITH STDERR, not with a generic message: `config --save` reports validation failures as one JSON
+ * object per line there, and {@link parseFieldErrors} attaches each to its control. Collapsing that into "command
+ * failed" is what would force the form to screen-scrape.</p> */
+function runConfig(context: vscode.ExtensionContext, cwd: string, args: string[]): Promise<string> {
+  const tool = resolveTool(context);
+  return new Promise<string>((resolve, reject) => {
+    // Args array, never a shell string — a path or project name containing a space or a quote must reach the tool
+    // as one argument. `toolCommandLine` builds a DISPLAY string for the terminal handoff and must not be used here.
+    const proc = spawn(tool.command, [...tool.prefixArgs, ...args], { cwd });
+    let out = '';
+    let errText = '';
+    let aborted = false;
+
+    const abort = (reason: string) => {
+      if (aborted) return;
+      aborted = true;
+      killWithEscalation(proc);
+      reject(new Error(reason));
+    };
+    // Generous for a command that only reads settings and renders one form; short enough that a wedged process
+    // does not leave the user staring at a panel that never opens.
+    const timer = setTimeout(() => abort('SpecScribe config timed out after 30s.'), 30_000);
+
+    proc.stdout?.on('data', (chunk: Buffer) => { out += chunk.toString('utf8'); });
+    proc.stderr?.on('data', (chunk: Buffer) => { errText += chunk.toString('utf8'); });
+    proc.on('error', (e) => { clearTimeout(timer); if (!aborted) reject(e); });
+    proc.on('close', (code) => {
+      clearTimeout(timer);
+      if (aborted) return;
+      if (code === 0) resolve(out);
+      else reject(new Error(errText.trim() || `SpecScribe config exited ${code}.`));
+    });
+  });
 }
 
 /** Kills a renderer process, escalating to SIGKILL after a grace period if it hasn't exited — a bare SIGTERM
@@ -1757,6 +2369,10 @@ function publishDiagnostics(folder: vscode.WorkspaceFolder, records: RawDiagnost
   for (const [fsPath, diags] of byPath) {
     diagnosticCollection.set(vscode.Uri.file(fsPath), diags);
   }
+  const fileAnchored = records.filter((r) => r.fileAnchored).length;
+  const errors = records.filter((r) => r.severity === 'error').length;
+  const warnings = records.filter((r) => r.severity === 'warning').length;
+  logHost(`diagnostics published: records=${records.length}, fileAnchored=${fileAnchored}, errors=${errors}, warnings=${warnings}`);
 }
 
 function errorHtml(message: string): string {
@@ -1778,4 +2394,5 @@ export function deactivate() {
   dataChanged.dispose();
   // The collection is also disposed via context.subscriptions; null it so a re-activate rebinds a fresh one.
   diagnosticCollection = undefined;
+  outputChannel = undefined;
 }

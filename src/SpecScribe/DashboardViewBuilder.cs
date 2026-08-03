@@ -128,7 +128,71 @@ public static class DashboardViewBuilder
             ModuleCoverageHtml = testArtifacts is { IsEmpty: false } moduleCoverage
                 ? TestArtifactsTemplater.RenderModuleCoveragePanelBody(moduleCoverage)
                 : string.Empty,
+            // The insight surfaces as cards on Home, because Home is the ONE page with no quick-link band. See
+            // DashboardView.ExploreHtml for why that mattered enough to add a panel. [field feedback 2026-08-01]
+            ExploreHtml = BuildExploreHtml(nav),
+            // Only when there is no epics model AT ALL — an epics.md with zero epics is a different state, already
+            // answered by the explorer's "Nothing to chart yet." empty panel, and telling that project to create
+            // epics would be wrong. [field feedback 2026-08-01]
+            NoEpicsGuidanceHtml = epicsModel is null ? BuildNoEpicsGuidanceHtml(commands) : string.Empty,
         };
+    }
+
+    /// <summary>The <c>create-epics-and-stories</c> command slug, named once. The two surfaces that ask a user to
+    /// run it (this builder's no-epics call to action and <c>HtmlRenderAdapter.AppendEmptyEpicsGuidance</c>) keep
+    /// their own SENTENCES deliberately — one explains an empty list, the other an empty project — but a drifting
+    /// slug would send one of them to a command that does not exist.</summary>
+    internal const string CreateEpicsCommandSlug = "create-epics-and-stories";
+
+    /// <summary>The "Explore this codebase" card grid: every <c>Insights</c> quick link as a titled card carrying
+    /// its own description, so the surfaces are discoverable from Home instead of only from the nav dropdown.
+    /// <para>Projected from <see cref="SiteNav.QuickLinks"/> rather than from a hand-written list, so a surface that
+    /// the run did not produce can never appear here — <c>SiteNav.Build</c> is already the single place that decides
+    /// which insight pages exist, and duplicating that decision is how a dashboard grows a link to a 404.</para>
+    /// <para>Empty (⇒ panel omitted, NFR8) when no insight surface was generated at all. Paths are emitted
+    /// verbatim; the dashboard is always at the output root, so no relative prefix applies.</para></summary>
+    private static string BuildExploreHtml(SiteNav nav)
+    {
+        var insights = nav.QuickLinks
+            .Where(q => string.Equals(q.Group, "Insights", StringComparison.Ordinal))
+            .ToList();
+        if (insights.Count == 0) return string.Empty;
+
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"explore-cards\">\n");
+        foreach (var link in insights)
+        {
+            sb.Append($"  <a class=\"explore-card\" href=\"{PathUtil.Html(link.OutputRelativePath)}\">\n");
+            sb.Append($"    <span class=\"explore-card-title\">{Icons.ForConcept(link.Label)}{PathUtil.Html(link.Label)}</span>\n");
+            sb.Append($"    <span class=\"explore-card-desc\">{PathUtil.Html(link.Description)}</span>\n");
+            sb.Append("  </a>\n");
+        }
+        sb.Append("</div>\n");
+        return sb.ToString();
+    }
+
+    /// <summary>The no-epics call to action: what this project is missing, and the command that produces it.
+    /// <para>Falls back to a command-free sentence when the detected module does not expose the command
+    /// (<see cref="BmadCommands.InlineGuidance"/>'s contract) — a portal must never instruct a user to run something
+    /// that is not installed.</para></summary>
+    private static string BuildNoEpicsGuidanceHtml(CommandCatalog commands)
+    {
+        var note = BmadCommands.InlineGuidance(
+            commands.Command(CreateEpicsCommandSlug),
+            "This project has no epics or stories yet. Break the plan into them with",
+            "This project has no epics or stories yet — add them to your plan to track delivery here.");
+        // ⚠️ A <div>, NOT a <p>, and this is a correctness requirement rather than a preference.
+        //
+        // `InlineGuidance` renders a command badge that contains a `<details class="send-menu">` (the "other ways
+        // to send this" disclosure). The HTML parser CLOSES AN OPEN <p> when it meets a `<details>` start tag, so
+        // `<p>…<details>…</details></p>` re-parses as `<p>…</p><details>…</details>` — the disclosure escapes the
+        // paragraph and renders as a stray ▾ marker on its own line under the sentence. That is what it did:
+        // correct in the emitted string, wrong in the DOM, and invisible to any test asserting on the markup.
+        // Caught by looking at the rendered page.
+        //
+        // `ListRow.EmptyState` already wraps guidance in a `<div class="pending-note">` for the same reason, which
+        // is why the epics-page empty state never had this bug. Same idiom here.
+        return $"<div class=\"no-epics-lead\">{note}</div>\n";
     }
 
     /// <summary>The dashboard instance's Hierarchy Explorer configuration + payload, or "" when there are no epics.

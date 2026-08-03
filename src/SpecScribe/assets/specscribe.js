@@ -896,83 +896,18 @@
     try { initRiskGridPager(grid); } catch (err) { /* degrade silently — the full server-ordered grid stands */ }
   });
 
-  // ---- Code Map file table: client-side pagination [Story 7.12 review; Story 20.10 Task 4.5] --
-  // Progressive enhancement ONLY, mirroring initRiskGridPager above (same shape, its own class family so the
-  // two pagers can never cross-wire). The server ships every DISTINCT file as a plain <tr> inside
-  // ".codemap-table", already in significance order — the complete, correct, no-JS truth.
+  // ---- Code Map file table: client-side pagination -> RETIRED -----------------------------
+  // `initCodemapTablePager` (Story 7.12 review; Story 20.10 Task 4.5) was deleted here together with the
+  // `.codemap-table-pager` markup and stylesheet family. Owner feedback 2026-08-01 turned "All files" into a
+  // DIRECTORY TREE of native <details> disclosures, which answers the complaint the pager was added for
+  // ('hundreds/thousands of rows with no way to page through it') structurally rather than arbitrarily — and
+  // does it with JavaScript off, which the pager could not.
   //
-  // Story 20.10 D3 shares ONE table across all four filter combinations, with the pure-CSS
-  // `#cm-exclude-*:checked ~ … .is-spec/.is-test` rule (specscribe.css) hiding whichever rows the active exclude
-  // checkboxes remove — a DIFFERENT hiding mechanism than this pager's own `hidden` attribute. Paging must count
-  // only what the reader can actually SEE: over the raw row count, a filtered-down view would report "page 1 of
-  // 12" while most of those pages are invisible rows nobody can reach with Next.
-  function initCodemapTablePager(table) {
-    var pager = table.nextElementSibling;
-    if (!pager || !pager.classList.contains("codemap-table-pager")) return;
-    var allRows = Array.prototype.slice.call(table.querySelectorAll(".codemap-table-row"));
-    var pageSize = parseInt(table.getAttribute("data-page-size"), 10) || 30;
-
-    var prevBtn = pager.querySelector(".codemap-table-pager-prev");
-    var nextBtn = pager.querySelector(".codemap-table-pager-next");
-    var status = pager.querySelector(".codemap-table-pager-status");
-    var page = 0;
-
-    // Mirrors the CSS rule exactly (same two checkbox ids, same is-spec/is-test predicate) rather than reading
-    // computed style back — cheap, and correct even before the stylesheet has painted a first frame.
-    var excludeSpec = document.getElementById("cm-exclude-spec");
-    var excludeTests = document.getElementById("cm-exclude-tests");
-    function isRowFiltered(row) {
-      return (!!excludeSpec && excludeSpec.checked && row.classList.contains("is-spec"))
-        || (!!excludeTests && excludeTests.checked && row.classList.contains("is-test"));
-    }
-    function visibleRows() {
-      return allRows.filter(function (row) { return !isRowFiltered(row); });
-    }
-
-    function render() {
-      var rows = visibleRows();
-      var totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
-      if (page >= totalPages) page = totalPages - 1;
-      if (page < 0) page = 0;
-
-      rows.forEach(function (row, i) { row.hidden = Math.floor(i / pageSize) !== page; });
-      // A filtered-out row's OWN hidden state is irrelevant — the CSS is-spec/is-test rule hides it regardless —
-      // but clearing it here means toggling the filter back off never leaves a stale hidden="" behind from a
-      // page boundary that no longer applies.
-      allRows.forEach(function (row) { if (isRowFiltered(row)) row.hidden = false; });
-
-      var showPager = rows.length > pageSize;
-      pager.hidden = !showPager;
-      if (!showPager) return;
-      status.textContent = "Page " + (page + 1) + " of " + totalPages;
-      prevBtn.disabled = page === 0;
-      nextBtn.disabled = page === totalPages - 1;
-    }
-
-    prevBtn.addEventListener("click", function () {
-      if (page === 0) return;
-      page--;
-      render();
-      table.scrollIntoView({ block: "nearest" });
-    });
-    nextBtn.addEventListener("click", function () {
-      page++;
-      render();
-      table.scrollIntoView({ block: "nearest" });
-    });
-    // The visible row set changes size when the reader flips an exclude checkbox — reset to page 1 and re-page
-    // rather than stranding them on a page index that may no longer exist.
-    [excludeSpec, excludeTests].forEach(function (box) {
-      if (!box) return;
-      box.addEventListener("change", function () { page = 0; render(); });
-    });
-
-    render();
-  }
-
-  Array.prototype.forEach.call(document.querySelectorAll(".codemap-table"), function (table) {
-    try { initCodemapTablePager(table); } catch (err) { /* degrade silently — the full server-ordered table stands */ }
-  });
+  // The two could not honestly coexist: a pager over a partially-expanded tree reports a page count that changes
+  // on every disclosure click, and this function already had to reconcile TWO hiding mechanisms (its own `hidden`
+  // attribute and the pure-CSS `#cm-exclude-*:checked` filter) — <details> would have been a third.
+  //
+  // `initRiskGridPager` above is UNAFFECTED: separate class family, separate surface, still a flat grid.
 
   // ---- Source-code treemap + code-ownership sunburst -> RETIRED by Story 20.9 --------------
   // `initCodeMapPanel` (Story 7.6/7.12) and `initOwnershipSunburst` (Story 7.11, ADR 0010) were deleted here,
@@ -989,8 +924,10 @@
   // and sometimes-false "has not worked on this file", and an explicit "(date unknown)" rather than a coercion
   // into the oldest bucket. All of it now lives in the dimension declarations the emitter writes.
   //
-  // `initCodemapTablePager` above is KEPT: it paginates the Code Map's per-variant file table, which Story 20.6
-  // D1 audited and kept as that surface's text twin. A pager is presentation, not truncation. [Story 20.9 Task 4.3]
+  // Story 20.9 recorded here that `initCodemapTablePager` was KEPT, paginating the Code Map's file table — the
+  // twin Story 20.6 D1 audited. That table is now a directory tree of native <details> and the pager is retired
+  // (see the block above). The twin decision is UNCHANGED: the listing is still this surface's text equivalent and
+  // still `HierarchyTwinDisplay.External`; only its shape moved. [Story 20.9 Task 4.3; owner feedback 2026-08-01]
 
   // ---- Planning <-> Code Impact Map ---------------------------------------------------------
   // Story 21.3's hand-rolled squarified treemap and arc renderer (`initImpactMap` / `renderTreemap` /

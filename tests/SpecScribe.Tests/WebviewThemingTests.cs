@@ -105,15 +105,118 @@ public class WebviewThemingTests
         foreach (var token in new[] { "--status-active", "--status-review", "--status-done", "--status-ready", "--status-pending", "--teal", "--gold", "--rust" })
             Assert.Contains(token + ":", bridge);
         // The explicitly-rejected direction must NOT appear: no stage bridged onto a host severity color.
-        Assert.DoesNotContain("--vscode-errorForeground", bridge);
-        Assert.DoesNotContain("--vscode-editorError", bridge);
-        Assert.DoesNotContain("--vscode-editorWarning", bridge);
+        //
+        // ⚠️ This was three whole-file `DoesNotContain` substring checks, and it was MIS-SCOPED — it forbade the
+        // severity variables ANYWHERE in the sheet. Story 6.5 rejected one specific thing: mapping SpecScribe's
+        // SIX LIFECYCLE STAGES onto VS Code's ~3 severities, because that collapses a six-way distinction the
+        // whole insight system depends on ("Bridge accents onto the host palette (map stages to --vscode-*
+        // error/warning/success) … Explicitly rejected", 6-5 story record). The SAME decision says chrome DOES
+        // adopt host vars, "because chrome has no SpecScribe semantic to protect".
+        //
+        // The substring check could not tell those apart, so it failed on two pieces of correct chrome: the host
+        // status banner (`.ss-webview-status[data-level="error"]` — an actual host error, reported in the host's
+        // error color) and the settings form's validation messages. Both are host severities being rendered as
+        // host severities, which is the RIGHT half of AD-7.
+        //
+        // Replaced with a guard on the actual rule, which is strictly stronger where it matters: no protected
+        // token may be ASSIGNED a severity variable, and severity variables may appear only on an allowlist of
+        // host-chrome selectors — so a drive-by cannot put one on `.status-badge` either. [2026-08-02]
+        AssertNoSemanticTokenBridgesOntoHostSeverity(bridge);
         // Story 9.5: resting AC tint companion (site parchment doesn't read on dark) beside the :target override.
         // border-color must not wipe the gold left accent — reassert border-left-color after it.
         Assert.Contains(".vscode-dark .ac-criterion,", bridge);
         Assert.Contains(".vscode-dark .ac-criterion:target,", bridge);
         Assert.Contains("border-left-color: var(--gold)", bridge);
         Assert.Contains("border-left-color: var(--gold-light)", bridge);
+    }
+
+    // ----- Guard-of-the-guard -----------------------------------------------------------------------------------
+    //
+    // Narrowing a gate is how a gate quietly stops gating. The check above replaced three whole-file substring
+    // assertions, so these two pin that it still REJECTS both shapes of the thing Story 6.5 rejected — run against
+    // synthetic CSS so they never depend on what the shipped sheet happens to contain today.
+
+    [Fact]
+    public void SeverityGuard_RejectsAStageTokenDeclaredInTermsOfAHostSeverity()
+    {
+        // The literal rejected direction: "map stages to --vscode-* error/warning/success".
+        var offending = ".vscode-dark {\n  --status-review: var(--vscode-editorWarning-foreground);\n}\n";
+
+        var ex = Assert.Throws<Xunit.Sdk.FalseException>(() => AssertNoSemanticTokenBridgesOntoHostSeverity(offending));
+        Assert.Contains("--status-review", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SeverityGuard_RejectsAHostSeverityUsedOnASpecScribeStageSelector()
+    {
+        // The sneakier shape the old substring check also covered and a naive replacement would miss: styling a
+        // stage with a severity colour WITHOUT ever naming its token.
+        var offending = ".vscode-dark .status-badge.done {\n  color: var(--vscode-errorForeground);\n}\n";
+
+        var ex = Assert.Throws<Xunit.Sdk.TrueException>(() => AssertNoSemanticTokenBridgesOntoHostSeverity(offending));
+        Assert.Contains("status-badge", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SeverityGuard_AllowsHostChromeToUseHostSeverityColours()
+    {
+        // The other half of AD-7, and the false positive that made the old check unusable: a banner reporting an
+        // actual host error renders in the host's error colour. That is correct, not a violation.
+        AssertNoSemanticTokenBridgesOntoHostSeverity(
+            ".ss-webview-status[data-level=\"error\"] {\n  background: var(--vscode-errorForeground);\n}\n");
+    }
+
+    /// <summary>SpecScribe's protected colour vocabulary: the six lifecycle stages plus the insight accents. These
+    /// carry MEANING — the six-way stage distinction the sunburst/donut/funnel exist to show — so they may be
+    /// contrast-tuned per theme but never re-pointed at a host severity variable. [Story 6.5]</summary>
+    private static readonly string[] SemanticTokens =
+    [
+        "--status-active", "--status-review", "--status-done", "--status-ready", "--status-drafted", "--status-pending",
+        "--teal", "--teal-deep", "--gold", "--gold-light", "--moss", "--moss-light", "--rust", "--rust-light",
+    ];
+
+    /// <summary>Selectors permitted to reference a host severity variable, because what they style IS a host
+    /// severity rather than a SpecScribe stage: the extension's status banner (missing source root, renderer
+    /// failure, diagnostics present) and the settings form's validation messages. Chrome adopting host vars is the
+    /// sanctioned half of AD-7; this list is what keeps "chrome" from quietly widening to mean "anything".</summary>
+    private static readonly string[] HostSeverityChromeSelectors =
+    [
+        ".ss-webview-status", ".ss-form-status", ".ss-form-error",
+    ];
+
+    /// <summary>The Story 6.5 rule, enforced precisely rather than by substring.</summary>
+    private static void AssertNoSemanticTokenBridgesOntoHostSeverity(string bridge)
+    {
+        const string severityPattern = @"--vscode-(?:[\w-]*[Ee]rror[\w-]*|[\w-]*[Ww]arning[\w-]*|[\w-]*[Ss]uccess[\w-]*)";
+
+        // 1. The rejected direction itself: a protected token DECLARED in terms of a host severity. This is what
+        //    "map stages to --vscode-* error/warning/success" would literally look like in CSS.
+        foreach (var declaration in System.Text.RegularExpressions.Regex.Matches(
+                     bridge, @"(--[\w-]+)\s*:\s*([^;}]*)").Cast<System.Text.RegularExpressions.Match>())
+        {
+            var token = declaration.Groups[1].Value;
+            if (!SemanticTokens.Contains(token, StringComparer.Ordinal)) continue;
+            Assert.False(
+                System.Text.RegularExpressions.Regex.IsMatch(declaration.Groups[2].Value, severityPattern),
+                $"`{token}` is bridged onto a host severity — the direction Story 6.5 explicitly rejected, because "
+                + $"it collapses six lifecycle stages into VS Code's ~3 severities. Declaration: {declaration.Value.Trim()}");
+        }
+
+        // 2. Containment: a severity variable may appear only inside an allowlisted host-chrome rule. Without this
+        //    the check above would miss `.status-badge.done { color: var(--vscode-errorForeground) }` — styling a
+        //    stage without ever naming its token.
+        foreach (var use in System.Text.RegularExpressions.Regex.Matches(bridge, severityPattern)
+                     .Cast<System.Text.RegularExpressions.Match>())
+        {
+            var braceStart = bridge.LastIndexOf('{', use.Index);
+            Assert.True(braceStart > 0, "a severity variable outside any rule block");
+            var preludeStart = Math.Max(bridge.LastIndexOf('}', braceStart), bridge.LastIndexOf("*/", braceStart, StringComparison.Ordinal));
+            var selector = bridge[(preludeStart + 1)..braceStart].Trim();
+            Assert.True(
+                HostSeverityChromeSelectors.Any(allowed => selector.Contains(allowed, StringComparison.Ordinal)),
+                $"`{use.Value}` is used by `{selector}`, which is not host chrome. Host severity colours belong "
+                + "only on surfaces that report a HOST condition; a SpecScribe stage must keep its own hue.");
+        }
     }
 
     // Deferred-work (Story 6.5 review): the ".vscode-light has no dedicated contrast-tuning block" gap is verified

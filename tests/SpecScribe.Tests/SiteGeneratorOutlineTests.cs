@@ -511,4 +511,87 @@ public class SiteGeneratorOutlineTests : IDisposable
         Assert.True(cmds[0].TryGetProperty("description", out _), "entry carries camelCase `description`");
         Assert.Equal(story.GetProperty("helperCommand").GetString(), first.GetString());
     }
+
+    // ===== Shortcuts pane entries, projected from the run's own nav (field feedback 2026-08-01) ==================
+    //
+    // The pane was two hard-coded TypeScript entries, identical in every workspace: a project with no epics was
+    // offered "Open Epics" (an empty page) and nothing else. These pin that the entries now describe THIS run.
+
+    [Fact]
+    public void Outline_Shortcuts_MirrorTheRunsOwnQuickLinks_OneForOne()
+    {
+        // The invariant that makes the pane trustworthy: it can never offer a link to a page the run did not write,
+        // because it is the SAME list SiteNav.Build produced to decide which pages exist. Asserting against the nav
+        // rather than a literal expected set is deliberate — a hard-coded set here would be a second list to keep
+        // in step, which is the defect being fixed.
+        var gen = new SiteGenerator(Options());
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+        var shortcuts = gen.RenderWebviewSurfaces().Outline.Shortcuts;
+
+        Assert.NotEmpty(shortcuts);
+        // Every entry carries a real, non-empty description and group — the tooltip is the whole point of moving
+        // this list core-side, and a blank one would read as a broken row.
+        Assert.All(shortcuts, s =>
+        {
+            Assert.False(string.IsNullOrWhiteSpace(s.Label));
+            Assert.False(string.IsNullOrWhiteSpace(s.Description));
+            Assert.False(string.IsNullOrWhiteSpace(s.Group));
+            Assert.Equal(s.Label, s.IconKey);
+            Assert.DoesNotContain('\\', s.SurfacePath);
+        });
+        // The epics index is present in this fixture (it has epics) — proving the projection is real content, not
+        // an empty list that happens to satisfy the assertions above.
+        Assert.Contains(shortcuts, s => s.SurfacePath == SiteNav.EpicsOutputPath);
+    }
+
+    [Fact]
+    public void Outline_Shortcuts_AreGroupedInKeyViewOrder_SoInsightsOutrankHelp()
+    {
+        // The defect this pins, found in the field on 2026-08-02: the projection passed QuickLinks' own order
+        // through, on a doc comment's claim that it was "already journey-ordered". It is not. On a real project the
+        // pane came out Help first — How to use SpecScribe, Design System, About Spec-Driven Development, About,
+        // Logs — then Project, with Code Map and Risk Quadrant DEAD LAST. The two entries the pane exists to
+        // surface were buried under five entries about the tool itself.
+        //
+        // Ordering by HtmlRenderAdapter.KeyViewGroupOrder also makes the pane and the portal's own key-views band
+        // agree, which is the stronger property: one order, two surfaces.
+        var gen = new SiteGenerator(Options());
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+        var shortcuts = gen.RenderWebviewSurfaces().Outline.Shortcuts;
+
+        int Rank(string group)
+        {
+            var i = Array.IndexOf(HtmlRenderAdapter.KeyViewGroupOrder, group);
+            return i >= 0 ? i : Array.IndexOf(HtmlRenderAdapter.KeyViewGroupOrder, "Project");
+        }
+
+        var ranks = shortcuts.Select(s => Rank(s.Group)).ToList();
+        Assert.Equal(ranks.Order().ToList(), ranks);
+
+        // And the concrete consequence, stated as itself rather than left implicit in the sort: if this fixture has
+        // both, Insights comes before Help.
+        var firstInsight = shortcuts.ToList().FindIndex(s => s.Group == "Insights");
+        var firstHelp = shortcuts.ToList().FindIndex(s => s.Group == "Help");
+        if (firstInsight >= 0 && firstHelp >= 0) Assert.True(firstInsight < firstHelp);
+    }
+
+    [Fact]
+    public void SerializePayload_EmitsShortcuts_CamelCase()
+    {
+        // The wire shape the TS `OutlineShortcut` interface reads. A rename on either side silently empties the
+        // pane — `shortcuts?: OutlineShortcut[]` is optional so an older core still parses, which means a
+        // mismatched field name degrades to "no entries" rather than to a parse error anyone would notice.
+        var gen = new SiteGenerator(Options());
+        Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+        var json = WebviewCommand.SerializePayload(gen.RenderWebviewSurfaces(), "SpecScribeOutput");
+        using var doc = JsonDocument.Parse(json);
+
+        var shortcuts = doc.RootElement.GetProperty("outline").GetProperty("shortcuts");
+        Assert.Equal(JsonValueKind.Array, shortcuts.ValueKind);
+        Assert.True(shortcuts.GetArrayLength() >= 1);
+        foreach (var field in new[] { "label", "description", "surfacePath", "group", "iconKey" })
+        {
+            Assert.True(shortcuts[0].TryGetProperty(field, out _), $"entry carries camelCase `{field}`");
+        }
+    }
 }

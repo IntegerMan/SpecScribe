@@ -539,12 +539,12 @@ public class CodeMapTemplaterTests
         var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(new[] { variant }, Nav()));
 
         Assert.Contains($"The {cap:N0} most significant files in the treemap", html);
-        Assert.Contains("+7 more files not shown in this table", html);
+        Assert.Contains("+7 more files not shown in this listing", html);
         Assert.Contains("still has its own colored, focusable rectangle in the treemap above", html);
         // The smallest file (never in the top-`cap` by size, the significance order when metrics are absent)
-        // has no table row at all — the cap actually removed rows, not just appended a note.
+        // has no row at all — the cap actually removed rows, not just appended a note.
         Assert.DoesNotContain("src/file-00001.cs<", html);
-        // The cap is applied ONCE — exactly one truncation row on the whole page.
+        // The cap is applied ONCE — exactly one truncation notice on the whole page.
         Assert.Single(Regex.Matches(html, "codemap-table-truncated"));
     }
 
@@ -576,19 +576,21 @@ public class CodeMapTemplaterTests
 
         var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(variants, Nav()));
 
-        // `full` genuinely lost its 40 smallest, and says so with ITS own number.
-        Assert.Contains($"data-codemap-view=\"full\"><td colspan=\"3\">+40 more files not shown", html);
+        // `full` genuinely lost its 40 smallest, and says so with ITS own number. The notice is a <p> since the
+        // listing became a tree: with one table per directory there is no single table for it to be a row of, and a
+        // statement about the whole listing does not belong inside one directory's table.
+        Assert.Contains("data-codemap-view=\"full\">+40 more files not shown", html);
         Assert.Contains($"The {cap:N0} most significant files in the treemap", html);
 
-        // `no-tests` lost NOTHING — every file it contains has a row — so it gets no truncation row and its lead is
-        // allowed to say "Every file". Under the old `FileCount - cap` arithmetic this view ALSO reported 0 omissions
-        // while sharing `full`'s single un-markered "+40 more files" row, which is the defect.
+        // `no-tests` lost NOTHING — every file it contains has a row — so it gets no truncation notice and its lead
+        // is allowed to say "Every file". Under the old `FileCount - cap` arithmetic this view ALSO reported 0
+        // omissions while sharing `full`'s single un-markered "+40 more files" row, which is the defect.
         Assert.Contains("data-codemap-view=\"no-tests\">Every file in the treemap", html);
-        Assert.DoesNotContain("data-codemap-view=\"no-tests\"><td", html);
+        Assert.DoesNotContain("data-codemap-view=\"no-tests\">+", html);
 
-        // One truncation row PER VIEW THAT OMITS SOMETHING — not one for the whole page, and never un-markered.
+        // One truncation notice PER VIEW THAT OMITS SOMETHING — not one for the whole page, and never un-markered.
         Assert.Single(Regex.Matches(html, "codemap-table-truncated"));
-        Assert.DoesNotContain("<tr class=\"codemap-table-truncated\"><td", html); // i.e. always view-tagged
+        Assert.DoesNotContain("\"chart-lead codemap-table-truncated\">", html); // i.e. always view-tagged
     }
 
     [Fact]
@@ -614,35 +616,135 @@ public class CodeMapTemplaterTests
         var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(variants, Nav()));
 
         // The no-tests view holds 30 files and EVERY ONE was cut by the distinct-set cap.
-        Assert.Contains("data-codemap-view=\"no-tests\"><td colspan=\"3\">+30 more files not shown", html);
+        Assert.Contains("data-codemap-view=\"no-tests\">+30 more files not shown", html);
         // And its lead must NOT claim completeness. Zero of its files are shown, so "Every file" would be a lie.
         Assert.DoesNotContain("data-codemap-view=\"no-tests\">Every file in the treemap", html);
         Assert.Contains("data-codemap-view=\"no-tests\">The 0 most significant files in the treemap", html);
     }
 
-    // ---- File table pagination (owner feedback, Story 7.12 review) ------------------------
+    // ---- "All files" is a DIRECTORY TREE (owner feedback 2026-08-01) ----------------------
+    //
+    // Replaced the paginated flat table. The pager tests that lived here are gone with it: collapsed directories
+    // answer the Story 7.12 complaint ("no way to page through it") structurally, and do it with JavaScript off,
+    // which the pager could not. What the flat table was protecting — Design Direction #5's real <thead scope="col">
+    // and the pure-CSS spec/test filter — is asserted below to still hold.
 
     [Fact]
-    public void RenderPage_FileTableCarriesAPageSizeAndAHiddenPagerControlForClientSidePagination()
+    public void RenderPage_AllFiles_NestsPerDirectoryTablesInsideDisclosures_NotOneFlatTable()
     {
-        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(VariantsWithMetrics(), Nav()));
+        var files = new[]
+        {
+            ("src/app/Main.cs", 300L),
+            ("src/app/util/Helper.cs", 120L),
+            ("docs/Guide.md", 40L),
+        };
+        var map = CodeMap.Build(files, NoMetrics);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(
+            new[] { new CodeMapVariant("full", false, false, map) }, Nav()));
 
-        Assert.Contains($"<table class=\"codemap-table\" data-page-size=\"{Reflect_CodeMapTablePageSize()}\">", html);
-        Assert.Contains("class=\"codemap-table-row\"", html);
-        // Emitted hidden — progressive enhancement only reveals it once there's more than one page's worth.
-        Assert.Contains("<div class=\"codemap-table-pager\" hidden>", html);
-        Assert.Contains("codemap-table-pager-prev", html);
-        Assert.Contains("codemap-table-pager-next", html);
-        Assert.Contains("codemap-table-pager-status", html);
-        // Exactly one pager for the exactly one (now shared) table.
-        Assert.Single(Regex.Matches(html, "codemap-table-pager\""));
+        // One tree container, and a disclosure per directory that owns files.
+        Assert.Single(Regex.Matches(html, "<div class=\"codemap-tree\">"));
+        Assert.Contains("<details class=\"codemap-tree-dir", html);
+        // A real <table> with a real column header survives at EVERY level — the load-bearing half of Design
+        // Direction #5. `<details>` cannot wrap `<tr>`, but its content model is flow content, so a `<table>`
+        // nests legally as a sibling of the child disclosures.
+        Assert.True(Regex.Matches(html, "<table class=\"codemap-table\">").Count >= 2,
+            "one table per file-owning directory, not one flat table for the page");
+        Assert.Contains("<th scope=\"col\">File</th>", html);
+        // The disclosure summary carries a TEXT weight, never color alone (UX-DR17).
+        Assert.Contains("codemap-tree-meta", html);
+        Assert.Matches(@"codemap-tree-meta"">\d+ files? · \d+ lines?", html);
     }
 
-    /// <summary>The page-size constant is private; reading it via reflection keeps this test honest about the
-    /// ACTUAL emitted attribute value rather than hard-coding a duplicate literal that could silently drift.</summary>
-    private static string Reflect_CodeMapTablePageSize()
+    [Fact]
+    public void RenderPage_AllFiles_RowShapeAndFullPathAreUnchangedFromTheFlatTable()
     {
-        var field = typeof(CodeMapTemplater).GetField("CodeMapTablePageSize", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
-        return field.GetValue(null)!.ToString()!;
+        // The two preservations that make the CSS filter and the ADR 0013 §2 completeness claim survive the
+        // reshape, asserted as their own contract rather than left implicit in the tests that happen to rely on
+        // them. The filter selector is a DESCENDANT of the section, so nesting is a no-op for rows — but only
+        // while the row markup itself is untouched. And the cell keeps the FULL repo-relative path: indentation
+        // carries the hierarchy, so it must not also have to carry the identity.
+        var map = CodeMap.Build(new[] { ("src/app/Widget.cs", 10L), ("tests/WidgetTests.cs", 5L) }, NoMetrics);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(
+            new[] { new CodeMapVariant("full", false, false, map) }, Nav()));
+
+        Assert.Matches(@"<tr class=""codemap-table-row""><th scope=""row"">(?:<a[^>]*>)?src/app/Widget\.cs", html);
+        Assert.Matches(@"<tr class=""codemap-table-row is-test""><th scope=""row"">(?:<a[^>]*>)?tests/WidgetTests\.cs", html);
+    }
+
+    [Fact]
+    public void RenderPage_AllFiles_DirectoryFilterMarkersDeriveFromDescendantFiles_NotTheDirectorysOwnPath()
+    {
+        // The case a naive per-directory-path predicate gets wrong, and the reason the markers exist at all.
+        //
+        // `CodeMap.IsSpecDevPath` matches on `prefix + "/"`, so it is FALSE for the directory `.claude` itself
+        // while being true for everything inside it — a marker derived from the directory's own path would fail to
+        // hide exactly the directories the filter exists to hide. Conversely `src/fixtures` is not test-NAMED but
+        // holds only test files, so it must still vanish under "exclude tests" or the reader is left with an empty
+        // disclosure. Both are answered by computing over descendant FILE paths.
+        var map = CodeMap.Build(new[]
+        {
+            (".claude/skills/thing.md", 10L),
+            ("src/fixtures/AlphaTests.cs", 20L),
+            ("src/app/Main.cs", 30L),
+        }, NoMetrics);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(
+            new[] { new CodeMapVariant("full", false, false, map) }, Nav()));
+
+        var claude = Regex.Match(html, @"<details class=""codemap-tree-dir([^""]*)""[^>]*>\s*<summary><span class=""codemap-tree-path"">\.claude");
+        Assert.True(claude.Success, "the .claude directory renders a disclosure");
+        Assert.Contains("dir-all-spec", claude.Groups[1].Value);
+        Assert.Contains("dir-all-excluded", claude.Groups[1].Value);
+
+        var fixtures = Regex.Match(html, @"<details class=""codemap-tree-dir([^""]*)""[^>]*>\s*<summary><span class=""codemap-tree-path"">(?:src / )?fixtures");
+        Assert.True(fixtures.Success, "the all-test fixtures directory renders a disclosure");
+        Assert.Contains("dir-all-test", fixtures.Groups[1].Value);
+
+        // The ordinary directory carries NO marker — it must never be hidden by either checkbox.
+        var app = Regex.Match(html, @"<details class=""codemap-tree-dir([^""]*)""[^>]*>\s*<summary><span class=""codemap-tree-path"">(?:src / )?app");
+        Assert.True(app.Success, "the ordinary directory renders a disclosure");
+        Assert.DoesNotContain("dir-all", app.Groups[1].Value);
+    }
+
+    [Fact]
+    public void RenderPage_AllFiles_OpensTheAncestorsOfTheMostSignificantFilesAndLeavesTheRestClosed()
+    {
+        // All-collapsed would open on a page showing nothing — a regression from the flat table's 18 visible rows.
+        // First-level-only would open one directory holding hundreds of files. The rule is significance-driven:
+        // the ancestors of the busiest files are open, everything else is one click away.
+        var metrics = new Dictionary<string, CodeFileMetrics>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["hot/Busy.cs"] = new(Changes: 99, TotalChurn: 990, AvgCoChanged: null, FirstDate: null, LastDate: null),
+        };
+        var map = CodeMap.Build(new[] { ("hot/Busy.cs", 10L), ("cold/Quiet.cs", 10L) }, metrics);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(
+            new[] { new CodeMapVariant("full", false, false, map) }, Nav()));
+
+        Assert.Matches(@"<details class=""codemap-tree-dir"" open>\s*<summary><span class=""codemap-tree-path"">hot", html);
+        // Both are within the auto-expand budget on a two-file fixture, so assert the ORDER instead: the busy
+        // directory's rolled-up change count outranks the quiet one, and directories sort by that rollup — which
+        // OrderBySignificance alone could not do, since every directory's own Metrics is null.
+        Assert.True(
+            html.IndexOf("codemap-tree-path\">hot", StringComparison.Ordinal)
+                < html.IndexOf("codemap-tree-path\">cold", StringComparison.Ordinal),
+            "the directory with the higher rolled-up change count sorts first");
+    }
+
+    [Fact]
+    public void RenderPage_AllFiles_ADirectoryWhoseFilesWereAllCutByTheCapEmitsNoEmptyDisclosure()
+    {
+        // A disclosure a reader can open to find nothing inside is worse than an absent one, and the truncation
+        // notice already accounts for those files.
+        var cap = Charts.MaxDetailedCodeMapFiles;
+        var all = new List<(string, long)>();
+        for (var i = 0; i < cap; i++) all.Add(($"big/file-{i:00000}.cs", 5_000L + i));
+        for (var i = 0; i < 5; i++) all.Add(($"tiny/file-{i:00000}.cs", 1L + i)); // all below the cap → all cut
+
+        var map = CodeMap.Build(all.ToArray(), NoMetrics);
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(
+            new[] { new CodeMapVariant("full", false, false, map) }, Nav()));
+
+        Assert.DoesNotContain("codemap-tree-path\">tiny", html);
+        Assert.Contains("+5 more files not shown in this listing", html);
     }
 }

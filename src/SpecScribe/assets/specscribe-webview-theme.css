@@ -399,6 +399,62 @@
   background: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-hoverBackground, var(--vscode-button-background, #1177bb)));
 }
 
+.ss-webview-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 1.5rem;
+  border-bottom: 1px solid var(--vscode-panel-border, var(--vscode-widget-border, transparent));
+  font: 0.8rem/1.4 var(--vscode-font-family, -apple-system, "Segoe UI", sans-serif);
+}
+
+.ss-webview-status[data-level="progress"] {
+  background: color-mix(in srgb, var(--vscode-editorWidget-background, transparent) 75%, var(--vscode-focusBorder) 25%);
+}
+
+.ss-webview-status[data-level="info"] {
+  background: color-mix(in srgb, var(--vscode-editorWidget-background, transparent) 80%, var(--vscode-descriptionForeground) 20%);
+}
+
+.ss-webview-status[data-level="warning"] {
+  background: color-mix(in srgb, var(--vscode-editorWidget-background, transparent) 72%, var(--vscode-editorWarning-foreground, #d4a017) 28%);
+}
+
+.ss-webview-status[data-level="error"] {
+  background: color-mix(in srgb, var(--vscode-editorWidget-background, transparent) 70%, var(--vscode-errorForeground, #c33) 30%);
+}
+
+.ss-webview-status-text {
+  color: var(--vscode-foreground);
+  flex: 1 1 20rem;
+}
+
+.ss-webview-status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.ss-host-action {
+  font: 0.78rem var(--vscode-font-family, -apple-system, "Segoe UI", sans-serif);
+  cursor: pointer;
+  padding: 0.24rem 0.62rem;
+  border-radius: 4px;
+  color: var(--vscode-button-secondaryForeground, var(--vscode-button-foreground, #fff));
+  background: var(--vscode-button-secondaryBackground, var(--vscode-button-background, #0e639c));
+  border: 1px solid var(--vscode-button-border, transparent);
+}
+
+.ss-host-action:hover {
+  background: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-hoverBackground, var(--vscode-button-background, #1177bb)));
+}
+
+.ss-host-action:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: 2px;
+}
+
 /* ── Chart mount failure reveals the text twin (ADR 0036 §1, the fallback half) ─────────────────────────────
    This sheet is inlined ONLY by WebviewRenderAdapter, so an unscoped rule here is webview-only by construction
    — it is never served to a browser and cannot move the static site's bytes.
@@ -438,4 +494,103 @@
   clip-path: none;
   white-space: normal;
   margin-top: 0.8rem;
+}
+
+/* ============ SETTINGS FORM (ADR 0037) ============
+   The extension's second webview document. Styled HERE rather than in specscribe.css because it exists only in
+   the webview — the generated site has no such surface — and because this sheet already owns the host-chrome
+   vocabulary (--vscode-* variables) the form has to sit inside. Keeping it out of specscribe.css also keeps it
+   out of the ir-content extraction, which prunes by what the IR renders and would drop every one of these. */
+.ss-form-main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1.2rem 1.5rem 2.5rem;
+}
+.ss-form-title { margin: 0 0 0.4rem; font-size: 1.35rem; }
+.ss-form-lead { margin: 0 0 1.4rem; font-size: 0.85rem; opacity: 0.85; line-height: 1.6; }
+.ss-form-lead code { word-break: break-all; }
+
+.ss-form-status {
+  margin: 0 0 1.2rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 4px;
+  border-left: 3px solid var(--vscode-focusBorder, #007acc);
+  background: var(--vscode-editorWidget-background, rgba(127, 127, 127, 0.12));
+  font-size: 0.85rem;
+}
+/* Never state-by-color-alone (UX-DR17): the status TEXT already says what happened; the accent only reinforces. */
+.ss-form-status[data-level="error"] { border-left-color: var(--vscode-errorForeground, #c33); }
+.ss-form-status[hidden] { display: none; }
+
+.ss-form-row {
+  margin: 0 0 1.4rem;
+  padding: 0 0 1.2rem;
+  border-bottom: 1px solid var(--vscode-editorWidget-border, rgba(127, 127, 127, 0.25));
+}
+.ss-form-row:last-of-type { border-bottom: none; }
+.ss-form-label { display: block; font-weight: 600; font-size: 0.92rem; margin-bottom: 0.2rem; }
+.ss-form-hint { margin: 0 0 0.5rem; font-size: 0.78rem; opacity: 0.8; line-height: 1.5; }
+
+.ss-form-control { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.ss-form-input, .ss-form-select, .ss-form-date {
+  flex: 1 1 18rem;
+  min-width: 0;
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.35rem 0.5rem;
+  color: var(--vscode-input-foreground, inherit);
+  background: var(--vscode-input-background, rgba(127, 127, 127, 0.1));
+  border: 1px solid var(--vscode-input-border, rgba(127, 127, 127, 0.35));
+  border-radius: 3px;
+}
+.ss-form-date[hidden] { display: none; }
+.ss-form-input:focus-visible, .ss-form-select:focus-visible, .ss-form-date:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder, #007acc);
+  outline-offset: -1px;
+}
+
+.ss-form-browse, .ss-form-save, .ss-form-cancel, .ss-form-reveal {
+  flex: none;
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.35rem 0.9rem;
+  cursor: pointer;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  color: var(--vscode-button-secondaryForeground, inherit);
+  background: var(--vscode-button-secondaryBackground, rgba(127, 127, 127, 0.2));
+}
+.ss-form-save {
+  color: var(--vscode-button-foreground, #fff);
+  background: var(--vscode-button-background, #0e639c);
+}
+.ss-form-browse:hover, .ss-form-cancel:hover, .ss-form-reveal:hover {
+  background: var(--vscode-button-secondaryHoverBackground, rgba(127, 127, 127, 0.32));
+}
+.ss-form-save:hover { background: var(--vscode-button-hoverBackground, #1177bb); }
+.ss-form-browse:focus-visible, .ss-form-save:focus-visible,
+.ss-form-cancel:focus-visible, .ss-form-reveal:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder, #007acc);
+  outline-offset: 2px;
+}
+
+/* "In effect: <value> (where it came from)" — the answer --show-config gives, finally rendered where a user looks.
+   A WORD, not a color, for the same UX-DR17 reason as everything else on this surface. */
+.ss-form-prov { margin: 0.45rem 0 0; font-size: 0.76rem; opacity: 0.75; line-height: 1.5; }
+.ss-form-prov code { word-break: break-all; }
+.ss-form-prov-tag { font-style: italic; }
+
+.ss-form-error {
+  margin: 0.4rem 0 0;
+  font-size: 0.78rem;
+  color: var(--vscode-errorForeground, #c33);
+}
+.ss-form-error[hidden] { display: none; }
+
+.ss-form-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 1.6rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--vscode-editorWidget-border, rgba(127, 127, 127, 0.25));
 }

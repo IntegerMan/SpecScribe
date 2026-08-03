@@ -130,6 +130,31 @@ public static class SettingsResolver
     public static ResolvedConfig Resolve(SiteSettings settings, string? startDirectory = null)
         => Resolve(Load(settings, startDirectory), settings, startDirectory);
 
+    /// <summary>Load-and-resolve in one step for the <c>webview</c> path: preserves the same
+    /// CLI &gt; <c>.specscribe</c> &gt; default precedence/provenance as <see cref="Resolve(SiteSettings,string?)"/>
+    /// while using <see cref="SiteSettings.ResolveTolerant(string?)"/> for repo-root discovery (no marker never
+    /// throws). This keeps extension parity with configured paths in non-default layouts.
+    /// [Story 5.2 parity follow-up]</summary>
+    public static ResolvedConfig ResolveTolerant(SiteSettings settings, string? startDirectory = null)
+        => ResolveTolerant(Load(settings, startDirectory), settings, startDirectory);
+
+    /// <summary>Tolerant resolve over an ALREADY-LOADED configuration — the counterpart of
+    /// <see cref="Resolve(SettingsLoad,SiteSettings,string?)"/>, for a caller that loaded once and must not load
+    /// again.
+    ///
+    /// <para><b>⚠️ Loading twice silently corrupts provenance, which is why this overload has to exist.</b>
+    /// <see cref="Load"/> calls <see cref="SettingsStore.ApplyTo"/>, which fills nulls on <paramref name="settings"/>
+    /// IN PLACE. A second <see cref="Load"/> then runs <see cref="CliOverrides.Capture"/> over those merged values
+    /// and cannot tell them from ones the command line supplied — so every restored field reports
+    /// <see cref="ConfigSource.CommandLine"/>. The <c>config</c> command hit exactly that: its <c>--json</c> and
+    /// <c>--form</c> output attributed saved settings to a command line that never mentioned them, which is the
+    /// one question provenance exists to answer.</para></summary>
+    public static ResolvedConfig ResolveTolerant(SettingsLoad load, SiteSettings settings, string? startDirectory = null)
+    {
+        var options = settings.ResolveTolerant(startDirectory);
+        return new ResolvedConfig(options, BuildProvenance(options, load), load.Path, load.Saved);
+    }
+
     /// <summary>Attributes each configurable field to the highest-precedence source that actually supplied it:
     /// CLI &gt; <c>.specscribe</c> &gt; auto-discovery/default, evaluated identically for every field so the order
     /// cannot quietly differ between them. [AC #3]</summary>

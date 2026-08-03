@@ -91,6 +91,41 @@ public class SettingsResolverTests : IDisposable
         Assert.Equal(Path.Combine(repo, SettingsStore.FileName), resolved.SavedSettingsPath);
     }
 
+    [Fact]
+    public void ResolveTolerant_AppliesSavedPaths_WhenWorkspaceHasNoBmadMarker()
+    {
+        // Mirrors extension usage in a non-default layout workspace: no _bmad-output marker at/above cwd,
+        // but configured paths exist in .specscribe and must be honored.
+        var workspace = Directory.CreateDirectory(Path.Combine(_root, $"case-{++_next}", "workspace")).FullName;
+        var configuredSource = Directory.CreateDirectory(Path.Combine(workspace, "spec", "artifacts")).FullName;
+        var configuredAdrs = Directory.CreateDirectory(Path.Combine(workspace, "decisions")).FullName;
+        var configuredOutput = Path.Combine(workspace, "site-out");
+        WriteSettings(workspace,
+            $$"""{ "Source": {{Json(configuredSource)}}, "Adrs": {{Json(configuredAdrs)}}, "Output": {{Json(configuredOutput)}} }""");
+
+        var resolved = SettingsResolver.ResolveTolerant(new SiteSettings(), workspace);
+
+        Assert.Equal(configuredSource, resolved.Options.SourceRoot);
+        Assert.Equal(configuredAdrs, resolved.Options.AdrSourceRoot);
+        Assert.Equal(configuredOutput, resolved.Options.OutputRoot);
+        Assert.Equal(ConfigSource.SavedSettings, OriginOf(resolved, SettingsResolver.Fields.Source));
+        Assert.Equal(ConfigSource.SavedSettings, OriginOf(resolved, SettingsResolver.Fields.Adrs));
+        Assert.Equal(ConfigSource.SavedSettings, OriginOf(resolved, SettingsResolver.Fields.Output));
+    }
+
+    [Fact]
+    public void ResolveTolerant_FallsBackToWorkspaceDefaults_WhenNothingConfiguredAndNoMarker()
+    {
+        var workspace = Directory.CreateDirectory(Path.Combine(_root, $"case-{++_next}", "workspace")).FullName;
+
+        var resolved = SettingsResolver.ResolveTolerant(new SiteSettings(), workspace);
+
+        Assert.Equal(Path.Combine(workspace, ForgeOptions.SourceDirName), resolved.Options.SourceRoot);
+        Assert.Equal(Path.Combine(workspace, ForgeOptions.OutputDirName), resolved.Options.OutputRoot);
+        Assert.Equal(ConfigSource.Default, OriginOf(resolved, SettingsResolver.Fields.Source));
+        Assert.Equal(ConfigSource.Default, OriginOf(resolved, SettingsResolver.Fields.Output));
+    }
+
     // --- Provenance (AC #2, #3) ---
 
     /// <summary>AC #3 in full: overriding ONE field must not relabel the others. Only the overridden field reports

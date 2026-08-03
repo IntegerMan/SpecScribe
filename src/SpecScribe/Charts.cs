@@ -2155,6 +2155,39 @@ public static partial class Charts
         .ThenByDescending(f => f.Lines)
         .ThenBy(f => f.RepoRelativePath, StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Σ of a subtree's own-file change counts — a DIRECTORY's significance, which it does not otherwise
+    /// have. <see cref="CodeMapNode.Metrics"/> is null on every directory by construction
+    /// (<see cref="CodeMap"/>'s type doc), so a directory sorted through
+    /// <see cref="OrderBySignificance"/> keys on <c>-1</c> and sinks below every file that has any git record at
+    /// all — which is why the tree needs its own comparer rather than reusing that one.
+    /// <para>Files with no git record contribute 0, not -1: a directory of never-changed files is genuinely
+    /// less significant than one with changes, but it is not less significant than nothing.</para></summary>
+    internal static long SubtreeChanges(CodeMapNode node)
+    {
+        if (!node.IsDirectory) return node.Metrics?.Changes ?? 0;
+
+        long total = 0;
+        foreach (var child in node.Children) total += SubtreeChanges(child);
+        return total;
+    }
+
+    /// <summary>Orders ONE level of the code-map tree — the directories and files that share a parent — by the same
+    /// notion of significance <see cref="OrderBySignificance"/> uses, with a directory standing for the rolled-up
+    /// weight of everything beneath it.
+    ///
+    /// <para><b>Directories and files interleave, deliberately.</b> "Directories first" is the conventional file
+    /// explorer ordering and it is wrong here: the lead sentence promises a listing ordered by change frequency,
+    /// and a busy file sitting under a quiet directory should not be pushed below it. The reader is looking for
+    /// the active parts of the codebase, not for a filesystem browser.</para>
+    ///
+    /// <para>Applied by <see cref="CodeMapTemplater"/> at render time only. <see cref="CodeMap"/>'s own
+    /// <c>BuildChildren</c> ordering (directories first, then alphabetical) is left untouched: it is the chart
+    /// payload's byte-stability contract and is pinned by tests.</para></summary>
+    internal static IEnumerable<CodeMapNode> OrderCodeMapLevel(IEnumerable<CodeMapNode> level) => level
+        .OrderByDescending(SubtreeChanges)
+        .ThenByDescending(n => n.Lines)
+        .ThenBy(n => n.RepoRelativePath, StringComparer.OrdinalIgnoreCase);
+
     /// <summary>The set of file <see cref="CodeMapNode.RepoRelativePath"/>s that get the full rich tooltip card —
     /// every file when <paramref name="totalFileCount"/> is at or under <see cref="MaxDetailedCodeMapFiles"/>
     /// (returns <c>null</c>, the "no cap" sentinel so the byte-identical default-scale path skips the

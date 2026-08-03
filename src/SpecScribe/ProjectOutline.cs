@@ -94,6 +94,36 @@ public sealed record OutlineSummary(int Active, int Review, int Done, int Total)
 /// <c>outline</c> field: the epic/story tree plus the status-bar <see cref="Summary"/>. Data, not rendering
 /// (ADR 0005 §1) — built from the already-ingested <see cref="EpicsModel"/>, so it emits no HTML and leaves the
 /// generated site byte-identical (the golden fingerprint is unaffected by construction). [Story 6.9]</summary>
+/// <summary>One entry for the VS Code Shortcuts pane: a surface this run actually produced, with the description
+/// the portal already shows for it.
+///
+/// <para><b>Why this is core-emitted rather than a TypeScript array.</b> The pane was two hard-coded entries (Open
+/// Dashboard, Open Epics) that were identical in every workspace — so a repository with no epics offered a shortcut
+/// to an empty page and none to the Code Map, which was the only surface with anything to say. Field feedback
+/// 2026-08-01 asked for entries "based on what's in the project", and the project is precisely what the shim does
+/// not know (AD-1/AD-2). <see cref="SiteNav.QuickLinks"/> is already the single place that decides which surfaces
+/// exist for a run; projecting it here means the pane cannot offer a link to a page that was never written, and no
+/// second list has to be kept in step.</para></summary>
+/// <param name="Label">The surface's name, exactly as the portal's own navigation labels it.</param>
+/// <param name="Description">The one-line description the portal shows for this link — the tree item's tooltip.</param>
+/// <param name="SurfacePath">The output-relative path: one of the <c>surfaces[...]</c> keys the webview bundle
+/// emits, so opening it is the same <c>push()</c> a nav click performs.</param>
+/// <param name="Group">The journey group (<c>Delivery</c> / <c>Insights</c> / <c>Follow-ups</c> / <c>Project</c> /
+/// <c>Help</c>) the portal files this link under, so the pane can group without inventing a taxonomy.</param>
+/// <param name="IconKey">The concept key <see cref="Icons.ForConcept"/> is keyed on — the CORE's icon vocabulary,
+/// not VS Code's. The shim maps it to a codicon with a pure lookup, exactly as it already maps
+/// <see cref="OutlineStory.Stage"/>: emitting a codicon name here would put host vocabulary in the core, and
+/// emitting SVG would be rendering (ADR 0005 §1).</param>
+public sealed record OutlineShortcut(
+    string Label,
+    string Description,
+    string SurfacePath,
+    string Group,
+    string IconKey);
+
+/// <param name="Shortcuts">The project-derived Shortcuts-pane entries. Empty is legitimate (and renders no
+/// entries) rather than a signal to fall back to a built-in list.</param>
 public sealed record ProjectOutline(
     IReadOnlyList<OutlineEpic> Epics,
-    OutlineSummary Summary);
+    OutlineSummary Summary,
+    IReadOnlyList<OutlineShortcut> Shortcuts);

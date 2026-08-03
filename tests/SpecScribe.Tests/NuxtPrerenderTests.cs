@@ -208,6 +208,83 @@ public class NuxtPrerenderTests
         Assert.StartsWith("v", version);
     }
 
+    // ── The prerequisite failure must reach the DIAGNOSTICS PAGE, not only the console ───────────────────────
+
+    [Fact]
+    public void GenerateAll_WithPrerenderOnAndNoArtefact_PutsTheRendererErrorOnTheDiagnosticsPage()
+    {
+        // Regression guard for a defect found in the field (VS Code extension, 2026-08-01): the user's output
+        // channel showed `x (renderer) - The SpecScribe renderer artefact could not be found` and `errors=1`,
+        // while diagnostics.html — a complete, readable page, because the prerender never overwrote the C#-written
+        // one — showed no such notice at all.
+        //
+        // The cause was ORDERING, not routing. WriteDiagnostics snapshots its notice list; the prerender runs
+        // ~35 lines later because it needs EmitSpaSite's manifest on disk; so anything the prerender raised could
+        // reach the console, the `errors=N` line and the exit code, but never the page. Two reporting surfaces
+        // disagreeing is precisely what this page exists to prevent, so the PREREQUISITE check was split out and
+        // moved ahead of the write (SiteGenerator.PrerenderPreflight).
+        //
+        // Node is verified BEFORE the artefact (NuxtPrerender.Render documents why), and this suite already pins
+        // that Node is present on any machine running it, so the failure this test forces is the artefact one.
+        //
+        // Specifically the EXPLICIT-OVERRIDE variant, not the search-exhausted one the field report quoted. Both
+        // are the same class — ResolveArtefactDirectory throwing before any route renders — but only the override
+        // is reachable from inside this checkout: the search path walks up from the working directory and would
+        // find the repo's own web/.output/ and succeed. What is under test is the ORDERING, which is indifferent
+        // to which of the two messages ends up being carried.
+        var root = Directory.CreateTempSubdirectory("specscribe-preflight-").FullName;
+        var previous = Environment.GetEnvironmentVariable("SPECSCRIBE_RENDERER_DIR");
+        try
+        {
+            var source = Path.Combine(root, "_bmad-output", "planning-artifacts");
+            Directory.CreateDirectory(source);
+            File.WriteAllText(Path.Combine(source, "epics.md"), """
+                # Epics
+
+                ## Epic 1: Rendering
+
+                ### Story 1.1: Render a page
+
+                As a reader, I want a page, so that I can read it.
+                """);
+
+            // An explicit override that cannot resolve is a hard error by design, which makes it the cheapest way
+            // to force the prerequisite failure without uninstalling Node or hiding the repo's own web/.output/.
+            Environment.SetEnvironmentVariable("SPECSCRIBE_RENDERER_DIR", Path.Combine(root, "no-such-renderer"));
+
+            var site = Path.Combine(root, "site");
+            var options = ForgeOptions.Resolve(
+                source: Path.Combine(root, "_bmad-output"),
+                adrs: Path.Combine(root, "docs", "adrs"),
+                output: site,
+                projectName: "TestProj");
+            var events = new SiteGenerator(options) { PrerenderHtml = true }.GenerateAll();
+
+            // 1. The run still fails loudly — the old behaviour that was already correct, pinned so the fix cannot
+            //    be mistaken for "swallow the error earlier".
+            var renderer = Assert.Single(events.Where(e => e.RelativePath == "(renderer)"));
+            Assert.Equal(GenerationOutcome.Error, renderer.Outcome);
+            Assert.Contains("renderer artefact", renderer.Message, StringComparison.OrdinalIgnoreCase);
+
+            // 2. …and exactly ONCE. The preflight failing must skip the render rather than let it re-raise the
+            //    identical failure, or the user reads the same problem twice and doubts both copies.
+            Assert.Single(events.Where(e =>
+                e.Outcome == GenerationOutcome.Error &&
+                e.Message.Contains("renderer artefact", StringComparison.OrdinalIgnoreCase)));
+
+            // 3. The headline: it is ON THE PAGE. Read from the IR because that is what every surface projects
+            //    from and what the Nuxt renderer renders (see SiteRegion).
+            var diagnostics = SiteRegion.Read(site, "diagnostics.html");
+            Assert.Contains("(renderer)", diagnostics, StringComparison.Ordinal);
+            Assert.Contains("is not a renderer artefact", diagnostics, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("SPECSCRIBE_RENDERER_DIR", previous);
+            try { Directory.Delete(root, recursive: true); } catch { /* best effort */ }
+        }
+    }
+
     private static string RepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

@@ -18,22 +18,77 @@ Consequences you must plan for:
 - **Never `git reset --hard`, `git checkout --`, or `git clean`** to tidy up. Another
   session's uncommitted work may be in the tree. This has already destroyed real work
   mid-story.
-- **Expect the golden fingerprint to move under you.** `GoldenContentFingerprint` may
-  shift because of a concurrent session's changes, not yours. Confirm a regenerated
-  hash is stable across two repeated runs before locking it in, and say in the story
-  record whose changes the regeneration sat on top of.
-- **Never regenerate the golden constant reflexively — establish causality first.**
-  If the fingerprint moved and you did **not** touch rendering, audit the normalizer
-  (`GoldenNormalization.NormalizeVolatile` / `FoldToday`) *before* touching the
-  constant: a broken normalizer leaks a volatile token, and regenerating hides the
-  defect behind a green test. Epic 5 found exactly that — the harness itself was
-  leaking the commit SHA. Prove whose change moved it by bisecting into a throwaway
+- **Expect a content-drift gate to move under you.** It may shift because of a
+  concurrent session's changes, not yours. Confirm a regenerated result is stable across
+  two repeated runs before locking it in, and say in the story record whose changes the
+  regeneration sat on top of.
+- **Never regenerate a gate's baseline reflexively — establish causality first.**
+  If a gate moved and you did **not** touch rendering, audit the harness *before*
+  touching the baseline: a broken normalizer leaks a volatile token, and regenerating
+  hides the defect behind a green test. Epic 5 found exactly that — the harness itself
+  was leaking the commit SHA. Prove whose change moved it by bisecting into a throwaway
   tree (`git archive HEAD` into the scratchpad, then overwrite only your own files) —
   never by resetting the shared tree. Stories 18.2, 18.4 and 18.6 each did this and
   each proved the move was somebody else's.
-- **Rebuild non-incrementally before trusting a fingerprint that involves an asset.**
+- **Rebuild non-incrementally before trusting anything that involves an asset.**
   `specscribe.css`/`.js` are embedded resources; an incremental build reuses the cached
-  assembly and never re-embeds a changed asset, so the hash you measure is stale.
+  assembly and never re-embeds a changed asset, so what you measure is stale. This bites
+  the *rendered page* too, not just a hash: a `generate` after an incremental build
+  serves the previous CSS, and the styles you are inspecting in the browser are not the
+  ones you wrote.
+
+### Which gate is which — `GoldenContentFingerprint` is retired
+
+`GoldenContentFingerprint` no longer exists. ADR 0034 (Story 23.6) retired it with its
+subject — the C# `.html` writer — and
+`tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs` carries only its tombstone comment.
+The live gates, and what each can actually see:
+
+| gate | run from | subject | catches |
+|---|---|---|---|
+| `npm run check:parity` | `web/` | the RENDERER against a **frozen** corpus (`web/fixtures/parity-corpus/`) + pinned oracle | a change in how Nuxt renders a fixed IR |
+| `npm run check:ir-content` | `web/` | `web/assets/ir-content.css` vs `src/SpecScribe/assets/specscribe.css` | a stylesheet edit not propagated to the scoped layer |
+| `npm run check:tokens` / `check:assets` | `web/` | token block / runtime asset copies | the same class, for tokens and assets |
+
+**`check:parity` cannot see a C#-side change.** Its corpus IR is frozen, so anything the
+C# region composer emits differently — nav markup, a new dashboard panel, changed body
+HTML — renders from the *pinned* input and the gate stays green. Verified 2026-08-01: a
+change that removed an element from the shared nav on every page left all 24 routes
+byte-identical. Do not read a green `check:parity` as "my rendering change is safe"; it
+means "the renderer still behaves the same on the frozen fixture". Cover C#-side output
+with unit tests over the region and with live-browser inspection.
+
+Regenerate with `npm run pin:parity`, which produces a **reviewable diff** rather than a
+hex-literal bump (ADR 0033). ADR 0033 also governs any NEW gate: it must localize failure
+to a named artifact, be scoped so a sibling story elsewhere cannot turn it red, and be
+proven deterministic across machines and CI operating systems before pinning.
+
+### Changing `specscribe.css`? The regeneration order is load-bearing
+
+`extract:ir-content` **prunes** any rule whose selector names a class or id it cannot find
+in the IR. So a stylesheet edit that lands alongside NEW markup must be extracted from an
+IR that already contains that markup, or the new rules are dropped — silently, with the
+gate green, and the styles simply absent from the rendered page. Run:
+
+```sh
+dotnet build src/SpecScribe/SpecScribe.csproj --no-incremental   # re-embed the asset
+dotnet run --project src/SpecScribe -- generate                  # IR now has the new markup
+cd web && npm run extract:ir-content && npm run check:ir-content # derive from THAT IR
+cd web && npm run build:package                                  # renderer bundles the CSS
+dotnet run --project src/SpecScribe -- generate                  # render with it
+```
+
+Two generates, deliberately. Skipping either one leaves you inspecting a page whose CSS
+predates your edit — and the failure looks exactly like "my selector is wrong".
+
+**The gate cannot catch a bug in its own derivation.** `check:ir-content` re-derives
+through the same `harvest`/`selectorIsUsed` code the extractor uses, so a rule wrongly
+dropped is dropped identically on both sides and the diff is empty. That is not
+hypothetical: a dangling `else` in `harvest` meant **no id was ever collected**, so every
+id-bearing selector was pruned and the Code Map's pure-CSS spec/test filter was absent
+from the shipped site — for however long, with every gate green. Found 2026-08-01 only by
+reading computed styles in a live browser. `web/test/ir-content-harvest.test.mjs` now
+pins the derivation itself; extend it rather than trusting the round-trip gate.
 - **Expect commits to bundle sibling stories.** Because code review runs at epic end
   (see below), a single commit routinely carries several stories' work.
 

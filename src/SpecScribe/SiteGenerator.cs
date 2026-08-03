@@ -349,6 +349,18 @@ public sealed class SiteGenerator
     /// <see cref="EmitSpaSite"/> for why it is keyed on the content digest rather than on the watcher event.</summary>
     private IReadOnlyList<string> _changedIrRoutes = Array.Empty<string>();
 
+    /// <summary>Set by <see cref="PrerenderPreflight"/> when a prerender PREREQUISITE (Node, or the renderer
+    /// artefact) is unavailable, so <see cref="GenerateAll"/> skips the render rather than reporting the identical
+    /// failure twice — once on the diagnostics page, once only on the console.
+    /// <para>Reset at the top of every preflight, so it can never outlive the run that set it. Watch's incremental
+    /// <see cref="PrerenderChanged"/> path deliberately does NOT consult it: it re-attempts every pass, which is
+    /// what lets a user build the missing artefact mid-session and have the next save start working.</para></summary>
+    private bool _prerenderPreflightFailed;
+
+    /// <summary>The artefact directory <see cref="PrerenderPreflight"/> resolved, handed on to
+    /// <see cref="NuxtPrerender.Render"/>. Null means "not resolved yet" and <c>Render</c> resolves it itself.</summary>
+    private string? _prerenderArtefactDir;
+
     /// <summary>Previous emit's route → region digest map, the basis <see cref="_changedIrRoutes"/> diffs against.
     /// Null until the first emit of a session (⇒ that emit re-renders everything, which is correct).</summary>
     private Dictionary<string, string>? _lastRouteHashes;
@@ -882,12 +894,29 @@ public sealed class SiteGenerator
             reporter?.EndPhase(GenerationPhase.Index);
             Mark("index-page");
 
+            // Prerender PREREQUISITES are checked HERE, before the diagnostics page is written, even though the
+            // prerender itself cannot run until EmitSpaSite has put the manifest on disk (~35 lines below).
+            //
+            // ⚠️ This ordering is the fix for a real defect, not a micro-optimization. The diagnostics page
+            // snapshots its notice list at WriteDiagnostics time; anything appended after that reaches the console,
+            // the `errors=N` line and the exit code, but CANNOT reach the page — and the C#-written diagnostics.html
+            // is still on disk (the prerender simply never overwrites it), so the user opened a readable page that
+            // said all-clear while the console said `x (renderer) … errors=1`. Two surfaces disagreeing is exactly
+            // what this page exists to prevent. Splitting the prerequisite check out is the only shape that reports
+            // an absent Node or a missing renderer artefact on the page without a circular render-then-re-render.
+            events.AddRange(PrerenderPreflight());
+
             // Diagnostics + About are the whole-run reporting surface (Story 4.8): written LAST, after every
             // phase has appended its events, so the diagnostics page reflects the COMPLETE non-fatal notice set.
             // Both are always written on a full run (the diagnostics page's zero-notice case renders an all-clear
             // state, never a gated-away page), so the site-wide footer "About" link — and the About page's link
             // on to the run log — can never 404. Each write's own Generated event is appended AFTER the
             // diagnostics page reads the notice list, so it never self-references. [Story 4.8 Task 6]
+            //
+            // ⚠️ "COMPLETE" is true of every phase that runs BEFORE this line, which is all of them except the
+            // prerender. PER-ROUTE prerender failures (a non-200, or a 200 with no <main id="main-content">) are
+            // still discovered after this point and reach only the console and the exit code. That limit is stated
+            // rather than implied — see PrerenderPreflight and Prerender.
             events.Add(WriteDiagnostics(nav, events));
             events.Add(WriteAbout(nav));
             events.Add(WriteHowToRead(nav));
@@ -923,7 +952,18 @@ public sealed class SiteGenerator
 
             // Render the static `.html` from the IR just emitted. [Story 23.6 AC #7, ADR 0022 §Decision 3]
             // Strictly after EmitSpaSite: the prerender drives one request per route from the manifest on disk.
-            events.AddRange(Prerender(_lastIrRoutes));
+            //
+            // Skipped when the preflight above already failed: the prerequisite it found missing has not become
+            // available in the intervening milliseconds, and re-attempting would report the SAME failure a second
+            // time — once on the diagnostics page and once only on the console.
+            if (_prerenderPreflightFailed)
+            {
+                Console.Error.WriteLine("[prerender] skipped — prerequisites unavailable (see diagnostics).");
+            }
+            else
+            {
+                events.AddRange(Prerender(_lastIrRoutes));
+            }
             Mark("prerender-html");
 
             // Story 22.5: install the rebuild-scope baseline from the set this pass RENDERED — LAST, after the
@@ -4259,7 +4299,45 @@ public sealed class SiteGenerator
         }
         FlushEpic();
 
-        return new ProjectOutline(outlineEpics, BuildOutlineSummary(outlineEpics));
+        return new ProjectOutline(outlineEpics, BuildOutlineSummary(outlineEpics), BuildOutlineShortcuts());
+    }
+
+    /// <summary>Projects the Shortcuts-pane entries from <see cref="SiteNav.QuickLinks"/> — the same list the
+    /// portal's own key-views band renders, so the pane offers exactly the surfaces this run produced and no
+    /// others. Data only; no HTML (ADR 0005 §1).
+    /// <para><b>Ordered by <see cref="HtmlRenderAdapter.KeyViewGroupOrder"/> — Delivery, Insights, Follow-ups,
+    /// Project, Help — not by <see cref="SiteNav.QuickLinks"/>' own order.</b> An earlier version claimed the
+    /// QuickLinks order was "already journey-ordered" and passed it through. It is not: on a real project it came
+    /// out Help first (How to use SpecScribe, Design System, About, Logs), then Project, with <em>Code Map</em> and
+    /// <em>Risk Quadrant</em> last — burying the two entries the pane exists to surface under five entries about
+    /// the tool itself. Sorting by the same order the portal's key-views band uses also means the two surfaces
+    /// cannot present the same links differently. Stable within a group, so a group's internal order is still
+    /// QuickLinks' own. [owner feedback 2026-08-02]</para>
+    /// <para>Empty when the nav has not been built (a pass that never got that far) — the shim renders no entries
+    /// rather than falling back to a built-in list, because a stale built-in list is what this replaced.</para></summary>
+    private IReadOnlyList<OutlineShortcut> BuildOutlineShortcuts()
+    {
+        if (_nav is not { } nav) return Array.Empty<OutlineShortcut>();
+
+        // An unrecognized Group sorts with "Project", matching AppendKeyViewsBand's own fallback for the same
+        // value rather than silently sinking to the end.
+        int GroupRank(string group)
+        {
+            var index = Array.IndexOf(HtmlRenderAdapter.KeyViewGroupOrder, group);
+            return index >= 0 ? index : Array.IndexOf(HtmlRenderAdapter.KeyViewGroupOrder, "Project");
+        }
+
+        return nav.QuickLinks
+            .OrderBy(q => GroupRank(q.Group))
+            .Select(q => new OutlineShortcut(
+                q.Label,
+                q.Description,
+                PathUtil.NormalizeSlashes(q.OutputRelativePath),
+                q.Group,
+                // The label IS the icon key — Icons.ForConcept is keyed on these same nav labels, which is the
+                // point of that helper: one naming scheme, not a third.
+                q.Label))
+            .ToList();
     }
 
     /// <summary>Tallies the status-bar summary from the assembled outline — stories by stage across all epics,
@@ -4630,7 +4708,9 @@ public sealed class SiteGenerator
     /// <para>Fire-and-report rather than event-returning, because the five incremental call sites sit in
     /// routes with differing event plumbing; a prerender failure during watch is written to stderr where the
     /// watch loop's own per-save reporting lives. A one-shot <c>generate</c> takes the evented path
-    /// (<see cref="Prerender"/>) so its failures reach the exit code and the diagnostics page.</para></summary>
+    /// (<see cref="Prerender"/>) so its failures reach the exit code — and, for the PREREQUISITE class only, the
+    /// diagnostics page via <see cref="PrerenderPreflight"/>. Per-route failures reach the console and the exit
+    /// code but not the page; see <see cref="PrerenderPreflight"/> for why that boundary is where it is.</para></summary>
     private void PrerenderChanged()
     {
         foreach (var ev in Prerender(_changedIrRoutes))
@@ -4642,13 +4722,51 @@ public sealed class SiteGenerator
         }
     }
 
+    /// <summary>Checks the prerender's two PREREQUISITES — Node on PATH and in range, then the renderer artefact —
+    /// early enough that a failure lands on the diagnostics page rather than only on the console.
+    /// <para><b>Why this exists as a separate step.</b> <see cref="Prerender"/> cannot run before
+    /// <see cref="EmitSpaSite"/> (it drives one request per route from the manifest on disk), but the diagnostics
+    /// page snapshots its notice list before that. So the prerequisite class of failure — the one a user hits on a
+    /// fresh checkout with no built artefact, or on a box with no Node — was reported on stderr and in the exit
+    /// code while <c>diagnostics.html</c> rendered all-clear. Checking prerequisites here, and rendering there,
+    /// closes that gap without a circular render-then-re-render of the page.</para>
+    /// <para><b>What it deliberately does NOT cover.</b> Per-route failures (HTTP non-200, or a 200 whose body has
+    /// no <c>&lt;main id="main-content"&gt;</c>) can only be discovered by actually rendering, which happens after
+    /// the page is written. Those still reach the console, the <c>errors=N</c> line and the exit code — and nothing
+    /// else. Anyone tempted to promise otherwise in a comment should change the ordering instead.</para>
+    /// <para>Ordering inside the check mirrors <see cref="NuxtPrerender.Render"/> exactly — Node first, then the
+    /// artefact — for the reason recorded there: a user with no Node who is told the artefact is missing goes and
+    /// builds the artefact, then hits the real problem one step later.</para>
+    /// <para>The resolved artefact directory is cached and handed to <see cref="NuxtPrerender.Render"/> so the
+    /// resolution is not repeated, and so the run cannot resolve to one artefact here and a different one there.</para></summary>
+    private IReadOnlyList<GenerationEvent> PrerenderPreflight()
+    {
+        _prerenderPreflightFailed = false;
+        _prerenderArtefactDir = null;
+        if (!PrerenderHtml) return Array.Empty<GenerationEvent>();
+
+        try
+        {
+            NuxtPrerender.VerifyNodeAvailable();
+            _prerenderArtefactDir = NuxtPrerender.ResolveArtefactDirectory();
+            return Array.Empty<GenerationEvent>();
+        }
+        catch (InvalidOperationException ex)
+        {
+            // Same event shape and anchor as Prerender's own catch, so the two paths are indistinguishable to the
+            // diagnostics page, the CLI summary and the Problems-panel wire.
+            _prerenderPreflightFailed = true;
+            return [new GenerationEvent(GenerationOutcome.Error, "(renderer)", TimeSpan.Zero, ex.Message)];
+        }
+    }
+
     private IReadOnlyList<GenerationEvent> Prerender(IReadOnlyList<string> routes)
     {
         if (!PrerenderHtml || routes.Count == 0) return Array.Empty<GenerationEvent>();
 
         try
         {
-            var result = NuxtPrerender.Render(_options.OutputRoot, routes);
+            var result = NuxtPrerender.Render(_options.OutputRoot, routes, _prerenderArtefactDir);
             // The prerender is now a material share of a cold generate, and a user watching a 40-second run
             // deserves to know which half is which. stderr, so a machine consumer of stdout is unaffected
             // (the Story 5.1 rule: the machine summary line never routes through Spectre).
@@ -4660,8 +4778,13 @@ public sealed class SiteGenerator
         }
         catch (InvalidOperationException ex)
         {
-            // Resolution and prerequisite failures land here. One event, anchored on the output root, so the
-            // diagnostics page and the CLI summary both carry it and `errors` is non-zero.
+            // Resolution and prerequisite failures land here. One event, anchored on the output root, so the CLI
+            // summary carries it and `errors` is non-zero.
+            //
+            // On a one-shot generate this arm is now largely unreachable for the PREREQUISITE class:
+            // PrerenderPreflight catches those earlier — precisely so they reach the diagnostics page, which an
+            // event raised from here cannot, the page having already been written. It stays as the guard for the
+            // watch path (which does not preflight) and for a prerequisite that disappears mid-run.
             return [new GenerationEvent(GenerationOutcome.Error, "(renderer)", TimeSpan.Zero, ex.Message)];
         }
     }

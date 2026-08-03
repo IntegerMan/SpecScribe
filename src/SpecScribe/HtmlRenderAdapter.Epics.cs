@@ -163,10 +163,15 @@ public sealed partial class HtmlRenderAdapter
         sb.Append("</div>\n\n");
     }
 
+    /// <summary>The empty-LIST state for <c>epics.html</c>. Note this page is not written at all when
+    /// <c>epics.md</c> is absent, so this answers "an epics file with nothing in it", never "a project with no
+    /// epics" — the latter is the dashboard's <see cref="DashboardView.NoEpicsGuidanceHtml"/>, which exists because
+    /// this guidance was unreachable in exactly that case. Different sentences on purpose; only the command slug is
+    /// shared.</summary>
     private void AppendEmptyEpicsGuidance(StringBuilder sb, CommandCatalog commands)
     {
         var note = BmadCommands.InlineGuidance(
-            commands.Command("create-epics-and-stories"),
+            commands.Command(DashboardViewBuilder.CreateEpicsCommandSlug),
             "No epics yet. Break your plan into epics and stories with",
             "No epics yet — add them to your plan to see them here.");
         // Story 10.8: routes through the promoted ListRow.EmptyState helper (byte-identical output).

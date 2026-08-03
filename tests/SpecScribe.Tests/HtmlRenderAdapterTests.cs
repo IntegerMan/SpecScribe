@@ -1675,4 +1675,117 @@ public class HtmlRenderAdapterTests
         Assert.DoesNotContain("evidence-strip", html);
         Assert.DoesNotContain("change-surface", html);
     }
+
+    // ===== Home discoverability for an epic-free project (field feedback 2026-08-01) ==============================
+    //
+    // The report: SpecScribe run on a project with a BMad PRD and no epics. Every surface the portal LEADS with is
+    // epic-derived, so the home page looked broken — while the code map and risk quadrant, which do work without
+    // epics, were reachable only from the dark nav's Insights dropdown (Home is the one page whose quick-link band
+    // is replaced by the work-mode strip).
+
+    /// <summary>A nav with the insight surfaces present — `hasCodeMap` adds Code Map AND Risk Quadrant together.</summary>
+    private static SiteNav NavWithInsights() =>
+        SiteNav.Build(
+            new[] { "planning-artifacts/epics.md" }, "SpecScribe",
+            hasAdrs: true, hasReadme: true, hasCodeMap: true, hasGitInsights: true);
+
+    private static DashboardView DashboardWith(SiteNav nav, EpicsModel? epicsModel) =>
+        DashboardViewBuilder.Build(
+            nav,
+            ProgressModel.Empty,
+            epicsModel,
+            requirements: null,
+            CommandCatalog.Empty,
+            WorkInventory.Empty,
+            sprint: null,
+            coverage: null);
+
+    [Fact]
+    public void RenderDashboardBody_ExplorePanel_CardsTheInsightSurfacesWithTheirDescriptions()
+    {
+        var body = HtmlRenderAdapter.Shared.RenderDashboardBody(DashboardWith(NavWithInsights(), RequirementsEpics()));
+
+        Assert.Contains("explore-panel", body);
+        Assert.Contains("Explore this codebase", body);
+        // Both surfaces the report named, each as a real link carrying its own description — not a bare label.
+        Assert.Contains($"href=\"{SiteNav.CodeMapOutputPath}\"", body);
+        Assert.Contains($"href=\"{SiteNav.RiskQuadrantOutputPath}\"", body);
+        Assert.Contains("Explore the codebase by size and change activity.", body);
+        Assert.Contains("Spot high-churn, high-size refactor targets.", body);
+    }
+
+    [Fact]
+    public void RenderDashboardBody_ExplorePanel_IsOmittedWhenTheRunProducedNoInsightSurface()
+    {
+        // NFR8: absent, never an empty panel. Nav() has no code map and no git insights.
+        var body = HtmlRenderAdapter.Shared.RenderDashboardBody(DashboardWith(Nav(), RequirementsEpics()));
+
+        Assert.DoesNotContain("explore-panel", body);
+        Assert.DoesNotContain("Explore this codebase", body);
+    }
+
+    [Fact]
+    public void RenderDashboardBody_ExplorePanel_IsRenderedExactlyOnce_InEitherEpicState()
+    {
+        // It is promoted to the top of the page with no epics and sinks beside Git Pulse with them. One panel in
+        // one of two positions — a regression that emitted both would double every insight link on the page.
+        foreach (var epics in new EpicsModel?[] { null, RequirementsEpics() })
+        {
+            var body = HtmlRenderAdapter.Shared.RenderDashboardBody(DashboardWith(NavWithInsights(), epics));
+            Assert.Equal(1, Count(body, "explore-panel"));
+            Assert.Equal(1, Count(body, $"href=\"{SiteNav.CodeMapOutputPath}\""));
+        }
+    }
+
+    [Fact]
+    public void RenderDashboardBody_NoEpicsGuidance_AppearsOnlyWhenThereIsNoEpicsModelAtAll()
+    {
+        // The guidance epics.html carries is unreachable in exactly this state — that page is not written when
+        // epics.md is absent — which is why it has to exist here too.
+        var epicFree = HtmlRenderAdapter.Shared.RenderDashboardBody(DashboardWith(NavWithInsights(), null));
+        Assert.Contains("no-epics-panel", epicFree);
+        Assert.Contains("This project has no epics or stories yet", epicFree);
+
+        // An epics model that EXISTS is a different state (its own "Nothing to chart yet." empty panel answers it),
+        // and telling that project to create epics would be wrong.
+        var withEpics = HtmlRenderAdapter.Shared.RenderDashboardBody(DashboardWith(NavWithInsights(), RequirementsEpics()));
+        Assert.DoesNotContain("no-epics-panel", withEpics);
+    }
+
+    [Fact]
+    public void RenderDashboardBody_NoEpicsGuidance_DoesNotWrapTheCommandBadgeInAParagraph()
+    {
+        // A DOM-corruption regression the emitted markup looked fine for. The command badge contains a
+        // `<details class="send-menu">`, and the HTML parser CLOSES an open `<p>` when it meets a `<details>` start
+        // tag — so `<p>…<details>…</details></p>` re-parses as `<p>…</p><details>…</details>`, and the disclosure
+        // escapes the sentence to render as a stray ▾ on its own line. Found by looking at the rendered page; no
+        // string assertion on the emitted HTML could have seen it, because the emitted HTML was well-formed.
+        //
+        // `ListRow.EmptyState` wraps guidance in a `<div class="pending-note">` for exactly this reason, which is
+        // why the epics-page empty state never had the bug. This pins the dashboard onto the same idiom.
+        var body = HtmlRenderAdapter.Shared.RenderDashboardBody(DashboardWith(NavWithInsights(), null));
+
+        Assert.Contains("<div class=\"no-epics-lead\">", body);
+        Assert.DoesNotContain("<p class=\"no-epics-lead\">", body);
+
+        // And the general form of the rule, so a future edit cannot reintroduce it via a different wrapper: no <p>
+        // anywhere in this panel may still be open when a <details> starts.
+        var start = body.IndexOf("no-epics-panel", StringComparison.Ordinal);
+        var panel = body[start..body.IndexOf("</div>\n\n", start, StringComparison.Ordinal)];
+        var lastOpenP = panel.LastIndexOf("<p", StringComparison.Ordinal);
+        var firstDetails = panel.IndexOf("<details", StringComparison.Ordinal);
+        if (lastOpenP >= 0 && firstDetails > lastOpenP)
+        {
+            Assert.True(
+                panel.IndexOf("</p>", lastOpenP, StringComparison.Ordinal) is var close && close >= 0 && close < firstDetails,
+                "a <details> inside this panel must not sit inside an unclosed <p> — the parser would eject it");
+        }
+    }
+
+    private static int Count(string haystack, string needle)
+    {
+        int n = 0, i = 0;
+        while ((i = haystack.IndexOf(needle, i, StringComparison.Ordinal)) >= 0) { n++; i += needle.Length; }
+        return n;
+    }
 }

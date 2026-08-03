@@ -53,6 +53,22 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
     /// Story 20.2 built for precisely this kind of <c>innerHTML</c> swap.</para></summary>
     private static readonly Lazy<string> AppScript = new(() => ReadEmbedded("SpecScribe.assets.specscribe.js"));
 
+    /// <summary>The webview CSP policy, verbatim and in ONE place. Shared with
+    /// <see cref="SettingsFormTemplater"/>, which is the second document this host renders (ADR 0037): two copies
+    /// of a security policy string is how one of them quietly becomes weaker than the other. Still carries the
+    /// <c>__CSP_SOURCE__</c>/<c>__NONCE__</c> seam for the shim to substitute.
+    /// <para>⚠️ <c>form-action 'none'</c> is why the settings form emits no <c>&lt;form&gt;</c> element — a submit
+    /// would be silently blocked. See <see cref="SettingsFormTemplater"/>.</para></summary>
+    internal const string CspPolicy =
+        "default-src 'none'; base-uri 'none'; form-action 'none'; img-src __CSP_SOURCE__ data: https:; "
+        + "style-src 'unsafe-inline' __CSP_SOURCE__; script-src 'nonce-__NONCE__'; font-src __CSP_SOURCE__ data:;";
+
+    /// <summary>The production stylesheet and the host-theme bridge, for the settings form's own shell — so both
+    /// webview documents inline the SAME two sheets rather than the second growing its own styling.</summary>
+    internal static string StylesheetCss => Stylesheet.Value;
+
+    internal static string ThemeBridgeCss => ThemeBridge.Value;
+
     private static string ReadEmbedded(string resourceName)
     {
         using var stream = typeof(WebviewRenderAdapter).Assembly.GetManifestResourceStream(resourceName)
@@ -114,6 +130,9 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
     /// (the bridge resolves relative links against it), and the nonce'd bridge script. <c>__CSP_SOURCE__</c> /
     /// <c>__NONCE__</c> are deliberately left for the shim — the two-value seam that keeps the shim dumb.</summary>
     public string WrapDocument(PageView page, string contentHtml, string? sourcePath = null) => DocumentTemplate
+        // Substituted from the ONE shared constant so this document and the settings form can never carry two
+        // different policies. [ADR 0037]
+        .Replace("__CSP__", CspPolicy)
         .Replace("__TITLE__", PathUtil.Html(page.Title))
         .Replace("__PATH__", PathUtil.Html(PathUtil.NormalizeSlashes(page.OutputRelativePath)))
         .Replace("__CSS__", Stylesheet.Value)
@@ -145,7 +164,7 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
         <html lang="en">
         <head>
         <meta charset="UTF-8" />
-        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; img-src __CSP_SOURCE__ data: https:; style-src 'unsafe-inline' __CSP_SOURCE__; script-src 'nonce-__NONCE__'; font-src __CSP_SOURCE__ data:;" />
+        <meta http-equiv="Content-Security-Policy" content="__CSP__" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>__TITLE__</title>
         <style>__CSS__</style>
@@ -158,6 +177,10 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
         <button type="button" class="ss-helper-btn" data-ss-label="a code-review prompt" data-ss-prompt="__HELPER_PROMPT__">Copy code-review prompt</button>
         <span class="spa-live-stamp" id="spa-live-stamp" role="status" aria-live="polite">Live updates: unavailable</span>
         </div>
+        <div class="ss-webview-status" id="ss-webview-status" hidden>
+        <span class="ss-webview-status-text" id="ss-webview-status-text"></span>
+        <span class="ss-webview-status-actions" id="ss-webview-status-actions"></span>
+        </div>
         <div id="specscribe-surface" data-path="__PATH__" data-source="__SOURCE__">
         __CONTENT__
         </div>
@@ -166,6 +189,9 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
           var vscode = (typeof acquireVsCodeApi === 'function') ? acquireVsCodeApi() : null;
           var surface = document.getElementById('specscribe-surface');
           var revealBtn = document.querySelector('.ss-reveal-src-btn');
+          var hostStatus = document.getElementById('ss-webview-status');
+          var hostStatusText = document.getElementById('ss-webview-status-text');
+          var hostStatusActions = document.getElementById('ss-webview-status-actions');
 
           // The current surface's repo-relative source artifact (Story 6.10). Read off #specscribe-surface's
           // data-source, which the entry document stamps and every in-place `update` swap refreshes.
@@ -174,6 +200,33 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
           // none). Called on first paint and after every content swap so the button always reflects the view.
           function syncRevealBtn() { if (revealBtn) revealBtn.hidden = !currentSource(); }
           syncRevealBtn();
+
+          function renderHostStatus(msg) {
+            if (!hostStatus || !hostStatusText || !hostStatusActions) return;
+            var text = (typeof msg.text === 'string') ? msg.text.trim() : '';
+            if (!text) {
+              hostStatus.hidden = true;
+              hostStatus.removeAttribute('data-level');
+              hostStatusText.textContent = '';
+              hostStatusActions.textContent = '';
+              return;
+            }
+            hostStatus.hidden = false;
+            hostStatus.setAttribute('data-level', typeof msg.level === 'string' ? msg.level : 'info');
+            hostStatusText.textContent = text;
+            hostStatusActions.textContent = '';
+            var actions = Array.isArray(msg.actions) ? msg.actions : [];
+            for (var i = 0; i < actions.length; i++) {
+              var action = actions[i];
+              if (!action || typeof action.id !== 'string' || typeof action.label !== 'string') continue;
+              var btn = document.createElement('button');
+              btn.type = 'button';
+              btn.className = 'ss-host-action';
+              btn.setAttribute('data-action', action.id);
+              btn.textContent = action.label;
+              hostStatusActions.appendChild(btn);
+            }
+          }
 
           // Resolves a rendered relative href (e.g. "story-1-1.html", "../index.html", "epics.html#epic-2")
           // against the CURRENT surface's output-relative path — a webview is not a browser tab, so anchor
@@ -203,6 +256,15 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
                 type: 'copyHelperText',
                 text: helper.getAttribute('data-ss-prompt') || '',
                 label: helper.getAttribute('data-ss-label') || 'text'
+              });
+              return;
+            }
+
+            var hostAction = t.closest('.ss-host-action');
+            if (hostAction) {
+              if (vscode) vscode.postMessage({
+                type: 'hostAction',
+                action: hostAction.getAttribute('data-action') || ''
               });
               return;
             }
@@ -305,6 +367,10 @@ public sealed class WebviewRenderAdapter : IRenderAdapter
             var m = e.data || {};
             if (m.type === 'liveStatus') {
               if (liveStamp && typeof m.text === 'string') liveStamp.textContent = m.text;
+              return;
+            }
+            if (m.type === 'hostStatus') {
+              renderHostStatus(m);
               return;
             }
             if (m.type !== 'update' || typeof m.html !== 'string' || !surface) return;

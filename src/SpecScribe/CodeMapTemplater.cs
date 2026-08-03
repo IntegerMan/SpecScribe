@@ -190,7 +190,7 @@ public static class CodeMapTemplater
         sb.Append(HierarchyExplorer.Render(
             model, "chart-panel codemap-panel", " data-explorer", controls.ToString(), legend.ToString()));
 
-        AppendFileTable(sb, variants, distinctFiles, hasMetrics, fileHref, prefix);
+        AppendFileTree(sb, variants, full.Map, distinctFiles, hasMetrics, fileHref, prefix);
     }
 
     /// <summary>The dimension-switch control — a dropdown, keyboard-operable, present whenever the variant has
@@ -299,12 +299,25 @@ public static class CodeMapTemplater
     /// files may not hit the cap even when "full" does), so <paramref name="variants"/> drives one <c>&lt;p&gt;</c>
     /// per view, toggled by the SAME 4-combination checkbox selector the panel switch used to use (Task 4.4) — a
     /// no-JS visitor still reads the correct sentence for whichever combination is checked.</para>
-    /// <para><b>Story 10.8 scope:</b> stays a genuine <c>&lt;table&gt;</c> (Design Direction #5) — its multi-column
-    /// numeric header row is load-bearing for the accessible/no-JS reading of the treemap, and files carry no
-    /// lifecycle status, so there is no badge to route through the shared row primitive. Only a badge-bearing
-    /// row family gets rewired onto <see cref="ListRow"/>.</para></summary>
-    private static void AppendFileTable(
-        StringBuilder sb, IReadOnlyList<CodeMapVariant> variants, IReadOnlyList<CodeMapNode> distinctFiles,
+    /// <para><b>Story 10.8's Design Direction #5 — "stays a genuine <c>&lt;table&gt;</c>" — is AMENDED, not
+    /// abandoned.</b> Owner feedback 2026-08-01: "Code Map All Files should be a hierarchy with expand / collapse."
+    /// A flat listing of every path in the repository is not readable at real scale, and the directory structure
+    /// this section flattens was already built and thrown away (<see cref="CodeMap.Roots"/>). What #5 was actually
+    /// protecting — the multi-column numeric header row, load-bearing for the accessible/no-JS reading of the
+    /// treemap — is preserved exactly: there is still a real <c>&lt;table&gt;</c> with a real
+    /// <c>&lt;th scope="col"&gt;</c> header at every level. There are simply N of them, one per directory, nested
+    /// inside <c>&lt;details&gt;</c>.</para>
+    ///
+    /// <para><b>Why this markup and not a nested list.</b> <c>&lt;details&gt;</c> cannot wrap <c>&lt;tr&gt;</c> —
+    /// <c>&lt;tbody&gt;</c>'s content model is <c>&lt;tr&gt;</c> alone — but <c>&lt;details&gt;</c>' own content
+    /// model is FLOW content, and a <c>&lt;table&gt;</c> is flow content. So each directory's
+    /// <c>&lt;details&gt;</c> holds its child directories' <c>&lt;details&gt;</c> followed by exactly one
+    /// <c>&lt;table&gt;</c> of that directory's OWN files. No table nests inside a cell; every table is a sibling
+    /// of the child disclosures. Valid HTML, and <c>&lt;details&gt;</c> is natively keyboard-operable with zero
+    /// script — the disclosure works with JavaScript off, which the retired pager did not.</para></summary>
+    private static void AppendFileTree(
+        StringBuilder sb, IReadOnlyList<CodeMapVariant> variants, CodeMap full,
+        IReadOnlyList<CodeMapNode> distinctFiles,
         bool hasMetrics, Func<string, string?>? fileHref, string prefix)
     {
         var ordered = Charts.OrderBySignificance(distinctFiles).ToList();
@@ -352,15 +365,110 @@ public static class CodeMapTemplater
             sb.Append($"      <p class=\"chart-lead\" data-codemap-view=\"{PathUtil.Html(variant.Key)}\">{PathUtil.Html(leadText)}</p>\n");
         }
 
-        sb.Append($"      <table class=\"codemap-table\" data-page-size=\"{CodeMapTablePageSize.ToString(CultureInfo.InvariantCulture)}\">\n");
-        sb.Append("        <thead><tr><th scope=\"col\">File</th><th scope=\"col\" class=\"num\">Lines</th><th scope=\"col\">Type</th>");
+        // The ancestor directories of the most significant files open on load. Everything else is one click away.
+        // All-collapsed would open on a page showing nothing (a regression from the flat table's 18 visible rows);
+        // first-level-only opens `src/SpecScribe` and its ~300 files as a wall. This opens roughly a screenful
+        // centred on the busiest code, which is what the lead sentence promises the listing is ordered by.
+        var expanded = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var file in shown.Take(TreeAutoExpandFiles))
+        {
+            var path = file.RepoRelativePath;
+            for (var slash = path.IndexOf('/'); slash >= 0; slash = path.IndexOf('/', slash + 1))
+            {
+                expanded.Add(path[..slash]);
+            }
+        }
+
+        sb.Append("      <div class=\"codemap-tree\">\n");
+        foreach (var node in Charts.OrderCodeMapLevel(full.Roots))
+        {
+            AppendTreeNode(sb, node, shownPaths, expanded, hasMetrics, fileHref, prefix, depth: 0);
+        }
+        sb.Append("      </div>\n");
+
+        // ONE truncation notice per view, each carrying THAT view's own omission count and tagged with the same
+        // `data-codemap-view` marker every other per-view fact in this section uses. Views that omit nothing emit
+        // nothing at all.
+        //
+        // It is a <p> now rather than a <tr colspan>: with N tables there is no single table for it to be the last
+        // row of, and a notice about the whole listing does not belong inside one directory's table.
+        foreach (var variant in variants)
+        {
+            var vOmitted = omittedByView[variant.Key];
+            if (vOmitted == 0) continue;
+            sb.Append($"      <p class=\"chart-lead codemap-table-truncated\" data-codemap-view=\"{PathUtil.Html(variant.Key)}\">+{vOmitted.ToString("N0", CultureInfo.InvariantCulture)} more ")
+              .Append(Charts.Plural(vOmitted, "file", "files"))
+              .Append(" not shown in this listing — each still has its own colored, focusable rectangle in the treemap above.</p>\n");
+        }
+
+        sb.Append("    </section>\n\n");
+    }
+
+    /// <summary>Emits one node of the tree: a directory as a <c>&lt;details&gt;</c> containing its child
+    /// directories then one <c>&lt;table&gt;</c> of its own files, or nothing at all for a file (files are emitted
+    /// by their parent, so this is only ever called with a directory at the top level and recurses on directories).
+    /// <para>A directory whose entire subtree fell outside the <see cref="Charts.MaxDetailedCodeMapFiles"/> cap
+    /// emits NOTHING — an empty disclosure a reader can open to find nothing inside is worse than an absent one,
+    /// and the truncation notice already accounts for those files.</para>
+    /// <para><paramref name="depth"/> guards against a pathological path producing unbounded nesting, mirroring
+    /// <see cref="HierarchyExplorer"/>'s twin emitter. Real repositories do not approach it.</para></summary>
+    private static void AppendTreeNode(
+        StringBuilder sb, CodeMapNode node, HashSet<string> shownPaths, HashSet<string> expanded,
+        bool hasMetrics, Func<string, string?>? fileHref, string prefix, int depth)
+    {
+        if (!node.IsDirectory || depth > MaxTreeDepth) return;
+
+        var ownFiles = node.Children
+            .Where(c => !c.IsDirectory && shownPaths.Contains(c.RepoRelativePath))
+            .ToList();
+        var childDirs = node.Children.Where(c => c.IsDirectory).ToList();
+        // Nothing under here survived the cap → emit nothing rather than an empty disclosure.
+        if (ownFiles.Count == 0 && !childDirs.Any(d => SubtreeHasShownFile(d, shownPaths))) return;
+
+        var descendants = DescendantFilePaths(node).ToList();
+        var open = expanded.Contains(node.RepoRelativePath) ? " open" : string.Empty;
+
+        sb.Append($"        <details class=\"codemap-tree-dir{DirectoryFilterMarkers(descendants)}\"{open}>\n");
+        sb.Append("          <summary>");
+        sb.Append($"<span class=\"codemap-tree-path\">{PathUtil.Html(node.Label)}</span>");
+        sb.Append($"<span class=\"codemap-tree-meta\">{descendants.Count.ToString("N0", CultureInfo.InvariantCulture)} {Charts.Plural(descendants.Count, "file", "files")} · {node.Lines.ToString("N0", CultureInfo.InvariantCulture)} {Charts.Plural((int)Math.Min(node.Lines, int.MaxValue), "line", "lines")}</span>");
+        sb.Append("</summary>\n");
+
+        foreach (var child in Charts.OrderCodeMapLevel(childDirs))
+        {
+            AppendTreeNode(sb, child, shownPaths, expanded, hasMetrics, fileHref, prefix, depth + 1);
+        }
+
+        if (ownFiles.Count > 0)
+        {
+            AppendFileTable(sb, Charts.OrderCodeMapLevel(ownFiles), hasMetrics, fileHref, prefix);
+        }
+
+        sb.Append("        </details>\n");
+    }
+
+    /// <summary>One directory's own files as a real <c>&lt;table&gt;</c> — the part of Design Direction #5 that is
+    /// preserved verbatim. Every level emits a full <c>&lt;thead&gt;</c> with <c>&lt;th scope="col"&gt;</c>, so the
+    /// column semantics survive at every depth unconditionally; whether a nested header is VISUALLY repeated is a
+    /// pure stylesheet decision, which is where it belongs rather than baked into the markup.
+    /// <para>The row shape — <c>&lt;tr class="codemap-table-row is-spec|is-test"&gt;&lt;th scope="row"&gt;</c> with
+    /// the FULL repo-relative path as the link text — is byte-identical to the flat table's. That is deliberate on
+    /// two counts: it is what keeps the pure-CSS spec/test filter working with no rule change (the selector is a
+    /// DESCENDANT of the section, so deeper nesting is a no-op), and the full path is what discharges ADR 0013 §2's
+    /// completeness contract. Indentation carries the hierarchy; it must not also have to carry the identity.</para></summary>
+    private static void AppendFileTable(
+        StringBuilder sb, IEnumerable<CodeMapNode> files, bool hasMetrics,
+        Func<string, string?>? fileHref, string prefix)
+    {
+        sb.Append("          <table class=\"codemap-table\">\n");
+        sb.Append("            <thead><tr><th scope=\"col\">File</th><th scope=\"col\" class=\"num\">Lines</th><th scope=\"col\">Type</th>");
         if (hasMetrics)
         {
             sb.Append("<th scope=\"col\" class=\"num\">Changes</th><th scope=\"col\" class=\"num\">Churn</th><th scope=\"col\" class=\"num\">Avg</th><th scope=\"col\" class=\"num\">Together</th><th scope=\"col\">First</th><th scope=\"col\">Last</th>");
         }
-        sb.Append("</tr></thead>\n        <tbody>\n");
+        sb.Append("</tr></thead>\n            <tbody>\n");
 
-        foreach (var file in shown)
+        foreach (var file in files)
         {
             var href = fileHref?.Invoke(file.RepoRelativePath);
             var pathCell = href is { Length: > 0 } target
@@ -371,7 +479,7 @@ public static class CodeMapTemplater
             if (CodeMap.IsSpecDevPath(file.RepoRelativePath)) rowClass += " is-spec";
             if (CodeMap.IsTestPath(file.RepoRelativePath)) rowClass += " is-test";
 
-            sb.Append("          <tr class=\"").Append(rowClass).Append("\"><th scope=\"row\">").Append(pathCell).Append("</th>");
+            sb.Append("              <tr class=\"").Append(rowClass).Append("\"><th scope=\"row\">").Append(pathCell).Append("</th>");
             sb.Append($"<td class=\"num\">{file.Lines.ToString("N0", CultureInfo.InvariantCulture)}</td>");
             // Always present, independent of hasMetrics — the categorical dimension's text equivalent. [Story 7.9]
             sb.Append($"<td>{PathUtil.Html((file.Category ?? CodeFileType.Other).Label)}</td>");
@@ -397,55 +505,93 @@ public static class CodeMapTemplater
             sb.Append("</tr>\n");
         }
 
-        // [Review][Patch] ONE truncation row per view, each carrying THAT view's own omission count and tagged with
-        // the same `data-codemap-view` marker every other per-view fact in this section uses. It was a single
-        // un-markered row before, so it showed in all four combinations with the distinct-set count — including
-        // directly beneath "No files match this filter." — and, being outside `.codemap-table-row`, it is invisible
-        // to the pager and so repeated on every page. Views that omit nothing emit no row at all, exactly as
-        // before, so the common (under-cap) case is byte-identical.
-        var colspan = hasMetrics ? 9 : 3;
-        foreach (var variant in variants)
+        sb.Append("            </tbody>\n          </table>\n");
+    }
+
+    /// <summary>The directory-level half of the pure-CSS spec/test filter, precomputed here so the stylesheet needs
+    /// three flat rules instead of counting.
+    ///
+    /// <para>Rows hide themselves — the existing <c>.codemap-table-row.is-spec</c> rules are descendant selectors
+    /// and are unaffected by nesting. A DIRECTORY must also disappear when every file beneath it would be filtered
+    /// out, or the listing shows empty disclosures. Emitting the predicate as a class is what keeps that expressible
+    /// without JavaScript and without <c>:has()</c>: it is a pure function over the subtree, unit-testable on its
+    /// own, and it cannot disagree with the server-side truth the way a CSS-evaluated approximation could.</para>
+    ///
+    /// <para><b>Computed over DESCENDANT FILE paths, never the directory's own path.</b>
+    /// <see cref="CodeMap.IsSpecDevPath"/> matches on <c>prefix + "/"</c>, so it returns <c>false</c> for the
+    /// directory <c>.claude</c> itself while returning <c>true</c> for everything inside it — a marker derived from
+    /// the directory path would be wrong for exactly the directories the filter exists to hide. Deriving both
+    /// markers the same way also means a non-test-NAMED directory holding only test files is correctly hidden.</para></summary>
+    private static string DirectoryFilterMarkers(IReadOnlyList<string> descendantFiles)
+    {
+        if (descendantFiles.Count == 0) return string.Empty;
+
+        var allSpec = true;
+        var allTest = true;
+        var allExcluded = true;
+        foreach (var path in descendantFiles)
         {
-            var vOmitted = omittedByView[variant.Key];
-            if (vOmitted == 0) continue;
-            sb.Append($"          <tr class=\"codemap-table-truncated\" data-codemap-view=\"{PathUtil.Html(variant.Key)}\"><td colspan=\"{colspan}\">+{vOmitted.ToString("N0", CultureInfo.InvariantCulture)} more ")
-              .Append(Charts.Plural(vOmitted, "file", "files"))
-              .Append(" not shown in this table — each still has its own colored, focusable rectangle in the treemap above.</td></tr>\n");
+            var spec = CodeMap.IsSpecDevPath(path);
+            var test = CodeMap.IsTestPath(path);
+            if (!spec) allSpec = false;
+            if (!test) allTest = false;
+            if (!spec && !test) allExcluded = false;
+            if (!allSpec && !allTest && !allExcluded) break;
         }
 
-        sb.Append("        </tbody>\n      </table>\n");
-        AppendCodeMapTablePager(sb);
-        sb.Append("    </section>\n\n");
+        var markers = string.Empty;
+        if (allSpec) markers += " dir-all-spec";
+        if (allTest) markers += " dir-all-test";
+        if (allExcluded) markers += " dir-all-excluded";
+        return markers;
     }
 
-    /// <summary>The number of rows the file table shows per page once client-side pagination kicks in — sized to
-    /// match <see cref="RiskQuadrantTemplater"/>'s elevated-risk grid pager in rendered PAGE HEIGHT, not in item
-    /// count. Owner feedback (Story 7.12 review): the "All files" table could run to hundreds/thousands of rows on
-    /// a real repo with no way to page through it.
-    ///
-    /// <para><b>Why 18 and not 30.</b> This was 30, justified as "sized larger since a table row is far denser than
-    /// a card". Measured on the live page, that reasoning does not carry its own conclusion: a row renders at
-    /// <b>55.4 px</b> against the risk grid's <b>83.8 px</b> card, so a row is denser by only 1.5× while 30-vs-12 is
-    /// 2.5× — and the result was a 1,719 px page, <b>1.89 viewports</b> tall at a 910 px viewport. Only ~14 rows fit
-    /// on screen, so page 1 always ran about two screens and the reader had to scroll past the entire table to reach
-    /// the Next button. At 18 the page is ~998 px, within a pixel-and-a-half of the risk grid's own 981 px page, so
-    /// the two pagers on the site are consistent in the thing the reader actually perceives. [Owner feedback
-    /// 2026-07-29, after the Story 20.10 code review]</para></summary>
-    private const int CodeMapTablePageSize = 18;
-
-    /// <summary>The client-side pager control for the file table (progressive enhancement ONLY — every row
-    /// always renders in the markup, in order, as the complete no-JS truth; specscribe.js's
-    /// <c>initCodemapTablePager</c> only reveals this control and hides off-page rows once there's more than one
-    /// page's worth). Mirrors <see cref="RiskQuadrantTemplater"/>'s <c>.risk-pager</c> exactly — same shape, new
-    /// class family so the two pagers can never cross-wire. Emitted <c>hidden</c>; sits immediately after the
-    /// table (not before it) so a no-JS visitor never sees inert controls, matching the risk grid's own
-    /// "controls belong at the bottom of the list they page" precedent.</summary>
-    private static void AppendCodeMapTablePager(StringBuilder sb)
+    private static IEnumerable<string> DescendantFilePaths(CodeMapNode node)
     {
-        sb.Append("      <div class=\"codemap-table-pager\" hidden>\n");
-        sb.Append("        <button type=\"button\" class=\"codemap-table-pager-prev\" aria-label=\"Previous page of files\">&lsaquo; Prev</button>\n");
-        sb.Append("        <span class=\"codemap-table-pager-status\" aria-live=\"polite\"></span>\n");
-        sb.Append("        <button type=\"button\" class=\"codemap-table-pager-next\" aria-label=\"Next page of files\">Next &rsaquo;</button>\n");
-        sb.Append("      </div>\n");
+        foreach (var child in node.Children)
+        {
+            if (child.IsDirectory)
+            {
+                foreach (var path in DescendantFilePaths(child)) yield return path;
+            }
+            else
+            {
+                yield return child.RepoRelativePath;
+            }
+        }
     }
+
+    private static bool SubtreeHasShownFile(CodeMapNode node, HashSet<string> shownPaths)
+    {
+        foreach (var child in node.Children)
+        {
+            if (child.IsDirectory)
+            {
+                if (SubtreeHasShownFile(child, shownPaths)) return true;
+            }
+            else if (shownPaths.Contains(child.RepoRelativePath))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>How many of the most significant files get their ancestor directories opened on load. Sized so the
+    /// listing opens on roughly a screenful of the busiest code — the same job the retired 18-row pager page did,
+    /// achieved by disclosure rather than by pagination.
+    ///
+    /// <para><b>The pager is gone, deliberately.</b> It existed because of owner feedback at the Story 7.12 review
+    /// ("hundreds/thousands of rows with no way to page through it"), and collapsed directories answer that
+    /// complaint strictly better: they are structural rather than arbitrary, and <c>&lt;details&gt;</c> works with
+    /// JavaScript off, which the pager did not. The two cannot honestly coexist — a pager over a partially expanded
+    /// tree reports a page count that changes on every disclosure click, and <c>initCodemapTablePager</c> already
+    /// had to reconcile two hiding mechanisms (<c>row.hidden</c> and the CSS filter); <c>&lt;details&gt;</c> would
+    /// have been a third. <see cref="RiskQuadrantTemplater"/>'s own <c>.risk-pager</c> is a separate class family
+    /// and is untouched.</para></summary>
+    private const int TreeAutoExpandFiles = 25;
+
+    /// <summary>Depth guard for the recursive emit — a defence against a pathological path, matching the cap
+    /// <see cref="HierarchyExplorer"/>'s twin emitter uses. No real repository approaches it.</summary>
+    private const int MaxTreeDepth = 12;
 }

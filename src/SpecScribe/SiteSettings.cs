@@ -125,8 +125,10 @@ public class SiteSettings : CommandSettings
     /// Used only by the <c>webview</c>/extension path so the VS Code extension is usable in ANY workspace: generation
     /// then degrades to README + Code Map + git-if-present rather than failing. The interactive/CLI
     /// <c>generate</c>/<c>watch</c> commands keep <see cref="Resolve"/> and its actionable error (CLI honesty).
+    /// <para><paramref name="startDirectory"/> mirrors <see cref="Resolve(string?)"/> and is injected only for
+    /// headless testing and deterministic resolver calls.</para>
     /// [spec-vscode-any-workspace-and-processing-indicators]</summary>
-    public ForgeOptions ResolveTolerant() => ForgeOptions.Resolve(Source, Adrs, Output, ProjectName, includeReadme: !NoReadme, deepGitAnalytics: DeepGit, emitSpa: Spa, codeSourceBaseUrl: CodeUrl, autoDetectCodeUrl: true, requireSource: false, dateCutoff: ResolveDateCutoff());
+    public ForgeOptions ResolveTolerant(string? startDirectory = null) => ForgeOptions.Resolve(Source, Adrs, Output, ProjectName, startDirectory: startDirectory, includeReadme: !NoReadme, deepGitAnalytics: DeepGit, emitSpa: Spa, codeSourceBaseUrl: CodeUrl, autoDetectCodeUrl: true, requireSource: false, dateCutoff: ResolveDateCutoff());
 
     /// <summary>Parses <c>--today-policy</c> / <c>--as-of</c> into the typed <see cref="DateCutoff"/>. An absent
     /// value keeps the default; an UNRECOGNIZED or conflicting one throws rather than silently defaulting — a typo

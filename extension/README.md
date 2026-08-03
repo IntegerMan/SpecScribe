@@ -1,13 +1,18 @@
 # SpecScribe — VS Code extension
 
-A **read-only, live-updating in-editor view** of a SpecScribe project's dashboard and epics surfaces
-(dashboard, epics index, epic pages, story pages, story placeholders — Story 6.4's navigable set).
+A **live-updating in-editor view** of a SpecScribe project's dashboard and epics surfaces
+(dashboard, epics index, epic pages, story pages, story placeholders — Story 6.4's navigable set), plus a form for
+the project's own settings.
 
 All rendering happens in the **SpecScribe C# core**: the extension spawns `specscribe webview`, reads one JSON
 bundle of finished CSP-safe HTML from stdout, injects the webview's `cspSource` + a script nonce, and assigns
 `webview.html` once. Navigation and file-change refreshes are in-place `postMessage` content swaps — the panel
-never resets. The shim parses no markdown, scrapes no generated site, and writes nothing (ADR 0005 / AD-1 /
-AD-2 / AD-6).
+never resets. The shim parses no markdown and scrapes no generated site (ADR 0005 / AD-1 / AD-2).
+
+**Read-only over project artifacts.** Nothing here writes a source artifact, an `_bmad-output` file or the output
+tree; Generate and Watch are *staged* into a terminal for you to run. The one exception is scoped to a single file:
+**Project Settings** writes `.specscribe/config.json` — and even then the extension does not write it. Save spawns
+`specscribe config --save`, so the core stays the only writer ([ADR 0037](../docs/adrs/0037-extension-authors-settings-through-the-core.md)).
 
 ## Running against this repo (F5 dev host)
 

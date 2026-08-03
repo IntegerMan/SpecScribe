@@ -38,6 +38,14 @@ app.Configure(config =>
         .WithExample(["watch", "--adrs", "./docs/decisions"]);
     config.AddCommand<WebviewCommand>("webview")
         .WithDescription("Render the VS Code webview surface bundle as JSON on stdout (used by the SpecScribe extension).");
+    // The non-interactive door onto `.specscribe` — until this existed, the settings could only be written by the
+    // interactive menu, which is why the extension could not offer to configure anything. [ADR 0037]
+    config.AddCommand<ConfigCommand>("config")
+        .WithDescription("Show, export or write the directory-scoped .specscribe settings.")
+        .WithExample(["config"])
+        .WithExample(["config", "--json"])
+        .WithExample(["config", "--save", "--deep-git"])
+        .WithExample(["config", "--save", "--clear", "code_url"]);
     config.PropagateExceptions();
 });
 

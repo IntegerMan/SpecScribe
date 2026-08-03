@@ -305,7 +305,14 @@ public sealed class NuxtPrerender
                 if (failure is not null)
                 {
                     failed++;
-                    // A reported error, never a silently missing page (AC #7). The diagnostics page is the surface.
+                    // A reported error, never a silently missing page (AC #7).
+                    //
+                    // ⚠️ The surface is the CONSOLE and the exit code, NOT the diagnostics page — this comment used
+                    // to claim the page and was wrong. The prerender can only run after EmitSpaSite has put the
+                    // manifest on disk, which is after WriteDiagnostics has already snapshotted its notice list, so
+                    // a per-route failure raised here has nowhere on the page to land. The PREREQUISITE class (no
+                    // Node, no artefact) is checked early by SiteGenerator.PrerenderPreflight precisely so it does
+                    // reach the page; per-route failures need an actual render and cannot.
                     events.Add(new GenerationEvent(GenerationOutcome.Error, route, routeSw.Elapsed, failure));
                     continue;
                 }

@@ -288,6 +288,53 @@ public static class SettingsStore
         }
     }
 
+    /// <summary>Writes an ALREADY-BUILT <see cref="SavedSettings"/> document verbatim, through the same location
+    /// resolution and legacy-file migration <see cref="TrySave"/> uses. Returns the folder path on success, or null
+    /// when the write failed. [ADR 0037]
+    ///
+    /// <para><b>Why not just call <see cref="TrySave"/>.</b> That overload runs <see cref="Capture"/> over the
+    /// MERGED live settings, which would re-persist auto-discovered values as if the user had chosen them — the
+    /// exact trap <c>ConfigurePaths</c> sidesteps for <c>CodeUrl</c>, where accepting an auto-detected branch URL as
+    /// the prompt default would freeze future runs onto today's branch. A caller that has computed precisely which
+    /// fields the user set (the <c>config --save</c> path, and the settings form behind it) must be able to write
+    /// that and nothing else.</para>
+    ///
+    /// <para><b>⚠️ Two deliberate divergences from <see cref="TrySave"/>, both required by the form.</b></para>
+    /// <list type="number">
+    /// <item>It writes even when <see cref="SavedSettings.IsEmpty"/>. That guard exists to avoid creating a file
+    /// nobody asked for; here the user pressed Save, and clearing every field back to its default is a legitimate
+    /// thing to have asked for. <see cref="TryReadCandidate"/> already treats an empty document as "no saved
+    /// settings", so <c>{}</c> is harmless and honest.</item>
+    /// <item>It never deletes the <c>.specscribe</c> FOLDER. ADR 0014 made it a container precisely so other
+    /// per-directory state could live beside the config; removing it because the config went empty would take that
+    /// with it.</item>
+    /// </list></summary>
+    public static string? TrySaveExplicit(SavedSettings saved, string? startDirectory = null)
+    {
+        var path = ResolvePath(startDirectory);
+        try
+        {
+            // Migrate: a legacy flat file and the new folder can't coexist under the same name. Same rule as
+            // TrySave — this deletes the legacy FILE, never the folder.
+            if (File.Exists(path)) File.Delete(path);
+
+            Directory.CreateDirectory(path);
+            File.WriteAllText(Path.Combine(path, ConfigFileName), JsonSerializer.Serialize(saved, SerializerOptions));
+            return path;
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // A read-only checkout or a permission-denied path is a "could not save", not a crash — the form shows
+            // the failure and the user's typed values are still theirs to retry with. TrySave predates this arm and
+            // would throw here; a save driven from a button must not take the editor down with it.
+            return null;
+        }
+    }
+
     /// <summary>Copies saved values onto the live settings, but only where the user didn't already pass a value
     /// on the command line — explicit CLI options always win over the persisted file.</summary>
     public static void ApplyTo(SavedSettings saved, SiteSettings settings)

@@ -285,20 +285,27 @@ public class HierarchyRolloutTests
         Assert.DoesNotContain("var STATUS_CLASS", js);
         Assert.Contains("colorClass", js);
 
-        // Every retired client renderer, gone by name — Story 20.7's three, plus Story 20.9's two.
+        // Every retired client renderer, gone by name — Story 20.7's three, plus Story 20.9's two, plus the Code
+        // Map file-table pager (owner feedback 2026-08-01).
+        //
+        // The pager was previously pinned as KEPT here, on the reasoning that removing it would strip a control
+        // from the one listing a JS-off visitor reads. That reasoning is what INVERTED, not what was overruled:
+        // "All files" is now a tree of native <details>, so the listing's navigation control works with JavaScript
+        // OFF — strictly better than a pager that only ever worked with it on. The twin decision is untouched (the
+        // listing is still HierarchyTwinDisplay.External); only its shape moved.
         foreach (var fn in new[]
                  {
                      "function initSunburstExplorer", "function renderSunburst", "function arcPath",
                      "function initImpactMap", "function initCodeMapPanel", "function initOwnershipSunburst",
+                     "function initCodemapTablePager",
                  })
         {
             Assert.DoesNotContain(fn, js);
         }
 
-        // KEPT, and deliberately: it paginates the Code Map's per-variant file table, which Story 20.6 D1 audited
-        // and kept as that surface's text twin. Sweeping it up with the renderers would have removed a control
-        // over the one listing a JS-off visitor reads.
-        Assert.Contains("function initCodemapTablePager", js);
+        // KEPT, and deliberately: the risk quadrant's elevated-risk grid is still a flat list with no structure to
+        // disclose, so its pager is still the right control. Separate class family, separate surface.
+        Assert.Contains("function initRiskGridPager", js);
     }
 
     [Fact]

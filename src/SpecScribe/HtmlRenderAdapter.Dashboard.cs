@@ -44,6 +44,29 @@ public sealed partial class HtmlRenderAdapter
         // Tile band — journey groups tagged for work-stage visibility. [Story 9.8]
         AppendTileBand(sb, view, p);
 
+        // ── The epic-free project ─────────────────────────────────────────────────────────────────────────────
+        //
+        // With no epics model, every panel from here down is either omitted or renders a zero — so the tile band is
+        // followed by nothing a visitor can act on, and the surfaces that DO have something to say (code map, risk
+        // quadrant, git insights) live only in the nav dropdown. Field feedback 2026-08-01 from a project with a
+        // PRD and no epics: the portal read as broken rather than as early.
+        //
+        // So in that state, and ONLY that state, the two panels below are promoted to the top: what is missing and
+        // how to create it, then what is already explorable. With epics present the page has its own lead and the
+        // explore panel sinks to its ordinary place near Git Pulse (below).
+        var epicFree = view.Epics is null;
+        if (epicFree)
+        {
+            if (view.NoEpicsGuidanceHtml.Length > 0)
+            {
+                sb.Append("<div class=\"chart-panel no-epics-panel wm-panel wm-show-overview wm-show-plan\">\n");
+                sb.Append("<h3>Next step</h3>\n");
+                sb.Append(view.NoEpicsGuidanceHtml);
+                sb.Append("</div>\n\n");
+            }
+            AppendExplorePanel(sb, view);
+        }
+
         // Sunburst — Overview pulse.
         if (view.Epics is { } epicsForSunburst)
         {
@@ -150,6 +173,14 @@ public sealed partial class HtmlRenderAdapter
             ? Charts.GitPulsePanel(pulse, codeItemHref, dateCutoff)
             : "<div class=\"chart-empty git-pulse-empty\" data-tooltip=\"Run in a git repository to enable commit stats\" tabindex=\"0\">—</div>\n");
         sb.Append("</div>\n\n");
+
+        // Explore this codebase — the insight surfaces as cards, in their ORDINARY position: next to Git Pulse,
+        // whose header already links to two of the same pages. Promoted to the top of the page instead when the
+        // project has no epics (see the block after the tile band) — one panel, one of two positions, never both.
+        if (!epicFree)
+        {
+            AppendExplorePanel(sb, view);
+        }
 
         // Planning documents — Requirements.
         if (view.Coverage is { IsEmpty: false } coverage)
@@ -521,6 +552,23 @@ public sealed partial class HtmlRenderAdapter
         "Epics" => "Epics & Stories",
         _ => label,
     };
+
+    /// <summary>The "Explore this codebase" panel — <see cref="DashboardView.ExploreHtml"/> in a framed panel.
+    /// <para>Called from exactly one of two positions depending on whether the project has epics, which is why it
+    /// is a method rather than an inline block: the same bytes must be produced either way, or the two states would
+    /// drift into two panels that merely look alike.</para>
+    /// <para>Work modes: Overview (it is a headline affordance on an epic-free project) and Develop (it sits beside
+    /// Git Pulse otherwise). Omitted entirely when the run generated no insight surface — absent, never an empty
+    /// panel (NFR8).</para></summary>
+    private static void AppendExplorePanel(StringBuilder sb, DashboardView view)
+    {
+        if (view.ExploreHtml.Length == 0) return;
+
+        sb.Append("<div class=\"chart-panel explore-panel wm-panel wm-show-overview wm-show-develop\">\n");
+        sb.Append("<h3>Explore this codebase</h3>\n");
+        sb.Append(view.ExploreHtml);
+        sb.Append("</div>\n\n");
+    }
 
     /// <summary>Artifact-family accent class for a key-view chip or group trigger
     /// (planning / architecture / epics / requirements).</summary>
