@@ -9,18 +9,43 @@
 // Proven in BOTH directions during Story 23.3 (see the story record): observed RED before extraction and
 // RED on a hand-edited rule, not only green. A gate only ever seen passing is not a gate.
 
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 import { buildIrContentCss } from './ir-content-build.mjs'
 import {
+  irManifestPath,
   OUT_CSS,
   OUT_MANIFEST,
   OUT_RUNTIME_CSS,
   OUT_SHARED_CSS,
   readCommitted,
   SOURCE_LABEL,
+  wantsIfIrSkip,
 } from './ir-content-lib.mjs'
+
+// `--if-ir` — skip (exit 0, loudly) when no IR exists yet, instead of failing on the precondition.
+//
+// This gate needs a generated IR, but `pregenerate`/`prebuild` run BEFORE the build that would produce one,
+// so wiring it in unconditionally would hard-fail every cold build — the cycle
+// `.github/workflows/build-test-analyze.yml` documents at its "ORDER OF THE NEXT FOUR STEPS" note.
+//
+// The flag resolves it by gating only what it can actually see. The realistic mistake is not a cold build;
+// it is editing `specscribe.css` and re-running `generate` against an output root that ALREADY exists, which
+// is precisely the case CLAUDE.md's regeneration-order rule warns about (a stylesheet edit extracted from an
+// IR that predates the new markup silently prunes rules). In that case the IR is present and the gate fires.
+//
+// The skip is deliberately NOISY. A silent skip is how a gate rots into decoration — the operator has to be
+// told the check did not run and what closes the gap.
+if (wantsIfIrSkip(process.argv)) {
+  const manifest = irManifestPath(process.env, process.cwd())
+  if (!existsSync(manifest)) {
+    console.warn(`check:ir-content SKIPPED — no IR at ${manifest}`)
+    console.warn('  The generated CSS layers were NOT checked for drift on this build.')
+    console.warn('  Run `npm run check` after generating to close this gap.')
+    process.exit(0)
+  }
+}
 
 let expected
 try {
