@@ -16,6 +16,16 @@ var app = new CommandApp<InteractiveCommand>();
 app.Configure(config =>
 {
     config.SetApplicationName("specscribe");
+    // Enables Spectre's built-in `-v` / `--version`, which "requires ApplicationVersion to be configured in the
+    // application" — without this call the global flag is not a flag at all, and UseStrictParsing below turns it
+    // into `Unknown option 'version'` (exit 1). On a terminal that then falls through to the interactive menu
+    // via the CommandParseException arm, so `specscribe --version` misfired as a MENU rather than as an error.
+    // [Story 16.3 AC #2]
+    //
+    // Sourced from the assembly through ProductMetadata rather than from a literal, so the CLI and the About
+    // page cannot drift: both now read the same MinVer-derived InformationalVersion, with the "+<sha>" build
+    // metadata split off (the hash is shown on the About page's Build row, not in `--version`).
+    config.SetApplicationVersion(ProductMetadata.FromAssembly().Version);
     config.UseStrictParsing(); // typo'd options should fail loudly (and fall back to the menu), not be ignored
 
     // Real, runnable invocations on `specscribe --help`. The zero-flag forms come first because auto-discovery is

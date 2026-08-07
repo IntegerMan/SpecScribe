@@ -22,6 +22,34 @@ public class AboutTemplaterTests
         Assert.Equal(PathUtil.RepositoryUrl, meta.RepositoryUrl);
     }
 
+    [Fact]
+    public void FromAssembly_OnThisBuild_StillCarriesACommitHashAndAPreReleaseLabel()
+    {
+        // ⚠️ TWO SILENT REGRESSIONS THIS PINS, both of which leave the whole suite green. [Story 16.3 AC #1]
+        //
+        // (1) THE COMMIT HASH. Story 16.3 moved version derivation to MinVer, which sets InformationalVersion
+        //     itself. The "+<sha>" suffix comes from the SDK's SourceLink path (SourceRevisionId); if MinVer's
+        //     assignment were to land AFTER the SDK's append, the suffix would simply be gone — and it would
+        //     not error, because ParseInformationalVersion DROPS an implausible suffix rather than showing a
+        //     bogus hash (IsShaLike). The About page's Build row would quietly lose the commit and nothing
+        //     above would notice: FromAssembly_ReadsMetadata asserts only that the TRIMMED version has no "+".
+        //
+        // (2) THE PRE-RELEASE LABEL. MinVer's undirected default on a tagless repository is 0.0.0-alpha.0, but
+        //     a mis-set MinVerDefaultPreReleaseIdentifiers (or a future stable tag) yields a bare 0.1.0 — which
+        //     removes the About page's "Preview" badge silently, since IsPrerelease is what drives it.
+        //     ADR 0040 §5: "the first release without the label is by definition no longer a preview."
+        //
+        // Asserted on SHAPE, never on a literal: the version carries a height that moves with every commit, and
+        // the sha changes on every build. A literal here would be a gate that fails for the wrong reason.
+        var meta = ProductMetadata.FromAssembly();
+
+        Assert.NotNull(meta.CommitHash);
+        Assert.Equal(7, meta.CommitHash!.Length);
+        Assert.True(meta.IsPrerelease, $"version '{meta.Version}' carries no pre-release label, so the About "
+            + "page's Preview badge has silently disappeared (ADR 0040 §5).");
+        Assert.StartsWith("0.", meta.Version); // ADR 0040 §5: the whole preview stays in 0.x
+    }
+
     [Theory]
     // Deterministic build with a full 40-char hex sha → version kept, hash truncated to the first 7.
     [InlineData("0.1.0-preview+9f8e7d6c5b4a3210fedcba98765432100abcdef1", "0.1.0-preview", "9f8e7d6")]
