@@ -97,7 +97,18 @@
 :root[data-ss-hierarchy-boot] .ir-content .chart-panel[data-hierarchy-mounted] .ss-hierarchy-booting,
 :root[data-ss-hierarchy-boot] .ir-content .chart-panel[data-hierarchy-failed] .ss-hierarchy-booting { display: none; }
 
-.ir-content .ss-hierarchy defs pattern > path { fill: none; }
+.ir-content .ss-hierarchy defs pattern > path { fill: none; stroke-opacity: 0.45; }
+
+.ir-content .ss-hierarchy g.slice path.surface:focus { outline: none; }
+
+.ir-content .ss-hierarchy g.slice path.surface:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 1px;
+}
+
+.ir-content .ss-hierarchy:hover g.slice { opacity: 0.5; }
+
+.ir-content .ss-hierarchy g.slice:hover { opacity: 1; }
 
 .ir-content .ss-hierarchy-controls { display: flex; justify-content: center; margin: 0 0 0.6rem; }
 
@@ -137,12 +148,85 @@
 
 .ir-content .ss-hierarchy-breadcrumb li + li::before { content: "\203A"; color: var(--ink-faded); margin-right: 0.05rem; }
 
+.ir-content .ss-hierarchy-crumb {
+  background: none;
+  border: 0;
+  color: var(--rust);
+  cursor: pointer;
+  padding: 0.1rem 0.2rem;
+  font: inherit;
+  border-radius: 3px;
+}
+
+.ir-content .ss-hierarchy-crumb:hover { text-decoration: underline; }
+
+.ir-content .ss-hierarchy-crumb:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+.ir-content .ss-hierarchy-crumb-current { color: var(--ink); font-weight: 600; }
+
+.ir-content .ss-hierarchy-crumb-open { font-size: 0.72rem; color: var(--rust); text-decoration: underline; }
+
+.ir-content .ss-hierarchy-crumb-open:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
+
 .ir-content .ss-hierarchy-legend-note {
   margin: 0.35rem 0 0;
   font-size: 0.72rem;
   color: var(--ink-faded);
   text-align: center;
 }
+
+.ir-content .ss-hierarchy-sw {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 2px;
+  margin-right: 0.35rem;
+  background: var(--status-unrecognized);
+}
+
+.ir-content .ss-hierarchy-sw.sb-pending { background: var(--status-pending); }
+
+.ir-content .ss-hierarchy-sw.sb-drafted { background: var(--status-drafted); }
+
+.ir-content .ss-hierarchy-sw.sb-ready { background: var(--status-ready); }
+
+.ir-content .ss-hierarchy-sw.sb-active { background: var(--status-active); }
+
+.ir-content .ss-hierarchy-sw.sb-review { background: var(--status-review); }
+
+.ir-content .ss-hierarchy-sw.sb-done { background: var(--status-done); }
+
+.ir-content .ss-hierarchy-sw.sb-retired { background: var(--status-deferred); }
+
+.ir-content .ss-hierarchy-sw.sb-unrecognized { background: var(--status-unrecognized); }
+
+.ir-content .ss-hierarchy-sw.sb-noplan {
+  background: var(--parchment-dark);
+  box-shadow: inset 0 0 0 1px var(--status-pending);
+  background-image: radial-gradient(var(--status-pending) 0.5px, transparent 0.6px);
+  background-size: 3px 3px;
+}
+
+.ir-content .ss-hierarchy-sw.sb-followup-open {
+  background: var(--sb-followup-open, #d97706);
+  background-image: repeating-linear-gradient(
+    45deg, transparent, transparent 1px, rgba(255, 255, 255, 0.55) 1px, rgba(255, 255, 255, 0.55) 2px);
+}
+
+.ir-content .ss-hierarchy-sw.sb-followup-done {
+  background: var(--sb-followup-done, var(--status-done));
+  background-image: repeating-linear-gradient(
+    -45deg, transparent, transparent 1px, rgba(255, 255, 255, 0.55) 1px, rgba(255, 255, 255, 0.55) 2px);
+}
+
+.ir-content .ss-hierarchy-sw.sb-unplanned {
+  background: var(--sb-unplanned, #0e7490);
+  background-image:
+    repeating-linear-gradient(45deg, transparent, transparent 1px, rgba(255, 255, 255, 0.55) 1px, rgba(255, 255, 255, 0.55) 2px),
+    repeating-linear-gradient(-45deg, transparent, transparent 1px, rgba(255, 255, 255, 0.55) 1px, rgba(255, 255, 255, 0.55) 2px);
+}
+
+.ir-content .ss-hierarchy-probe .sb-noplan { fill: var(--parchment-dark); }
 
 .ir-content .ss-hierarchy-twin { margin-top: 0.8rem; font-size: 0.8rem; }
 
@@ -288,6 +372,8 @@
 .ir-content [data-related-ready] .related-card[data-related-node] { display: none; }
 
 .ir-content [data-related-ready][data-related-scope] .related-card-project { display: none; }
+
+.ir-content [data-related-ready] .related-card[data-related-node].is-related-current { display: block; }
 
 .ir-content .site-nav {
   position: sticky;
@@ -5226,27 +5312,6 @@ body:has(#wm-review:checked) .ir-content .dashboard-tile-band {
   border-radius: 6px;
 }
 
-.ir-content .codemap-card { display: block; white-space: normal; min-width: 11rem; max-width: 17rem; }
-
-.ir-content .codemap-card-name { display: block; font-weight: 700; color: var(--ink); font-size: 0.8rem; }
-
-.ir-content .codemap-card-path {
-  display: block;
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-  font-size: 0.66rem;
-  color: var(--ink-faded);
-  margin: 0.1rem 0 0.4rem;
-  word-break: break-all;
-}
-
-.ir-content .codemap-card-metrics { margin: 0; display: grid; grid-template-columns: auto auto; gap: 0.08rem 0.7rem; }
-
-.ir-content .codemap-card-metrics > div { display: contents; }
-
-.ir-content .codemap-card-metrics dt { color: var(--ink-faded); font-weight: 400; }
-
-.ir-content .codemap-card-metrics dd { margin: 0; color: var(--ink); font-variant-numeric: tabular-nums; text-align: right; }
-
 .ir-content .next-steps-list li { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.5rem; }
 
 .ir-content .next-steps-list li .cmd-badge { order: 1; }
@@ -5456,6 +5521,10 @@ body:has(#wm-review:checked) .ir-content .dashboard-tile-band {
 
 .ir-content .donut { animation: chart-enter var(--motion-entrance) var(--motion-ease) both; }
 
+.ir-content [data-related-ready] .related-card[data-related-node].is-related-current {
+    animation: sb-drill-fade var(--motion-fast) var(--motion-ease);
+  }
+
 .ir-content .heatmap .heatmap-cell {
     animation: cell-fade var(--motion-entrance) var(--motion-ease) both;
     animation-delay: min(calc(var(--motion-stagger) * var(--col, 0)), 0.4s);
@@ -5481,7 +5550,8 @@ body:has(#wm-review:checked) .ir-content .dashboard-tile-band {
 .ir-content .git-pulse,
 .ir-content .coverage,
 .ir-content .refinement-funnel,
-.ir-content .req-flow {
+.ir-content .req-flow,
+.ir-content [data-related-ready] .related-card[data-related-node].is-related-current {
     animation: none;
   }
 
@@ -6291,6 +6361,8 @@ body:has(main.followup-detail) .ir-content .doc-header {
 
 @media (prefers-reduced-motion: no-preference) {
 @keyframes progress-grow { from { width: 0; } }
+
+@keyframes sb-drill-fade { from { opacity: 0.35; } to { opacity: 1; } }
 
 @keyframes chart-enter {
     from { opacity: 0; transform: scale(0.94); }

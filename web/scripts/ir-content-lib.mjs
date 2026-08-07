@@ -31,6 +31,7 @@ export const SOURCE_CSS = fileURLToPath(
 export const OUT_CSS = fileURLToPath(new URL('../assets/ir-content.css', import.meta.url))
 export const OUT_MANIFEST = fileURLToPath(new URL('../assets/ir-content.manifest.json', import.meta.url))
 export const OUT_SHARED_CSS = fileURLToPath(new URL('../assets/shared-primitives.css', import.meta.url))
+export const OUT_RUNTIME_CSS = fileURLToPath(new URL('../assets/runtime-body.css', import.meta.url))
 
 /** Repo-relative label — never an absolute machine path, which would differ per checkout. */
 export const SOURCE_LABEL = 'src/SpecScribe/assets/specscribe.css'
@@ -79,6 +80,64 @@ export const SHARED_PRIMITIVES = ['pill']
 
 const SHARED_SET = new Set(SHARED_PRIMITIVES)
 
+// ── The runtime-body layer (UNSCOPED) ────────────────────────────────────────────────────────────────────
+//
+// ⚠️ A SECOND deliberate break of property 3 (SCOPED), for a second bounded allowlist, and NOT a widening of
+// the shared-primitive list above. See ADR 0039, which amends ADR 0029 to permit exactly this and no more.
+//
+// WHY IT IS A DIFFERENT CATEGORY. `SHARED_PRIMITIVES` answers "a C# primitive emits it AND a
+// template-authored Vue component consumes it" — both ends are markup. These classes have no markup end at
+// all on the page: `specscribe.js` creates the node at RUNTIME and attaches it to `document.body`, which is
+// OUTSIDE the `.ir-content` wrapper every scoped rule is nested under. `.ir-content .ss-tooltip` can
+// therefore never match, no matter what the harvest saw. Scoping is not merely unhelpful here, it is wrong.
+//
+// The body-level placement is deliberate and load-bearing, so "move the node instead" is not the cheaper
+// fix it looks like: `.ss-tooltip` is `position: absolute; z-index: 300` precisely so it layers above the
+// sticky nav and is clamped to the viewport rather than clipped by whatever ancestor it would otherwise sit
+// in (specscribe.css § "shared body-level `.ss-tooltip`"), and `specscribe.js` computes its coordinates in
+// PAGE space by adding `scrollX`/`scrollY`. Re-parenting it under `.ir-content` would trade a styling bug
+// for a positioning-and-clipping bug. [ADR 0039]
+//
+// ⚠️ HARVEST VISIBILITY IS NOT THE TEST — CONTAINMENT IS. `codemap-card*` is the worked example, and it is
+// why this list is not simply "whatever the harvest misses". Its markup IS server-built (`Charts.cs`
+// `BuildTreemapCard` writes `<div class='codemap-card'>` into the `data-tip-html` attribute), so the
+// harvest finds it and its rules were carried into the SCOPED layer perfectly happily — and were dead on
+// the page anyway, because that markup is only ever `innerHTML`'d into the body-level `.ss-tooltip` node.
+// A class can be perfectly visible to the harvest and still need to be here.
+//
+// THE ADMISSION TEST, so this list cannot grow by association: is this class only ever applied to a node
+// that is provably OUTSIDE `.ir-content`? "It is styled by JS-generated markup" is not sufficient — the
+// hierarchy explorer's own sector, probe, legend-swatch and breadcrumb classes are all runtime-applied too,
+// and they live INSIDE the chart panel, so they belong in the scoped layer and are seeded through
+// `CONDITIONAL_CLASSES` instead.
+
+/**
+ * Class names whose rules are emitted UNSCOPED because the node carrying them lives outside `.ir-content`.
+ *
+ * Two families, both of them tooltip: the shared body-level tip node itself, and the two rich cards that are
+ * rendered into it as `innerHTML` — the hierarchy explorer's (built in `specscribe.js` `tipCardFor`) and the
+ * code map's (built in C# `Charts.BuildTreemapCard`).
+ */
+export const RUNTIME_BODY_CLASSES = [
+  'ss-tooltip', //               the shared tip node — `ensureTip()` appends it to document.body
+  // The hierarchy explorer's rich card, built by `specscribe.js` `tipCardFor()` and set as the tip's
+  // innerHTML. Never in any markup, so the harvest cannot see it AND it could not be scoped if it could.
+  'ss-hierarchy-card',
+  'ss-hierarchy-card-kind',
+  'ss-hierarchy-card-name',
+  'ss-hierarchy-card-status',
+  'ss-hierarchy-card-detail',
+  'ss-hierarchy-card-hint',
+  // The code map's card. Server-built into `data-tip-html`, therefore HARVESTED — these rules were being
+  // carried into the scoped layer and were inert there. See the containment note above.
+  'codemap-card',
+  'codemap-card-name',
+  'codemap-card-path',
+  'codemap-card-metrics', // its dt/dd rows are element selectors under this class, so they ride along
+]
+
+const RUNTIME_SET = new Set(RUNTIME_BODY_CLASSES)
+
 /**
  * Does this selector belong to the unscoped shared layer?
  *
@@ -91,6 +150,23 @@ export function isSharedPrimitive(selector) {
   const { classes, ids } = selectorTokens(normalized)
   if (classes.length === 0 || ids.length > 0) return false
   return classes.every((c) => SHARED_SET.has(c))
+}
+
+/**
+ * Does this selector belong to the unscoped runtime-body layer? [ADR 0039]
+ *
+ * Same all-or-nothing shape as `isSharedPrimitive`, and for the same reason: a rule is carried only when
+ * EVERY class it names is on the allowlist, so a selector that reaches from the tip node back into page
+ * content (were one ever written) stays scoped rather than silently escaping containment.
+ *
+ * The two allowlists are disjoint by construction — see the guard test in `test/ir-content-lib.test.mjs`.
+ * A selector can therefore never be claimed by both layers, so "exactly one definition" still holds.
+ */
+export function isRuntimeBodyClass(selector) {
+  const normalized = selector.replace(/:root\b/g, 'html')
+  const { classes, ids } = selectorTokens(normalized)
+  if (classes.length === 0 || ids.length > 0) return false
+  return classes.every((c) => RUNTIME_SET.has(c))
 }
 
 /**
@@ -253,6 +329,29 @@ export const CONDITIONAL_CLASSES = [
   'milestone-band-name',
   'milestone-band-meta',
   'milestone-band-empty',
+  // ── Applied by specscribe.js at RUNTIME, INSIDE `.ir-content` ─────────────────────────────────────────
+  // The same probe-only visibility gap as `sb-%s` above, reached by a different route: these are stamped
+  // onto live DOM by the hierarchy explorer and the details rail after the page is rendered, so no harvest
+  // of static markup can ever find them. They belong in the SCOPED layer — unlike the tooltip families in
+  // `RUNTIME_BODY_CLASSES`, every one of these nodes is a descendant of the page's `.ir-content` wrapper.
+  //
+  // What their absence cost, all of it silent and all of it with every gate green [incident 2026-08-06]:
+  'is-related-current', //     Story 20.3's details rail. `specscribe.js` toggles it on the ONE card matching
+  //                          the selected node; the pruned rule was the `display: block` that un-hides it.
+  //                          Its `display: none` sibling survived, so selecting a node on the dashboard hid
+  //                          every card and revealed nothing — the rail went BLANK on select.
+  'ss-hierarchy-sector', //    stamped on every Plotly sector; the tooltip/hover/focus hook (`SEG`)
+  'ss-hierarchy-probe', //     the hidden colour-probe host. `.ss-hierarchy-probe .sb-noplan` gives no-plan a
+  //                          real chart fill; without it `fillFor` falls through to the STROKE and a no-plan
+  //                          wedge came out byte-identical to a Pending one.
+  'ss-hierarchy-sw', //        the legend's hatched swatches — the KEY that explains the hatching
+  'ss-hierarchy-crumb', //     the JS-built drill breadcrumb
+  'ss-hierarchy-crumb-current',
+  'ss-hierarchy-crumb-open',
+  // Plotly's OWN class names, on the sector nodes it emits. `.ss-hierarchy g.slice path.surface:focus`
+  // is the keyboard focus ring; it named two classes this repo never writes, so it was always dropped.
+  'slice',
+  'surface',
 ]
 
 /** Every class name the seeding above contributes, flattened. */
@@ -408,6 +507,27 @@ export function selectorAttributes(selector) {
  * element name. `:root` is normalized to `html` first so root-anchored rules reach `scopeSelector`, which
  * is where the decision about what can and cannot be scoped actually belongs.
  */
+/**
+ * WHICH tokens made `selectorIsUsed` say no — the companion this file went four incidents without.
+ *
+ * `selectorIsUsed` answers a yes/no that nothing records: a dropped rule leaves no trace in the manifest,
+ * no line in the log and no failing gate, so "silently absent from the shipped site" has been this layer's
+ * repeated failure mode (black sunburst fills, `owner-author-2`, the Code Map's id-bearing filter, and the
+ * tooltip/details-rail loss this function was added for). Reporting the CAUSE turns each of those from a
+ * live-browser discovery into a line a human can read at extraction time.
+ *
+ * Returns `{ classes, ids }` of the tokens that are absent. Empty arrays for both means the selector was
+ * carried, or was rejected on element name rather than on a token.
+ */
+export function missingTokens(selector, used) {
+  const normalized = selector.replace(/:root\b/g, 'html')
+  const { classes, ids } = selectorTokens(normalized)
+  return {
+    classes: classes.filter((c) => !used.classes.has(c)),
+    ids: ids.filter((id) => !used.ids.has(id)),
+  }
+}
+
 export function selectorIsUsed(selector, used) {
   const normalized = selector.replace(/:root\b/g, 'html')
   const { classes, ids } = selectorTokens(normalized)

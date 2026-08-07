@@ -49,20 +49,26 @@ export default defineNuxtConfig({
   telemetry: false,
   devtools: { enabled: false },
 
-  // The token bridge (23.2 AC #1), the app's own minimal base layer, the UNSCOPED shared-primitive layer
-  // (ADR 0029), and the scoped IR-content layer (23.3 AC #6). All three generated sheets come from the C#
-  // stylesheet — never hand-edit any of them; `npm run check:tokens` and `npm run check:ir-content` fail on
-  // drift. Deliberately NOT importing specscribe.css wholesale (the 23.1 spike's shape).
+  // The token bridge (23.2 AC #1), the app's own minimal base layer, the two UNSCOPED layers — shared
+  // primitives (ADR 0029) and runtime body-level classes (ADR 0039) — and the scoped IR-content layer
+  // (23.3 AC #6). All four generated sheets come from the C# stylesheet — never hand-edit any of them;
+  // `npm run check:tokens` and `npm run check:ir-content` fail on drift. Deliberately NOT importing
+  // specscribe.css wholesale (the 23.1 spike's shape).
   //
   // ORDER IS LOAD-BEARING. shared-primitives.css comes BEFORE ir-content.css so the scoped layer can override
   // it: every `.ir-content …` selector is at least (0,2,0) against an unscoped primitive's (0,1,0), so the
   // cascade already agrees, and source order settles the case where a future shared rule ties. A component's
   // own `<style scoped>` also outranks it — `.list-row-chip[data-v-x]` beats `.pill` — which is what lets
   // ListRow keep its layout properties while inheriting the shared look.
+  //
+  // runtime-body.css sits with it, and its ordering is NOT load-bearing in the same way: nothing in the
+  // scoped layer can name `.ss-tooltip` or the cards inside it, because the builder removes those selectors
+  // from that layer rather than duplicating them. It is placed here so both unscoped layers read together.
   css: [
     '~/assets/tokens.css',
     '~/assets/base.css',
     '~/assets/shared-primitives.css',
+    '~/assets/runtime-body.css',
     '~/assets/ir-content.css',
   ],
 

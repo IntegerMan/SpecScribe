@@ -1,0 +1,3078 @@
+{
+  "generatedBy": "web/scripts/extract-ir-content.mjs",
+  "why": "Selectors `selectorIsUsed` discarded because a class or id was absent from the harvest. NOT a defect list — the monolith styles surfaces this app does not render. It exists because the same silent drop shipped the sunburst black-fill, owner-author-2, Code Map filter and tooltip/details-rail regressions with every gate green. Deliberately NOT in ir-content.manifest.json: it is a function of the whole source stylesheet and would redden the gate on edits that cannot move the emitted layer.",
+  "droppedSelectors": 372,
+  "absentTokens": [
+    {
+      "token": "ownership-wedge",
+      "rules": 18
+    },
+    {
+      "token": "codemap-cell",
+      "rules": 15
+    },
+    {
+      "token": "req-index",
+      "rules": 11
+    },
+    {
+      "token": "sunburst",
+      "rules": 10
+    },
+    {
+      "token": "sprint-page",
+      "rules": 9
+    },
+    {
+      "token": "index-card--primary",
+      "rules": 7
+    },
+    {
+      "token": "req-stacked-bar",
+      "rules": 7
+    },
+    {
+      "token": "req-stacked-legend",
+      "rules": 7
+    },
+    {
+      "token": "followup-row-detail",
+      "rules": 6
+    },
+    {
+      "token": "followup-row-detail--primary",
+      "rules": 6
+    },
+    {
+      "token": "story",
+      "rules": 6
+    },
+    {
+      "token": "idea-entry-type",
+      "rules": 5
+    },
+    {
+      "token": "req-detail",
+      "rules": 5
+    },
+    {
+      "token": "summary-card",
+      "rules": 5
+    },
+    {
+      "token": "ta-table",
+      "rules": 5
+    },
+    {
+      "token": "ta-tier-legend",
+      "rules": 5
+    },
+    {
+      "token": "token",
+      "rules": 5
+    },
+    {
+      "token": "gi-filter",
+      "rules": 4
+    },
+    {
+      "token": "gi-pager-next",
+      "rules": 4
+    },
+    {
+      "token": "gi-pager-prev",
+      "rules": 4
+    },
+    {
+      "token": "impact-sb-link",
+      "rules": 4
+    },
+    {
+      "token": "impact-tm-link",
+      "rules": 4
+    },
+    {
+      "token": "quick-link-card",
+      "rules": 4
+    },
+    {
+      "token": "action-item-cross",
+      "rules": 3
+    },
+    {
+      "token": "coverage-chip",
+      "rules": 3
+    },
+    {
+      "token": "doc-footer",
+      "rules": 3
+    },
+    {
+      "token": "followup-detail",
+      "rules": 3
+    },
+    {
+      "token": "followup-row-detail-body",
+      "rules": 3
+    },
+    {
+      "token": "gi-sort-btn",
+      "rules": 3
+    },
+    {
+      "token": "idea-entry",
+      "rules": 3
+    },
+    {
+      "token": "idea-handoff",
+      "rules": 3
+    },
+    {
+      "token": "impact-arc",
+      "rules": 3
+    },
+    {
+      "token": "impact-tm-tile",
+      "rules": 3
+    },
+    {
+      "token": "index-card-branch",
+      "rules": 3
+    },
+    {
+      "token": "index-section-title",
+      "rules": 3
+    },
+    {
+      "token": "index-section-title-row",
+      "rules": 3
+    },
+    {
+      "token": "info-page",
+      "rules": 3
+    },
+    {
+      "token": "list-controls-group",
+      "rules": 3
+    },
+    {
+      "token": "list-controls-sort",
+      "rules": 3
+    },
+    {
+      "token": "list-row-group-heading",
+      "rules": 3
+    },
+    {
+      "token": "mini-donut",
+      "rules": 3
+    },
+    {
+      "token": "sb-center-zoom",
+      "rules": 3
+    },
+    {
+      "token": "ss-relgraph-node",
+      "rules": 3
+    },
+    {
+      "token": "tile-card-header",
+      "rules": 3
+    },
+    {
+      "token": "#impact-view-sunburst",
+      "rules": 2
+    },
+    {
+      "token": "#impact-view-treemap",
+      "rules": 2
+    },
+    {
+      "token": "code-aside",
+      "rules": 2
+    },
+    {
+      "token": "code-layout",
+      "rules": 2
+    },
+    {
+      "token": "codemap",
+      "rules": 2
+    },
+    {
+      "token": "commit-detail",
+      "rules": 2
+    },
+    {
+      "token": "copied",
+      "rules": 2
+    },
+    {
+      "token": "deep-page-panel-head",
+      "rules": 2
+    },
+    {
+      "token": "deferral-source-link",
+      "rules": 2
+    },
+    {
+      "token": "diagnostics-clear",
+      "rules": 2
+    },
+    {
+      "token": "gi-pager",
+      "rules": 2
+    },
+    {
+      "token": "idea-entry-crack",
+      "rules": 2
+    },
+    {
+      "token": "idea-entry-decision",
+      "rules": 2
+    },
+    {
+      "token": "idea-entry-kill",
+      "rules": 2
+    },
+    {
+      "token": "idea-entry-lock",
+      "rules": 2
+    },
+    {
+      "token": "impact-shape-sunburst",
+      "rules": 2
+    },
+    {
+      "token": "impact-shape-tabs",
+      "rules": 2
+    },
+    {
+      "token": "impact-shapes",
+      "rules": 2
+    },
+    {
+      "token": "is-anim",
+      "rules": 2
+    },
+    {
+      "token": "is-drilled",
+      "rules": 2
+    },
+    {
+      "token": "missing",
+      "rules": 2
+    },
+    {
+      "token": "sb-story-summary",
+      "rules": 2
+    },
+    {
+      "token": "stale",
+      "rules": 2
+    },
+    {
+      "token": "sunburst-center-label",
+      "rules": 2
+    },
+    {
+      "token": "sunburst-center-num",
+      "rules": 2
+    },
+    {
+      "token": "ta-gate-criteria",
+      "rules": 2
+    },
+    {
+      "token": "ta-intro",
+      "rules": 2
+    },
+    {
+      "token": "ta-section",
+      "rules": 2
+    },
+    {
+      "token": "action-item-resolve",
+      "rules": 1
+    },
+    {
+      "token": "action-item-resolve-hint",
+      "rules": 1
+    },
+    {
+      "token": "cdata",
+      "rules": 1
+    },
+    {
+      "token": "change-surface-head",
+      "rules": 1
+    },
+    {
+      "token": "change-surface-label",
+      "rules": 1
+    },
+    {
+      "token": "code-actions",
+      "rules": 1
+    },
+    {
+      "token": "code-insight-more",
+      "rules": 1
+    },
+    {
+      "token": "code-placeholder",
+      "rules": 1
+    },
+    {
+      "token": "code-tabs--released",
+      "rules": 1
+    },
+    {
+      "token": "codemap-dir-sunburst",
+      "rules": 1
+    },
+    {
+      "token": "codemap-notice",
+      "rules": 1
+    },
+    {
+      "token": "codemap-notice-secondary",
+      "rules": 1
+    },
+    {
+      "token": "comment",
+      "rules": 1
+    },
+    {
+      "token": "coverage-cta",
+      "rules": 1
+    },
+    {
+      "token": "deep-page",
+      "rules": 1
+    },
+    {
+      "token": "deep-page-lead",
+      "rules": 1
+    },
+    {
+      "token": "deep-page-note",
+      "rules": 1
+    },
+    {
+      "token": "deep-page-panel-count",
+      "rules": 1
+    },
+    {
+      "token": "deferral-sources",
+      "rules": 1
+    },
+    {
+      "token": "deferred-work-fallback",
+      "rules": 1
+    },
+    {
+      "token": "diag-error",
+      "rules": 1
+    },
+    {
+      "token": "diag-info",
+      "rules": 1
+    },
+    {
+      "token": "doctype",
+      "rules": 1
+    },
+    {
+      "token": "empty-state",
+      "rules": 1
+    },
+    {
+      "token": "epic-remaining-followup-open",
+      "rules": 1
+    },
+    {
+      "token": "followup-detail-cross",
+      "rules": 1
+    },
+    {
+      "token": "funnel-zero",
+      "rules": 1
+    },
+    {
+      "token": "gi-filter-count",
+      "rules": 1
+    },
+    {
+      "token": "gi-pager-status",
+      "rules": 1
+    },
+    {
+      "token": "gi-row-hidden",
+      "rules": 1
+    },
+    {
+      "token": "gi-solo-repo-note",
+      "rules": 1
+    },
+    {
+      "token": "gi-sort-glyph",
+      "rules": 1
+    },
+    {
+      "token": "git-pulse-empty",
+      "rules": 1
+    },
+    {
+      "token": "idea-chronology",
+      "rules": 1
+    },
+    {
+      "token": "idea-chronology-empty",
+      "rules": 1
+    },
+    {
+      "token": "idea-downstream-list",
+      "rules": 1
+    },
+    {
+      "token": "idea-entry-text",
+      "rules": 1
+    },
+    {
+      "token": "idea-link-unresolved",
+      "rules": 1
+    },
+    {
+      "token": "idea-outcome",
+      "rules": 1
+    },
+    {
+      "token": "idea-report-link",
+      "rules": 1
+    },
+    {
+      "token": "idea-report-note",
+      "rules": 1
+    },
+    {
+      "token": "ideas-intro",
+      "rules": 1
+    },
+    {
+      "token": "ideas-section",
+      "rules": 1
+    },
+    {
+      "token": "ideas-section-count",
+      "rules": 1
+    },
+    {
+      "token": "ideas-section-heading",
+      "rules": 1
+    },
+    {
+      "token": "impact-arc-dir",
+      "rules": 1
+    },
+    {
+      "token": "impact-controls",
+      "rules": 1
+    },
+    {
+      "token": "impact-sb",
+      "rules": 1
+    },
+    {
+      "token": "impact-sb-center",
+      "rules": 1
+    },
+    {
+      "token": "impact-shape",
+      "rules": 1
+    },
+    {
+      "token": "impact-shape-treemap",
+      "rules": 1
+    },
+    {
+      "token": "impact-tm",
+      "rules": 1
+    },
+    {
+      "token": "impact-tm-dir",
+      "rules": 1
+    },
+    {
+      "token": "impact-tm-dir-bg",
+      "rules": 1
+    },
+    {
+      "token": "impact-tm-label",
+      "rules": 1
+    },
+    {
+      "token": "impact-treemap",
+      "rules": 1
+    },
+    {
+      "token": "impact-treemap-empty",
+      "rules": 1
+    },
+    {
+      "token": "index-card-kicker",
+      "rules": 1
+    },
+    {
+      "token": "index-card-meta",
+      "rules": 1
+    },
+    {
+      "token": "index-card-summary",
+      "rules": 1
+    },
+    {
+      "token": "index-subgroup-label",
+      "rules": 1
+    },
+    {
+      "token": "is-current",
+      "rules": 1
+    },
+    {
+      "token": "is-open",
+      "rules": 1
+    },
+    {
+      "token": "is-static",
+      "rules": 1
+    },
+    {
+      "token": "kw-but",
+      "rules": 1
+    },
+    {
+      "token": "list-controls",
+      "rules": 1
+    },
+    {
+      "token": "list-controls-filter",
+      "rules": 1
+    },
+    {
+      "token": "list-row-hidden",
+      "rules": 1
+    },
+    {
+      "token": "module-coverage-count",
+      "rules": 1
+    },
+    {
+      "token": "module-coverage-gate",
+      "rules": 1
+    },
+    {
+      "token": "module-coverage-gate-label",
+      "rules": 1
+    },
+    {
+      "token": "module-coverage-lead",
+      "rules": 1
+    },
+    {
+      "token": "module-coverage-link",
+      "rules": 1
+    },
+    {
+      "token": "module-coverage-rationale",
+      "rules": 1
+    },
+    {
+      "token": "module-coverage-tier-note",
+      "rules": 1
+    },
+    {
+      "token": "module-coverage-tiers",
+      "rules": 1
+    },
+    {
+      "token": "next-steps-primary",
+      "rules": 1
+    },
+    {
+      "token": "no-epics-lead",
+      "rules": 1
+    },
+    {
+      "token": "now-next",
+      "rules": 1
+    },
+    {
+      "token": "ownership-legend-empty",
+      "rules": 1
+    },
+    {
+      "token": "ownership-wedge-dir",
+      "rules": 1
+    },
+    {
+      "token": "panel-source-note",
+      "rules": 1
+    },
+    {
+      "token": "prolog",
+      "rules": 1
+    },
+    {
+      "token": "punctuation",
+      "rules": 1
+    },
+    {
+      "token": "quick-dev-card",
+      "rules": 1
+    },
+    {
+      "token": "quick-link-grid",
+      "rules": 1
+    },
+    {
+      "token": "quick-link-sub",
+      "rules": 1
+    },
+    {
+      "token": "quick-link-title",
+      "rules": 1
+    },
+    {
+      "token": "related-chip",
+      "rules": 1
+    },
+    {
+      "token": "req-donut-label",
+      "rules": 1
+    },
+    {
+      "token": "req-stacked",
+      "rules": 1
+    },
+    {
+      "token": "risk-quadrant-empty",
+      "rules": 1
+    },
+    {
+      "token": "site-nav-open",
+      "rules": 1
+    },
+    {
+      "token": "spa-live-stamp",
+      "rules": 1
+    },
+    {
+      "token": "spotlight-touched",
+      "rules": 1
+    },
+    {
+      "token": "sprint-action-items",
+      "rules": 1
+    },
+    {
+      "token": "sprint-action-list",
+      "rules": 1
+    },
+    {
+      "token": "sprint-action-row",
+      "rules": 1
+    },
+    {
+      "token": "sprint-action-text",
+      "rules": 1
+    },
+    {
+      "token": "ss-hierarchy-legend",
+      "rules": 1
+    },
+    {
+      "token": "ss-hierarchy-legend-item",
+      "rules": 1
+    },
+    {
+      "token": "status-clarified",
+      "rules": 1
+    },
+    {
+      "token": "status-complete",
+      "rules": 1
+    },
+    {
+      "token": "status-deprecated",
+      "rules": 1
+    },
+    {
+      "token": "status-hardened",
+      "rules": 1
+    },
+    {
+      "token": "status-in-progress",
+      "rules": 1
+    },
+    {
+      "token": "status-killed",
+      "rules": 1
+    },
+    {
+      "token": "status-superseded",
+      "rules": 1
+    },
+    {
+      "token": "summary-card-count",
+      "rules": 1
+    },
+    {
+      "token": "summary-card-label",
+      "rules": 1
+    },
+    {
+      "token": "sunburst-hint",
+      "rules": 1
+    },
+    {
+      "token": "ta-attribution",
+      "rules": 1
+    },
+    {
+      "token": "ta-criterion-label",
+      "rules": 1
+    },
+    {
+      "token": "ta-gate-meaning",
+      "rules": 1
+    },
+    {
+      "token": "ta-gate-rationale",
+      "rules": 1
+    },
+    {
+      "token": "ta-gate-risk",
+      "rules": 1
+    },
+    {
+      "token": "ta-gate-row",
+      "rules": 1
+    },
+    {
+      "token": "ta-join-absent",
+      "rules": 1
+    },
+    {
+      "token": "ta-note",
+      "rules": 1
+    },
+    {
+      "token": "timeline-empty",
+      "rules": 1
+    },
+    {
+      "token": "touch-file-story",
+      "rules": 1
+    },
+    {
+      "token": "work-card-badges",
+      "rules": 1
+    },
+    {
+      "token": "work-edge-soft",
+      "rules": 1
+    },
+    {
+      "token": "work-graph-cycles",
+      "rules": 1
+    },
+    {
+      "token": "work-node-retro",
+      "rules": 1
+    }
+  ],
+  "dropped": [
+    {
+      "selector": ".index-card--primary h2 a:focus-visible",
+      "missingClasses": [
+        "index-card--primary"
+      ]
+    },
+    {
+      "selector": ".index-card-branch:focus-visible",
+      "missingClasses": [
+        "index-card-branch"
+      ]
+    },
+    {
+      "selector": ".quick-link-card:focus-visible",
+      "missingClasses": [
+        "quick-link-card"
+      ]
+    },
+    {
+      "selector": ".sb-center-zoom",
+      "missingClasses": [
+        "sb-center-zoom"
+      ]
+    },
+    {
+      "selector": ".sb-center-zoom:hover",
+      "missingClasses": [
+        "sb-center-zoom"
+      ]
+    },
+    {
+      "selector": ".sb-center-zoom:focus-visible",
+      "missingClasses": [
+        "sb-center-zoom"
+      ]
+    },
+    {
+      "selector": ".sunburst.is-drilled .sunburst-center-num",
+      "missingClasses": [
+        "sunburst",
+        "is-drilled",
+        "sunburst-center-num"
+      ]
+    },
+    {
+      "selector": ".sunburst.is-drilled .sunburst-center-label",
+      "missingClasses": [
+        "sunburst",
+        "is-drilled",
+        "sunburst-center-label"
+      ]
+    },
+    {
+      "selector": ".ss-hierarchy-legend",
+      "missingClasses": [
+        "ss-hierarchy-legend"
+      ]
+    },
+    {
+      "selector": ".ss-hierarchy-legend-item",
+      "missingClasses": [
+        "ss-hierarchy-legend-item"
+      ]
+    },
+    {
+      "selector": ".related-chip",
+      "missingClasses": [
+        "related-chip"
+      ]
+    },
+    {
+      "selector": ".key-view-group.is-open > .key-view-panel",
+      "missingClasses": [
+        "is-open"
+      ]
+    },
+    {
+      "selector": ".change-surface-head",
+      "missingClasses": [
+        "change-surface-head"
+      ]
+    },
+    {
+      "selector": ".change-surface-label",
+      "missingClasses": [
+        "change-surface-label"
+      ]
+    },
+    {
+      "selector": ".change-surface-files .touch-file-story a",
+      "missingClasses": [
+        "touch-file-story"
+      ]
+    },
+    {
+      "selector": ".change-surface-chip.is-static",
+      "missingClasses": [
+        "is-static"
+      ]
+    },
+    {
+      "selector": ".pill.status-complete",
+      "missingClasses": [
+        "status-complete"
+      ]
+    },
+    {
+      "selector": ".pill.status-in-progress",
+      "missingClasses": [
+        "status-in-progress"
+      ]
+    },
+    {
+      "selector": ".pill.status-superseded",
+      "missingClasses": [
+        "status-superseded"
+      ]
+    },
+    {
+      "selector": ".pill.status-deprecated",
+      "missingClasses": [
+        "status-deprecated"
+      ]
+    },
+    {
+      "selector": ".toc-sidebar a.toc-link.is-current",
+      "missingClasses": [
+        "is-current"
+      ]
+    },
+    {
+      "selector": ".code-file .token.comment",
+      "missingClasses": [
+        "token",
+        "comment"
+      ]
+    },
+    {
+      "selector": ".code-file .token.prolog",
+      "missingClasses": [
+        "token",
+        "prolog"
+      ]
+    },
+    {
+      "selector": ".code-file .token.doctype",
+      "missingClasses": [
+        "token",
+        "doctype"
+      ]
+    },
+    {
+      "selector": ".code-file .token.cdata",
+      "missingClasses": [
+        "token",
+        "cdata"
+      ]
+    },
+    {
+      "selector": ".code-file .token.punctuation",
+      "missingClasses": [
+        "token",
+        "punctuation"
+      ]
+    },
+    {
+      "selector": ".code-placeholder",
+      "missingClasses": [
+        "code-placeholder"
+      ]
+    },
+    {
+      "selector": ".code-tabs--released .code-tab:has(.code-tab-input:checked)",
+      "missingClasses": [
+        "code-tabs--released"
+      ]
+    },
+    {
+      "selector": ".code-layout",
+      "missingClasses": [
+        "code-layout"
+      ]
+    },
+    {
+      "selector": ".code-aside",
+      "missingClasses": [
+        "code-aside"
+      ]
+    },
+    {
+      "selector": ".ss-relgraph-node:focus",
+      "missingClasses": [
+        "ss-relgraph-node"
+      ]
+    },
+    {
+      "selector": ".ss-relgraph-node:focus-visible",
+      "missingClasses": [
+        "ss-relgraph-node"
+      ]
+    },
+    {
+      "selector": ".ss-relgraph-node[data-relgraph-href]",
+      "missingClasses": [
+        "ss-relgraph-node"
+      ]
+    },
+    {
+      "selector": ".work-edge-soft",
+      "missingClasses": [
+        "work-edge-soft"
+      ]
+    },
+    {
+      "selector": ".work-node-retro",
+      "missingClasses": [
+        "work-node-retro"
+      ]
+    },
+    {
+      "selector": ".work-graph-cycles",
+      "missingClasses": [
+        "work-graph-cycles"
+      ]
+    },
+    {
+      "selector": ".code-actions",
+      "missingClasses": [
+        "code-actions"
+      ]
+    },
+    {
+      "selector": ".code-layout",
+      "within": "@media (max-width: 900px)",
+      "missingClasses": [
+        "code-layout"
+      ]
+    },
+    {
+      "selector": ".code-aside",
+      "within": "@media (max-width: 900px)",
+      "missingClasses": [
+        "code-aside"
+      ]
+    },
+    {
+      "selector": ".code-insight-more",
+      "missingClasses": [
+        "code-insight-more"
+      ]
+    },
+    {
+      "selector": ".info-page",
+      "missingClasses": [
+        "info-page"
+      ]
+    },
+    {
+      "selector": ".info-page a",
+      "missingClasses": [
+        "info-page"
+      ]
+    },
+    {
+      "selector": ".info-page a:hover",
+      "missingClasses": [
+        "info-page"
+      ]
+    },
+    {
+      "selector": ".doc-footer",
+      "missingClasses": [
+        "doc-footer"
+      ]
+    },
+    {
+      "selector": ".doc-footer a",
+      "missingClasses": [
+        "doc-footer"
+      ]
+    },
+    {
+      "selector": ".doc-footer a:hover",
+      "missingClasses": [
+        "doc-footer"
+      ]
+    },
+    {
+      "selector": ".index-section-title",
+      "missingClasses": [
+        "index-section-title"
+      ]
+    },
+    {
+      "selector": ".index-section-title:first-of-type",
+      "missingClasses": [
+        "index-section-title"
+      ]
+    },
+    {
+      "selector": ".index-section-title-row",
+      "missingClasses": [
+        "index-section-title-row"
+      ]
+    },
+    {
+      "selector": ".index-section-title-row .index-section-title",
+      "missingClasses": [
+        "index-section-title-row",
+        "index-section-title"
+      ]
+    },
+    {
+      "selector": ".index-section-title-row .view-epic-link",
+      "missingClasses": [
+        "index-section-title-row"
+      ]
+    },
+    {
+      "selector": ".index-card .index-card-meta",
+      "missingClasses": [
+        "index-card-meta"
+      ]
+    },
+    {
+      "selector": ".index-card .index-card-summary",
+      "missingClasses": [
+        "index-card-summary"
+      ]
+    },
+    {
+      "selector": ".index-grid > .index-card--primary",
+      "missingClasses": [
+        "index-card--primary"
+      ]
+    },
+    {
+      "selector": ".index-card--primary",
+      "missingClasses": [
+        "index-card--primary"
+      ]
+    },
+    {
+      "selector": ".index-card-kicker",
+      "missingClasses": [
+        "index-card-kicker"
+      ]
+    },
+    {
+      "selector": ".index-card--primary h2",
+      "missingClasses": [
+        "index-card--primary"
+      ]
+    },
+    {
+      "selector": ".index-card--primary h2 a",
+      "missingClasses": [
+        "index-card--primary"
+      ]
+    },
+    {
+      "selector": ".index-card--primary h2 a:hover",
+      "missingClasses": [
+        "index-card--primary"
+      ]
+    },
+    {
+      "selector": ".index-card--primary h2 a::after",
+      "missingClasses": [
+        "index-card--primary"
+      ]
+    },
+    {
+      "selector": ".index-card-branch",
+      "missingClasses": [
+        "index-card-branch"
+      ]
+    },
+    {
+      "selector": ".index-card-branch:hover",
+      "missingClasses": [
+        "index-card-branch"
+      ]
+    },
+    {
+      "selector": ".index-subgroup-label",
+      "missingClasses": [
+        "index-subgroup-label"
+      ]
+    },
+    {
+      "selector": ".story",
+      "missingClasses": [
+        "story"
+      ]
+    },
+    {
+      "selector": ".story summary",
+      "missingClasses": [
+        "story"
+      ]
+    },
+    {
+      "selector": ".story summary::-webkit-details-marker",
+      "missingClasses": [
+        "story"
+      ]
+    },
+    {
+      "selector": ".story summary::before",
+      "missingClasses": [
+        "story"
+      ]
+    },
+    {
+      "selector": ".story[open] summary::before",
+      "missingClasses": [
+        "story"
+      ]
+    },
+    {
+      "selector": ".story summary .story-id",
+      "missingClasses": [
+        "story"
+      ]
+    },
+    {
+      "selector": ".gherkin-kw.kw-but",
+      "missingClasses": [
+        "kw-but"
+      ]
+    },
+    {
+      "selector": ".status-badge.diag-error",
+      "missingClasses": [
+        "diag-error"
+      ]
+    },
+    {
+      "selector": ".status-badge.diag-info",
+      "missingClasses": [
+        "diag-info"
+      ]
+    },
+    {
+      "selector": ".sunburst",
+      "missingClasses": [
+        "sunburst"
+      ]
+    },
+    {
+      "selector": ".sunburst:hover .sb-seg",
+      "missingClasses": [
+        "sunburst"
+      ]
+    },
+    {
+      "selector": ".sunburst .sb-seg:hover",
+      "missingClasses": [
+        "sunburst"
+      ]
+    },
+    {
+      "selector": ".sunburst .sb-noplan:hover",
+      "missingClasses": [
+        "sunburst"
+      ]
+    },
+    {
+      "selector": ".sunburst-center-num",
+      "missingClasses": [
+        "sunburst-center-num"
+      ]
+    },
+    {
+      "selector": ".sunburst-center-label",
+      "missingClasses": [
+        "sunburst-center-label"
+      ]
+    },
+    {
+      "selector": ".sunburst-hint",
+      "missingClasses": [
+        "sunburst-hint"
+      ]
+    },
+    {
+      "selector": ".sb-story-summary",
+      "missingClasses": [
+        "sb-story-summary"
+      ]
+    },
+    {
+      "selector": ".sunburst .sb-story-summary:hover",
+      "missingClasses": [
+        "sunburst",
+        "sb-story-summary"
+      ]
+    },
+    {
+      "selector": ".epic-remaining-followup-open",
+      "missingClasses": [
+        "epic-remaining-followup-open"
+      ]
+    },
+    {
+      "selector": ".no-epics-lead",
+      "missingClasses": [
+        "no-epics-lead"
+      ]
+    },
+    {
+      "selector": ".next-steps-primary",
+      "missingClasses": [
+        "next-steps-primary"
+      ]
+    },
+    {
+      "selector": ".now-next",
+      "missingClasses": [
+        "now-next"
+      ]
+    },
+    {
+      "selector": ".quick-link-grid",
+      "missingClasses": [
+        "quick-link-grid"
+      ]
+    },
+    {
+      "selector": ".quick-link-card",
+      "missingClasses": [
+        "quick-link-card"
+      ]
+    },
+    {
+      "selector": ".quick-link-card:hover",
+      "missingClasses": [
+        "quick-link-card"
+      ]
+    },
+    {
+      "selector": ".quick-link-title",
+      "missingClasses": [
+        "quick-link-title"
+      ]
+    },
+    {
+      "selector": ".quick-link-sub",
+      "missingClasses": [
+        "quick-link-sub"
+      ]
+    },
+    {
+      "selector": ".funnel-band.funnel-zero",
+      "missingClasses": [
+        "funnel-zero"
+      ]
+    },
+    {
+      "selector": ".mini-donut",
+      "missingClasses": [
+        "mini-donut"
+      ]
+    },
+    {
+      "selector": ".mini-donut .donut-track",
+      "missingClasses": [
+        "mini-donut"
+      ]
+    },
+    {
+      "selector": ".mini-donut .donut-seg",
+      "missingClasses": [
+        "mini-donut"
+      ]
+    },
+    {
+      "selector": ".git-pulse-empty",
+      "missingClasses": [
+        "git-pulse-empty"
+      ]
+    },
+    {
+      "selector": ".coverage-cta",
+      "missingClasses": [
+        "coverage-cta"
+      ]
+    },
+    {
+      "selector": ".coverage-chip",
+      "missingClasses": [
+        "coverage-chip"
+      ]
+    },
+    {
+      "selector": ".coverage-chip.missing",
+      "missingClasses": [
+        "coverage-chip",
+        "missing"
+      ]
+    },
+    {
+      "selector": ".coverage-chip.stale",
+      "missingClasses": [
+        "coverage-chip",
+        "stale"
+      ]
+    },
+    {
+      "selector": ".coverage-card.missing",
+      "missingClasses": [
+        "missing"
+      ]
+    },
+    {
+      "selector": ".coverage-card.stale",
+      "missingClasses": [
+        "stale"
+      ]
+    },
+    {
+      "selector": ".codemap-cell",
+      "missingClasses": [
+        "codemap-cell"
+      ]
+    },
+    {
+      "selector": ".codemap-cell.level-0",
+      "missingClasses": [
+        "codemap-cell"
+      ]
+    },
+    {
+      "selector": ".codemap-cell.level-1",
+      "missingClasses": [
+        "codemap-cell"
+      ]
+    },
+    {
+      "selector": ".codemap-cell.level-2",
+      "missingClasses": [
+        "codemap-cell"
+      ]
+    },
+    {
+      "selector": ".codemap-cell.level-3",
+      "missingClasses": [
+        "codemap-cell"
+      ]
+    },
+    {
+      "selector": ".codemap-cell.level-4",
+      "missingClasses": [
+        "codemap-cell"
+      ]
+    },
+    {
+      "selector": ".codemap-cell.level-none",
+      "missingClasses": [
+        "codemap-cell"
+      ]
+    },
+    {
+      "selector": ".codemap-cell.type-csharp",
+      "missingClasses": [
+        "codemap-cell"
+      ]
+    },
+    {
+      "selector": ".codemap-cell.type-python",
+      "missingClasses": [
+        "codemap-cell"
+      ]
+    },
+    {
+      "selector": ".codemap-cell.type-script",
+      "missingClasses": [
+        "codemap-cell"
+      ]
+    },
+    {
+      "selector": ".codemap-cell.type-styles",
+      "missingClasses": [
+        "codemap-cell"
+      ]
+    },
+    {
+      "selector": ".codemap-cell.type-markup",
+      "missingClasses": [
+        "codemap-cell"
+      ]
+    },
+    {
+      "selector": ".codemap-cell.type-config",
+      "missingClasses": [
+        "codemap-cell"
+      ]
+    },
+    {
+      "selector": ".codemap-cell.type-other-lang",
+      "missingClasses": [
+        "codemap-cell"
+      ]
+    },
+    {
+      "selector": ".codemap-cell.type-other",
+      "missingClasses": [
+        "codemap-cell"
+      ]
+    },
+    {
+      "selector": ".codemap-notice",
+      "missingClasses": [
+        "codemap-notice"
+      ]
+    },
+    {
+      "selector": ".codemap-notice-secondary",
+      "missingClasses": [
+        "codemap-notice-secondary"
+      ]
+    },
+    {
+      "selector": ".codemap-dir-sunburst",
+      "missingClasses": [
+        "codemap-dir-sunburst"
+      ]
+    },
+    {
+      "selector": ".risk-quadrant-empty",
+      "missingClasses": [
+        "risk-quadrant-empty"
+      ]
+    },
+    {
+      "selector": ".deep-page",
+      "missingClasses": [
+        "deep-page"
+      ]
+    },
+    {
+      "selector": ".deep-page-lead",
+      "missingClasses": [
+        "deep-page-lead"
+      ]
+    },
+    {
+      "selector": ".deep-page-panel-head",
+      "missingClasses": [
+        "deep-page-panel-head"
+      ]
+    },
+    {
+      "selector": ".deep-page-panel-head h3",
+      "missingClasses": [
+        "deep-page-panel-head"
+      ]
+    },
+    {
+      "selector": ".deep-page-panel-count",
+      "missingClasses": [
+        "deep-page-panel-count"
+      ]
+    },
+    {
+      "selector": ".deep-page-note",
+      "missingClasses": [
+        "deep-page-note"
+      ]
+    },
+    {
+      "selector": ".timeline-empty",
+      "missingClasses": [
+        "timeline-empty"
+      ]
+    },
+    {
+      "selector": ".commit-detail .commit-hash-pill code",
+      "missingClasses": [
+        "commit-detail"
+      ]
+    },
+    {
+      "selector": ".commit-detail .commit-attribution",
+      "missingClasses": [
+        "commit-detail"
+      ]
+    },
+    {
+      "selector": ".empty-state",
+      "missingClasses": [
+        "empty-state"
+      ]
+    },
+    {
+      "selector": ".quick-dev-card .work-card-badges",
+      "missingClasses": [
+        "quick-dev-card",
+        "work-card-badges"
+      ]
+    },
+    {
+      "selector": ".tile-card-header",
+      "missingClasses": [
+        "tile-card-header"
+      ]
+    },
+    {
+      "selector": ".tile-card-header h3",
+      "missingClasses": [
+        "tile-card-header"
+      ]
+    },
+    {
+      "selector": ".tile-card-header .view-epic-link",
+      "missingClasses": [
+        "tile-card-header"
+      ]
+    },
+    {
+      "selector": ".summary-card",
+      "missingClasses": [
+        "summary-card"
+      ]
+    },
+    {
+      "selector": ".summary-card:hover",
+      "missingClasses": [
+        "summary-card"
+      ]
+    },
+    {
+      "selector": ".summary-card:focus-visible",
+      "missingClasses": [
+        "summary-card"
+      ]
+    },
+    {
+      "selector": ".summary-card.retro",
+      "missingClasses": [
+        "summary-card"
+      ]
+    },
+    {
+      "selector": ".summary-card-label",
+      "missingClasses": [
+        "summary-card-label"
+      ]
+    },
+    {
+      "selector": ".summary-card-count",
+      "missingClasses": [
+        "summary-card-count"
+      ]
+    },
+    {
+      "selector": ".deferral-sources",
+      "missingClasses": [
+        "deferral-sources"
+      ]
+    },
+    {
+      "selector": ".deferral-source-link",
+      "missingClasses": [
+        "deferral-source-link"
+      ]
+    },
+    {
+      "selector": ".deferral-source-link:hover",
+      "missingClasses": [
+        "deferral-source-link"
+      ]
+    },
+    {
+      "selector": ".req-donut-label",
+      "missingClasses": [
+        "req-donut-label"
+      ]
+    },
+    {
+      "selector": ".req-stacked",
+      "missingClasses": [
+        "req-stacked"
+      ]
+    },
+    {
+      "selector": ".req-stacked-bar",
+      "missingClasses": [
+        "req-stacked-bar"
+      ]
+    },
+    {
+      "selector": ".req-stacked-bar .seg",
+      "missingClasses": [
+        "req-stacked-bar"
+      ]
+    },
+    {
+      "selector": ".req-stacked-bar .seg.done",
+      "missingClasses": [
+        "req-stacked-bar"
+      ]
+    },
+    {
+      "selector": ".req-stacked-bar .seg.active",
+      "missingClasses": [
+        "req-stacked-bar"
+      ]
+    },
+    {
+      "selector": ".req-stacked-bar .seg.ready",
+      "missingClasses": [
+        "req-stacked-bar"
+      ]
+    },
+    {
+      "selector": ".req-stacked-bar .seg.pending",
+      "missingClasses": [
+        "req-stacked-bar"
+      ]
+    },
+    {
+      "selector": ".req-stacked-bar .seg.deferred",
+      "missingClasses": [
+        "req-stacked-bar"
+      ]
+    },
+    {
+      "selector": ".req-stacked-legend",
+      "missingClasses": [
+        "req-stacked-legend"
+      ]
+    },
+    {
+      "selector": ".req-stacked-legend .swatch",
+      "missingClasses": [
+        "req-stacked-legend"
+      ]
+    },
+    {
+      "selector": ".req-stacked-legend .swatch.done",
+      "missingClasses": [
+        "req-stacked-legend"
+      ]
+    },
+    {
+      "selector": ".req-stacked-legend .swatch.active",
+      "missingClasses": [
+        "req-stacked-legend"
+      ]
+    },
+    {
+      "selector": ".req-stacked-legend .swatch.ready",
+      "missingClasses": [
+        "req-stacked-legend"
+      ]
+    },
+    {
+      "selector": ".req-stacked-legend .swatch.pending",
+      "missingClasses": [
+        "req-stacked-legend"
+      ]
+    },
+    {
+      "selector": ".req-stacked-legend .swatch.deferred",
+      "missingClasses": [
+        "req-stacked-legend"
+      ]
+    },
+    {
+      "selector": ".impact-controls",
+      "missingClasses": [
+        "impact-controls"
+      ]
+    },
+    {
+      "selector": ".impact-shape-tabs",
+      "missingClasses": [
+        "impact-shape-tabs"
+      ]
+    },
+    {
+      "selector": ".impact-treemap",
+      "missingClasses": [
+        "impact-treemap"
+      ]
+    },
+    {
+      "selector": ".impact-tm",
+      "missingClasses": [
+        "impact-tm"
+      ]
+    },
+    {
+      "selector": ".impact-tm-tile",
+      "missingClasses": [
+        "impact-tm-tile"
+      ]
+    },
+    {
+      "selector": ".impact-tm-link",
+      "missingClasses": [
+        "impact-tm-link"
+      ]
+    },
+    {
+      "selector": ".impact-tm-link:hover .impact-tm-tile",
+      "missingClasses": [
+        "impact-tm-link",
+        "impact-tm-tile"
+      ]
+    },
+    {
+      "selector": ".impact-tm-link:focus-visible",
+      "missingClasses": [
+        "impact-tm-link"
+      ]
+    },
+    {
+      "selector": ".impact-tm-link:focus-visible .impact-tm-tile",
+      "missingClasses": [
+        "impact-tm-link",
+        "impact-tm-tile"
+      ]
+    },
+    {
+      "selector": ".impact-tm-dir-bg",
+      "missingClasses": [
+        "impact-tm-dir-bg"
+      ]
+    },
+    {
+      "selector": ".impact-tm-dir",
+      "missingClasses": [
+        "impact-tm-dir"
+      ]
+    },
+    {
+      "selector": ".impact-tm-label",
+      "missingClasses": [
+        "impact-tm-label"
+      ]
+    },
+    {
+      "selector": ".impact-treemap-empty",
+      "missingClasses": [
+        "impact-treemap-empty"
+      ]
+    },
+    {
+      "selector": ".impact-shape-tabs",
+      "missingClasses": [
+        "impact-shape-tabs"
+      ]
+    },
+    {
+      "selector": ".impact-shape",
+      "missingClasses": [
+        "impact-shape"
+      ]
+    },
+    {
+      "selector": ".impact-shape-sunburst",
+      "missingClasses": [
+        "impact-shape-sunburst"
+      ]
+    },
+    {
+      "selector": ".impact-shapes:has(#impact-view-sunburst:checked) .impact-shape-treemap",
+      "missingClasses": [
+        "impact-shapes",
+        "impact-shape-treemap"
+      ]
+    },
+    {
+      "selector": ".impact-shapes:has(#impact-view-sunburst:checked) .impact-shape-sunburst",
+      "missingClasses": [
+        "impact-shapes",
+        "impact-shape-sunburst"
+      ]
+    },
+    {
+      "selector": "#impact-view-treemap:checked ~ .board-tabbar label[for=\"impact-view-treemap\"]",
+      "missingClasses": [],
+      "missingIds": [
+        "impact-view-treemap"
+      ]
+    },
+    {
+      "selector": "#impact-view-sunburst:checked ~ .board-tabbar label[for=\"impact-view-sunburst\"]",
+      "missingClasses": [],
+      "missingIds": [
+        "impact-view-sunburst"
+      ]
+    },
+    {
+      "selector": "#impact-view-treemap:focus-visible ~ .board-tabbar label[for=\"impact-view-treemap\"]",
+      "missingClasses": [],
+      "missingIds": [
+        "impact-view-treemap"
+      ]
+    },
+    {
+      "selector": "#impact-view-sunburst:focus-visible ~ .board-tabbar label[for=\"impact-view-sunburst\"]",
+      "missingClasses": [],
+      "missingIds": [
+        "impact-view-sunburst"
+      ]
+    },
+    {
+      "selector": ".impact-sb",
+      "missingClasses": [
+        "impact-sb"
+      ]
+    },
+    {
+      "selector": ".impact-arc",
+      "missingClasses": [
+        "impact-arc"
+      ]
+    },
+    {
+      "selector": ".impact-arc-dir",
+      "missingClasses": [
+        "impact-arc-dir"
+      ]
+    },
+    {
+      "selector": ".impact-sb-link",
+      "missingClasses": [
+        "impact-sb-link"
+      ]
+    },
+    {
+      "selector": ".impact-sb-link:hover .impact-arc",
+      "missingClasses": [
+        "impact-sb-link",
+        "impact-arc"
+      ]
+    },
+    {
+      "selector": ".impact-sb-link:focus-visible",
+      "missingClasses": [
+        "impact-sb-link"
+      ]
+    },
+    {
+      "selector": ".impact-sb-link:focus-visible .impact-arc",
+      "missingClasses": [
+        "impact-sb-link",
+        "impact-arc"
+      ]
+    },
+    {
+      "selector": ".impact-sb-center",
+      "missingClasses": [
+        "impact-sb-center"
+      ]
+    },
+    {
+      "selector": ".req-index",
+      "missingClasses": [
+        "req-index"
+      ]
+    },
+    {
+      "selector": ".req-index .dashboard",
+      "missingClasses": [
+        "req-index"
+      ]
+    },
+    {
+      "selector": ".req-index .section-divider",
+      "missingClasses": [
+        "req-index"
+      ]
+    },
+    {
+      "selector": ".req-index .chart-panel",
+      "missingClasses": [
+        "req-index"
+      ]
+    },
+    {
+      "selector": ".req-index .req-card",
+      "missingClasses": [
+        "req-index"
+      ]
+    },
+    {
+      "selector": ".req-index .dashboard",
+      "missingClasses": [
+        "req-index"
+      ]
+    },
+    {
+      "selector": ".req-index .chart-panel",
+      "missingClasses": [
+        "req-index"
+      ]
+    },
+    {
+      "selector": ".req-index .section-divider[id]",
+      "missingClasses": [
+        "req-index"
+      ]
+    },
+    {
+      "selector": ".req-detail",
+      "missingClasses": [
+        "req-detail"
+      ]
+    },
+    {
+      "selector": ".req-detail .epic-card",
+      "missingClasses": [
+        "req-detail"
+      ]
+    },
+    {
+      "selector": ".req-detail .story-lead",
+      "missingClasses": [
+        "req-detail"
+      ]
+    },
+    {
+      "selector": ".req-index",
+      "within": "@media (max-width: 900px)",
+      "missingClasses": [
+        "req-index"
+      ]
+    },
+    {
+      "selector": ".req-detail",
+      "within": "@media (max-width: 900px)",
+      "missingClasses": [
+        "req-detail"
+      ]
+    },
+    {
+      "selector": ".req-index .chart-row",
+      "within": "@media (max-width: 900px)",
+      "missingClasses": [
+        "req-index"
+      ]
+    },
+    {
+      "selector": ".req-index",
+      "within": "@media (max-width: 640px)",
+      "missingClasses": [
+        "req-index"
+      ]
+    },
+    {
+      "selector": ".req-detail",
+      "within": "@media (max-width: 640px)",
+      "missingClasses": [
+        "req-detail"
+      ]
+    },
+    {
+      "selector": ".site-nav.site-nav-open .site-nav-links",
+      "within": "@media (max-width: 640px)",
+      "missingClasses": [
+        "site-nav-open"
+      ]
+    },
+    {
+      "selector": ".cmd-badge .cmd-copy.copied .icon",
+      "missingClasses": [
+        "copied"
+      ]
+    },
+    {
+      "selector": ".send-menu-list .send-item.copied",
+      "missingClasses": [
+        "copied"
+      ]
+    },
+    {
+      "selector": ".gi-sort-btn",
+      "missingClasses": [
+        "gi-sort-btn"
+      ]
+    },
+    {
+      "selector": ".gi-sort-btn:hover",
+      "missingClasses": [
+        "gi-sort-btn"
+      ]
+    },
+    {
+      "selector": ".gi-sort-btn:focus-visible",
+      "missingClasses": [
+        "gi-sort-btn"
+      ]
+    },
+    {
+      "selector": ".gi-sort-glyph",
+      "missingClasses": [
+        "gi-sort-glyph"
+      ]
+    },
+    {
+      "selector": ".gi-filter",
+      "missingClasses": [
+        "gi-filter"
+      ]
+    },
+    {
+      "selector": ".gi-filter label",
+      "missingClasses": [
+        "gi-filter"
+      ]
+    },
+    {
+      "selector": ".gi-filter input",
+      "missingClasses": [
+        "gi-filter"
+      ]
+    },
+    {
+      "selector": ".gi-filter input:focus-visible",
+      "missingClasses": [
+        "gi-filter"
+      ]
+    },
+    {
+      "selector": ".gi-pager",
+      "missingClasses": [
+        "gi-pager"
+      ]
+    },
+    {
+      "selector": ".gi-pager[hidden]",
+      "missingClasses": [
+        "gi-pager"
+      ]
+    },
+    {
+      "selector": ".gi-pager-prev",
+      "missingClasses": [
+        "gi-pager-prev"
+      ]
+    },
+    {
+      "selector": ".gi-pager-next",
+      "missingClasses": [
+        "gi-pager-next"
+      ]
+    },
+    {
+      "selector": ".gi-pager-prev:hover:not(:disabled)",
+      "missingClasses": [
+        "gi-pager-prev"
+      ]
+    },
+    {
+      "selector": ".gi-pager-next:hover:not(:disabled)",
+      "missingClasses": [
+        "gi-pager-next"
+      ]
+    },
+    {
+      "selector": ".gi-pager-prev:disabled",
+      "missingClasses": [
+        "gi-pager-prev"
+      ]
+    },
+    {
+      "selector": ".gi-pager-next:disabled",
+      "missingClasses": [
+        "gi-pager-next"
+      ]
+    },
+    {
+      "selector": ".gi-pager-prev:focus-visible",
+      "missingClasses": [
+        "gi-pager-prev"
+      ]
+    },
+    {
+      "selector": ".gi-pager-next:focus-visible",
+      "missingClasses": [
+        "gi-pager-next"
+      ]
+    },
+    {
+      "selector": ".gi-pager-status",
+      "missingClasses": [
+        "gi-pager-status"
+      ]
+    },
+    {
+      "selector": ".gi-filter-count",
+      "missingClasses": [
+        "gi-filter-count"
+      ]
+    },
+    {
+      "selector": ".gi-row-hidden",
+      "missingClasses": [
+        "gi-row-hidden"
+      ]
+    },
+    {
+      "selector": ".list-controls",
+      "missingClasses": [
+        "list-controls"
+      ]
+    },
+    {
+      "selector": ".list-controls-sort",
+      "missingClasses": [
+        "list-controls-sort"
+      ]
+    },
+    {
+      "selector": ".list-controls-sort select",
+      "missingClasses": [
+        "list-controls-sort"
+      ]
+    },
+    {
+      "selector": ".list-controls-sort select:focus-visible",
+      "missingClasses": [
+        "list-controls-sort"
+      ]
+    },
+    {
+      "selector": ".list-controls-group",
+      "missingClasses": [
+        "list-controls-group"
+      ]
+    },
+    {
+      "selector": ".list-controls-group[aria-pressed=\"true\"]",
+      "missingClasses": [
+        "list-controls-group"
+      ]
+    },
+    {
+      "selector": ".list-controls-group:focus-visible",
+      "missingClasses": [
+        "list-controls-group"
+      ]
+    },
+    {
+      "selector": ".list-controls-filter",
+      "missingClasses": [
+        "list-controls-filter"
+      ]
+    },
+    {
+      "selector": ".list-row-hidden",
+      "missingClasses": [
+        "list-row-hidden"
+      ]
+    },
+    {
+      "selector": ".list-row-group-heading",
+      "missingClasses": [
+        "list-row-group-heading"
+      ]
+    },
+    {
+      "selector": ".list-row-group-heading:first-child",
+      "missingClasses": [
+        "list-row-group-heading"
+      ]
+    },
+    {
+      "selector": ".list-row-group-heading h3",
+      "missingClasses": [
+        "list-row-group-heading"
+      ]
+    },
+    {
+      "selector": ".gi-solo-repo-note",
+      "missingClasses": [
+        "gi-solo-repo-note"
+      ]
+    },
+    {
+      "selector": ".ownership-wedge",
+      "missingClasses": [
+        "ownership-wedge"
+      ]
+    },
+    {
+      "selector": ".ownership-wedge.level-1",
+      "missingClasses": [
+        "ownership-wedge"
+      ]
+    },
+    {
+      "selector": ".ownership-wedge.level-2",
+      "missingClasses": [
+        "ownership-wedge"
+      ]
+    },
+    {
+      "selector": ".ownership-wedge.level-3",
+      "missingClasses": [
+        "ownership-wedge"
+      ]
+    },
+    {
+      "selector": ".ownership-wedge.level-4",
+      "missingClasses": [
+        "ownership-wedge"
+      ]
+    },
+    {
+      "selector": ".ownership-wedge.level-none",
+      "missingClasses": [
+        "ownership-wedge"
+      ]
+    },
+    {
+      "selector": ".ownership-wedge-dir",
+      "missingClasses": [
+        "ownership-wedge-dir"
+      ]
+    },
+    {
+      "selector": ".ownership-wedge.owner-author-0",
+      "missingClasses": [
+        "ownership-wedge"
+      ]
+    },
+    {
+      "selector": ".ownership-wedge.owner-author-1",
+      "missingClasses": [
+        "ownership-wedge"
+      ]
+    },
+    {
+      "selector": ".ownership-wedge.owner-author-2",
+      "missingClasses": [
+        "ownership-wedge"
+      ]
+    },
+    {
+      "selector": ".ownership-wedge.owner-author-3",
+      "missingClasses": [
+        "ownership-wedge"
+      ]
+    },
+    {
+      "selector": ".ownership-wedge.owner-author-4",
+      "missingClasses": [
+        "ownership-wedge"
+      ]
+    },
+    {
+      "selector": ".ownership-wedge.owner-author-5",
+      "missingClasses": [
+        "ownership-wedge"
+      ]
+    },
+    {
+      "selector": ".ownership-wedge.owner-author-6",
+      "missingClasses": [
+        "ownership-wedge"
+      ]
+    },
+    {
+      "selector": ".ownership-wedge.owner-author-other",
+      "missingClasses": [
+        "ownership-wedge"
+      ]
+    },
+    {
+      "selector": ".ownership-wedge.spotlight-touched",
+      "missingClasses": [
+        "ownership-wedge",
+        "spotlight-touched"
+      ]
+    },
+    {
+      "selector": ".ownership-wedge.owner-spotlight-off",
+      "missingClasses": [
+        "ownership-wedge"
+      ]
+    },
+    {
+      "selector": ".ownership-wedge.owner-fresh",
+      "missingClasses": [
+        "ownership-wedge"
+      ]
+    },
+    {
+      "selector": ".ownership-wedge.owner-stale",
+      "missingClasses": [
+        "ownership-wedge"
+      ]
+    },
+    {
+      "selector": ".ownership-legend-empty",
+      "missingClasses": [
+        "ownership-legend-empty"
+      ]
+    },
+    {
+      "selector": ".sunburst",
+      "within": "@media (prefers-reduced-motion: no-preference)",
+      "missingClasses": [
+        "sunburst"
+      ]
+    },
+    {
+      "selector": ".sunburst.is-anim .sb-seg",
+      "within": "@media (prefers-reduced-motion: no-preference)",
+      "missingClasses": [
+        "sunburst",
+        "is-anim"
+      ]
+    },
+    {
+      "selector": ".codemap",
+      "within": "@media (prefers-reduced-motion: no-preference)",
+      "missingClasses": [
+        "codemap"
+      ]
+    },
+    {
+      "selector": ".quick-link-card:hover",
+      "within": "@media (prefers-reduced-motion: reduce)",
+      "missingClasses": [
+        "quick-link-card"
+      ]
+    },
+    {
+      "selector": ".summary-card:hover",
+      "within": "@media (prefers-reduced-motion: reduce)",
+      "missingClasses": [
+        "summary-card"
+      ]
+    },
+    {
+      "selector": ".codemap",
+      "within": "@media (prefers-reduced-motion: reduce)",
+      "missingClasses": [
+        "codemap"
+      ]
+    },
+    {
+      "selector": ".sunburst.is-anim .sb-seg",
+      "within": "@media (prefers-reduced-motion: reduce)",
+      "missingClasses": [
+        "sunburst",
+        "is-anim"
+      ]
+    },
+    {
+      "selector": ".sprint-page",
+      "missingClasses": [
+        "sprint-page"
+      ]
+    },
+    {
+      "selector": ".panel-source-note",
+      "missingClasses": [
+        "panel-source-note"
+      ]
+    },
+    {
+      "selector": ".sprint-page .sprint-board",
+      "missingClasses": [
+        "sprint-page"
+      ]
+    },
+    {
+      "selector": ".sprint-page .sprint-lane",
+      "missingClasses": [
+        "sprint-page"
+      ]
+    },
+    {
+      "selector": ".sprint-page .sprint-lane-head",
+      "missingClasses": [
+        "sprint-page"
+      ]
+    },
+    {
+      "selector": ".sprint-page .sprint-cards",
+      "missingClasses": [
+        "sprint-page"
+      ]
+    },
+    {
+      "selector": ".sprint-page .sprint-cards::-webkit-scrollbar",
+      "missingClasses": [
+        "sprint-page"
+      ]
+    },
+    {
+      "selector": ".sprint-page .sprint-cards::-webkit-scrollbar-thumb",
+      "missingClasses": [
+        "sprint-page"
+      ]
+    },
+    {
+      "selector": ".sprint-page:has(#sv-epic:checked) .board-view-status",
+      "missingClasses": [
+        "sprint-page"
+      ]
+    },
+    {
+      "selector": ".sprint-page:has(#sv-epic:checked) .board-view-epic",
+      "missingClasses": [
+        "sprint-page"
+      ]
+    },
+    {
+      "selector": ".followup-row-detail",
+      "missingClasses": [
+        "followup-row-detail"
+      ]
+    },
+    {
+      "selector": ".followup-row-detail--primary",
+      "missingClasses": [
+        "followup-row-detail--primary"
+      ]
+    },
+    {
+      "selector": ".followup-row-detail > summary",
+      "missingClasses": [
+        "followup-row-detail"
+      ]
+    },
+    {
+      "selector": ".followup-row-detail--primary > summary",
+      "missingClasses": [
+        "followup-row-detail--primary"
+      ]
+    },
+    {
+      "selector": ".followup-row-detail > summary::-webkit-details-marker",
+      "missingClasses": [
+        "followup-row-detail"
+      ]
+    },
+    {
+      "selector": ".followup-row-detail--primary > summary::-webkit-details-marker",
+      "missingClasses": [
+        "followup-row-detail--primary"
+      ]
+    },
+    {
+      "selector": ".followup-row-detail > summary::before",
+      "missingClasses": [
+        "followup-row-detail"
+      ]
+    },
+    {
+      "selector": ".followup-row-detail--primary > summary::before",
+      "missingClasses": [
+        "followup-row-detail--primary"
+      ]
+    },
+    {
+      "selector": ".followup-row-detail[open] > summary::before",
+      "missingClasses": [
+        "followup-row-detail"
+      ]
+    },
+    {
+      "selector": ".followup-row-detail--primary[open] > summary::before",
+      "missingClasses": [
+        "followup-row-detail--primary"
+      ]
+    },
+    {
+      "selector": ".followup-row-detail[open] > summary",
+      "missingClasses": [
+        "followup-row-detail"
+      ]
+    },
+    {
+      "selector": ".followup-row-detail--primary[open] > summary",
+      "missingClasses": [
+        "followup-row-detail--primary"
+      ]
+    },
+    {
+      "selector": ".followup-row-detail-body",
+      "missingClasses": [
+        "followup-row-detail-body"
+      ]
+    },
+    {
+      "selector": ".followup-row-detail-body > :first-child",
+      "missingClasses": [
+        "followup-row-detail-body"
+      ]
+    },
+    {
+      "selector": ".followup-row-detail-body > :last-child",
+      "missingClasses": [
+        "followup-row-detail-body"
+      ]
+    },
+    {
+      "selector": "main.followup-detail",
+      "missingClasses": [
+        "followup-detail"
+      ]
+    },
+    {
+      "selector": ".followup-detail",
+      "missingClasses": [
+        "followup-detail"
+      ]
+    },
+    {
+      "selector": ".followup-detail-cross",
+      "missingClasses": [
+        "followup-detail-cross"
+      ]
+    },
+    {
+      "selector": ".followup-detail .next-steps",
+      "missingClasses": [
+        "followup-detail"
+      ]
+    },
+    {
+      "selector": ".action-item-resolve-hint",
+      "missingClasses": [
+        "action-item-resolve-hint"
+      ]
+    },
+    {
+      "selector": ".action-item-cross",
+      "missingClasses": [
+        "action-item-cross"
+      ]
+    },
+    {
+      "selector": "a.action-item-cross",
+      "missingClasses": [
+        "action-item-cross"
+      ]
+    },
+    {
+      "selector": "a.action-item-cross:hover",
+      "missingClasses": [
+        "action-item-cross"
+      ]
+    },
+    {
+      "selector": ".action-item-resolve",
+      "missingClasses": [
+        "action-item-resolve"
+      ]
+    },
+    {
+      "selector": ".deferred-work-fallback",
+      "missingClasses": [
+        "deferred-work-fallback"
+      ]
+    },
+    {
+      "selector": ".sprint-action-items",
+      "missingClasses": [
+        "sprint-action-items"
+      ]
+    },
+    {
+      "selector": ".sprint-action-list",
+      "missingClasses": [
+        "sprint-action-list"
+      ]
+    },
+    {
+      "selector": ".sprint-action-row",
+      "missingClasses": [
+        "sprint-action-row"
+      ]
+    },
+    {
+      "selector": ".sprint-action-text",
+      "missingClasses": [
+        "sprint-action-text"
+      ]
+    },
+    {
+      "selector": ".diagnostics-clear",
+      "missingClasses": [
+        "diagnostics-clear"
+      ]
+    },
+    {
+      "selector": ".diagnostics-clear p",
+      "missingClasses": [
+        "diagnostics-clear"
+      ]
+    },
+    {
+      "selector": ".ideas-intro",
+      "missingClasses": [
+        "ideas-intro"
+      ]
+    },
+    {
+      "selector": ".ideas-section",
+      "missingClasses": [
+        "ideas-section"
+      ]
+    },
+    {
+      "selector": ".ideas-section-heading",
+      "missingClasses": [
+        "ideas-section-heading"
+      ]
+    },
+    {
+      "selector": ".ideas-section-count",
+      "missingClasses": [
+        "ideas-section-count"
+      ]
+    },
+    {
+      "selector": ".pill.status-hardened",
+      "missingClasses": [
+        "status-hardened"
+      ]
+    },
+    {
+      "selector": ".pill.status-clarified",
+      "missingClasses": [
+        "status-clarified"
+      ]
+    },
+    {
+      "selector": ".pill.status-killed",
+      "missingClasses": [
+        "status-killed"
+      ]
+    },
+    {
+      "selector": ".idea-outcome",
+      "missingClasses": [
+        "idea-outcome"
+      ]
+    },
+    {
+      "selector": ".idea-downstream-list",
+      "missingClasses": [
+        "idea-downstream-list"
+      ]
+    },
+    {
+      "selector": ".idea-handoff",
+      "missingClasses": [
+        "idea-handoff"
+      ]
+    },
+    {
+      "selector": ".idea-handoff > :first-child",
+      "missingClasses": [
+        "idea-handoff"
+      ]
+    },
+    {
+      "selector": ".idea-handoff > :last-child",
+      "missingClasses": [
+        "idea-handoff"
+      ]
+    },
+    {
+      "selector": ".idea-chronology",
+      "missingClasses": [
+        "idea-chronology"
+      ]
+    },
+    {
+      "selector": ".idea-entry",
+      "missingClasses": [
+        "idea-entry"
+      ]
+    },
+    {
+      "selector": ".idea-entry + .idea-entry",
+      "missingClasses": [
+        "idea-entry",
+        "idea-entry"
+      ]
+    },
+    {
+      "selector": ".idea-entry-type",
+      "missingClasses": [
+        "idea-entry-type"
+      ]
+    },
+    {
+      "selector": ".idea-entry-text",
+      "missingClasses": [
+        "idea-entry-text"
+      ]
+    },
+    {
+      "selector": ".idea-entry-lock",
+      "missingClasses": [
+        "idea-entry-lock"
+      ]
+    },
+    {
+      "selector": ".idea-entry-lock .idea-entry-type",
+      "missingClasses": [
+        "idea-entry-lock",
+        "idea-entry-type"
+      ]
+    },
+    {
+      "selector": ".idea-entry-decision",
+      "missingClasses": [
+        "idea-entry-decision"
+      ]
+    },
+    {
+      "selector": ".idea-entry-decision .idea-entry-type",
+      "missingClasses": [
+        "idea-entry-decision",
+        "idea-entry-type"
+      ]
+    },
+    {
+      "selector": ".idea-entry-kill",
+      "missingClasses": [
+        "idea-entry-kill"
+      ]
+    },
+    {
+      "selector": ".idea-entry-kill .idea-entry-type",
+      "missingClasses": [
+        "idea-entry-kill",
+        "idea-entry-type"
+      ]
+    },
+    {
+      "selector": ".idea-entry-crack",
+      "missingClasses": [
+        "idea-entry-crack"
+      ]
+    },
+    {
+      "selector": ".idea-entry-crack .idea-entry-type",
+      "missingClasses": [
+        "idea-entry-crack",
+        "idea-entry-type"
+      ]
+    },
+    {
+      "selector": ".idea-chronology-empty",
+      "missingClasses": [
+        "idea-chronology-empty"
+      ]
+    },
+    {
+      "selector": ".idea-report-note",
+      "missingClasses": [
+        "idea-report-note"
+      ]
+    },
+    {
+      "selector": ".idea-report-link",
+      "missingClasses": [
+        "idea-report-link"
+      ]
+    },
+    {
+      "selector": ".idea-link-unresolved",
+      "missingClasses": [
+        "idea-link-unresolved"
+      ]
+    },
+    {
+      "selector": ".ta-intro",
+      "missingClasses": [
+        "ta-intro"
+      ]
+    },
+    {
+      "selector": ".ta-note",
+      "missingClasses": [
+        "ta-note"
+      ]
+    },
+    {
+      "selector": ".ta-intro",
+      "missingClasses": [
+        "ta-intro"
+      ]
+    },
+    {
+      "selector": ".ta-section",
+      "missingClasses": [
+        "ta-section"
+      ]
+    },
+    {
+      "selector": ".ta-section > h2",
+      "missingClasses": [
+        "ta-section"
+      ]
+    },
+    {
+      "selector": ".ta-gate-row",
+      "missingClasses": [
+        "ta-gate-row"
+      ]
+    },
+    {
+      "selector": ".ta-gate-meaning",
+      "missingClasses": [
+        "ta-gate-meaning"
+      ]
+    },
+    {
+      "selector": ".ta-gate-rationale",
+      "missingClasses": [
+        "ta-gate-rationale"
+      ]
+    },
+    {
+      "selector": ".ta-gate-criteria",
+      "missingClasses": [
+        "ta-gate-criteria"
+      ]
+    },
+    {
+      "selector": ".ta-gate-criteria li",
+      "missingClasses": [
+        "ta-gate-criteria"
+      ]
+    },
+    {
+      "selector": ".ta-criterion-label",
+      "missingClasses": [
+        "ta-criterion-label"
+      ]
+    },
+    {
+      "selector": ".ta-gate-risk",
+      "missingClasses": [
+        "ta-gate-risk"
+      ]
+    },
+    {
+      "selector": ".ta-table",
+      "missingClasses": [
+        "ta-table"
+      ]
+    },
+    {
+      "selector": ".ta-table caption",
+      "missingClasses": [
+        "ta-table"
+      ]
+    },
+    {
+      "selector": ".ta-table th",
+      "missingClasses": [
+        "ta-table"
+      ]
+    },
+    {
+      "selector": ".ta-table td",
+      "missingClasses": [
+        "ta-table"
+      ]
+    },
+    {
+      "selector": ".ta-table thead th",
+      "missingClasses": [
+        "ta-table"
+      ]
+    },
+    {
+      "selector": ".ta-join-absent",
+      "missingClasses": [
+        "ta-join-absent"
+      ]
+    },
+    {
+      "selector": ".ta-attribution",
+      "missingClasses": [
+        "ta-attribution"
+      ]
+    },
+    {
+      "selector": ".ta-tier-legend",
+      "missingClasses": [
+        "ta-tier-legend"
+      ]
+    },
+    {
+      "selector": ".ta-tier-legend dt",
+      "missingClasses": [
+        "ta-tier-legend"
+      ]
+    },
+    {
+      "selector": ".ta-tier-legend dd",
+      "missingClasses": [
+        "ta-tier-legend"
+      ]
+    },
+    {
+      "selector": ".ta-tier-legend",
+      "within": "@media (max-width: 640px)",
+      "missingClasses": [
+        "ta-tier-legend"
+      ]
+    },
+    {
+      "selector": ".ta-tier-legend dd",
+      "within": "@media (max-width: 640px)",
+      "missingClasses": [
+        "ta-tier-legend"
+      ]
+    },
+    {
+      "selector": ".module-coverage-lead",
+      "missingClasses": [
+        "module-coverage-lead"
+      ]
+    },
+    {
+      "selector": ".module-coverage-rationale",
+      "missingClasses": [
+        "module-coverage-rationale"
+      ]
+    },
+    {
+      "selector": ".module-coverage-gate",
+      "missingClasses": [
+        "module-coverage-gate"
+      ]
+    },
+    {
+      "selector": ".module-coverage-gate-label",
+      "missingClasses": [
+        "module-coverage-gate-label"
+      ]
+    },
+    {
+      "selector": ".module-coverage-tiers",
+      "missingClasses": [
+        "module-coverage-tiers"
+      ]
+    },
+    {
+      "selector": ".module-coverage-count",
+      "missingClasses": [
+        "module-coverage-count"
+      ]
+    },
+    {
+      "selector": ".module-coverage-tier-note",
+      "missingClasses": [
+        "module-coverage-tier-note"
+      ]
+    },
+    {
+      "selector": ".module-coverage-link",
+      "missingClasses": [
+        "module-coverage-link"
+      ]
+    },
+    {
+      "selector": ".spa-live-stamp",
+      "missingClasses": [
+        "spa-live-stamp"
+      ]
+    }
+  ]
+}

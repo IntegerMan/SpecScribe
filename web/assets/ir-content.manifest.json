@@ -10,12 +10,13 @@
     "epics/story-{id}.html"
   ],
   "stats": {
-    "carriedRules": 1457,
-    "carriedSelectors": 1673,
-    "carriedKeyframes": 4,
+    "carriedRules": 1476,
+    "carriedSelectors": 1693,
+    "carriedKeyframes": 5,
     "droppedRoot": 4,
-    "generatedBytes": 184083,
-    "sharedRules": 1
+    "generatedBytes": 186699,
+    "sharedRules": 1,
+    "runtimeRules": 15
   },
   "rules": [
     {
@@ -78,6 +79,52 @@
       "carried": true
     },
     {
+      "selector": ".ss-hierarchy g.slice path.surface:focus",
+      "carried": true
+    },
+    {
+      "selector": ".ss-hierarchy g.slice path.surface:focus-visible",
+      "carried": true
+    },
+    {
+      "selector": ".ss-hierarchy:hover g.slice",
+      "carried": true
+    },
+    {
+      "selector": ".ss-hierarchy g.slice:hover",
+      "carried": true
+    },
+    {
+      "selector": ".ss-hierarchy-card",
+      "carried": false,
+      "reason": "runtime body-level class — emitted UNSCOPED into runtime-body.css; see runtimeBodyClasses below"
+    },
+    {
+      "selector": ".ss-hierarchy-card-kind",
+      "carried": false,
+      "reason": "runtime body-level class — emitted UNSCOPED into runtime-body.css; see runtimeBodyClasses below"
+    },
+    {
+      "selector": ".ss-hierarchy-card-name",
+      "carried": false,
+      "reason": "runtime body-level class — emitted UNSCOPED into runtime-body.css; see runtimeBodyClasses below"
+    },
+    {
+      "selector": ".ss-hierarchy-card-status",
+      "carried": false,
+      "reason": "runtime body-level class — emitted UNSCOPED into runtime-body.css; see runtimeBodyClasses below"
+    },
+    {
+      "selector": ".ss-hierarchy-card-detail",
+      "carried": false,
+      "reason": "runtime body-level class — emitted UNSCOPED into runtime-body.css; see runtimeBodyClasses below"
+    },
+    {
+      "selector": ".ss-hierarchy-card-hint",
+      "carried": false,
+      "reason": "runtime body-level class — emitted UNSCOPED into runtime-body.css; see runtimeBodyClasses below"
+    },
+    {
       "selector": ".ss-hierarchy-controls",
       "carried": true
     },
@@ -118,7 +165,87 @@
       "carried": true
     },
     {
+      "selector": ".ss-hierarchy-crumb",
+      "carried": true
+    },
+    {
+      "selector": ".ss-hierarchy-crumb:hover",
+      "carried": true
+    },
+    {
+      "selector": ".ss-hierarchy-crumb:focus-visible",
+      "carried": true
+    },
+    {
+      "selector": ".ss-hierarchy-crumb-current",
+      "carried": true
+    },
+    {
+      "selector": ".ss-hierarchy-crumb-open",
+      "carried": true
+    },
+    {
+      "selector": ".ss-hierarchy-crumb-open:focus-visible",
+      "carried": true
+    },
+    {
       "selector": ".ss-hierarchy-legend-note",
+      "carried": true
+    },
+    {
+      "selector": ".ss-hierarchy-sw",
+      "carried": true
+    },
+    {
+      "selector": ".ss-hierarchy-sw.sb-pending",
+      "carried": true
+    },
+    {
+      "selector": ".ss-hierarchy-sw.sb-drafted",
+      "carried": true
+    },
+    {
+      "selector": ".ss-hierarchy-sw.sb-ready",
+      "carried": true
+    },
+    {
+      "selector": ".ss-hierarchy-sw.sb-active",
+      "carried": true
+    },
+    {
+      "selector": ".ss-hierarchy-sw.sb-review",
+      "carried": true
+    },
+    {
+      "selector": ".ss-hierarchy-sw.sb-done",
+      "carried": true
+    },
+    {
+      "selector": ".ss-hierarchy-sw.sb-retired",
+      "carried": true
+    },
+    {
+      "selector": ".ss-hierarchy-sw.sb-unrecognized",
+      "carried": true
+    },
+    {
+      "selector": ".ss-hierarchy-sw.sb-noplan",
+      "carried": true
+    },
+    {
+      "selector": ".ss-hierarchy-sw.sb-followup-open",
+      "carried": true
+    },
+    {
+      "selector": ".ss-hierarchy-sw.sb-followup-done",
+      "carried": true
+    },
+    {
+      "selector": ".ss-hierarchy-sw.sb-unplanned",
+      "carried": true
+    },
+    {
+      "selector": ".ss-hierarchy-probe .sb-noplan",
       "carried": true
     },
     {
@@ -313,6 +440,10 @@
     },
     {
       "selector": "[data-related-ready][data-related-scope] .related-card-project",
+      "carried": true
+    },
+    {
+      "selector": "[data-related-ready] .related-card[data-related-node].is-related-current",
       "carried": true
     },
     {
@@ -4853,32 +4984,49 @@
       "carried": true
     },
     {
+      "selector": ".ss-tooltip",
+      "carried": false,
+      "reason": "runtime body-level class — emitted UNSCOPED into runtime-body.css; see runtimeBodyClasses below"
+    },
+    {
+      "selector": ".ss-tooltip[hidden]",
+      "carried": false,
+      "reason": "runtime body-level class — emitted UNSCOPED into runtime-body.css; see runtimeBodyClasses below"
+    },
+    {
       "selector": ".codemap-card",
-      "carried": true
+      "carried": false,
+      "reason": "runtime body-level class — emitted UNSCOPED into runtime-body.css; see runtimeBodyClasses below"
     },
     {
       "selector": ".codemap-card-name",
-      "carried": true
+      "carried": false,
+      "reason": "runtime body-level class — emitted UNSCOPED into runtime-body.css; see runtimeBodyClasses below"
     },
     {
       "selector": ".codemap-card-path",
-      "carried": true
+      "carried": false,
+      "reason": "runtime body-level class — emitted UNSCOPED into runtime-body.css; see runtimeBodyClasses below"
     },
     {
       "selector": ".codemap-card-metrics",
-      "carried": true
+      "carried": false,
+      "reason": "runtime body-level class — emitted UNSCOPED into runtime-body.css; see runtimeBodyClasses below"
     },
     {
       "selector": ".codemap-card-metrics > div",
-      "carried": true
+      "carried": false,
+      "reason": "runtime body-level class — emitted UNSCOPED into runtime-body.css; see runtimeBodyClasses below"
     },
     {
       "selector": ".codemap-card-metrics dt",
-      "carried": true
+      "carried": false,
+      "reason": "runtime body-level class — emitted UNSCOPED into runtime-body.css; see runtimeBodyClasses below"
     },
     {
       "selector": ".codemap-card-metrics dd",
-      "carried": true
+      "carried": false,
+      "reason": "runtime body-level class — emitted UNSCOPED into runtime-body.css; see runtimeBodyClasses below"
     },
     {
       "selector": ".next-steps-list li",
@@ -5096,6 +5244,11 @@
       "note": "1 unused selector(s) in the source rule were not carried"
     },
     {
+      "selector": "[data-related-ready] .related-card[data-related-node].is-related-current",
+      "carried": true,
+      "within": "@media (prefers-reduced-motion: no-preference)"
+    },
+    {
       "selector": ".heatmap .heatmap-cell",
       "carried": true,
       "within": "@media (prefers-reduced-motion: no-preference)"
@@ -5113,10 +5266,10 @@
       "note": "2 unused selector(s) in the source rule were not carried"
     },
     {
-      "selector": ".heatmap .heatmap-cell, .git-pulse, .coverage, .refinement-funnel, .req-flow",
+      "selector": ".heatmap .heatmap-cell, .git-pulse, .coverage, .refinement-funnel, .req-flow, [data-related-ready] .related-card[data-related-node].is-related-current",
       "carried": true,
       "within": "@media (prefers-reduced-motion: reduce)",
-      "note": "3 unused selector(s) in the source rule were not carried"
+      "note": "2 unused selector(s) in the source rule were not carried"
     },
     {
       "selector": ".req-status-block:hover",
@@ -5946,6 +6099,11 @@
       "within": "@media (prefers-reduced-motion: no-preference)"
     },
     {
+      "selector": "@keyframes sb-drill-fade",
+      "carried": true,
+      "within": "@media (prefers-reduced-motion: no-preference)"
+    },
+    {
       "selector": "@keyframes chart-enter",
       "carried": true,
       "within": "@media (prefers-reduced-motion: no-preference)"
@@ -5975,6 +6133,105 @@
     "rules": [
       {
         "selector": ".pill",
+        "carried": true,
+        "unscoped": true
+      }
+    ]
+  },
+  "runtimeBodyClasses": {
+    "generatedFile": "web/assets/runtime-body.css",
+    "unscoped": true,
+    "allowlist": [
+      "ss-tooltip",
+      "ss-hierarchy-card",
+      "ss-hierarchy-card-kind",
+      "ss-hierarchy-card-name",
+      "ss-hierarchy-card-status",
+      "ss-hierarchy-card-detail",
+      "ss-hierarchy-card-hint",
+      "codemap-card",
+      "codemap-card-name",
+      "codemap-card-path",
+      "codemap-card-metrics"
+    ],
+    "admission": "A class qualifies only if it is applied exclusively to a node specscribe.js attaches OUTSIDE the .ir-content wrapper, so no scoped selector could ever match it. Being invisible to the harvest is NOT the test (codemap-card* is harvested and still belongs here); being runtime-applied is not sufficient either (the explorer's in-panel classes are seeded via CONDITIONAL_CLASSES instead).",
+    "stats": {
+      "rules": 15,
+      "generatedBytes": 3805
+    },
+    "rules": [
+      {
+        "selector": ".ss-hierarchy-card",
+        "carried": true,
+        "unscoped": true
+      },
+      {
+        "selector": ".ss-hierarchy-card-kind",
+        "carried": true,
+        "unscoped": true
+      },
+      {
+        "selector": ".ss-hierarchy-card-name",
+        "carried": true,
+        "unscoped": true
+      },
+      {
+        "selector": ".ss-hierarchy-card-status",
+        "carried": true,
+        "unscoped": true
+      },
+      {
+        "selector": ".ss-hierarchy-card-detail",
+        "carried": true,
+        "unscoped": true
+      },
+      {
+        "selector": ".ss-hierarchy-card-hint",
+        "carried": true,
+        "unscoped": true
+      },
+      {
+        "selector": ".ss-tooltip",
+        "carried": true,
+        "unscoped": true
+      },
+      {
+        "selector": ".ss-tooltip[hidden]",
+        "carried": true,
+        "unscoped": true
+      },
+      {
+        "selector": ".codemap-card",
+        "carried": true,
+        "unscoped": true
+      },
+      {
+        "selector": ".codemap-card-name",
+        "carried": true,
+        "unscoped": true
+      },
+      {
+        "selector": ".codemap-card-path",
+        "carried": true,
+        "unscoped": true
+      },
+      {
+        "selector": ".codemap-card-metrics",
+        "carried": true,
+        "unscoped": true
+      },
+      {
+        "selector": ".codemap-card-metrics > div",
+        "carried": true,
+        "unscoped": true
+      },
+      {
+        "selector": ".codemap-card-metrics dt",
+        "carried": true,
+        "unscoped": true
+      },
+      {
+        "selector": ".codemap-card-metrics dd",
         "carried": true,
         "unscoped": true
       }

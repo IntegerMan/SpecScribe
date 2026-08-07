@@ -1672,9 +1672,19 @@
             // MUST be per-sector and explicit: left unset, Plotly paints the pattern's backing rect BLACK (67
             // occurrences measured), which is a default colour reaching the output.
             bgcolor: VIS.map(function (n) { return fillFor(n); }),
+            // Full ink, DELIBERATELY — the hatch is softened by `stroke-opacity` in the stylesheet's
+            // `.ss-hierarchy defs pattern > path` rule, not here. Passing an `rgba()` to `fgcolor` is the
+            // obvious-looking way to do it and is silently discarded: Plotly writes only the RGB back onto the
+            // pattern path's `stroke` attribute and drops the alpha. Verified in a live browser — the trace
+            // held `rgba(92,101,112,0.45)` while the rendered path read `stroke="rgb(92,101,112)"` with
+            // computed stroke-opacity 1. Do not "simplify" this back into an rgba here; it will do nothing.
             fgcolor: VIS.map(function () { return inkColor; }),
-            size: 6,
-            solidity: 0.28
+            // Softened on the owner's verify round 2026-08-06 ("harder to read with the hatched fills"). The
+            // hatch STAYS — it is the non-colour status channel UX-DR17 and ADR 0012 §6 require, and it is what
+            // replaced the dashed stroke `marker.line` cannot express. Only its weight drops: wider spacing and
+            // thinner strokes here, lower opacity in the stylesheet.
+            size: 9,
+            solidity: 0.14
           }
         },
         // Status as TEXT, so nothing is signalled by colour alone even to a viewer who cannot distinguish fill or

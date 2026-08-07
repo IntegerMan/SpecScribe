@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
 import { harvest } from '../scripts/ir-content-build.mjs'
-import { conditionalClassNames, selectorIsUsed } from '../scripts/ir-content-lib.mjs'
+import {
+  conditionalClassNames,
+  isRuntimeBodyClass,
+  isSharedPrimitive,
+  missingTokens,
+  RUNTIME_BODY_CLASSES,
+  selectorIsUsed,
+  SHARED_PRIMITIVES,
+} from '../scripts/ir-content-lib.mjs'
 
 /** Same shape `harvest` fills, for the seeding tests below. */
 const collectInto = (html) => {
@@ -148,5 +156,113 @@ describe('cross-framework conditional classes [Story 12.2]', () => {
     expect(selectorIsUsed('.milestone-band .epic-overview', used)).toBe(false)
     used.classes.add('milestone-band')
     expect(selectorIsUsed('.milestone-band .epic-overview', used)).toBe(true)
+  })
+})
+
+/**
+ * Classes `specscribe.js` applies at RUNTIME. Same silent-loss mechanism as the block above, reached by a third
+ * route — and the one that actually shipped: on 2026-08-06 the hover tooltip was an unstyled `<div>` and the
+ * dashboard's details rail went BLANK when a node was selected, because the rules those behaviours depend on
+ * name classes that only ever exist after the page has run.
+ *
+ * ⚠️ Each assertion here is one the round-trip gate structurally cannot make. `check:ir-content` re-derives
+ * through this same seed list, so a class missing from it is missing on both sides, the diff is empty, and the
+ * styling is simply absent from the shipped site. That is not hypothetical for any entry below.
+ */
+describe('runtime-applied classes [ADR 0039]', () => {
+  /**
+   * INSIDE `.ir-content`, so these belong in the scoped layer and are seeded like any other conditional class.
+   *
+   * `is-related-current` is the one that cost the most. `specscribe.js` toggles it onto the single details-rail
+   * card matching the selected node, and the pruned rule was the `display: block` that un-hides it. Its
+   * `display: none` sibling names only classes the server renders, so IT survived — leaving a stylesheet that
+   * hides every card and reveals none. Selecting a sunburst node emptied the rail.
+   */
+  it('seeds the classes specscribe.js applies inside the content wrapper', () => {
+    const seeded = new Set(conditionalClassNames())
+    for (const cls of [
+      'is-related-current', //   the details rail's reveal hook
+      'ss-hierarchy-sector', //  the tooltip/hover/focus hook on every Plotly sector
+      'ss-hierarchy-probe', //   the colour probe; without it no-plan resolves to the Pending colour
+      'ss-hierarchy-sw', //      the legend swatches that explain the hatching
+      'ss-hierarchy-crumb', //   the drill breadcrumb
+      'slice', //                Plotly's own, on the sector group
+      'surface', //              Plotly's own, on the sector path — together these carry the focus ring
+    ]) {
+      expect(seeded.has(cls)).toBe(true)
+    }
+  })
+
+  /**
+   * The concrete regression, asserted at the layer that caused it: with the seed the reveal rule survives
+   * derivation, and without it it does not. Both directions, because "it passes now" is not evidence that the
+   * seed is what makes it pass.
+   */
+  it('carries the details-rail reveal rule, and drops it without the seed', () => {
+    const REVEAL = '[data-related-ready] .related-card[data-related-node].is-related-current'
+    // What the server actually renders: the card, but never the JS-applied state class.
+    const used = collectInto(
+      '<div data-related-pane><div class="related-card" data-related-node="epic-20"></div></div>',
+    )
+
+    expect(selectorIsUsed(REVEAL, used)).toBe(false)
+    expect(missingTokens(REVEAL, used).classes).toEqual(['is-related-current'])
+
+    for (const name of conditionalClassNames()) used.classes.add(name)
+    expect(selectorIsUsed(REVEAL, used)).toBe(true)
+
+    // And its `display: none` counterpart never needed the seed — which is exactly why the pair broke
+    // ASYMMETRICALLY and left the rail hiding everything.
+    const HIDE = '[data-related-ready] .related-card[data-related-node]'
+    expect(selectorIsUsed(HIDE, collectInto('<div class="related-card" data-related-node="x"></div>'))).toBe(true)
+  })
+
+  /**
+   * OUTSIDE `.ir-content`, so seeding alone would not have been enough: the rule would be carried and then
+   * nested under an ancestor the node does not have. These go to the unscoped layer instead.
+   */
+  it('routes the body-level tooltip families to the unscoped layer', () => {
+    for (const sel of ['.ss-tooltip', '.ss-hierarchy-card', '.ss-hierarchy-card-kind', '.codemap-card-name']) {
+      expect(isRuntimeBodyClass(sel)).toBe(true)
+      // Never claimed by the OTHER unscoped layer — the two answer different questions.
+      expect(isSharedPrimitive(sel)).toBe(false)
+    }
+  })
+
+  /**
+   * Same all-or-nothing containment rule the shared-primitive layer has. A selector that reached from the tip
+   * node back into page content must NOT escape scoping just because one of its classes is on the list.
+   */
+  it('keeps the unscoped layer bounded — every named class must be on the allowlist', () => {
+    expect(isRuntimeBodyClass('.ss-tooltip .related-card')).toBe(false)
+    expect(isRuntimeBodyClass('.ss-hierarchy-card .pill')).toBe(false)
+    expect(isRuntimeBodyClass('#main-content .ss-tooltip')).toBe(false)
+    expect(isRuntimeBodyClass('div')).toBe(false)
+    // A compound of two allowlisted classes is still in.
+    expect(isRuntimeBodyClass('.ss-tooltip.ss-hierarchy-card')).toBe(true)
+  })
+
+  /**
+   * The two unscoped allowlists must stay disjoint. If a class ever appeared on both, the builder's three-way
+   * partition would emit its rule into whichever layer it tested first — a silent, order-dependent choice, and
+   * "exactly one definition" would quietly stop being true.
+   */
+  it('keeps the two unscoped allowlists disjoint', () => {
+    const shared = new Set(SHARED_PRIMITIVES)
+    expect(RUNTIME_BODY_CLASSES.filter((c) => shared.has(c))).toEqual([])
+  })
+
+  /**
+   * `missingTokens` is the reporting companion, and it has to agree with the function it explains: whenever
+   * `selectorIsUsed` says no because of a token, `missingTokens` must name that token. A drift between them
+   * would make the drop report point at the wrong class, which is worse than not reporting at all.
+   */
+  it('names the token that caused a drop, agreeing with selectorIsUsed', () => {
+    const used = collectInto('<div class="sunburst-panel"></div>')
+
+    expect(selectorIsUsed('.sunburst-panel .sb-seg', used)).toBe(false)
+    expect(missingTokens('.sunburst-panel .sb-seg', used).classes).toEqual(['sb-seg'])
+    expect(missingTokens('.sunburst-panel', used).classes).toEqual([])
+    expect(missingTokens('#cm-exclude-spec .sunburst-panel', used).ids).toEqual(['cm-exclude-spec'])
   })
 })

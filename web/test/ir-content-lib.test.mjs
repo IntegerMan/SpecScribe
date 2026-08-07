@@ -186,6 +186,8 @@ describe('ir-content.manifest.json committed fields', () => {
         'generatedBytes',
         // How many rules moved to the UNSCOPED shared layer. Moves only when that layer moves. [ADR 0029]
         'sharedRules',
+        // The same, for the SECOND unscoped layer — the body-level tooltip families. [ADR 0039]
+        'runtimeRules',
       ].sort(),
     )
   })
@@ -203,16 +205,18 @@ describe('ir-content.manifest.json committed fields', () => {
     // Ties the two halves together: if a future change writes one and not the other, the manifest is
     // internally inconsistent and this fails without needing the C# stylesheet at all.
     const carried = manifest.rules.filter((r) => r.carried)
-    // `carried: false` now has TWO causes, and conflating them would let a shared-layer handoff be counted as
-    // a root-level drop. Partition by the recorded reason so each stat is checked against its own cause.
+    // `carried: false` now has THREE causes, and conflating them would let an unscoped-layer handoff be
+    // counted as a root-level drop. Partition by the recorded reason so each stat is checked against its own.
     const notCarried = manifest.rules.filter((r) => !r.carried)
     const droppedRoot = notCarried.filter((r) => r.reason.startsWith('root-level rule'))
     const handedToShared = notCarried.filter((r) => r.reason.startsWith('shared primitive'))
+    const handedToRuntime = notCarried.filter((r) => r.reason.startsWith('runtime body-level class'))
     const keyframes = carried.filter((r) => r.selector.startsWith('@keyframes '))
     expect(droppedRoot).toHaveLength(manifest.stats.droppedRoot)
     expect(handedToShared).toHaveLength(manifest.stats.sharedRules)
-    // Every not-carried rule falls into one of the two known causes — no silent third reason.
-    expect(droppedRoot.length + handedToShared.length).toBe(notCarried.length)
+    expect(handedToRuntime).toHaveLength(manifest.stats.runtimeRules)
+    // Every not-carried rule falls into one of the three known causes — no silent fourth reason.
+    expect(droppedRoot.length + handedToShared.length + handedToRuntime.length).toBe(notCarried.length)
     expect(keyframes).toHaveLength(manifest.stats.carriedKeyframes)
     expect(carried.length - keyframes.length).toBe(manifest.stats.carriedRules)
   })
