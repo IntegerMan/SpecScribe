@@ -1,6 +1,7 @@
 # `web/` — SpecScribe's Vue/Nuxt presentation layer
 
-The production-intent Nuxt 3 app for Epic 23. Established by Story 23.2 (component library + design-token
+The production-intent Nuxt app for Epic 23 (Nuxt 4 — `package.json` pins `^4.5.1`; it was established on
+Nuxt 3 and the wording lagged the bump). Established by Story 23.2 (component library + design-token
 bridge); Story 23.3 migrated the first real surfaces onto it — the dashboard and the whole epics tree — and
 prerenders the rest of the site as pass-throughs so the link graph resolves end to end.
 
@@ -62,7 +63,6 @@ ir/adapter.client.ts     The browser stub `#ir` resolves to. Throws — nothing 
 ir/types.ts              The neutral shape both of the above speak. Types only, compiles to nothing.
 
 pages/[...path].vue      The single catch-all. All IR routing goes through it (ADR 0017).
-pages/design-system.vue  The design system: every primitive in every state.
 pages/component-library  The app's own dev landing page. `/` is the project dashboard.
 pages/measure/           23.2 AC #4's three data-path variants. Measurement fixtures, not product surfaces.
 error.vue                The error page, and the reason 404s carry a landmark and a skip link.
@@ -72,9 +72,12 @@ components/IrHtml.ts     Injects a run of IR markup with NO wrapper element.
 components/IrMain.ts     The `<main>` landmark for IR routes, with no scoped attribute and no fragment anchors.
 components/surfaces/     One component per migrated family, plus the shared IrSurface and the pass-through.
 
-assets/tokens.css        GENERATED — verbatim copy of the C# stylesheet's :root block. Never hand-edit.
-assets/ir-content.css    GENERATED — the bounded, scoped monolith extract for injected markup. Transitional.
-assets/base.css          The app's own minimal base layer (reset, typography, focus, reduced-motion).
+assets/tokens.css            GENERATED — verbatim copy of the C# stylesheet's :root blocks. Never hand-edit.
+assets/ir-content.css        GENERATED — the bounded, SCOPED monolith extract for injected markup. Transitional.
+assets/shared-primitives.css GENERATED — the bounded UNSCOPED layer (ADR 0029). Reaches template-authored
+                             components too, which is the whole point. Allowlist: `pill`, `skip-link`.
+assets/runtime-body.css      The runtime-attached body-level classes (ADR 0039).
+assets/base.css              The app's own minimal base layer (reset, typography, focus, reduced-motion).
 
 server/plugins/          Two Nitro plugins: real prerender error messages, and no payload for IR routes.
 scripts/                 The two bridges, the asset copy, and the three verification harnesses.

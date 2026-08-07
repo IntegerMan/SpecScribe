@@ -74,6 +74,12 @@ public class SiteGeneratorDesignSystemTests : IDisposable
     {
         var html = Generate();
 
+        // A test that loops over a collection is vacuous whenever that collection can be empty — the lesson
+        // this story's own 2026-07-29 pass recorded after its new tests passed with an emptied allowlist.
+        // Its three sibling tests in this file each open with this guard; this one was missed until the
+        // 2026-08-07 pass. [Story 23.2 review]
+        Assert.NotEmpty(StatusStyles.LegendStages);
+
         foreach (var stage in StatusStyles.LegendStages)
         {
             // The token NAME (so a component author knows what to reference)...
@@ -142,6 +148,33 @@ public class SiteGeneratorDesignSystemTests : IDisposable
 
         // The panels are Charts.Framed output, so the page cannot grow a frame anatomy charts do not have.
         Assert.Contains(Charts.FrameWhySlot("Framing every chart the same way means a reader never has to work out what they are looking at from the picture alone."), html);
+    }
+
+    [Fact]
+    public void DesignSystem_EverySwatchClassResolvesToARuleInTheStylesheet()
+    {
+        // The CLASS half of the same guarantee `DesignSystem_NamesNoTokenTheStylesheetDoesNotDeclare` gives
+        // for token names. The templater's `_ =>` arm emits `status-legend-key-swatch <stage>` for any stage
+        // it has no special case for, so an eleventh `LegendStages` entry with a real `--status-<stage>` token
+        // but no `.status-legend-key-swatch.<stage>` rule ships a BLANK swatch next to a correct caption —
+        // green, and wrong in the direction a component author trusts. [Story 23.2 review 2026-08-07]
+        var html = MainOf(Generate());
+        var css = File.ReadAllText(Path.Combine(Site, ForgeOptions.StylesheetName));
+
+        var swatchClasses = Regex.Matches(html, @"status-legend-key-swatch ([a-z0-9-]+)", RegexOptions.IgnoreCase)
+            .Select(m => m.Groups[1].Value)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.NotEmpty(swatchClasses);
+        foreach (var cls in swatchClasses)
+        {
+            Assert.True(
+                Regex.IsMatch(css, $@"\.status-legend-key-swatch\.{Regex.Escape(cls)}\b"),
+                $"The design-system page renders a swatch with class `{cls}`, but {ForgeOptions.StylesheetName} "
+                + $"has no `.status-legend-key-swatch.{cls}` rule — so that swatch renders blank. Add the rule, "
+                + "or give the stage an explicit borrow arm in DesignSystemTemplater.StatusBody.");
+        }
     }
 
     [Fact]
@@ -229,7 +262,28 @@ public class SiteGeneratorDesignSystemTests : IDisposable
         Assert.Equal(
             DesignSystemTemplater.StageFillTokens["ready"],
             DesignSystemTemplater.StageFillTokens["drafted"]);
-        Assert.Contains("shared with ready/drafted", html);
+
+        // ⚠️ Asserts the BEHAVIOUR for every shared fill, not the literal "shared with ready/drafted".
+        // [Story 23.2 review 2026-08-07] The templater derived that phrase from a hardcoded
+        // `stage is "ready" or "drafted"`, so a fifth stage joining an existing fill printed no note at all
+        // and this assertion stayed green — it pinned the one pair that happened to be spelled out. The note
+        // is now derived, and this checks each sharer is actually named on the page.
+        var sharedFills = DesignSystemTemplater.StageFillTokens
+            .GroupBy(kv => kv.Value, StringComparer.Ordinal)
+            .Where(g => g.Count() > 1)
+            .ToArray();
+        Assert.NotEmpty(sharedFills);
+        foreach (var group in sharedFills)
+        {
+            foreach (var stage in group.Select(kv => kv.Key))
+            {
+                var others = group.Select(kv => kv.Key).Where(s => s != stage);
+                foreach (var other in others)
+                {
+                    Assert.Contains($"shared with {other}", html);
+                }
+            }
+        }
     }
 
     [Fact]
@@ -246,11 +300,22 @@ public class SiteGeneratorDesignSystemTests : IDisposable
         var html = MainOf(Generate());
         var css = File.ReadAllText(Path.Combine(Site, ForgeOptions.StylesheetName));
 
-        var rootBlock = Regex.Match(css, @"^:root\s*\{(.*?)^\}", RegexOptions.Singleline | RegexOptions.Multiline);
-        Assert.True(rootBlock.Success, "Could not locate the `:root` block in the generated stylesheet.");
+        // ⚠️ EVERY top-level `:root` block, not the first. [Story 23.2 review 2026-08-07] The pattern is
+        // non-greedy, so it used to stop at block one — and `specscribe.css` has a second top-level `:root`
+        // declaring `--impact-lvl-1`…`-5` (`#f3e8c6`, `#e9cd82`, `#dcae4d`, `#c8912b`, `#a86f1e`). That is
+        // precisely the block whose omission from the token bridge was this story's headline regression, so
+        // the page could have stated one of those five hexes verbatim with this test still green.
+        var rootBlocks = Regex.Matches(css, @"^:root\s*\{(.*?)^\}", RegexOptions.Singleline | RegexOptions.Multiline);
+        Assert.NotEmpty(rootBlocks);
 
-        var literals = Regex.Matches(rootBlock.Groups[1].Value, @"#[0-9a-fA-F]{6}\b")
-            .Select(m => m.Value)
+        // ⚠️ Every notation CSS actually permits, not 6-digit hex alone: `#fff`, `#rrggbbaa`, `rgb()`, `hsl()`
+        // and `oklch()` are all legal ways to re-type a token's value, and all of them used to pass.
+        var literals = rootBlocks
+            .SelectMany(b => Regex.Matches(
+                    b.Groups[1].Value,
+                    @"#[0-9a-fA-F]{8}\b|#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3,4}\b|\b(?:rgba?|hsla?|oklch|oklab|lab|lch)\([^)]*\)")
+                .Select(m => m.Value))
+            .Select(v => Regex.Replace(v, @"\s+", " ").Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 

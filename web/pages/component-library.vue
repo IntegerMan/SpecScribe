@@ -15,7 +15,10 @@ useHead({ title: 'SpecScribe — component library' })
     <ChartPanel title="Routes">
       <ul class="route-list">
         <ListRow summary="The portal itself, rendered from the IR: the dashboard and the whole epics tree (Story 23.3)." primary-href="/index.html" primary-label="Project dashboard" />
-        <ListRow summary="The design system: token families and every primitive, in every state." primary-href="/design-system" primary-label="Design system" />
+        <!-- The `/design-system` Vue showcase was retired 2026-08-07 (Story 23.2 review). The design-system
+             page users actually get is `design-system.html`, rendered from the C#-composed region through
+             `PortalMetaSurface` — it is reachable from the portal's own Help nav, not from here. -->
+        <ListRow summary="The design system: token families and every primitive, in every state. Rendered from the IR like every other portal page." primary-href="/design-system.html" primary-label="Design system" />
         <ListRow summary="Payload measurement: the same primitive rendered three ways (Story 23.2 AC #4)." :chips="['/measure/async', '/measure/island', '/measure/static']" />
       </ul>
     </ChartPanel>

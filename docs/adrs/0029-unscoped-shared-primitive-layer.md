@@ -35,7 +35,7 @@ Deleting the copy required a channel that did not exist. This ADR is that channe
 
 The three properties of ADR 0018 that are not scoping are *strengthened*, not relaxed:
 
-**1. Bounded by an ALLOWLIST, not by usage.** `SHARED_PRIMITIVES` in `web/scripts/ir-content-lib.mjs` is a hand-authored constant — one entry today, `pill`. Nothing enters this layer by being used somewhere; it enters only by being named. A rule is carried **only when every class it names is on the allowlist**, so `.pill.status-draft` and `.pill.pill-link` stay in the scoped layer where they belong: those are IR content's variants, not shared component vocabulary. The bound is therefore *tighter* than the scoped layer's, which is usage-driven.
+**1. Bounded by an ALLOWLIST, not by usage.** `SHARED_PRIMITIVES` in `web/scripts/ir-content-lib.mjs` is a hand-authored constant — **two entries: `pill` and `skip-link`** (see § Admissions). Nothing enters this layer by being used somewhere; it enters only by being named. A rule is carried **only when every class it names is on the allowlist**, so `.pill.status-draft` and `.pill.pill-link` stay in the scoped layer where they belong: those are IR content's variants, not shared component vocabulary. The bound is therefore *tighter* than the scoped layer's, which is usage-driven.
 
 **2. Generated and gated in both directions, by the same run.** `npm run check:ir-content` re-derives and diffs **both** sheets and the manifest, and names which sheet drifted. Demonstrated red on a hand-edited shared rule and on an absent sheet, and green again.
 
@@ -54,6 +54,20 @@ A class qualifies **only** if:
 
 A class that appears only in injected markup is already covered by the scoped layer and **must not** be added. Growing this list is an architectural decision, not a convenience — which is why the list lives next to this reasoning and is published in the manifest.
 
+### Admissions
+
+| class | admitted | why it passed the test |
+| --- | --- | --- |
+| `pill` | 2026-07-29, Story 23.2 review follow-up | `ListRow.Chip` emits `class="list-row-chip pill"`; `ListRow.vue` renders the same chip. The hand-typed second definition was deleted rather than corrected again. |
+| `skip-link` | 2026-08-07, Story 23.2 third review pass | `PageShell.vue` renders a template-authored `<a class="skip-link">` while the C# chrome emits the same class into injected markup — both halves satisfied by construction. |
+
+`skip-link` was admitted to **fix a live defect**, not for tidiness, and the defect is worth recording because it is the first one this layer's absence actually caused. `PageShell.vue` carried its own scoped `.skip-link`. `IrSurface.vue` puts `class="ir-content"` on PageShell's **own root element**, so the generated `.ir-content .skip-link` (0,2,0) and the scoped `.skip-link[data-v-…]` (0,2,0) tied, and the winner was decided by Vite's chunk ordering rather than by anything in the code. Both outcomes broke UX-DR16 on every IR-backed route:
+
+- PageShell wins → its `z-index: 10` sits beneath `.ir-content .site-nav`'s `z-index: 100` (sticky, opaque), so the focused skip link renders *behind the nav bar*;
+- the generated rule wins → `position: absolute` returns, and with no positioned ancestor the offsets resolve against the **document**, so a keyboard user who has scrolled focuses a link rendered off-screen at the top of the page.
+
+Admitting the class collapses both to one unscoped definition and **removes** the scoped `.ir-content .skip-link` from `ir-content.css`, so there is no longer a pair to tie. The source rule in `specscribe.css` was corrected from `absolute` to `fixed` in the same change, which is what stops the promotion from regressing the fix the 2026-07-28 re-review had made in `PageShell.vue`. Note the direction of the lesson: the cascade argument in § Cascade order below reasons about a component's scoped rule *outranking* an unscoped primitive, and that reasoning is sound — but it does not cover the case where the scope class is applied *to* the component's root, which turns a descendant selector into a competitor at equal specificity.
+
 ### Cascade order
 
 `nuxt.config.ts` imports `shared-primitives.css` **before** `ir-content.css`. The cascade already agrees without relying on order — every `.ir-content …` selector is at least `(0,2,0)` against an unscoped primitive's `(0,1,0)`, and a component's own scoped rule (`.list-row-chip[data-v-…]`, `(0,2,0)`) also outranks it — but source order settles any future tie in favour of the scoped layer, and it is what lets `ListRow.vue` keep `flex-shrink` while inheriting the shared look.
@@ -68,7 +82,7 @@ A class that appears only in injected markup is already covered by the scoped la
 
 **Bad, and accepted.**
 
-- **ADR 0018's containment property is no longer absolute.** An unscoped rule can, by construction, reach any element carrying that class anywhere in the app. The mitigation is that the set is an allowlist of one, published, and gated — not that the risk is absent. This is a real reduction in a property that was previously guaranteed.
+- **ADR 0018's containment property is no longer absolute.** An unscoped rule can, by construction, reach any element carrying that class anywhere in the app. The mitigation is that the set is a published, gated allowlist of **two** — not that the risk is absent. This is a real reduction in a property that was previously guaranteed, and the list has now grown once, which is the thing to watch: each admission is individually defensible and the property erodes anyway if nobody counts.
 - Two generated CSS layers become three sheets total (plus the token bridge). Story 23.4 retires both derived layers, so the count is transitional.
 - A variant of a shared class is reachable only inside `.ir-content`: `.pill.pill-link` stays scoped, so a Vue component writing `class="pill pill-link"` would get the base look and not the link treatment. That is the all-or-nothing rule behaving correctly and conservatively; the fix, if it is ever needed, is to add `pill-link` to the allowlist deliberately.
 

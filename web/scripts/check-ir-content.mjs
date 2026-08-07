@@ -9,6 +9,9 @@
 // Proven in BOTH directions during Story 23.3 (see the story record): observed RED before extraction and
 // RED on a hand-edited rule, not only green. A gate only ever seen passing is not a gate.
 
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
 import { buildIrContentCss } from './ir-content-build.mjs'
 import {
   OUT_CSS,
@@ -63,13 +66,49 @@ if (
   actualRuntimeCss === expectedRuntimeCss &&
   actualManifest === expectedManifest
 ) {
+  assertSheetsAreActuallyImported()
   console.log(
     `check:ir-content OK — ${expected.stats.carriedRules} rules + ${expected.stats.carriedKeyframes} ` +
       `keyframes scoped, ${expected.stats.sharedRules} shared primitive rule(s) and ` +
       `${expected.stats.runtimeRules} runtime body rule(s) unscoped, in sync with ` +
       SOURCE_LABEL,
   )
+  console.log('check:ir-content OK — nuxt.config.ts imports all three generated sheets, in the required order')
   process.exit(0)
+}
+
+/**
+ * The sheets have a gated CONTENT and, until now, a completely ungated DELIVERY PATH.
+ * [Story 23.2 review 2026-08-07]
+ *
+ * ADR 0029 removed the base `.pill` rule from the scoped layer entirely, so its only route into a page is one
+ * line in `nuxt.config.ts`. Delete or reorder that line and every `.pill` on the site — injected chips AND
+ * `ListRow.vue`'s, which deliberately declare no look properties — renders unstyled, while this gate, the
+ * token gate, the parity gate and the unit tests all stay green: every one of them reads the sheet FILE, and
+ * none reads the config. `skip-link` joined the same layer in this change, which doubles the exposure.
+ *
+ * Order is load-bearing and asserted, not just presence: `shared-primitives.css` must come BEFORE
+ * `ir-content.css` so a scoped `.ir-content …` rule still wins over an unscoped primitive.
+ */
+function assertSheetsAreActuallyImported() {
+  const configPath = fileURLToPath(new URL('../nuxt.config.ts', import.meta.url))
+  const config = readFileSync(configPath, 'utf8').replace(/\/\/[^\n]*/g, '')
+  const at = (name) => config.indexOf(`assets/${name}`)
+
+  const missing = ['tokens.css', 'shared-primitives.css', 'ir-content.css'].filter((n) => at(n) === -1)
+  if (missing.length > 0) {
+    console.error('check:ir-content FAILED — nuxt.config.ts does not import: ' + missing.join(', '))
+    console.error('  A generated sheet that no page imports is styling nothing. The sheet files themselves')
+    console.error('  are in sync, which is exactly why nothing else catches this.')
+    process.exit(1)
+  }
+
+  if (at('shared-primitives.css') > at('ir-content.css')) {
+    console.error('check:ir-content FAILED — nuxt.config.ts imports shared-primitives.css AFTER ir-content.css.')
+    console.error('  Order is load-bearing: the UNSCOPED shared layer must come first so a scoped')
+    console.error('  `.ir-content …` rule still overrides it. See ADR 0029 § Cascade order.')
+    process.exit(1)
+  }
 }
 
 // Report at RULE granularity, not "files differ" — a re-extraction and a hand-edit need different fixes,

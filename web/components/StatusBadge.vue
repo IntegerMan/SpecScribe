@@ -8,10 +8,20 @@
  *
  * ⚠️ WHAT THIS COMPONENT DOES NOT YET DO, stated plainly because an earlier version of this header claimed
  * otherwise. The portal's `StatusStyles.Badge` emits `icon + word` and documents the rule as "color + icon +
- * word, never icon-only". **This component renders no icon.** That matters for two pairs the portal separates
- * by glyph alone: `ready`/`drafted` share a border colour, and `deferred`/`retired` are byte-identical rule
- * sets here. Supplying the glyph is a **Story 23.3 dependency** — the stage -> icon mapping needs a data
- * source, and the canonical IR is it (see CONVENTIONS.md §5). Until then the word carries the whole load.
+ * word, never icon-only". **This component renders no icon.** That matters for `ready`/`drafted`, which share
+ * a border colour and which the portal separates by glyph alone.
+ *
+ * [Story 23.2 review 2026-08-07] This header used to add that `deferred`/`retired` "are byte-identical rule
+ * sets here". They are not: `.is-deferred` binds `var(--status-deferred)` and `.is-retired` binds
+ * `var(--border)`, so they differ by border as well as by word. The claim was inherited from an earlier state
+ * of this file and was one of the stated justifications for deferring the glyph, so it is corrected rather
+ * than dropped.
+ *
+ * The glyph deferral to Story 23.3 is **withdrawn**: the IR-backed surfaces never instantiate this component
+ * — they inject C#-rendered markup that already carries the glyph — so 23.3 was never in a position to
+ * discharge it. Since the `/design-system` showcase was retired, this component's only remaining callers are
+ * the `/measure/*` payload fixtures. Treat it as fixture-grade, not as a shipped primitive, and read
+ * CONVENTIONS.md §5 before building a product surface on it.
  *
  * Note what is also NOT here: no stage -> word map and no stage -> meaning map. Those belong to the data
  * (C# `StatusStyles` today, the canonical IR from 23.3 on). A parallel copy in JS would be a second status
@@ -83,12 +93,17 @@ if (import.meta.dev) {
         `Known stages: ${KNOWN_STAGES.join(', ')}.`,
     )
   }
-  // Required-ness guards `undefined`, not `''`. An empty label is a colour-only badge, which is the one thing
-  // this component must never render — so it is a loud dev failure rather than a silent UX-DR17 breach.
-  if (props.label.trim() === '') {
+  // Required-ness guards `undefined`, not `''` — and not `null`, which is what a JSON IR emits for an absent
+  // field and what `label: string` cannot prevent at runtime. Any of the three is a colour-only badge, the
+  // one thing this component must never render, so it is a loud dev failure rather than a silent UX-DR17
+  // breach. Note the ORDER: `props.label.trim()` was called unguarded, so a `null` label threw a TypeError
+  // and failed the whole route's SSR in dev, while in production the dev block is compiled out and the same
+  // input shipped the colour-only badge silently. [Story 23.2 review 2026-08-07]
+  if (typeof props.label !== 'string' || props.label.trim() === '') {
     console.warn(
-      `[StatusBadge] empty label for stage "${props.stage}" — this renders a colour-only badge and breaks ` +
-        `UX-DR17. Pass the status WORD (StatusStyles.LegendWord on the C# side).`,
+      `[StatusBadge] missing or empty label for stage "${props.stage}" (received ${JSON.stringify(props.label)}) ` +
+        `— this renders a colour-only badge and breaks UX-DR17. Pass the status WORD ` +
+        `(StatusStyles.LegendWord on the C# side).`,
     )
   }
 }

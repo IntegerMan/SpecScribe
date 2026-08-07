@@ -16,7 +16,10 @@ useHead({ title: 'Measure — async data' })
 
 <template>
   <PageShell title="Measure: async data" subtitle="200 rows reaching the primitive through useAsyncData.">
-    <ChartPanel title="Rows" window="variant A">
+    <!-- `window` is the NUMERIC analysis window ("last 90 days"), not a free-text label — see ChartPanel's
+         prop doc and Charts.cs. It carried "variant A" here, which is the same misuse the C# design-system
+         page was corrected for. The variant is in the title. [Story 23.2 review 2026-08-07] -->
+    <ChartPanel title="Rows — variant A (useAsyncData)">
       <ul class="measure-list">
         <ListRow v-for="row in rows ?? []" :key="row.id" :summary="row.summary" :chips="row.chips">
           <template #badge>

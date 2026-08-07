@@ -73,10 +73,19 @@ export const SCOPE = '.ir-content'
 /**
  * Class names whose rules are emitted UNSCOPED, so template-authored components can use them.
  *
- * One entry today. `list-row-chip` is deliberately NOT here: it is the Vue component's own class and belongs
- * in its `<style scoped>` block — only the SHARED half (`pill`) crosses.
+ * `list-row-chip` is deliberately NOT here: it is the Vue component's own class and belongs in its
+ * `<style scoped>` block — only the SHARED half (`pill`) crosses.
+ *
+ * `skip-link` was admitted by the Story 23.2 review on 2026-08-07, and it is the clearest case the admission
+ * test has produced: `PageShell.vue` renders a template-authored `<a class="skip-link">` while the C# chrome
+ * emits the same class into injected markup, so BOTH halves of the test are satisfied by construction. It was
+ * admitted to fix a live defect rather than for tidiness — `PageShell` carried its own scoped `.skip-link`,
+ * which tied on specificity (0,2,0) with the generated `.ir-content .skip-link` and lost or won by chunk
+ * order. Both outcomes broke UX-DR16 on every IR-backed route: the scoped copy's `z-index: 10` sat under the
+ * sticky nav's 100, and the generated copy reinstated the `position: absolute` containing-block bug. One
+ * unscoped definition removes the race; the scoped copy in `PageShell.vue` is gone.
  */
-export const SHARED_PRIMITIVES = ['pill']
+export const SHARED_PRIMITIVES = ['pill', 'skip-link']
 
 const SHARED_SET = new Set(SHARED_PRIMITIVES)
 

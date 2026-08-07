@@ -10,7 +10,9 @@
  * not stamped with this SFC's `data-v-*` attribute, so the rules below will not reach it.
  * See CONVENTIONS.md, "Styling injected content".
  */
-withDefaults(
+import { onMounted } from 'vue'
+
+const props = withDefaults(
   defineProps<{
     /**
      * The page's title. Rendered as the h1 under `chrome: 'full'`; under `chrome: 'nav-only'` the injected
@@ -39,6 +41,35 @@ withDefaults(
   }>(),
   { subtitle: undefined, brand: 'SpecScribe', chrome: 'full' },
 )
+
+/**
+ * The skip link is emitted unconditionally; `<main id="main-content">` is emitted only under `chrome: 'full'`.
+ * That asymmetry is CORRECT — under `nav-only` the caller owns the landmark (`IrMain`) — but nothing checked
+ * that the caller actually supplied one, so a `nav-only` consumer that forgot it shipped a skip link pointing
+ * at an id that does not exist: the link focuses, and activating it goes nowhere. Silent, and invisible to
+ * SSR-only tests. `chrome` is union-erased too, and `chrome === 'full'` is the only test in the template, so
+ * ANY out-of-vocabulary value selects the `nav-only` branch and lands in exactly this hole.
+ * [Story 23.2 review 2026-08-07]
+ */
+if (import.meta.dev) {
+  if (props.chrome !== 'full' && props.chrome !== 'nav-only') {
+    console.warn(
+      `[PageShell] unknown chrome "${props.chrome}" — every value that is not "full" renders the bare shell, ` +
+        `which does NOT emit <main id="main-content">. Use "full" or "nav-only".`,
+    )
+  }
+  if (props.chrome !== 'full') {
+    onMounted(() => {
+      if (!document.getElementById('main-content')) {
+        console.warn(
+          `[PageShell] chrome="${props.chrome}" does not emit <main id="main-content">, and the slot content ` +
+            `did not supply one either — so this page's skip link targets a missing id and goes nowhere ` +
+            `(UX-DR16). Render the landmark via <IrMain>, or use chrome="full".`,
+        )
+      }
+    })
+  }
+}
 </script>
 
 <template>
@@ -76,26 +107,16 @@ withDefaults(
   min-height: 100vh;
 }
 
-/* Visually hidden until focused, then pinned so a keyboard user can jump past the header.
-   `fixed`, not `absolute`: `.shell` establishes no containing block, so absolute offsets resolved against the
-   DOCUMENT — a keyboard user who had scrolled down and shift-tabbed back out of the content focused a link
-   rendered at the top of the page, off-screen, with :focus-visible drawing an outline nobody could see. It
-   must be visible wherever the viewport is (UX-DR16). [Story 23.2 re-review 2026-07-28] */
-.skip-link {
-  position: fixed;
-  left: -9999px;
-  top: 0;
-  background: var(--warm-white);
-  color: var(--ink);
-  border: 1px solid var(--border);
-  padding: 0.5rem 0.9rem;
-  z-index: 10;
-}
-
-.skip-link:focus {
-  left: 0.5rem;
-  top: 0.5rem;
-}
+/* NOTE: `.skip-link` has NO rule here, and must not gain one. [Story 23.2 review 2026-08-07]
+   It is a SHARED PRIMITIVE (ADR 0029): the single definition lives in `specscribe.css` and is emitted
+   unscoped into `web/assets/shared-primitives.css`, which reaches this component's template-authored anchor.
+   A scoped copy here previously tied on specificity (0,2,0) with the generated `.ir-content .skip-link` —
+   because `IrSurface` puts `class="ir-content"` on this component's own root — so the winner was decided by
+   chunk order. If PageShell won, its `z-index: 10` sat beneath the sticky nav's 100 and the focused link was
+   invisible; if the generated rule won, `position: absolute` came back and the link rendered at the top of
+   the DOCUMENT rather than the viewport. Re-adding a rule here reinstates that race.
+   The `fixed`-not-`absolute` reasoning that the 2026-07-28 re-review established now lives on the source
+   rule in `specscribe.css`, where it protects both surfaces instead of one. */
 
 .shell-head {
   border-bottom: 2px solid var(--border);

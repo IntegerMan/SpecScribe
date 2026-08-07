@@ -70,8 +70,10 @@ template-authored elements only; HTML that arrives as a string is never stamped,
 matches nothing and fails **silently** — no error, no warning, just unstyled content.
 
 This is Story 23.1's spike finding 4, and it binds Story 23.3 directly, because 23.3 injects the IR's rendered
-prose. `/design-system` carries a live worked example of both halves side by side — the failing control and
-the working fix — under "Styling injected content".
+prose. Both halves are shown below — the failing control and the working fix.
+
+_(Until 2026-08-07 this example was also rendered live at `/design-system`. That Vue route was retired — see
+§ Status of this app — so the worked example lives here, which is where AC #5 says it must be demonstrated.)_
 
 ```vue
 <template>
@@ -87,9 +89,17 @@ the working fix — under "Styling injected content".
 </style>
 ```
 
-Either `:deep()` or a global stylesheet will work. Prefer `:deep()` scoped to the injecting component — it
-keeps the blast radius at one component instead of the whole app, which is the property a global sheet gives
-away.
+Either `:deep()` or a global stylesheet will work, and the choice is a real trade: `:deep()` keeps the blast
+radius at one component, which is the property a global sheet gives away.
+
+> ⚠️ **What actually shipped is the global sheet, not `:deep()` — read §10 and §10a before following the
+> preference above.** [Story 23.2 review 2026-08-07] Stories 23.3/23.4 inject through `IrHtml.ts`
+> (`createStaticVNode`) and style the result from **generated global sheets**: `ir-content.css`, scoped only
+> by an `.ir-content` prefix, plus the deliberately **unscoped** `shared-primitives.css` of ADR 0029. That was
+> the right call at that scale — a per-component `:deep()` cannot carry ~875 rules harvested from the C#
+> monolith — but it means this section's preference describes the *small* case only. Use `:deep()` when your
+> component injects a bounded fragment it owns; use the generated layers for IR content. This paragraph exists
+> because a reader following §3 in isolation was being pointed away from the shipped architecture.
 
 ---
 
@@ -98,14 +108,18 @@ away.
 AC #4's experiment. Three routes render **identical markup from identical data** (200 story-shaped rows
 through `ListRow` + `StatusBadge`) and differ only in how the data reaches the component. Re-measured
 2026-07-28 with `npm run generate && npm run measure:payload` on **Nuxt 4.5.1 / Vue 3.5.40 / Node 24.11.1**;
-the run is committed at [`measurements/payload.json`](measurements/payload.txt) so the numbers are checkable
-rather than quoted:
+the run is committed at [`measurements/payload.txt`](measurements/payload.txt) (and `payload.json`) so the
+numbers are checkable rather than quoted:
+
+_(Table synced to the committed record 2026-08-07. It had drifted ~2 KB per row: sibling Story 23.4 re-ran
+the harness and left the table at the previous run. Ratios were unaffected, so the conclusion never moved —
+but "checkable rather than quoted" is only true if someone checks, so this is the check.)_
 
 | variant | HTML | payload | island JSON | total | vs control |
 | --- | --- | --- | --- | --- | --- |
-| A — `useAsyncData` | 119.3 KB | 44.5 KB | — | **163.9 KB** | 1.37× |
-| B — `.server.vue` island | 119.0 KB | 0.3 KB | 119.0 KB | **238.4 KB** | 2.00× |
-| C — module-scope control | 119.3 KB | 0.1 KB | — | **119.4 KB** | 1.00× |
+| A — `useAsyncData` | 121.2 KB | 44.5 KB | — | **165.8 KB** | 1.37× |
+| B — `.server.vue` island | 120.9 KB | 0.3 KB | 121.0 KB | **242.2 KB** | 2.00× |
+| C — module-scope control | 121.2 KB | 0.1 KB | — | **121.3 KB** | 1.00× |
 
 _(The original 23.2 run on Nuxt 3.21.9 gave 1.36× / 1.99× / 1.00×. The conclusion survived the Nuxt 4 major
 unchanged; the table had been left pinned to a version the app no longer used.)_
@@ -158,30 +172,51 @@ stage→meaning map. That vocabulary belongs to the data layer (C# `StatusStyles
 23.3 on). A parallel copy in JS would be a second status vocabulary free to drift from the one the portal
 renders — the exact class of drift this epic exists to end.
 
-The `/design-system` page holds the vocabulary as page data for its gallery. That is a showcase fixture, not
-a source of truth; 23.3 replaces it with the IR.
+The `/design-system` page used to hold the vocabulary as page data for its gallery. **That page was retired
+on 2026-08-07** (Story 23.2 review) — it was never prerendered into a packaged build, so no user could reach
+it, and it had begun to teach a *different* definition of `unmapped` than the portal did. The design-system
+page users actually get is `design-system.html`, rendered from the C#-composed region through
+`PortalMetaSurface`, which takes its vocabulary from `StatusStyles` and so cannot drift from it.
 
 The union carries **all ten** of `StatusStyles.LegendStages`. Two of them have no `--status-*` token of their
 own and borrow one — `unmapped` shares `--status-pending`, `retired` shares `--status-deferred` — and both
 stay distinct by WORD. Never publish `--status-unmapped` or `--status-retired`; neither exists.
 
-### ⚠️ Open dependency on 23.3: the badge glyph
+### ⚠️ The badge glyph is missing, and it has no owner — read this before using `StatusBadge`
 
 `StatusStyles.Badge` emits **icon + word** and documents the portal rule as "color + icon + word, never
 icon-only". `StatusBadge.vue` renders **the word only** — there is no icon prop, slot or sprite. UX-DR17 still
-holds (the word is always present), but two pairs the portal separates by glyph do not separate here:
-`ready`/`drafted` share a border colour, and `deferred`/`retired` are byte-identical rule sets.
+holds (the word is always present), but `ready`/`drafted` share a border colour and are separated in the
+portal by glyph alone.
 
-Supplying the glyph is deferred to **Story 23.3**, where the stage→icon mapping gains a data source in the
-canonical IR. Until then, do not write a component or a doc that claims the icon channel exists. (An earlier
-version of `StatusBadge.vue`'s header asserted UX-DR17 was "enforced BY THE COMPONENT'S SHAPE"; it was not,
-and required-ness guards `undefined`, not `''`.)
+**Corrected 2026-08-07:** this paragraph used to add that "`deferred`/`retired` are byte-identical rule sets".
+They are not — `.is-deferred` binds `var(--status-deferred)` and `.is-retired` binds `var(--border)`, so they
+differ by border as well as by word. The claim was inherited from an earlier state of the component and was
+one of the stated justifications for deferring the glyph, so it is corrected here rather than quietly dropped.
+
+**The deferral to Story 23.3 is withdrawn, because 23.3 could never have discharged it.** The IR-backed
+surfaces do not instantiate `StatusBadge` at all — they inject C#-rendered markup, which already carries the
+glyph. After the `/design-system` retirement, `StatusBadge` has **no product consumer**: its only remaining
+uses are the `/measure/*` payload fixtures. Treat it as a **fixture-grade component**, not a shipped
+primitive, and do not build a product surface on it until either the glyph lands or the surface genuinely
+needs a template-authored badge. `ChartPanel`, `ListRow` and `PageShell` are *not* in this position — they are
+consumed by `/component-library`, `error.vue` and (for `PageShell`) every IR route through `IrSurface`.
+
+Until then, do not write a component or a doc that claims the icon channel exists. (An earlier version of
+`StatusBadge.vue`'s header asserted UX-DR17 was "enforced BY THE COMPONENT'S SHAPE"; it was not, and
+required-ness guards `undefined`, not `''` — nor `null`, which is what a JSON IR emits for an absent field.)
 
 ---
 
 ## 6. Accessibility and motion are structural, not per-component
 
-- `PageShell` owns the skip link and the `#main-content` landmark, so a new route cannot forget them.
+- `PageShell` owns the skip link **element** and the `#main-content` landmark, so a new route cannot forget
+  them. It does **not** own the skip link's CSS: since 2026-08-07 `.skip-link` is a shared primitive (ADR
+  0029), so the one definition lives in `specscribe.css` and arrives via the unscoped
+  `shared-primitives.css`. Do not add a `.skip-link` rule to a `<style scoped>` block — a scoped copy ties on
+  specificity with the generated `.ir-content .skip-link` and the winner is decided by chunk order, which is
+  the defect that prompted the promotion. `IrSurface` puts `class="ir-content"` on `PageShell`'s own root, so
+  a descendant selector from the generated layer is a *competitor* here, not a non-match.
 - Motion is declared **only** through `--motion-*` tokens. Do not write literal durations.
 - The `prefers-reduced-motion` reduce block lives once, globally, in `assets/base.css`. Components do **not**
   each carry their own — a per-SFC copy is exactly the drift the token family exists to prevent.
@@ -505,7 +540,29 @@ render silently inert. ADR 0032 restates ADR 0005 §4 around this.
 
 ## Status of this app
 
-`web/` is production-intent but **not shipped yet**: it is not in `SpecScribe.slnx` and not wired into
-`specscribe generate`. How the Node build reaches users is Story 23.5's decision, sequenced ahead of 23.4
-because it is Epic 23's load-bearing unknown. `spike/nuxt-ir/` remains the throwaway 23.1 probe — read it for
-context, but its token binding (wholesale `specscribe.css` import) is superseded by the extraction here.
+**Corrected 2026-08-07.** This section used to read *"`web/` is production-intent but **not shipped yet**: it
+is not in `SpecScribe.slnx` and not wired into `specscribe generate`."* The first half is still true; **the
+second is not, and has not been since ADR 0034.** `web/` **is** the shipping path:
+
+- `src/SpecScribe/NuxtPrerender.cs` boots `web/.output/` (or `renderer/` beside the executable) as part of
+  `specscribe generate`.
+- Per [ADR 0034](../docs/adrs/0034-node-renders-every-content-page.md), **no C# code path emits a content
+  `.html`** any more — `SiteGenerator.WritePage` says so in as many words. Node renders every content page,
+  so Node is a hard prerequisite of `generate`, not an optional accelerator.
+- `web/` is still absent from `SpecScribe.slnx`, which is a build-system fact, not a shipping one.
+
+The practical consequence for a reader of this document: it is not a description of a side experiment. It is
+the authority for the code that renders every page a user sees.
+
+`spike/nuxt-ir/` remains the throwaway 23.1 probe — read it for context, but its token binding (wholesale
+`specscribe.css` import) is superseded by the extraction here.
+
+### Retired surfaces
+
+- **`pages/design-system.vue` — retired 2026-08-07** (Story 23.2 third review pass). It was never in the
+  `PACKAGE_BUILD` prerender list, so no user could reach it, while it duplicated — and had begun to
+  contradict — the `design-system.html` page rendered from the C#-composed region. Its `:deep()` worked
+  example moved to §3; its status vocabulary was a showcase fixture, and `StatusStyles` remains the source of
+  truth. AC #6's "a parallel Nuxt route becomes the portal's design-system surface" is therefore **withdrawn
+  rather than pending** — ADR 0034 made the C#-composed region the thing Node renders, so there was no
+  convergence left to wait for.
