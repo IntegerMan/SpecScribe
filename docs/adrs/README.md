@@ -108,3 +108,25 @@ Each record is numbered by its filename prefix and carries a `**Status:**` line.
   stated on each framework page), and [ADR 0020](0020-module-declared-non-markdown-sources.md)'s non-markdown gate
   stays BMad-keyed, which is why GSD's `config.json` is reported as uninterpreted rather than read. **No new gate**
   per [ADR 0033](0033-content-drift-gates-are-targeted-and-regenerable.md).)
+- [ADR 0040 — Release Channels, Packaging Shape, Credential Posture and Versioning Policy](0040-release-channels-and-versioning-policy.md) — **Proposed** 2026-08-07
+  (authored by [Story 16.1](../../_bmad-output/implementation-artifacts/16-1-release-and-distribution-packaging-spike.md),
+  the Epic 16 packaging spike; evidence in [16-1-spike-report.md](../../_bmad-output/implementation-artifacts/16-1-spike-report.md)).
+  Answers the question [ADR 0006](0006-delivery-architecture-and-distribution.md) and
+  [ADR 0022](0022-node-is-a-build-toolchain-and-a-generate-time-runtime.md) both left open — **how the prebuilt
+  renderer artefact physically gets inside a package** — and answers it by measurement, not argument: a
+  `renderer/**` payload packed at `tools/<tfm>/any/` lands beside the executing assembly in the `dotnet tool`
+  store, `AppContext.BaseDirectory` resolves there, and `generate` runs to `errors=0` **from a repository other
+  than this one** with `SPECSCRIBE_RENDERER_DIR` unset; `PublishSingleFile` likewise does **not** move
+  `AppContext.BaseDirectory` away from a sibling `renderer/`. Cost measured at **+1.18 MB on the nupkg** for a
+  3.96 MB / 187-file payload. Also fixes the preview cut and its order (dotnet tool → npx → binaries, **VSIX
+  OUT**), the RID matrix at three, `0.x`/`-preview` with **MinVer** deriving the version from the tag, Keep a
+  Changelog, and the exact-version pin that makes a CLI/renderer mismatch unexpressible.
+  **AMENDS** ADR 0006 §Decision (adds the packaging shape + an ordered cut) and ADR 0022 §Decision 5 (Node-check
+  placement moves to *prerender time*, matching the shipped code, and both of that ADR's open owner questions on
+  packaging are closed). ⚠️ **Two live findings recorded rather than fixed:** the VS Marketplace PAT path is
+  **already closed** — Azure DevOps blocked global-PAT creation on **2026-03-15**, and `vsce` requires exactly
+  that token shape — so 16.5 must use an **organization**-owned publisher with Entra federation; and `npm ci`
+  **fails on a clean checkout** at `838d591`, which breaks even the weak reading of NFR9 this ADR claims.
+  ⚠️ **Open:** ratification. Story 16.1 AC #4 requires this ADR **Accepted**, and Stories 16.2–16.9 + 17.4 all
+  build on it. Note **0039 was taken** by Story 4.9 before this landed; 0019 remains claimed-but-unwritten by
+  Story 18.3.)
