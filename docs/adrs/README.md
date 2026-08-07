@@ -108,6 +108,25 @@ Each record is numbered by its filename prefix and carries a `**Status:**` line.
   stated on each framework page), and [ADR 0020](0020-module-declared-non-markdown-sources.md)'s non-markdown gate
   stays BMad-keyed, which is why GSD's `config.json` is reported as uninterpreted rather than read. **No new gate**
   per [ADR 0033](0033-content-drift-gates-are-targeted-and-regenerable.md).)
+- [ADR 0039 — A Second Bounded Unscoped Layer, for Runtime-Attached Body-Level Classes](0039-runtime-attached-body-level-classes.md) — **Proposed** 2026-08-06
+  (**Amends [ADR 0029](0029-unscoped-shared-primitive-layer.md)**, which carved the first exception to
+  [ADR 0018](0018-transitional-ir-content-style-layer.md)'s property 3. Context: the owner's verify round found the
+  sunburst had **no hover tooltip and a details rail that went blank on selection**. Neither was a JavaScript
+  regression — every handler still fired. `specscribe.js` appends the shared tooltip to `document.body`, which is
+  OUTSIDE `.ir-content`, so the scoped rules the extractor emits could never match it; and the rail's `display: block`
+  reveal rule names `.is-related-current`, a class only JS applies, so it was pruned while its `display: none`
+  sibling survived — a stylesheet that hid every card and revealed none. Latent since
+  [ADR 0034](0034-the-ir-is-the-product-and-the-site-is-rendered-from-it.md) made the Nuxt pages the product; these
+  rules were never in `ir-content.css` in any commit. **Decides:** a second bounded unscoped allowlist
+  (`RUNTIME_BODY_CLASSES` → `web/assets/runtime-body.css`) whose admission test is **CONTAINMENT, not harvest
+  visibility and not provenance** — `codemap-card*` IS harvested and still qualifies, while `ss-hierarchy-sector` IS
+  runtime-applied and does NOT, because it lives inside the wrapper; the two allowlists stay separate and
+  guard-tested disjoint; re-parenting the tooltip is **rejected** (its body-level placement is what keeps it above
+  the sticky nav and unclipped, and its coordinates are page-space). Also makes this layer's signature silent
+  failure visible: `extract:ir-content` now reports every dropped selector with the token that caused it —
+  **reported, not gated**, because it is a whole-source function that would redden CI on edits that cannot move the
+  layer. ⚠️ The round-trip gate **cannot** catch a bug in its own derivation — it stayed green through all four
+  incidents — so `web/test/ir-content-harvest.test.mjs` pins the derivation directly, both directions.)
 - [ADR 0040 — Release Channels, Packaging Shape, Credential Posture and Versioning Policy](0040-release-channels-and-versioning-policy.md) — **Proposed** 2026-08-07
   (authored by [Story 16.1](../../_bmad-output/implementation-artifacts/16-1-release-and-distribution-packaging-spike.md),
   the Epic 16 packaging spike; evidence in [16-1-spike-report.md](../../_bmad-output/implementation-artifacts/16-1-spike-report.md)).

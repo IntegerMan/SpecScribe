@@ -556,12 +556,21 @@ public class StylesheetTests
     [Fact]
     public void Stylesheet_HasTheHierarchyPatternFillRule()
     {
-        // THE rule with no Plotly attribute behind it. Plotly emits the hatch <path> inside every <pattern> with a
-        // `stroke` but NO `fill`, so SVG's initial black paints beneath every hatched sector (21 occurrences
-        // measured on the real dashboard). Config cannot fix it — the <pattern> element is generated, not
-        // configured — and this single rule took the foreign-colour count 1 -> 0. If it is ever "cleaned up"
-        // because the trace already sets colours, the chart goes back to painting black under 57 sectors.
-        Assert.Contains(".ss-hierarchy defs pattern > path { fill: none; }", ReadStylesheet());
+        // THE rule with no Plotly attribute behind it, and it now carries TWO declarations that both have to be
+        // here for the same reason: the <pattern> element is generated rather than configured, so neither is
+        // reachable from the trace.
+        //
+        // `fill: none` — Plotly emits the hatch <path> with a `stroke` but NO `fill`, so SVG's initial black
+        // paints beneath every hatched sector (21 occurrences measured on the real dashboard). This single
+        // declaration took the foreign-colour count 1 -> 0. If it is ever "cleaned up" because the trace already
+        // sets colours, the chart goes back to painting black under 57 sectors.
+        //
+        // `stroke-opacity` — the hatch's WEIGHT, softened on the owner's 2026-08-06 verify round. It lives here
+        // and not in `marker.pattern.fgcolor` because Plotly drops the alpha of an rgba fgcolor in transit,
+        // writing only its RGB onto the path's `stroke` attribute; verified in a live browser, where the trace
+        // held `rgba(...,0.45)` and the rendered path computed stroke-opacity 1. Moving it back into the trace
+        // silently restores a full-strength hatch.
+        Assert.Contains(".ss-hierarchy defs pattern > path { fill: none; stroke-opacity: 0.45; }", ReadStylesheet());
     }
 
     [Fact]

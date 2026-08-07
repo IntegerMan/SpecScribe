@@ -6,13 +6,16 @@ import { readFileSync } from 'node:fs'
 import {
   conditionalClassNames,
   isMigrated,
+  isRuntimeBodyClass,
   isSharedPrimitive,
+  missingTokens,
   readBlocks,
   scopePrelude,
   selectorAttributes,
   selectorIsUsed,
   selectorTokens,
   stripComments,
+  RUNTIME_BODY_CLASSES,
   SCOPE,
   SHARED_PRIMITIVES,
   SOURCE_CSS,
@@ -106,6 +109,14 @@ export async function buildIrContentCss() {
   // the durable fix. This is what makes the layer a function of the TEMPLATES, not of the sprint.
   for (const name of conditionalClassNames()) used.classes.add(name)
 
+  // The unscoped runtime allowlist is seeded HERE TOO, and it is not redundant with the partition further
+  // down. `selectorIsUsed` runs FIRST and drops a selector naming any unharvested class — so without this,
+  // `.ss-tooltip` never survives long enough for `isRuntimeBodyClass` to route it anywhere, and the layer
+  // emits only the members that happen to be harvested anyway. Measured exactly that on the first run: 7
+  // rules emitted, every one of them `codemap-card*` (server-built into `data-tip-html`, therefore visible),
+  // and the tooltip itself — the whole reason the layer exists — still missing. [ADR 0039]
+  for (const name of RUNTIME_BODY_CLASSES) used.classes.add(name)
+
   // ── 2. Carry the matching rules ────────────────────────────────────────────────────────────────────────
   const source = readFileSync(SOURCE_CSS, 'utf8').replace(/\r\n/g, '\n')
   const blocks = readBlocks(stripComments(source))
@@ -115,6 +126,19 @@ export async function buildIrContentCss() {
   /** Emitted CSS text for the unscoped shared layer, and its manifest entries. [ADR 0029] */
   const sharedCarried = []
   const manifestSharedRules = []
+  /** The second unscoped layer: nodes specscribe.js attaches outside `.ir-content`. [ADR 0039] */
+  const runtimeCarried = []
+  const manifestRuntimeRules = []
+  /**
+   * Every selector dropped for a token the harvest never saw, with the token that caused it.
+   *
+   * ⚠️ REPORTED, never committed to the manifest — deliberately, and the reason is the committed-fields rule
+   * documented at the manifest below. This list is a function of the WHOLE SOURCE stylesheet, so it moves on
+   * any `specscribe.css` edit; putting it in the gated artifact would redden CI on commits that cannot have
+   * changed the emitted layer, which is precisely how people learn to re-run the extractor on reflex. It goes
+   * to the console and to `web/measurements/`, which is where a human actually reads it. [ADR 0039]
+   */
+  const dropped = []
   const stats = {
     sourceRules: 0,
     carriedRules: 0,
@@ -122,6 +146,7 @@ export async function buildIrContentCss() {
     droppedUnused: 0,
     droppedRoot: 0,
     sharedRules: 0,
+    runtimeRules: 0,
   }
   const keyframeBlocks = new Map()
 
@@ -139,15 +164,32 @@ export async function buildIrContentCss() {
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean)
+    // Record the CAUSE of every drop, per selector, before collapsing to a count. A selector rejected on
+    // element name rather than on a class/id contributes empty arrays and is filtered out downstream.
+    for (const s of selectors) {
+      if (selectorIsUsed(s, used)) continue
+      const miss = missingTokens(s, used)
+      if (miss.classes.length === 0 && miss.ids.length === 0) continue
+      dropped.push({
+        selector: s,
+        ...(insideAt ? { within: insideAt } : {}),
+        missingClasses: miss.classes,
+        ...(miss.ids.length ? { missingIds: miss.ids } : {}),
+      })
+    }
+
     const keep = selectors.filter((s) => selectorIsUsed(s, used))
     if (keep.length === 0) {
       stats.droppedUnused += 1
-      return { scoped: null, shared: null }
+      return { scoped: null, shared: null, runtime: null }
     }
 
-    // Partition BEFORE scoping: a shared primitive is emitted verbatim, never nested under `.ir-content`.
+    // Partition BEFORE scoping: an unscoped selector is emitted verbatim, never nested under `.ir-content`.
+    // Three-way, and the two unscoped allowlists are disjoint by construction (guard-tested), so the order of
+    // these filters cannot change which layer claims a selector.
     const sharedSel = keep.filter(isSharedPrimitive)
-    const scopedSel = keep.filter((s) => !isSharedPrimitive(s))
+    const runtimeSel = keep.filter(isRuntimeBodyClass)
+    const scopedSel = keep.filter((s) => !isSharedPrimitive(s) && !isRuntimeBodyClass(s))
 
     let sharedText = null
     if (sharedSel.length > 0) {
@@ -169,7 +211,27 @@ export async function buildIrContentCss() {
       })
     }
 
-    if (scopedSel.length === 0) return { scoped: null, shared: sharedText }
+    let runtimeText = null
+    if (runtimeSel.length > 0) {
+      stats.runtimeRules += 1
+      runtimeText = `${runtimeSel.join(',\n')} {${block.body.replace(/\n+$/, '\n')}}`
+      manifestRuntimeRules.push({
+        selector: runtimeSel.join(', '),
+        carried: true,
+        unscoped: true,
+        ...(insideAt ? { within: insideAt } : {}),
+      })
+      // Same handoff bookkeeping as the shared layer: recorded in the SCOPED list as a move with a reason,
+      // never as a silent disappearance.
+      manifestRules.push({
+        selector: runtimeSel.join(', '),
+        carried: false,
+        ...(insideAt ? { within: insideAt } : {}),
+        reason: 'runtime body-level class — emitted UNSCOPED into runtime-body.css; see runtimeBodyClasses below',
+      })
+    }
+
+    if (scopedSel.length === 0) return { scoped: null, shared: sharedText, runtime: runtimeText }
 
     const scoped = scopePrelude(scopedSel.join(','))
     if (!scoped) {
@@ -180,23 +242,28 @@ export async function buildIrContentCss() {
         carried: false,
         reason: 'root-level rule — no descendant to scope under .ir-content; see web/assets/base.css',
       })
-      return { scoped: null, shared: sharedText }
+      return { scoped: null, shared: sharedText, runtime: runtimeText }
     }
     stats.carriedRules += 1
     stats.carriedSelectors += scopedSel.length
+    const placed = scopedSel.length + sharedSel.length + runtimeSel.length
     manifestRules.push({
       selector: scopedSel.join(', '),
       carried: true,
       ...(insideAt ? { within: insideAt } : {}),
-      ...(scopedSel.length + sharedSel.length < selectors.length
+      ...(placed < selectors.length
         ? {
             note:
-              `${selectors.length - scopedSel.length - sharedSel.length} unused selector(s) in the source rule ` +
+              `${selectors.length - placed} unused selector(s) in the source rule ` +
               'were not carried',
           }
         : {}),
     })
-    return { scoped: `${scoped} {${block.body.replace(/\n+$/, '\n')}}`, shared: sharedText }
+    return {
+      scoped: `${scoped} {${block.body.replace(/\n+$/, '\n')}}`,
+      shared: sharedText,
+      runtime: runtimeText,
+    }
   }
 
   /**
@@ -211,6 +278,7 @@ export async function buildIrContentCss() {
   function walk(level, at) {
     const out = []
     const shared = []
+    const runtime = []
     for (const block of level) {
       if (block.kind === 'statement') continue
 
@@ -218,6 +286,7 @@ export async function buildIrContentCss() {
         const text = takeRule(block, at)
         if (text.scoped) out.push(text.scoped)
         if (text.shared) shared.push(text.shared)
+        if (text.runtime) runtime.push(text.runtime)
         continue
       }
 
@@ -236,26 +305,30 @@ export async function buildIrContentCss() {
         const inner = walk(readBlocks(block.body), prelude)
         if (inner.out.length) out.push(`${prelude} {\n${inner.out.join('\n\n')}\n}`)
         // A shared primitive inside a conditional at-rule keeps its condition — dropping the wrapper would
-        // apply a reduced-motion or narrow-viewport override unconditionally.
+        // apply a reduced-motion or narrow-viewport override unconditionally. Same for the runtime layer:
+        // `.ss-tooltip` has reduced-motion and narrow-viewport overrides that must not apply unconditionally.
         if (inner.shared.length) shared.push(`${prelude} {\n${inner.shared.join('\n\n')}\n}`)
+        if (inner.runtime.length) runtime.push(`${prelude} {\n${inner.runtime.join('\n\n')}\n}`)
         continue
       }
       // @font-face and friends: carried whole — they declare a resource, not a selector match.
       out.push(`${prelude} {${block.body}}`)
       manifestRules.push({ selector: prelude, carried: true })
     }
-    return { out, shared }
+    return { out, shared, runtime }
   }
 
   const walked = walk(blocks, null)
   carried.push(...walked.out)
   sharedCarried.push(...walked.shared)
+  runtimeCarried.push(...walked.runtime)
 
   // ── 3. Keyframes, only those the carried rules animate ─────────────────────────────────────────────────
   //
-  // BOTH layers are scanned: a shared primitive that animates would otherwise name a keyframe nobody emitted,
-  // which fails silently — the rule applies, the animation does not, and no markup comparison can see it.
-  const body = [...carried, ...sharedCarried].join('\n')
+  // ALL THREE layers are scanned: an unscoped rule that animates would otherwise name a keyframe nobody
+  // emitted, which fails silently — the rule applies, the animation does not, and no markup comparison can
+  // see it. `.ss-tooltip` has a fade-in, so the runtime layer is not a hypothetical third case here.
+  const body = [...carried, ...sharedCarried, ...runtimeCarried].join('\n')
   const animated = new Set()
   for (const m of body.matchAll(/animation(?:-name)?\s*:\s*([^;}]+)/g)) {
     for (const tok of m[1].split(/[,\s]+/)) if (tok) animated.add(tok.trim())
@@ -337,6 +410,37 @@ export async function buildIrContentCss() {
   // blank body — the file is imported unconditionally by nuxt.config.ts.
   const sharedCss = `${sharedBanner}\n\n${sharedCarried.join('\n\n')}\n`
 
+  // The SECOND unscoped sibling. Kept as its own file rather than folded into shared-primitives.css so a
+  // failure localizes to a named artifact and the two allowlists cannot be conflated in review — they answer
+  // different questions and have different admission tests. [ADR 0033 §new-gate rule, ADR 0039]
+  const runtimeBanner = [
+    '/* GENERATED FILE - DO NOT EDIT.',
+    ` * Extracted from ${SOURCE_LABEL} by \`npm run extract:ir-content\` (ADR 0039).`,
+    ' *',
+    ' * ⚠️ UNSCOPED, and for a DIFFERENT reason than shared-primitives.css. These classes are attached at',
+    ' * RUNTIME by specscribe.js to a node it appends to document.body — the shared tooltip and the two rich',
+    ' * cards rendered into it. That node is OUTSIDE the `.ir-content` wrapper, so `.ir-content .ss-tooltip`',
+    ' * can never match it no matter what the harvest saw. Scoping these is not merely unhelpful, it is wrong.',
+    ' *',
+    ' * The body-level placement is deliberate: `.ss-tooltip` is position:absolute/z-index:300 so it layers',
+    ' * above the sticky nav and clamps to the viewport instead of being clipped, and its coordinates are',
+    ' * computed in PAGE space. Re-parenting it under `.ir-content` would trade a styling bug for a clipping',
+    ' * one — see ADR 0039 for why that alternative was rejected.',
+    ' *',
+    ' * BOUNDED by an explicit allowlist, not by usage: a rule is carried only when EVERY class it names is on',
+    ` * the list. Today the whole list is: ${RUNTIME_BODY_CLASSES.map((c) => `.${c}`).join(', ')}.`,
+    ' * Admission test: is this class only ever applied to a node provably OUTSIDE `.ir-content`?',
+    ' * "Runtime-applied" alone is NOT sufficient — the hierarchy explorer stamps sector, probe, swatch and',
+    ' * breadcrumb classes at runtime too, and those live inside the chart panel, so they stay scoped and are',
+    ' * seeded through CONDITIONAL_CLASSES instead.',
+    ' *',
+    ' * Each rule here is REMOVED from ir-content.css rather than duplicated into both, so the app has exactly',
+    ' * one definition. The manifest records the handoff from both sides.',
+    ' */',
+  ].join('\n')
+
+  const runtimeCss = `${runtimeBanner}\n\n${runtimeCarried.join('\n\n')}\n`
+
   // ── 5. Pass-through coverage, reported rather than implied ─────────────────────────────────────────────
   const otherOnly = [...other.classes].filter((c) => !used.classes.has(c))
   const passThroughCoveredPct =
@@ -396,6 +500,7 @@ export async function buildIrContentCss() {
       droppedRoot: stats.droppedRoot,
       generatedBytes: outBytes,
       sharedRules: stats.sharedRules,
+      runtimeRules: stats.runtimeRules,
     },
     rules: manifestRules,
     /**
@@ -420,12 +525,33 @@ export async function buildIrContentCss() {
       stats: { rules: stats.sharedRules, generatedBytes: Buffer.byteLength(sharedCss) },
       rules: manifestSharedRules,
     },
+    /**
+     * The SECOND unscoped layer. [ADR 0039]
+     *
+     * Separate from `sharedPrimitives` rather than merged into it because the two answer different questions
+     * and admit on different tests. Merging them would let a reviewer approve a `.pill`-shaped addition and
+     * silently widen the tooltip escape hatch, or the reverse.
+     */
+    runtimeBodyClasses: {
+      generatedFile: 'web/assets/runtime-body.css',
+      unscoped: true,
+      allowlist: RUNTIME_BODY_CLASSES,
+      admission:
+        'A class qualifies only if it is applied exclusively to a node specscribe.js attaches OUTSIDE the '
+        + '.ir-content wrapper, so no scoped selector could ever match it. Being invisible to the harvest is '
+        + 'NOT the test (codemap-card* is harvested and still belongs here); being runtime-applied is not '
+        + 'sufficient either (the explorer\'s in-panel classes are seeded via CONDITIONAL_CLASSES instead).',
+      stats: { rules: stats.runtimeRules, generatedBytes: Buffer.byteLength(runtimeCss) },
+      rules: manifestRuntimeRules,
+    },
   }
 
   return {
     css,
     sharedCss,
+    runtimeCss,
     manifest,
+    dropped,
     stats: {
       ...stats,
       migratedPages,

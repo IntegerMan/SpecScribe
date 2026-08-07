@@ -1,0 +1,89 @@
+/* GENERATED FILE - DO NOT EDIT.
+ * Extracted from src/SpecScribe/assets/specscribe.css by `npm run extract:ir-content` (ADR 0039).
+ *
+ * ⚠️ UNSCOPED, and for a DIFFERENT reason than shared-primitives.css. These classes are attached at
+ * RUNTIME by specscribe.js to a node it appends to document.body — the shared tooltip and the two rich
+ * cards rendered into it. That node is OUTSIDE the `.ir-content` wrapper, so `.ir-content .ss-tooltip`
+ * can never match it no matter what the harvest saw. Scoping these is not merely unhelpful, it is wrong.
+ *
+ * The body-level placement is deliberate: `.ss-tooltip` is position:absolute/z-index:300 so it layers
+ * above the sticky nav and clamps to the viewport instead of being clipped, and its coordinates are
+ * computed in PAGE space. Re-parenting it under `.ir-content` would trade a styling bug for a clipping
+ * one — see ADR 0039 for why that alternative was rejected.
+ *
+ * BOUNDED by an explicit allowlist, not by usage: a rule is carried only when EVERY class it names is on
+ * the list. Today the whole list is: .ss-tooltip, .ss-hierarchy-card, .ss-hierarchy-card-kind, .ss-hierarchy-card-name, .ss-hierarchy-card-status, .ss-hierarchy-card-detail, .ss-hierarchy-card-hint, .codemap-card, .codemap-card-name, .codemap-card-path, .codemap-card-metrics.
+ * Admission test: is this class only ever applied to a node provably OUTSIDE `.ir-content`?
+ * "Runtime-applied" alone is NOT sufficient — the hierarchy explorer stamps sector, probe, swatch and
+ * breadcrumb classes at runtime too, and those live inside the chart panel, so they stay scoped and are
+ * seeded through CONDITIONAL_CLASSES instead.
+ *
+ * Each rule here is REMOVED from ir-content.css rather than duplicated into both, so the app has exactly
+ * one definition. The manifest records the handoff from both sides.
+ */
+
+.ss-hierarchy-card { display: block; white-space: normal; min-width: 10rem; max-width: 17rem; }
+
+.ss-hierarchy-card-kind {
+  display: block;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faded);
+}
+
+.ss-hierarchy-card-name { display: block; font-weight: 700; color: var(--ink); font-size: 0.8rem; margin: 0.1rem 0; }
+
+.ss-hierarchy-card-status { display: block; color: var(--ink); font-size: 0.72rem; }
+
+.ss-hierarchy-card-detail { display: block; color: var(--ink-faded); font-size: 0.72rem; font-variant-numeric: tabular-nums; }
+
+.ss-hierarchy-card-hint {
+  display: block;
+  margin-top: 0.3rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--border);
+  color: var(--rust);
+  font-size: 0.66rem;
+}
+
+.ss-tooltip {
+  position: absolute;
+  z-index: 300;
+  max-width: 300px;
+  padding: 0.4rem 0.65rem;
+  background: var(--parchment);
+  color: var(--ink);
+  border: 1px solid var(--gold-light);
+  border-radius: 5px;
+  box-shadow: 0 3px 12px var(--shadow);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 0.74rem;
+  line-height: 1.4;
+  
+  white-space: pre-line;
+  pointer-events: none;
+}
+
+.ss-tooltip[hidden] { display: none; }
+
+.codemap-card { display: block; white-space: normal; min-width: 11rem; max-width: 17rem; }
+
+.codemap-card-name { display: block; font-weight: 700; color: var(--ink); font-size: 0.8rem; }
+
+.codemap-card-path {
+  display: block;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 0.66rem;
+  color: var(--ink-faded);
+  margin: 0.1rem 0 0.4rem;
+  word-break: break-all;
+}
+
+.codemap-card-metrics { margin: 0; display: grid; grid-template-columns: auto auto; gap: 0.08rem 0.7rem; }
+
+.codemap-card-metrics > div { display: contents; }
+
+.codemap-card-metrics dt { color: var(--ink-faded); font-weight: 400; }
+
+.codemap-card-metrics dd { margin: 0; color: var(--ink); font-variant-numeric: tabular-nums; text-align: right; }
