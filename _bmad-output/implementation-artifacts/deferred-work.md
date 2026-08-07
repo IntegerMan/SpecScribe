@@ -1384,3 +1384,17 @@ Baseline SonarCloud triage of the whole codebase, performed rule-first against a
 - source_spec: `12-1-gsd-and-gsd-pi-integration-spike.md`
   summary: Story 12.1's own Acceptance Criteria in `_bmad-output/planning-artifacts/epics.md:2608-2620` were not revisited to reflect the owner-directed scope addition (Tasks 8-10 land production code — roster `Url`/`Blurb`, the `epics.md`/`sprint-status.yaml` 12.2/12.3 split, README updates) — the ACs still read as pure-spike language ("a written coverage map classifies..."). Not a functional bug: the story file's own "Owner-directed scope addition" note and Change Log disclose the deviation clearly, so this only misconstrues a reader who reads `epics.md`'s AC block in isolation. Worth a convention going forward: when a spike's scope is overridden mid-story, revisit its charter AC block in `epics.md` too, not just the story file's task list.
   evidence: Blind Hunter finding 9, code review 2026-08-02.
+
+## Deferred from: code review of 23-2-component-library-and-design-token-bridge (2026-08-07)
+
+- source_spec: `23-2-component-library-and-design-token-bridge.md`
+  summary: `npm ci` fails in `web/` — `package.json` and `package-lock.json` are out of sync (`Missing: @emnapi/runtime@1.11.3 from lock file`; the lock carries `@emnapi/core` and `@emnapi/wasi-threads` but not `runtime`). CI runs `npm ci` deliberately and says so ("the lockfile is the pin, and a lockfile-drifting install in CI would…"), but pins Node 24.11.1 via `web/.nvmrc` while this reproduction used 24.18.1 / npm 11.16.0 — so CI is probably still green and this is a lockfile-portability defect rather than a broken pipeline. Sibling-owned: the file's last write is commit `c1a6ee5` (Story 23.5's Nuxt 4 bump), not 23.2's `261b300`. Handed off to Story 23.5.
+  evidence: Orchestrator reproduction, code review 2026-08-07. `.github/workflows/build-test-analyze.yml:241,246`.
+
+- source_spec: `23-2-component-library-and-design-token-bridge.md`
+  summary: The token bridge's brace scanner (`web/scripts/tokens-lib.mjs:94`) is comment-aware but not string-aware — a quoted CSS string containing `}` or `/*` (e.g. `content: "}"`) would decrement `depth` and misjudge every subsequent top-level `:root` block. Verified unreached: no such string exists in `specscribe.css` today. Deferred as latent, but noted because the structurally identical comment case is guarded twice with a docblock explaining why, and this repo has a `*/`-in-a-custom-property silent-truncation incident in its history.
+  evidence: Edge Case Hunter, code review 2026-08-07.
+
+- source_spec: `23-2-component-library-and-design-token-bridge.md`
+  summary: No committed gate covers `design-system.html`'s rendered output any more. The story record stamps three `GoldenContentFingerprint` values as its regeneration provenance; ADR 0034 retired that gate and `SiteGeneratorAdapterTests.cs:256` carries only its tombstone. Its successor `check:parity` runs over a frozen 24-route corpus that does not include `design-system.html` (the `PortalMetaSurface` family is represented by `about-sdd.html`). Defensible — the family is covered by proxy and the region by 13 C# tests — but the three stamped hashes are now unverifiable and the page's rendered chrome has no direct gate.
+  evidence: Acceptance Auditor, code review 2026-08-07. ADR 0034; `web/measurements/parity-pinned.json`.
