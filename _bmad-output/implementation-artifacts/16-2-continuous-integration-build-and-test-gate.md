@@ -422,6 +422,13 @@ scope guard.
         `worktree-story-16-2-dev` — CI for that branch is run **`31208253189`**, dispatched deliberately
         (a push to a non-`main` branch triggers nothing; the workflow is `push`/`pull_request` on `main`
         plus `workflow_dispatch`).
+  - [x] **This story's own fix is proven green in CI, on both operating systems.** Run **`31208253189`** on
+        `worktree-story-16-2-dev`: **`build-test-analyze` `success` with every step green** — `Build`,
+        **`Test`**, `Install web dependencies`, `Generate the IR and prerender the site`,
+        **`Check web drift gates`**, `Test web` — and **`portability-probe (ubuntu, non-gating)` `success`
+        too**, which matters because this flake class was first observed on Linux (Story 25.1's probe).
+        That green `Check web drift gates` is also the independent confirmation that the local
+        `check:ir-content` red was environmental and nothing was actually drifted.
   - [x] Non-incremental rebuild done before measuring: `dotnet build SpecScribe.slnx --no-incremental`
         (0 errors), then again for the test project after the fix.
   - [x] **Regression floor recorded:**
