@@ -11,11 +11,11 @@
   ],
   "stats": {
     "carriedRules": 1476,
-    "carriedSelectors": 1693,
+    "carriedSelectors": 1694,
     "carriedKeyframes": 5,
     "droppedRoot": 4,
-    "generatedBytes": 186699,
-    "sharedRules": 1,
+    "generatedBytes": 186492,
+    "sharedRules": 3,
     "runtimeRules": 15
   },
   "rules": [
@@ -31,11 +31,13 @@
     },
     {
       "selector": ".skip-link",
-      "carried": true
+      "carried": false,
+      "reason": "shared primitive — emitted UNSCOPED into shared-primitives.css; see sharedPrimitives below"
     },
     {
       "selector": ".skip-link:focus",
-      "carried": true
+      "carried": false,
+      "reason": "shared primitive — emitted UNSCOPED into shared-primitives.css; see sharedPrimitives below"
     },
     {
       "selector": ".index-card:focus-visible, .now-next-card:focus-visible, .epic-mosaic-card:focus-visible, .epic-chip:focus-visible, .story-title-link:focus-visible, .req-id-link:focus-visible, .req-epic:focus-visible, .toc-sidebar a:focus-visible, .breadcrumb a:focus-visible, .ac-anchor:focus-visible, .ac-ref:focus-visible, .view-epic-link:focus-visible",
@@ -3075,6 +3077,14 @@
     },
     {
       "selector": ".donut-center-text.donut-center-fraction",
+      "carried": true
+    },
+    {
+      "selector": ".mini-donut",
+      "carried": true
+    },
+    {
+      "selector": ".mini-donut .donut-track, .mini-donut .donut-seg",
       "carried": true
     },
     {
@@ -6123,14 +6133,25 @@
     "generatedFile": "web/assets/shared-primitives.css",
     "unscoped": true,
     "allowlist": [
-      "pill"
+      "pill",
+      "skip-link"
     ],
     "admission": "A class qualifies only if a C# primitive emits it AND a template-authored Vue component consumes it. Classes that appear only in injected markup are covered by the scoped layer and must not be added here.",
     "stats": {
-      "rules": 1,
-      "generatedBytes": 1496
+      "rules": 3,
+      "generatedBytes": 1893
     },
     "rules": [
+      {
+        "selector": ".skip-link",
+        "carried": true,
+        "unscoped": true
+      },
+      {
+        "selector": ".skip-link:focus",
+        "carried": true,
+        "unscoped": true
+      },
       {
         "selector": ".pill",
         "carried": true,

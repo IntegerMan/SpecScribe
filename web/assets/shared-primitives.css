@@ -8,7 +8,7 @@
  * what drifted before: serif instead of Courier, wrong padding, wrong tokens.
  *
  * BOUNDED by an explicit allowlist, not by usage: a rule is carried only when EVERY class it names is on
- * the list. Today the whole list is: .pill.
+ * the list. Today the whole list is: .pill, .skip-link.
  * Growing it is an architectural decision — see ir-content-lib.mjs and ADR 0029 for the admission test.
  *
  * Each rule here is REMOVED from ir-content.css rather than duplicated into both, so the app has exactly
@@ -16,6 +16,26 @@
  *
  * TRANSITIONAL: Story 23.4 retires this alongside ir-content.css. The manifest enumerates every rule.
  */
+
+.skip-link {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  z-index: 200;
+  padding: 0.5rem 0.9rem;
+  background: var(--teal-deep);
+  color: var(--warm-white);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 0.85rem;
+  text-decoration: none;
+  border-radius: 0 0 6px 0;
+}
+
+.skip-link:focus {
+  left: 0;
+  outline: 2px solid var(--gold-light);
+  outline-offset: 2px;
+}
 
 .pill {
   font-family: 'Courier New', monospace;
