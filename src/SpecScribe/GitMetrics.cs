@@ -34,7 +34,7 @@ public sealed record GitPulse(
 /// commit count from the bounded <c>-n 300</c> fetch — never a hard-coded "300"). [Story 3.2; Story 10.2]</summary>
 public sealed record DeepGitPulse(
     IReadOnlyList<(string Path, int Changes)> Hotspots,
-    IReadOnlyList<(string FileA, string FileB, int CoChanges)> Coupling,
+    IReadOnlyList<CoupledPair> Coupling,
     int AnalyzedCommits = 0)
 {
     /// <summary>The Git Insights hub aggregates (file frequency + churn, contributor attribution, activity)
@@ -95,6 +95,16 @@ public sealed record DeepGitPulse(
     /// <see cref="Coupling"/> is retained alongside it: the node-link graph still encodes shared commits on
     /// undirected edges, and a directed list is the wrong input for that. [Story 24.1]</para></summary>
     public IReadOnlyList<DirectedCouple> DirectedCoupling { get; init; } = Array.Empty<DirectedCouple>();
+
+    /// <summary>The minimum-support floor actually used to build this pulse's coupling views — recorded rather than
+    /// assumed, so a consumer filtering <see cref="CoChangePairs"/> (which is deliberately stored UNFILTERED, being
+    /// a general-purpose lookup map) applies the same threshold these views did instead of hardcoding one.
+    /// <para>Story 24.1 introduced <see cref="GitMetrics.CouplingMinSupport"/> as "the shared source, not two
+    /// literals in two methods", then left <c>SiteGenerator.BuildRelatedRelatedEdges</c> comparing against a bare
+    /// <c>2</c> under a comment claiming it mirrored that threshold — true only by coincidence, and silently false
+    /// the moment a caller passed a different floor. This property is what makes the claim structural.
+    /// [Story 24.1 code review]</para></summary>
+    public int MinSupport { get; init; } = GitMetrics.CouplingMinSupport;
 }
 
 /// <summary>The per-file git-derived signals a source-code treemap colorizes by (Story 7.6). <paramref name="Changes"/>
@@ -195,10 +205,18 @@ public sealed record FileInsight(
 /// <item><description><paramref name="Support"/> — the shared-commit count (the old <c>CoChanges</c>): how many
 /// commits changed both files. Filtered by <see cref="GitMetrics.CouplingMinSupport"/> upstream so a single
 /// coincidental co-commit never reads as a relationship.</description></item>
-/// <item><description><paramref name="Confidence"/> — <c>Support / ChangeCount[focal]</c>, in <c>[0,1]</c>: "when I
-/// touch this file, I touch <paramref name="Path"/> this often". ASYMMETRIC — a rarely-changed file can be 100%
-/// confident about a churning one while the reverse is 5% — which is the whole point: a raw shared count makes
-/// always-churning files look coupled to everything.</description></item>
+/// <item><description><paramref name="Confidence"/> — <c>Support / ChangeCount[focal]</c>, in <c>[0,1]</c>:
+/// roughly "when I touch this file, I touch <paramref name="Path"/> this often". ASYMMETRIC — a rarely-changed file
+/// can be 100% confident about a churning one while the reverse is 5% — which is the whole point: a raw shared count
+/// makes always-churning files look coupled to everything.
+/// <para><b>Read the two halves honestly.</b> The numerator and denominator are drawn from DIFFERENT commit
+/// populations, by design: <paramref name="Support"/> is tallied only over commits touching between 2 and
+/// <see cref="GitMetrics.CouplingFileSetCap"/> files, while <c>ChangeCount</c> counts EVERY commit touching the focal
+/// file. A file dragged through bulk/vendored/import sweeps therefore reads LESS confident than the plain-English
+/// sentence above implies — a lockfile pulled through fifty 200-file vendor commits can report ~17% about its real
+/// partner. That is deliberate: a 200-file sweep is not evidence that two of those files belong together, but it IS
+/// evidence that the file churns, and the metric declines to reward churn. Owner decision, Story 24.1 code review:
+/// keep the formula, state the skew.</para></description></item>
 /// <item><description><paramref name="Lift"/> — <c>Confidence ÷ (ChangeCount[Path] ÷ analyzed commits)</c>: how much
 /// the pairing beats <paramref name="Path"/>'s own base rate. Above 1 means genuinely more together than chance; a
 /// file touched in every commit has a base rate near 1 and self-demotes. NULL (never <c>NaN</c>/<c>Infinity</c>)
@@ -234,6 +252,34 @@ public sealed record DirectedCouple(
     double? Lift,
     bool CrossBoundary,
     GitMetrics.CouplingKind Kind);
+
+/// <summary>One UNORDERED co-changed pair of the whole-repo coupling view — the population behind
+/// <see cref="DeepGitPulse.Coupling"/> and the hub's coupling graph, ranked by <paramref name="CoChanges"/> (shared
+/// commits) rather than by confidence, which is what keeps the graph a stable "what moves together most" picture
+/// while <see cref="DeepGitPulse.DirectedCoupling"/> answers the sharper directional question.
+/// <para>This replaced a bare <c>(FileA, FileB, CoChanges)</c> tuple so the pair can CARRY its classifications
+/// instead of every view re-deriving them. AC #2 requires cross-boundary to be "available to every downstream
+/// surface (list and graphs) as a shared property, not recomputed per view" — with a 3-tuple the flag was not
+/// merely unrendered on the graph, it was structurally unreachable there, and the hub was separately calling
+/// <see cref="GitMetrics.ClassifyCoupling"/> again per render to find its process pairs. Both flags are now
+/// computed once, beside the identical computation feeding <see cref="DirectedCouple"/>, so the two surfaces can
+/// never disagree about whether a given pair crosses a boundary. [Story 24.1; widened by its code review]</para>
+/// <para>Deconstructs to <c>(FileA, FileB, CoChanges)</c> so the pair still reads as a triple at call sites that
+/// only want the counts.</para></summary>
+public sealed record CoupledPair(
+    string FileA,
+    string FileB,
+    int CoChanges,
+    bool CrossBoundary,
+    GitMetrics.CouplingKind Kind)
+{
+    public void Deconstruct(out string fileA, out string fileB, out int coChanges)
+    {
+        fileA = FileA;
+        fileB = FileB;
+        coChanges = CoChanges;
+    }
+}
 
 /// <summary>The aggregate views behind the Git Insights hub page (FR-10), all derived from the one shared
 /// bounded numstat fetch: per-file change frequency + churn + the file's contributors (the master-detail
@@ -598,7 +644,8 @@ public static class GitMetrics
     /// deep-git signals.
     /// <para><b>Hotspots</b> = per-path change frequency (commits touching the file), sorted desc with an
     /// ordinal path tie-break, top <paramref name="topHotspots"/>. <b>Coupling</b> = for each commit's file
-    /// set, every unordered co-changed pair, kept only at <c>CoChanges &gt;= 2</c>, sorted desc, top
+    /// set, every unordered co-changed pair, kept only at <c>CoChanges &gt;= <paramref name="minSupport"/></c>
+    /// (default <see cref="CouplingMinSupport"/>), sorted desc, top
     /// <paramref name="topCoupling"/>. Commits touching more than <see cref="CouplingFileSetCap"/> files are
     /// skipped for coupling (bulk imports). The returned pulse also carries the Git Insights hub aggregates
     /// (<see cref="DeepGitPulse.Insights"/>) computed from the same parsed records. [Story 3.8]</para>
@@ -662,8 +709,25 @@ public static class GitMetrics
             .ThenBy(kv => kv.Key.Item1, StringComparer.Ordinal)
             .ThenBy(kv => kv.Key.Item2, StringComparer.Ordinal)
             .Take(topCoupling)
-            .Select(kv => (kv.Key.Item1, kv.Key.Item2, kv.Value))
+            // Classify ONCE, here, beside the identical computation feeding DirectedCoupling — never per view.
+            // AC #2 requires cross-boundary to reach every downstream surface as a shared property. [Story 24.1]
+            .Select(kv => new CoupledPair(
+                kv.Key.Item1,
+                kv.Key.Item2,
+                kv.Value,
+                IsCrossBoundary(kv.Key.Item1, kv.Key.Item2),
+                ClassifyCoupling(kv.Key.Item1, kv.Key.Item2)))
             .ToList();
+
+        // Lift's base-rate denominator is NOT the same number as AnalyzedCommits. A record that contributed no
+        // numstat rows — every merge commit, since `log --numstat` does not diff merges by default and the fetch
+        // carries no --no-merges — is skipped by the accumulation loop above, so it can never raise any file's
+        // ChangeCount. Counting it in the denominator understates every base rate and therefore OVERSTATES every
+        // lift, whose entire interpretive value is its anchor at 1.0 ("shows up that often anyway"). On this
+        // repository 25 of 299 windowed commits are merges, so lift read ~9% high across the board.
+        // AnalyzedCommits stays commits.Count: it is the honest size of the window we looked at, which is a
+        // different question from "how many commits could have moved this file". [Story 24.1 code review]
+        var couplingWindow = commits.Count(c => c.Files.Count > 0);
 
         var fileInsights = BuildFileInsights(commits, out var coChangePairs, coupledCap: coupledCap, minSupport: minSupport);
         return new DeepGitPulse(hotspots, coupling, AnalyzedCommits: commits.Count)
@@ -673,7 +737,8 @@ public static class GitMetrics
             FileInsights = fileInsights,
             CodeMapMetrics = BuildCodeMapMetrics(commits),
             CoChangePairs = coChangePairs,
-            DirectedCoupling = BuildDirectedCoupling(pairCounts, changeCounts, commits.Count, topCoupling, minSupport),
+            DirectedCoupling = BuildDirectedCoupling(pairCounts, changeCounts, couplingWindow, topCoupling, minSupport),
+            MinSupport = minSupport,
         };
     }
 
@@ -681,11 +746,19 @@ public static class GitMetrics
     /// — the whole-repo analog of <see cref="FileInsight.CoupledFiles"/>, sharing its metric definitions, its
     /// <paramref name="minSupport"/> floor, and its confidence-first ordering so the two surfaces can never disagree
     /// about what counts as a couple or which couples matter most.
-    /// <para>BOTH directions of each qualifying pair are emitted and then ranked together, because they carry
+    /// <para>Both directions of each qualifying pair are emitted and then ranked together, because they usually carry
     /// different confidence: a helper file dragged along by a hub file is a real finding on one side and noise on the
-    /// other, and collapsing them to one row would average that away. The top-N take therefore selects the strongest
-    /// DIRECTED relationships, which is the ranking AC #3 asks for — it is not the same population as
-    /// <see cref="DeepGitPulse.Coupling"/>'s top-N by shared commits, and the hub's ranking caption says so.</para>
+    /// other, and collapsing THAT to one row would average the finding away. The exception is an exact echo — equal
+    /// support and equal confidence, hence equal lift — where the two rows differ in nothing the table renders; see
+    /// <see cref="IsEcho"/>. The top-N take therefore selects the strongest DIRECTED relationships, which is the
+    /// ranking AC #3 asks for — it is not the same population as <see cref="DeepGitPulse.Coupling"/>'s top-N by
+    /// shared commits, and the hub's ranking caption says so.</para>
+    /// <para><paramref name="minSupport"/> does double duty: it is the floor for ADMITTING a pair at all, and
+    /// <c>support &gt; minSupport</c> is the preference for RANKING one into the visible top-N, so bare-floor pairs
+    /// cannot crowd out well-evidenced ones. The preference degrades to the full admitted set when nothing clears
+    /// it, so a young repository gets a weak panel rather than an empty one.</para>
+    /// <para><paramref name="analyzedCommits"/> is the count of commits that contributed files — NOT
+    /// <see cref="DeepGitPulse.AnalyzedCommits"/>. See the call site for why the two differ.</para>
     /// <para>Derived entirely from maps the single numstat parse already built (no extra git call, no second commit
     /// scan). Pure and repo-free; empty in, empty out; never throws.</para></summary>
     private static IReadOnlyList<DirectedCouple> BuildDirectedCoupling(
@@ -702,24 +775,44 @@ public static class GitMetrics
             var (a, b) = key;
             var crossBoundary = IsCrossBoundary(a, b);
             var kind = ClassifyCoupling(a, b);
-            Add(a, b);
-            Add(b, a);
 
-            void Add(string from, string to)
+            // pairCounts keys are canonicalized ordinal-first, so `a`->`b` is the deterministic survivor when the
+            // two directions turn out to be echoes of each other.
+            var forward = Make(a, b);
+            var reverse = Make(b, a);
+            if (forward is not null) directed.Add(forward);
+            if (reverse is not null && !(forward is not null && IsEcho(forward, reverse))) directed.Add(reverse);
+
+            DirectedCouple? Make(string from, string to)
             {
                 // A file present in a pair was touched, so its change count is >= the pair's support; the guard
                 // keeps a malformed/partial map from dividing by zero rather than expressing a real case.
                 var fromChanges = changeCounts.GetValueOrDefault(from);
-                if (fromChanges <= 0) return;
+                if (fromChanges <= 0) return null;
                 var confidence = (double)support / fromChanges;
-                directed.Add(new DirectedCouple(
+                return new DirectedCouple(
                     from, to, support, confidence,
                     Lift(confidence, changeCounts.GetValueOrDefault(to), analyzedCommits),
-                    crossBoundary, kind));
+                    crossBoundary, kind);
             }
         }
 
-        return directed
+        // Ranking (Story 24.1 code review, owner decision). Two problems fixed here, both invisible in a unit
+        // fixture and both obvious on a real repository:
+        //
+        // 1. A pair sitting at EXACTLY the support floor carries the weakest evidence the floor admits — two
+        //    commits — yet scores confidence 1.0 whenever neither file has ever changed apart, which is the norm
+        //    for files introduced together. Real repositories hold far more such pairs than topCoupling, so
+        //    ranking on confidence alone let the ORDINAL PATH tie-break pick the visible window: the panel
+        //    degenerated into an alphabetical list of support-floor trivia while genuinely well-evidenced couples
+        //    could never appear. Prefer pairs carrying more evidence than the floor demands.
+        // 2. The fallback matters as much as the rule. On a young repository, or a narrow window, EVERY pair may
+        //    sit at the floor; dropping them all would trade a weak panel for an empty one. So the strict set is
+        //    a preference, not a gate.
+        var ranked = directed.Where(d => d.Support > minSupport).ToList();
+        if (ranked.Count == 0) ranked = directed;
+
+        return ranked
             .OrderByDescending(d => d.Confidence)
             .ThenByDescending(d => d.Support)
             .ThenBy(d => d.FromPath, StringComparer.Ordinal)
@@ -727,6 +820,16 @@ public static class GitMetrics
             .Take(topCoupling)
             .ToList();
     }
+
+    /// <summary>True when two directions of the same pair would render as byte-identical rows. Lift is
+    /// mathematically symmetric (<c>support·N ÷ (changeCount[a]·changeCount[b])</c> is invariant under swapping the
+    /// endpoints), and support is shared by construction, so equal confidence — which happens exactly when both
+    /// files changed the same number of times, the everyday "these two only ever move together" case — leaves the
+    /// two rows differing in nothing the table shows but the order of the path cells. Emitting both was defended as
+    /// "the asymmetry is the finding, not a duplicate"; that defence holds only where an asymmetry actually exists,
+    /// and not in the population confidence-ranking floats to the top. [Story 24.1 code review]</summary>
+    private static bool IsEcho(DirectedCouple x, DirectedCouple y) =>
+        x.Support == y.Support && Math.Abs(x.Confidence - y.Confidence) < 1e-9;
 
     /// <summary>Commit-record boundary sentinel in the shared deep-git fetch (<c>%x01</c>): marks where each
     /// commit's header begins. Field/record sentinels are used (not blank lines or tabs) because subjects and
@@ -1058,9 +1161,13 @@ public static class GitMetrics
             listB.Add((a, count));
         }
 
-        // Lift's denominator: the other file's base rate = ChangeCount[other] / analyzed commits. Records with no
-        // files were skipped above, so commits.Count is the honest analyzed-window size, matching DeepGitPulse's.
-        var analyzedCommits = commits.Count;
+        // Lift's denominator: the other file's base rate = ChangeCount[other] / the commits that could have moved
+        // it. Records with no files were skipped by the loop above and can never raise anyone's ChangeCount, so
+        // they must be excluded HERE too — counting them understates every base rate and overstates every lift.
+        // (This is deliberately NOT DeepGitPulse.AnalyzedCommits, which answers the different question "how big
+        // was the window we looked at". The previous comment here claimed the skip was the reason commits.Count
+        // was correct; the skip is precisely why it was wrong.) [Story 24.1 code review]
+        var analyzedCommits = commits.Count(c => c.Files.Count > 0);
 
         // Both members of every surviving pair were touched, so both are in accum by construction; the guard is
         // defensive only (0 makes Lift return null rather than dividing by zero).

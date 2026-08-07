@@ -1314,7 +1314,7 @@ public class ProgressCalculatorTests : IDisposable
     // ---- Story 8.8 LastUpdatedDate resolution ------------------------------------------------------------
 
     private static DeepGitPulse DeepWithFileDate(string repoRelativePath, DateOnly lastDate) =>
-        new(Array.Empty<(string, int)>(), Array.Empty<(string, string, int)>())
+        new(Array.Empty<(string, int)>(), Array.Empty<CoupledPair>())
         {
             CodeMapMetrics = new Dictionary<string, CodeFileMetrics>(StringComparer.Ordinal)
             {

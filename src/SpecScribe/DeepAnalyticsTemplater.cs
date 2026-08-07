@@ -50,7 +50,8 @@ public static class DeepAnalyticsTemplater
         var hasCoupling = deep.Coupling.Count > 0;
         // Process-vs-code coupling (Story 10.6, AC1): shown only when it applies, so a purely code-coupled
         // project never sees copy about a case that doesn't exist for it.
-        var hasProcessPairs = deep.Coupling.Any(p => GitMetrics.ClassifyCoupling(p.FileA, p.FileB) == GitMetrics.CouplingKind.Process);
+        // Read off the pair — classified once upstream, never re-derived per view (AC #2). [Story 24.1 code review]
+        var hasProcessPairs = deep.Coupling.Any(p => p.Kind == GitMetrics.CouplingKind.Process);
         var couplingBody = new StringBuilder();
         if (hasCoupling)
         {

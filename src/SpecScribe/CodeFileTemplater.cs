@@ -622,7 +622,9 @@ public static class CodeFileTemplater
           .Append(Charts.Plural(r.Support, "time", "times"))
           .Append(", confidence ")
           .Append(Charts.Percent(r.Confidence));
-        if (r.Lift is { } lift) sb.Append(", lift ").Append(lift.ToString("0.0", CultureInfo.InvariantCulture)).Append('×');
+        // Shared number formatting (Charts.LiftNumber) so this JSON detail and the HTML surfaces can never round
+        // the same lift differently; the literal '×' stays because this string is JSON, not markup.
+        if (r.Lift is { } lift) sb.Append(", lift ").Append(Charts.LiftNumber(lift)).Append('×');
         if (r.CrossBoundary) sb.Append(", cross-boundary");
         if (r.ProcessCoupling) sb.Append(", process coupling");
         sb.Append('.');
@@ -675,8 +677,14 @@ public static class CodeFileTemplater
                 // and §2 forbids a fact existing only inside the chart — so the twin has to be able to say it. It
                 // could not before this story; the audit is what found that, and this is the fix rather than a note.
                 var processSuffix = r.ProcessCoupling ? " &#183; process coupling" : "";
+                // "this file's usual rate" was wrong: CoupledFile.Lift divides by the COUPLED file's base rate
+                // (GitMetrics passes OtherChangeCount), so the number describes how much this pairing beats how
+                // often `r.Title` moves anyway — not how often the focal file does. The hub's table worded the
+                // identical number correctly, so the two surfaces described one number as belonging to two
+                // different files. Formatting now goes through the shared Charts.LiftLabel for the same reason
+                // confidence goes through Charts.Percent. [Story 24.1 code review]
                 var liftAttr = r.Lift is { } lift
-                    ? $" title=\"Lift {lift.ToString("0.0", CultureInfo.InvariantCulture)}&#215; this file's usual rate\""
+                    ? $" title=\"Lift {Charts.LiftLabel(lift)} {pathHtml}'s usual rate\""
                     : "";
                 sb.Append($"        <li{liftAttr}>{nameCell} &#8212; changed together {r.Support.ToString(CultureInfo.InvariantCulture)} {Charts.Plural(r.Support, "time", "times")} &#183; confidence {Charts.Percent(r.Confidence)}{boundarySuffix}{processSuffix}{relatedCrossSuffix}</li>\n");
             }
