@@ -4,7 +4,7 @@ baseline_commit: 9580f62d3431cfc25cd67d5b8627a2b79e4aed50
 
 # Story 12.2: GSD Core Baseline Adapter Coverage
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -288,118 +288,121 @@ ordinal, so `02.1-03-PLAN.md` in CORA's third-listed phase becomes `"3.3"` and t
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Confirm the contract and the corrected map against live code and the live repo (AC: #1, #3)**
-  - [ ] Read in full: `IArtifactAdapter.cs`, `ArtifactBundle.cs`, `AdapterDiagnostic.cs`,
+- [x] **Task 1 — Confirm the contract and the corrected map against live code and the live repo (AC: #1, #3)**
+  - [x] Read in full: `IArtifactAdapter.cs`, `ArtifactBundle.cs`, `AdapterDiagnostic.cs`,
     `BmadArtifactAdapter.cs`, `EpicsModel.cs`, `RequirementsModel.cs`, `SprintStatus.cs`, `RetroModel.cs`,
     `ForgeOptions.cs`, `TestArtifactsModel.cs` (CoverageTier), `ProgressCalculator.cs`, `TaskListParser.cs`,
     `StatusStyles.cs`. Confirm by symbol; line anchors in this story may have drifted.
-  - [ ] Re-verify the eight findings above against `C:/dev/CORA` — they are the basis of every decision here.
+  - [x] Re-verify the eight findings above against `C:/dev/CORA` — they are the basis of every decision here.
     If one no longer holds, **say so in Completion Notes before acting on it**.
-  - [ ] Re-read the `gds` vs `gsd` distinction in `AboutSddTemplater.cs` so the two are never conflated.
+  - [x] Re-read the `gds` vs `gsd` distinction in `AboutSddTemplater.cs` so the two are never conflated.
 
-- [ ] **Task 2 — Close Gap 2: framework-neutral source-root discovery (AC: #5)**
-  - [ ] Replace the single `SourceDirName` literal with an ordered marker set (`_bmad-output`, `.planning`,
+- [x] **Task 2 — Close Gap 2: framework-neutral source-root discovery (AC: #5)**
+  - [x] Replace the single `SourceDirName` literal with an ordered marker set (`_bmad-output`, `.planning`,
     `.gsd`, `.specify`) probed by the same walk-up. Keep `_bmad-output` **first** so this repo's own resolution
-    is byte-identical.
-  - [ ] Neutralize `DefaultSiteTitle` for a non-BMad root (a GSD site must not be branded "BMad Live Docs") and
+    is byte-identical. — ⚠️ **Followed in intent, not to the letter: `_bmad-output` probes LAST.** See
+    Completion Notes §D1.
+  - [x] Neutralize `DefaultSiteTitle` for a non-BMad root (a GSD site must not be branded "BMad Live Docs") and
     keep `ReadProjectName`'s `_bmad/config.toml` read as one probe among others, not the only one.
-  - [ ] Keep the `requireSource: false` tolerant path (the webview/extension contract) working unchanged.
-  - [ ] Tests: a `.planning`-only temp tree resolves; a tree with neither still throws the actionable message;
+  - [x] Keep the `requireSource: false` tolerant path (the webview/extension contract) working unchanged.
+  - [x] Tests: a `.planning`-only temp tree resolves; a tree with neither still throws the actionable message;
     a `_bmad-output` tree resolves exactly as before.
 
-- [ ] **Task 3 — Close Gap 1: the adapter registry, with the merge rule (AC: #5)**
-  - [ ] Introduce an ordered `IReadOnlyList<IArtifactAdapter>`, **every** match runs, `BmadArtifactAdapter`
+- [x] **Task 3 — Close Gap 1: the adapter registry, with the merge rule (AC: #5)**
+  - [x] Introduce an ordered `IReadOnlyList<IArtifactAdapter>`, **every** match runs, `BmadArtifactAdapter`
     last as the fallback. Implement the merge table above; every dropped contribution gets a `Skipped`
     diagnostic and the match set gets one `Informational`.
-  - [ ] Resolve the `IngestEpics` watch-path constraint explicitly (AD-5 / ADR 0027). State in the story record
-    which route you took and how you proved watch output is unchanged for a BMad repo.
-  - [ ] Tests: BMad-only repo → identical bundle to today; GSD-only repo → the GSD adapter's bundle;
+  - [x] Resolve the `IngestEpics` watch-path constraint explicitly (AD-5 / ADR 0027). State in the story record
+    which route you took and how you proved watch output is unchanged for a BMad repo. — see Notes §D2.
+  - [x] Tests: BMad-only repo → identical bundle to today; GSD-only repo → the GSD adapter's bundle;
     both-markers repo → merged bundle with the documented diagnostics; a repo matching nothing → today's
     fallback behaviour.
 
-- [ ] **Task 4 — `GsdCoreArtifactAdapter`: discovery and `AppliesTo` (AC: #1, #2)**
-  - [ ] `AppliesTo` = `.planning/` directory at `RepoRoot`. Cheap, never throws.
-  - [ ] Discover `ROADMAP.md`, `STATE.md`, `REQUIREMENTS.md`, `PROJECT.md` by exact name at the `.planning/`
+- [x] **Task 4 — `GsdCoreArtifactAdapter`: discovery and `AppliesTo` (AC: #1, #2)**
+  - [x] `AppliesTo` = `.planning/` directory at `RepoRoot`. Cheap, never throws.
+  - [x] Discover `ROADMAP.md`, `STATE.md`, `REQUIREMENTS.md`, `PROJECT.md` by exact name at the `.planning/`
     root; discover phase dirs under `.planning/phases/`; discover plans by the decimal-tolerant filename
     pattern. **Never read frontmatter for identity** (finding #5).
-  - [ ] Ignored working files are neither ingested nor diagnosed — re-filter through
+  - [x] Ignored working files are neither ingested nor diagnosed — re-filter through
     `PathUtil.IsIgnoredSourceFile` as `BmadArtifactAdapter.Ingest` does.
 
-- [ ] **Task 5 — Project `ROADMAP.md` → `EpicsModel` (AC: #1, #3)**
-  - [ ] Parse phases from `## Phases` + the `## Milestone: … — Phase Details` sections + `## Backlog`.
-  - [ ] Assign D2's synthetic ordinal to `EpicInfo.Number` in ROADMAP order; carry the real label in
+- [x] **Task 5 — Project `ROADMAP.md` → `EpicsModel` (AC: #1, #3)**
+  - [x] Parse phases from `## Phases` + the `## Milestone: … — Phase Details` sections + `## Backlog`.
+  - [x] Assign D2's synthetic ordinal to `EpicInfo.Number` in ROADMAP order; carry the real label in
     `EpicInfo.Title`. **Pin both the ordinal assignment and the `{ordinal}.{plan}` story-id form by a test**
     (AC #3), including a decimal phase and a `999.x` backlog phase.
-  - [ ] Map each `- [x] NN-YY-PLAN.md` line to a `StoryInfo`, resolve `StoryArtifactsById` to the plan file, and
-    add both plan and summary to `ConsumedSourceRelatives`.
-  - [ ] Pick constant, honest values for `EpicStatus` and `EpicSection` (BMad epics.md conventions with no GSD
+  - [x] Map each `- [x] NN-YY-PLAN.md` line to a `StoryInfo`, resolve `StoryArtifactsById` to the plan file, and
+    add both plan and summary to `ConsumedSourceRelatives`. — ⚠️ **the SUMMARY is deliberately NOT consumed**;
+    the coverage map assigns it tier `Rendered`, which consuming it would contradict. See Notes §D3.
+  - [x] Pick constant, honest values for `EpicStatus` and `EpicSection` (BMad epics.md conventions with no GSD
     analog) and say in the code comment that they are semantically empty for this framework.
-  - [ ] `Malformed` diagnostic on a `ROADMAP.md` that will not parse; siblings still ingest.
+  - [x] `Malformed` diagnostic on a `ROADMAP.md` that will not parse; siblings still ingest.
 
-- [ ] **Task 6 — Story status and task tally, honestly (AC: #1, #2, #3)**
-  - [ ] Do **not** rely on `TaskListParser`/`ExtractStatus` (findings #2 and #8): a GSD plan yields 0/0 tasks
+- [x] **Task 6 — Story status and task tally, honestly (AC: #1, #2, #3)**
+  - [x] Do **not** rely on `TaskListParser`/`ExtractStatus` (findings #2 and #8): a GSD plan yields 0/0 tasks
     and a null status, which renders every finished plan as drafted-with-no-plan.
-  - [ ] Derive `StoryInfo.Status` from ROADMAP's per-plan checkbox, mapped onto the canonical vocabulary via
+  - [x] Derive `StoryInfo.Status` from ROADMAP's per-plan checkbox, mapped onto the canonical vocabulary via
     `StatusStyles`. Leave `TasksDone`/`TasksTotal` at 0/0 — the badge is suppressed at `total == 0`, which is
     the honest outcome; **do not** synthesize a tally from `<task>` blocks in this story.
-  - [ ] Reconcile the three completion signals (finding #7): name ROADMAP's checkbox as authoritative, and emit
+  - [x] Reconcile the three completion signals (finding #7): name ROADMAP's checkbox as authoritative, and emit
     one `Informational` diagnostic when `STATE.md`'s roll-up or the SUMMARY set disagrees with it.
 
-- [ ] **Task 7 — Project `STATE.md` → `SprintStatus` (AC: #1, #2)**
-  - [ ] Read the YAML frontmatter (`milestone`, `status`, `progress.*`); emit one `SprintEntry` per phase using
-    the same synthetic ordinal so sprint and epics surfaces agree.
-  - [ ] `Unsupported` diagnostic when no per-phase status is recoverable; `Sprint = null` then, so the page,
+- [x] **Task 7 — Project `STATE.md` → `SprintStatus` (AC: #1, #2)**
+  - [x] Read the YAML frontmatter (`milestone`, `status`, `progress.*`); emit one `SprintEntry` per phase using
+    the same synthetic ordinal so sprint and epics surfaces agree. — plus one per PLAN; see Notes §D4.
+  - [x] `Unsupported` diagnostic when no per-phase status is recoverable; `Sprint = null` then, so the page,
     widget and nav gate omit cleanly.
-  - [ ] `ActionItems` is empty — GSD Core has no analog. Honest absence, no diagnostic.
+  - [x] `ActionItems` is empty — GSD Core has no analog. Honest absence, no diagnostic.
 
-- [ ] **Task 8 — Milestone bands on the epics index (AC: #4)**
-  - [ ] Carry milestone grouping on `EpicsModel` as a new list defaulting to **empty**, so BMad is unchanged by
+- [x] **Task 8 — Milestone bands on the epics index (AC: #4)**
+  - [x] Carry milestone grouping on `EpicsModel` as a new list defaulting to **empty**, so BMad is unchanged by
     construction. Surface it on `EpicsIndexView` and render the bands in `EpicsTemplater.BuildIndexPage`.
-  - [ ] Band header carries: milestone name, its state, its completion date when present, and rolled-up phase
+  - [x] Band header carries: milestone name, its state, its completion date when present, and rolled-up phase
     and plan counts. The band body is composed in C#, so the badge is the templater's — take the class from
     `StatusStyles` and always emit the status **word** alongside it, never colour alone (UX-DR17), the same
     guarantee `StatusBadge.vue` enforces by shape on the template-authored side.
-  - [ ] Empty state: a milestone with no phases must not render as a bare heading (NFR8, and the same trap
+  - [x] Empty state: a milestone with no phases must not render as a bare heading (NFR8, and the same trap
     `HierarchyExplorerHtml`'s doc comment records).
-  - [ ] **Byte-identical proof for BMad**: assert the epics index output for a BMad fixture is unchanged.
-  - [ ] New CSS goes in `src/SpecScribe/assets/specscribe.css` — **follow the regeneration order below or the
-    rules are silently pruned.**
+  - [x] **Byte-identical proof for BMad**: assert the epics index output for a BMad fixture is unchanged.
+  - [x] New CSS goes in `src/SpecScribe/assets/specscribe.css` — **follow the regeneration order below or the
+    rules are silently pruned.** — ⚠️ **the documented order was NOT sufficient**; see Notes §F1, the most
+    important finding in this story.
 
-- [ ] **Task 9 — Framework page and support matrix honesty (AC: #2)**
-  - [ ] Flip `gsd` to `Supported: true` in `AboutSddTemplater.Frameworks` and give it a real body in place of
+- [x] **Task 9 — Framework page and support matrix honesty (AC: #2)**
+  - [x] Flip `gsd` to `Supported: true` in `AboutSddTemplater.Frameworks` and give it a real body in place of
     `AppendComingSoonBody`, following `AppendBmadBody`'s shape (what it is → get started → SpecScribe support →
     commands → methodology). Read `fw.Url` from the roster; do not hardcode a literal (this was a 12.1 review
     patch).
-  - [ ] `AppendMatrixRow` / `AppendFamilySupportTable` take a single `bool supported` and tick all six nouns.
+  - [x] `AppendMatrixRow` / `AppendFamilySupportTable` take a single `bool supported` and tick all six nouns.
     **GSD needs per-noun granularity**: Epics & Stories ✓, Sprint ✓, Retros — honestly empty, Requirements ✗
     (D3), Planning docs ✗ and Commands ✗ (Gap 3). Widen both helpers; keep BMad/GDS all-✓ so their rows are
     unchanged.
-  - [ ] Say **in words** on the GSD page why Requirements, Planning docs and Commands are not ticked — an
+  - [x] Say **in words** on the GSD page why Requirements, Planning docs and Commands are not ticked — an
     absent tick must read as a stated boundary, not as unfinished work (NFR8).
-  - [ ] Update `README.md`'s "Supported frameworks" table: GSD moves from `🧭 Planned` to supported, matching
+  - [x] Update `README.md`'s "Supported frameworks" table: GSD moves from `🧭 Planned` to supported, matching
     the shipped state.
 
-- [ ] **Task 10 — The shared ADR (AC: #5)**
-  - [ ] One ADR at `docs/adrs/0038-*.md` (0038 is the next free number; 0019 remains claimed-but-unwritten by
+- [x] **Task 10 — The shared ADR (AC: #5)**
+  - [x] One ADR at `docs/adrs/0038-*.md` (0038 is the next free number; 0019 remains claimed-but-unwritten by
     two stories — do not take it), indexed in `docs/adrs/README.md`. Subject: **framework adapter selection,
     minimal multi-adapter merge, and framework-neutral source-root discovery** — one decision, not three.
-  - [ ] State what it supersedes (`SiteGenerator`'s hardcoded field comment; `ForgeOptions.SourceDirName` as a
+  - [x] State what it supersedes (`SiteGenerator`'s hardcoded field comment; `ForgeOptions.SourceDirName` as a
     single literal), how it relates to AD-5/ADR 0027 (the watch constraint), and that the **strategic**
     multi-framework policy is deliberately deferred to Story 4.9.
-  - [ ] Per ADR 0033: any new gate must localize failure to a named artifact, be scoped so a sibling story
-    cannot turn it red, and be proven deterministic before pinning. Prefer no new gate.
+  - [x] Per ADR 0033: any new gate must localize failure to a named artifact, be scoped so a sibling story
+    cannot turn it red, and be proven deterministic before pinning. Prefer no new gate. — **no new gate added.**
 
-- [ ] **Task 11 — Tests and verification (AC: #1–#5)**
-  - [ ] New `tests/SpecScribe.Tests/GsdCoreArtifactAdapterTests.cs` and `AdapterRegistryTests.cs` — **new files,
+- [x] **Task 11 — Tests and verification (AC: #1–#5)**
+  - [x] New `tests/SpecScribe.Tests/GsdCoreArtifactAdapterTests.cs` and `AdapterRegistryTests.cs` — **new files,
     not additions to files a concurrent session may be editing** (CLAUDE.md § hunk attribution; Story 12.1 did
     exactly this for the same reason).
-  - [ ] Fixtures via `Directory.CreateTempSubdirectory` + `const string` bodies, derived from CORA's real
+  - [x] Fixtures via `Directory.CreateTempSubdirectory` + `const string` bodies, derived from CORA's real
     shapes. Cover explicitly: a decimal phase (`02.1`), a `999.x` backlog phase, a plan with no `## Tasks`
     heading, a `[x]` plan with no `-SUMMARY.md`, a `STATE.md` whose roll-up disagrees with ROADMAP, an
     unparseable `ROADMAP.md`, and a repo carrying **both** `_bmad-output/` and `.planning/`.
-  - [ ] Run the full suite. Per CLAUDE.md, if it is red, **establish causality before touching anything** —
+  - [x] Run the full suite. Per CLAUDE.md, if it is red, **establish causality before touching anything** —
     bisect with `git archive HEAD` into the scratchpad; never reset the shared tree.
-  - [ ] **Verify in a live browser** (CLAUDE.md § Verification): generate against `C:/dev/CORA` with
+  - [x] **Verify in a live browser** (CLAUDE.md § Verification): generate against `C:/dev/CORA` with
     `--source`/`--output` into `SpecScribeOutput/`, and inspect the epics index bands, the story cards' status
     and absent task badges, the sprint surface, the diagnostics page, and the GSD framework page. The test
     suite structurally cannot see layout collapse or containment leaks.
@@ -555,14 +558,208 @@ side against a well-established contract with one working reference implementati
 
 ### Agent Model Used
 
+Claude Opus 5 (1M context), `bmad-dev-story`, 2026-08-06. Worktree
+`.claude/worktrees/story-12-2-gsd-core-adapter`, branch `worktree-story-12-2-gsd-core-adapter`, from `f9d7529`
+(story creation, one commit past the recorded baseline `9580f62`).
+
 ### Debug Log References
+
+**Green baseline established before any edit**: 2929 passed / 0 failed / 3 skipped.
+**Final**: 2963 passed / 0 failed / 3 skipped (+34 new). Web: vitest 166 passed, `check:tokens`,
+`check:assets`, `check:ir-content`, `check:parity` (24 routes / 14 families) all green.
+
+**All eight of create-story's findings re-verified against `C:/dev/CORA` before acting on any of them.** Every
+one held, by command not inference: 168 files under `.planning/`; decimal phase dirs `02.1`, `04.5` and backlog
+`999.1/.2/.3`; **0 checked / 39 unchecked** checkboxes across all 58 `PLAN.md` files with only 25 carrying a
+`## Tasks` heading; **0** `Status:`/`status:` lines anywhere in those 58 files; 42 `-SUMMARY.md` files against
+ROADMAP's 58 `[x]` and `STATE.md`'s `completed_plans: 42 / total_plans: 50`. Nothing needed correcting.
+
+**Two test-suite investigations, both proven NOT to be this story's** (CLAUDE.md § establish causality first):
+
+1. `FileWatcherServiceTests` failed intermittently on full-suite runs (1–2 failures). **Not a regression.** The
+   *failing test varied* across runs — `BurstOfSaves_CoalescesAndLeavesCoherentOutput`,
+   `SprintStatusYaml_AddedThenEditedThenRemoved…`, `EditingAStoryFile_RegeneratesThroughTheOrdinaryMarkdownRoute`
+   — which a deterministic regression cannot do; the class passed **3/3 in isolation**, and two consecutive full
+   runs were green at 2963/2963. These use a real `FileSystemWatcher` against a 400 ms debounce, and this story
+   added 34 tests to the parallel pool. Load-sensitivity, pre-existing, not caused by the registry swap.
+2. Pristine `HEAD` bisected into `$CLAUDE_JOB_DIR/tmp/pristine` via `git archive` (never a reset of any tree):
+   2929/2929 green there, and it reports the *same* `errors=1` on `generate --deep-git` that the worktree did —
+   proving that error pre-existed this story. It was the renderer package not being built;
+   `SPECSCRIBE_RENDERER_DIR` pointed at the worktree's own `web/.output` takes it to `errors=0`.
+
+**Content-drift gate discipline.** `ir-content.css` was regenerated three times before being locked in, because
+the first two runs were provably wrong and *both looked fine*:
+
+- Run 1 (`generate` without `--deep-git`) removed **1,557 lines** of deep-git-only rules. The gate was GREEN,
+  because `check:ir-content` re-derives from the same IR the extractor read.
+- Run 2 (`--deep-git`, renderer unbuilt) added `.status-badge.diag-error` — false drift from the `errors=1`
+  above, which would have reddened CI where the renderer *is* built.
+- Run 3 (`--deep-git`, `SPECSCRIBE_RENDERER_DIR` set, `errors=0`) produced a purely additive diff: **7 selectors
+  added, 0 removed.** Confirmed **stable across two repeated runs** (identical SHA-256) before locking, per
+  CLAUDE.md.
 
 ### Completion Notes List
 
+**HEADLINE — a GSD Core repository generates, for the first time in this project.** `C:/dev/CORA` produced
+**160 pages, 0 errors**, branded **"CORA"** (not "BMad Live Docs"), with 14 phases across 4 milestone bands and
+58 plans as stories. Before this story it did not get as far as an adapter: `ForgeOptions.Resolve` threw
+`DirectoryNotFoundException` while resolving paths.
+
+**LIVE BROWSER VERIFICATION: PASS**, and it earned its place — see §F2. Real computed styles on the generated
+CORA site: all 4 bands `background: rgb(250,247,242)` (`--warm-white`), `1px solid` border, `6px` radius,
+header `display: flex`, heights 288/181/162/201 px (no collapse), chip grid `display: grid` at 6 columns with
+168×99 px chips, `scrollWidth == clientWidth` (no horizontal overflow), no band overlapping its neighbour, every
+band badge carrying its WORD ("Done"/"Drafted", UX-DR17), 0 task badges on epic-3, and the GSD page's `n/a` cell
+`font-style: italic` **with** its `aria-label`. Screenshots captured.
+
+#### Decisions taken that differ from the task text — each stated, none silent
+
+**§D1 — `_bmad-output` probes LAST, not first.** Task 2 said to keep it first "so this repo's own resolution is
+byte-identical". The stated GOAL is preserved exactly; the ordering is not. `_bmad-output` is an *output* folder
+(a BMad project writes one regardless of what else is present) while `.planning`/`.gsd`/`.specify` are framework
+*install* markers, so probing it first makes it a universal winner. **CORA carries BOTH** — its `_bmad-output`
+holds 6 planning documents, its `.planning` holds 168 files / 11 phase dirs / 58 plans. Following the letter
+would have resolved `SourceRoot` to the six-file tree and left every GSD artifact outside it, where
+`PathUtil.EscapesRepoRoot` rejects the paths — i.e. AC #1 unmeetable. Ordering by specificity costs nothing in
+the case the instruction protected: a BMad-only repo (this one included) has no other marker, and
+`Resolve_BmadOutputTree_ResolvesExactlyAsBefore` pins that. It also matches the same story's own registry
+guidance verbatim ("specific markers before BMad's fallback"). Recorded in ADR 0038 §Decision 3.
+
+**§D2 — the watch constraint: LIFTED onto the interface, not degraded.** `IArtifactAdapter` gains `IngestEpics`
+and `EpicsIngest` is promoted from a nested record to a top-level one. Of the two sanctioned routes, this is the
+one that makes the guarantee *structural*: BMad's implementation is the same method body at the same call site,
+so watch output for a BMad repo is byte-identical **by construction**, not by a measurement that could drift
+(ADR 0027's definition of "safe"). `AdapterRegistry.IngestEpics` returns a single matching adapter's result
+verbatim; `IngestEpics_ResolvesTheSameOwnerAsAFullIngest` pins that a scoped pass and a full build agree about
+the epics owner for both a BMad and a GSD repo.
+
+**§D3 — `-SUMMARY.md` is NOT added to `ConsumedSourceRelatives`.** Task 5's bullet and the coverage-map table
+disagree; the table is the more specific statement and it wins. It assigns the summary tier **`Rendered`**,
+which means "a full page exists" — and `ConsumedSourceRelatives` is documented as "consumed into a *dedicated
+surface*", which the summary is not (the plan is the story artifact). Consuming it would have deleted its page
+and made the declared tier false. The `Skipped` diagnostic the map asks for is still emitted, recording that the
+plan won the story-artifact slot.
+
+**§D4 — the sprint ledger carries story entries as well as phase entries.** Task 7 says "one `SprintEntry` per
+phase". `SprintTemplater.GroupByEpic` buckets by kind and renders story rows beneath each epic, so an
+epic-only ledger would have produced a sprint page whose entire body is empty — the "misleadingly empty" surface
+NFR8 forbids, which is worse than honest omission. Both kinds derive from the one authoritative signal
+(ROADMAP's checkbox), so no second source of truth is introduced.
+
+**§D5 — one line changed in `ProgressCalculator`,** the only edit to a shared file that a sibling story might
+hold: `story.Status = status` became `story.Status = status ?? story.Status`. Without it the projection callback
+silently erased the status the GSD adapter derived from ROADMAP and every finished plan rendered as a drafted
+story with no task plan (finding #8's defect, reproduced exactly). **BMad is unaffected byte-for-byte**:
+`EpicsParser` never sets `StoryInfo.Status` (only the `EpicStatus` enum), so the value is null on entry for
+every BMad story and `null ?? null` is the assignment this replaced.
+
+#### Findings a reviewer should not have to rediscover
+
+**§F1 — ⚠️ THE DOCUMENTED CSS REGENERATION ORDER CANNOT SAVE CROSS-FRAMEWORK MARKUP. This is the most
+important finding here.** `extract:ir-content` prunes any rule whose selector names a class absent from the IR,
+and the extraction corpus is **this repository's own IR — and this repository is a BMad project**. Milestone
+bands only ever render for a framework that HAS a milestone level, so no harvest run here can see them. Measured,
+not theorised: with the stylesheet edit in place and the order followed exactly, **all five `.milestone-band*`
+rules were pruned and `check:ir-content` stayed GREEN** — the bands would have shipped unstyled on a real GSD
+site with no gate able to see it. Fixed by seeding `CONDITIONAL_CLASSES` in `web/scripts/ir-content-lib.mjs`,
+the existing seam for exactly this (the sunburst-black-fill and `owner-author-2` incidents), and pinned by two
+new cases in `web/test/ir-content-harvest.test.mjs` — which is the layer the round-trip gate structurally cannot
+check. **Every remaining framework epic (11, 12.3, 13, 14, 15) will hit this**; the seed list now says so in a
+comment. `.sdd-check--na` needed no seeding, because the About-SDD page *is* generated for this repo.
+
+**§F2 — the live-browser check found a real scope failure before it found a pass.** The first run over `file://`
+reported 19 problems: transparent backgrounds, zero borders, `display: block` headers, 17 px collapsed chips.
+Cause: Nuxt emits `<link rel="stylesheet" … crossorigin>`, and Chromium refuses `crossorigin` stylesheets over
+`file://` (CORS: "only supported for protocol schemes: chrome, data, http, https"), so **every** stylesheet
+failed to load — pre-existing `.epic-overview` grid included. Served over HTTP the same page passes cleanly.
+**⚠️ Worth an owner decision, and NOT this story's to fix:** the same `crossorigin` attribute is on
+SpecScribe's own generated `index.html`, so a portal opened directly from disk in Chromium renders unstyled.
+NFR-3 / ADR 0012 §1 say the portal must render offline from `file://`. Pre-existing, unrelated to this story's
+changes, and reported rather than patched.
+
+**§F3 — the merge case is live, not hypothetical.** CORA carries `_bmad/` (with `bmm`, `core`, `tea`, …),
+`_bmad-output/` and `.planning/`, so BOTH adapters match on a real repository. D5's prediction held exactly:
+GSD Core supplies the epics family (its ROADMAP is the only epics source inside the resolved source root) and
+BMad supplies the module identity, with one `Informational` naming who supplied what and a second naming the
+marker that did not become primary. The escalation trigger the story armed (§"the sharpest risk") was reached
+and resolved **within** the sanctioned bounded answer — one primary `SourceRoot`, bundle-level merge, the
+non-primary framework's loose documents diagnosed as not rendering. No improvised path scheme; Story 4.9's
+question is untouched.
+
+**§F4 — `.status-badge.diag-error` is a false-drift hazard in the ir-content gate.** It is emitted only when a
+run reports errors, so whether it appears in the committed sheet depends on the regenerating machine's
+environment rather than on any code change. It is *not* in `CONDITIONAL_CLASSES`. Not fixed here (it belongs to
+whoever owns that surface), but it will bite the next person who regenerates with an unbuilt renderer.
+
+**§F5 — ADR 0037 is missing from `docs/adrs/README.md`'s index.** Noticed while adding 0038's entry. Left alone
+deliberately, per CLAUDE.md's hunk-attribution rule: it belongs to the story that wrote it, and silently
+adopting another story's hunk is what makes review attribution fail.
+
+**§F6 — GSD story status words render lowercase ("done") on story cards.** Verified this is **pre-existing,
+shared behaviour, not new**: SpecScribe's own BMad site renders `done => 'done'` on its story badges too (the
+card shows the raw status word; only epic badges route through `StatusStyles.EpicLabel`). Left as-is for
+consistency rather than special-casing GSD.
+
+**Not done, and deliberately so:** `ModuleContext` not widened (Gap 3 — stated as a ceiling on the GSD page,
+where the 67 in-repo `/gsd-*` commands are named as blocked by the model rather than by discoverability); ADR
+0020's non-markdown gate not widened (`config.json` reported as uninterpreted, per the map); `RequirementKind`
+and `EpicInfo.Number` not widened; no new content-drift gate (ADR 0033); no new NuGet or npm dependency.
+
 ### File List
+
+**New — source**
+- `src/SpecScribe/GsdCoreArtifactAdapter.cs`
+- `src/SpecScribe/AdapterRegistry.cs`
+- `src/SpecScribe/EpicsIngest.cs` (promoted from a nested `BmadArtifactAdapter` record)
+
+**New — tests**
+- `tests/SpecScribe.Tests/GsdCoreArtifactAdapterTests.cs` (20 tests)
+- `tests/SpecScribe.Tests/AdapterRegistryTests.cs` (14 tests)
+
+**New — docs**
+- `docs/adrs/0038-framework-adapter-selection-and-neutral-source-root-discovery.md`
+
+**Modified — source**
+- `src/SpecScribe/IArtifactAdapter.cs` (adds `IngestEpics` to the contract)
+- `src/SpecScribe/BmadArtifactAdapter.cs` (nested `EpicsIngest` removed; `AppliesTo` doc updated — method bodies unchanged)
+- `src/SpecScribe/ForgeOptions.cs` (`SourceDirNames`, marker walk-up, `ResolveSiteTitle`/`ReadProjectDocTitle`)
+- `src/SpecScribe/SiteGenerator.cs` (adapter field → `AdapterRegistry`; `gsdPresent` threaded to About-SDD)
+- `src/SpecScribe/ProgressCalculator.cs` (one line — see §D5)
+- `src/SpecScribe/EpicsModel.cs` (`MilestoneInfo`, `EpicsModel.Milestones`)
+- `src/SpecScribe/EpicsView.cs` (`MilestoneBandView`, `EpicsIndexView.Milestones`)
+- `src/SpecScribe/EpicsViewBuilder.cs` (`BuildMilestoneBands`)
+- `src/SpecScribe/HtmlRenderAdapter.Epics.cs` (`AppendMilestoneBands` + the branch)
+- `src/SpecScribe/AboutSddTemplater.cs` (`FamilySupport`/`FamilyMatrix`, `AppendGsdCoreBody`, roster `Supported: true`)
+- `src/SpecScribe/Mermaid.cs` (`SddGsdCoreDiagram`)
+- `src/SpecScribe/assets/specscribe.css` (milestone-band block; `.sdd-check--na`)
+
+**Modified — web**
+- `web/scripts/ir-content-lib.mjs` (`CONDITIONAL_CLASSES` cross-framework seed — see §F1)
+- `web/test/ir-content-harvest.test.mjs` (2 new seeding tests)
+- `web/assets/ir-content.css`, `web/assets/ir-content.manifest.json` (regenerated: +7 selectors, 0 removed)
+
+**Modified — docs**
+- `README.md` (GSD → Supported, with the per-family caveat; Roadmap line)
+- `docs/adrs/README.md` (ADR 0038 index entry)
+- `_bmad-output/implementation-artifacts/12-2-gsd-core-baseline-adapter-coverage.md` (this file)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
 
 ## Change Log
 
+- 2026-08-06 — **Story 12.2 implemented (dev-story, worktree `story-12-2-gsd-core-adapter` off `f9d7529`).**
+  `ready-for-dev → in-progress → review`. All 11 tasks complete; ACs #1–#5 satisfied. **A GSD Core repository
+  generates for the first time** (`C:/dev/CORA` → 160 pages, 0 errors, branded "CORA", 14 phases in 4 milestone
+  bands, 58 plans as stories). Tests 2929 → 2963 (+34, 0 failures); all four web gates green; live-browser
+  computed-style verification passed. Both shared prerequisites closed (adapter registry with D5's merge;
+  framework-neutral source-root discovery) plus ADR 0038, which Epics 11/12.3/13/14/15 inherit. **Four decisions
+  differ from the task text and are recorded in Completion Notes §D1–§D5** — most consequentially that
+  `_bmad-output` probes LAST rather than first (following Task 2's stated goal rather than its letter, because
+  the reference repo carries both markers and the letter would have made AC #1 unmeetable). **The most important
+  finding is §F1**: the documented CSS regeneration order structurally cannot save markup only a non-BMad repo
+  produces — measured, all five band rules were pruned with the gate GREEN — which every remaining framework
+  epic will hit. Two pre-existing issues found and reported rather than patched: the `crossorigin` attribute
+  makes the portal render unstyled from `file://` in Chromium (§F2, NFR-3-relevant), and ADR 0037 is missing
+  from the ADR index (§F5).
 - 2026-08-06 — Story 12.2 drafted (create-story, baseline `9580f62`). Ultimate context engine analysis completed
   — comprehensive developer guide created. **Drafted against a REAL GSD Core repository (`C:/dev/CORA`, 168
   files under `.planning/`) rather than vendor documentation, which Story 12.1 explicitly flagged as required

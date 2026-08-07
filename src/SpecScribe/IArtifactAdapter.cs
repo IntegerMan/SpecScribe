@@ -35,4 +35,21 @@ public interface IArtifactAdapter
     /// <param name="projectProgress">Projection-layer enrichment callback (see <see cref="ProgressProjection"/>);
     /// null skips progress-dependent families (BMad: requirements).</param>
     ArtifactBundle Ingest(ForgeOptions options, IReadOnlyList<string> sourceFiles, ProgressProjection? projectProgress);
+
+    /// <summary>The EPICS-SCOPED slice of <see cref="Ingest"/> — epics + story artifacts + requirements only —
+    /// for watch mode's incremental regeneration, which must not re-parse the sprint/retro/module state it never
+    /// refreshes (AD-5). Same never-throws contract as <see cref="Ingest"/>; returns
+    /// <see cref="EpicsIngest.None"/> when this framework's epics source is absent.
+    ///
+    /// <para><b>On the contract deliberately, not discovered by a type test</b> [Story 12.2 Task 3]. Until the
+    /// adapter registry landed, <see cref="SiteGenerator"/> held the concrete <see cref="BmadArtifactAdapter"/>
+    /// SOLELY so the watch path could reach this method. A registry returning <see cref="IArtifactAdapter"/> would
+    /// therefore have broken watch-mode incremental regeneration unless the scoped re-ingest was lifted here or the
+    /// watch path degraded to a full re-ingest for adapters that lack it. Lifting it is the route taken: BMad's
+    /// implementation is the same method body it always had, so watch output for a BMad repo is byte-identical by
+    /// construction rather than by measurement (ADR 0027; ADR 0038).</para></summary>
+    /// <param name="options">Resolved run paths/settings (source root, repo root, flags).</param>
+    /// <param name="sourceFiles">Full paths of the discovered source artifacts to ingest.</param>
+    /// <param name="projectProgress">Projection-layer enrichment callback (see <see cref="ProgressProjection"/>).</param>
+    EpicsIngest IngestEpics(ForgeOptions options, IReadOnlyList<string> sourceFiles, ProgressProjection? projectProgress);
 }

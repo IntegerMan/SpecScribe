@@ -230,6 +230,29 @@ export const CONDITIONAL_CLASSES = [
   'owner-author-4',
   'owner-author-5',
   'owner-author-6',
+  // ── Cross-FRAMEWORK markup ────────────────────────────────────────────────────────────────────────────
+  // The epics index's milestone bands (HtmlRenderAdapter.AppendMilestoneBands), emitted only when the
+  // ingested project's framework HAS a milestone level above the epic — GSD Core's `v1.0`/`v2.0` and its
+  // `Backlog` group. BMad has no such level, so `EpicsModel.Milestones` is empty for it and the renderer
+  // takes the chip-section branch instead.
+  //
+  // ⚠️ This is a NEW SUB-CATEGORY of the gap this list exists for, and it is worth naming because every
+  // remaining framework epic (11, 12.3, 13, 14, 15) will hit it. The entries above are absent because a data
+  // condition happens to be false in THIS repo right now; these are absent because the extraction corpus is
+  // this repository's own IR, and this repository is a BMad project. No amount of regenerating fixes that —
+  // markup only a NON-BMAD repo can produce is structurally invisible to a harvest of a BMad one.
+  //
+  // Measured, not assumed: with the stylesheet edit in place and the documented regeneration order followed
+  // exactly, all five `.milestone-band*` rules were pruned and `check:ir-content` stayed GREEN — the bands
+  // would have shipped unstyled on a real GSD site with no gate able to see it. That is the same silent-loss
+  // failure as the sunburst-black-fill and `owner-author-2` incidents above, reached by a different route.
+  // Seeding stays self-limiting: `.milestone-band .epic-overview` is carried only because `epic-overview`
+  // is genuinely present too. [Story 12.2 Task 8; ADR 0038]
+  'milestone-band',
+  'milestone-band-header',
+  'milestone-band-name',
+  'milestone-band-meta',
+  'milestone-band-empty',
 ]
 
 /** Every class name the seeding above contributes, flattened. */

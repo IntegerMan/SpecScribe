@@ -10,11 +10,11 @@
     "epics/story-{id}.html"
   ],
   "stats": {
-    "carriedRules": 1450,
-    "carriedSelectors": 1666,
+    "carriedRules": 1457,
+    "carriedSelectors": 1673,
     "carriedKeyframes": 4,
     "droppedRoot": 4,
-    "generatedBytes": 183034,
+    "generatedBytes": 184083,
     "sharedRules": 1
   },
   "rules": [
@@ -1708,6 +1708,30 @@
     },
     {
       "selector": ".section-divider",
+      "carried": true
+    },
+    {
+      "selector": ".milestone-band",
+      "carried": true
+    },
+    {
+      "selector": ".milestone-band-header",
+      "carried": true
+    },
+    {
+      "selector": ".milestone-band-name",
+      "carried": true
+    },
+    {
+      "selector": ".milestone-band-meta",
+      "carried": true
+    },
+    {
+      "selector": ".milestone-band-empty",
+      "carried": true
+    },
+    {
+      "selector": ".milestone-band .epic-overview",
       "carried": true
     },
     {
@@ -5854,6 +5878,10 @@
     },
     {
       "selector": ".sdd-check--no",
+      "carried": true
+    },
+    {
+      "selector": ".sdd-check--na",
       "carried": true
     },
     {

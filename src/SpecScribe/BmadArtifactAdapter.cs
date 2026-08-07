@@ -54,25 +54,12 @@ public sealed class BmadArtifactAdapter : IArtifactAdapter
 
     private static readonly Regex ArtifactFilenamePattern = new(@"^(?<epic>\d+)-(?<story>\d+)-", RegexOptions.Compiled);
 
-    /// <summary>The epics-scoped slice of an ingest, exposed separately so the watch-mode incremental path
-    /// (<see cref="SiteGenerator.RegenerateEpics"/>) can re-parse exactly the scope it always has — epics +
-    /// story artifacts + requirements — without re-ingesting sprint/retro/module state it doesn't refresh
-    /// (AD-5: watch behavior must not regress). <paramref name="SourceFullPath"/> is set whenever the epics
-    /// file was FOUND, independent of parse success, so callers can keep excluding it from generic-page
-    /// rendering exactly as before. [Story 4.1]</summary>
-    public sealed record EpicsIngest(
-        string? SourceFullPath,
-        EpicsModel? Epics,
-        RequirementsModel? Requirements,
-        IReadOnlyDictionary<string, string> StoryArtifactsById,
-        IReadOnlyCollection<string> ConsumedSourceRelatives,
-        IReadOnlyList<AdapterDiagnostic> Diagnostics);
-
     /// <summary>BMad's self-selection signal is the framework's marker directory: an <c>_bmad/</c> install
-    /// root at the repo root — the same signal <see cref="ModuleContext.Detect"/> keys off. Deliberately NOT
-    /// consulted by <see cref="SiteGenerator"/> in Story 4.1 (BMad is the only adapter, and a bare
-    /// <c>_bmad-output</c> tree without an install must keep rendering as it does today); the adapter
-    /// registry of Stories 4.3+ is its consumer.</summary>
+    /// root at the repo root — the same signal <see cref="ModuleContext.Detect"/> keys off.
+    /// <para>Its consumer is <see cref="AdapterRegistry"/> [Story 12.2]. The Story 4.1 caveat that a bare
+    /// <c>_bmad-output</c> tree WITHOUT an install must keep rendering as it does today still holds, and is honoured
+    /// there rather than here: this adapter is the registry's ordered LAST entry and also its no-match fallback, so
+    /// a tree whose markers this returns false for still ingests through BMad exactly as before.</para></summary>
     public bool AppliesTo(ForgeOptions options, IReadOnlyList<string> sourceFiles) =>
         Directory.Exists(Path.Combine(options.RepoRoot, "_bmad"));
 

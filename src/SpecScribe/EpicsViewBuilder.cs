@@ -41,11 +41,49 @@ public static class EpicsViewBuilder
             Commands = commands,
             VerticalSliceChips = model.Epics.Where(e => e.Section == EpicSection.VerticalSlice).Select(BuildChip).ToList(),
             FurtherDevelopmentChips = model.Epics.Where(e => e.Section == EpicSection.FurtherDevelopment).Select(BuildChip).ToList(),
+            Milestones = BuildMilestoneBands(model),
             FollowUps = geometry,
             UnplannedWork = unplanned ?? UnplannedWorkGeometry.Empty,
             HierarchyExplorerHtml = BuildIndexHierarchyExplorerHtml(
                 model, nav.SiteTitle, geometry, unplanned ?? UnplannedWorkGeometry.Empty),
         };
+    }
+
+    /// <summary>Projects <see cref="EpicsModel.Milestones"/> onto band views, resolving each band's chips from the
+    /// epic numbers it names and rolling up its phase and plan counts.
+    ///
+    /// <para><b>Nothing is invented here.</b> The band's state word arrives already CANONICAL from the adapter (the
+    /// native-vocabulary seam is <see cref="StatusStyles"/>, and the adapter is where a framework's own words are
+    /// mapped), so this method only turns it into a class and a label. A band naming an epic number that does not
+    /// exist contributes no chip rather than a broken link, and a band with no chips at all is still returned — the
+    /// renderer states the empty case in words instead of dropping the band, which would silently hide a milestone
+    /// the framework declared.</para> [Story 12.2 Task 8]</summary>
+    private static IReadOnlyList<MilestoneBandView> BuildMilestoneBands(EpicsModel model)
+    {
+        if (model.Milestones.Count == 0) return Array.Empty<MilestoneBandView>();
+
+        var byNumber = model.Epics.ToDictionary(e => e.Number);
+        var bands = new List<MilestoneBandView>(model.Milestones.Count);
+        foreach (var milestone in model.Milestones)
+        {
+            var epics = milestone.EpicNumbers
+                .Select(n => byNumber.TryGetValue(n, out var e) ? e : null)
+                .Where(e => e is not null)
+                .Select(e => e!)
+                .ToList();
+
+            var statusClass = StatusStyles.ForStatus(milestone.StatusWord);
+            bands.Add(new MilestoneBandView(
+                Name: milestone.Name,
+                StatusClass: statusClass,
+                StatusLabel: StatusStyles.StoryLabel(statusClass),
+                CompletedDate: milestone.CompletedDate,
+                PhaseCount: epics.Count,
+                PlansDone: epics.Sum(e => e.Stories.Count(s => StatusStyles.ForStory(s) == "done")),
+                PlansTotal: epics.Sum(e => e.Stories.Count),
+                Chips: epics.Select(BuildChip).ToList()));
+        }
+        return bands;
     }
 
     /// <summary>The epics index's Hierarchy Explorer instance.
