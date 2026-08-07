@@ -149,3 +149,36 @@ Each record is numbered by its filename prefix and carries a `**Status:**` line.
   ⚠️ **Open:** ratification. Story 16.1 AC #4 requires this ADR **Accepted**, and Stories 16.2–16.9 + 17.4 all
   build on it. Note **0039 was taken** by Story 4.9 before this landed; 0019 remains claimed-but-unwritten by
   Story 18.3.)
+- [ADR 0041 — Multi-Framework Coexistence: Per-Family Policy, Source Discovery, and the Liveness Precondition](0041-multi-framework-coexistence-policy.md) — **Proposed** 2026-08-07
+  (**Amends [ADR 0038](0038-framework-adapter-selection-and-neutral-source-root-discovery.md)**, settling what its
+  §5 deferred; authored by [Story 4.9](../../_bmad-output/implementation-artifacts/4-9-multi-framework-coexistence-strategy-spike.md),
+  evidence in [4-9-spike-report.md](../../_bmad-output/implementation-artifacts/4-9-spike-report.md). **Not** a
+  second registry ADR — 0038 stays the one selection decision inherited by Epics 11/12.3/13/14/15.
+  **The measurement that reframed it:** driving the shipped registry over the real reference repo and four
+  constructed shapes emitted **zero** `Skipped` diagnostics across **8** scenarios, including two repos where both
+  frameworks hold a complete artifact set — the first-non-null merge rules are not wrong, they are *unreachable*,
+  because every adapter is handed the same `sourceFiles` list from the single `SourceRoot` and a non-primary
+  framework has nothing to lose. On CORA the BMad adapter contributes **exactly one** field, `Module`, and only
+  because `ModuleContext.Detect` is anchored to `RepoRoot`. **Decides:** the resolution axis is **role**, expressed
+  through the mechanism already shipped (the framework owning the resolved root owns delivery) rather than a new
+  role vocabulary on the adapter contract; epics family and `Sprint` resolve by **precedence bound to root
+  ownership** (superseding 0038 §2's independent first-non-null `Sprint` rule), `Module` is **retained as a
+  cross-role planning-side contribution and must be attributed**, collections merge unchanged; per-family
+  attribution is promoted to the **About-SDD framework page** (not the dashboard — a rare case must not tax the
+  highest-traffic surface), creating **no new reader surface**. **Source discovery stays single-rooted** (cost
+  measured: six documents on CORA). Option **B** (auxiliary document roots on the working `AdrSourceRoot`/`adrs/`
+  pattern — new prefixes, so existing URLs do **not** move under [ADR 0017](0017-projection-routes-mirror-ir-paths.md))
+  is named with its trigger; option **C** (root = `RepoRoot`) is **rejected on measurement** — `--source` at a repo
+  root re-derives `RepoRoot` as its *parent*, walking **9,510** files on CORA, branding the site `dev`, matching
+  **no** adapter and emitting **0** diagnostics; option **D** (`SourceRef`) is deferred at 41 `ToSourceRelative`
+  call sites behind 4 definitions plus 46 `.SourceRoot` references. ⚠️ **The root count is not what is broken.**
+  Marker probes test *presence*, never *life*: a vestigial `.planning/` from 2020 wins **both** the source root and
+  the epics family while a live BMad `epics.md` vanishes with **no** diagnostic — fixed by making probes require
+  content, for which this repo already holds the precedent in `HasMarkdownWithinOneLevel`. ⚠️ **Corrects 0038 §5**,
+  whose claim that a non-primary framework's "artifact families still merge into the bundle" is measurably false in
+  both directions — as is the same sentence in the reader-facing `AppendNonPrimaryMarkerNotice`, which NFR8 makes a
+  worse failure than the gap it explains. **B1–B11 ruled on individually** (7 stand, 3 refined, 1 superseded); B11's
+  watch/full-build agreement re-measured and held **8/8**. **No new gate** per
+  [ADR 0033](0033-content-drift-gates-are-targeted-and-regenerable.md) — and neither existing gate can see this
+  work. Took **0041** because 0039 and 0040 were both claimed after the story's baseline; 0019 remains
+  claimed-but-unwritten.)
