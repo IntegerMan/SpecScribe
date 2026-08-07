@@ -22,26 +22,6 @@
  * surfaces render. `npm run check:ir-content` fails the build when this file and the source diverge.
  */
 
-.ir-content .skip-link {
-  position: absolute;
-  left: -9999px;
-  top: 0;
-  z-index: 200;
-  padding: 0.5rem 0.9rem;
-  background: var(--teal-deep);
-  color: var(--warm-white);
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 0.85rem;
-  text-decoration: none;
-  border-radius: 0 0 6px 0;
-}
-
-.ir-content .skip-link:focus {
-  left: 0;
-  outline: 2px solid var(--gold-light);
-  outline-offset: 2px;
-}
-
 .ir-content .index-card:focus-visible,
 .ir-content .now-next-card:focus-visible,
 .ir-content .epic-mosaic-card:focus-visible,
@@ -2330,16 +2310,16 @@
   font-family: 'Courier New', monospace;
 }
 
-.ir-content .epic-status.done { background: var(--status-done-bg); color: var(--moss); border: 1px solid var(--moss-light); }
+.ir-content .epic-status.done { background: var(--status-done-bg); color: var(--moss); border: 1px solid var(--status-done); }
 
-.ir-content .epic-status.review { background: var(--status-review-bg); color: var(--teal-deep); border: 1px solid var(--teal-deep); }
+.ir-content .epic-status.review { background: var(--status-review-bg); color: var(--teal-deep); border: 1px solid var(--status-review); }
 
-.ir-content .epic-status.active { background: var(--status-active-bg); color: var(--teal); border: 1px solid var(--teal); }
+.ir-content .epic-status.active { background: var(--status-active-bg); color: var(--teal); border: 1px solid var(--status-active); }
 
 .ir-content .epic-status.ready,
-.ir-content .epic-status.drafted { background: var(--status-ready-bg); color: var(--gold); border: 1px solid var(--gold-light); }
+.ir-content .epic-status.drafted { background: var(--status-ready-bg); color: var(--gold); border: 1px solid var(--status-ready); }
 
-.ir-content .epic-status.pending { background: var(--parchment-dark); color: var(--ink-light); border: 1px solid var(--border); }
+.ir-content .epic-status.pending { background: var(--parchment-dark); color: var(--ink-light); border: 1px solid var(--status-pending); }
 
 .ir-content .epic-status.unrecognized {
   background: repeating-linear-gradient(
@@ -2550,16 +2530,16 @@
   border: 1px solid var(--border);
 }
 
-.ir-content .status-badge.done { background: var(--status-done-bg); color: var(--moss); border-color: var(--moss-light); }
+.ir-content .status-badge.done { background: var(--status-done-bg); color: var(--moss); border-color: var(--status-done); }
 
-.ir-content .status-badge.active { background: var(--status-active-bg); color: var(--teal); border-color: var(--teal); }
+.ir-content .status-badge.active { background: var(--status-active-bg); color: var(--teal); border-color: var(--status-active); }
 
-.ir-content .status-badge.review { background: var(--status-review-bg); color: var(--teal-deep); border-color: var(--teal-deep); }
+.ir-content .status-badge.review { background: var(--status-review-bg); color: var(--teal-deep); border-color: var(--status-review); }
 
 .ir-content .status-badge.ready,
-.ir-content .status-badge.drafted { background: var(--status-ready-bg); color: var(--gold); border-color: var(--gold-light); }
+.ir-content .status-badge.drafted { background: var(--status-ready-bg); color: var(--gold); border-color: var(--status-ready); }
 
-.ir-content .status-badge.pending { background: var(--parchment-dark); color: var(--ink-light); border-color: var(--border); }
+.ir-content .status-badge.pending { background: var(--parchment-dark); color: var(--ink-light); border-color: var(--status-pending); }
 
 .ir-content .status-badge.retired { background: var(--parchment-dark); color: var(--ink-light); border-color: var(--border); }
 
@@ -3495,6 +3475,11 @@
 .ir-content .donut-center-text { font-size: 1.4rem; font-weight: bold; fill: var(--ink); font-family: 'Courier New', monospace; }
 
 .ir-content .donut-center-text.donut-center-fraction { font-size: 1.05rem; }
+
+.ir-content .mini-donut { vertical-align: middle; }
+
+.ir-content .mini-donut .donut-track,
+.ir-content .mini-donut .donut-seg { stroke-width: 4; }
 
 .ir-content .chart-empty { font-size: 0.82rem; color: var(--ink-light); font-style: italic; }
 
@@ -4658,7 +4643,7 @@ body:has(#wm-review:checked) .ir-content .dashboard-tile-band {
   font-weight: 700;
 }
 
-.ir-content .status-badge.deferred { background: var(--parchment-dark); color: var(--ink-light); border-color: var(--border); }
+.ir-content .status-badge.deferred { background: var(--parchment-dark); color: var(--ink-light); border-color: var(--status-deferred); }
 
 .ir-content .donut-seg.deferred { stroke: var(--status-deferred); }
 

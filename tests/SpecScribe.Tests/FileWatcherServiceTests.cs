@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using SpecScribe;
 
 namespace SpecScribe.Tests;
@@ -145,12 +147,26 @@ public class FileWatcherServiceTests : IDisposable
     /// <summary>A poll predicate that reads generated files is racing a rebuild in progress — and the whole-tree
     /// routes wipe the output root before repopulating it, so "file missing" and "file locked" are both NORMAL
     /// transient states here, not failures. Swallowing them is what makes the poll mean "did this converge?"
-    /// rather than "was the very first read lucky?".</summary>
+    /// rather than "was the very first read lucky?".
+    /// <para>⚠️ THE THIRD TRANSIENT STATE IS PLATFORM-SPECIFIC, AND IT IS WHY THIS LIST WAS INCOMPLETE FOR SO LONG.
+    /// The two catches above are the complete set only on Windows, where a concurrent writer's share mode makes a
+    /// mid-write read FAIL before it can return anything. Linux has no mandatory locking, so the identical race
+    /// instead SUCCEEDS and hands back however many bytes have been flushed — a truncated but perfectly readable
+    /// file. <c>SiteRegion.ReadShared</c> asks for <c>FileShare.ReadWrite</c>, so nothing stops it. The read
+    /// then reaches <c>JsonDocument.Parse</c> and throws <see cref="JsonException"/>, which is not an
+    /// <see cref="IOException"/> and so escaped this guard entirely: the same normal transient state, arriving in a
+    /// different exception type, failed the test instead of being polled through. Observed on the Story 25.1
+    /// portability probe as "Expected end of string, but instead reached end of data … BytePositionInLine: 163840"
+    /// — 160 KB exactly, a flush boundary rather than anything wrong with the generator.
+    /// <para>This does NOT weaken the assertion. <see cref="WaitFor"/> evaluates once more after the deadline, so
+    /// JSON that is genuinely corrupt rather than merely half-written still fails there, with the caller's own
+    /// message — exactly as a file that stays missing or stays locked already does.</para></para></summary>
     private static bool Evaluate(Func<bool> condition)
     {
         try { return condition(); }
         catch (IOException) { return false; }
         catch (UnauthorizedAccessException) { return false; }
+        catch (JsonException) { return false; }
     }
 
     /// <summary>Waits for an emitted event to match. Event delivery is asynchronous, so asserting on

@@ -7,7 +7,7 @@
       "path": "code/spike/nuxt-ir/app.vue.html",
       "family": "code-file",
       "mainSha": "c5251bc76e4012f0",
-      "pageSha": "1d9fb68228ef123b",
+      "pageSha": "4688a609b7a8b5eb",
       "mainBytes": 4803,
       "pageBytes": 19718
     },
@@ -15,7 +15,7 @@
       "path": "code/src/SpecScribe/MarkdownConverter.cs.html",
       "family": "code-file",
       "mainSha": "8776dadc61281fce",
-      "pageSha": "f516102c52fb534b",
+      "pageSha": "39fdc373b81f7bcc",
       "mainBytes": 52796,
       "pageBytes": 79988
     },
@@ -23,7 +23,7 @@
       "path": "commits/2026-07-04.html",
       "family": "commit-day",
       "mainSha": "72cc913f92286ff7",
-      "pageSha": "5a7332a37908eed2",
+      "pageSha": "b6049819f48f5b47",
       "mainBytes": 894,
       "pageBytes": 18245
     },
@@ -31,7 +31,7 @@
       "path": "commits/2026-07-17.html",
       "family": "commit-day",
       "mainSha": "cb5b2342fb49fa02",
-      "pageSha": "de4afa2759b24e9c",
+      "pageSha": "f84bf7e7325c2bc4",
       "mainBytes": 8903,
       "pageBytes": 26325
     },
@@ -39,7 +39,7 @@
       "path": "commit/7d8882e.html",
       "family": "commit-detail",
       "mainSha": "9273103e53934cbe",
-      "pageSha": "faaae048f1888136",
+      "pageSha": "06b9ab9698a74d39",
       "mainBytes": 603,
       "pageBytes": 53665
     },
@@ -47,7 +47,7 @@
       "path": "commit/1210a41.html",
       "family": "commit-detail",
       "mainSha": "dcf21887b0c96591",
-      "pageSha": "023a1032b8961d5b",
+      "pageSha": "4f7b4039513f3867",
       "mainBytes": 3811,
       "pageBytes": 57093
     },
@@ -55,7 +55,7 @@
       "path": "index.html",
       "family": "dashboard",
       "mainSha": "81245fa899c46a31",
-      "pageSha": "81d65d5001f5c36e",
+      "pageSha": "b0dfac6658b72dae",
       "mainBytes": 1225803,
       "pageBytes": 1242072
     },
@@ -63,7 +63,7 @@
       "path": "adrs/0004-cross-surface-interaction-and-theme-contract.html",
       "family": "doc-prose",
       "mainSha": "a06de9674859f25d",
-      "pageSha": "b2dc7896cb7f5b92",
+      "pageSha": "820703927bb7fc27",
       "mainBytes": 3394,
       "pageBytes": 27550
     },
@@ -71,7 +71,7 @@
       "path": "implementation-artifacts/spec-address-deferred-next-steps.html",
       "family": "doc-prose",
       "mainSha": "5a9b1f6102ea555c",
-      "pageSha": "989805fc63e9bd95",
+      "pageSha": "8fccffa845eab825",
       "mainBytes": 13430,
       "pageBytes": 40971
     },
@@ -79,7 +79,7 @@
       "path": "epics/epic-14.html",
       "family": "epic-detail",
       "mainSha": "e0047319be240359",
-      "pageSha": "47a51200bfab5088",
+      "pageSha": "967437db0a560311",
       "mainBytes": 21670,
       "pageBytes": 36283
     },
@@ -87,7 +87,7 @@
       "path": "epics/epic-26.html",
       "family": "epic-detail",
       "mainSha": "35391c22a11d8b6a",
-      "pageSha": "cc72fa07cf849b2c",
+      "pageSha": "4978eb3b535ccc95",
       "mainBytes": 59333,
       "pageBytes": 74814
     },
@@ -95,7 +95,7 @@
       "path": "epics.html",
       "family": "epics-index",
       "mainSha": "fc25b61b3196261f",
-      "pageSha": "43c791e24b032a35",
+      "pageSha": "ac276bc35bdb5dc3",
       "mainBytes": 266730,
       "pageBytes": 282615
     },
@@ -103,7 +103,7 @@
       "path": "follow-ups/action-schedule-a-story-spec-to-fix-htmltemplater-knownindexgroups.html",
       "family": "follow-up",
       "mainSha": "38bc6c03e8590383",
-      "pageSha": "fb17336cda18d7af",
+      "pageSha": "cb090d727d5f044a",
       "mainBytes": 7719,
       "pageBytes": 23322
     },
@@ -111,7 +111,7 @@
       "path": "follow-ups/deferred-epic-angular-weight-on-project-glance-is-max.html",
       "family": "follow-up",
       "mainSha": "68f573aba7662fbe",
-      "pageSha": "3e1d778b27d1a1d2",
+      "pageSha": "df2f72716d1753fd",
       "mainBytes": 8249,
       "pageBytes": 33227
     },
@@ -119,7 +119,7 @@
       "path": "deep-analytics.html",
       "family": "insight",
       "mainSha": "10d7f2b14eb5ba9a",
-      "pageSha": "29eabb176cffaf41",
+      "pageSha": "c6ab752c15515d79",
       "mainBytes": 18736,
       "pageBytes": 39677
     },
@@ -127,7 +127,7 @@
       "path": "impact-map.html",
       "family": "insight",
       "mainSha": "e6c05cc59a7b2728",
-      "pageSha": "b505f67517e4a344",
+      "pageSha": "7429ae0f8b003c46",
       "mainBytes": 901186,
       "pageBytes": 917333
     },
@@ -135,7 +135,7 @@
       "path": "about-sdd-gsd.html",
       "family": "portal-meta",
       "mainSha": "9b5dc1cb7c486571",
-      "pageSha": "0c747fe4705e911b",
+      "pageSha": "0ee426eac4587e09",
       "mainBytes": 1760,
       "pageBytes": 16792
     },
@@ -143,7 +143,7 @@
       "path": "about-sdd.html",
       "family": "portal-meta",
       "mainSha": "586f9ccfd9677691",
-      "pageSha": "f706babc319a86b4",
+      "pageSha": "c8ce6dcda50fa934",
       "mainBytes": 4766,
       "pageBytes": 19829
     },
@@ -151,7 +151,7 @@
       "path": "requirements/nfr3.html",
       "family": "requirement",
       "mainSha": "83f4d21cf2ff6f54",
-      "pageSha": "91ccc094c388ac94",
+      "pageSha": "399887fa3219126f",
       "mainBytes": 7279,
       "pageBytes": 22510
     },
@@ -159,7 +159,7 @@
       "path": "requirements/ux-dr23.html",
       "family": "requirement",
       "mainSha": "4466b3265d37ab92",
-      "pageSha": "1da52b9fdbfc501f",
+      "pageSha": "7e3f172c75468f7b",
       "mainBytes": 17397,
       "pageBytes": 34109
     },
@@ -167,7 +167,7 @@
       "path": "retros.html",
       "family": "retro",
       "mainSha": "e6fbd468f23d4d9c",
-      "pageSha": "e333e08ef2ca4354",
+      "pageSha": "5d4ae0f3adde2fab",
       "mainBytes": 4372,
       "pageBytes": 31562
     },
@@ -175,7 +175,7 @@
       "path": "sprint.html",
       "family": "sprint",
       "mainSha": "ad69a20f5360887f",
-      "pageSha": "ae425792ae02d5be",
+      "pageSha": "002fac06dc6eeffa",
       "mainBytes": 365284,
       "pageBytes": 381248
     },
@@ -183,7 +183,7 @@
       "path": "epics/story-11-2.html",
       "family": "story-detail",
       "mainSha": "e671a7e6a5c55b24",
-      "pageSha": "e099b4716743595c",
+      "pageSha": "0945a44614ebd5ae",
       "mainBytes": 9350,
       "pageBytes": 24179
     },
@@ -191,7 +191,7 @@
       "path": "epics/story-10-1.html",
       "family": "story-detail",
       "mainSha": "02f481ae35d7983c",
-      "pageSha": "b6bf045eb65cf745",
+      "pageSha": "b7ba5bdc0209ba8f",
       "mainBytes": 112695,
       "pageBytes": 128786
     }

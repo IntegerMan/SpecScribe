@@ -1,7 +1,7 @@
 {
   "generatedBy": "web/scripts/extract-ir-content.mjs",
   "why": "Selectors `selectorIsUsed` discarded because a class or id was absent from the harvest. NOT a defect list — the monolith styles surfaces this app does not render. It exists because the same silent drop shipped the sunburst black-fill, owner-author-2, Code Map filter and tooltip/details-rail regressions with every gate green. Deliberately NOT in ir-content.manifest.json: it is a function of the whole source stylesheet and would redden the gate on edits that cannot move the emitted layer.",
-  "droppedSelectors": 372,
+  "droppedSelectors": 369,
   "absentTokens": [
     {
       "token": "ownership-wedge",
@@ -161,10 +161,6 @@
     },
     {
       "token": "list-row-group-heading",
-      "rules": 3
-    },
-    {
-      "token": "mini-donut",
       "rules": 3
     },
     {
@@ -1350,24 +1346,6 @@
       "selector": ".funnel-band.funnel-zero",
       "missingClasses": [
         "funnel-zero"
-      ]
-    },
-    {
-      "selector": ".mini-donut",
-      "missingClasses": [
-        "mini-donut"
-      ]
-    },
-    {
-      "selector": ".mini-donut .donut-track",
-      "missingClasses": [
-        "mini-donut"
-      ]
-    },
-    {
-      "selector": ".mini-donut .donut-seg",
-      "missingClasses": [
-        "mini-donut"
       ]
     },
     {
