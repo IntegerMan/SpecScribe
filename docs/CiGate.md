@@ -102,10 +102,12 @@ guessed.
 
 ### Re-applying it
 
+The live ruleset is **id `20567252`**, created 2026-08-07.
+
 ```sh
 # Inspect what is live today
 gh api repos/IntegerMan/SpecScribe/rulesets
-gh api repos/IntegerMan/SpecScribe/rulesets/<id>
+gh api repos/IntegerMan/SpecScribe/rulesets/20567252
 
 # Recreate from the committed record (strip the server-assigned fields first)
 jq 'del(.id, .node_id, .created_at, .updated_at, ._links, .source, .source_type, .current_user_can_bypass)' \
@@ -113,20 +115,46 @@ jq 'del(.id, .node_id, .created_at, .updated_at, ._links, .source, .source_type,
 gh api --method POST repos/IntegerMan/SpecScribe/rulesets --input /tmp/ruleset.json
 
 # Update in place instead of recreating
-gh api --method PUT repos/IntegerMan/SpecScribe/rulesets/<id> --input /tmp/ruleset.json
+gh api --method PUT repos/IntegerMan/SpecScribe/rulesets/20567252 --input /tmp/ruleset.json
 ```
 
-`gh ruleset` is **read-only** (`list` / `view` / `check`), so `gh api` is the write path.
+`gh ruleset` is **read-only** (`list` / `view` / `check`), so `gh api` is the write path. Recreating with the
+same `name` returns **`422 name must be unique`** — that error means the rule already exists, not that the
+payload is malformed.
+
+**`actor_id: 5` is the built-in `admin` repository role.** That id is not in the REST reference and public
+sources disagree about it, so it was **confirmed against the platform** rather than trusted: the applied
+ruleset reports `"current_user_can_bypass": "always"` for the repository admin. The committed JSON is the
+exported live object, so the id in it is observed, not asserted.
 
 ### Verifying it
 
 ```sh
-# Does the rule apply to ME? Empty output means the caller bypasses it.
-gh api repos/IntegerMan/SpecScribe/rules/branches/main
+# THE authoritative bypass check — does the CALLING user bypass this rule?
+gh api repos/IntegerMan/SpecScribe/rulesets/20567252 --jq '.current_user_can_bypass'   # -> "always"
 
-# Classic view of the same state
-gh api repos/IntegerMan/SpecScribe/branches/main --jq '.protected'
+# Is the branch gated at all, and by exactly which contexts?
+gh api repos/IntegerMan/SpecScribe/branches/main --jq '.protected'                     # -> true
+gh api repos/IntegerMan/SpecScribe/rules/branches/main \
+  --jq '.[] | select(.type=="required_status_checks") | .parameters.required_status_checks[].context'
 ```
+
+⚠️ **Do not read `rules/branches/main` as a bypass check.** It lists the rules that apply to the **branch**,
+and it returns them **whether or not the calling user can bypass them** — an admin who bypasses still sees
+the rule listed. Only `current_user_can_bypass` on the ruleset answers "does this bind *me*". Misreading that
+endpoint looks exactly like a broken bypass and will send you chasing a non-existent misconfiguration.
+
+### What "gated" actually looks like, measured
+
+Both directions were verified empirically on 2026-08-07 against PR **#7**, a throwaway branch carrying a
+deliberately failing test so `build-test-analyze` went red:
+
+| | before the ruleset | after |
+|---|---|---|
+| PR with a red gate | `mergeable: MERGEABLE`, `mergeStateStatus: **UNSTABLE**` — merge allowed | `mergeStateStatus: **BLOCKED**` |
+| `branches/main.protected` | `false` | `true` |
+| required contexts | *(none)* | `build-test-analyze` only |
+| admin direct push | unaffected | unaffected (`current_user_can_bypass: always`) |
 
 ## It does not disturb the Pages workflow
 
