@@ -254,7 +254,19 @@ body {
    paints beneath every hatched sector (21 occurrences measured on the real dashboard). There is no Plotly
    attribute for this — the pattern element is generated, not configured — so this rule is the only fix, and it
    took the foreign-color count 1 -> 0. Do not delete it because "the config already sets the colors". [Story 20.4] */
-.ss-hierarchy defs pattern > path { fill: none; }
+/* `stroke-opacity` is here and NOT in `marker.pattern.fgcolor`, and that is measured rather than stylistic.
+   Passing `fgcolor: "rgba(92,101,112,0.45)"` looks like the natural home for it and silently does nothing:
+   Plotly parses the colour and writes only its RGB back onto the pattern's `<path>` as a `stroke` attribute —
+   verified in a live browser, where the trace held the rgba string while the rendered path read
+   `stroke="rgb(92,101,112)"`, no `stroke-opacity` attribute, computed stroke-opacity 1. The alpha was dropped
+   in transit, so the hatch stayed at full ink and the softening was invisible.
+
+   CSS reaches it cleanly because Plotly never sets this property inline at all, so there is nothing to lose a
+   specificity fight with. Softened on the owner's verify round 2026-08-06 ("harder to read with the hatched
+   fills") — the hatch STAYS, since UX-DR17 and ADR 0012 §6 require a non-colour status channel; only its
+   weight drops, so it reads as a texture over the status colour rather than competing with it. Its spacing and
+   stroke thickness are the `size`/`solidity` half of the same change, in specscribe.js. */
+.ss-hierarchy defs pattern > path { fill: none; stroke-opacity: 0.45; }
 
 /* Focus and selection on a sector — THREE distinct states that must not be confused: hovered, focused, and
    selected. `outline` is deliberately NOT used: on an SVG <path> the browser draws it as the bounding RECTANGLE,
@@ -276,6 +288,23 @@ body {
   outline: 2px solid var(--teal);
   outline-offset: 1px;
 }
+
+/* HOVER — the third of the three states above, and the one that went missing when Story 20.7 swapped the
+   renderer. The shipped grammar (Story 1.5 D3) is "dim the siblings, do not dim what you point at", and the
+   retired SVG expressed it as `.sunburst:hover .sb-seg { opacity: .5 }`. Those rules still exist further down
+   this file and are now INERT: they key on `.sb-seg`, which no Plotly sector carries — since 20.7 that class
+   lives only on the hidden colour probe, so the selector matches nothing on a rendered chart.
+
+   Restated against what Plotly actually emits, and deliberately on the GROUP rather than the path. Two
+   reasons, both learned the hard way in the block above: Plotly rewrites `stroke`/`stroke-width` inline on
+   every redraw (so a stroke-based lift is inert), and it writes the leaf's own `opacity` inline onto
+   `path.surface` (so a path-level opacity rule fights it). A `<g>`'s opacity composites with whatever the
+   child path already has and Plotly never sets it, so this is a channel the engine does not own.
+
+   Hover is opacity-only and carries no colour of its own — the focus ring stays the teal outline and the
+   selection ring stays Plotly's `marker.line`, so the three states remain distinguishable. */
+.ss-hierarchy:hover g.slice { opacity: 0.5; }
+.ss-hierarchy g.slice:hover { opacity: 1; }
 
 /* Rich hover card — the shared body-level `.ss-tooltip` node renders this as innerHTML, exactly as the code map's
    `.codemap-card` does, so a hierarchy chart's tooltip looks like every other tooltip in the portal rather than

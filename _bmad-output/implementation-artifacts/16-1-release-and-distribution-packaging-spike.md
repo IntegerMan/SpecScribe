@@ -24,7 +24,7 @@ deliverables:
 
 # Story 16.1: SPIKE — Release & Distribution Packaging
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -312,65 +312,65 @@ no-product-code spike and that needs a checkable assertion.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Inherit before deciding (AC: #1)**
-  - [ ] Read ADR 0006 § Decision + § Comparison and ADR 0022 § Decision 1-7 and § Relationship to ADR 0006. Build the settled-vs-open table from R1 **with citations**; do not re-derive the measurements.
-  - [ ] Read Story 23.5's report (`23-5-packaging-strategy-report.md`) § 4 (strategy comparison), § 4 "Per channel", and § 10 (open items 3-6). Four of its six open items are this epic's.
-  - [ ] Confirm each cited line number still resolves at your HEAD (shared `main`; R11).
+- [x] **Task 1 — Inherit before deciding (AC: #1)**
+  - [x] Read ADR 0006 § Decision + § Comparison and ADR 0022 § Decision 1-7 and § Relationship to ADR 0006. Build the settled-vs-open table from R1 **with citations**; do not re-derive the measurements. → report § 3
+  - [x] Read Story 23.5's report (`23-5-packaging-strategy-report.md`) § 4 (strategy comparison), § 4 "Per channel", and § 10 (open items 3-6). Four of its six open items are this epic's. → items 4, 5 and 6 taken by ADR 0040; item 3 confirmed already-shipped (R5)
+  - [x] Confirm each cited line number still resolves at your HEAD (shared `main`; R11). → all verified at `838d591`: `NuxtPrerender.cs:41,68,73`, `SpecScribe.csproj:14-16,19,23`, `AboutTemplater.cs:90,133-135`, `extension/package.json:5-14`. `<Deterministic>` confirmed absent.
 
-- [ ] **Task 2 — Decide the renderer packaging shape, empirically (AC: #1, #5)** ← *protect this one*
-  - [ ] Build the artefact: `cd web && SPECSCRIBE_PACKAGE_BUILD=1 npm ci && npm run sync:assets && npm run build:package`. Use `build:package`, **never** `build` (`README.md:125-127` says why: a plain `nuxt build` bakes this project's pages into `.output/public` and Nitro serves them ahead of the SSR route — HTTP 200, wrong project).
-  - [ ] Add a **temporary** `<None Include="..\..\web\.output\**" Pack="true" PackagePath="tools\net10.0\any\renderer\" />` to `SpecScribe.csproj`, `dotnet pack -c Release -o artifacts`, and inspect the nupkg layout.
-  - [ ] `dotnet tool install SpecScribe --tool-path ./probe-tools --add-source ./artifacts`, then run `generate` **from a different repository** with `SPECSCRIBE_RENDERER_DIR` unset. Record `errors=`, the page count, and the resolved artefact path.
-  - [ ] Record the nupkg size before and after the payload (~3.78 MB / 185 files expected, per 23.5).
-  - [ ] Answer the self-contained-binary case: does `PublishSingleFile` extraction move `AppContext.BaseDirectory` away from a sibling `renderer/`? Measure or, if the box is tight, state it as **unmeasured** and seat it against 16.3.
-  - [ ] Answer the npm case: does each per-RID platform package carry its own `renderer/` (multiplying ~3.78 MB across RIDs) or is it shared? This is 16.8's cost driver.
-  - [ ] **Revert the csproj edit.** Confirm with `git status` that no file under `src/` is modified by you.
+- [x] **Task 2 — Decide the renderer packaging shape, empirically (AC: #1, #5)** ← *protect this one*
+  - [x] Build the artefact. Used `build:package`, never `build`; artefact verified to carry **0** prerendered HTML files in `public/`. `npm ci` had to be replaced with `npm install --no-save --no-package-lock` because `npm ci` **fails at HEAD** — recorded as a finding, report § 6.1.
+  - [x] Add a **temporary** `<None Include=... />` to `SpecScribe.csproj`, `dotnet pack -c Release -o artifacts`, and inspect the nupkg layout. → **`%(RecursiveDir)` double-applies**; correct form omits it (report § 2.7 finding 1).
+  - [x] `dotnet tool install ... --tool-path ./probe-tools`, then run `generate` **from a different repository** with `SPECSCRIBE_RENDERER_DIR` unset. → **`errors=0`**, 373 routes @ 4.9 ms/route, 18 pages. Resolved artefact path proven by negative case (report § 2.3).
+  - [x] Record the nupkg size before and after the payload. → baseline **2,515,650 B / 25 entries** → **3,757,359 B / 212 entries**; delta **+1,241,709 B (+49.4%)**. Artefact re-measured at **3.96 MB / 187 files** (23.5 recorded 3.78 MB / 185).
+  - [x] Answer the self-contained-binary case. → **MEASURED, not deferred:** `PublishSingleFile` does **not** move `AppContext.BaseDirectory`; sibling `renderer/` resolves; `errors=0`, 373 routes @ 5.0 ms/route. Exe = **79,742,177 B (76.0 MiB)**.
+  - [x] Answer the npm case. → **one shared `specscribe-renderer` package, not per-RID.** Decided from a measured property (0 native bindings, 0 platform binaries in the artefact). Marked **unmeasured** for the end-to-end npx install, seated against 16.8 (report § 10 item 5).
+  - [x] **Revert the csproj edit.** → reverted; `git status --porcelain src/ tests/ web/ extension/` is **empty**.
 
-- [ ] **Task 3 — Choose the preview cut and the non-goals (AC: #1)**
-  - [ ] Decide which channels ship in the **first preview** and in what order, given: 16.5 is blocked on Epic 6, 16.9 is blocked on 16.3's renderer payload, and Epic 17's sign-off (Story 17.4) gates the cut.
-  - [ ] Write the **explicit non-goals** AC #1 demands. Candidates to rule in or out by name: stable/1.0, Homebrew/winget/Chocolatey/Scoop, a container image (recorded but deliberately unseated in epics.md § Story 16.9), Open VSX alongside the VS Marketplace, and per-RID matrix breadth.
-  - [ ] State the **RID matrix** for the self-contained binaries — each RID is ~73 MiB / 34 MB gzipped (ADR 0006), so the matrix is a real cost decision and 16.8's `optionalDependencies` shape follows from it.
+- [x] **Task 3 — Choose the preview cut and the non-goals (AC: #1)**
+  - [x] Decide which channels ship in the **first preview** and in what order. → dotnet tool → npx → self-contained binaries; **VSIX OUT** (report § 3.1, ADR 0040 § Decision 2)
+  - [x] Write the **explicit non-goals** AC #1 demands. → eleven named, report § 3.2
+  - [x] State the **RID matrix**. → **three**: `win-x64`, `linux-x64`, `osx-arm64`; `linux-arm64`/`osx-x64` named and deferred. Deferral is cheap *because* the renderer is shared.
 
-- [ ] **Task 4 — Credential and prerequisite inventory (AC: #2)**
-  - [ ] Re-verify R3's three mechanisms live before writing them down — this area moved twice in the last year.
-  - [ ] Record, per channel: the account/identity needed, the mechanism (trusted publishing vs. stored token), what is stored **where** (repository secret, environment secret, or *nothing*), and who can rotate it.
-  - [ ] Decide the VS Marketplace credential path against the **2026-12-01** PAT retirement (R3). Name the option chosen and seat the migration explicitly against Story 16.5 if it is deferred.
-  - [ ] Decide the **npx install-time Node check** (ADR 0022 § Decision 5 / 23.5 open item 5, owner-assigned).
-  - [ ] Record the **code-signing decision** AC #2 requires — Authenticode for Windows binaries, notarization for macOS, or explicitly neither for the preview. An unsigned single-file exe has real SmartScreen/AV consequences; ADR 0022 § Alternatives already flags the dropper-heuristic issue for a related shape. Say what preview users will see.
-  - [ ] Record the package-ID reservations as **owner actions** with today's verified 404s as evidence (R4), plus the fallback ID per registry.
-  - [ ] Assert AC #2's "no secret value is committed" — and note that trusted publishing makes it structural for two of three channels rather than a matter of discipline.
+- [x] **Task 4 — Credential and prerequisite inventory (AC: #2)**
+  - [x] Re-verify R3's three mechanisms live before writing them down. → all three re-verified 2026-08-07; **one changed the decision** (§ 5.3)
+  - [x] Record, per channel: identity, mechanism, what is stored **where**, and who rotates it. → report § 5.1. Two channels store **nothing**.
+  - [x] Decide the VS Marketplace credential path. → **the PAT path is already CLOSED**, not merely dated: global-PAT creation/regeneration was blocked **2026-03-15**, and `vsce` requires exactly that "All accessible organizations" shape. Decision: **organization-owned publisher + Entra federation**, VSIX out of the preview cut. Seated against 16.5.
+  - [x] Decide the **npx install-time Node check**. → **no install-time check**; `engines.node` only, postinstall script explicitly rejected (report § 5.6). Closes ADR 0022 open question 1.
+  - [x] Record the **code-signing decision**. → **neither Authenticode nor notarization for the preview**, with SmartScreen/Gatekeeper consequences stated (report § 5.5). The two lead channels install via package managers and dodge both.
+  - [x] Record the package-ID reservations as **owner actions** with today's verified 404s, plus fallbacks. → four endpoints re-checked 2026-08-07, all **404**; full five-name set and per-registry fallbacks in report § 5.4.
+  - [x] Assert AC #2's "no secret value is committed" — and note trusted publishing makes it structural. → asserted, report § 5.1.
 
-- [ ] **Task 5 — Versioning, changelog, and preview promises (AC: #3)**
-  - [ ] Decide the scheme: `0.x` + `-preview` (today's shape) or an alternative, and how a pre-release tag maps to each channel's version string — including the VS Marketplace, which has **no semver pre-release concept**, only a Preview flag (R7).
-  - [ ] Decide how `<Version>` derives from the tag (MinVer / Nerdbank.GitVersioning / `-p:Version=`), which is 16.3 AC #1's requirement and this AC's decision.
-  - [ ] State how **the CLI and its renderer are pinned as one released unit** (Story 16.9 AC #2 depends on this).
-  - [ ] Decide the changelog format (Keep a Changelog vs. generated release notes), where `CHANGELOG.md` lives — **it does not exist yet** — and who updates it. Story 16.6 AC #1 requires "a `CHANGELOG.md` following the Story 16.1 format".
-  - [ ] Write what "preview" **promises and does not promise**: breaking-change policy inside `0.x`, support expectations, data/output-format stability (the IR is versioned — ADR 0008/ADR 0034), and the Node prerequisite as a stated consumer-facing condition.
-  - [ ] Scope **NFR9 reproducibility** per R6: name which of the three gaps the preview closes, which it defers, and to which story. Say which reading of "reproducible" you are claiming.
-  - [ ] Name the four existing version numbers (R7) and state what happens to each.
+- [x] **Task 5 — Versioning, changelog, and preview promises (AC: #3)**
+  - [x] Decide the scheme and how a pre-release tag maps to each channel. → `0.MINOR.PATCH-preview.N`; Marketplace exception documented (no SemVer pre-release; Preview flag + `--pre-release`)
+  - [x] Decide how `<Version>` derives from the tag. → **MinVer**, with the rejection reasons for Nerdbank.GitVersioning and `-p:Version=` recorded (report § 6.2)
+  - [x] State how **the CLI and its renderer are pinned as one released unit**. → structural on two channels; **exact pin (`=X.Y.Z`, never `^`)** on npm (report § 6.3)
+  - [x] Decide the changelog format, location and owner. → **Keep a Changelog 1.1.0**, repo root, hand-authored per story (generated notes rejected because commits bundle stories here)
+  - [x] Write what "preview" **promises and does not promise**. → report § 6.6, including the Node prerequisite as a consumer-facing condition
+  - [x] Scope **NFR9 reproducibility** per R6. → **weaker reading claimed explicitly**; three gaps triaged, and a **fourth found** (`npm ci` fails at HEAD) that breaks even the weak reading
+  - [x] Name the four existing version numbers and state what happens to each. → report § 6.4
 
-- [ ] **Task 6 — Author and ratify the ADR (AC: #4)**
-  - [ ] Verify the next free ADR number at authoring time (`docs/adrs/` ends at 0038; 0019 is claimed-but-unwritten by Story 18.3, so 0039 is likely — **confirm, do not assume**).
-  - [ ] Author `docs/adrs/00NN-release-channels-and-versioning-policy.md` in the house shape: Status / Date / Deciders / Amends, Context, Options, Decision, Consequences (positive **and** negative), References.
-  - [ ] State explicitly what it amends. ADR 0022 § Decision 5's channel table and ADR 0006 § Decision's channel list are both in scope.
-  - [ ] Add one line to `docs/adrs/README.md` in the existing format.
-  - [ ] **Take it to the owner and ratify it.** `Proposed` does not satisfy AC #4.
+- [~] **Task 6 — Author and ratify the ADR (AC: #4)** — authored; **ratification is the owner's act and remains open**
+  - [x] Verify the next free ADR number at authoring time. → **0039 was NOT free** — Story 4.9 claimed it 2026-08-06. Next free is **0040**. (The story said "confirm, do not assume"; this is why.)
+  - [x] Author `docs/adrs/0040-release-channels-and-versioning-policy.md` in the house shape.
+  - [x] State explicitly what it amends. → § Relationship to ADR 0006 and § Relationship to ADR 0022, both in the shape ADR 0022 models.
+  - [x] Add one line to `docs/adrs/README.md` in the existing format.
+  - [ ] **Take it to the owner and ratify it.** `Proposed` does not satisfy AC #4. → **BLOCKED — owner action.** The dev agent cannot ratify on the owner's behalf; the story's own § Owner actions item 5 assigns this to the owner. Surfaced at hand-off; see Completion Notes.
 
-- [ ] **Task 7 — Write the spike report (AC: #1-#5)**
-  - [ ] `_bmad-output/implementation-artifacts/16-1-spike-report.md`, following the shape of `23-5-packaging-strategy-report.md`: a **Verdict** up front, a **method-and-provenance table** marking each figure as harness-derived / session-measured / read-from-registry, then the axes.
-  - [ ] Record anything that came out **wrong first** and what it taught — 23.5 § 2 does this and it is the most useful section in that report.
-  - [ ] Close with an **open-items table with named owners**, in 23.5 § 10's shape. Anything you could not measure goes here as *unmeasured*, not as an estimate.
+- [x] **Task 7 — Write the spike report (AC: #1-#5)**
+  - [x] `_bmad-output/implementation-artifacts/16-1-spike-report.md` with a **Verdict** up front and a **method-and-provenance table**.
+  - [x] Record anything that came out **wrong first**. → **four**, report § 2.7; three produced a green-looking or self-consistent wrong answer.
+  - [x] Close with an **open-items table with named owners**. → ten items, report § 10; three marked *unmeasured*/*unverified* rather than estimated.
 
-- [ ] **Task 8 — Sequence the rest of the epic and record it (AC: #1, #4)**
-  - [ ] Note per story what this spike unblocks or changes: 16.2 (R8's required-check string + how the gate applies to a tag), 16.3 (packaging shape + version-from-tag; **not** Node detection — R5), 16.4 (build:package stage; 23.5 open item 4), 16.5 (credential path + the 2026-12-01 deadline + the Story 6.8 prerequisite), 16.6 (docs surfaces for the Node prerequisite + changelog format), 16.8 (RID matrix, platform-package names, install-time check), 16.9 (renderer-in-package + the CLI/renderer pinning rule).
-  - [ ] Per CLAUDE.md: **a structural scope change lands in `epics.md` AND `sprint-status.yaml` in the same change.** If your decision adds, removes, or re-sequences a story, edit both. If it only refines ACs within existing stories, say so and edit neither.
-  - [ ] Update `sprint-status.yaml`: `epic-16` → `in-progress`, `16-1-…` → `review` when done, `last_updated`.
+- [x] **Task 8 — Sequence the rest of the epic and record it (AC: #1, #4)**
+  - [x] Note per story what this spike unblocks or changes. → report § 9, all ten stories incl. 23.3 and 17.4
+  - [x] Per CLAUDE.md: a structural scope change lands in `epics.md` AND `sprint-status.yaml`. → **No structural change.** No story added, removed or re-sequenced; ACs refined within existing stories only. **Neither file structurally edited, and the decision is recorded explicitly** rather than left as an absent diff.
+  - [x] Update `sprint-status.yaml`. → `epic-16` already `in-progress`; story → `in-progress` → `review`; `last_updated` set.
 
-- [ ] **Task 9 — Scope guard (AC: #6)**
-  - [ ] `git status` shows no modification under `src/`, `tests/`, `web/`, `extension/` **attributable to you**. Concurrent sessions may show their own — name them rather than reverting them (CLAUDE.md forbids `git checkout --`).
-  - [ ] `dotnet test SpecScribe.slnx` green.
-  - [ ] `cd web && npm run check` green (`check:tokens`, `check:ir-content`, `check:assets`, `check:parity`).
-  - [ ] If a gate moved: **establish causality before touching any baseline.** You changed no rendering code, so a moved gate is somebody else's. Bisect in a throwaway tree (`git archive HEAD` into the scratchpad), never by resetting the shared tree. Stories 18.2, 18.4 and 18.6 each did this and each proved the move was someone else's.
+- [x] **Task 9 — Scope guard (AC: #6)**
+  - [x] `git status` shows no modification under `src/`, `tests/`, `web/`, `extension/`. → **empty.** Ran in a dedicated worktree, so no concurrent session's work was in the tree to attribute or disturb.
+  - [x] `dotnet test SpecScribe.slnx` green. → **2,962 passed / 1 failed / 3 skipped.** The one failure is `FileWatcherServiceTests.EditingAStoryFile_…`, a known-class timing flake: **11/11 green on isolated re-run**, and this story changed no product code.
+  - [x] `cd web && npm run check` green. → all four gates **OK** (`check:parity` 24 routes / 14 families byte-identical).
+  - [x] If a gate moved: **establish causality before touching any baseline.** → `check:ir-content` went red **twice** and **no baseline was regenerated**. Cause 1: fresh worktree had no IR. Cause 2: a plain `generate` omits `--deep-git`, giving `+4 / -185` — the signature `build-test-analyze.yml:281-290` documents in advance as `+4 / -182`. Running `extract:ir-content` at that point would have **deleted 185 rules** and turned the gate green over a real regression.
 
 ---
 
@@ -542,8 +542,133 @@ Sources: [NuGet Trusted Publishing](https://learn.microsoft.com/en-us/nuget/nuge
 
 ### Agent Model Used
 
+Claude Opus 5 (`claude-opus-5[1m]`) — dev-story workflow, 2026-08-07.
+
 ### Debug Log References
+
+Run in a dedicated git worktree, `.claude/worktrees/story-16-1-dev` on branch `worktree-story-16-1-dev`,
+branched from `838d591`. The story frontmatter's `baseline_commit: 7ff3b13` was **preserved, not overwritten**
+— `main` had advanced by one merge (`838d591`) between create-story and dev-story.
+
+Key commands, in order:
+
+```sh
+cd web && npm install --no-save --no-package-lock   # npm ci FAILS at 838d591 — see Completion Note 6
+npm run sync:assets && npm run build:package        # 187 files / 4,154,964 B; 0 prerendered HTML in public/
+dotnet pack src/SpecScribe/SpecScribe.csproj -c Release -o artifacts-baseline   # 2,515,650 B / 25 entries
+# + temporary <None Include="..\..\web\.output\**\*" Pack="true" PackagePath="tools\net10.0\any\renderer" />
+dotnet pack src/SpecScribe/SpecScribe.csproj -c Release -o artifacts            # 3,757,359 B / 212 entries
+dotnet tool install SpecScribe --version 0.1.0-preview --tool-path ./probe-tools --add-source ./artifacts
+# from C:\Users\MattE\.claude\jobs\eac9eab5\tmp\probe-project (own git repo, NO web/, env unset):
+specscribe generate --output probe-out3        # 373 routes @ 4.9 ms/route, errors=0
+dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o probe-singlefile
+specscribe generate --output probe-out-sf      # 373 routes @ 5.0 ms/route, errors=0
+# revert csproj; then the regression floor:
+dotnet test SpecScribe.slnx                                                     # 2962 / 1 / 3
+dotnet run --project src/SpecScribe --no-build -- generate --deep-git           # --deep-git is REQUIRED
+cd web && npm run check                                                          # all four gates OK
+```
+
+Probe build outputs (`probe-tools/`, `probe-singlefile/`, `artifacts/`, `artifacts-baseline/`) were deleted
+before the final gate run so they could not pollute the Code Map corpus the IR gates derive from.
 
 ### Completion Notes List
 
+1. **AC #5 is satisfied on two channels, measured from a foreign repository.** A `renderer/**` payload packed
+   at `tools/net10.0/any/renderer/` lands beside the executing assembly in the `dotnet tool` store;
+   `AppContext.BaseDirectory` resolves there; `generate` runs to **`errors=0`** with `SPECSCRIBE_RENDERER_DIR`
+   unset. `PublishSingleFile` **does not** move `AppContext.BaseDirectory` away from a sibling `renderer/` —
+   the case R2 allowed to be left unmeasured is measured. The observed `BaseDirectory` was obtained by a
+   **negative case** (renaming the artefact away and reading the tool's own error), not from documentation,
+   and that same negative case is the proof the probe repository was genuinely foreign: candidate 3
+   (`web/.output` in the repo) did **not** rescue it.
+
+2. **Cost: +1,241,709 bytes (+49.4%) on the nupkg for a 3.96 MB / 187-file payload.** The artefact compresses
+   ~3.4× because it is pure JavaScript. Story 23.5 measured 3.78 MB / 185 files eleven days ago; this is a
+   **refresh, not a correction**, and the figure has now moved twice — Story 16.3 should derive it, not quote it.
+
+3. **The VS Marketplace finding changed a decision.** R3 framed the PAT as "dated" with a 2026-12-01 deadline.
+   Live verification found the operative date is **2026-03-15**, when Azure DevOps blocked creation *and
+   regeneration* of global PATs — and `vsce` requires exactly that shape ("All accessible organizations" +
+   Marketplace (Manage)). For a publisher not already holding a pre-March token, **there is no PAT path at
+   all**. Decision: organization-owned publisher + Entra federation, and the **VSIX drops out of the preview
+   cut**. `microsoft/vscode-vsce#1023` (federated SPs failing on *personally*-owned publishers, closed
+   `not_planned`) is why the org-vs-personal call is made now rather than at 16.5 time.
+
+4. **`0039` was not free.** Story 4.9 claimed it on 2026-08-06. The ADR landed as **0040**. The story file said
+   "confirm, do not assume", and this is the case that justified it.
+
+5. **A real product defect was found and raised, not patched — same class as 23.5's `DashboardSurface.vue`.**
+   `EpicsIndexSurface.vue` hard-throws when the epics index has no child pages, so a project SpecScribe cannot
+   extract epics from generates with `errors=1` and no `epics.html`. Reproduced twice. Practical weight for
+   Epic 16 is high: it is what a thin or non-BMad external adopter sees first. **Routed to Story 23.3, gating
+   Story 16.7.** The dashboard already handles its own empty case gracefully *in the same run*, so the correct
+   behaviour is modelled one component over.
+
+6. **`npm ci` fails on a clean checkout at `838d591`** (`Missing: @emnapi/runtime@1.11.3 from lock file`), and
+   three CI steps depend on it. This breaks even the *weaker* reading of NFR9 that ADR 0040 claims. **Honest
+   limit: CI's actual status could not be checked — `gh` is not installed on this machine — and CI pins Node
+   24.11.1 while this session ran 24.18.1, so the failure may be npm-version-specific.** Recorded as
+   **unverified-on-CI**, not as "CI is broken". Routed to Story 16.2. The session worked around it with
+   `npm install --no-save --no-package-lock`, which left `web/package-lock.json` untouched.
+
+7. **Second defect: `NuxtPrerender.FindRepoRoot` does not recognise a git worktree.** It tests
+   `Directory.Exists(".git")`, but in a worktree `.git` is a *file* (56 bytes, measured), so the walk runs past
+   the worktree root to the main checkout. Observed live: a generate from this worktree resolved
+   `C:\Dev\SpecScribe\web\.output`. Developer-path only, but newly reachable — CLAUDE.md still says worktrees
+   are unavailable on this machine while `git worktree list` shows five and the last four commits on `main`
+   are worktree merges. Routed to Story 16.3; the CLAUDE.md statement is stale.
+
+8. **`check:ir-content` went red twice and no baseline was regenerated.** First red was an environmental
+   precondition (a fresh worktree has no IR). Second was `+4 / -185` from a `generate` without `--deep-git` —
+   the exact signature `build-test-analyze.yml:281-290` documents in advance as `+4 / -182`. Following the
+   gate's own suggested fix (`npm run extract:ir-content`) would have **deleted 185 deep-analytics rules from
+   the shipped stylesheet layer and turned the gate green**. This is the CLAUDE.md trap, met in the wild.
+
+9. **AC #6 holds.** No file under `src/`, `tests/`, `web/` or `extension/` is modified; the temporary csproj
+   probe edit was reverted and the revert *verified by `git status`*, not assumed. Suite 2,962 passed / 1
+   failed / 3 skipped, the one failure a known-class `FileWatcherService` timing flake proven by an isolated
+   re-run at 11/11. All four web gates green.
+
+10. **⚠️ AC #4 IS NOT FULLY SATISFIED, and this is a genuine hand-off, not an oversight.** ADR 0040 is
+    authored, indexed, and complete — but it stands at **`Proposed`**. AC #4 requires it *ratified*, while the
+    story's own § Owner actions item 5 assigns ratification to the owner. The dev agent cannot ratify on the
+    owner's behalf, so the two clauses can only be reconciled by the owner acting at review time. **This is
+    the one acceptance criterion the implementation cannot close by itself.** Everything else it asks for —
+    ADR under `docs/adrs/`, indexed in `README.md`, explicit amendment statements — is done.
+
+11. **No structural scope change**, so per CLAUDE.md neither `epics.md` nor `sprint-status.yaml` needed a
+    structural edit. Recorded explicitly (report § 9) so the absent `epics.md` diff reads as a decision rather
+    than an omission.
+
 ### File List
+
+**Added**
+
+- `_bmad-output/implementation-artifacts/16-1-spike-report.md`
+- `docs/adrs/0040-release-channels-and-versioning-policy.md`
+
+**Modified**
+
+- `docs/adrs/README.md` — one index entry for ADR 0040
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — story status + `last_updated`
+- `_bmad-output/implementation-artifacts/16-1-release-and-distribution-packaging-spike.md` — this story file
+  (tasks, Dev Agent Record, File List, Change Log, Status)
+
+**Deliberately NOT created**
+
+- `spike/release/**` — the probe needed no committed throwaway code: six shell commands and one reverted
+  `.csproj` item, reproduced verbatim in report § 2.1.
+
+**Touched during the probe and reverted / removed (no net change)**
+
+- `src/SpecScribe/SpecScribe.csproj` — temporary `<None Include=... />` pack item, **reverted**; verified
+  absent from `git status`.
+- `probe-tools/`, `probe-singlefile/`, `artifacts/`, `artifacts-baseline/`, `SpecScribeOutput/` — untracked
+  build outputs; the first four deleted before the final gate run.
+
+## Change Log
+
+| date | change |
+|---|---|
+| 2026-08-07 | Story implemented. Renderer packaging shape decided **empirically** on two channels (`errors=0` from a foreign repository, `AppContext.BaseDirectory` proven by negative case); nupkg delta measured at +1,241,709 B (+49.4%). Preview cut, non-goals and a three-RID matrix fixed. Credential inventory re-verified live — two channels store **no secret**, and the VS Marketplace PAT path found **already closed** since 2026-03-15, moving the VSIX out of the preview. Versioning (MinVer, `0.x`/`-preview`, exact CLI↔renderer pin), Keep a Changelog, and preview promises recorded. **ADR 0040** authored (0039 was taken by Story 4.9) and indexed, amending ADR 0006 §Decision and ADR 0022 §Decision 5. Two product defects found and routed rather than patched (`EpicsIndexSurface.vue` empty-epics throw → 23.3; `FindRepoRoot` worktree blindness → 16.3), plus a live `npm ci` failure → 16.2. No product code changed; AC #6 verified. **ADR ratification remains open — owner action (AC #4).** |

@@ -10,7 +10,14 @@
 // RED on a hand-edited rule, not only green. A gate only ever seen passing is not a gate.
 
 import { buildIrContentCss } from './ir-content-build.mjs'
-import { OUT_CSS, OUT_MANIFEST, OUT_SHARED_CSS, readCommitted, SOURCE_LABEL } from './ir-content-lib.mjs'
+import {
+  OUT_CSS,
+  OUT_MANIFEST,
+  OUT_RUNTIME_CSS,
+  OUT_SHARED_CSS,
+  readCommitted,
+  SOURCE_LABEL,
+} from './ir-content-lib.mjs'
 
 let expected
 try {
@@ -27,11 +34,16 @@ const actualManifest = readCommitted(OUT_MANIFEST)
 // only the scoped layer was checked would be invisible, and it is the layer template-authored components
 // actually bind to. [ADR 0029]
 const actualSharedCss = readCommitted(OUT_SHARED_CSS)
+// The runtime-body layer is gated by the same run for the same reason, and it needs it MORE than its
+// siblings: nothing else on the page styles the tooltip, so a drop here is invisible until a human hovers a
+// chart sector. That is exactly how it shipped unstyled in the first place. [ADR 0039]
+const actualRuntimeCss = readCommitted(OUT_RUNTIME_CSS)
 
-if (actualCss === null || actualManifest === null || actualSharedCss === null) {
+if (actualCss === null || actualManifest === null || actualSharedCss === null || actualRuntimeCss === null) {
   const missing = [
     actualCss === null ? 'web/assets/ir-content.css' : null,
     actualSharedCss === null ? 'web/assets/shared-primitives.css' : null,
+    actualRuntimeCss === null ? 'web/assets/runtime-body.css' : null,
     actualManifest === null ? 'web/assets/ir-content.manifest.json' : null,
   ].filter(Boolean)
   console.error('check:ir-content FAILED — the generated layer does not exist.')
@@ -42,12 +54,19 @@ if (actualCss === null || actualManifest === null || actualSharedCss === null) {
 
 const expectedCss = expected.css.replace(/\r\n/g, '\n')
 const expectedSharedCss = expected.sharedCss.replace(/\r\n/g, '\n')
+const expectedRuntimeCss = expected.runtimeCss.replace(/\r\n/g, '\n')
 const expectedManifest = `${JSON.stringify(expected.manifest, null, 2)}\n`.replace(/\r\n/g, '\n')
 
-if (actualCss === expectedCss && actualSharedCss === expectedSharedCss && actualManifest === expectedManifest) {
+if (
+  actualCss === expectedCss &&
+  actualSharedCss === expectedSharedCss &&
+  actualRuntimeCss === expectedRuntimeCss &&
+  actualManifest === expectedManifest
+) {
   console.log(
     `check:ir-content OK — ${expected.stats.carriedRules} rules + ${expected.stats.carriedKeyframes} ` +
-      `keyframes scoped, ${expected.stats.sharedRules} shared primitive rule(s) unscoped, in sync with ` +
+      `keyframes scoped, ${expected.stats.sharedRules} shared primitive rule(s) and ` +
+      `${expected.stats.runtimeRules} runtime body rule(s) unscoped, in sync with ` +
       SOURCE_LABEL,
   )
   process.exit(0)
@@ -59,6 +78,7 @@ console.error(`check:ir-content FAILED — the generated layer has drifted from 
 
 reportSheet('ir-content.css', actualCss, expectedCss)
 reportSheet('shared-primitives.css', actualSharedCss, expectedSharedCss)
+reportSheet('runtime-body.css', actualRuntimeCss, expectedRuntimeCss)
 
 /** Rule-granularity diff for one generated sheet. Silent when that sheet is in sync. */
 function reportSheet(label, actual, expectedText) {
