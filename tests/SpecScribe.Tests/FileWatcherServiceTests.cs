@@ -169,6 +169,38 @@ public class FileWatcherServiceTests : IDisposable
         catch (JsonException) { return false; }
     }
 
+    /// <summary>Renders the state a timed-out <see cref="WaitFor"/> left behind. A bare "should refresh the board"
+    /// cannot distinguish the three outcomes that matter — the rebuild never ran, it ran and produced STALE
+    /// content, or the watcher reported an error and dropped the event — and those route to three completely
+    /// different fixes. Since <see cref="Evaluate"/> swallows the transient read failures, an exhausted bound is
+    /// now the ONLY way this class reports a non-convergence, so it has to carry its own evidence. [Story 16.2]
+    /// <para>Failure path only: nothing here runs while the poll is succeeding, so it costs a passing test
+    /// nothing and cannot itself become a source of flake.</para></summary>
+    private string Diagnose(string because, string route, string sourcePath)
+    {
+        string source;
+        try { source = File.Exists(sourcePath) ? File.ReadAllText(sourcePath) : "<absent from disk>"; }
+        catch (Exception ex) { source = $"<unreadable: {ex.GetType().Name}>"; }
+
+        bool routeInIr;
+        try { routeInIr = SiteRegion.Exists(Site, route); }
+        catch (Exception ex) { return $"{because}\n  IR unreadable at diagnosis time: {ex.GetType().Name}: {ex.Message}"; }
+
+        string page;
+        try { page = routeInIr ? SiteRegion.Read(Site, route) : "<route absent from IR>"; }
+        catch (Exception ex) { page = $"<unreadable: {ex.GetType().Name}: {ex.Message}>"; }
+
+        var marker = page.Contains("MARKER-V2") ? "MARKER-V2"
+            : page.Contains("MARKER-V1") ? "MARKER-V1 (STALE — the edit never reached the page)"
+            : "<neither marker present>";
+
+        return $"{because}\n"
+             + $"  source on disk : {source.ReplaceLineEndings("\\n")}\n"
+             + $"  route in IR    : {routeInIr}\n"
+             + $"  marker in page : {marker}\n"
+             + $"  events         : [{string.Join(", ", Observed().Select(e => $"{e.Outcome} {e.RelativePath} \"{e.Message}\""))}]";
+    }
+
     /// <summary>Waits for an emitted event to match. Event delivery is asynchronous, so asserting on
     /// <see cref="Observed"/> synchronously right after the on-disk outcome lands is a race: the file-level and
     /// topology routes run on independent timers and either can win.</summary>
@@ -231,17 +263,23 @@ public class FileWatcherServiceTests : IDisposable
         using var watcher = StartedWatcher(gen);
 
         File.WriteAllText(SprintPath, SprintYaml);
-        Assert.True(WaitFor(() => SiteRegion.Exists(Site, "sprint.html")
-                && SiteRegion.Read(Site, "sprint.html").Contains("MARKER-V1")),
-            "adding sprint-status.yaml should produce the sprint page");
+        if (!WaitFor(() => SiteRegion.Exists(Site, "sprint.html")
+                && SiteRegion.Read(Site, "sprint.html").Contains("MARKER-V1")))
+        {
+            Assert.Fail(Diagnose("adding sprint-status.yaml should produce the sprint page", "sprint.html", SprintPath));
+        }
 
         File.WriteAllText(SprintPath, SprintYaml.Replace("MARKER-V1", "MARKER-V2"));
-        Assert.True(WaitFor(() => SiteRegion.Read(Site, "sprint.html").Contains("MARKER-V2")),
-            "editing sprint-status.yaml should refresh the board");
+        if (!WaitFor(() => SiteRegion.Read(Site, "sprint.html").Contains("MARKER-V2")))
+        {
+            Assert.Fail(Diagnose("editing sprint-status.yaml should refresh the board", "sprint.html", SprintPath));
+        }
 
         File.Delete(SprintPath);
-        Assert.True(WaitFor(() => !SiteRegion.Exists(Site, "sprint.html")),
-            "removing sprint-status.yaml should remove the sprint page");
+        if (!WaitFor(() => !SiteRegion.Exists(Site, "sprint.html")))
+        {
+            Assert.Fail(Diagnose("removing sprint-status.yaml should remove the sprint page", "sprint.html", SprintPath));
+        }
         Assert.DoesNotContain(Observed(), e => e.Outcome == GenerationOutcome.Error);
     }
 
