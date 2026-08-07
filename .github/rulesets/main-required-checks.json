@@ -1,0 +1,49 @@
+{
+  "id": 20567252,
+  "name": "main: require build-test-analyze",
+  "target": "branch",
+  "source_type": "Repository",
+  "source": "IntegerMan/SpecScribe",
+  "enforcement": "active",
+  "conditions": {
+    "ref_name": {
+      "exclude": [],
+      "include": [
+        "~DEFAULT_BRANCH"
+      ]
+    }
+  },
+  "rules": [
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": false,
+        "do_not_enforce_on_create": false,
+        "required_status_checks": [
+          {
+            "context": "build-test-analyze"
+          }
+        ]
+      }
+    }
+  ],
+  "node_id": "RRS_lACqUmVwb3NpdG9yec5M6HXuzgE51NQ",
+  "created_at": "2026-08-07T15:09:29.112-04:00",
+  "updated_at": "2026-08-07T15:09:29.132-04:00",
+  "bypass_actors": [
+    {
+      "actor_id": 5,
+      "actor_type": "RepositoryRole",
+      "bypass_mode": "always"
+    }
+  ],
+  "current_user_can_bypass": "always",
+  "_links": {
+    "self": {
+      "href": "https://api.github.com/repos/IntegerMan/SpecScribe/rulesets/20567252"
+    },
+    "html": {
+      "href": "https://github.com/IntegerMan/SpecScribe/rules/20567252"
+    }
+  }
+}

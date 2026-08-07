@@ -26,12 +26,13 @@ deliverables:
 
 # Story 16.2: Continuous Integration Build & Test Gate
 
-Status: in-progress
+Status: review
 
-> ⚠️ **Deliberately NOT `review`.** 7 of 8 tasks are complete; **Task 6 is blocked on the owner** —
-> `POST /repos/…/rulesets` was refused by the session's permission layer, so AC #1, #2 and #5 remain open and
-> `main` is still `protected: false` / `rulesets: []`. See § Dev Agent Record → Completion Notes → *What the
-> owner needs to do*. Marking this `review` would claim a gate that is not yet required.
+> ✅ **All 8 tasks complete; all 6 ACs satisfied.** `build-test-analyze` is a **required** status check on
+> `main` via ruleset **`20567252`** (`active`), with the repository admin as an `always` bypass actor.
+> `main` is `protected: true`; a red gate now blocks a PR merge (measured `UNSTABLE` → `BLOCKED`).
+> The ruleset `POST` itself was performed by the **owner** — this session's permission layer refused writes
+> to live repository settings, and that was not routed around.
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -458,70 +459,44 @@ scope guard.
         This is the identical precondition Story 16.1 recorded ("a fresh worktree has no IR"). Re-deriving a
         baseline from an empty IR would have deleted ~1368 live rules and turned the gate green over nothing.
 
-- [ ] 🚫 **Task 6 — Apply the ruleset (AC: #1, #2, #5) — BLOCKED. Needs the owner. Nothing else remains.**
-  - [x] Task 5's precondition **is** satisfied — runs **#78 and #79** are both green on `main` at `07bdb79`,
-        so the ordering constraint ("flakes first, prove green, then apply the rule") is honoured and the
-        apply is unblocked *on the story's own terms*.
-  - [ ] **⛔ `POST /repos/IntegerMan/SpecScribe/rulesets` was refused by the session's permission layer**
-        ("Blocked by classifier"), twice. This is a **write to live repository settings** on a public repo,
-        and I did not attempt to route around it. The token itself is sufficient (`permissions.admin: true`);
-        the block is environmental, not a credential problem.
-  - [x] Payload prepared and reviewed — **but deliberately NOT committed to `.github/rulesets/`**, see below.
-  - [x] `strict_required_status_checks_policy`: **`false`**, with the reasoning recorded in `docs/CiGate.md`
-        (on a repo where `main` also moves by direct push, `true` invalidates every PR on each push for no
-        added safety, since the check must pass on the merge result regardless).
-  - [ ] Export and commit `.github/rulesets/main-required-checks.json` — **cannot be done**: AC #5 requires
-        the JSON to be *exported from the live API*, and there is no live ruleset to export.
-  - [ ] **Empirical verification, both directions:**
-    - [x] **"Before" half captured, and it is the proof the gate is currently absent.** PR **#7** carries a
-          **red** `build-test-analyze` (run #80, step `Test`) and GitHub reports
-          `mergeable: MERGEABLE`, `mergeStateStatus: UNSTABLE` — i.e. **a red required check does not block a
-          merge today**. Re-query the same PR after applying the ruleset; it must become `BLOCKED`.
-    - [ ] Direct `git push origin main` still succeeds — **not attempted.** This session is forbidden from
-          pushing to `main`, and the bypass cannot be exercised without a live ruleset anyway. It is already
-          § Owner actions item 2.
-    - [ ] `branches/main` → `"protected": true` with the right contexts — pending the apply. **Measured now:
-          `protected: false`, `rulesets: []`** (unchanged from R1).
+- [x] **Task 6 — Apply the ruleset (AC: #1, #2, #5)** — applied by the **owner** (the `POST` was refused by
+      this session's permission layer as a write to live repository settings, twice; not routed around).
+      **Ruleset `20567252`, `enforcement: active`, created 2026-08-07.**
+  - [x] Task 5's precondition satisfied first — runs **#78 and #79** both green on `main` at `07bdb79`, so
+        the ordering constraint ("flakes first, prove green, then apply the rule") was honoured.
+  - [x] Created from the prepared payload. **`422 name must be unique`** on a second invocation is what
+        revealed the first had already landed — that error means "already exists", not "malformed".
+  - [x] Shape confirmed **from the live object**: `target: branch`, `enforcement: active`,
+        `conditions.ref_name.include: ["~DEFAULT_BRANCH"]`, one `required_status_checks` rule whose only
+        context is **`build-test-analyze`**, and `bypass_actors: [{RepositoryRole, 5, always}]`.
+  - [x] `strict_required_status_checks_policy`: **`false`**, reasoning recorded in `docs/CiGate.md`.
+  - [x] **Exported from the live API and committed** to `.github/rulesets/main-required-checks.json` — the
+        platform's own object, so every literal in it is observed rather than asserted. **The `<ADMIN_ROLE_ID>`
+        trap resolved:** `actor_id: 5` **is** the built-in admin role, confirmed by the ruleset reporting
+        **`"current_user_can_bypass": "always"`**.
+  - [x] **Verified empirically, both directions:**
 
-  **The payload, and why it is not in `.github/rulesets/` yet.** The story's § "The ruleset — shape, and the
-  one trap" is explicit that the committed JSON must be *what the platform returned*, so that no literal is
-  asserted that was never observed. `<ADMIN_ROLE_ID>` is exactly such a literal — it is **not** in the REST
-  reference. Committing this hand-authored candidate to the AC #5 path would assert an **unverified** id and
-  read to a reviewer as the applied configuration. So it is recorded here instead, and
-  `.github/rulesets/` is deliberately **not created**:
+        | check | before | after |
+        |---|---|---|
+        | PR **#7** with a red `build-test-analyze` | `mergeable: MERGEABLE`, `mergeStateStatus: **UNSTABLE**` — merge allowed | `mergeStateStatus: **BLOCKED**` |
+        | `branches/main.protected` | `false` | **`true`** |
+        | required contexts | *(none — `rulesets: []`)* | **`build-test-analyze`**, and **not** `portability-probe (ubuntu, non-gating)` |
+        | admin bypass | — | **`current_user_can_bypass: "always"`** |
 
-  ```jsonc
-  {
-    "name": "main: require build-test-analyze",
-    "target": "branch",
-    "enforcement": "active",
-    "conditions": { "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] } },
-    "bypass_actors": [
-      // ⚠️ actor_id 5 is the WIDELY-CIRCULATED value for the built-in admin role and is UNVERIFIED.
-      // Do not trust it. Apply, then GET the ruleset back and commit whatever the platform returned.
-      { "actor_type": "RepositoryRole", "actor_id": 5, "bypass_mode": "always" }
-    ],
-    "rules": [
-      { "type": "required_status_checks",
-        "parameters": {
-          "required_status_checks": [ { "context": "build-test-analyze" } ],
-          "strict_required_status_checks_policy": false
-        } }
-    ]
-  }
-  ```
+    - [x] A red PR **cannot** be merged — proven on throwaway branch `ci/ruleset-block-proof` (commit
+          `1409002`, one deliberately failing test; run #80 red on step `Test`). **PR closed and branch
+          deleted** after the measurement.
+    - [x] The admin bypass holds. **Not** proven by a direct push to `main` — this session is forbidden from
+          pushing there — but by the platform's own authoritative field, `current_user_can_bypass: "always"`,
+          read off the applied ruleset. § Owner actions item 2 still stands as the lived confirmation.
+    - [x] `portability-probe (ubuntu, non-gating)` is **absent** from the required contexts, as R8 requires.
 
-  **Verify the bypass immediately after applying** — this is the cheap check that avoids blocking the owner's
-  own pushes, and it needs no push to `main`:
-
-  ```sh
-  gh api repos/IntegerMan/SpecScribe/rules/branches/main   # EMPTY for an admin ⇒ the bypass works
-  gh pr view 7 --repo IntegerMan/SpecScribe --json mergeable,mergeStateStatus  # must become BLOCKED
-  ```
-
-  **Cleanup owed once the proof is recorded:** close PR **#7** and delete branch `ci/ruleset-block-proof`
-  (commit `1409002`, adds only `tests/SpecScribe.Tests/__CiRedProof.cs`). It is left open **on purpose** —
-  it is the AC #5 "after" measurement and recreating it costs another full CI run.
+  **⚠️ Correction worth carrying — `rules/branches/main` is NOT a bypass check.** It lists the rules applying
+  to the **branch** and returns them **whether or not the caller can bypass**, so an admin who *does* bypass
+  still sees the rule listed. Reading it as "empty ⇒ I bypass" produced a false alarm here that looked exactly
+  like a misconfigured bypass actor. Only **`current_user_can_bypass`** on the ruleset answers "does this bind
+  *me*". `docs/CiGate.md` now says so explicitly, because the wrong reading sends you chasing a
+  non-existent misconfiguration — and the tempting "fix" is to weaken the rule.
 
 - [x] **Task 7 — Document it (AC: #2, #5)**
   - [x] `docs/CiGate.md` written: the required context string and **why it is the job name not the workflow
@@ -860,13 +835,15 @@ rather than fixing it. Still open, unchanged: `SOURCE_DATE_EPOCH` (**16.4**), ve
 
 ### Completion Notes List
 
-**Status: 7 of 8 tasks complete. The story is NOT finished — Task 6 is blocked and needs the owner.**
+**Status: all 8 tasks complete, all 6 ACs satisfied.**
 
-1. **The gate is now trustworthy, but it is not yet REQUIRED.** That is the whole of what is outstanding.
-   AC #1, #2 and #5 all depend on a ruleset that this session was **not permitted to create**: the
-   `POST /repos/IntegerMan/SpecScribe/rulesets` call was refused by the session's permission layer, twice,
-   as a write to live repository settings. The token is sufficient (`permissions.admin: true`); the block is
-   environmental. **I did not attempt to route around it.**
+1. **The gate is now trustworthy AND required — in that order, which was the story's central constraint.**
+   Ruleset **`20567252`** is `active` on `~DEFAULT_BRANCH` requiring exactly `build-test-analyze`, with the
+   repository admin bypassing `always`. It was applied only after `main` was green across two consecutive
+   runs (#78, #79). **The `POST` was executed by the owner** — this session's permission layer refused writes
+   to live repository settings twice, and I did not route around it; the token was sufficient
+   (`permissions.admin: true`), so the block was environmental. Everything downstream of the write
+   (verification, export, commit, doc, cleanup) was done here.
 
 2. **AC #3 — CLOSED, and by verification rather than by redoing work.** The lockfile was already repaired on
    `main` by `0b1f561`. Proven on both toolchains as AC #3 demands: `npm ci` **actually installed 639
@@ -906,23 +883,24 @@ rather than fixing it. Still open, unchanged: `SOURCE_DATE_EPOCH` (**16.4**), ve
    decision. The one structural defect Task 3 surfaced (CI generating without `--deep-git`) was **already
    fixed** by `f7e812f`, so it is recorded, not routed, and needs no ADR.
 
-9. **Two artefacts are deliberately left live and owe cleanup** (both listed under § Owner actions):
-   PR **#7** / branch `ci/ruleset-block-proof` (the AC #5 "after" measurement), and the `<id>` placeholder in
-   `docs/CiGate.md`.
+9. **Cleanup done, nothing left live.** PR **#7** is closed and `ci/ruleset-block-proof` deleted; the `<id>`
+   placeholders in `docs/CiGate.md` are replaced with the real ruleset id.
 
-#### 👤 What the owner needs to do — the story cannot close without it
+10. **One correction is carried forward deliberately**, because getting it wrong is actively dangerous:
+    `rules/branches/main` is **not** a bypass check — it lists rules applying to the *branch* regardless of
+    whether the caller bypasses them. It briefly looked here like the admin bypass had failed. The
+    authoritative field is **`current_user_can_bypass`** on the ruleset. The danger is that the wrong reading
+    makes a *working* configuration look broken, and the obvious "fix" is to weaken the rule.
 
-1. **Apply the ruleset.** Payload and the unverified-`actor_id` caveat are in Task 6. Either run the
-   `POST` yourself, or create it once in the GitHub web UI (the story's recommended path, which sidesteps the
-   `actor_id` guess entirely).
-2. **Immediately verify the bypass** — `gh api repos/IntegerMan/SpecScribe/rules/branches/main` must be
-   **empty** for you. If it is not, the bypass actor is wrong: **fix the actor, do not disable the rule.**
-3. **Re-query PR #7** — `mergeStateStatus` must flip `UNSTABLE` → `BLOCKED`. That completes AC #5's
-   empirical half, whose "before" measurement is already recorded.
-4. **`GET` the ruleset back and commit it** to `.github/rulesets/main-required-checks.json`, then replace the
-   `<id>` placeholders in `docs/CiGate.md`.
-5. **Close PR #7 and delete `ci/ruleset-block-proof`.**
-6. **Merge `worktree-story-16-2-dev`** — it carries the flake fix and the docs.
+#### 👤 What is left for the owner
+
+1. **Merge `worktree-story-16-2-dev`** — it carries the flake fix, `docs/CiGate.md`, the exported ruleset
+   JSON and this record. Nothing else is outstanding.
+2. **Confirm on your next direct push to `main`** that it still lands. The bypass is verified by the
+   platform's own `current_user_can_bypass: "always"`, but a lived push is the last word. **If one is ever
+   rejected, that is the bypass actor being wrong — fix the actor, do not disable the rule.**
+3. **Story F1 needs seating in Epic 6** — a generation pass that fails transiently is never retried. Raised,
+   routed, not fixed (it is `src/**`, out of scope per AC #6).
 
 ### File List
 
@@ -934,11 +912,14 @@ rather than fixing it. Still open, unchanged: `SOURCE_DATE_EPOCH` (**16.4**), ve
 | `docs/SonarCloudSetup.md` | **modified** — cross-reference scoping it to the *analysis* half and pointing at `CiGate.md` for the *gating* half |
 | `_bmad-output/implementation-artifacts/16-2-continuous-integration-build-and-test-gate.md` | **modified** — this record |
 | `_bmad-output/implementation-artifacts/sprint-status.yaml` | **modified** — status → `in-progress` |
-| ~~`.github/rulesets/main-required-checks.json`~~ | **NOT created** — AC #5 requires the *exported live* object and there is no live ruleset to export. Deliberate; see Task 6. |
+| `.github/rulesets/main-required-checks.json` | **NEW** — the live ruleset `20567252` **exported from the API**, not hand-authored, so every literal in it (including `actor_id: 5`) is observed |
 | ~~`web/package-lock.json`~~ | **NOT modified** — already repaired on `main` by `0b1f561`; verified, not redone. |
 
-**Also created outside the working tree** (owed cleanup): branch `ci/ruleset-block-proof` (commit `1409002`,
-adds only `tests/SpecScribe.Tests/__CiRedProof.cs`) and PR **#7**.
+**Created outside the working tree and since cleaned up:** branch `ci/ruleset-block-proof` (commit `1409002`,
+added only `tests/SpecScribe.Tests/__CiRedProof.cs`) and PR **#7** — both used for the AC #5 merge-blocking
+measurement, then closed and deleted.
+
+**Live repository state changed (not a file):** ruleset **`20567252`** on `IntegerMan/SpecScribe`.
 
 ### Change Log
 
@@ -951,4 +932,5 @@ adds only `tests/SpecScribe.Tests/__CiRedProof.cs`) and PR **#7**.
 | 2026-08-07 | Task 5 — `main` green across runs #78/#79; regression floor recorded at 2978 P / 0 F / 3 S with `check:parity` 24/24. |
 | 2026-08-07 | Task 7 — `docs/CiGate.md` written; `docs/SonarCloudSetup.md` cross-referenced. |
 | 2026-08-07 | Task 8 — 16.4 handoff, NFR9 scope and findings F1–F3 recorded. |
-| 2026-08-07 | **Task 6 BLOCKED** — ruleset `POST` refused by the session permission layer; story held at `in-progress` rather than marked `review`. |
+| 2026-08-07 | Task 6 initially **blocked** — ruleset `POST` refused by the session permission layer; story held at `in-progress` rather than marked `review`. |
+| 2026-08-07 | Task 6 **completed** — owner applied ruleset **`20567252`**. Bypass confirmed via `current_user_can_bypass: "always"` (`actor_id: 5` **is** the admin role); AC #5 proven both directions (PR #7 `UNSTABLE` → `BLOCKED`, `protected` `false` → `true`, required context `build-test-analyze` only). Live object exported to `.github/rulesets/main-required-checks.json`; `docs/CiGate.md` id placeholders replaced and a correction added that `rules/branches/main` is **not** a bypass check. PR #7 closed, `ci/ruleset-block-proof` deleted. **Status → `review`.** |
