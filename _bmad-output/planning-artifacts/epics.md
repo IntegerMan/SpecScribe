@@ -901,6 +901,40 @@ So that silent or partial degradation is detectable in the output itself rather 
 **Then** it records the effective configuration and detection results (source root, resolved ADR location, output directory, deep-git flag, detected framework/module)
 **And** this information is derived entirely at generation time with no remote calls, consistent with local-first operation.
 
+<!-- Story 4.9 added 2026-08-06 (owner-directed at create-story 12.2) — a POST-RETROSPECTIVE amendment to Epic 4,
+     not a renumber: 4.1/4.2/4.8 are untouched and Epic 4 reopens to in-progress (same pattern as Stories 7.9 and
+     8.9). Provoked by a real repository: `C:/dev/CORA` authors its PRD and architecture with BMad
+     (`_bmad/` + `_bmad-output/planning-artifacts/`) and then runs delivery entirely in GSD Core (`.planning/`),
+     so two adapters' AppliesTo both return true on one tree. Story 12.2 lands the MINIMAL merge it needs
+     (run every matching adapter, first-non-null-wins per single-valued family, displaced families diagnosed);
+     this story owns the STRATEGIC answer, which 12.2 deliberately does not attempt. Belongs in Epic 4 because
+     the question is about the shared adapter contract, not about any one framework. -->
+### Story 4.9: Multi-Framework Coexistence Strategy Spike
+
+As a maintainer whose repository uses more than one spec-driven framework at once,
+I want a decided strategy for how SpecScribe behaves when several adapters recognize the same tree,
+So that a mixed repository gets a coherent portal instead of an arbitrary winner or a silently dropped half.
+
+**Acceptance Criteria:**
+
+1.
+**Given** representative repositories that carry more than one framework's markers (the motivating case: BMad for planning artifacts plus GSD Core for delivery, as in `C:/dev/CORA`)
+**When** the coexistence question is surveyed against the shared adapter contract
+**Then** a written strategy states, per `ArtifactBundle` family, how competing contributions resolve — precedence, merge, or explicit refusal — and what the reader is told about the choice
+**And** the single-valued-field conflict (`Epics`, `Sprint`, `Requirements`, `Module`, `EpicsSourceFullPath`) is answered directly rather than deferred to per-framework judgment.
+
+2.
+**Given** SpecScribe resolves exactly one `SourceRoot`, which anchors both the `*.md` source enumeration and every source-relative output path
+**When** two frameworks keep their artifacts in disjoint directories (`_bmad-output/` and `.planning/`)
+**Then** the strategy decides whether source discovery becomes multi-rooted, and if so how output paths stay collision-free and stable
+**And** the cost of each option to watch mode (AD-5), the canonical IR's route shape (ADR 0017), and the content-drift gates (ADR 0033) is stated, not assumed.
+
+3.
+**Given** the strategy changes a cross-cutting contract
+**When** the spike concludes
+**Then** it lands as one ADR amending the adapter-selection decision rather than as prose in a story file
+**And** it names which of Story 12.2's minimal behaviors it supersedes, so the follow-through is a known, bounded change rather than a rediscovery.
+
 ## Epic 5: Reliable CLI Operations and Configuration
 
 Make generation and watch dependable and easy to configure, so the tool is trustworthy for daily use. Sequences late in delivery order (immediately before the Epic 17 hardening pass) so the operational surface is finalized just before hardening and release.
@@ -2652,6 +2686,30 @@ So that progress and scope remain understandable in one portal.
 **When** artifacts are projected
 **Then** the chosen level mapping and the synthesized story-id form are pinned by a test
 **And** requirements are surfaced without claiming a coverage status GSD Core does not record.
+
+<!-- ACs #4 and #5 added 2026-08-06 at create-story, recording five owner decisions taken against a REAL GSD Core
+repository (`C:/dev/CORA`) rather than against the vendor documentation Story 12.1 had to rely on. The live repo
+overturned several of the spike's derived assumptions — see the story file's "What the real repo changed" section.
+D1: Phase → EpicInfo, Plan (`NN-YY-PLAN.md`) → StoryInfo, and Milestone gets its own surface (AC #4). D2: phase
+numbers are decimal in practice (`02.1`, `04.5`, `999.1`) and `EpicInfo.Number` is an `int`, so phases take a
+synthetic sequential ordinal and carry their real label in the title. D3: GSD Core requirement ids are
+project-defined prefixes (`CONV-01`, `RAG-03`), unrepresentable by the closed `RequirementKind` enum whose `Id`
+throws, so `REQUIREMENTS.md` is rendered as a document and `Requirements` stays null — AC #3's "without claiming a
+coverage status GSD Core does not record" is satisfied by claiming none. D4: this story owns the two shared
+prerequisites Story 12.1 found (AC #5). D5: a repo may carry several frameworks at once, so matching adapters MERGE
+minimally here; the strategic answer is Story 4.9's. -->
+
+4.
+**Given** GSD Core groups its phases under named milestones (`v1.0`, `v2.0`) that carry their own completion state and progress roll-up
+**When** the epics index is generated
+**Then** phases render as banded groups under a milestone header carrying the milestone's name, state, and rolled-up phase and plan counts
+**And** a framework with no milestone level renders exactly as it does today, byte-for-byte.
+
+5.
+**Given** SpecScribe selects a single hardcoded adapter and discovers its repo root by a hardcoded `_bmad-output` marker, so a non-BMad repository fails before any adapter is consulted
+**When** generation runs against a GSD Core repository, and against a repository carrying both BMad and GSD Core markers
+**Then** adapter selection and framework-neutral source-root discovery are in place, every matching adapter contributes, and a family that loses a merge conflict is reported as a non-fatal diagnostic rather than dropped silently
+**And** a BMad-only repository's output is unchanged, with the decision recorded as one shared ADR the remaining framework epics inherit.
 
 ### Story 12.3: GSD Pi Baseline Adapter Coverage
 
