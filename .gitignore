@@ -501,3 +501,14 @@ docs/live/
 # so no redundant rule is added for them here.
 .sonarqube/
 .sonar/
+
+# Agent git worktrees. These are working directories, not content: each one is a
+# checkout of a branch this repo already tracks, so the branch is the durable
+# artifact and the directory is disposable.
+#
+# Without this rule they were being committed as GITLINKS (mode 160000) with no
+# .gitmodules to back them -- 10 of them were tracked at 3312256. That is
+# harmless to `actions/checkout`, which does not init submodules by default, but
+# it pins a stale commit per worktree into every tree and turns an ordinary
+# `git add -A` from within a session into a repo-wide index change.
+.claude/worktrees/
