@@ -314,6 +314,15 @@ development_status:
   # spike's proven ~1.5 KB wrapper (spike/delivery/npm-wrapper) into a real channel: `npx specscribe` runs the
   # self-contained binary with no .NET SDK. Aligns with / feeds Story 16.3 (CLI packaging). Run create-story to detail.
   16-8-npx-distribution-via-npm-wrapped-binary: backlog
+  # Story 16.9 = composite GitHub Action for external-project CI/CD. Seated 2026-08-06 from an
+  # external-consumption audit: with no published channel and no packaged renderer, another project must vendor
+  # this whole repo — a second checkout, a ~200 MB `npm ci`, sync:assets, build:package, and SPECSCRIBE_RENDERER_DIR
+  # by hand, in a load-bearing order. DEPENDS ON 16.3, specifically on the renderer shipping INSIDE the package
+  # (`NuxtPrerender.ResolveArtefactDirectory` already probes `renderer/` beside the executable; nothing populates
+  # it). Same audit found README.md's external recipe broken since 23.6; that fix landed 2026-08-06 as a stopgap.
+  # A prebuilt container image for non-GitHub CI is recorded in the epics.md entry, deliberately not seated yet.
+  # Run create-story to detail.
+  16-9-composite-github-action-for-external-ci-cd: backlog
   epic-16-retrospective: optional
 
   # Epic 17 added 2026-07-11 (SCP 2026-07-11, correct-course): pre-publication code hardening (NFR10). Runs after

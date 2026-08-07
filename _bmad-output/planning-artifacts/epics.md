@@ -3096,6 +3096,65 @@ So that trying and using the tool (locally or in CI) is as low-friction as any N
 **When** it ships
 **Then** the `dotnet tool` channel remains available for .NET users, versioning stays aligned with Story 16.1's policy, and the wrapper's per-RID binary matrix is documented (size/latency trade-offs per ADR 0006).
 
+### Story 16.9: Composite GitHub Action for External-Project CI/CD Consumption
+
+<!-- 2026-08-06: Seated from an external-consumption audit. The question asked was "what would it take right now
+     for another project to generate SpecScribe reports in its CI/CD?" and the measured answer was: vendor this
+     entire repository. There is no published channel (nuget.org/packages/SpecScribe → HTTP 404; every 16-* key
+     here is backlog; ADR 0022 §5 states it outright — "No Epic 16 channel exists yet"), and since Story 23.6 no
+     C# path writes content HTML, so `generate` also needs the prebuilt Nitro artefact that nothing ships. An
+     external project must therefore run a second checkout, a ~200 MB `npm ci`, `sync:assets`, `build:package`,
+     and set SPECSCRIBE_RENDERER_DIR by hand — six steps whose ORDER is load-bearing and whose failure modes are
+     documented only in this repo's own workflow comments.
+
+     WHY THIS IS A STORY AND NOT JUST DOCUMENTATION. The same audit found README.md's existing external recipe
+     had been broken since 23.6 and nobody noticed, which is the failure publish-docs-live-pages.yml:63-69 already
+     warned about in prose ("when a step acquires a new dependency, audit EVERY workflow that runs it"). A recipe
+     that lives as copy-pasteable YAML in N consumers' repositories cannot be audited when a dependency changes;
+     an Action can, because the ordering traps live in one versioned place this project owns. The README fix
+     landed 2026-08-06 alongside this entry and is a stopgap, not the answer.
+
+     DEPENDS ON STORY 16.3, AND ON ONE SPECIFIC THING WITHIN IT: the renderer artefact being IN the published
+     package. `NuxtPrerender.ResolveArtefactDirectory` already probes `renderer/` beside the executable and calls
+     it "the Epic 16 packaging shape" — the resolution logic exists and nothing populates it. Until it does, this
+     Action can only build from source and inherits the whole toolchain; after it does, the Action collapses to
+     install-and-run. Sequence accordingly.
+
+     CONTAINER IMAGE — considered, deliberately NOT seated as its own story yet. A prebuilt image with .NET, Node
+     and the renderer baked in solves the same problem for non-GitHub CI (Azure DevOps, GitLab, Jenkins), and the
+     same 16.3 dependency governs it. Recorded here so it is not lost; promote it if a non-GitHub consumer appears
+     or if the owner wants it decoupled from the Action. Full ACs via create-story when scheduled. -->
+
+As a maintainer of a different spec-driven-development project,
+I want to generate and publish a SpecScribe portal from my own CI with a small, versioned workflow step,
+So that I can adopt SpecScribe without vendoring its source tree or reproducing its build ordering by hand.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a published CLI that carries its renderer (Story 16.3)
+**When** an external project references the composite action at a released version
+**Then** a single workflow step installs SpecScribe and generates the portal — no second checkout, no `npm ci`, and no `SPECSCRIBE_RENDERER_DIR` set by the consumer
+**And** the action surfaces `--source`, `--adrs`, `--output`, `--project-name` and `--deep-git` as inputs, with the same defaults the CLI documents.
+
+2.
+**Given** the CLI and the renderer must match
+**When** the action resolves a version
+**Then** it pins both halves together as one released unit, so a consumer cannot combine a CLI and a renderer from different revisions
+**And** the resolved version is echoed in the step log, since a portal that renders from a mismatched pair fails as wrong output rather than as an error.
+
+3.
+**Given** generation can partially fail
+**When** any page reports an error
+**Then** the action fails the step, preserving the CLI's existing `ExitCodes.Failure` contract rather than masking it
+**And** a missing prerequisite (unsupported or absent Node) fails with the CLI's actionable message rather than an empty output root.
+
+4.
+**Given** consumers need to publish what was generated
+**When** the action completes
+**Then** it outputs the generated directory path for a following `upload-pages-artifact`/deploy step
+**And** the repository documents the end-to-end example, replacing README.md's hand-rolled recipe rather than sitting beside it.
+
 <!-- Epic 17 added 2026-07-11 (SCP 2026-07-11, correct-course): pre-publication hardening. Runs after feature
      completion (Epics 1–15, 18) and Epic 5, and BEFORE Epic 16's publish/cut stories — its sign-off (Story 17.4)
      gates the community preview. NFR10. Append-only, no renumber. Run create-story per story when scheduled. -->

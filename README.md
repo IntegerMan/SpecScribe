@@ -86,16 +86,60 @@ page and no nav entry; no Test Architect artifacts means no Test Artifacts page 
 
 SpecScribe is a [.NET global tool](https://learn.microsoft.com/dotnet/core/tools/global-tools) targeting .NET 10.
 
-From a clone of this repository:
+> **Not published to a package feed yet.** Every Epic 16 release story is still backlog, so there is no
+> `nuget.org` package and no tagged release. Install from a clone, and pin by commit SHA.
 
-```
+### Prerequisites
+
+- **.NET 10 SDK.**
+- **Node `^22.19.0 || ^24.11.0 || >=26.0.0`** — needed at *generate* time, not just to build. SpecScribe
+  renders every page through a prebuilt JavaScript renderer
+  ([ADR 0022](docs/adrs/0022-node-is-a-build-toolchain-and-a-generate-time-runtime.md)), so `generate` boots
+  Node and fails with an actionable message when it is missing or out of range.
+
+### Build the renderer, then install the CLI
+
+**Both halves are required.** Since
+[ADR 0034](docs/adrs/0034-the-ir-is-the-product-and-the-site-is-rendered-from-it.md) no C# code path writes
+content HTML: `generate` emits the JSON IR, then boots the renderer artefact and requests one route per
+manifest entry. Without the artefact it produces an IR with **no pages** and exits non-zero.
+
+```sh
+# 1. Build the renderer artefact. Needs Node; the ~200 MB toolchain is build-time only
+#    and is never shipped — what it produces is a ~2.2 MB pure-JS artefact.
+cd web
+SPECSCRIBE_PACKAGE_BUILD=1 npm ci   # PowerShell: $env:SPECSCRIBE_PACKAGE_BUILD='1'; npm ci
+npm run sync:assets
+npm run build:package               # MUST be build:package, never build — see below
+cd ..
+
+# 2. Pack and install the CLI.
 dotnet pack src/SpecScribe -c Release -o artifacts
 dotnet tool install --global SpecScribe --add-source ./artifacts
 ```
 
+`SPECSCRIBE_PACKAGE_BUILD=1` is what lets step 1 run on a fresh clone: `postinstall: nuxt prepare` loads
+`web/nuxt.config.ts`, which hard-fails when no IR is on disk, and on a fresh checkout there is none. The flag
+stubs the route manifest empty, which is exactly what it exists for.
+
+Use `build:package`, never `build`. A plain `nuxt build` bakes *this* project's pages into `.output/public`,
+and Nitro serves `public/` ahead of the SSR route — so an artefact built that way returns SpecScribe's own
+pages for your project, with HTTP 200. A wrong answer with a success status.
+
 That puts `specscribe` on your PATH (`%USERPROFILE%\.dotnet\tools`), so you can run it from any
 project directory. To pick up a newer build later: bump the `<Version>` in
 `src/SpecScribe/SpecScribe.csproj`, re-pack, then `dotnet tool update --global SpecScribe --add-source ./artifacts`.
+
+> **Running against a project other than this one?** The packaged tool does not yet carry its renderer
+> (populating `renderer/` beside the executable is Story 16.3, backlog), and the fallback search looks for
+> `web/.output` in **your** repository, where it does not exist. Point SpecScribe at the artefact you built
+> above:
+>
+> ```sh
+> export SPECSCRIBE_RENDERER_DIR=/path/to/SpecScribe/web/.output
+> ```
+>
+> Skip this and `generate` fails with `errors=1` and a message naming all three locations it searched.
 
 ## Usage
 
@@ -130,6 +174,13 @@ You can publish SpecScribe output for any repository, not just this one.
 
 ### Option A: Build and deploy with GitHub Actions (recommended)
 
+> **What this costs today, stated up front.** There is no published SpecScribe package, and the CLI cannot
+> render without its Node renderer, so an external project must check SpecScribe out and build both halves.
+> That is six steps whose **order is load-bearing**. Making this a single versioned step is
+> [Story 16.9](_bmad-output/planning-artifacts/epics.md) (backlog); until it ships, the workflow below is the
+> supported path. It was verified end-to-end on 2026-08-06 against a separate repository — 940 pages,
+> `errors=0`.
+
 Create `.github/workflows/publish-specscribe-pages.yml`:
 
 ```yaml
@@ -142,30 +193,83 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
   cancel-in-progress: false
 
+env:
+  # Pin SpecScribe by commit SHA: there is no tagged release yet, and the CLI and its
+  # renderer MUST come from the same revision. Nothing validates a mismatched pair, and
+  # the failure mode is wrong output rather than an error.
+  SPECSCRIBE_REF: "<commit-sha>"
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out your project
+        uses: actions/checkout@v4
         with:
           # Full history so git metrics (commit count, activity heatmap) and the
           # opt-in deep analytics (--deep-git) reflect real history, not just the tip.
           fetch-depth: 0
+
+      - name: Check out SpecScribe
+        uses: actions/checkout@v4
+        with:
+          repository: IntegerMan/SpecScribe
+          ref: ${{ env.SPECSCRIBE_REF }}
+          path: .specscribe-src
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
 
-      - name: Generate static site
+      - name: Setup Node
+        # Version comes from SpecScribe's own pin, never a hand-typed number.
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .specscribe-src/web/.nvmrc
+          cache: npm
+          cache-dependency-path: .specscribe-src/web/package-lock.json
+
+      # ── The renderer must exist BEFORE the generate. ──────────────────────────────────
+      # No C# path writes content HTML (ADR 0034). `generate` emits the IR, then boots this
+      # artefact and requests one route per manifest entry. With no artefact every route
+      # fails, errors=1, and the job exits non-zero having rendered nothing.
+      - name: Build the SpecScribe renderer
+        working-directory: .specscribe-src/web
+        env:
+          # `postinstall: nuxt prepare` loads nuxt.config.ts, which hard-fails when no IR is
+          # on disk — and none is, this early. This flag stubs the manifest empty, which is
+          # precisely what it exists for, and breaks the install-needs-IR cycle.
+          SPECSCRIBE_PACKAGE_BUILD: "1"
+        # `build:package`, NEVER `build`. A plain `nuxt build` bakes the building project's
+        # pages into .output/public, and Nitro serves public/ ahead of the SSR route — so
+        # the artefact would return SpecScribe's own pages for your project, at HTTP 200.
+        run: npm ci && npm run sync:assets && npm run build:package
+
+      - name: Install the SpecScribe CLI
+        # --tool-path (not --global) keeps the install explicit and off PATH-guessing.
+        # The version literal tracks <Version> in src/SpecScribe/SpecScribe.csproj.
         run: |
-          dotnet tool restore
-          specscribe generate \
+          dotnet pack .specscribe-src/src/SpecScribe/SpecScribe.csproj -c Release -o sspkg
+          dotnet tool install SpecScribe --version 0.1.0-preview \
+            --tool-path sstools --add-source sspkg
+
+      - name: Generate the portal
+        env:
+          # REQUIRED for an external project. Without it SpecScribe looks for `renderer/`
+          # beside the executable (not populated until Story 16.3 ships) and then for
+          # `web/.output` in YOUR repository, which does not exist.
+          SPECSCRIBE_RENDERER_DIR: ${{ github.workspace }}/.specscribe-src/web/.output
+        # Runs from your repo root, so git analysis targets your history. Exits non-zero
+        # if any page errors, so a broken portal fails the job instead of publishing.
+        run: |
+          ./sstools/specscribe generate \
             --source _bmad-output \
             --adrs docs/adrs \
             --output SpecScribeOutput \
@@ -181,6 +285,12 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      # Declared per job, not workflow-wide, so the build job above never carries
+      # write scopes it does not need.
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url || steps.deployment_retry.outputs.page_url }}
@@ -201,8 +311,14 @@ jobs:
 ```
 
 Notes:
-- Replace paths and project name for your project layout.
-- If you are not using a local tool manifest, install SpecScribe in the workflow before running `specscribe`.
+- Replace `SPECSCRIBE_REF`, the paths, and the project name for your layout.
+- **Your project needs artifacts SpecScribe can read** — today that means BMad (`bmm`/`gds`). Spec Kit, GSD
+  and GSD-Pi are planned; see [Supported frameworks](#supported-frameworks).
+- **Do not reorder the steps.** The renderer build must precede the generate. This repository's *own* publish
+  workflow regressed exactly that way once, and the reason it was missed is instructive: it had no Node steps
+  at all, so nothing in it *looked* like it depended on the renderer.
+- `generate` exits non-zero when any page errors, so the job fails rather than publishing a broken portal.
+  A missing or out-of-range Node fails with a message naming the supported range.
 - The deploy step is retried once because GitHub's Pages backend occasionally reports a transient `Deployment failed, try again later.` error; the retry avoids a full rebuild.
 - Full repository example workflow: https://github.com/IntegerMan/SpecScribe/blob/main/.github/workflows/publish-docs-live-pages.yml
 
