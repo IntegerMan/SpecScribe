@@ -14,6 +14,15 @@ import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'n
 import { join, posix, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { assertFullRun } from './harness-lib.mjs'
+
+// This harness was the ONLY one that did not make this call, while README.md promised "every harness
+// hard-fails when it is set". The gap was reachable, not theoretical: `nuxt.config.ts` appends `/measure/*`
+// to the prerender list AFTER the truncated `prerenderIrRoutes`, so the three measure routes survive
+// `SPECSCRIBE_IR_ROUTE_LIMIT=5` — a truncated run produced a complete-looking table and COMMITTED it.
+// [Story 23.2 review 2026-08-07]
+assertFullRun('measure:payload')
+
 const PUBLIC_DIR = fileURLToPath(new URL('../.output/public', import.meta.url))
 const MEASUREMENTS_DIR = fileURLToPath(new URL('../measurements', import.meta.url))
 
@@ -36,15 +45,20 @@ const CAVEATS = [
 // a SHARED directory keyed by component + props hash, so attribution has to be declared — the previous
 // `route.endsWith('island')` string test charged EVERY file under `__nuxt_island/` to variant B, meaning one
 // unrelated `.server.vue` added anywhere in web/ would move the published 1.99x without variant B changing.
+// `expectsPayload` records that the route keeps the Nuxt runtime (`noScripts: false` in nuxt.config.ts) and
+// must therefore emit a payload file. Stated per variant rather than assumed, so that if a route is ever
+// moved under `noScripts: true` the expectation is updated deliberately instead of silently reading as 0.
 const VARIANTS = [
-  { route: 'measure/async', label: 'A · useAsyncData', islandComponents: [] },
-  { route: 'measure/island', label: 'B · server component', islandComponents: ['MeasureRows'] },
-  { route: 'measure/static', label: 'C · static (control)', islandComponents: [] },
+  { route: 'measure/async', label: 'A · useAsyncData', islandComponents: [], expectsPayload: true },
+  { route: 'measure/island', label: 'B · server component', islandComponents: ['MeasureRows'], expectsPayload: true },
+  { route: 'measure/static', label: 'C · static (control)', islandComponents: [], expectsPayload: true },
 ]
 
-let files
+// The ENOENT test is scoped to the ROOT stat, deliberately. `walk` recurses, so wrapping the whole traversal
+// in one `try` meant a broken symlink or a file removed mid-walk was reported as ".output/public not found"
+// — sending the operator to regenerate a directory that exists and is complete. [Story 23.2 review 2026-08-07]
 try {
-  files = walk(PUBLIC_DIR)
+  statSync(PUBLIC_DIR)
 } catch (err) {
   if (err.code === 'ENOENT') {
     console.error('measure:payload — .output/public not found. Run `npm run generate` first.')
@@ -52,6 +66,7 @@ try {
   }
   throw err
 }
+const files = walk(PUBLIC_DIR)
 
 // Island responses are emitted to a SHARED directory keyed by component + props hash, not under the route
 // that used them — `__nuxt_island/<Component>_<hash>.json`. Attribute each file to the variant that declares
@@ -77,14 +92,35 @@ const unattributedIslands = islandFiles.filter((f) => !claimed.has(f.rel))
 
 const rows = VARIANTS.map((v) => {
   const htmlSize = sizeOf(files, `${v.route}/index.html`) ?? sizeOf(files, `${v.route}.html`)
-  const payload =
-    (sizeOf(files, `${v.route}/_payload.json`) ?? 0) + (sizeOf(files, `${v.route}/_payload.js`) ?? 0)
+  const payloadJson = sizeOf(files, `${v.route}/_payload.json`)
+  const payloadJs = sizeOf(files, `${v.route}/_payload.js`)
+  const payload = (payloadJson ?? 0) + (payloadJs ?? 0)
   const island = islandBytesFor(v.islandComponents)
   const html = htmlSize ?? 0
   // `missing` is tracked SEPARATELY from a zero size. Every lookup used to end `?? 0` with the only guard
   // being "did EVERY row come back zero", so one route failing to prerender printed a plausible `0.00x` for
   // it — reading as "this shape ships nothing", the exact inversion of what the table is used to conclude.
-  return { ...v, html, payload, island, total: html + payload + island, missing: htmlSize === undefined }
+  //
+  // [Story 23.2 review 2026-08-07] The same reasoning now covers the PAYLOAD column — the column the whole
+  // experiment is about. A route that keeps its runtime must emit a payload file; if it does not, the tool
+  // has lost track of the filename (a Nuxt change) or the route silently inherited `noScripts: true` from
+  // the `'/**'` rule, which sits one line from `/measure/**` in nuxt.config.ts. Either way `payload: 0` is a
+  // measurement failure, not a result of zero — and left unguarded it prints variant A at 1.00x.
+  const payloadMissing = v.expectsPayload && payloadJson === undefined && payloadJs === undefined
+  // A variant that DECLARES island components must resolve bytes for them. `startsWith(`${c}_`)` is a
+  // filename-shape assumption about Nuxt's `__nuxt_island/` output; if that shape changes, the column reads
+  // `—`, the total is understated and the ratio moves, with a zero exit code.
+  const islandMissing = v.islandComponents.length > 0 && island === 0
+  return {
+    ...v,
+    html,
+    payload,
+    island,
+    total: html + payload + island,
+    missing: htmlSize === undefined,
+    payloadMissing,
+    islandMissing,
+  }
 })
 
 // A measurement with a hole in it is not a measurement. These numbers are quoted in CONVENTIONS.md as a
@@ -94,6 +130,26 @@ if (missing.length > 0) {
   console.error('measure:payload FAILED — these measure routes are absent from .output/public:')
   for (const r of missing) console.error(`  - ${r.route}  (${r.label})`)
   console.error('  Run `npm run generate` and check it prerendered every /measure/* route before measuring.')
+  process.exit(1)
+}
+
+const noPayload = rows.filter((r) => r.payloadMissing)
+if (noPayload.length > 0) {
+  console.error('measure:payload FAILED — these routes emitted no `_payload.json`/`_payload.js`:')
+  for (const r of noPayload) console.error(`  - ${r.route}  (${r.label})`)
+  console.error('  A hydrating route must carry a payload. Either the route inherited `noScripts: true`')
+  console.error('  from the `/**` route rule, or Nuxt changed the payload filename this tool looks for.')
+  console.error('  Reporting 0 here would print this shape as costing nothing, inverting AC #4.')
+  process.exit(1)
+}
+
+const noIslands = rows.filter((r) => r.islandMissing)
+if (noIslands.length > 0) {
+  console.error('measure:payload FAILED — these variants declare island components but matched no files:')
+  for (const r of noIslands) console.error(`  - ${r.route}  declares ${r.islandComponents.join(', ')}`)
+  console.error(`  Looked under __nuxt_island/ for a name starting "<Component>_". Found ${islandFiles.length}`)
+  console.error('  island file(s) total. If Nuxt changed that filename shape, fix `islandBytesFor` — do not')
+  console.error('  publish a table whose island column is silently zero.')
   process.exit(1)
 }
 

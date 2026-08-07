@@ -1,4 +1,4 @@
-// SpecScribe's production-intent Nuxt 3 app (Epic 23, Stories 23.2 + 23.3).
+// SpecScribe's production-intent Nuxt app (Epic 23, Stories 23.2 + 23.3). Nuxt 4 — see `package.json`.
 //
 // Universal/SSR + full prerender — ADR 0009's ratified Axis 1 = Option B. `nuxt generate` must emit
 // fully-rendered HTML per route (NFR-5/NFR6), never a hydration shell.
@@ -141,9 +141,9 @@ export default defineNuxtConfig({
      * scripts cannot carry a hydration payload at all.
      */
     '/**': { noScripts: true },
-    // The app's OWN routes keep the runtime: `/design-system` is an interactive showcase, and the three
-    // `/measure/*` routes exist to reproduce 23.2 AC #4's payload table, which is meaningless without it.
-    '/design-system': { noScripts: false },
+    // The app's OWN routes keep the runtime: the three `/measure/*` routes exist to reproduce 23.2 AC #4's
+    // payload table, which is meaningless without it, and `/component-library` is the developer landing page.
+    // (`/design-system` was retired on 2026-08-07 — see the prerender list below.)
     '/component-library': { noScripts: false },
     '/measure/**': { noScripts: false },
   },
@@ -171,8 +171,15 @@ export default defineNuxtConfig({
             '/',
             ...prerenderIrRoutes,
             // The app's own routes (not IR-backed).
+            //
+            // `/design-system` is deliberately ABSENT. [Story 23.2 review 2026-08-07] The Vue showcase route
+            // was retired: under `PACKAGE_BUILD` this list is empty, so the route was never prerendered into
+            // a shipped portal, and the design-system page a user actually gets is `design-system.html`,
+            // rendered from the C#-composed region through `PortalMetaSurface`. Keeping a second, divergent
+            // design-system page that no user could reach was a permanent duplication rather than the
+            // transitional one AC #6 assumed. The `:deep()` worked example it carried now lives in
+            // `CONVENTIONS.md` §3, which is where AC #5 says the convention must be demonstrated.
             '/component-library',
-            '/design-system',
             '/measure/async',
             '/measure/island',
             '/measure/static',

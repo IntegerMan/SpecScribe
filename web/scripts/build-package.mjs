@@ -32,6 +32,18 @@ import { dirname, join } from 'node:path'
 
 const here = dirname(fileURLToPath(import.meta.url))
 
+// The token drift gate. npm's lifecycle prefix matches the script NAME, so `prebuild` fires for
+// `npm run build` and NOT for `npm run build:package` — meaning the one build that produces the artefact
+// users actually get was the one build with no token check. CI still covers it via `npm run check`, so this
+// closes a local/packaging gap rather than an unguarded pipeline, but the artefact is the wrong thing to
+// leave to CI. Run it first: a drifted token is cheaper to catch before a full prerender than after.
+// [Story 23.2 review 2026-08-07]
+const tokens = spawnSync(process.execPath, [join(here, 'check-tokens.mjs')], {
+  cwd: join(here, '..'),
+  stdio: 'inherit',
+})
+if (tokens.status !== 0) process.exit(tokens.status ?? 1)
+
 // Static assets still come from the C# source of truth — the artefact ships them, so they must be current.
 const sync = spawnSync(process.execPath, [join(here, 'sync-runtime-assets.mjs')], {
   cwd: join(here, '..'),

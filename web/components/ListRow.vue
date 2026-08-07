@@ -24,6 +24,17 @@ import { computed } from 'vue'
  */
 export type RowAccent = 'done' | 'pending' | 'deferred' | 'ready'
 
+/**
+ * The same list at RUNTIME. [Story 23.2 review 2026-08-07]
+ *
+ * The union above erases at compile time, so `accent="review"` — a value this component genuinely carried
+ * until the 2026-07-28 re-review removed it — emitted `accent-review`, matched no rule, left
+ * `--list-row-accent` unset, and rendered as an ordinary row. A "deferred" row silently losing its accent is
+ * a wrong signal, not a missing one. `StatusBadge` has guarded exactly this since it was written; the
+ * asymmetry was the defect.
+ */
+const KNOWN_ACCENTS: RowAccent[] = ['done', 'pending', 'deferred', 'ready']
+
 const props = withDefaults(
   defineProps<{
     /** The row's primary text. */
@@ -45,18 +56,53 @@ const props = withDefaults(
  * `withDefaults` substitutes for `undefined` ONLY. A JSON IR emits `null` for an absent array, and
  * `chips.length` on `null` threw during render — failing the WHOLE route's SSR, not just the row. 23.3 feeds
  * these components from the IR, so null-vs-undefined is a live input class, not a hypothetical.
+ *
+ * [Story 23.2 review 2026-08-07] `?? []` covers `null`/`undefined` and nothing else, so a SCALAR slipped
+ * through: `:chips="'3 tasks'"` (the shape a loosely-typed IR field takes when it holds one value instead of
+ * a list) is truthy, is not nullish, and `v-for` over a string iterates its CHARACTERS — seven single-letter
+ * chips. `Array.isArray` is the actual question. Empty strings are dropped in the same pass: `['']` made
+ * `chipList.length` truthy, so the `.list-row-meta` cluster rendered solely to hold a blank pill, which is
+ * the empty-but-present wrapper NFR8 forbids and this component's header claims it never emits.
  */
-const chipList = computed(() => props.chips ?? [])
+const chipList = computed(() => {
+  const raw = props.chips
+  if (!Array.isArray(raw)) {
+    if (import.meta.dev && raw !== null && raw !== undefined) {
+      console.warn(
+        `[ListRow] \`chips\` must be an array; received ${JSON.stringify(raw)}. Ignoring it — rendering it ` +
+          `directly would iterate a string by character. Wrap a single value: :chips="['${String(raw)}']".`,
+      )
+    }
+    return []
+  }
+  return raw.filter((c) => typeof c === 'string' && c.trim() !== '')
+})
 
 /**
  * `??` passes `''` through, so `primary-label=""` (an IR field present but empty) rendered an anchor whose
  * entire accessible name was the bare arrow — "link, right arrow" to a screen reader. `||` covers both.
  */
 const primaryText = computed(() => props.primaryLabel || 'Open')
+
+/**
+ * An out-of-vocabulary accent is dropped rather than emitted as a class that matches nothing, so the row
+ * falls back to the neutral default deliberately instead of by accident. [Story 23.2 review 2026-08-07]
+ */
+const accentClass = computed(() =>
+  props.accent && KNOWN_ACCENTS.includes(props.accent) ? `accent-${props.accent}` : null,
+)
+
+if (import.meta.dev && props.accent && !KNOWN_ACCENTS.includes(props.accent)) {
+  console.warn(
+    `[ListRow] unknown accent "${props.accent}" — ignoring it, so this row renders with the neutral rule. ` +
+      `Known accents: ${KNOWN_ACCENTS.join(', ')}. Adding one means adding the matching ` +
+      `\`.list-row-accent-*\` rule to specscribe.css in the same change.`,
+  )
+}
 </script>
 
 <template>
-  <li class="list-row" :class="[accent ? `accent-${accent}` : null, { resolved }]">
+  <li class="list-row" :class="[accentClass, { resolved }]">
     <div class="list-row-scan">
       <span class="list-row-summary">{{ summary }}</span>
       <div v-if="$slots.badge || chipList.length || primaryHref" class="list-row-meta">

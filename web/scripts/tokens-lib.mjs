@@ -149,9 +149,11 @@ function matchBrace(css, braceAt, label) {
 export function findRootBlocks(css, label = SOURCE_LABEL) {
   const blocks = []
   let i = 0
-  let depth = 0
   let inComment = false
   let selector = ''
+  // Preludes of the blocks currently open around `i`, outermost first. This exists so a `:root` found at
+  // depth > 0 can be judged by WHAT encloses it rather than by the bare fact that something does.
+  const stack = []
 
   while (i < css.length) {
     if (inComment) {
@@ -171,35 +173,81 @@ export function findRootBlocks(css, label = SOURCE_LABEL) {
 
     const ch = css[i]
     if (ch === '{') {
-      if (depth === 0 && selector.trim() === ':root') {
-        const end = matchBrace(css, i, label)
-        blocks.push({ body: css.slice(i + 1, end), startLine: lineOf(css, i), endLine: lineOf(css, end) })
-        i = end + 1
-        selector = ''
-        continue
+      const prelude = selector.trim()
+      if (preludeNamesRoot(prelude)) {
+        if (stack.length === 0) {
+          // A GROUPED prelude (`:root, :host { … }`) declares the same tokens for more than one subject.
+          // Copying the body out under a bare `:root` would silently change what the sheet means, and
+          // skipping it would drop a whole token family while `check:tokens` still printed "in sync" —
+          // because both sides run this same extractor, so neither can see a block neither looks at.
+          // Fail loudly instead; splitting the rule in the source is a one-line, reviewable change.
+          if (prelude !== ':root') {
+            throw new Error(
+              `token bridge: ${label}:${lineOf(css, i)} has the grouped prelude \`${prelude}\`. The extractor ` +
+                `carries only a rule whose prelude is exactly \`:root\`, because copying a grouped rule out ` +
+                `under a bare \`:root\` would change its meaning. Split it into its own \`:root { … }\` rule, ` +
+                `or extend this extractor deliberately — do not let the family cross by accident.`,
+            )
+          }
+          const end = matchBrace(css, i, label)
+          blocks.push({ body: css.slice(i + 1, end), startLine: lineOf(css, i), endLine: lineOf(css, end) })
+          i = end + 1
+          selector = ''
+          continue
+        }
+
+        // Nested `:root`. Inside `@media` this is the established viewport-override shape (`--nav-offset` at
+        // a breakpoint) and is deliberately NOT carried: the bridge publishes the unconditional values.
+        // Inside any OTHER at-rule it is very likely a real token definition, and silently dropping it is the
+        // same fail-open bug as the grouped prelude above. `ir-content-build.mjs` already treats
+        // `@media|@supports|@layer|@container` as four distinct conditional forms; the bridge now does too.
+        const enclosing = stack[stack.length - 1]
+        const atRule = /^@([a-zA-Z-]+)/.exec(enclosing)
+        const kind = atRule ? atRule[1].toLowerCase() : null
+        if (kind !== 'media') {
+          throw new Error(
+            `token bridge: ${label}:${lineOf(css, i)} declares a \`:root\` block inside \`${enclosing.trim()}\`. ` +
+              `Only \`@media\` nesting is understood (a viewport override, deliberately not carried). ` +
+              `A \`:root\` inside \`@layer\`/\`@supports\`/\`@container\` — or inside another rule — is most ` +
+              `likely a real token family, and dropping it silently would leave \`check:tokens\` green while ` +
+              `the tokens never reached the app. Decide explicitly: hoist it, or teach the extractor.`,
+          )
+        }
       }
-      depth += 1
+      stack.push(prelude)
       selector = ''
       i += 1
       continue
     }
     if (ch === '}') {
-      if (depth > 0) depth -= 1
+      stack.pop()
       selector = ''
       i += 1
       continue
     }
-    // A top-level at-rule statement (`@charset "…";`) ends its selector without ever opening a block.
-    if (ch === ';' && depth === 0) {
+    // Ends a statement without opening a block: a top-level at-rule (`@charset "…";`) or a declaration
+    // inside a rule we are scanning through.
+    if (ch === ';') {
       selector = ''
       i += 1
       continue
     }
-    if (depth === 0) selector += ch
+    selector += ch
     i += 1
   }
 
   return blocks
+}
+
+/**
+ * Does this prelude name `:root` as one of its comma-separated selectors?
+ *
+ * Exact-match per selector, deliberately: `html:root` and `:root[data-boot]` are NOT the unconditional token
+ * block and must not be treated as one. Grouping is detected here so the caller can refuse it loudly rather
+ * than fail open — the bug this whole module has been bitten by twice.
+ */
+function preludeNamesRoot(prelude) {
+  return prelude.split(',').some((s) => s.trim() === ':root')
 }
 
 /**
@@ -255,9 +303,10 @@ export function renderTokensCss(cssText = readFileSync(SOURCE_CSS, 'utf8')) {
   const missing = REQUIRED_TOKENS.filter((t) => !declared.has(t))
   if (missing.length > 0) {
     throw new Error(
-      `token bridge: the extracted ':root' block(s) (${SOURCE_LABEL}:${spans}) ${'are'} missing ` +
-        `${missing.length} required token(s): ${missing.join(', ')}. Either the extractor latched onto the ` +
-        `wrong rule, or a token family was renamed in the C# stylesheet — reconcile before regenerating.`,
+      `token bridge: the ${blocks.length} extracted ':root' ${blocks.length === 1 ? 'block' : 'blocks'} ` +
+        `(${SOURCE_LABEL}:${spans}) ${blocks.length === 1 ? 'is' : 'are'} missing ${missing.length} required ` +
+        `${missing.length === 1 ? 'token' : 'tokens'}: ${missing.join(', ')}. Either the extractor latched ` +
+        `onto the wrong rule, or a token family was renamed in the C# stylesheet — reconcile before regenerating.`,
     )
   }
 

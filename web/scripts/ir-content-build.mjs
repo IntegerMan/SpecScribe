@@ -178,7 +178,21 @@ export async function buildIrContentCss() {
       })
     }
 
-    const keep = selectors.filter((s) => selectorIsUsed(s, used))
+    // The usage prune asks "does the IR corpus render this class?" — the right question for the SCOPED layer,
+    // whose whole job is styling injected markup. It is the WRONG question for the unscoped layers, and
+    // asking it of them was a real defect. [Story 23.2 review 2026-08-07]
+    //
+    // `used` is harvested from IR page markup only, never from Vue templates. So on a project whose IR
+    // happens to render no `.pill`, the base `.pill` rule was pruned as "unused" and `shared-primitives.css`
+    // regenerated EMPTY — and `ListRow.vue`'s chips, which deliberately declare no visual properties because
+    // ADR 0029 made the shared layer their single definition, rendered completely unstyled. The admission
+    // test ADR 0029 publishes is "a C# primitive emits it AND a template-authored Vue component consumes it";
+    // what actually gated carriage was IR usage, an unrelated condition that no consumer of this repo
+    // controls. An allowlisted class is carried because it is NAMED, which is the entire point of an
+    // allowlist — so it bypasses the prune. The bound stays tight: nothing enters by being used.
+    const keep = selectors.filter(
+      (s) => isSharedPrimitive(s) || isRuntimeBodyClass(s) || selectorIsUsed(s, used),
+    )
     if (keep.length === 0) {
       stats.droppedUnused += 1
       return { scoped: null, shared: null, runtime: null }

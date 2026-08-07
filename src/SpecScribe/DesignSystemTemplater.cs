@@ -187,12 +187,32 @@ public static class DesignSystemTemplater
                 _ => (stage, $"<code>--status-{stage}</code>"),
             };
 
+            // The `_ =>` arm above assumes a `.status-legend-key-swatch.<stage>` rule exists in the stylesheet.
+            // For an eleventh LegendStages entry that has a `--status-<stage>` token but no swatch rule, the
+            // class matches nothing and the page renders a BLANK swatch beside a caption naming a token that
+            // does exist — documentation that is wrong in the one direction a component author trusts.
+            // `DesignSystem_NamesNoTokenTheStylesheetDoesNotDeclare` closed the token half of this hole; this
+            // is the class half. Asserted in tests rather than guarded at render time, because the right
+            // response is to add the rule, not to hide the stage. [Story 23.2 review 2026-08-07]
+
             // The accent above is half the pair. Four stages also sit on a pale fill, and a component author
             // binding only the accent gets a badge with the right border on the wrong background — which is
             // precisely what happened to StatusBadge.vue. Named, never valued. [Story 23.2 re-review]
             if (StageFillTokens.TryGetValue(stage, out var fill))
             {
-                var shared = stage is "ready" or "drafted" ? ", shared with ready/drafted" : string.Empty;
+                // DERIVED from StageFillTokens, not hardcoded to "ready/drafted". [Story 23.2 review
+                // 2026-08-07] The pair was written as a literal, so a fifth stage pointing at an existing
+                // fill would print no note at all — leaving a reader to see two identical token names and
+                // wonder whether it was a mistake, which is the exact confusion this note exists to prevent —
+                // and moving the sharing to another pair would have printed the wrong two stage names.
+                // Ordered by LegendStages — the canonical, explicitly-ordered vocabulary — rather than by
+                // Dictionary enumeration order, which is an implementation detail this page must not depend on.
+                var sharers = StageFillTokens
+                    .Where(kv => kv.Value == fill && !string.Equals(kv.Key, stage, StringComparison.Ordinal))
+                    .Select(kv => kv.Key)
+                    .OrderBy(s => StatusStyles.LegendStages.ToList().IndexOf(s))
+                    .ToArray();
+                var shared = sharers.Length > 0 ? $", shared with {string.Join("/", sharers)}" : string.Empty;
                 tokenNote += $" on <code>{fill}</code>{shared}";
             }
 
@@ -224,7 +244,16 @@ public static class DesignSystemTemplater
     private static string BadgeBody()
     {
         var sb = new StringBuilder();
-        sb.Append("<p class=\"chart-lead\">Hover or focus any badge for its meaning.</p>\n");
+        // ⚠️ NOT "hover or focus". [Story 23.2 review 2026-08-07] `StatusStyles.Badge` emits a bare
+        // `<span class="status-badge … js-tip" data-tip title>`, and nothing in `specscribe.css` or
+        // `specscribe.js` puts a `tabindex` on `.status-badge` — so a badge cannot receive focus, and both
+        // `title` and `data-tip` are pointer-only. Telling a keyboard-only reader to focus a badge, on the
+        // page that teaches this portal's accessibility discipline, was an instruction that could not be
+        // followed. No information is lost either way: every meaning is also printed as visible text in the
+        // status-token list above, which is why the fix is to correct the sentence rather than add a tabindex
+        // to a non-interactive element.
+        sb.Append("<p class=\"chart-lead\">Every badge's meaning is written out in the status-token list above; "
+            + "pointer users can also hover a badge for the same text.</p>\n");
         sb.Append("<div class=\"story-status-pair\">\n");
         foreach (var stage in StatusStyles.LegendStages)
         {

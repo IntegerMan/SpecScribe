@@ -14,7 +14,8 @@ useHead({ title: 'Measure — static' })
 
 <template>
   <PageShell title="Measure: static" subtitle="200 rows resolved at module scope — no data composable.">
-    <ChartPanel title="Rows" window="variant C">
+    <!-- `window` is the NUMERIC analysis window, not a free-text label. [Story 23.2 review 2026-08-07] -->
+    <ChartPanel title="Rows — variant C (module-scope control)">
       <ul class="measure-list">
         <ListRow v-for="row in rows" :key="row.id" :summary="row.summary" :chips="row.chips">
           <template #badge>

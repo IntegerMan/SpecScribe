@@ -11,7 +11,7 @@
  *
  * `legend` is a named slot rather than a prop because a legend is markup, not metadata.
  */
-defineProps<{
+const props = defineProps<{
   /** Required. The panel's name. */
   title: string
   /** Numeric analysis window ("last 90 days"). Omitted entirely when absent — never rendered empty (NFR8). */
@@ -23,6 +23,18 @@ defineProps<{
   /** Why this metric matters — generic framing, never project-specific (NFR8). */
   why?: string
 }>()
+
+if (import.meta.dev && (typeof props.title !== 'string' || props.title.trim() === '')) {
+  // The ONE field on this component with no empty guard, on the component whose own documentation states
+  // "a slot with nothing to say renders nothing at all, rather than an empty heading". Every optional region
+  // is `v-if`-guarded; the REQUIRED one was not, so `title=""` or `:title="null"` (an IR field present but
+  // empty) shipped an empty `<h3>` — an unlabelled heading inside a landmark-bearing panel, which is worse
+  // for a screen-reader user than no heading at all. [Story 23.2 review 2026-08-07]
+  console.warn(
+    `[ChartPanel] missing or empty title (received ${JSON.stringify(props.title)}). This renders an empty ` +
+      `<h3> inside the panel — an unlabelled heading. Every panel needs a name.`,
+  )
+}
 </script>
 
 <template>

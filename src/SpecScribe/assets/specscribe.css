@@ -115,8 +115,17 @@ body {
 /* Skip link: the first focusable element on every page (emitted at <body> start by RenderHeadOpen),
    visually hidden until focused, then pinned top-left so a keyboard user can jump straight past the nav
    to #main-content. [Story 1.4 AC #1, UX-DR16] */
+/* [Story 23.2 review 2026-08-07] This rule is now the SINGLE definition of the skip link for both surfaces:
+   it is on the `SHARED_PRIMITIVES` allowlist (ADR 0029), so it is emitted UNSCOPED into
+   `web/assets/shared-primitives.css` and reaches the Vue `PageShell`'s template-authored anchor, which used
+   to carry a competing scoped copy. That copy tied on specificity with the generated `.ir-content .skip-link`
+   and the winner was decided by chunk order — see the review record.
+   `fixed`, not `absolute`: nothing here establishes a containing block, so absolute offsets resolved against
+   the DOCUMENT — a keyboard user who had scrolled down and shift-tabbed back out of the content focused a
+   link rendered at the top of the page, off-screen, with the focus outline drawn where nobody could see it.
+   It must be visible wherever the viewport is (UX-DR16). `z-index: 200` clears the sticky nav's 100. */
 .skip-link {
-  position: absolute;
+  position: fixed;
   left: -9999px;
   top: 0;
   z-index: 200;
@@ -2968,13 +2977,16 @@ a.work-node:focus-visible {
 
 /* These four FILLS are the same tokens `.status-badge.<stage>` uses, not a second set of literals — the
    "mirrors" claim below used to be enforced by nothing but two matching hexes. [Story 23.2 re-review] */
-.epic-status.done { background: var(--status-done-bg); color: var(--moss); border: 1px solid var(--moss-light); }
+/* [Story 23.2 review 2026-08-07] BORDERS now bind the same semantic tokens as the badges, for the same
+   reason the fills do — a mirror enforced by two matching alias names is not enforced at all. `pending`
+   moves from `--border` to `--status-pending`, tracking the badge's real value change. */
+.epic-status.done { background: var(--status-done-bg); color: var(--moss); border: 1px solid var(--status-done); }
 /* Retro-gated "In review" tier — mirrors .status-badge.review's deep-teal. [spec-sunburst-retro] */
-.epic-status.review { background: var(--status-review-bg); color: var(--teal-deep); border: 1px solid var(--teal-deep); }
-.epic-status.active { background: var(--status-active-bg); color: var(--teal); border: 1px solid var(--teal); }
+.epic-status.review { background: var(--status-review-bg); color: var(--teal-deep); border: 1px solid var(--status-review); }
+.epic-status.active { background: var(--status-active-bg); color: var(--teal); border: 1px solid var(--status-active); }
 .epic-status.ready,
-.epic-status.drafted { background: var(--status-ready-bg); color: var(--gold); border: 1px solid var(--gold-light); }
-.epic-status.pending { background: var(--parchment-dark); color: var(--ink-light); border: 1px solid var(--border); }
+.epic-status.drafted { background: var(--status-ready-bg); color: var(--gold); border: 1px solid var(--status-ready); }
+.epic-status.pending { background: var(--parchment-dark); color: var(--ink-light); border: 1px solid var(--status-pending); }
 .epic-status.unrecognized {
   background: repeating-linear-gradient(
     -45deg,
@@ -3233,15 +3245,24 @@ a.work-node:focus-visible {
   border: 1px solid var(--border);
 }
 
-.status-badge.done { background: var(--status-done-bg); color: var(--moss); border-color: var(--moss-light); }
-.status-badge.active { background: var(--status-active-bg); color: var(--teal); border-color: var(--teal); }
-.status-badge.review { background: var(--status-review-bg); color: var(--teal-deep); border-color: var(--teal-deep); }
+/* [Story 23.2 review 2026-08-07] Stage BORDERS bind to the semantic `--status-*` tokens, not to the palette
+   tokens they happen to alias. `--status-done` IS `var(--moss-light)`, `--status-active` IS `var(--teal)`,
+   `--status-review` IS `var(--teal-deep)` and `--status-ready` IS `var(--gold-light)`, so these four are a
+   zero-visual-change rebinding — their point is that the Vue twin (`web/components/StatusBadge.vue`) binds
+   the semantic name, and a rule that names the alias can drift from one that names the token without any
+   gate noticing. `pending` and `deferred` below are NOT aliases and did visibly differ; see their comments. */
+.status-badge.done { background: var(--status-done-bg); color: var(--moss); border-color: var(--status-done); }
+.status-badge.active { background: var(--status-active-bg); color: var(--teal); border-color: var(--status-active); }
+.status-badge.review { background: var(--status-review-bg); color: var(--teal-deep); border-color: var(--status-review); }
 .status-badge.ready,
-.status-badge.drafted { background: var(--status-ready-bg); color: var(--gold); border-color: var(--gold-light); }
+.status-badge.drafted { background: var(--status-ready-bg); color: var(--gold); border-color: var(--status-ready); }
 /* backlog/pending rows (sprint tracking) read on-brand — mirrors .status-badge.deferred (parchment/grey).
    The base .status-badge already carries these values; the explicit rule documents the mapping and pins it
-   against future base changes. [Story 2.3 Task 2] */
-.status-badge.pending { background: var(--parchment-dark); color: var(--ink-light); border-color: var(--border); }
+   against future base changes. [Story 2.3 Task 2]
+   [Story 23.2 review 2026-08-07] Border moved from `--border` (#d4c4a8) to `--status-pending` (#b8b2a8) —
+   a REAL value change, adopting the Vue twin's binding per the owner's decision. `unmapped` inherits this
+   rule through `StatusStyles.LegendKey`'s remap, so it follows automatically. */
+.status-badge.pending { background: var(--parchment-dark); color: var(--ink-light); border-color: var(--status-pending); }
 /* Sprint ledger history (removed from active plan) — same parchment/grey as deferred; own class. */
 .status-badge.retired { background: var(--parchment-dark); color: var(--ink-light); border-color: var(--border); }
 /* Present-but-unmapped native status: dashed outline + cool slate, never a lifecycle fill. [Story 8.2] */
@@ -5572,8 +5593,11 @@ a.satisfaction-chip:hover { filter: brightness(0.97); }
   font-weight: 700;
 }
 
-/* The one genuinely new status color: grey for requirements shelved for later. */
-.status-badge.deferred { background: var(--parchment-dark); color: var(--ink-light); border-color: var(--border); }
+/* The one genuinely new status color: grey for requirements shelved for later.
+   [Story 23.2 review 2026-08-07] Border moved from `--border` (#d4c4a8, pale tan) to `--status-deferred`
+   (#7a6250, grey-brown) — the most visible half of the badge drift, adopting the Vue twin's binding per the
+   owner's decision. The donut rules below already bound `--status-deferred`; the badge now agrees with them. */
+.status-badge.deferred { background: var(--parchment-dark); color: var(--ink-light); border-color: var(--status-deferred); }
 .donut-seg.deferred { stroke: var(--status-deferred); }
 .donut-legend .swatch.deferred { background: var(--status-deferred); }
 .donut-seg.retired { stroke: var(--status-deferred); }
