@@ -114,6 +114,38 @@ public static class Mermaid
           Reviewed: Reviewed
         """;
 
+    /// <summary>GSD Core's methodology, in its own vocabulary: a project is defined once, then each phase is
+    /// planned into numbered plans and executed plan by plan, with the roadmap's per-plan checkbox the record that
+    /// a plan is done. Deliberately mirrors the shape of the two diagrams above rather than inventing a different
+    /// visual language for a second framework. [Story 12.2 Task 9]</summary>
+    public static string SddGsdCoreDiagram() => """
+        stateDiagram-v2
+          direction TB
+          [*] --> ProjectDefined: /gsd-new
+          ProjectDefined --> RequirementsCaptured: /gsd-requirements
+          RequirementsCaptured --> RoadmapPlanned: /gsd-roadmap
+          RoadmapPlanned --> Phase
+
+          state "Per Phase" as Phase {
+            [*] --> PhasePlanned: /gsd-plan-phase
+            PhasePlanned --> PlanExecuted: /gsd-execute
+            PlanExecuted --> PlanSummarized: writes NN-YY-SUMMARY.md
+            PlanSummarized --> PlanExecuted: next plan
+            PlanSummarized --> [*]
+          }
+
+          Phase --> MilestoneComplete
+          MilestoneComplete --> [*]
+
+          ProjectDefined: Project Defined
+          RequirementsCaptured: Requirements Captured
+          RoadmapPlanned: Roadmap Planned
+          PhasePlanned: Phase Planned
+          PlanExecuted: Plan Executed
+          PlanSummarized: Plan Summarized
+          MilestoneComplete: Milestone Complete
+        """;
+
     public static string InitScript() => """
         <script type="module">
           import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';

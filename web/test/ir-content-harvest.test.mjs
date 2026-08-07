@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
 import { harvest } from '../scripts/ir-content-build.mjs'
+import { conditionalClassNames, selectorIsUsed } from '../scripts/ir-content-lib.mjs'
+
+/** Same shape `harvest` fills, for the seeding tests below. */
+const collectInto = (html) => {
+  const into = { classes: new Set(), ids: new Set(), attributes: new Set(), elements: new Set() }
+  harvest(html, into)
+  return into
+}
 
 /**
  * `harvest` collects the classes, ids, attributes and elements the IR actually renders; `selectorIsUsed` then
@@ -90,5 +98,55 @@ describe('harvest', () => {
     for (const cls of ['codemap-table-section', 'codemap-tree-dir', 'dir-all-spec', 'codemap-table-row', 'is-spec']) {
       expect(used.classes.has(cls)).toBe(true)
     }
+  })
+})
+
+/**
+ * The seeded half of the derivation. `harvest` answers "what does the IR render RIGHT NOW", and for a class whose
+ * presence depends on project DATA — or, since Story 12.2, on which FRAMEWORK produced the project — that is the
+ * wrong question. `CONDITIONAL_CLASSES` seeds the closed domain instead.
+ *
+ * ⚠️ These assertions exist because the round-trip gate cannot make them. `check:ir-content` re-derives through the
+ * same seed list, so a class MISSING from it is missing on both sides and the diff is empty — the rule is simply
+ * absent from the shipped stylesheet, with every gate green and the element rendering bare.
+ */
+describe('cross-framework conditional classes [Story 12.2]', () => {
+  /**
+   * The epics index renders milestone bands only for a framework that HAS a milestone level above the epic — GSD
+   * Core. This repository is a BMad project, and the extraction corpus is this repository's own IR, so no harvest
+   * run here can ever see this markup. That is a different gap from the data-conditional entries beside it: those
+   * are absent because a condition is false today, these because the corpus is the wrong framework, and no amount
+   * of regenerating changes it.
+   *
+   * Measured when the seed was added: without it all five rules were pruned and `check:ir-content` stayed GREEN,
+   * so the bands would have shipped unstyled on a real GSD site.
+   */
+  it('seeds the milestone-band classes, which a BMad corpus can never harvest', () => {
+    const seeded = new Set(conditionalClassNames())
+    for (const cls of [
+      'milestone-band',
+      'milestone-band-header',
+      'milestone-band-name',
+      'milestone-band-meta',
+      'milestone-band-empty',
+    ]) {
+      expect(seeded.has(cls)).toBe(true)
+    }
+  })
+
+  /**
+   * Seeding stays SELF-LIMITING, which is what keeps the list from carrying rules by association: a rule is
+   * emitted only when EVERY token it names was seen or seeded. `.milestone-band .epic-overview` therefore rides on
+   * `epic-overview` being genuinely present in the corpus, not on the seed alone.
+   */
+  it('does not seed the classes the band composes with', () => {
+    const seeded = new Set(conditionalClassNames())
+    expect(seeded.has('epic-overview')).toBe(false)
+    expect(seeded.has('epic-chip')).toBe(false)
+
+    const used = collectInto('<div class="epic-overview"><a class="epic-chip done"></a></div>')
+    expect(selectorIsUsed('.milestone-band .epic-overview', used)).toBe(false)
+    used.classes.add('milestone-band')
+    expect(selectorIsUsed('.milestone-band .epic-overview', used)).toBe(true)
   })
 })

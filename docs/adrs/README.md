@@ -85,3 +85,26 @@ Each record is numbered by its filename prefix and carries a `**Status:**` line.
   (1,243,124 B) — so Story 20.9's 1.24 MB returns, no longer dead but still the first line item to revisit. No
   text-twin audit is owed: [ADR 0031](0031-text-twin-standardization-moves-to-its-own-epic.md) moved that to
   Epic 28. ⚠️ **Open:** ADR 0032 is itself still `Proposed` — the two want ratifying together.)
+- [ADR 0038 — Framework Adapter Selection and Neutral Source-Root Discovery](0038-framework-adapter-selection-and-neutral-source-root-discovery.md) — **Proposed** 2026-08-06
+  (authored by [Story 12.2](../../_bmad-output/implementation-artifacts/12-2-gsd-core-baseline-adapter-coverage.md),
+  owner decisions D4/D5. **The ONE registry decision** — Epics 11, 12.3, 13, 14 and 15 inherit it and must not
+  propose a second. Context: a non-BMad repository could not generate at **two independent layers** — `SiteGenerator`
+  held a single hardcoded `BmadArtifactAdapter` field whose comment promised a registry "with Stories 4.3+" (those
+  stories relocated into Epics 11–15, orphaning the promise), and `ForgeOptions.SourceDirName` was the literal
+  `"_bmad-output"`, so a pure GSD repo threw `DirectoryNotFoundException` **before `AppliesTo` was ever called**.
+  **Decides:** an ordered registry where EVERY matching adapter runs and single-valued families merge
+  first-non-null-wins with every drop reported as a `Skipped` diagnostic (a single-adapter run returns that
+  adapter's bundle verbatim, so no notice fires on an existing BMad project); an ordered marker set
+  `.planning → .gsd → .specify → _bmad-output` where framework INSTALL markers precede BMad's OUTPUT folder — the
+  one place Story 12.2's task list was followed in intent rather than to the letter, because probing the output
+  folder first makes it a universal winner and would have left every GSD artifact outside the source root in the
+  real reference repo, while costing nothing for a BMad-only repo, which has no other marker; and the scoped
+  watch-mode epics re-ingest moves ONTO `IArtifactAdapter`, which is what makes BMad's watch output byte-identical
+  **by construction** rather than by measurement (AD-5, [ADR 0027](0027-watch-rebuild-scope-is-one-classifier-and-topology-escalates.md)).
+  ⚠️ **Deliberately NOT decided:** multi-ROOTED source discovery — in a two-framework repo the non-primary
+  framework's loose documents do not render as pages, diagnosed rather than hidden; that is Story 4.9's AC #2.
+  Also **names rather than silently does** two widenings it declines: `ModuleContext` stays BMad-typed (so the
+  About-SDD "Planning docs"/"Commands" columns are structurally unfillable for any non-BMad framework — a ceiling
+  stated on each framework page), and [ADR 0020](0020-module-declared-non-markdown-sources.md)'s non-markdown gate
+  stays BMad-keyed, which is why GSD's `config.json` is reported as uninterpreted rather than read. **No new gate**
+  per [ADR 0033](0033-content-drift-gates-are-targeted-and-regenerable.md).)

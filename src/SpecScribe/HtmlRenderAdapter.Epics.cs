@@ -65,8 +65,20 @@ public sealed partial class HtmlRenderAdapter
             AppendEmptyEpicsGuidance(sb, view.Commands);
         }
 
-        AppendChipSection(sb, "Vertical Slice", view.VerticalSliceChips);
-        AppendChipSection(sb, "Further Development", view.FurtherDevelopmentChips);
+        // Milestone bands REPLACE the two chip sections when the framework has a milestone level, because the bands
+        // carry the same chips grouped by the framework's own structure. Drawing both would list every phase twice,
+        // the second time under an EpicSection label ("Vertical Slice") that GSD Core never made. The `else` is the
+        // untouched pre-Story-12.2 path, so a framework with no milestones renders byte-for-byte as before — AC #4's
+        // guarantee held by construction, not by comparison. [Story 12.2 Task 8]
+        if (view.Milestones.Count > 0)
+        {
+            AppendMilestoneBands(sb, view.Milestones);
+        }
+        else
+        {
+            AppendChipSection(sb, "Vertical Slice", view.VerticalSliceChips);
+            AppendChipSection(sb, "Further Development", view.FurtherDevelopmentChips);
+        }
 
         if (model.Epics.Count > 0)
         {
@@ -123,6 +135,57 @@ public sealed partial class HtmlRenderAdapter
         sb.Append("<div class=\"chart-panel\">\n<h3>Progress by Epic</h3>\n");
         sb.Append(Charts.EpicMosaic(progress.PerEpic, e => $"epics/epic-{e.Number}.html"));
         sb.Append("</div>\n\n");
+    }
+
+    /// <summary>The milestone bands: one framed group per milestone, each headed by the milestone's name, its status
+    /// badge, its declared completion date when it has one, and its rolled-up phase and plan counts.
+    ///
+    /// <para><b>The badge always carries its WORD.</b> This body is composed in C#, so the badge is this
+    /// templater's responsibility rather than <c>StatusBadge.vue</c>'s — and it routes through
+    /// <see cref="StatusStyles.Badge"/>, the one place icon + colour + word are paired, so a band can never signal
+    /// its state by colour alone (UX-DR17).</para>
+    ///
+    /// <para><b>An empty band is stated, not skipped.</b> A milestone the framework declared but has not yet given
+    /// any phases renders its header plus an explicit note — never a bare heading with nothing under it, which
+    /// reads as a rendering bug rather than as the honest "declared, nothing planned yet" it actually is
+    /// (NFR8).</para> [Story 12.2 Task 8; AC #4]</summary>
+    private void AppendMilestoneBands(StringBuilder sb, IReadOnlyList<MilestoneBandView> bands)
+    {
+        sb.Append("<div class=\"section-divider\">Milestones</div>\n");
+        foreach (var band in bands)
+        {
+            sb.Append("<section class=\"milestone-band\">\n");
+            sb.Append("  <div class=\"milestone-band-header\">\n");
+            sb.Append($"    <h3 class=\"milestone-band-name\">{PathUtil.Html(band.Name)}</h3>\n");
+            sb.Append($"    {StatusStyles.Badge(band.StatusClass, band.StatusLabel)}\n");
+
+            var facts = new List<string>
+            {
+                $"{band.PhaseCount} phase{(band.PhaseCount == 1 ? "" : "s")}",
+            };
+            // 0 plans total means the milestone's phases have no plans listed yet — say that, rather than print a
+            // "0/0 plans" tally that reads as a measurement.
+            facts.Add(band.PlansTotal > 0 ? $"{band.PlansDone}/{band.PlansTotal} plans complete" : "no plans listed yet");
+            if (band.CompletedDate is { Length: > 0 } completed) facts.Add($"completed {completed}");
+            sb.Append($"    <span class=\"milestone-band-meta\">{PathUtil.Html(string.Join(" · ", facts))}</span>\n");
+            sb.Append("  </div>\n");
+
+            if (band.Chips.Count == 0)
+            {
+                sb.Append("  <p class=\"milestone-band-empty\">No phases are grouped under this milestone yet.</p>\n");
+            }
+            else
+            {
+                sb.Append("  <div class=\"epic-overview\">\n");
+                foreach (var chip in band.Chips)
+                {
+                    sb.Append($"    <a class=\"epic-chip {chip.StatusClass}\" href=\"{chip.Href}\"><span class=\"num\">{chip.Number:00}</span>{chip.TitleHtml}</a>\n");
+                }
+                sb.Append("  </div>\n");
+            }
+            sb.Append("</section>\n");
+        }
+        sb.Append("\n");
     }
 
     private void AppendChipSection(StringBuilder sb, string title, IReadOnlyList<EpicChip> chips)

@@ -56,11 +56,15 @@ public sealed class SiteGenerator
     /// rule and why this is not a <c>Lazy&lt;&gt;</c>. [Story 22.4 code review]</summary>
     private SurfacePrelude? _prelude;
 
-    // The ingestion seam (AD-1): all framework-specific discovery/parsing lives behind this adapter, so the
-    // generator only ever consumes the normalized ArtifactBundle. Held as the concrete type (not
-    // IArtifactAdapter) because the watch paths also need its scoped epics re-ingest; the adapter registry
-    // that selects among IArtifactAdapter implementations arrives with Stories 4.3+. [Story 4.1]
-    private readonly BmadArtifactAdapter _adapter = new();
+    // The ingestion seam (AD-1): all framework-specific discovery/parsing lives behind the adapters, so the
+    // generator only ever consumes the normalized ArtifactBundle. Story 12.2 replaced the single hardcoded
+    // BmadArtifactAdapter field with the registry the Story 4.1 comment here promised "with Stories 4.3+" — those
+    // stories relocated into Epics 11–15, leaving the field with no owner and a non-BMad repo unable to project at
+    // all. The registry keeps BOTH call sites below unchanged in shape: it exposes the same Ingest and the same
+    // scoped IngestEpics the watch path (RegenerateEpics) has always needed, the latter now a member of
+    // IArtifactAdapter rather than of one concrete class, so watch behaviour cannot regress (AD-5, ADR 0027).
+    // [Story 4.1; Story 12.2; ADR 0038]
+    private readonly AdapterRegistry _adapter = new();
 
     private SiteNav? _nav;
     private ModuleContext _module = ModuleContext.None;
@@ -5788,16 +5792,20 @@ public sealed class SiteGenerator
     {
         var methodPresent = ModuleContext.IsMethodPresent(_options.RepoRoot);
         var gdsPresent = ModuleContext.IsGdsPresent(_options.RepoRoot);
+        // GSD Core's presence signal is its marker directory — the same sniff GsdCoreArtifactAdapter.AppliesTo
+        // uses, read from that adapter's constant rather than re-hardcoding ".planning" here (NFR4). [Story 12.2]
+        var gsdPresent = Directory.Exists(
+            Path.Combine(_options.RepoRoot, GsdCoreArtifactAdapter.MarkerDirName));
 
         var sw = Stopwatch.StartNew();
-        WritePage(AboutSddTemplater.BuildHubPage(nav, methodPresent, gdsPresent), linkify: false);
+        WritePage(AboutSddTemplater.BuildHubPage(nav, methodPresent, gdsPresent, gsdPresent), linkify: false);
         yield return new GenerationEvent(GenerationOutcome.Generated, SiteNav.AboutSddOutputPath, sw.Elapsed);
 
         foreach (var fw in AboutSddTemplater.Frameworks)
         {
             sw.Restart();
             WritePage(
-                AboutSddTemplater.BuildFrameworkPage(nav, fw.Id, methodPresent, gdsPresent), linkify: false);
+                AboutSddTemplater.BuildFrameworkPage(nav, fw.Id, methodPresent, gdsPresent, gsdPresent), linkify: false);
             yield return new GenerationEvent(GenerationOutcome.Generated, fw.OutputPath, sw.Elapsed);
         }
     }

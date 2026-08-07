@@ -2162,6 +2162,53 @@
   color: var(--ink-light);
 }
 
+.ir-content .milestone-band {
+  max-width: 1100px;
+  margin: 0 auto 1rem;
+  padding: 0.9rem 1.5rem 1rem;
+  background: var(--warm-white);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px var(--shadow);
+}
+
+.ir-content .milestone-band-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.8rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.ir-content .milestone-band-name {
+  margin: 0;
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.ir-content .milestone-band-meta {
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: var(--ink-light);
+}
+
+.ir-content .milestone-band-empty {
+  margin: 0;
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--ink-light);
+}
+
+.ir-content .milestone-band .epic-overview {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
 .ir-content .epic-card {
   max-width: 860px;
   margin: 0 auto 1.25rem;
@@ -6166,6 +6213,13 @@ body:has(main.followup-detail) .ir-content .doc-header {
 .ir-content .sdd-check { color: var(--emerald-deep, #3d6b35); font-weight: 700; }
 
 .ir-content .sdd-check--no { color: var(--ink-light); font-weight: 500; }
+
+.ir-content .sdd-check--na {
+  color: var(--ink-light);
+  font-weight: 500;
+  font-style: italic;
+  font-size: 0.85em;
+}
 
 .ir-content .sdd-detected,
 .ir-content .sdd-support-yes,

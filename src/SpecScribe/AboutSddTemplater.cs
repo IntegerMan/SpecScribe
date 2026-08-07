@@ -36,7 +36,9 @@ public static class AboutSddTemplater
             "<strong>GitHub Spec Kit</strong> drives development from a specification: a <code>.specify/</code> "
             + "install marker plus numbered <code>specs/&lt;NNN&gt;-slug/</code> folders holding a spec, plan, and "
             + "task breakdown, authored through <code>/speckit.*</code> commands."),
-        ("gsd", "GSD", SiteNav.AboutSddGsdOutputPath, false,
+        // Supported since Story 12.2: GsdCoreArtifactAdapter projects .planning/ROADMAP.md into epics & stories and
+        // STATE.md into the sprint ledger. Support is per-noun, not blanket — see FamilyMatrix.GsdCore.
+        ("gsd", "GSD", SiteNav.AboutSddGsdOutputPath, true,
             "https://docs.opengsd.net/core",
             "<strong>GSD Core</strong> (Get Shit Done) is a spec-driven framework layered on your existing AI "
             + "coding runtime as <code>/gsd-*</code> slash commands. It keeps every artifact as plain Markdown and "
@@ -56,7 +58,7 @@ public static class AboutSddTemplater
     /// <summary>Builds the hub page's host-neutral <see cref="PageView"/> — the AD-2 delivery contract, so the
     /// IR's content region can be COMPOSED (<see cref="JsonSpaRenderAdapter.RenderContent"/>) instead of sliced
     /// back out of a rendered full page. [Story 23.4 AC #3]</summary>
-    public static PageView BuildHubPage(SiteNav nav, bool methodPresent, bool gdsPresent)
+    public static PageView BuildHubPage(SiteNav nav, bool methodPresent, bool gdsPresent, bool gsdPresent = false)
     {
         var outputPath = SiteNav.AboutSddOutputPath;
         var page = Begin(nav, outputPath, "About Spec-Driven Development",
@@ -82,6 +84,7 @@ public static class AboutSddTemplater
             {
                 "bmad" => methodPresent,
                 "gds" => gdsPresent,
+                "gsd" => gsdPresent,
                 _ => false,
             };
             sb.Append("    <li>");
@@ -105,13 +108,15 @@ public static class AboutSddTemplater
 
     /// <summary>Builds a framework page's host-neutral <see cref="PageView"/> — see <see cref="BuildHubPage"/>.
     /// [Story 23.4 AC #3]</summary>
-    public static PageView BuildFrameworkPage(SiteNav nav, string frameworkId, bool methodPresent, bool gdsPresent)
+    public static PageView BuildFrameworkPage(
+        SiteNav nav, string frameworkId, bool methodPresent, bool gdsPresent, bool gsdPresent = false)
     {
         var fw = Frameworks.First(f => f.Id == frameworkId);
         var detected = frameworkId switch
         {
             "bmad" => methodPresent,
             "gds" => gdsPresent,
+            "gsd" => gsdPresent,
             _ => false,
         };
 
@@ -129,6 +134,9 @@ public static class AboutSddTemplater
                 return End(page, hasMermaid: true);
             case "gds":
                 AppendGdsBody(sb, detected, fw.Url!);
+                return End(page, hasMermaid: true);
+            case "gsd":
+                AppendGsdCoreBody(sb, detected, fw.Url!);
                 return End(page, hasMermaid: true);
             default:
                 AppendComingSoonBody(sb, fw.Label, fw.Url, fw.Blurb);
@@ -157,43 +165,98 @@ public static class AboutSddTemplater
         sb.Append("</tr></thead>\n");
         sb.Append("    <tbody>\n");
         // BMad / BMad GDS both ride BmadArtifactAdapter → full ArtifactBundle + CommandCatalog.
-        AppendMatrixRow(sb, "BMad", SiteNav.AboutSddBmadOutputPath, true);
-        AppendMatrixRow(sb, "BMad GDS", SiteNav.AboutSddGdsOutputPath, true);
-        AppendMatrixRow(sb, "Spec Kit", SiteNav.AboutSddSpecKitOutputPath, false);
-        AppendMatrixRow(sb, "GSD", SiteNav.AboutSddGsdOutputPath, false);
-        AppendMatrixRow(sb, "GSD-Pi", SiteNav.AboutSddGsdPiOutputPath, false);
-        AppendMatrixRow(sb, "Superpowers", SiteNav.AboutSddSuperpowersOutputPath, false);
+        AppendMatrixRow(sb, "BMad", SiteNav.AboutSddBmadOutputPath, FamilyMatrix.All);
+        AppendMatrixRow(sb, "BMad GDS", SiteNav.AboutSddGdsOutputPath, FamilyMatrix.All);
+        AppendMatrixRow(sb, "Spec Kit", SiteNav.AboutSddSpecKitOutputPath, FamilyMatrix.None);
+        AppendMatrixRow(sb, "GSD", SiteNav.AboutSddGsdOutputPath, FamilyMatrix.GsdCore);
+        AppendMatrixRow(sb, "GSD-Pi", SiteNav.AboutSddGsdPiOutputPath, FamilyMatrix.None);
+        AppendMatrixRow(sb, "Superpowers", SiteNav.AboutSddSuperpowersOutputPath, FamilyMatrix.None);
         sb.Append("    </tbody>\n  </table>\n");
     }
 
-    private static void AppendMatrixRow(StringBuilder sb, string label, string href, bool supported)
+    /// <summary>What a matrix cell can say. The third value is the point: before Story 12.2 both helpers took a
+    /// single <c>bool supported</c>, which forced a framework to be all-✓ or all-✗ — and GSD Core is genuinely
+    /// neither. Worse, a bare ✗ conflates two different facts. <see cref="NotProjected"/> means the framework HAS
+    /// the artifact and SpecScribe does not project it (a SpecScribe boundary); <see cref="NoAnalog"/> means the
+    /// framework has no such artifact at all (nothing to project, and nothing owed). Rendering both as "—" would
+    /// have made GSD's empty Retros row read as unfinished work when it is a structural absence. [Story 12.2 Task 9]</summary>
+    private enum FamilySupport
+    {
+        Supported,
+        NotProjected,
+        NoAnalog,
+    }
+
+    /// <summary>Per-noun support for one framework, in the matrix's column order. The nouns mirror
+    /// <see cref="ArtifactBundle"/>'s projection families plus <see cref="ModuleContext"/>'s commands — the same
+    /// nouns the shared adapter contract already uses.</summary>
+    private sealed record FamilyMatrix(
+        FamilySupport EpicsAndStories,
+        FamilySupport Requirements,
+        FamilySupport Sprint,
+        FamilySupport Retros,
+        FamilySupport PlanningDocs,
+        FamilySupport Commands)
+    {
+        /// <summary>Every family projected — BMad and BMad GDS, both riding <see cref="BmadArtifactAdapter"/>.</summary>
+        public static FamilyMatrix All { get; } = Uniform(FamilySupport.Supported);
+
+        /// <summary>No adapter yet. Deliberately <see cref="FamilySupport.NotProjected"/> rather than
+        /// <see cref="FamilySupport.NoAnalog"/>: these frameworks have the artifacts, SpecScribe just does not read
+        /// them yet.</summary>
+        public static FamilyMatrix None { get; } = Uniform(FamilySupport.NotProjected);
+
+        /// <summary>GSD Core, per owner decisions D1/D3 and the module ceiling (Gap 3). The three unticked rows are
+        /// each unticked for a DIFFERENT stated reason, spelled out in words on the framework page.</summary>
+        public static FamilyMatrix GsdCore { get; } = new(
+            EpicsAndStories: FamilySupport.Supported,  // ROADMAP.md → phases + plans
+            Requirements: FamilySupport.NotProjected,  // D3 — open-ended id prefixes; REQUIREMENTS.md renders as a document
+            Sprint: FamilySupport.Supported,           // STATE.md + the roadmap's per-plan checkbox
+            Retros: FamilySupport.NoAnalog,            // GSD Core has no retrospective artifact at all
+            PlanningDocs: FamilySupport.NotProjected,  // Gap 3 — ModuleContext is BMad-typed
+            Commands: FamilySupport.NotProjected);     // Gap 3 — the 67 /gsd-* commands are in-repo but unreachable
+
+        private static FamilyMatrix Uniform(FamilySupport v) => new(v, v, v, v, v, v);
+
+        public IReadOnlyList<FamilySupport> InColumnOrder =>
+            new[] { EpicsAndStories, Requirements, Sprint, Retros, PlanningDocs, Commands };
+    }
+
+    private static void AppendMatrixRow(StringBuilder sb, string label, string href, FamilyMatrix families)
     {
         sb.Append("      <tr>");
         sb.Append($"<th scope=\"row\"><a href=\"{PathUtil.Html(href)}\">{PathUtil.Html(label)}</a></th>");
-        for (var i = 0; i < 6; i++)
-            sb.Append($"<td>{Check(supported)}</td>");
+        foreach (var family in families.InColumnOrder)
+            sb.Append($"<td>{Check(family)}</td>");
         sb.Append("</tr>\n");
     }
 
-    private static string Check(bool yes) => yes
-        ? "<span class=\"sdd-check\" aria-label=\"Yes\">✓</span>"
-        : "<span class=\"sdd-check sdd-check--no\" aria-label=\"No\">—</span>";
+    /// <summary>The cell glyph. Every state carries its own <c>aria-label</c> word, so the distinction survives for
+    /// a screen-reader user exactly as it does visually — the table's meaning is never carried by glyph shape
+    /// alone. The ✓ and — markup is byte-identical to what the two-state helper emitted, so every all-✓ and all-✗
+    /// row in the matrix is unchanged.</summary>
+    private static string Check(FamilySupport support) => support switch
+    {
+        FamilySupport.Supported => "<span class=\"sdd-check\" aria-label=\"Yes\">✓</span>",
+        FamilySupport.NoAnalog => "<span class=\"sdd-check sdd-check--na\" aria-label=\"Not applicable — this framework has no such artifact\">n/a</span>",
+        _ => "<span class=\"sdd-check sdd-check--no\" aria-label=\"No\">—</span>",
+    };
 
-    private static void AppendFamilySupportTable(StringBuilder sb, bool supported)
+    private static void AppendFamilySupportTable(StringBuilder sb, FamilyMatrix families)
     {
         sb.Append("  <table class=\"sdd-support-matrix sdd-support-matrix--compact\">\n");
         sb.Append("    <tbody>\n");
-        AppendCompactRow(sb, "Epics &amp; Stories", supported);
-        AppendCompactRow(sb, "Requirements", supported);
-        AppendCompactRow(sb, "Sprint", supported);
-        AppendCompactRow(sb, "Retros", supported);
-        AppendCompactRow(sb, "Planning docs", supported);
-        AppendCompactRow(sb, "Commands", supported);
+        AppendCompactRow(sb, "Epics &amp; Stories", families.EpicsAndStories);
+        AppendCompactRow(sb, "Requirements", families.Requirements);
+        AppendCompactRow(sb, "Sprint", families.Sprint);
+        AppendCompactRow(sb, "Retros", families.Retros);
+        AppendCompactRow(sb, "Planning docs", families.PlanningDocs);
+        AppendCompactRow(sb, "Commands", families.Commands);
         sb.Append("    </tbody>\n  </table>\n");
     }
 
-    private static void AppendCompactRow(StringBuilder sb, string label, bool supported) =>
-        sb.Append($"      <tr><th scope=\"row\">{label}</th><td>{Check(supported)}</td></tr>\n");
+    private static void AppendCompactRow(StringBuilder sb, string label, FamilySupport support) =>
+        sb.Append($"      <tr><th scope=\"row\">{label}</th><td>{Check(support)}</td></tr>\n");
 
     private static void AppendBmadBody(StringBuilder sb, bool detected, string url)
     {
@@ -213,7 +276,7 @@ public static class AboutSddTemplater
         sb.Append("  <h2 id=\"specscribe-support\">SpecScribe support</h2>\n");
         sb.Append("  <p>SpecScribe projects BMad through the shared adapter contract: epics &amp; stories, ");
         sb.Append("requirements, sprint, retros, planning docs, and next-step commands when those artifacts exist.</p>\n");
-        AppendFamilySupportTable(sb, supported: true);
+        AppendFamilySupportTable(sb, FamilyMatrix.All);
 
         AppendBmadModulesSection(sb);
 
@@ -324,7 +387,7 @@ public static class AboutSddTemplater
         sb.Append("  <h2 id=\"specscribe-support\">SpecScribe support</h2>\n");
         sb.Append("  <p>SpecScribe projects BMad GDS through the same adapter families as BMad — including ");
         sb.Append("GDD / narrative / architecture planning docs and GDS-oriented commands when installed.</p>\n");
-        AppendFamilySupportTable(sb, supported: true);
+        AppendFamilySupportTable(sb, FamilyMatrix.All);
         sb.Append("  <p>GDS is one of BMad's modules, and a repo may install several at once. For how SpecScribe ");
         sb.Append($"treats the rest of them, see <a href=\"{PathUtil.Html(SiteNav.AboutSddBmadOutputPath)}#modules\">");
         sb.Append("BMad &rsaquo; Modules</a>.</p>\n");
@@ -340,6 +403,89 @@ public static class AboutSddTemplater
         sb.Append("  <h2 id=\"methodology\">Methodology</h2>\n");
         sb.Append("  <p>Typical progression through GDS workflows:</p>\n");
         sb.Append(Mermaid.Block(Mermaid.SddGdsDiagram()));
+    }
+
+    /// <summary>GSD Core's framework page — the same five-beat shape as <see cref="AppendBmadBody"/> (what it is →
+    /// get started → SpecScribe support → commands → methodology), replacing the "coming soon" placeholder now that
+    /// <see cref="GsdCoreArtifactAdapter"/> exists.
+    ///
+    /// <para><b>The three unticked rows are explained IN WORDS, not left as bare dashes.</b> This is the whole
+    /// posture of Story 12.2: an absent tick must read as a stated boundary, never as unfinished work (NFR8). Each
+    /// of the three is unticked for a different reason — a deliberate modelling decision (Requirements), and a
+    /// structural ceiling in a shared type that this story is explicitly out of scope to widen (Planning docs,
+    /// Commands) — and a reader who cannot tell those apart has been told nothing useful.</para>
+    /// [Story 12.2 Task 9]</summary>
+    private static void AppendGsdCoreBody(StringBuilder sb, bool detected, string url)
+    {
+        sb.Append("  <h2 id=\"overview\">What it is</h2>\n");
+        sb.Append("  <p><strong>GSD Core</strong> (Get Shit Done) is a spec-driven framework layered on your ");
+        sb.Append("existing AI coding runtime as <code>/gsd-*</code> slash commands. It keeps every artifact as ");
+        sb.Append("plain Markdown and JSON in a <code>.planning/</code> directory &mdash; project brief, ");
+        sb.Append("requirements, roadmap, and live state at the root, then one folder per phase &mdash; and ");
+        sb.Append("decomposes work as Milestone &rarr; Phase &rarr; Plan. There is no database: what is on disk is ");
+        sb.Append("the project. Choose it when you want the whole plan reviewable in your editor and your diff.</p>\n");
+        sb.Append("  <p class=\"sdd-absent-info\">Not to be confused with <strong>BMad GDS</strong> (Game Dev ");
+        sb.Append($"Studio), a different framework with a near-anagram name &mdash; see ");
+        sb.Append($"<a href=\"{PathUtil.Html(SiteNav.AboutSddGdsOutputPath)}\">BMad GDS</a>. GSD Core is keyed on ");
+        sb.Append("<code>.planning/</code>; BMad GDS installs under <code>_bmad/gds</code>.</p>\n");
+
+        sb.Append("  <h2 id=\"get-started\">Get started</h2>\n");
+        sb.Append("  <p>Install GSD Core into a repo, then let it scaffold the planning directory:</p>\n");
+        sb.Append("  <pre class=\"sdd-install\"><code>npx @opengsd/gsd-core install</code></pre>\n");
+        sb.Append($"  <p>See <a href=\"{PathUtil.Html(url)}\">the official documentation</a> ");
+        sb.Append("for more information and installation options.</p>\n");
+        if (!detected)
+            sb.Append("  <p class=\"sdd-absent-info\">GSD Core is not detected in this repository yet (.planning).</p>\n");
+
+        sb.Append("  <h2 id=\"specscribe-support\">SpecScribe support</h2>\n");
+        sb.Append("  <p>SpecScribe reads <code>.planning/ROADMAP.md</code> as the epics source: each <em>phase</em> ");
+        sb.Append("becomes an epic and each <em>plan</em> (<code>NN-YY-PLAN.md</code>) becomes a story, with the ");
+        sb.Append("roadmap's per-plan checkbox as the completion signal. Milestones render as banded groups on the ");
+        sb.Append($"<a href=\"{PathUtil.Html(SiteNav.EpicsOutputPath)}\">Epics &amp; Stories</a> index, and ");
+        sb.Append("<code>.planning/STATE.md</code> supplies the sprint view. Support is per-family, not blanket:</p>\n");
+        AppendFamilySupportTable(sb, FamilyMatrix.GsdCore);
+
+        sb.Append("  <h3 id=\"boundaries\">Why three rows are not ticked</h3>\n");
+        sb.Append("  <p>Each is a stated boundary with its own reason, not a queue of unfinished work:</p>\n");
+        sb.Append("  <dl class=\"sdd-tier-list\">\n");
+        sb.Append("    <div class=\"cap-row\"><dt>Requirements</dt><dd>GSD Core does ship a ");
+        sb.Append("<code>REQUIREMENTS.md</code> with a requirement&rarr;phase traceability table, and it renders in ");
+        sb.Append("full as its own page. What SpecScribe does <em>not</em> do is model its ids. GSD projects define ");
+        sb.Append("their own id prefixes &mdash; one real project uses twelve (<code>CONV-01</code>, ");
+        sb.Append("<code>CAP-01</code>, <code>GADM-01</code>, &hellip;) &mdash; so the set is open-ended, while ");
+        sb.Append("SpecScribe's requirement model is a closed vocabulary. Projecting them would mean renaming each ");
+        sb.Append("one to an id GSD never wrote, which is worse than not projecting them.</dd></div>\n");
+        sb.Append("    <div class=\"cap-row\"><dt>Retros</dt><dd>Marked <em>n/a</em> rather than unsupported: GSD ");
+        sb.Append("Core has no retrospective artifact at all. Its per-plan <code>NN-YY-SUMMARY.md</code> files are ");
+        sb.Append("execution logs, and treating one as a retrospective would mark its phase closed out on every ");
+        sb.Append("status surface on the strength of a build log. They render as their own pages instead.</dd></div>\n");
+        sb.Append("    <div class=\"cap-row\"><dt>Planning docs and Commands</dt><dd>A shared ceiling, not a GSD ");
+        sb.Append("gap. Both columns are driven by SpecScribe's module-identity model, which is typed to BMad's ");
+        sb.Append("installed-module layout (<code>_bmad/{code}/</code>) &mdash; so a non-BMad framework cannot fill ");
+        sb.Append("them however well its artifacts parse. GSD's slash commands genuinely are in the repository, at ");
+        sb.Append("<code>.claude/commands/gsd/</code>, and would populate the Commands column well; widening the ");
+        sb.Append("model to reach them is its own decision, deliberately not taken here.</dd></div>\n");
+        sb.Append("  </dl>\n");
+        sb.Append("  <p>Everything else under <code>.planning/</code> &mdash; the project brief, the codebase map, ");
+        sb.Append("research notes, todos, and each phase's context and verification companions &mdash; renders as ");
+        sb.Append("its own page through the standard Markdown pass. The one file SpecScribe does not read is ");
+        sb.Append($"<code>config.json</code>, and the run records that on ");
+        sb.Append($"<a href=\"{PathUtil.Html(SiteNav.DiagnosticsOutputPath)}\">Diagnostics</a>.</p>\n");
+
+        sb.Append("  <h2 id=\"commands\">Common commands</h2>\n");
+        sb.Append("  <ul class=\"sdd-commands\">\n");
+        sb.Append("    <li><code>/gsd-new</code> — define the project brief and core value</li>\n");
+        sb.Append("    <li><code>/gsd-requirements</code> — capture requirements</li>\n");
+        sb.Append("    <li><code>/gsd-roadmap</code> — plan milestones and phases</li>\n");
+        sb.Append("    <li><code>/gsd-plan-phase</code> — decompose a phase into numbered plans</li>\n");
+        sb.Append("    <li><code>/gsd-execute</code> — execute a plan and write its summary</li>\n");
+        sb.Append("    <li><code>/gsd-review-backlog</code> — promote backlog phases into the roadmap</li>\n");
+        sb.Append("  </ul>\n");
+
+        sb.Append("  <h2 id=\"methodology\">Methodology</h2>\n");
+        sb.Append("  <p>Typical progression: define the project once, then loop plan &rarr; execute &rarr; ");
+        sb.Append("summarize for each plan inside a phase, and close each milestone when its phases are done.</p>\n");
+        sb.Append(Mermaid.Block(Mermaid.SddGsdCoreDiagram()));
     }
 
     /// <summary>The placeholder body for a framework SpecScribe does not yet project. Carries the framework's
@@ -364,7 +510,7 @@ public static class AboutSddTemplater
         }
 
         sb.Append("  <h2 id=\"specscribe-support\">SpecScribe support</h2>\n");
-        AppendFamilySupportTable(sb, supported: false);
+        AppendFamilySupportTable(sb, FamilyMatrix.None);
     }
 
     /// <summary>The identity every SDD page shares, carried from <see cref="Begin"/> to <see cref="End"/> so the

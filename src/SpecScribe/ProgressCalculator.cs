@@ -31,7 +31,19 @@ public static class ProgressCalculator
                     var (done, total, status, changeLogDate) = ReadArtifactProgress(artifactFullPath);
                     story.TasksDone = done;
                     story.TasksTotal = total;
-                    story.Status = status;
+                    // ?? story.Status, not a bare assignment: an adapter may already have established a status from
+                    // a source OTHER than the artifact's own `Status:` line, and reading that line is not allowed to
+                    // erase it. GSD Core is the case that forced this — no GSD plan carries a `Status:` line or a
+                    // `status:` frontmatter key, so ExtractStatus returns null for every one of them, and the bare
+                    // assignment silently reset the status GsdCoreArtifactAdapter had derived from ROADMAP's
+                    // authoritative per-plan checkbox. Every finished plan then rendered as a drafted story with no
+                    // task plan (0/0 tasks is genuine for GSD) — the exact defect class BmadArtifactAdapter's
+                    // artifact-map doc comment already warns about.
+                    //
+                    // BMad is unaffected, byte for byte: EpicsParser never sets StoryInfo.Status (it sets only the
+                    // EpicStatus enum), so story.Status is null on entry for every BMad story and `null ?? null` is
+                    // the assignment this replaced. [Story 12.2 Task 6]
+                    story.Status = status ?? story.Status;
                     story.LastUpdatedDate = ResolveLastUpdated(story, gitFileDates, changeLogDate);
                     epicTasksDone += done;
                     epicTasksTotal += total;

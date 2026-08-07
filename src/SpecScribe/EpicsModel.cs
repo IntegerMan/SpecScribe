@@ -80,9 +80,41 @@ public sealed class EpicInfo
 /// <see cref="PlainText"/> is the tooltip a "(AC: #N)" task reference shows when it links back to it.</summary>
 public sealed record AcceptanceCriterion(int Number, string Html, string PlainText);
 
+/// <summary>One named grouping of epics ABOVE the epic level — GSD Core's Milestone (<c>v1.0</c>, <c>v2.0</c>) and
+/// its <c>## Backlog</c> band. A framework with no such level simply produces none, which is why
+/// <see cref="EpicsModel.Milestones"/> defaults to empty: BMad is unchanged by CONSTRUCTION rather than by a
+/// conditional (AC #4's byte-for-byte guarantee). [Story 12.2 Task 8; owner decision D1]
+///
+/// <para>Deliberately NOT a third level of the epic/story model. It carries no stories and no goal prose — only
+/// what an epics-index band header shows: the name, the state, the declared completion date, and the roll-ups.
+/// Widening <see cref="EpicInfo"/>/<see cref="StoryInfo"/> into a three-level hierarchy would touch the sunburst,
+/// donut, sprint grouping, requirement roll-up and the IR schema; that is its own story, and D1 rejected it.</para></summary>
+/// <param name="Name">The milestone's own label, verbatim from the framework (e.g. <c>v1.0</c>, <c>Backlog</c>).</param>
+/// <param name="StatusWord">A CANONICAL lifecycle word (<c>done</c>/<c>in-progress</c>/<c>drafted</c>), already
+/// mapped from the framework's native vocabulary by the ADAPTER — never a native word. Surfaces route it through
+/// <see cref="StatusStyles.ForStatus"/> for the class and <see cref="StatusStyles.StoryLabel"/> for the visible
+/// word, so a band badge can never mint a status the rest of the portal does not have. GSD's own words
+/// (<c>Complete</c> / <c>Not started</c>) are mapped in <see cref="GsdCoreArtifactAdapter"/> precisely because
+/// <c>"not started"</c> has no <see cref="StatusStyles"/> arm and would otherwise render <c>unrecognized</c>.</param>
+/// <param name="CompletedDate">The declared completion date when the framework records one; null omits the marker
+/// rather than inventing one (NFR8).</param>
+/// <param name="EpicNumbers">The <see cref="EpicInfo.Number"/>s banded under this milestone, in roadmap order. May
+/// be empty — a milestone declared with no phases yet — which the surface must render as a stated empty band, never
+/// as a bare heading.</param>
+public sealed record MilestoneInfo(
+    string Name,
+    string StatusWord,
+    string? CompletedDate,
+    IReadOnlyList<int> EpicNumbers);
+
 public sealed class EpicsModel
 {
     public required string OverviewHtml { get; init; }
     public required string RequirementsInventoryHtml { get; init; }
     public required IReadOnlyList<EpicInfo> Epics { get; init; }
+
+    /// <summary>The optional milestone grouping above the epic level, in roadmap order. EMPTY for every framework
+    /// that has no milestone level (BMad, BMad GDS) — and empty is the signal the epics index reads to render its
+    /// chip sections exactly as it always has, byte for byte. [Story 12.2 Task 8; AC #4]</summary>
+    public IReadOnlyList<MilestoneInfo> Milestones { get; init; } = Array.Empty<MilestoneInfo>();
 }

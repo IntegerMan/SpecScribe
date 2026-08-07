@@ -9,6 +9,31 @@ namespace SpecScribe;
 /// <param name="Href">The drill href to the epic page (e.g. <c>epics/epic-1.html</c>).</param>
 public sealed record EpicChip(int Number, string TitleHtml, string StatusClass, string Href);
 
+/// <summary>One MILESTONE BAND on the epics index as DATA: a named group of epic chips sitting above the epic
+/// level, with the milestone's own state and its rolled-up phase and plan counts. GSD Core's <c>v1.0</c>/<c>v2.0</c>
+/// milestones and its <c>Backlog</c> group; empty for every framework with no such level. [Story 12.2 Task 8; AC #4]</summary>
+/// <param name="Name">The milestone's label, verbatim from the framework.</param>
+/// <param name="StatusClass">The <see cref="StatusStyles.ForStatus"/> css class for the band badge.</param>
+/// <param name="StatusLabel">The badge's visible WORD. Always emitted alongside the class — a band's state is never
+/// signalled by colour alone (UX-DR17), the same guarantee <c>StatusBadge.vue</c> enforces by shape on the
+/// template-authored side.</param>
+/// <param name="CompletedDate">The declared completion date, or null to omit the marker rather than invent one.</param>
+/// <param name="PhaseCount">How many phases are banded here.</param>
+/// <param name="PlansDone">Plans complete across those phases.</param>
+/// <param name="PlansTotal">Plans defined across those phases; 0 suppresses the plan roll-up entirely.</param>
+/// <param name="Chips">The phase chips in this band. MAY BE EMPTY — a milestone declared with no phases yet — and
+/// the renderer must say so in words rather than leave a bare heading (NFR8, the same trap
+/// <c>HierarchyExplorerHtml</c>'s doc comment records).</param>
+public sealed record MilestoneBandView(
+    string Name,
+    string StatusClass,
+    string StatusLabel,
+    string? CompletedDate,
+    int PhaseCount,
+    int PlansDone,
+    int PlansTotal,
+    IReadOnlyList<EpicChip> Chips);
+
 /// <summary>One story card on an epic page as DATA — the story's identity + status + task tally + drill targets
 /// (the checkable "section facts" the parity harness asserts), PLUS the inherently-HTML prose the card also
 /// renders as NAMED OPAQUE fragments (<see cref="UserStoryHtml"/>, <see cref="AcBlocksHtml"/>,
@@ -114,6 +139,15 @@ public sealed record EpicsIndexView
 
     /// <summary>The "Further Development" chip section (empty → omitted).</summary>
     public required IReadOnlyList<EpicChip> FurtherDevelopmentChips { get; init; }
+
+    /// <summary>The milestone bands, in roadmap order. EMPTY for every framework with no milestone level — and
+    /// empty is what the renderer branches on: it draws the two chip sections above, exactly as it always has.
+    /// A NON-empty list REPLACES those chip sections, because the bands carry the same chips grouped by the
+    /// framework's own structure, and drawing both would list every phase twice under a
+    /// <see cref="EpicSection"/> label its framework never made. That branch is what makes AC #4's "a framework
+    /// with no milestone level renders exactly as it does today, byte-for-byte" true by construction.
+    /// [Story 12.2 Task 8]</summary>
+    public IReadOnlyList<MilestoneBandView> Milestones { get; init; } = Array.Empty<MilestoneBandView>();
 
     /// <summary>Open follow-ups for the project sunburst's story-ring peers + Follow-ups orphan. Defaults to
     /// <see cref="FollowUpGeometry.Empty"/>. [Story 9.7]</summary>

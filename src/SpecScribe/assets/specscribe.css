@@ -2841,6 +2841,66 @@ a.work-node:focus-visible {
   color: var(--ink-light);
 }
 
+/* ====================== EPICS: MILESTONE BANDS ======================
+   The grouping level ABOVE the epic, for frameworks that have one (GSD Core's v1.0 / v2.0 milestones and its
+   Backlog group). Frameworks with no milestone level emit no bands at all, so none of this ever applies to them —
+   the epics index renders its two chip sections exactly as it always has. [Story 12.2 Task 8]
+
+   The band is a frame, not a card: it groups chips that already carry their own status accents, so a second heavy
+   border would compete with them. Status colour on the header sits on the badge (which always carries its word),
+   never on the band edge alone. */
+.milestone-band {
+  max-width: 1100px;
+  margin: 0 auto 1rem;
+  padding: 0.9rem 1.5rem 1rem;
+  background: var(--warm-white);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px var(--shadow);
+}
+
+.milestone-band-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.8rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.milestone-band-name {
+  margin: 0;
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+/* Phase and plan roll-ups. `margin-left: auto` pushes them to the trailing edge on a wide header and simply
+   wraps to the next line on a narrow one, so the row never overflows horizontally. */
+.milestone-band-meta {
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: var(--ink-light);
+}
+
+/* A milestone declared with no phases yet. Stated in words rather than left as a bare heading — an empty frame
+   reads as a rendering fault, which is the opposite of the honest absence it should convey (NFR8). */
+.milestone-band-empty {
+  margin: 0;
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--ink-light);
+}
+
+/* The chip grid is already max-width/padded for standalone use; inside a band the frame supplies both. */
+.milestone-band .epic-overview {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
 /* ====================== EPICS: EPIC CARD ====================== */
 .epic-card {
   max-width: 860px;
@@ -7384,6 +7444,15 @@ a.deferred-item-resolving:hover { color: var(--rust); }
 }
 .sdd-check { color: var(--emerald-deep, #3d6b35); font-weight: 700; }
 .sdd-check--no { color: var(--ink-light); font-weight: 500; }
+/* "n/a" — the framework has no such artifact, as distinct from "—" (it has one, SpecScribe does not project it).
+   Smaller and italic so the two read apart at a glance; the aria-label carries the full distinction for a screen
+   reader, so the difference is never conveyed by styling alone. [Story 12.2 Task 9] */
+.sdd-check--na {
+  color: var(--ink-light);
+  font-weight: 500;
+  font-style: italic;
+  font-size: 0.85em;
+}
 .sdd-detected,
 .sdd-support-yes,
 .sdd-support-soon {

@@ -21,9 +21,14 @@ frameworks is planned — see the [Roadmap](#roadmap) for feature-level plans.
 | [BMad Method](https://github.com/bmad-code-org/BMAD-METHOD) | 6.10.0 | ✅ Supported |
 | BMad GDS (Game Dev Studio) | 0.6.0 | ✅ Supported |
 | [GitHub Spec Kit](https://github.com/github/spec-kit) | — | 🧭 Planned |
-| [GSD](https://docs.opengsd.net/core) | — | 🧭 Planned |
+| [GSD](https://docs.opengsd.net/core) | — | ✅ Supported |
 | [GSD-Pi](https://docs.opengsd.net/pi) | — | 🧭 Planned |
 | Superpowers | — | 🧭 Planned |
+
+GSD Core support is **per artifact family, not blanket**: phases and plans become epics and stories, milestones
+render as banded groups on the epics index, and `.planning/STATE.md` supplies the sprint view. Requirements,
+planning docs and commands are deliberately not projected — each for its own stated reason, spelled out on the
+portal's own **About SDD › GSD** page rather than left as unexplained blanks.
 
 > **GSD and GSD-Pi are distinct products, not two versions of one thing.**
 > [GSD Core](https://docs.opengsd.net/core) is a slash-command framework layered on your AI coding runtime; it
@@ -232,7 +237,7 @@ it observes.
 
 ## Roadmap
 
-Planned framework support (Spec Kit, GSD, GSD-Pi, Superpowers) is tracked in the
+Planned framework support (Spec Kit, GSD-Pi, Superpowers) is tracked in the
 [Supported frameworks](#supported-frameworks) table above. Feature-level plans:
 
 - **Git insights** — richer history-derived views (velocity, file heatmaps) beyond the current commit stats

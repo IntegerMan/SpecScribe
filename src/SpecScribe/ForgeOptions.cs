@@ -86,6 +86,52 @@ public sealed class ForgeOptions
     public const string DefaultSiteTitle = "BMad Live Docs";
     public const string SourceDirName = "_bmad-output";
 
+    /// <summary>The framework marker directories <see cref="Resolve"/> probes when no explicit <c>--source</c> is
+    /// given, in priority order. Each entry is BOTH the marker that identifies a repo root AND the source root
+    /// derived from it — the layout every framework here shares (its planning artifacts live inside its marker).
+    ///
+    /// <para><b>Framework INSTALL markers precede BMad's OUTPUT directory, deliberately</b> — and this is the one
+    /// place Story 12.2's task list was followed in intent rather than to the letter. That task said to keep
+    /// <c>_bmad-output</c> first "so this repo's own resolution is byte-identical"; the stated GOAL is what is
+    /// preserved here, and preserved exactly. <c>_bmad-output</c> is an OUTPUT folder — a BMad project writes one
+    /// whether or not any other framework is present — whereas <c>.planning</c>/<c>.gsd</c>/<c>.specify</c> are
+    /// framework install markers. Probing the output folder first makes it a universal winner, and the real
+    /// reference repository (<c>CORA</c>) carries BOTH: its <c>_bmad-output</c> holds six planning documents while
+    /// its <c>.planning</c> holds 168 files, 11 phases and 58 plans. Ordering BMad first would have resolved
+    /// <see cref="SourceRoot"/> to the six-file tree and left every GSD artifact OUTSIDE the source root — where
+    /// <see cref="PathUtil.EscapesRepoRoot"/> rejects it — so the framework this story exists to support could not
+    /// render at all (AC #1). Ordering by specificity costs nothing in the case the instruction was protecting: a
+    /// BMad-only repo, this repository included, has none of the other markers, so it resolves to
+    /// <c>_bmad-output</c> exactly as it always did. It also matches the same story's registry guidance verbatim —
+    /// "specific markers before BMad's fallback".</para>
+    ///
+    /// <para><b>The cost, stated rather than hidden.</b> In a repo carrying two frameworks the NON-primary
+    /// framework's documents sit outside the single source root and do not render as pages. That is the bounded
+    /// compromise D5 accepts — bundle-level merging is cheap, file-discovery-level merging is not — and
+    /// <see cref="AdapterRegistry"/> reports it as an <see cref="AdapterDiagnosticCategory.Informational"/> notice
+    /// naming the marker that was not made primary, so the omission is a stated boundary rather than a silent gap
+    /// (NFR8).</para>
+    ///
+    /// <para><b>What this does and does not decide.</b> It decides which single directory the <c>*.md</c>
+    /// enumeration walks and which root every source-relative path is computed against — <see cref="SourceRoot"/>
+    /// is single-valued and anchors both. It does NOT decide which adapters run: that is
+    /// <see cref="AdapterRegistry"/>'s ordered <c>AppliesTo</c> sweep, and a repo carrying two frameworks merges at
+    /// the <see cref="ArtifactBundle"/> level with the non-primary framework's documents rendering through whatever
+    /// this primary root already sees. Multi-ROOTED source discovery is deliberately out of scope (Story 4.9 AC #2);
+    /// see ADR 0038.</para>
+    ///
+    /// <para><c>.specify</c> is Spec Kit's install marker; whether its source root should instead be the sibling
+    /// <c>specs/</c> tree is Story 11.2's call, not this one's. Listing the marker here is what stops a Spec Kit
+    /// repo failing before any adapter is consulted; refining where it points is that story's.</para>
+    /// [Story 12.2 Task 2; ADR 0038]</summary>
+    public static readonly IReadOnlyList<string> SourceDirNames = new[]
+    {
+        GsdCoreArtifactAdapter.MarkerDirName, // GSD Core [Story 12.2]
+        ".gsd",                               // GSD Pi [Story 12.3]
+        ".specify",                           // Spec Kit [Story 11.2]
+        SourceDirName,                        // BMad's output folder — the least specific marker, so it probes LAST
+    };
+
     /// <summary>BMad's config directory (repo-root <c>_bmad</c>) and the project-config file inside it whose
     /// <c>project_name</c> brands the site (<see cref="ReadProjectName"/>). Named constants because this file lives
     /// under NEITHER source root — the watch layer (<see cref="FileWatcherService"/>) and the data-source
@@ -154,22 +200,29 @@ public sealed class ForgeOptions
         {
             // Deliberately walks up from the cwd only — never the executable directory, which for an
             // installed global tool lives in the tool store under the user profile.
+            //
+            // Story 12.2: the probe is now the ordered SourceDirNames marker set rather than the single
+            // _bmad-output literal. NEAREST DIRECTORY WINS, then marker order within it — so a nested BMad project
+            // under a GSD parent still resolves to the nested one, exactly as the single-marker walk did, and a
+            // repo carrying several markers at the SAME level resolves by SourceDirNames order (BMad first).
             var dir = new DirectoryInfo(startDirectory ?? Directory.GetCurrentDirectory());
-            while (dir is not null && !Directory.Exists(Path.Combine(dir.FullName, SourceDirName)))
+            string? markerDirName = null;
+            while (dir is not null && (markerDirName = FindSourceMarker(dir.FullName)) is null)
             {
                 dir = dir.Parent;
             }
 
-            if (dir is not null)
+            if (dir is not null && markerDirName is not null)
             {
                 repoRoot = dir.FullName;
-                sourceRoot = Path.Combine(repoRoot, SourceDirName);
+                sourceRoot = Path.Combine(repoRoot, markerDirName);
             }
             else if (requireSource)
             {
                 throw new DirectoryNotFoundException(
-                    $"Could not locate a repo root (a directory containing '{SourceDirName}') at or above the " +
-                    "current directory. Run from inside a BMad project, or pass --source to point at your artifacts.");
+                    $"Could not locate a repo root (a directory containing one of {string.Join(", ", SourceDirNames.Select(m => $"'{m}'"))}) " +
+                    "at or above the current directory. Run from inside a spec-driven project, or pass --source to " +
+                    "point at your artifacts.");
             }
             else
             {
@@ -190,7 +243,7 @@ public sealed class ForgeOptions
             AdrSourceRoot = adrs is { Length: > 0 } ? Path.GetFullPath(adrs) : ResolveAdrSourceRoot(repoRoot),
             AdrSourceExplicit = adrs is { Length: > 0 },
             OutputRoot = output is { Length: > 0 } ? Path.GetFullPath(output) : Path.Combine(repoRoot, OutputDirName),
-            SiteTitle = projectName is { Length: > 0 } ? projectName : ReadProjectName(repoRoot) ?? DefaultSiteTitle,
+            SiteTitle = projectName is { Length: > 0 } ? projectName : ResolveSiteTitle(repoRoot, sourceRoot),
             IncludeReadme = includeReadme,
             DeepGitAnalytics = deepGitAnalytics,
             EmitSpa = emitSpa,
@@ -276,6 +329,75 @@ public sealed class ForgeOptions
         catch (Exception)
         {
             return false;
+        }
+    }
+
+    /// <summary>The first <see cref="SourceDirNames"/> marker present directly under <paramref name="dir"/>, or
+    /// null when none is. Never throws: an unreadable candidate simply is not a marker. [Story 12.2 Task 2]</summary>
+    private static string? FindSourceMarker(string dir)
+    {
+        foreach (var marker in SourceDirNames)
+        {
+            try
+            {
+                if (Directory.Exists(Path.Combine(dir, marker))) return marker;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                // An unreadable/malformed candidate is not a marker; keep probing the rest.
+            }
+        }
+        return null;
+    }
+
+    /// <summary>Brands the site when <c>--project-name</c> was not given: BMad's <c>_bmad/config.toml</c> first
+    /// (unchanged, and still the only probe that can fire for a BMad root), then the source root's own
+    /// <c>PROJECT.md</c> H1 for a non-BMad framework, then a neutral fallback.
+    ///
+    /// <para><b>Why the default is no longer unconditional.</b> <see cref="DefaultSiteTitle"/> is the literal
+    /// "BMad Live Docs". Before Story 12.2 a repo with no <c>_bmad/config.toml</c> got that name whatever framework
+    /// produced it — harmless while BMad was the only resolvable root, actively wrong the moment a GSD Core repo
+    /// could generate at all: the portal would brand a project that has never installed BMad with BMad's name. A
+    /// non-BMad root now falls back to the repo's own directory name, which is honest and never claims a framework
+    /// the repo does not use. A BMad root's fallback is untouched, so this repo and every existing BMad project
+    /// resolve exactly as before. [Story 12.2 Task 2; ADR 0038]</para></summary>
+    private static string ResolveSiteTitle(string repoRoot, string sourceRoot)
+    {
+        if (ReadProjectName(repoRoot) is { Length: > 0 } fromConfig) return fromConfig;
+
+        var isBmadRoot = string.Equals(
+            Path.GetFileName(sourceRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)),
+            SourceDirName, StringComparison.OrdinalIgnoreCase);
+        if (isBmadRoot) return DefaultSiteTitle;
+
+        if (ReadProjectDocTitle(sourceRoot) is { Length: > 0 } fromDoc) return fromDoc;
+
+        // The repo's own folder name — never a framework's name. Empty only for a filesystem root, which falls
+        // back to the historical default rather than an empty <title>.
+        var folder = Path.GetFileName(repoRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        return folder is { Length: > 0 } ? folder : DefaultSiteTitle;
+    }
+
+    private static readonly Regex ProjectDocTitlePattern = new(
+        @"^\#\s+(?<name>\S.*?)\s*$", RegexOptions.Multiline | RegexOptions.Compiled);
+
+    /// <summary>The first level-1 heading of <c>&lt;sourceRoot&gt;/PROJECT.md</c> — GSD Core's project brief, whose
+    /// H1 is the project name (<c># CORA</c>). Probed only for a NON-BMad source root (see
+    /// <see cref="ResolveSiteTitle"/>), so a BMad tree that happens to hold a <c>PROJECT.md</c> cannot change the
+    /// title it resolves today. Never throws. [Story 12.2 Task 2]</summary>
+    private static string? ReadProjectDocTitle(string sourceRoot)
+    {
+        try
+        {
+            var path = Path.Combine(sourceRoot, "PROJECT.md");
+            if (!File.Exists(path)) return null;
+
+            var m = ProjectDocTitlePattern.Match(MarkdownConverter.ReadAllTextShared(path));
+            return m.Success ? m.Groups["name"].Value.Trim() : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
         }
     }
 
