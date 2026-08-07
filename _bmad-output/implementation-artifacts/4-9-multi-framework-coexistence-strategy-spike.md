@@ -4,7 +4,7 @@ baseline_commit: 7ff3b13921b0c00c885f3b37719f18a9478ea9c3
 
 # Story 4.9: Multi-Framework Coexistence Strategy Spike
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -257,49 +257,49 @@ create-story refinements against shipped code, not changes to the criteria._
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Re-establish ground truth before designing anything (AC: #1, #2)**
-  - [ ] Read in full: `src/SpecScribe/AdapterRegistry.cs`, `IArtifactAdapter.cs`, `ArtifactBundle.cs`,
+- [x] **Task 1 — Re-establish ground truth before designing anything (AC: #1, #2)**
+  - [x] Read in full: `src/SpecScribe/AdapterRegistry.cs`, `IArtifactAdapter.cs`, `ArtifactBundle.cs`,
     `AdapterDiagnostic.cs`, `ForgeOptions.cs` (§`SourceDirNames`, §`Resolve`), and
     [ADR 0038](../../docs/adrs/0038-framework-adapter-selection-and-neutral-source-root-discovery.md) end to end.
     Confirm B1–B11 (R1) still describe the code **by symbol**; record any that have moved.
-  - [ ] Count the real call sites, do not estimate: `ToSourceRelative` (three separate private copies —
+  - [x] Count the real call sites, do not estimate: `ToSourceRelative` (three separate private copies —
     `SiteGenerator`, `BmadArtifactAdapter`, `GsdCoreArtifactAdapter`), `EnumerateSourceFiles`,
     `_options.SourceRoot` across `src/`, and the `AdrSourceRoot` twin of each. These counts are AC #2's evidence.
-  - [ ] Re-inspect `C:/dev/CORA` and re-derive R2's six-file loss. If the repo has changed, say so in the report
+  - [x] Re-inspect `C:/dev/CORA` and re-derive R2's six-file loss. If the repo has changed, say so in the report
     before relying on the number.
-  - [ ] Read Story 12.2's Completion Notes §D1–§D5 and §F1–§F7. Several are load-bearing for your cost model and
+  - [x] Read Story 12.2's Completion Notes §D1–§D5 and §F1–§F7. Several are load-bearing for your cost model and
     §F1 is the reason a proposed surface is more expensive than it looks.
 
-- [ ] **Task 2 — Survey the coexistence shapes that actually occur (AC: #1)**
-  - [ ] Enumerate the *kinds* of multi-framework repository, not just CORA's: (a) plan in one, deliver in another
+- [x] **Task 2 — Survey the coexistence shapes that actually occur (AC: #1)**
+  - [x] Enumerate the *kinds* of multi-framework repository, not just CORA's: (a) plan in one, deliver in another
     (CORA); (b) migration in progress, both frameworks holding a full artifact set; (c) vestigial marker — a
     framework installed and abandoned, its directory still present; (d) monorepo with per-package frameworks.
     Each stresses a different family. (c) is the one that makes "every matching adapter runs" actively wrong, and
     it is cheap to construct.
-  - [ ] For each shape, state what shipped code does **today** — trace it, do not predict it — and whether the
+  - [x] For each shape, state what shipped code does **today** — trace it, do not predict it — and whether the
     result is coherent, degraded-but-honest, or wrong.
-  - [ ] Note explicitly that CORA is the **only** real multi-framework repository available; anything else is
+  - [x] Note explicitly that CORA is the **only** real multi-framework repository available; anything else is
     constructed. Do not present a constructed case as observed evidence.
 
-- [ ] **Task 3 — Decide the per-family policy (AC: #1)**
-  - [ ] For each of the three resolution units (epics family, `Sprint`, `Module`) and each collection family
+- [x] **Task 3 — Decide the per-family policy (AC: #1)**
+  - [x] For each of the three resolution units (epics family, `Sprint`, `Module`) and each collection family
     (`Retros`, `StoryArtifactsById`, `ConsumedSourceRelatives`, `Diagnostics`), choose **precedence**, **merge**,
     or **explicit refusal**, and give the reason in one paragraph.
-  - [ ] Price **merge** honestly where you propose it. A merged epics index needs per-item framework attribution
+  - [x] Price **merge** honestly where you propose it. A merged epics index needs per-item framework attribution
     to be readable at all — which is a field on `EpicInfo`/`StoryInfo`, i.e. a shared-model change **and** an IR
     schema change (ADR 0008 territory), not a rendering tweak.
-  - [ ] Price **explicit refusal** too. It is the cheapest and most honest option and it must be on the table:
+  - [x] Price **explicit refusal** too. It is the cheapest and most honest option and it must be on the table:
     generate for the primary framework, refuse the second, say so loudly. Its cost is coverage, and the reader
     surface is already built.
-  - [ ] Decide what the reader is told and **on which surface** — diagnostics page (Story 4.8), dashboard, or the
+  - [x] Decide what the reader is told and **on which surface** — diagnostics page (Story 4.8), dashboard, or the
     About-SDD framework page — and whether B10's two `Informational` notices are sufficient, insufficient, or
     excessive.
-  - [ ] Re-examine **B4** deliberately. A single-adapter run emits no cross-adapter notice *by design*, so that
+  - [x] Re-examine **B4** deliberately. A single-adapter run emits no cross-adapter notice *by design*, so that
     existing BMad projects gain nothing. Confirm that still holds under your policy, or state the regression you
     are accepting.
 
-- [ ] **Task 4 — Decide the source-discovery question, with costs as numbers (AC: #2)**
-  - [ ] Price at minimum these four options; add others if the survey suggests them:
+- [x] **Task 4 — Decide the source-discovery question, with costs as numbers (AC: #2)**
+  - [x] Price at minimum these four options; add others if the survey suggests them:
     - **A — Status quo.** One root by marker probe, bundle-level merge, non-primary documents diagnosed. Cost
       today = R2's six files on CORA. Zero implementation cost.
     - **B — Auxiliary document roots.** Additional read-only roots whose documents render under a per-root output
@@ -311,36 +311,36 @@ create-story refinements against shipped code, not changes to the criteria._
     - **D — A root-qualified path type** (`SourceRef(root, relative)`) replacing bare relative strings. The
       cleanest model and the largest refactor: every `ToSourceRelative` call site, diagnostic anchoring, watch,
       settings and the IR.
-  - [ ] For each option state the cost to: watch mode (R6), ADR 0017's route shape and href non-rewriting (R5),
+  - [x] For each option state the cost to: watch mode (R6), ADR 0017's route shape and href non-rewriting (R5),
     the content-drift gates (R8), `DiagnosticAnchorRoot` resolution (R4), settings shape (R7), and
     `PathUtil.EscapesRepoRoot`.
-  - [ ] Recommend one, and name the **trigger** that would make a different option correct later (e.g. "when a
+  - [x] Recommend one, and name the **trigger** that would make a different option correct later (e.g. "when a
     second real repository carries a full artifact set in both frameworks").
 
-- [ ] **Task 5 — Rule on B1–B11 explicitly (AC: #3)**
-  - [ ] Produce a table: behavior → **stands** / **refined** / **superseded**, with one sentence each.
-  - [ ] For every "superseded", state the bounded follow-through — which story owns it, roughly what changes, and
+- [x] **Task 5 — Rule on B1–B11 explicitly (AC: #3)**
+  - [x] Produce a table: behavior → **stands** / **refined** / **superseded**, with one sentence each.
+  - [x] For every "superseded", state the bounded follow-through — which story owns it, roughly what changes, and
     what proves it. AC #3's purpose is that the follow-up is *known*, not rediscovered.
-  - [ ] Record the AC #1 five-field/three-unit correction (R1) as an explicit item.
+  - [x] Record the AC #1 five-field/three-unit correction (R1) as an explicit item.
 
-- [ ] **Task 6 — Write the ADR and the spike report (AC: #1, #2, #3)**
-  - [ ] **ADR `docs/adrs/0039-*.md`** — the durable deliverable. Subject: the multi-framework coexistence policy,
+- [x] **Task 6 — Write the ADR and the spike report (AC: #1, #2, #3)**
+  - [x] **ADR `docs/adrs/0039-*.md`** — the durable deliverable. Subject: the multi-framework coexistence policy,
     amending ADR 0038. Standard shape: Status / Date / Deciders / Context / Decision / Consequences / Alternatives
     considered. It must carry the per-family policy, the source-discovery decision, the B1–B11 ruling, and an
     explicit **Supersedes** section. Index it in `docs/adrs/README.md`.
-  - [ ] **Report `_bmad-output/implementation-artifacts/4-9-spike-report.md`** — the evidence: the survey, the
+  - [x] **Report `_bmad-output/implementation-artifacts/4-9-spike-report.md`** — the evidence: the survey, the
     counted call sites, the option pricing, the measured CORA numbers, and the handoffs (R10, and R11's ADR-0037
     index gap if still open). Follow `25-3-spike-report.md`'s shape — status/timebox/baseline header, executive
     summary, numbered sections, and a closing section proving no production code shipped.
-  - [ ] The ADR carries the **decision**; the report carries the **evidence**. Do not duplicate the decision into
+  - [x] The ADR carries the **decision**; the report carries the **evidence**. Do not duplicate the decision into
     the story file — AC #3 forbids exactly that.
 
-- [ ] **Task 7 — Prove the spike shipped nothing (AC: all)**
-  - [ ] `git status` / `git diff --stat` showing zero changes under `src/`, `tests/`, `web/`, `extension/`.
+- [x] **Task 7 — Prove the spike shipped nothing (AC: all)**
+  - [x] `git status` / `git diff --stat` showing zero changes under `src/`, `tests/`, `web/`, `extension/`.
     Paste the evidence into the report.
-  - [ ] No new NuGet or npm dependency. No new content-drift gate (ADR 0033 — prefer none; if you propose one for
+  - [x] No new NuGet or npm dependency. No new content-drift gate (ADR 0033 — prefer none; if you propose one for
     a future story, state its three preconditions).
-  - [ ] If you ran the full suite, report the result honestly including R9's known flake; if you did not, say you
+  - [x] If you ran the full suite, report the result honestly including R9's known flake; if you did not, say you
     did not. A spike that changes no code has no obligation to run it — but it has an obligation not to imply it
     did.
 
@@ -507,14 +507,141 @@ handoff**, not adopted (CLAUDE.md § hunk attribution).
 
 ### Agent Model Used
 
+Claude Opus 5 (1M context) — `claude-opus-5[1m]`, dev-story workflow, worktree `worktree-story-4-9-dev` off `07bdb79`.
+
 ### Debug Log References
+
+Measurement harness: a throwaway console project at `$CLAUDE_JOB_DIR/tmp/probe/` referencing
+`src/SpecScribe/SpecScribe.csproj`. **Outside the repository, untracked, ships nothing** (Task 7). It replicates
+`SiteGenerator.EnumerateSourceFiles` exactly — that method is private — then drives the public
+`AdapterRegistry.Select` / `Ingest` / `IngestEpics`, each matched adapter's `Ingest` in isolation, and flags every
+emitted diagnostic path through `PathUtil.EscapesRepoRoot`. Eight scenarios: three OBSERVED on the real
+`C:/dev/CORA` (`f312528`), five CONSTRUCTED. Full evidence in
+[`4-9-spike-report.md`](4-9-spike-report.md) §§ 3–5.
 
 ### Completion Notes List
 
+**HEADLINE — the merge rules are not wrong; they are unreachable, and that reframes the whole story.** Driving
+the shipped registry over the reference repository and four constructed shapes emitted **zero `Skipped`
+diagnostics across eight scenarios**, including two repositories where *both* frameworks hold a complete artifact
+set. Every adapter is handed the same `sourceFiles` list from the single `SourceRoot`, so a non-primary framework
+has nothing to lose and nothing is reported as lost. On CORA the BMad adapter contributes **exactly one** field —
+`Module` — and only because `ModuleContext.Detect` is anchored to `RepoRoot` rather than `SourceRoot`.
+
+**⚠️ §N1 — the ADR number moved: 0041, not 0039.** The story file, its Change Log and the create-story
+`sprint-status.yaml` note all specify ADR 0039, which was correct at baseline `7ff3b13`. Between that baseline and
+this session's HEAD `07bdb79`, **both 0039 and 0040 were claimed** — 0039 by
+`0039-runtime-attached-body-level-classes.md` (the owner's sunburst verify round) and 0040 by Story 16.1's
+packaging spike. This spike therefore took **0041**. `0019` remains claimed-but-unwritten and was not taken.
+
+**§N2 — the decision.** *Role*, not rivalry, is the resolution axis — expressed through the mechanism already
+shipped (the framework owning the resolved root owns delivery), **not** through a new role vocabulary on
+`IArtifactAdapter`, which would be a contract change inherited by five unbuilt adapters on a sample of one
+repository. Epics family and `Sprint` resolve by precedence bound to root ownership; `Module` is retained as a
+cross-role planning-side contribution and must be *attributed*; collections merge unchanged. Explicit refusal was
+genuinely priced and rejected — it would remove the module identity CORA legitimately gains from BMad, and no
+family actually contends today.
+
+**§N3 — reader surface, named rather than left open.** Per-family attribution is promoted to the **About-SDD
+framework page**, which already states framework ceilings; the Story 4.8 diagnostics page keeps its rows as
+evidence. The **dashboard is explicitly not used** — a multi-framework repository is rare and the dashboard is the
+highest-traffic surface. **No new reader surface is created.**
+
+**§N4 — source discovery stays single-rooted (Option A), and Option C is rejected on measurement.** `--source` at
+a repository root re-derives `RepoRoot` as that directory's *parent*, so on CORA it walks **9,510** markdown
+files, brands the site `dev`, matches **no** adapter and emits **zero** diagnostics. Option C is therefore not
+merely costly — it is not currently expressible. Option **B** (auxiliary document roots on the working
+`AdrSourceRoot`/`adrs/` pattern) is named as the option to take, with its trigger, because new roots take new
+prefixes and existing URLs do **not** move under ADR 0017. Option **D** (`SourceRef`) is deferred at 41
+`ToSourceRelative` call sites behind **four** definitions (the story's R2 said three — `GsdCoreArtifactAdapter`
+carries two overloads) plus 46 `.SourceRoot` and 29 `.AdrSourceRoot` references in `src/`.
+
+**⚠️ §N5 — the root count is not what is broken.** Marker probes test *presence*, never *life*:
+`FindSourceMarker` and both `AppliesTo` implementations are each a bare `Directory.Exists`. Measured on a
+constructed repository, a `.planning/` abandoned in 2020 wins **both** layers — the source root *and* the epics
+family — so the portal shows the dead framework's roadmap as its only epic while the live BMad `epics.md` is
+absent and **no diagnostic names the loss**, under a site correctly branded with the live project's name. The fix
+is cheap and precedented: this repository already probes its ADR fallback roots with `HasMarkdownWithinOneLevel`,
+a deliberately bounded content test. Source-marker probing is the same question answered inconsistently.
+
+**§N6 — B1–B11 ruled on individually** (report § 6): **7 stand** (B2, B3, B4, B5-as-unit, B8, B9, B11),
+**3 refined** (B1 — matching must mean *live*; B7 — reinterpreted as a role contribution requiring attribution;
+B10 — right content, wrong surface, plus a false clause), **1 superseded** (B6 — `Sprint` binds to the epics
+owner). B4 was re-examined deliberately as Task 3 required: existing BMad-only projects gain and lose nothing,
+which is correct — no regression accepted. **B11 was re-measured and held 8/8.** The AC #1 five-field → three-unit
+correction is recorded as an explicit item (report § 6.1).
+
+**⚠️ §N7 — two live defects and one false reader-facing claim, recorded not fixed** (all in Story 12.2's hunks
+while 12.2 is `review`). (a) `GsdCoreArtifactAdapter.IngestSprint` and `ReportUnsupportedArtifacts` are called
+unconditionally by `Ingest` and re-derive the planning root from `RepoRoot` **without** `ResolvePlanningRoot`'s
+containment check, emitting `Source`-anchored paths that escape the root — measured on CORA as
+`../.planning/STATE.md` and `../.planning/config.json`. `Commands.cs` joins `Source`-anchored paths with
+`SourceRoot` for the VS Code Problems panel, so this is the extension contract (ADR 0037), and it is reached by
+following the registry's **own printed advice**. (b) `AppendNonPrimaryMarkerNotice` claims non-primary "artifact
+families are still merged into the portal" — measurably false in **both** directions; NFR8 makes an inaccurate
+boundary worse than the gap it explains. (c) The same sentence appears in ADR 0038 §5; ADR 0041 §Supersedes
+corrects the record half.
+
+**§N8 — five bounded follow-through items (FT-1…FT-5) are named with their proof** in report § 6.2, but
+**deliberately not seated**: CLAUDE.md § Decision records requires a structural scope change to land in
+`epics.md` and `sprint-status.yaml` in the same change, which is the owner's call.
+
+**§N9 — verification posture, stated honestly.** No gate was run: this spike changes no rendering, and there is
+nothing for `check:parity`/`check:ir-content` to observe in two markdown files. **The full test suite was not
+run**, and nothing here implies it was — a spike that changes no code has no obligation to. R9's known
+`FileWatcherServiceTests` flake was therefore neither hit nor disproved. `.specscribe/analysis/` is **absent** at
+this HEAD; absent means UNKNOWN, never clean, so no file's quality state is cited anywhere.
+
+**Not done, deliberately:** no production code (Task 7 proof in report § 9); no new NuGet or npm dependency; no
+new content-drift gate (ADR 0033 — preferred none); no role vocabulary added to `IArtifactAdapter`; the two
+pre-existing issues flagged in R9 were not chased; handoffs H1–H5 recorded rather than adopted.
+
 ### File List
+
+**New — documentation (2):**
+
+- `docs/adrs/0041-multi-framework-coexistence-policy.md`
+- `_bmad-output/implementation-artifacts/4-9-spike-report.md`
+
+**Modified — documentation (3):**
+
+- `docs/adrs/README.md` (index entry for ADR 0041)
+- `_bmad-output/implementation-artifacts/4-9-multi-framework-coexistence-strategy-spike.md` (this file)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+
+**Modified under `src/`, `tests/`, `web/`, `extension/`: NONE.** That is Task 7's assertion; the evidence is
+pasted in report § 9.
 
 ## Change Log
 
+- 2026-08-07 — **Story 4.9 implemented (dev-story, worktree `worktree-story-4-9-dev` off `07bdb79`).**
+  `ready-for-dev → in-progress → review`. All 7 tasks complete; ACs #1–#3 satisfied. **Ships no production code**
+  — two new markdown files, three modified, zero changes under `src/`, `tests/`, `web/`, `extension/` (Task 7
+  proof in report § 9). **The ADR number moved to `0041`**: both 0039 and 0040 were claimed between this story's
+  `7ff3b13` baseline and HEAD, so every prior reference to "ADR 0039" for this story is superseded (§N1).
+  **The spike was answered by measurement, not by reading intent** — a throwaway harness outside the repository
+  drove the shipped registry over the real `C:/dev/CORA` and four constructed shapes. **The headline finding
+  reframes the story: the first-non-null merge rules are not wrong, they are unreachable** — zero `Skipped`
+  diagnostics across eight scenarios, including two repositories where both frameworks hold a complete artifact
+  set, because every adapter is handed the same `sourceFiles` list from the single `SourceRoot` and the
+  non-primary framework has nothing to lose. On CORA the BMad adapter contributes exactly one field, `Module`,
+  and only because `ModuleContext.Detect` is `RepoRoot`-anchored — which makes ADR 0038 §5's "artifact families
+  still merge into the bundle" measurably false, in both directions, in the record *and* in the reader-facing
+  notice. **Decided:** role rather than rivalry as the resolution axis, expressed through root ownership rather
+  than a new adapter-contract vocabulary; epics family and `Sprint` by precedence bound to the root owner;
+  `Module` retained as a cross-role planning-side contribution that must be attributed on the **About-SDD page**
+  (not the dashboard, and no new surface); source discovery **stays single-rooted**, with Option B named plus its
+  trigger, Option C **rejected on measurement** (9,510 files, site branded `dev`, no adapter matched, zero
+  diagnostics), Option D deferred at 41 call sites behind four `ToSourceRelative` definitions. **B1–B11 ruled on
+  one by one** — 7 stand, 3 refined, 1 superseded — with B11 re-measured at 8/8 and the AC #1 five-field →
+  three-unit correction recorded explicitly. **The most actionable finding is that the root count is not what is
+  broken** (§N5): marker probes test presence, never life, so a `.planning/` abandoned in 2020 wins both the
+  source root and the epics family while a live BMad `epics.md` vanishes undiagnosed — fixable with the content
+  probe this repository already uses for ADR fallback roots. Five bounded follow-through items named, not seated.
+  **Five handoffs recorded rather than adopted** (H1–H5), three of them new: two escaping `Source`-anchored
+  diagnostic paths on the real repo, the false family-merging clause, and a factual error in ADR 0040's index
+  entry claiming Story 4.9 took 0039. No gate run (nothing rendering changed); full suite **not** run and not
+  implied.
 - 2026-08-06 — Story 4.9 drafted (create-story, baseline `7ff3b13`). Ultimate context engine analysis completed
   — comprehensive developer guide created. **Drafted against merged code, not against intent**: Story 12.2's
   registry, neutral source-root discovery and ADR 0038 landed on `main` (`be65cf1`) days before this story, so
