@@ -322,6 +322,36 @@ npm run extract:ir-content   # regenerate after ANY change to specscribe.css OR 
 npm run check:ir-content     # drift gate — proven red three ways, not only green
 ```
 
+⚠️ **`extract:ir-content` is only ever correct for the corpus it was extracted from, and `--deep-git` is part
+of that corpus.** The extractor **prunes** any rule whose selector names a class it cannot find in the IR, so a
+regeneration run against a *narrower* portal silently strips rules the shipped site needs — with the gate
+green afterwards, because the check re-derives through the same pruning. A shallow run omits the code-insights
+history/relationships tabs, the relationship-graph swatches and the deep-analytics panels; CI measured
+**-182 rules** without the flag and **-0** with it, and `publish-docs-live-pages.yml` publishes *with* it.
+Always regenerate from a full run:
+
+```sh
+dotnet build src/SpecScribe/SpecScribe.csproj --no-incremental   # re-embed the changed asset
+cd web && SPECSCRIBE_PACKAGE_BUILD=1 npm ci && npm run sync:assets && npm run build:package
+cd .. && dotnet run --project src/SpecScribe --no-build -- generate --deep-git
+cd web && npm run extract:ir-content && npm run check:ir-content
+```
+
+`SPECSCRIBE_PACKAGE_BUILD=1` on the install is what breaks the cycle: `postinstall: nuxt prepare` loads
+`nuxt.config.ts`, which reads the IR manifest, which does not exist before the first generate. (Working from a
+git worktree, also set `SPECSCRIBE_RENDERER_DIR` to *that* checkout's `web/.output` — the repo-root search
+finds a `.git` **directory**, and a worktree's is a **file**, so `generate` otherwise looks for the renderer in
+the main checkout and silently skips the prerender.)
+
+**The build-lifecycle hook, and what it deliberately does not cover.** `prebuild` and `pregenerate` run
+`check-tokens` unconditionally and `check-ir-content --if-ir` conditionally. The `--if-ir` flag runs the real
+check when an IR is present and otherwise **skips loudly** (exit 0, three lines of warning). That asymmetry is
+the point: `pregenerate` runs *before* the build that would produce an IR, so an unconditional gate would
+hard-fail every cold build, while the mistake actually worth catching — editing `specscribe.css` and
+re-running `generate` against an output root that already exists — always has one. `npm run check` stays
+**unflagged**, so in CI (which always generates first) a missing IR is a hard failure rather than a silent
+skip.
+
 What makes it a transition rather than a re-import: it is **bounded** by measured selector usage, **generated**
 and gated, **scoped** under `.ir-content` so it cannot reach a template-authored component, and **enumerated**
 in `assets/ir-content.manifest.json`.

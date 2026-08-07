@@ -23,6 +23,7 @@
 // hazard by construction; the generated banner below is the only comment in the output.
 
 import { readFileSync } from 'node:fs'
+import { resolve as pathResolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 export const SOURCE_CSS = fileURLToPath(
@@ -587,6 +588,28 @@ export function scopePrelude(prelude) {
     .map(scopeSelector)
     .filter(Boolean)
   return scoped.length ? scoped.join(',\n') : null
+}
+
+/**
+ * Does this invocation want the skip-when-no-IR behaviour? [Story 23.2, the 2026-08-07 CSS-gate decision]
+ *
+ * Split out of `check-ir-content.mjs` so it can be unit-tested: that script runs its work at module scope
+ * (top-level await), so importing it in a test would execute the whole gate.
+ */
+export function wantsIfIrSkip(argv) {
+  return argv.includes('--if-ir')
+}
+
+/**
+ * Where the IR manifest lives, by the SAME resolution `web/ir/adapter.ts` uses — `SPECSCRIBE_IR_DIR` when
+ * set, else the repo's own output root. `cwd` is `web/`, so `..` is the repo root.
+ *
+ * Duplicated deliberately rather than imported: `ir/adapter.ts` is TypeScript and pulls in the Nuxt config
+ * surface, which a plain `node scripts/…` run must not need. The test below pins the two in correspondence.
+ */
+export function irManifestPath(env, cwd) {
+  const irDir = pathResolve(env.SPECSCRIBE_IR_DIR ?? pathResolve(cwd, '..', 'SpecScribeOutput'))
+  return pathResolve(irDir, 'spa', 'manifest.json')
 }
 
 /** The committed generated sheet, line-ending-normalized. Null when it does not exist yet. */

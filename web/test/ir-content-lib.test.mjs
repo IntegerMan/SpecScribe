@@ -15,6 +15,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   CONDITIONAL_CLASSES,
+  irManifestPath,
   isMigrated,
   isSharedPrimitive,
   MIGRATED,
@@ -25,6 +26,7 @@ import {
   STAGE_CLASS_TEMPLATES,
   STAGES,
   stripComments,
+  wantsIfIrSkip,
 } from '../scripts/ir-content-lib.mjs'
 
 describe('isMigrated / MIGRATED', () => {
@@ -356,5 +358,76 @@ describe('sunburst wedge classes stay seeded (probe-only, never on real markup)'
     for (const cls of CONDITIONAL_CLASSES.filter((c) => c.startsWith('sb-'))) {
       expect(scopedCss, `.${cls} must be carried`).toMatch(new RegExp(`\\.ir-content \\.${cls}\\s*\\{`))
     }
+  })
+})
+
+/**
+ * The `--if-ir` precondition gate. [Story 23.2, the 2026-08-07 CSS-gate decision]
+ *
+ * `pregenerate`/`prebuild` run BEFORE the build that produces an IR, so `check:ir-content` cannot be wired in
+ * unconditionally without hard-failing every cold build — the cycle documented at the "ORDER OF THE NEXT FOUR
+ * STEPS" note in `.github/workflows/build-test-analyze.yml`. `--if-ir` gates only what it can see: it runs the
+ * real check when an IR is present and skips loudly when it is not.
+ *
+ * ⚠️ The WIRING block at the bottom is the load-bearing one. This story has twice found a gate whose CONTENT
+ * was verified while its DELIVERY PATH was not — ADR 0029's `.pill` reached the page through a single
+ * `nuxt.config.ts` import line that no test read. A helper that works but is never invoked is that same
+ * defect wearing a passing test.
+ */
+describe('wantsIfIrSkip', () => {
+  it('is opt-in — a bare invocation still fails on a missing IR rather than skipping', () => {
+    expect(wantsIfIrSkip(['node', 'check-ir-content.mjs'])).toBe(false)
+  })
+
+  it('recognises the flag', () => {
+    expect(wantsIfIrSkip(['node', 'check-ir-content.mjs', '--if-ir'])).toBe(true)
+  })
+
+  it('does not match a lookalike flag', () => {
+    expect(wantsIfIrSkip(['node', 'check-ir-content.mjs', '--if-ir-content'])).toBe(false)
+  })
+})
+
+describe('irManifestPath', () => {
+  it('honours SPECSCRIBE_IR_DIR, the same override web/ir/adapter.ts reads', () => {
+    const got = irManifestPath({ SPECSCRIBE_IR_DIR: '/tmp/other-output' }, '/repo/web')
+    expect(got.replace(/\\/g, '/')).toMatch(/\/tmp\/other-output\/spa\/manifest\.json$/)
+  })
+
+  it("falls back to the repo's own output root, resolved from web/ as the cwd", () => {
+    const got = irManifestPath({}, '/repo/web')
+    expect(got.replace(/\\/g, '/')).toMatch(/\/repo\/SpecScribeOutput\/spa\/manifest\.json$/)
+  })
+
+  it('stays in correspondence with the path web/ir/adapter.ts resolves', () => {
+    // adapter.ts: resolve(process.env.SPECSCRIBE_IR_DIR ?? resolve(process.cwd(), '..', 'SpecScribeOutput')).
+    // The two are duplicated deliberately (the gate must not import TypeScript), so if that line ever moves,
+    // the gate would look in the wrong place and skip forever — a silent hole, which is the failure mode the
+    // loud skip message exists to avoid.
+    const adapter = readFileSync(new URL('../ir/adapter.ts', import.meta.url), 'utf8')
+    expect(adapter).toMatch(/SPECSCRIBE_IR_DIR/)
+    expect(adapter).toMatch(/['"]\.\.['"],\s*['"]SpecScribeOutput['"]/)
+  })
+})
+
+describe('the --if-ir gate is actually wired into the build lifecycle', () => {
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
+
+  for (const hook of ['prebuild', 'pregenerate']) {
+    it(`${hook} runs check-ir-content with --if-ir`, () => {
+      expect(pkg.scripts[hook], `${hook} must exist`).toBeTruthy()
+      expect(pkg.scripts[hook]).toContain('check-ir-content.mjs --if-ir')
+    })
+
+    it(`${hook} still runs the token gate as well`, () => {
+      expect(pkg.scripts[hook]).toContain('check-tokens.mjs')
+    })
+  }
+
+  it('the unconditional `npm run check` can never silently skip', () => {
+    // CI generates a portal before running `check`, so an absent IR there means a broken pipeline, not a cold
+    // build. Keeping `check:ir-content` unflagged is what makes that a hard failure.
+    expect(pkg.scripts.check).toContain('check:ir-content')
+    expect(pkg.scripts['check:ir-content']).not.toContain('--if-ir')
   })
 })

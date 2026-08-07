@@ -26,8 +26,8 @@
     "check": "npm run check:tokens && npm run check:ir-content && npm run check:assets && npm run check:parity",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "prebuild": "node scripts/check-tokens.mjs",
-    "pregenerate": "node scripts/check-tokens.mjs",
+    "prebuild": "node scripts/check-tokens.mjs && node scripts/check-ir-content.mjs --if-ir",
+    "pregenerate": "node scripts/check-tokens.mjs && node scripts/check-ir-content.mjs --if-ir",
     "experiment:two-ir": "node scripts/experiment-two-ir.mjs",
     "pin:parity": "node scripts/pin-parity.mjs",
     "check:parity": "node scripts/check-parity.mjs"

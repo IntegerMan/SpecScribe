@@ -4,12 +4,19 @@ baseline_commit: cd7f30255bb07112332c0876f4335e6b77ca9f4d
 
 # Story 23.2: Component Library + Design-Token Bridge
 
-Status: in-progress
+Status: review
 
-<!-- Moved review -> in-progress by the 2026-08-07 code review. Two things are outstanding and neither is
-     optional: `check:ir-content` is RED until `extract:ir-content` is re-run on a FULL corpus (see the
-     ⛔ block in § Review follow-up — 2026-08-07), and one [Review][Decision] is still open. The stylesheet
-     change also needs the live-browser pass CLAUDE.md requires for visual work. -->
+<!-- Moved in-progress -> review by the 2026-08-07 dev-story round. Both blockers the code review left are
+     closed: `check:ir-content` is GREEN on a full `--deep-git` corpus (1476 rules / 3 shared, and a fresh
+     extraction reproduced the committed artifacts byte-for-byte — the RED was a missing flag, not a broken
+     environment; see the ✅ block in § Review follow-up — 2026-08-07), and the last open [Review][Decision]
+     was answered by the owner and implemented (`--if-ir`). Every checkbox in this file is now ticked.
+
+     ⚠️ ONE THING REMAINS FOR THE OWNER, AND IT IS NOT A CHECKBOX: the live-browser pass CLAUDE.md requires
+     for visual work has still NOT happened, across four consecutive sessions. This session had no browser
+     tool at all. The token BINDINGS were verified statically on both surfaces and the skip-link is now
+     provably a single unscoped rule, but nobody has LOOKED at the pending/deferred border change or a
+     focused skip link on a scrolled IR page. That is the owner's verify round. -->
 
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
@@ -321,7 +328,7 @@ this checkout, so SonarCloud state is **UNKNOWN, not clean** (per CLAUDE.md, abs
 - [x] [Review][Decision] ✅ **RESOLVED 2026-08-07 — owner chose "promote `.skip-link` to a shared primitive" (ADR 0029).** `SHARED_PRIMITIVES` is now `['pill', 'skip-link']`, `PageShell.vue`'s competing scoped rule is **deleted** (replaced by a comment saying why re-adding one reinstates the race), and the base `.ir-content .skip-link` will leave the scoped sheet on the next extraction — so there is no longer a pair to tie. **Promoting the rule forced a decision the finding did not anticipate:** the two rules were different designs (teal-deep pill at `z-index: 200` vs warm-white bordered at `z-index: 10`), and the portal's carried `position: absolute` — the same containing-block bug the 2026-07-28 pass had fixed *in PageShell only*. Adopting the portal's rule unchanged would have regressed that fix, so `specscribe.css`'s `.skip-link` was corrected to `position: fixed` in the same change, which now protects **both** surfaces from one definition instead of one surface from a copy. ADR 0029 amended: allowlist "of one" → "of two", a new § Admissions table, and the observation that its § Cascade order reasoning did not cover a scope class applied *to* a component's root. ⚠️ **Which rule won before the fix was never determined empirically** — the fix removes the race rather than resolving it, so that question is now moot, but the *new* single rule still wants a live-browser check. _Original finding:_ **`PageShell`'s `.skip-link` collides with the extracted `.ir-content .skip-link` rule on every IR-backed route, and both outcomes break UX-DR16** [web/components/PageShell.vue:84 vs web/assets/ir-content.css:25] — `IrSurface.vue:155` puts `class="ir-content"` **on PageShell's own root element**, so `.ir-content .skip-link` (0,2,0) and PageShell's scoped `.skip-link[data-v-*]` (0,2,0) tie, and the winner is decided by chunk order rather than by anything in the code. If PageShell wins, its `z-index: 10` (`:92`) sits **below** `.ir-content .site-nav`'s `z-index: 100` (`ir-content.css:294`, sticky at `top: 0`, opaque) — the focused skip link renders behind the nav bar, invisible. If `ir-content.css` wins, `position: absolute` returns — the exact regression `PageShell.vue:79-83` records the 2026-07-28 re-review as having fixed. The skip-link *target* is fine (`IrMain.ts:37` supplies `<main id="main-content">`), so this is purely the CSS collision. It also falsifies `IrSurface.vue:147-149`'s claim that "the extracted monolith rules cannot reach template-authored components" — applying the scope class *to* a template-authored root is precisely how they can. ⚠️ **Confirm in a live browser which rule actually wins before patching.** Options: raise PageShell's `z-index` above the nav and win the tie deliberately / exclude `.skip-link` from the `ir-content` extraction so PageShell owns it outright / promote `.skip-link` to a shared primitive under ADR 0029.
 - [x] [Review][Decision] ✅ **RESOLVED 2026-08-07 — owner chose "retire the Vue showcase page now".** `web/pages/design-system.vue` is **deleted**, its `routeRules` and prerender entries removed, and the `/component-library` link re-pointed at `design-system.html` (the page users actually get, rendered from the C#-composed region through `PortalMetaSurface`). **AC #6's second half is recorded as WITHDRAWN, not pending** — ADR 0034 made the C#-composed region the thing Node renders, so there was no convergence left to wait for. ⚠️ **One thing the decision did not account for, handled explicitly:** the retired page carried AC #5's live `:deep()` worked example (the failing control and the fix, side by side). Deleting it would have removed the demonstration AC #5 requires, so the example was **moved into `CONVENTIONS.md` §3**, which is where AC #5 says the convention must be demonstrated. §3 also gained the forward pointer it was missing (patch below). _Original finding:_ **AC #6 is superseded by ADR 0034, and its second half is now unreachable rather than pending** — `SiteGenerator.WritePage` (`SiteGenerator.cs:4373`) states *"[Story 23.6 AC #1] It no longer writes anything"*, and ADR 0034 §Decision 3 is *"No C# code path emits a content `.html`."* `WriteDesignSystem` (`:5783`, still called unconditionally from `:915`) now only composes the region into `_spaPageViews`; **Node** writes `design-system.html`, and without Node no HTML is produced at all. Meanwhile `nuxt.config.ts` sets `prerender.routes` to `[]` under `PACKAGE_BUILD` and lists `/design-system` only in the non-package branch — so a user's portal renders `design-system.html` from the **C#-composed region** via `PortalMetaSurface` (`web/ir/families.ts:77`) and **never** `pages/design-system.vue`. The Dev Notes tradeoff assumed "the page is then re-authored as the Nuxt route"; as shipped, the two design-system pages are a **permanent** duplication. Options: restate AC #6 to match ADR 0034 / retire `pages/design-system.vue` / schedule the convergence as a 23.4 follow-up.
 - [x] [Review][Decision] ✅ **RESOLVED 2026-08-07 — recorded honestly, and the finding itself was CORRECTED in the process.** ⚠️ **The Acceptance Auditor's claim was too strong and I confirmed it was wrong before acting on it.** It grepped only `web/components/surfaces/` and `pages/[...path].vue`. A full sweep shows `ChartPanel`, `ListRow` and `PageShell` **are** consumed by real app pages — `pages/component-library.vue` (the developer landing page) and `error.vue` — and `PageShell` additionally by every IR route through `IrSurface`. Only **`StatusBadge`** is genuinely without a product consumer, and after the `/design-system` retirement its sole remaining callers are the `/measure/*` payload fixtures. So: CONVENTIONS §5's glyph deferral to Story 23.3 is **withdrawn** (23.3 injects C#-rendered markup that already carries the glyph, so it could never have discharged it), `StatusBadge` is documented as **fixture-grade rather than a shipped primitive**, and the other three are explicitly recorded as NOT being in that position. The same correction is in `StatusBadge.vue`'s header. _Original finding (as raised, and partly wrong):_ **The primitives this story exists to ship are consumed by no live surface, so CONVENTIONS §5's glyph deferral can never be discharged by the story it names** — `grep '<StatusBadge|<ListRow|<ChartPanel'` across `web/components/surfaces/` and `pages/[...path].vue` returns **comments only**; the real routes inject C#-rendered markup (which already carries the glyph). Only `PageShell` is on the live path (`IrSurface.vue:154`). `CONVENTIONS.md:168-178` defers the badge glyph to Story 23.3 "where the stage→icon mapping gains a data source"; 23.3 is `review` and 23.4 has shipped, and `StatusBadge.vue:98` still renders `{{ label }}` with no icon prop, slot or sprite. Options: park the three unused primitives and say so plainly / re-point the deferral at a story that will actually consume them / accept them as showcase-only and rewrite §5's dependency note.
-- [ ] [Review][Decision] ⏳ **STILL OPEN — not put to the owner in the 2026-08-07 round, and deliberately not decided unilaterally.** Two of its three symptoms were closed by patches below without needing the decision: `build:package` now runs `check-tokens` (it bypassed `prebuild` because npm's lifecycle prefix matches the script *name*), and `check:ir-content` now asserts that `nuxt.config.ts` actually imports all three generated sheets in the load-bearing order. What remains is the original question — whether `npm run generate` should refuse to build on a drifted `shared-primitives.css`/`ir-content.css` — and it is genuinely ambiguous because `check:ir-content` needs a generated IR, which is the cycle `.github/workflows/build-test-analyze.yml:222-233` documents. _Original finding:_ **The token bridge got a build-time hook; the CSS layer this story added did not, and the obvious fix hits a documented cycle** [web/package.json:29-30] — `prebuild`/`pregenerate` run `check-tokens.mjs` only, so `npm run generate` builds and prerenders happily on a stale or hand-edited `shared-primitives.css`/`ir-content.css`; only the explicit `npm run check` catches it. Given CLAUDE.md's regeneration-order rule (a stylesheet edit must be extracted from an IR that already contains the new markup, or rules are silently pruned), `generate` is exactly where that mistake is made and the one path with no gate. Adding `check:ir-content` to `pregenerate` is **not** unambiguous: it needs a generated IR, which is the cycle `.github/workflows/build-test-analyze.yml:222-233` documents. Options: gate only when an IR is already present (skip-with-warning otherwise) / leave it to CI and document the hole in CONVENTIONS / restructure so the check runs post-generate.
+- [x] [Review][Decision] ✅ **RESOLVED 2026-08-07 (dev-story round) — owner chose "gate when an IR is present, warn otherwise".** `check-ir-content.mjs` gained an opt-in `--if-ir` flag, wired into **both** `prebuild` and `pregenerate`; `npm run check` stays deliberately **unflagged**. The flag runs the real gate when an IR is present and otherwise skips at exit 0 with a three-line warning naming the path it looked for and the command that closes the gap. That resolves the cycle rather than working around it: `pregenerate` runs before the build that would produce an IR, so an unconditional gate hard-fails every cold build, while the mistake actually worth catching — editing `specscribe.css` then re-running `generate` against an output root that **already exists**, the case CLAUDE.md's regeneration-order rule warns about — always has one. Keeping `check` unflagged means CI (which always generates first) still treats a missing IR as a hard failure, so the skip path can never hide a broken pipeline. **All four arms proven live, not argued:** no IR + flag → skip, exit 0; no IR, no flag → exit 1 (unchanged); IR present + flag → the real check runs and passes; IR present + flag + a hand-edited `shared-primitives.css` → **exit 1**, reporting `shared-primitives.css: +0 rule(s), -0, ~1 changed / ~ .pill`. The decision logic was extracted into `wantsIfIrSkip` / `irManifestPath` in `ir-content-lib.mjs` so it is unit-testable (the script does its work at module scope under top-level await, so a test importing it would execute the whole gate), and **11 tests** were added — including a **wiring** block asserting both lifecycle hooks actually invoke it, which is the load-bearing half: this story has twice found a gate whose content was verified while its delivery path was not (ADR 0029's `.pill` reached the page through one `nuxt.config.ts` import line no test read). That wiring test was **proven red** by reverting `pregenerate` to its pre-fix shape. Documented in CONVENTIONS §10. _Original finding:_ Two of its three symptoms were closed by patches below without needing the decision: `build:package` now runs `check-tokens` (it bypassed `prebuild` because npm's lifecycle prefix matches the script *name*), and `check:ir-content` now asserts that `nuxt.config.ts` actually imports all three generated sheets in the load-bearing order. What remains is the original question — whether `npm run generate` should refuse to build on a drifted `shared-primitives.css`/`ir-content.css` — and it is genuinely ambiguous because `check:ir-content` needs a generated IR, which is the cycle `.github/workflows/build-test-analyze.yml:222-233` documents. _Original finding:_ **The token bridge got a build-time hook; the CSS layer this story added did not, and the obvious fix hits a documented cycle** [web/package.json:29-30] — `prebuild`/`pregenerate` run `check-tokens.mjs` only, so `npm run generate` builds and prerenders happily on a stale or hand-edited `shared-primitives.css`/`ir-content.css`; only the explicit `npm run check` catches it. Given CLAUDE.md's regeneration-order rule (a stylesheet edit must be extracted from an IR that already contains the new markup, or rules are silently pruned), `generate` is exactly where that mistake is made and the one path with no gate. Adding `check:ir-content` to `pregenerate` is **not** unambiguous: it needs a generated IR, which is the cycle `.github/workflows/build-test-analyze.yml:222-233` documents. Options: gate only when an IR is already present (skip-with-warning otherwise) / leave it to CI and document the hole in CONVENTIONS / restructure so the check runs post-generate.
 
 **Patches**
 
@@ -370,7 +377,45 @@ Owner answered four decisions in one round; all four are applied and recorded in
 applied**; the two not applied are `unmapped`'s wording drift and the missing "shared with" caption, both of
 which lived in `web/pages/design-system.vue` and are **moot because that file was deleted** by decision 3.
 
-> ## ⛔ THE ONE THING LEFT UNDONE — `check:ir-content` IS RED AND MUST BE REGENERATED
+> ## ✅ CLOSED 2026-08-07 (dev-story round) — `check:ir-content` IS GREEN, AND THE DIAGNOSIS BELOW WAS WRONG
+>
+> **`check:ir-content` passes at HEAD with `carriedRules: 1476` and `sharedRules: 3` — the exact numbers this
+> block demanded — and it did so with NO regeneration at all.** A fresh `npm run extract:ir-content` from a
+> full corpus reproduced the four committed artifacts **byte-for-byte** (`git status --porcelain web/assets/`
+> → empty). The committed layer was already correct; sibling commit `0b1f561` ("regenerate the two stale
+> drift gates") had done it properly.
+>
+> ⚠️ **The root cause named below — "this environment cannot produce a full corpus" — is NOT what happened,
+> and the correction matters more than the fix.** The missing ingredient was a **command-line flag**:
+> `--deep-git`. `.github/workflows/build-test-analyze.yml` documents it explicitly ("⚠️ `--deep-git` IS
+> REQUIRED, and the reason is `check:ir-content` — not analytics"), because a shallow run never emits the
+> code-insights history/relationships tabs, the relationship-graph swatches or the deep-analytics panels, so
+> `selectorIsUsed` prunes every rule only those surfaces exercise. CI measured the delta as **`-182` rules**
+> without the flag and **`-0` with it**. The third-pass run was **181 rules short** (1295 vs 1476) — the same
+> number. It was a plain shallow generate, not a broken machine.
+>
+> Two environment factors were real but secondary, and both are now recorded in CONVENTIONS §10 so the next
+> reader does not rediscover them: `npm ci` must run with `SPECSCRIBE_PACKAGE_BUILD=1` (otherwise
+> `postinstall: nuxt prepare` loads `nuxt.config.ts`, which reads an IR manifest that does not exist before
+> the first generate — the cycle CI documents), and from a git worktree `SPECSCRIBE_RENDERER_DIR` must point
+> at *that* checkout's `web/.output` (the repo-root search looks for a `.git` **directory**; a worktree's is a
+> **file**, so `generate` otherwise looks in the main checkout and silently skips the prerender).
+>
+> **Executed here, in full, and this is what a correct run looks like:** the `--deep-git` generate reported
+> `[prerender] 1546 route(s) … errors=0`, `generated=801`, and a **populated `SpecScribeOutput/code/` with 284
+> code pages** (the corpus whose absence caused the shortfall). `npm run check` is green on all four gates —
+> `check:tokens` (45 tokens / 2 `:root` blocks), `check:ir-content` (1476 + 5 keyframes scoped, 3 shared, 15
+> runtime-body), `check:assets`, and `check:parity` (24 pinned routes across 14 of 14 families,
+> byte-identical). The gate was additionally **proven red** by hand-editing `shared-primitives.css`, which
+> reported `~1 changed / ~ .pill`, then restored clean.
+>
+> _The original block, kept because its refusal was the right call:_ **the third-pass session ran the
+> extraction, got `carriedRules: 1295`, and THREW THE RESULT AWAY rather than commit it.** Committing would
+> have stripped 755 lines from the shipped stylesheet with the gate green — the exact "regenerate a baseline
+> on a corpus that moved under you" failure CLAUDE.md warns about. Declining to regenerate on a corpus it
+> could not trust was correct; only the explanation was wrong.
+>
+> <details><summary>Original ⛔ text (superseded)</summary>
 >
 > `specscribe.css` changed (six badge borders, five `.epic-status` mirrors, `.skip-link` → `position: fixed`)
 > and `.skip-link` joined `SHARED_PRIMITIVES`. Both require `npm run extract:ir-content` to be re-run, and
@@ -394,6 +439,8 @@ which lived in `web/pages/design-system.vue` and are **moot because that file wa
 > ```
 >
 > Confirm `carriedRules` lands at ~1476 (not ~1295) and `sharedRules` at **3** before committing.
+>
+> </details>
 
 **What was verified, and how.** Full C# suite **2964 passed / 0 failed / 3 skipped** — no preview servers
 were running, and the run was clean, which is consistent with this story's own finding that the
@@ -565,7 +612,84 @@ claude-opus-5 (dev-story, 2026-07-25)
 - Golden fingerprint captured twice, identically: `2050b586…`.
 - Full suite: 2404 passed / 3 skipped. See "Test-suite flakes" below.
 
+**2026-08-07 dev-story round.** Executed from worktree `.claude/worktrees/story-23-2-close-ir-content`
+(branch `worktree-story-23-2-close-ir-content`), baselined on `main` at `07bdb79`.
+
+- `dotnet build … --no-incremental` → succeeded (mandatory: `specscribe.css` is an embedded resource).
+- `npm ci` → **failed** on `nuxt prepare`; re-run as `SPECSCRIBE_PACKAGE_BUILD=1 npm ci` → succeeded. The
+  `@emnapi/runtime` lockfile mismatch recorded under **Deferred** did **not** recur.
+- `npm run sync:assets && npm run build:package` → renderer artefact built.
+- `SPECSCRIBE_RENDERER_DIR=<worktree>/web/.output dotnet run … -- generate --deep-git` →
+  `[prerender] 1546 route(s) … errors=0`, `generated=801 skipped=17 errors=0`, `SpecScribeOutput/code/`
+  populated with **284** pages.
+- `npm run check:ir-content` → **OK, 1476 rules + 5 keyframes scoped, 3 shared, 15 runtime-body.**
+- `npm run extract:ir-content` → re-derived; `git status --porcelain web/assets/` **empty** (byte-identical).
+- Gate proven RED: hand-edited `shared-primitives.css` → `shared-primitives.css: +0, -0, ~1 changed / ~ .pill`,
+  exit 1; restored clean.
+- `--if-ir` proven in four states: no IR + flag → skip, exit 0 · no IR, no flag → exit 1 · IR + flag → real
+  check, exit 0 · IR + flag + drift → exit 1.
+- Wiring test proven RED by reverting `pregenerate` to its pre-fix shape → `× pregenerate runs
+  check-ir-content with --if-ir`; restored.
+- `npm run check` → all four gates green. `npm test` → 183 passed. `dotnet test SpecScribe.slnx` →
+  **2978 passed / 0 failed / 3 skipped**, no preview servers running.
+- ⚠️ **No browser tool in this session** — no live-browser verification performed. Stated, not skipped
+  silently.
+
 ### Completion Notes List
+
+**⟡ 2026-08-07 dev-story round — the two remaining blockers closed. Read this first; the notes below it are
+from earlier rounds and are unchanged.**
+
+**1. `check:ir-content` was never actually drifted, and the recorded diagnosis was wrong.** The ⛔ block said
+this environment could not produce a full corpus. It can. What the third-pass run was missing is the
+**`--deep-git` flag**, which `build-test-analyze.yml` documents as required *for this gate specifically* —
+a shallow generate never emits the code-insights history/relationships tabs, the relationship-graph swatches
+or the deep-analytics panels, so `selectorIsUsed` prunes every rule only those surfaces exercise. CI measured
+that as `-182` rules; the third-pass run was `-181`. Run correctly here — `1546` routes prerendered,
+`errors=0`, `284` code pages — the gate is **green at HEAD with `carriedRules: 1476` and `sharedRules: 3`**,
+and a fresh `extract:ir-content` reproduced all four committed artifacts **byte-for-byte** (`git status
+--porcelain web/assets/` → empty). Nothing needed regenerating; sibling commit `0b1f561` had already done it.
+The third-pass session's refusal to commit a 1295-rule extraction was the **right call on wrong reasoning**.
+
+Two secondary environment facts, now in CONVENTIONS §10 rather than left to be rediscovered: `npm ci` needs
+`SPECSCRIBE_PACKAGE_BUILD=1` (else `postinstall: nuxt prepare` loads `nuxt.config.ts`, which reads an IR
+manifest that cannot exist before the first generate), and a worktree needs `SPECSCRIBE_RENDERER_DIR` (the
+repo-root search wants a `.git` *directory*; a worktree's is a *file*). The 23.5-owned `npm ci` lockfile
+defect recorded under **Deferred** also **no longer reproduces** — commit `0b1f561` repaired it.
+
+**2. The last open `[Review][Decision]` — owner chose "gate when an IR is present, warn otherwise".**
+`check-ir-content.mjs` gained an opt-in `--if-ir`, wired into `prebuild` and `pregenerate`; `npm run check`
+stays unflagged so CI still hard-fails on a missing IR. All four arms proven live (skip / unchanged failure /
+real check / **red** on a hand-edited `shared-primitives.css`, reporting `~ .pill`). The decision logic was
+extracted to `wantsIfIrSkip` + `irManifestPath` so it is unit-testable at all — the script does its work at
+module scope under top-level await, so importing it in a test would run the whole gate. **11 tests added**,
+of which the **wiring** block is the load-bearing part and was itself proven red: this story has twice shipped
+a gate whose content was verified while its delivery path was not, and a helper that works but is never
+invoked is that same defect wearing a passing test.
+
+**⚠️ Still not done, and it is not mine to tick: the live-browser pass.** CLAUDE.md requires it for visual
+work; this is visual work; and it has now been skipped for **four consecutive sessions** — this one had no
+browser tool available at all. What *was* established statically is worth stating precisely, because it is
+narrower than "verified":
+
+- **Badge borders** — every stage binds the **same token name on both surfaces**: `done`/`active`/`review`/
+  `ready`+`drafted` → their `--status-*`, `pending` **and** `unmapped` → `--status-pending`, `deferred` →
+  `--status-deferred`, `retired` → `--border`. Since `tokens.css` is generated from that same `:root`, the
+  values are identical by construction. This proves the **binding drift** the finding was about is gone.
+  It does **not** show anyone the new `deferred` hairline (`#d4c4a8` → `#7a6250`, the visible change).
+- **Skip link** — `.skip-link` now resolves to **exactly one rule**, in the unscoped `shared-primitives.css`,
+  and is absent from `ir-content.css`; `PageShell.vue` carries no scoped copy, only a comment forbidding one.
+  The (0,2,0) specificity tie is therefore **structurally** gone rather than won. The promoted rule is
+  `position: fixed; z-index: 200`, which clears the sticky nav's `100`. Nobody has focused it on a scrolled
+  IR page.
+
+**Gates and suites, all green, no preview servers running:** C# **2978 passed / 0 failed / 3 skipped** —
+clean, again consistent with this story's finding that the "rotating flake" is preview-server contention.
+web vitest **183 passed** (was 165; +11 mine, the rest siblings'). `npm run check` green on all four:
+`check:tokens` (45 tokens / 2 blocks), `check:ir-content` (1476 + 5 keyframes scoped, 3 shared, 15
+runtime-body), `check:assets`, `check:parity` (24 pinned routes, 14 of 14 families, byte-identical).
+
+---
 
 **AC #4's result contradicts the hypothesis it was written to test — this is the story's most important finding.**
 
@@ -745,9 +869,25 @@ owns packaging); `spike/nuxt-ir/` is left untouched as the throwaway 23.1 probe.
 **Modified — docs:**
 - `docs/adrs/README.md` — ADR 0029 index entry
 
+#### Added by the 2026-08-07 dev-story round (the CSS-gate decision)
+
+**Modified — web:**
+- `web/scripts/check-ir-content.mjs` — the `--if-ir` precondition branch (skip loudly when no IR exists)
+- `web/scripts/ir-content-lib.mjs` — new exports `wantsIfIrSkip`, `irManifestPath`; `node:path` import
+- `web/package.json` — `prebuild` and `pregenerate` now also run `check-ir-content.mjs --if-ir`
+- `web/CONVENTIONS.md` — §10 gained the `--deep-git` regeneration warning, the full corpus recipe
+  (`SPECSCRIBE_PACKAGE_BUILD` / `SPECSCRIBE_RENDERER_DIR`), and the build-lifecycle hook's contract
+- `web/test/ir-content-lib.test.mjs` — 11 tests: `wantsIfIrSkip` (3), `irManifestPath` (3, incl. an
+  adapter-correspondence assertion), and the lifecycle **wiring** block (5)
+
+**Not modified, and deliberately so:** no generated asset changed. `web/assets/{ir-content,shared-primitives,
+runtime-body}.css` and `ir-content.manifest.json` were re-derived from a full `--deep-git` corpus and came
+back **byte-identical**, which is the evidence closing the ⛔ item — so there is nothing to commit for it.
+
 ## Change Log
 
 | Date | Change |
 | --- | --- |
+| 2026-08-07 | **Dev-story round — both blockers the third code-review pass left are closed; status `in-progress` → `review`.** (1) **`check:ir-content` was never drifted.** It is green at HEAD with `carriedRules: 1476` / `sharedRules: 3`, and a fresh extraction from a full corpus reproduced all four committed artifacts **byte-for-byte** — nothing needed regenerating (sibling `0b1f561` had already done it). ⚠️ **The recorded diagnosis was wrong and is corrected in place:** the third-pass shortfall was a missing **`--deep-git`** flag, not an environment that "cannot produce a full corpus". CI documents the flag as required *for this gate* and measured its cost as `-182` rules; the third-pass run was `-181`. Its refusal to commit a 1295-rule extraction was the right call on wrong reasoning. Two secondary environment facts (`SPECSCRIBE_PACKAGE_BUILD=1` for `npm ci`, `SPECSCRIBE_RENDERER_DIR` in a worktree) are now in CONVENTIONS §10; the 23.5-owned `npm ci` lockfile defect no longer reproduces. (2) **The last open `[Review][Decision]` answered and implemented** — owner chose "gate when an IR is present, warn otherwise": `check-ir-content.mjs --if-ir`, wired into `prebuild`/`pregenerate`, with `npm run check` left unflagged so CI still hard-fails. All four arms proven live including **red** on a hand-edited `shared-primitives.css`; the logic was extracted to `wantsIfIrSkip`/`irManifestPath` to be testable at all, and 11 tests added — the **wiring** block being the load-bearing half, itself proven red, because this story has twice shipped a gate whose delivery path nothing read. Suites: C# **2978/0/3**, web vitest **183**, `npm run check` green on all four gates (incl. `check:parity`, 24 routes / 14 families byte-identical). ⚠️ **The live-browser pass is STILL outstanding — a fourth consecutive session without it** (no browser tool here). Token bindings were verified statically on both surfaces and the skip link is provably a single unscoped rule, but the `deferred` border change and a focused skip link on a scrolled page have not been *seen*. That is the owner's verify round. |
 | 2026-07-29 | **Review follow-up — the three open `[Review][Decision]` items closed; the story's checkbox surface is now fully clear.** (1) The held stylesheet decision applied now that its blocker landed: four `--status-*-bg` fill tokens, bound by the four `.status-badge.<stage>` rules **and** by the mirrors that already claimed to mirror them (owner widened the scope), so the Vue badge's flat `--parchment` substitution is gone — all eight stages now compute identically on both surfaces. (2) The `.pill` second definition **deleted**, not corrected again, via a new UNSCOPED `shared-primitives.css` layer bounded by a one-entry allowlist — **[ADR 0029](../../docs/adrs/0029-unscoped-shared-primitive-layer.md) proposed unasked** because it amends ADR 0018's ratified scoping property, and it states the cost (containment is no longer absolute) rather than minimising it. (3) `DesignSystem_BypassesApplyReferenceLinks` made non-vacuous with **none** of the three recorded options — `ApplyReferenceLinks` is five linkifiers, and the demo chip's "Epic 1" gives `StoryEpicLinkifier` a positive control needing no fixture and no new seam. All four new/changed gates proven RED. ⚠️ Proving the partition mechanism exposed a **vacuity bug in this pass's own tests** (an empty allowlist skipped every loop body), now guarded — the same defect class the re-review existed to find. Fingerprint `501ee958…` → `22c921de…`, stable across two `--no-incremental` runs, **provenance clean** (self-contained temp fixture; the only modified `src/` files were this change's). Suite 2814/0/3 with no flake; web vitest 106. A **pre-existing** `check:assets` failure at HEAD (stale gitignored `web/public/specscribe.js`) was fixed and disclosed as not caused here. |
 | 2026-07-25 | Story 23.2 implemented. `web/` Nuxt app established with a generated token bridge + drift gate, four scoped-CSS primitives, and a `/design-system` route. AC #4's payload experiment measured and **contradicted the spike's hypothesis** — server components cost 1.99× vs async-data's 1.36×; build-time data (1.00×) is the recorded recommendation for 23.3. C#-generated `design-system.html` shipped and wired into the Help nav. Golden fingerprint regenerated to `2050b586…` on top of a concurrent session's uncommitted Story 20.x work. |
