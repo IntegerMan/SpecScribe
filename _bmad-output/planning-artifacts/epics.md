@@ -3247,6 +3247,26 @@ So that the community preview ships from a known, deliberate state rather than a
 **And** items resolved by Stories 17.1–17.3 are closed in the same pass (per the Epic 3 retro rule: close items when the fix ships).
 
 2.
+**Given** the 13 consolidation clusters named by the 2026-08-07 deferred-work triage — each one root cause that several reviews filed separately because review scope is per-story by File List
+**When** the burndown disposes of them
+**Then** each cluster is dispositioned **once, as a cluster**, rather than as its individual member entries
+**And** the clusters are: `BmadCommands` next-step classifiers routing on raw status strings instead of `StatusStyles`; the filesystem path-comparer policy (ADR-shaped — two existing precedents point opposite ways); unguarded `ToDictionary(e => e.Number)` at 5 sites; git-availability test policy (10 files hard-fail, 3 skip) plus its duplicated footer-strip regex in 8 files; the extension's absent TypeScript test harness; the webview first-paint prelude follow-on (10 items, one architectural split); the Story 24.1 review cluster (route to 24.2/24.3 while Epic 24 is in flight); byte-blind emitters and at-scale bounding (5 items, a failure mode this project has shipped twice); duplicated-constant hygiene; branding/iconography/theming; the ownerless `.claude/launch.json`; the zero-contributor Git Insights gate; and the last watch/SPA staleness residual
+**And** a cluster whose members disagree (e.g. a stale citation beside a live one) is resolved against the code, not against the older record.
+
+3.
+**Given** the story candidates the same triage identified as belonging to no story today
+**When** the burndown seats them
+**Then** each is either seated as a real story with a named epic home, or explicitly accepted as a known limitation with the reason recorded
+**And** two are treated as time-critical rather than queued: the `FileWatcherServiceTests.BurstOfSaves` flake — which **must be resolved before Story 16.2 lands**, since 16.2 makes that suite a required status check and a load-sensitive test inside one converts a busy runner into a blocked pull request — and `npm run check:ir-content`, believed to be shipping RED under a check that is already required
+**And** the remainder are at minimum: the webview Problems wire collapsing `Informational` to `warning` (C# and extension halves must land together, or the notice is dropped entirely rather than mislabelled); `specscribe.js` invisible to all static analysis; the hierarchy dimension-contract validation; multi-epic retro attribution (which contains a real cross-epic correctness bug, not just a heuristic gap); the D2 docs landing page and its 13 mapped edge cases; the nib social-preview card; and webview navigation breadth.
+
+4.
+**Given** two items the triage could not resolve from the record and marked NEEDS RE-MEASUREMENT
+**When** the burndown begins
+**Then** both are measured before any decision rests on them, because each is currently neither confirmed good nor confirmed bad
+**And** they are: ADR 0033 §Decision 4, undischarged because `check:parity`'s Ubuntu half was wired into `portability-probe` but never observed — the same single-OS evidence that let its removed predecessor gate ship and then diverge across three environments; and `check:ir-content`'s true state, which must be re-measured through the full load-bearing order (`dotnet build --no-incremental` → `generate` → `extract:ir-content` → `check:ir-content`), since an incremental build reuses a cached assembly, never re-embeds a changed asset, and yields a confidently wrong answer either way.
+
+5.
 **Given** the hardening work of this epic is complete
 **When** the sign-off is produced
 **Then** a release-readiness record states that structural, security/privacy, and performance reviews passed (or lists accepted limitations), and that the tool is cleared to run against public and private codebases
@@ -3254,6 +3274,21 @@ So that the community preview ships from a known, deliberate state rather than a
 
 <!-- 2026-07-18 (owner-directed, append-only): Story 17.5 seated — investigate oversized source files
      (notably specscribe.css) and propose a split/modularization path before more feature CSS accumulates. -->
+
+<!-- 2026-08-07 (deferred-work triage, append-only): Story 17.4 ACs 2-4 added; the original AC 2 (sign-off)
+     renumbered to 5, text unchanged. Rationale: AC 1 said "each open item", which sized the burndown at ~215
+     bullets and gave no way to tell a duplicate from a defect. The triage read all 138 sections, verified the
+     open items against HEAD, closed 13 as already handled (Story 20.7 deletions; ADR 0034 retiring
+     GoldenContentFingerprint; and one _spaCapture item that was the same defect as an entry fixed and struck
+     on 2026-07-21), and grouped ~55 more into 13 clusters. Net: 215 -> 202 open, with the real shape now
+     legible. ACs 2-4 record that shape so the burndown is not re-derived from scratch. Full evidence per item
+     is in deferred-work.md, which now carries a "How to read this file" preamble. -->
+
+<!-- STANDING NOTE for whoever runs this story: deferred-work.md is 1,573 lines / ~300 KB and roughly 60%
+     struck-through, and it is PARSED into rendered follow-up pages by DeferredWorkParser. Archiving the closed
+     sections would shrink it substantially but costs the on-site audit trail; the triage deliberately left that
+     call to the owner rather than making it. Cited line numbers throughout are approximate and must be
+     re-resolved by symbol — Story 25.2's own record documents two of its citations moving within a day. -->
 
 ### Story 17.5: Large-File Investigation (CSS and Kindred Hotspots)
 
