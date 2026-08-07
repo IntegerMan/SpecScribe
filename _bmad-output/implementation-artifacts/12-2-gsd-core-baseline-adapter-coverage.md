@@ -691,6 +691,16 @@ run reports errors, so whether it appears in the committed sheet depends on the 
 environment rather than on any code change. It is *not* in `CONDITIONAL_CLASSES`. Not fixed here (it belongs to
 whoever owns that surface), but it will bite the next person who regenerates with an unbuilt renderer.
 
+**§F7 — ⚠️ the `FileWatcherServiceTests` flake is frequent enough to expect in CI, and this story made it more
+likely.** Measured across six full-suite runs on this branch: three were green at 2963/2963 and three failed
+with 1–2 failures, always from that one class and always a *different* test (`BurstOfSaves…`,
+`SprintStatusYaml_AddedThenEditedThenRemoved…`, `EditingAStoryFile…`). The class passes 3/3 in isolation and
+pristine `HEAD` is green, so the fragility is pre-existing — these drive a real `FileSystemWatcher` against a
+400 ms debounce. But **this story added 34 tests to the parallel pool**, which raises the contention that
+triggers it. Not fixed here (it is nobody's story, and a timing fix is a design decision about how those tests
+wait), but it should be expected on a CI re-run and is worth someone owning: a re-run being the standard
+remedy is exactly how a flake becomes invisible.
+
 **§F5 — ADR 0037 is missing from `docs/adrs/README.md`'s index.** Noticed while adding 0038's entry. Left alone
 deliberately, per CLAUDE.md's hunk-attribution rule: it belongs to the story that wrote it, and silently
 adopting another story's hunk is what makes review attribution fail.
