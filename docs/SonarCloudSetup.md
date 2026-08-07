@@ -7,6 +7,12 @@ The CI workflow that performs the analysis — [`.github/workflows/build-test-an
 — is already committed and **already builds and tests without any of this setup**. What the steps below add is
 the analysis upload. Until they are done, CI still runs green; the three scanner steps simply skip.
 
+> **This document owns the *analysis* half of that workflow only.** The *gating* half — which check is a
+> required status check on `main`, its exact context string (`build-test-analyze`), why
+> `portability-probe (ubuntu, non-gating)` is deliberately **not** required, and the admin bypass — lives in
+> [`CiGate.md`](CiGate.md). Keep the two in step: they describe one workflow from two angles, and the scanner
+> steps' `continue-on-error` posture described below is precisely why a SonarCloud outage cannot fail the gate.
+
 ---
 
 ## The short answer

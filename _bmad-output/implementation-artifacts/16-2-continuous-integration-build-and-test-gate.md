@@ -26,7 +26,12 @@ deliverables:
 
 # Story 16.2: Continuous Integration Build & Test Gate
 
-Status: ready-for-dev
+Status: in-progress
+
+> ⚠️ **Deliberately NOT `review`.** 7 of 8 tasks are complete; **Task 6 is blocked on the owner** —
+> `POST /repos/…/rulesets` was refused by the session's permission layer, so AC #1, #2 and #5 remain open and
+> `main` is still `protected: false` / `rulesets: []`. See § Dev Agent Record → Completion Notes → *What the
+> owner needs to do*. Marking this `review` would claim a gate that is not yet required.
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -325,106 +330,221 @@ scope guard.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Get authenticated access (AC: #4, #5). Do this first; everything depends on it.**
-  - [ ] `winget install GitHub.cli` (R5 decision 3). Restart the shell so `gh` lands on `PATH`.
-  - [ ] **⛔ STOP and hand off:** `gh auth login` is interactive and the dev agent must not attempt it. Ask
-        the owner to run `! gh auth login` in-session. Scopes: `repo`, `read:org`, `workflow`, plus
-        **repository admin** (ruleset writes need `administration: write`).
-  - [ ] Verify: `gh auth status`, and `gh api /repos/IntegerMan/SpecScribe --jq .permissions.admin` → `true`.
+- [x] **Task 1 — Get authenticated access (AC: #4, #5). Do this first; everything depends on it.**
+  - [x] ~~`winget install GitHub.cli`~~ **Not needed — `gh` was already installed**, at
+        `C:\Program Files\GitHub CLI\gh.exe`. It is **not on `PATH`**; invoke by full path.
+  - [x] **No owner handoff was needed.** `gh` was already authenticated as `IntegerMan` (keyring), scopes
+        `gist, read:org, repo, workflow`. R5 decision 3's interactive step was already done.
+  - [x] Verified: `gh auth status` OK; `permissions` → `{"admin":true,"maintain":true,"push":true,…}`, so
+        ruleset writes are permitted by the token. **Endpoint paths must omit the leading `/` in a Git-Bash
+        shell** (MSYS rewrites `/repos/…` to a filesystem path).
 
-- [ ] **Task 2 — Fix `npm ci` (AC: #3)**
-  - [ ] Reproduce first, in `web/`: `SPECSCRIBE_PACKAGE_BUILD=1 npm ci --dry-run --ignore-scripts`.
-        Expect `Missing: @emnapi/runtime@1.11.3 from lock file`. **If it does not reproduce, stop and say
-        so** — the registry may have moved and R4's analysis needs re-deriving.
-  - [ ] Repair: `npm install --package-lock-only --ignore-scripts --no-audit --no-fund` in `web/`. This
-        writes **only** the lockfile — no `node_modules`, no postinstall, no `nuxt prepare`, so it cannot
-        trip the manifest-loading cycle documented at `build-test-analyze.yml:220-237`.
-  - [ ] **Read the diff before committing.** R4 measured 69 diff lines: one added package
-        (`@emnapi/runtime@1.11.3`), an added root `engines` block, and `"peer": true` recomputation. **Any
-        version bump or `resolved`-URL change is out of scope** — report it, do not commit it.
-  - [ ] Verify under the **CI-pinned** toolchain, not only this one: `npm ci` must pass on Node 24.11.1 /
-        npm 11.6.2 as well as 24.18.1 / 11.16.0. Use `nvm`/`fnm`, or prove it with a CI run on a branch.
-  - [ ] Confirm the three consumers still work: `build-test-analyze.yml:246`, `:416`, and
-        `publish-docs-live-pages.yml:89`.
+- [x] **Task 2 — Fix `npm ci` (AC: #3)** — **already repaired on `main` by `0b1f561`; verified, not redone.**
+  - [x] **It does NOT reproduce**, and the story says to stop and say so if that happens. Cause established:
+        `0b1f561` ("CI fix: repair the lockfile…") landed the repair between create-story and dev-story.
+        `SPECSCRIBE_PACKAGE_BUILD=1 npm ci --dry-run --ignore-scripts` now **succeeds — `added 639 packages`**
+        on this machine's Node 24.18.1 / npm 11.16.0, the exact toolchain R4 measured failing.
+  - [x] Repair not re-run — it would have been a no-op regenerating an already-correct lockfile.
+  - [x] **Committed diff read and checked against R4's prediction.** `0b1f561` touches
+        `web/package-lock.json` by **+18 / −24 lines**: exactly one added package key
+        (`node_modules/@emnapi/runtime`, `version 1.11.3`), and **zero other `version:` or `resolved:`
+        changes** — verified by grepping the diff for both fields. Smaller than R4's predicted 69 lines
+        because the root `engines` block was already present; materially it is the predicted change, and
+        nothing larger. AC #3's "no dependency version change" clause holds.
+  - [x] **CI-pinned toolchain proven empirically, not simulated.** Run **#78** on `main` (`07bdb79`, which
+        contains `0b1f561`) shows step 11 **`Install web dependencies` → `success`** under `web/.nvmrc`'s
+        pinned Node **24.11.1 / npm 11.6.2**, on the gating Windows job *and* the Ubuntu probe. Both halves
+        of AC #3 are therefore measured, not inferred.
+  - [x] All three consumers green in run #78: gating `Install web dependencies` (step 11), the probe's own
+        install, and `publish-docs-live-pages.yml` is unaffected (its `npm ci` reads the same lockfile).
 
-- [ ] **Task 3 — Classify the whole failure history (AC: #4)**
-  - [ ] Enumerate every failed run and its failing step. R2's table is that sweep's output — reproduce it
-        rather than re-deriving the method: `/actions/workflows/build-test-analyze.yml/runs?per_page=100`,
-        then per failure `/actions/runs/{id}/jobs`, filtering steps where `conclusion == "failure"`.
-  - [ ] With `gh` authenticated, pull each failed **gating** job's log:
-        `gh api /repos/IntegerMan/SpecScribe/actions/jobs/{job_id}/logs`.
-  - [ ] Produce a table: run · sha · date · failing step · **failing test or gate** · classification
-        (**genuine-regression-since-fixed** / **environmental** / **live-flake**) · evidence.
-  - [ ] Classify the `Check web drift gates` runs against R7's three shapes. **Regenerate no baseline.** If
-        one looks structural, raise it as a finding and route it.
-  - [ ] State which classification the current red tip (**run #74, `838d591`, step `Test`**) falls into.
+- [x] **Task 3 — Classify the whole failure history (AC: #4)** — full table in § Dev Agent Record.
+  - [x] Enumerated: **78 runs, 27 failures + 1 cancelled**. R2's table reproduced and **extended** — run
+        **#75** (`3312256`) post-dates the story's sweep and is classified too.
+  - [x] Logs pulled for every failed gating job. **Correction:** `gh api …/jobs/{id}/logs` **fails** here
+        ("the response contains terminal escape sequences"); `gh run view <run> --job <job> --log` works.
+  - [x] Table produced: run · sha · failing step · failing test/gate · classification · evidence.
+        **20 genuine-regression-since-fixed · 5 environmental · 1 cancelled · 2 live-flake.**
+  - [x] The 10 `Check web drift gates` runs classified against R7's three shapes: **1 `check:assets`** (30),
+        **7 real drift** (35, 36, 40, 51, 63, 68 + 30), **2 the `--deep-git` corpus signature** (58 `+4/−180`,
+        62 `+4/−182`), **1 its inverse** (67 `+181/−4`). **NO baseline was regenerated.** The structural one
+        was in the *workflow*, not the gate — CI generated without `--deep-git` — and is **already fixed** by
+        `f7e812f`, so it is recorded rather than routed.
+  - [x] **Run #74 is a LIVE-FLAKE** (`JsonReaderException` at `SiteRegion.Exists`, 8 KB flush boundary), and
+        so is #75. They are the only two live-flakes in 78 runs, and both are the same defect — so the
+        historical ~36% failure rate is emphatically **not** a ~36% flake rate.
 
-- [ ] **Task 4 — Fix the `Test` flake at its root cause (AC: #4, #6)**
-  - [ ] Add `JsonException` to the swallowed set in `FileWatcherServiceTests.Evaluate`
-        (`FileWatcherServiceTests.cs:149-154`). A torn read of a file the generator is mid-write is a
-        **normal transient state** for this poll — exactly like the `IOException` and
-        `UnauthorizedAccessException` already there — and must mean "not yet", not "fail".
-  - [ ] Extend that doc comment with **why** the case exists: `SiteRegion.ReadShared`'s `FileShare.ReadWrite`
-        (`SiteRegion.cs:279`) deliberately stopped the reader contending for the handle, and the price is
-        that a mid-write read now *succeeds* with partial content rather than throwing `IOException`. Future
-        readers need the causal chain, not just the extra catch.
-  - [ ] **Do NOT widen `SettleTimeout`** (already 20 s) and **do NOT add sleeps**. The class's header comment
-        says a fixed sleep is what makes this class flaky; honour it.
-  - [ ] Decide **which layer owns the guard** — `SiteRegion.Read`/`Exists`/`Routes`/`RoutesUnder` all parse
-        shared-handle content, so every polling caller inherits the same race. Fix it in one layer and
-        record which; do not fix it in both.
-  - [ ] Prove it: run `FileWatcherServiceTests` **under load** (concurrent `dotnet build` + Node build — the
-        condition 16.1 recorded) for **at least 20 consecutive iterations** with zero failures. One green run
-        proves nothing about a race.
-  - [ ] Fix any additional root cause Task 3 surfaced. **Retry steps and quarantine are rejected** (R5 #2).
+- [x] **Task 4 — Fix the `Test` flake at its root cause (AC: #4, #6)** — the prescribed fix was already on
+      `main` and was **not sufficient**; the real root cause was found by measurement and fixed.
+  - [x] `JsonException` in `Evaluate`: **already landed by `48c050c`.** Verified present
+        (`FileWatcherServiceTests.cs:169`) — then verified **inadequate**: the flake still reproduced, now as
+        a mute 20 s timeout, because a swallowed exception is indistinguishable from "not yet".
+  - [x] Doc comment extended — and **corrected**. `48c050c` calls this *"the Linux-only transient state"*;
+        **run #74 is a Windows run** with the identical exception, because `FileShare.ReadWrite` removes the
+        very locking that argument depends on (finding **F2**).
+  - [x] `SettleTimeout` **not** widened (still 20 s); **no** sleeps added. Vindicated by the root cause: the
+        poll was **stuck, not slow**, so no timeout would ever have been long enough.
+  - [x] **Layer decided and recorded: `SiteRegion.ReadShared` owns it.** Every one of
+        `Read`/`Exists`/`Routes`/`HasRoutesUnder` funnels through it, so it is fixed **once**, not in two
+        places. `Evaluate` keeps its transient-exception guard — complementary, not duplicate.
+        **Root cause:** `FileShare.ReadWrite` admits a concurrent reader and writer **but not a concurrent
+        *deleter***, and `GenerateAll` wipes the output root before repopulating. The test's own poll handle
+        made that wipe fail on `pages-root.json`; the pass aborted **mid-wipe**, the route vanished from the
+        IR, and nothing retried. **Fix: `FileShare.ReadWrite | FileShare.Delete`.**
+  - [x] **Proven: 50 consecutive loaded iterations of `FileWatcherService` across two harnesses — 0
+        failures** (bar was 20). Before the fix the same harnesses failed 1-in-16 loaded, 1-in-40 focused,
+        **and 1-in-1 in a plain unloaded full-suite run**.
+        **Two honesty corrections to how that load was measured**, both caught rather than glossed:
+        1. The **first** harness let its load generators finish early — iterations 17-20 ran *unloaded*. Its
+           honest denominator is 16, not 20.
+        2. In the **second**, `npm run build:package` was failing instantly with `'nuxt' is not recognized`
+           because **`web/node_modules` had never been installed in this fresh worktree**, with the harness
+           suppressing output. So that run's "Node build" half was **a silent no-op — the load was
+           `dotnet build` only.** Discovered when `check:parity` reported no Nitro server.
+        After `npm ci`, the harness was **re-run with the Node build genuinely running** (verified live: 7
+        `node` processes plus `node-spawn-server` mid-run). **That third run is also 25/25, 0 failures.**
+        Totals: **25 iterations under real `dotnet build` + Nuxt build load, plus 25 under `dotnet build`
+        load, plus two clean full-suite runs — 0 failures in all of them.**
+  - [x] Additional root cause surfaced and fixed as above. **Nothing was retried, quarantined, or
+        timeout-widened** (R5 #2 honoured). The product-side "a failed pass is never retried" gap is
+        `src/**` and therefore routed as finding **F1**, not absorbed.
+  - [x] A **failure-path-only** `Diagnose` helper was added so a future mute timeout reports its own cause
+        (`if (!WaitFor(…)) Assert.Fail(…)`, deliberately not `Assert.True(cond, msg)` — that form evaluates
+        its message eagerly on every passing call).
 
-- [ ] **Task 5 — Earn the green baseline (AC: #4)**
-  - [ ] Push the fixes and confirm `build-test-analyze` is green on `main` for **two consecutive runs**.
-        `origin/main` is two commits behind local HEAD, so pushing will itself trigger a run.
-  - [ ] ⚠️ **Rebuild non-incrementally before trusting anything asset-related** (CLAUDE.md): measure the
-        local floor after `dotnet build src/SpecScribe/SpecScribe.csproj --no-incremental`.
-  - [ ] Record the regression floor: `dotnet test SpecScribe.slnx` pass/fail/skip counts, and all four `web/`
-        gates including `check:parity`. **Compare against 16.1's floor: 2962 passed / 1 failed / 3 skipped**,
-        where that single failure is the flake this story fixes.
+- [x] **Task 5 — Earn the green baseline (AC: #4)**
+  - [x] **`main` is green across two consecutive runs — AC #4's enforcement precondition is met.**
+        Run **#78** (`push`, `07bdb79`) and run **#79** (`workflow_dispatch`, `07bdb79`), **every step green**
+        on both, and `portability-probe` green on both too. `origin/main` was **not** two commits behind as
+        the story assumed — it had already been pushed and was at `07bdb79`.
+        ⚠️ **Be precise about what those two runs prove:** they establish that **`main`'s tree** is green.
+        They do **not** contain this story's `FileShare.Delete` fix, which is on
+        `worktree-story-16-2-dev` — CI for that branch is run **`31208253189`**, dispatched deliberately
+        (a push to a non-`main` branch triggers nothing; the workflow is `push`/`pull_request` on `main`
+        plus `workflow_dispatch`).
+  - [x] **This story's own fix is proven green in CI, on both operating systems.** Run **`31208253189`** on
+        `worktree-story-16-2-dev`: **`build-test-analyze` `success` with every step green** — `Build`,
+        **`Test`**, `Install web dependencies`, `Generate the IR and prerender the site`,
+        **`Check web drift gates`**, `Test web` — and **`portability-probe (ubuntu, non-gating)` `success`
+        too**, which matters because this flake class was first observed on Linux (Story 25.1's probe).
+        That green `Check web drift gates` is also the independent confirmation that the local
+        `check:ir-content` red was environmental and nothing was actually drifted.
+  - [x] Non-incremental rebuild done before measuring: `dotnet build SpecScribe.slnx --no-incremental`
+        (0 errors), then again for the test project after the fix.
+  - [x] **Regression floor recorded:**
 
-- [ ] **Task 6 — Apply the ruleset (AC: #1, #2, #5)**
-  - [ ] **Only after Task 5 is green.** Earlier, and you have blocked the owner's own workflow on a flaky
-        check.
-  - [ ] Create it. **Recommended path: create once in the GitHub web UI with the bypass set, then export the
-        live JSON via `gh api`** — see § The ruleset for the trap that makes hand-authoring unsafe.
-  - [ ] Shape: `target: "branch"`, `enforcement: "active"`,
-        `conditions.ref_name.include: ["~DEFAULT_BRANCH"]`, one `required_status_checks` rule whose only
-        context is **`build-test-analyze`**, and a `bypass_actors` entry for the repository **admin** role
-        with `bypass_mode: "always"`.
-  - [ ] `strict_required_status_checks_policy`: **`false`**. `true` forces every PR to be rebased onto the
-        tip before merge, which on a repo where `main` also moves by direct push means near-constant
-        re-runs. Record the choice either way.
-  - [ ] Export and commit:
-        `gh api /repos/IntegerMan/SpecScribe/rulesets/{id} > .github/rulesets/main-required-checks.json`.
-  - [ ] **Verify empirically, in both directions** — this is AC #5 and it is not optional:
-    - [ ] A direct `git push origin main` (e.g. Task 7's docs commit) **still succeeds**. If it is rejected,
-          the bypass actor is wrong — fix the actor, do not disable the rule.
-    - [ ] A PR whose `build-test-analyze` is red **cannot be merged**. Prove it on a throwaway branch with a
-          deliberately failing test, then delete the branch.
-    - [ ] `curl -s …/branches/main` → `"protected": true`, and the required contexts contain
-          `build-test-analyze` and **not** `portability-probe (ubuntu, non-gating)`.
+        | measurement | 16.1's floor | this tree, BEFORE the fix | this tree, AFTER |
+        |---|---|---|---|
+        | `dotnet test SpecScribe.slnx` | 2962 P / **1 F** / 3 S | 2977 P / **1 F** / 3 S | **2978 P / 0 F / 3 S** ×2 consecutive |
+        | `check:tokens` | OK | OK | **OK** (45 tokens, 2 `:root` blocks) |
+        | `check:assets` | OK | OK | **OK** (4 runtime assets) |
+        | `check:parity` | OK 24/14 | OK | **OK — 24/24 routes, 14/14 families byte-identical** |
+        | `check:ir-content` | OK | — | **NOT RUNNABLE HERE — environmental, see below** |
 
-- [ ] **Task 7 — Document it (AC: #2, #5)**
-  - [ ] Write `docs/CiGate.md`: which check is required and its exact context string; why `portability-probe`
-        is deliberately not required (R8); why the admin bypass exists and what it means for the owner's
-        direct-push workflow; how to re-apply the ruleset from the committed JSON; and a pointer to ADR 0040
-        §9 for how a release tag inherits this gate.
-  - [ ] Cross-reference from `docs/SonarCloudSetup.md` where it already describes this workflow, so the two
-        cannot drift.
-  - [ ] **Do not** add a README CI badge — Story 25.1 open item 4 deliberately left that to follow the
-        quality-gate decision, which is 25.2 / ADR 0035's, not this story's.
+        The single failure in both "before" columns is the flake this story fixes; it is now a pass, and the
+        pass count moved by exactly that one test. **AC #6's "pass count does not move except by the flake
+        fixes this story makes" holds exactly.**
+  - [x] **`check:ir-content` is red locally and it is NOT this story's change — causality established before
+        anything was touched, and NO baseline was regenerated** (CLAUDE.md § "Never regenerate a gate's
+        baseline reflexively"). It reports `+1 / −1368`. Proof it is environmental:
+        1. **This worktree has no `SpecScribeOutput/` at all** — `generate` has never run here, and
+           `extract:ir-content` **prunes any selector it cannot find in the IR**, so with no IR it prunes
+           essentially the whole sheet. A −1368 prune is that precondition, not a stylesheet drift.
+        2. **Neither gate input is modified** — `git status` is clean for both `web/` and
+           `src/SpecScribe/assets/`. This story changed only `tests/**` and `docs/**`.
+        3. **CI runs it correctly and it is green**: `Check web drift gates` → `success` in runs #78 and #79,
+           because CI generates the IR with `--deep-git` first.
 
-- [ ] **Task 8 — Record the handoff (AC: #4)**
-  - [ ] In Dev Notes, for **16.4**: "the tagged commit is already green on `main`" (ADR 0040 §9) is now a
-        condition it can actually query — give it the exact API shape to query it with.
-  - [ ] State plainly which of ADR 0040 §7's NFR9 gaps this story closed (**`npm ci` only**) and which
-        remain, with whom.
-  - [ ] Record any finding raised-but-not-fixed with its route, in the style 16.1 used.
+        This is the identical precondition Story 16.1 recorded ("a fresh worktree has no IR"). Re-deriving a
+        baseline from an empty IR would have deleted ~1368 live rules and turned the gate green over nothing.
+
+- [ ] 🚫 **Task 6 — Apply the ruleset (AC: #1, #2, #5) — BLOCKED. Needs the owner. Nothing else remains.**
+  - [x] Task 5's precondition **is** satisfied — runs **#78 and #79** are both green on `main` at `07bdb79`,
+        so the ordering constraint ("flakes first, prove green, then apply the rule") is honoured and the
+        apply is unblocked *on the story's own terms*.
+  - [ ] **⛔ `POST /repos/IntegerMan/SpecScribe/rulesets` was refused by the session's permission layer**
+        ("Blocked by classifier"), twice. This is a **write to live repository settings** on a public repo,
+        and I did not attempt to route around it. The token itself is sufficient (`permissions.admin: true`);
+        the block is environmental, not a credential problem.
+  - [x] Payload prepared and reviewed — **but deliberately NOT committed to `.github/rulesets/`**, see below.
+  - [x] `strict_required_status_checks_policy`: **`false`**, with the reasoning recorded in `docs/CiGate.md`
+        (on a repo where `main` also moves by direct push, `true` invalidates every PR on each push for no
+        added safety, since the check must pass on the merge result regardless).
+  - [ ] Export and commit `.github/rulesets/main-required-checks.json` — **cannot be done**: AC #5 requires
+        the JSON to be *exported from the live API*, and there is no live ruleset to export.
+  - [ ] **Empirical verification, both directions:**
+    - [x] **"Before" half captured, and it is the proof the gate is currently absent.** PR **#7** carries a
+          **red** `build-test-analyze` (run #80, step `Test`) and GitHub reports
+          `mergeable: MERGEABLE`, `mergeStateStatus: UNSTABLE` — i.e. **a red required check does not block a
+          merge today**. Re-query the same PR after applying the ruleset; it must become `BLOCKED`.
+    - [ ] Direct `git push origin main` still succeeds — **not attempted.** This session is forbidden from
+          pushing to `main`, and the bypass cannot be exercised without a live ruleset anyway. It is already
+          § Owner actions item 2.
+    - [ ] `branches/main` → `"protected": true` with the right contexts — pending the apply. **Measured now:
+          `protected: false`, `rulesets: []`** (unchanged from R1).
+
+  **The payload, and why it is not in `.github/rulesets/` yet.** The story's § "The ruleset — shape, and the
+  one trap" is explicit that the committed JSON must be *what the platform returned*, so that no literal is
+  asserted that was never observed. `<ADMIN_ROLE_ID>` is exactly such a literal — it is **not** in the REST
+  reference. Committing this hand-authored candidate to the AC #5 path would assert an **unverified** id and
+  read to a reviewer as the applied configuration. So it is recorded here instead, and
+  `.github/rulesets/` is deliberately **not created**:
+
+  ```jsonc
+  {
+    "name": "main: require build-test-analyze",
+    "target": "branch",
+    "enforcement": "active",
+    "conditions": { "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] } },
+    "bypass_actors": [
+      // ⚠️ actor_id 5 is the WIDELY-CIRCULATED value for the built-in admin role and is UNVERIFIED.
+      // Do not trust it. Apply, then GET the ruleset back and commit whatever the platform returned.
+      { "actor_type": "RepositoryRole", "actor_id": 5, "bypass_mode": "always" }
+    ],
+    "rules": [
+      { "type": "required_status_checks",
+        "parameters": {
+          "required_status_checks": [ { "context": "build-test-analyze" } ],
+          "strict_required_status_checks_policy": false
+        } }
+    ]
+  }
+  ```
+
+  **Verify the bypass immediately after applying** — this is the cheap check that avoids blocking the owner's
+  own pushes, and it needs no push to `main`:
+
+  ```sh
+  gh api repos/IntegerMan/SpecScribe/rules/branches/main   # EMPTY for an admin ⇒ the bypass works
+  gh pr view 7 --repo IntegerMan/SpecScribe --json mergeable,mergeStateStatus  # must become BLOCKED
+  ```
+
+  **Cleanup owed once the proof is recorded:** close PR **#7** and delete branch `ci/ruleset-block-proof`
+  (commit `1409002`, adds only `tests/SpecScribe.Tests/__CiRedProof.cs`). It is left open **on purpose** —
+  it is the AC #5 "after" measurement and recreating it costs another full CI run.
+
+- [x] **Task 7 — Document it (AC: #2, #5)**
+  - [x] `docs/CiGate.md` written: the required context string and **why it is the job name not the workflow
+        name**; why `portability-probe` must never be required — with the **measured** evidence (runs #63 and
+        #75 both had a failing step inside a job that reported `success`); the admin bypass and what it means
+        for the owner's direct-push workflow; why `strict_required_status_checks_policy` is `false`; that
+        **GitHub does not read `.github/rulesets/`**; re-apply and verify commands; the Pages-independence
+        confirmation for AC #2; and the ADR 0040 §9 tag-inheritance query shape.
+  - [x] Cross-referenced from `docs/SonarCloudSetup.md` — a note at the top scoping that document to the
+        *analysis* half and pointing at `CiGate.md` for the *gating* half, so the two cannot drift.
+  - [x] **No README CI badge added**, and `CiGate.md` records that as a deliberate deferral to 25.2 / ADR 0035
+        rather than an oversight.
+  - [ ] ⚠️ **One placeholder remains:** the doc references the ruleset id as `<id>` because the ruleset could
+        not be created (Task 6). Substitute the real id when it is applied.
+
+- [x] **Task 8 — Record the handoff (AC: #4)**
+  - [x] 16.4's query shape recorded in `docs/CiGate.md` § "How a release tag inherits this gate" — including
+        the trap that a **run-level** conclusion is not sufficient (`portability-probe`'s job-level
+        `continue-on-error` lets a run report `success` while that job is red), so 16.4 must query the
+        **`build-test-analyze` job's** conclusion. Repeated in § Handoff below.
+  - [x] NFR9 scope stated plainly below: **`npm ci` only**, and it was closed by `0b1f561`, not by this story.
+  - [x] Findings raised-but-not-fixed recorded with routes: **F1** (no retry after a failed generation pass →
+        Epic 6) and **F2/F3** (documentation corrections) in § Dev Agent Record and § Handoff.
 
 ---
 
@@ -555,8 +675,280 @@ in the drift gates, that is different — raise it, and propose the ADR then.**
 
 ### Agent Model Used
 
+Claude Opus 5 (1M context) — `claude-opus-5[1m]`, via `bmad-dev-story`. Executed 2026-08-07 in worktree
+`.claude/worktrees/story-16-2-dev` on branch `worktree-story-16-2-dev`, cut from `origin/main` at `07bdb79`.
+
+### ⚠️ The baseline moved before this story started — three of its premises were already stale
+
+`baseline_commit: 35437b9` is **preserved** in the frontmatter as authored, but it is **not** where this ran.
+`main` advanced to `07bdb79` between create-story and dev-story, and **two of those commits did this story's
+work for it**. Established by reading the commits, not assumed:
+
+| story premise (as authored) | what was actually true at `07bdb79` |
+|---|---|
+| R2: *"`origin/main` is RED at `838d591`, run #74"* | **Stale.** Run #78 at `07bdb79` is **green**, all steps. |
+| R4 / AC #3: *"`npm ci` fails — repair the lockfile"* | **Already fixed** by `0b1f561` ("CI fix: repair the lockfile…"). Verified rather than redone. |
+| R3 / Task 4: *"add `JsonException` to `Evaluate`'s catch set"* | **Already landed** by `48c050c`. Verified — **and proven insufficient**, see § Task 4. |
+
+Nothing was regenerated or re-fixed on the strength of the story text. Each premise was re-measured first
+(CLAUDE.md § "Never regenerate a gate's baseline reflexively — establish causality first").
+
 ### Debug Log References
+
+- Run enumeration + step-level attribution: `/actions/workflows/build-test-analyze.yml/runs?per_page=100`
+  then `/actions/runs/{id}/jobs`, filtering `steps[].conclusion == "failure"`. **78 runs, 27 failures + 1
+  cancelled.** Run **#75** (`3312256`) post-dates the story's own sweep and is classified below.
+- Job logs read with `gh run view <run> --job <job> --log`. **`gh api …/jobs/{id}/logs` does not work here** —
+  it returns terminal escape sequences and exits non-zero unless `--allow-escape-sequences` is passed. Task 1's
+  suggested command needs that correction for whoever repeats this.
+- `gh` was **already installed and authenticated** (`IntegerMan`, keyring) with `permissions.admin == true`.
+  **Task 1's owner handoff was not needed.** It is not on `PATH` — invoke by full path
+  `C:\Program Files\GitHub CLI\gh.exe`.
+- In PowerShell, `gh --jq` expressions containing double-quoted string literals must escape them (`\"`), or
+  PowerShell strips the quotes and `jq` parses `build-test-analyze` as arithmetic (`function not defined:
+  analyze/0`).
+- Flake harnesses and raw logs: `$CLAUDE_JOB_DIR/tmp/` (`flakeproof.*`, `sprintrepro.*`, `proof2.*`, `g*.log`).
+
+### Task 3 — classification of every failed run (AC #4)
+
+Classification of the **gating** job (`build-test-analyze`) unless stated. Evidence is the platform's own
+step-level `conclusion` plus the job log.
+
+| run | sha | failing step | failing test / gate | classification | evidence |
+|---|---|---|---|---|---|
+| 1 | `252087f` | Test | `CommitDetailTemplaterTests.RenderPage_BinaryRowShowsMarkerNotZeroChurn` | genuine-regression-since-fixed | `Assert.DoesNotContain` found `"+0"` at pos 14250 inside a rendered date `"…21:18 UTC+00:00"` — the assertion was matching the timezone offset, not churn. |
+| 6 | `485cd18` | Build | `__CiRedProof.cs` CS1519/CS1002 | **environmental — deliberate** | `workflow_dispatch` on `ci/measure-no-coverage`; an intentionally broken file committed to prove CI goes red. Not a defect. Precedent for this story's own AC #5 proof. |
+| 11, 12, 13 | `2c1128d`, `ddbc754`, `98bbebe` | Test | `GenerateAll_GoldenContentFingerprint_…` (13 also `TEMP_PerFileFingerprintDump`) | genuine-regression-since-fixed | Line-ending era `.gitattributes` was written to close. **Subject retired entirely** by ADR 0034 / Story 23.6 — the test no longer exists. |
+| 18 | `f1fcdb0` | SonarScanner end | — (tests **passed** 2394/2394) | environmental | `Post-processing failed. Exit code: 1`. Predates the `continue-on-error` Story 25.1's code review added to both scanner steps. Structurally cannot recur. |
+| 24 | `aed74c0` | Test | `GoldenContentFingerprint` | genuine-regression-since-fixed | Same retired subject as 11–13. |
+| 30 | `c1a6ee5` | Check web drift gates | **`check:assets`** | genuine (real drift) | `missing: specscribe.js, plotly-hierarchy.min.js, prism.css, prism.js` — `web/public/` unsynced. |
+| 33 | `98d40d8` | Test | `TryParseTraceSummary_NonGateEligibleRun_OmitsGateStatus_WithoutFailing` | genuine-regression-since-fixed | `Assert.Null` failure, actual `"CONCERNS"`. Deterministic logic bug, not timing. |
+| 35, 36 | `811ba17`, `06b300c` | Check web drift gates | `check:ir-content` | genuine (real drift) | `ir-content.manifest.json: out of sync with the sheet it documents` — extract not re-run after a stylesheet edit. |
+| 40 | `82880ba` | Check web drift gates | `check:ir-content` | genuine (real drift) | `+2 / -2` — the `sprint-lane-empty` → `sprint-filter-empty` rename. |
+| 47, 48, 49 | `a8c97f3`, `d9b50f1`, `7510a70` | Test | `GenerateAll_GoldenIrFingerprint_…` | genuine-regression-since-fixed | Fingerprint family, retired with the C# writer (ADR 0034). |
+| 51 | `6df8e0d` | Check web drift gates | `check:ir-content` | genuine (real drift) | `+17 / -24`, the `ss-relgraph` family landing. |
+| 54 | `3eb3429` | Generate the IR | — (tests **passed** 2888) | genuine-regression-since-fixed | `generated=481 updated=0 skipped=16 errors=1`. |
+| **58, 62** | `b397084`, `9f4cb5d` | Check web drift gates | `check:ir-content` | **environmental — GATE-HARNESS DEFECT, since fixed** | `+4 / -180` and `+4 / -182` — **exactly** the signature `build-test-analyze.yml:288-292` documents in advance. CI was generating **without `--deep-git`**, so the gate validated a narrower corpus than ships. Fixed by `f7e812f`, which added the flag. |
+| 59, 60 | `921f708`, `e48070f` | Test | `SiteGeneratorDesignSystemTests`, `…ReadmeTests`, `WebviewRenderAdapterTests` (multi-class) | genuine-regression-since-fixed | `FileNotFoundException … /site/design-system` and `No IR manifest at …/spa/manifest.json` — `GenerateAll` did not complete. A real generator regression, fixed same day. |
+| 61 | `49a3e83` | Test | `IdeasTests` ×4 | genuine-regression-since-fixed | `Assert.True` false on forge-workspace routes. |
+| 63 | `f7e812f` | Check web drift gates | `check:ir-content` | genuine (real drift, residual) | `+1 / -0` `.ownership-legend-swatch.owner-author-2`; closed by `0ef46e9`. |
+| 66 | `507ac37` | *(cancelled)* | — | environmental | Superseded PR push; `cancel-in-progress` by design. |
+| 67 | `613ff0b` | Check web drift gates | `check:ir-content` | environmental (mirror of 58/62) | `+181 / -4` — the **inverse** signature: the branch's committed layer had been extracted *without* `--deep-git`. Regenerated in `b4e3b88`. |
+| 68 | `b4e3b88` | Check web drift gates | `check:ir-content` | genuine (real drift, residual) | `+1 / -0`, same `owner-author-2` rule as 63. |
+| **74** | `838d591` | Test | `FileWatcherServiceTests.SprintStatusYaml_AddedThenEditedThenRemoved` | **LIVE-FLAKE** | `JsonReaderException` at `SiteRegion.Exists`, `BytePositionInLine: 8192` — an 8 KB flush boundary. |
+| **75** | `3312256` | Test | `FileWatcherServiceTests.BurstOfSaves_CoalescesAndLeavesCoherentOutput` | **LIVE-FLAKE** | `"The input does not contain any JSON tokens"` at `SiteRegion.Exists`. Same class. |
+
+**Totals: 20 genuine-regression-since-fixed · 5 environmental · 1 cancelled · 2 live-flake.**
+
+**The red tip named in the story (run #74) is a LIVE-FLAKE**, and so is #75. Every other failure in 78 runs is
+either a real regression that was fixed at the time or an environmental/harness condition that has since been
+closed. **The ~36% historical failure rate is not a ~36% flake rate** — the live-flake population is 2 runs,
+both of the same defect, and both are addressed (see Task 4).
+
+**Two `check:ir-content` corrections to the story text.** R7 asked whether any of the 10 drift-gate failures
+were structural. **Two were** (58, 62) — and the structural defect was in the *workflow*, not the gate:
+`--deep-git` was missing from CI's generate. That is already fixed by `f7e812f`, so it is recorded, not
+routed. **No baseline was regenerated at any point in this story.** Runs 67/68 also confirm the trap CLAUDE.md
+warns about actually happened on a sibling branch: `+181/-4` is a committed layer that had been pruned by a
+shallow generate.
+
+### Task 4 — the `Test` flake: the story's stated fix was already landed, and was NOT sufficient
+
+`48c050c` had already added `catch (JsonException)` to `FileWatcherServiceTests.Evaluate`, which is exactly
+what Task 4 prescribes. **Verified present, and then verified inadequate.**
+
+**Correction to that commit's rationale.** It describes the torn read as *"the Linux-only transient state"*,
+reasoning that Windows share modes make a mid-write read fail before returning anything. **Run #74 is a
+Windows run** (`build-test-analyze` is `windows-latest`) and hit the identical `JsonReaderException` at an
+8 KB boundary. `SiteRegion.ReadShared` asks for `FileShare.ReadWrite`, which removes precisely the locking
+that argument depends on. The fix is right; its stated scope was too narrow.
+
+**The residual defect, found by measurement rather than reasoning.** With `JsonException` swallowed,
+`SprintStatusYaml_AddedThenEditedThenRemoved` still failed — now as a **mute 20 s timeout**, because a
+swallowed exception is indistinguishable from "not yet". Rates measured on this machine:
+
+| harness | iterations | failures |
+|---|---|---|
+| `FileWatcherService` class, concurrent `dotnet build` + Node build | 16 loaded (of 20) | **1** |
+| `SprintStatusYaml…` alone, sustained load | 40 | **1** |
+| **full suite, no artificial load at all** | 1 | **1** |
+
+To find out *why* a mute timeout happened, a `Diagnose` helper was added (`FileWatcherServiceTests.cs`) that
+renders the state a timed-out poll left behind. It is **failure-path only** (`if (!WaitFor(…)) Assert.Fail(…)`,
+not `Assert.True(cond, msg)`, whose message argument evaluates eagerly on every pass). It caught the cause on
+the next reproduction:
+
+```
+editing sprint-status.yaml should refresh the board
+  source on disk : last_updated: MARKER-V2\n…      <- the edit WAS delivered
+  route in IR    : False                            <- sprint.html gone from the IR entirely
+  marker in page : <neither marker present>
+  events         : [Updated …/sprint-status.yaml "data source",
+                    Error …/sprint-status.yaml "The process cannot access the file
+                    'pages-root.json' because it is being used by another process."]
+```
+
+**Root cause: the test's own poll handle was blocking the generator's output wipe.**
+`SiteRegion.ReadShared` opened with `FileShare.ReadWrite`, which admits a concurrent reader and writer **but
+not a concurrent *deleter***. `GenerateAll`'s whole-tree routes `Directory.Delete(OutputRoot, recursive: true)`
+before repopulating. With a poll holding a handle, that wipe failed on `pages-root.json`, the pass **aborted
+part-way through the wipe**, and the IR was left with the route gone and nothing queued to restore it. A
+failed pass is never retried, so the poll had nothing left to converge to and burned its full 20 s bound.
+**Stuck, not slow** — which is why widening the timeout would never have helped, exactly as the story insisted.
+
+**Fix — one flag, in the layer that already owns this concern:** `FileShare.ReadWrite | FileShare.Delete` in
+`SiteRegion.ReadShared`. This answers Task 4's "decide which layer owns the guard" explicitly:
+
+- **`SiteRegion.ReadShared` owns it** — it is the only long-lived handle any test holds on a generated file,
+  and it is where the previous half of this same fix (Story 23.6's `FileShare.ReadWrite`) already lives.
+- **`Evaluate` keeps the transient-exception guard** it already has; the two are complementary, not duplicate.
+- **`SiteRegion.Read`/`Exists`/`Routes` were NOT separately guarded** — they all funnel through `ReadShared`,
+  so fixing it once covers every caller. No guard was added in two places.
+- `SettleTimeout` was **not** widened, no sleeps were added, nothing was retried, nothing was quarantined.
+
+### Finding raised, NOT fixed — routed (product-side, out of scope per AC #6)
+
+**F1 — a generation pass that fails transiently is never retried, and can leave the site incoherent.**
+The test-side contention is fixed above, but the product-side behaviour it exposed is real and is *not* this
+story's to change (AC #6 forbids `src/**`). When `GenerateAll` throws mid-wipe, `FileWatcherService` reports a
+`GenerationOutcome.Error` event and **stops** — no retry, no fallback rebuild — leaving the output root
+part-wiped. In `specscribe watch`, any handle held on a generated file (an editor, a browser dev-server, a file
+indexer, antivirus) at the instant a rebuild starts can therefore leave the generated site **permanently stale
+or broken until an unrelated edit happens to trigger another pass**.
+
+This is asymmetric with the *directory* watcher, which already treats exactly this hazard as unacceptable:
+`CreateDirectoryWatcher`'s `Error` handler calls `ForceTopologyRebuild()` because *"an overflow means the OS
+dropped events outright, so logging alone could leave output silently stale"*
+(`FileWatcherService.cs:207-215`). The file/generation path has the same hazard and only logs
+(`FileWatcherService.cs:242-243`). It is also the NFR2 "degrade, don't lose the event" property.
+
+**Route:** Epic 6 (watch-mode reliability) — needs a named follow-up story. Not absorbed here, and **not**
+quarantined: the test is a legitimate guard and it now passes.
+
+### Handoff (Task 8)
+
+*Recorded here rather than in Dev Notes: `dev-story` may only modify frontmatter `baseline_commit`,
+Tasks/Subtasks checkboxes, Dev Agent Record, File List, Change Log and Status.*
+
+**→ Story 16.4 (tag-triggered release pipeline).** ADR 0040 §9's "the tagged commit is already green on
+`main`" is now a queryable condition. The shape, and its one trap:
+
+```sh
+SHA=$(gh api repos/IntegerMan/SpecScribe/git/refs/tags/<tag> --jq '.object.sha')
+RUN=$(gh api "repos/IntegerMan/SpecScribe/actions/workflows/build-test-analyze.yml/runs?head_sha=$SHA" \
+        --jq '.workflow_runs[0].id')
+gh api "repos/IntegerMan/SpecScribe/actions/runs/$RUN/jobs" \
+  --jq '.jobs[] | select(.name == "build-test-analyze") | .conclusion'
+```
+
+⚠️ **Do not gate on the run-level `conclusion`.** `portability-probe (ubuntu, non-gating)` carries
+`continue-on-error` at the **job** level, so a run reports `success` even when that job is red — observed at
+runs **#63** and **#75**. Query the `build-test-analyze` **job's** conclusion, as above.
+
+**→ NFR9 (ADR 0040 §7).** This story's scope was **one** of the three named gaps — a working `npm ci` — and
+even that was closed by `0b1f561` before dev-story began; this story **verified** it under both toolchains
+rather than fixing it. Still open, unchanged: `SOURCE_DATE_EPOCH` (**16.4**), version-from-tag (**16.3**),
+`<Deterministic>` / SourceLink (**deferred post-preview**). **No broader reproducibility claim is made.**
+
+**→ Findings raised, not fixed.**
+
+| # | finding | route |
+|---|---|---|
+| **F1** | A generation pass that fails transiently is **never retried**, and can abort mid-wipe leaving the output root incoherent. Asymmetric with the directory watcher, which already forces a fallback rebuild for exactly this hazard (`FileWatcherService.cs:207-215` vs `:242-243`). Real `specscribe watch` impact. | **Epic 6** — needs a named follow-up story. `src/**`, out of scope per AC #6. |
+| **F2** | `48c050c`'s message calls the torn read *"the Linux-only transient state"*. **Run #74 is a Windows run** with the identical exception — `FileShare.ReadWrite` removes the locking that argument relies on. Fix correct, rationale too narrow. | Corrected in `SiteRegion.ReadShared`'s doc comment by this story. No code change needed. |
+| **F3** | Task 1's `gh api …/actions/jobs/{id}/logs` **does not work** (terminal escape sequences → non-zero exit). Use `gh run view <run> --job <job> --log`. Also: `gh` is installed but **not on `PATH`**, and `--jq` string literals need `\"` escaping under PowerShell. | Recorded here for 16.3 / 16.4, which also need `gh`. |
 
 ### Completion Notes List
 
+**Status: 7 of 8 tasks complete. The story is NOT finished — Task 6 is blocked and needs the owner.**
+
+1. **The gate is now trustworthy, but it is not yet REQUIRED.** That is the whole of what is outstanding.
+   AC #1, #2 and #5 all depend on a ruleset that this session was **not permitted to create**: the
+   `POST /repos/IntegerMan/SpecScribe/rulesets` call was refused by the session's permission layer, twice,
+   as a write to live repository settings. The token is sufficient (`permissions.admin: true`); the block is
+   environmental. **I did not attempt to route around it.**
+
+2. **AC #3 — CLOSED, and by verification rather than by redoing work.** The lockfile was already repaired on
+   `main` by `0b1f561`. Proven on both toolchains as AC #3 demands: `npm ci` **actually installed 639
+   packages in 27 s** here on Node 24.18.1 / npm 11.16.0, and step `Install web dependencies` is `success`
+   in run #78 under `web/.nvmrc`'s pinned Node 24.11.1 / npm 11.6.2. The committed diff is **+18 / −24 with
+   exactly one added package and zero `version:`/`resolved:` churn** — within R4's "anything larger must be
+   reported" bound.
+
+3. **AC #4 — the classification half is CLOSED and it reframes the story's own headline.** All 27 failures
+   + 1 cancelled run are classified: **20 genuine-regression-since-fixed, 5 environmental, 1 cancelled,
+   2 live-flake**. The story's "fails ~1 push in 3" is a historical *failure* rate, not a flake rate — the
+   live-flake population is **two runs of one defect**. Both are now fixed.
+
+4. **AC #4 — the flake half is CLOSED, but not by the fix the story prescribed.** That fix (`JsonException`
+   in `Evaluate`) was already on `main` and **provably insufficient**; it converted a loud exception into a
+   mute 20 s timeout. The real cause was `SiteRegion.ReadShared`'s share mode blocking the generator's own
+   output wipe. **Fixed in one layer, proven by repetition, nothing retried or quarantined or
+   timeout-widened.** Full mechanism in § Task 4.
+
+5. **AC #6 — HOLDS, with one disclosure.** Changes are confined to `tests/SpecScribe.Tests/**` and `docs/**`.
+   **No `src/**`, no `web/` source, no `extension/**`.** `check:parity` is byte-identical (24/24, 14/14) and
+   the C# pass count moved by exactly the one flaky test. **Disclosure:** AC #6's allow-list names
+   `docs/CiGate.md` specifically, and I also edited **`docs/SonarCloudSetup.md`** — because Task 7 explicitly
+   instructs cross-referencing from it. Task-sanctioned, but outside the literal AC #6 list, so it is called
+   out rather than left for a reviewer to notice.
+
+6. **NFR9 — exactly one of ADR 0040 §7's three gaps is closed (`npm ci`), and not even by this story.**
+   `SOURCE_DATE_EPOCH` (16.4), version-from-tag (16.3) and `<Deterministic>`/SourceLink (deferred) all
+   remain. **No broader reproducibility claim is made**, per the story's explicit instruction.
+
+7. **No baseline was regenerated, anywhere.** `check:ir-content` went red locally at `+1 / −1368` and was
+   proven environmental (fresh worktree, no IR) before anything was touched. Regenerating would have deleted
+   ~1368 live rules behind a green gate — the exact failure mode CLAUDE.md and Story 16.1 both warn about.
+
+8. **No structural scope change and no new ADR** — as the story predicted. `epics.md` and
+   `sprint-status.yaml` need no scope edit; recorded explicitly so the absent `epics.md` diff reads as a
+   decision. The one structural defect Task 3 surfaced (CI generating without `--deep-git`) was **already
+   fixed** by `f7e812f`, so it is recorded, not routed, and needs no ADR.
+
+9. **Two artefacts are deliberately left live and owe cleanup** (both listed under § Owner actions):
+   PR **#7** / branch `ci/ruleset-block-proof` (the AC #5 "after" measurement), and the `<id>` placeholder in
+   `docs/CiGate.md`.
+
+#### 👤 What the owner needs to do — the story cannot close without it
+
+1. **Apply the ruleset.** Payload and the unverified-`actor_id` caveat are in Task 6. Either run the
+   `POST` yourself, or create it once in the GitHub web UI (the story's recommended path, which sidesteps the
+   `actor_id` guess entirely).
+2. **Immediately verify the bypass** — `gh api repos/IntegerMan/SpecScribe/rules/branches/main` must be
+   **empty** for you. If it is not, the bypass actor is wrong: **fix the actor, do not disable the rule.**
+3. **Re-query PR #7** — `mergeStateStatus` must flip `UNSTABLE` → `BLOCKED`. That completes AC #5's
+   empirical half, whose "before" measurement is already recorded.
+4. **`GET` the ruleset back and commit it** to `.github/rulesets/main-required-checks.json`, then replace the
+   `<id>` placeholders in `docs/CiGate.md`.
+5. **Close PR #7 and delete `ci/ruleset-block-proof`.**
+6. **Merge `worktree-story-16-2-dev`** — it carries the flake fix and the docs.
+
 ### File List
+
+| file | change |
+|---|---|
+| `tests/SpecScribe.Tests/SiteRegion.cs` | **modified** — `ReadShared` now opens `FileShare.ReadWrite \| FileShare.Delete`; doc comment extended with the causal chain and the Windows correction |
+| `tests/SpecScribe.Tests/FileWatcherServiceTests.cs` | **modified** — added the failure-path-only `Diagnose` helper; the three `SprintStatusYaml…` waits now report state on timeout via `if (!WaitFor(…)) Assert.Fail(…)` |
+| `docs/CiGate.md` | **NEW** — the required check, the context string, why `portability-probe` is not required, the admin bypass, re-apply/verify commands, Pages independence, ADR 0040 §9 tag inheritance |
+| `docs/SonarCloudSetup.md` | **modified** — cross-reference scoping it to the *analysis* half and pointing at `CiGate.md` for the *gating* half |
+| `_bmad-output/implementation-artifacts/16-2-continuous-integration-build-and-test-gate.md` | **modified** — this record |
+| `_bmad-output/implementation-artifacts/sprint-status.yaml` | **modified** — status → `in-progress` |
+| ~~`.github/rulesets/main-required-checks.json`~~ | **NOT created** — AC #5 requires the *exported live* object and there is no live ruleset to export. Deliberate; see Task 6. |
+| ~~`web/package-lock.json`~~ | **NOT modified** — already repaired on `main` by `0b1f561`; verified, not redone. |
+
+**Also created outside the working tree** (owed cleanup): branch `ci/ruleset-block-proof` (commit `1409002`,
+adds only `tests/SpecScribe.Tests/__CiRedProof.cs`) and PR **#7**.
+
+### Change Log
+
+| date | change |
+|---|---|
+| 2026-08-07 | Task 1 — `gh` found already installed and authenticated with `admin: true`; no owner handoff needed. |
+| 2026-08-07 | Task 2 — AC #3 verified closed by `0b1f561`; `npm ci` proven on npm 11.16.0 locally and on the CI-pinned 11.6.2 in run #78. |
+| 2026-08-07 | Task 3 — all 27 failures + 1 cancelled classified from job logs; run #75 added to the story's sweep. |
+| 2026-08-07 | Task 4 — root-caused and fixed the residual `Test` flake (`FileShare.Delete` in `SiteRegion.ReadShared`); added the `Diagnose` helper; raised finding **F1** to Epic 6. |
+| 2026-08-07 | Task 5 — `main` green across runs #78/#79; regression floor recorded at 2978 P / 0 F / 3 S with `check:parity` 24/24. |
+| 2026-08-07 | Task 7 — `docs/CiGate.md` written; `docs/SonarCloudSetup.md` cross-referenced. |
+| 2026-08-07 | Task 8 — 16.4 handoff, NFR9 scope and findings F1–F3 recorded. |
+| 2026-08-07 | **Task 6 BLOCKED** — ruleset `POST` refused by the session permission layer; story held at `in-progress` rather than marked `review`. |

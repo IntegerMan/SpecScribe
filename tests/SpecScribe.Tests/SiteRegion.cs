@@ -273,10 +273,30 @@ internal static class SiteRegion
     /// those reads targets the same handful of chunk files instead of a page each. <c>BurstOfSaves</c> duly
     /// failed with "the process cannot access the file … because it is being used by another process", reported
     /// as a GENERATOR error: the test had locked the chunk the generator was trying to write. Sharing the handle
-    /// keeps a read-only assertion from perturbing the thing it is asserting about.</para></summary>
+    /// keeps a read-only assertion from perturbing the thing it is asserting about.</para>
+    ///
+    /// <para><b>[Story 16.2] <c>FileShare.Delete</c> is the other half of that fix, and omitting it left the
+    /// SAME defect open through a second door.</b> <c>ReadWrite</c> admits a concurrent reader and writer — but
+    /// NOT a concurrent <i>deleter</i>. <c>GenerateAll</c> does not only write: the whole-tree routes
+    /// <c>Directory.Delete(OutputRoot, recursive: true)</c> the output root before repopulating it. With a poll
+    /// holding an open handle, that wipe failed on <c>pages-root.json</c> with the identical "used by another
+    /// process" message, the pass aborted PART-WAY THROUGH THE WIPE, and the IR was left with the route gone
+    /// (<c>Exists</c> → false) and nothing queued to rebuild it. Because a failed pass is never retried, the poll
+    /// then had nothing left to converge to and burned its whole 20 s bound — a mute timeout whose real cause was
+    /// this handle. Measured 2026-08-07: reproduced in an ordinary full-suite run with no artificial load, as
+    /// <c>SprintStatusYaml_AddedThenEditedThenRemoved</c>, and it is the same class as CI runs #74 and #75.
+    /// <c>FileShare.Delete</c> lets the generator's wipe proceed against an open read handle, which is exactly
+    /// the "do not perturb what you are asserting about" property the paragraph above was reaching for.</para>
+    ///
+    /// <para><b>This does not mask a generator defect — it stops the TEST from causing one.</b> A rebuild that
+    /// fails for a reason the test did not create still surfaces as a <c>GenerationOutcome.Error</c> event, and
+    /// every watch-mode test asserts <c>DoesNotContain(Observed(), … Error)</c>. What is fixed here is only the
+    /// contention this helper itself introduced. That a failed pass is never retried is a REAL product-side gap
+    /// and is recorded as a finding by Story 16.2, not absorbed here.</para></summary>
     private static string ReadShared(string path)
     {
-        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        using var stream = new FileStream(
+            path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd();
     }
