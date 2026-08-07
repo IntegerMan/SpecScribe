@@ -414,7 +414,13 @@ public class HtmlTemplaterTests
                 TopChangedFiles: new (string, int)[] { ("src/Program.cs", 3) }),
             DeepGit = new DeepGitPulse(
                 Hotspots: new (string, int)[] { ("src/HtmlTemplater.cs", 9), ("src/Charts.cs", 4) },
-                Coupling: new (string, string, int)[] { ("src/Charts.cs", "src/HtmlTemplater.cs", 5) }),
+                Coupling: new[]
+                {
+                    new CoupledPair(
+                        "src/Charts.cs", "src/HtmlTemplater.cs", 5,
+                        CrossBoundary: GitMetrics.IsCrossBoundary("src/Charts.cs", "src/HtmlTemplater.cs"),
+                        Kind: GitMetrics.ClassifyCoupling("src/Charts.cs", "src/HtmlTemplater.cs")),
+                }),
         };
     }
 

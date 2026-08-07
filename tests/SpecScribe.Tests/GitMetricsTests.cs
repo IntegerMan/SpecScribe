@@ -10,6 +10,12 @@ namespace SpecScribe.Tests;
 /// time), and must skip malformed lines rather than fail the whole pulse (GitMetrics is never-throw).</summary>
 public class GitMetricsTests
 {
+    /// <summary>The identifying triple of a <see cref="CoupledPair"/>. The pair grew two classification fields so
+    /// the graph could read cross-boundary as a shared property rather than re-deriving it (AC #2, Story 24.1 code
+    /// review); these assertions are about WHICH pairs survived the floor and in what order, not about the flags,
+    /// which have their own tests.</summary>
+    private static (string, string, int) Triple(CoupledPair p) => (p.FileA, p.FileB, p.CoChanges);
+
     [Fact]
     public void ParseLog_GroupsCommitsByDayInAscendingOrderWithAuthorAndTime()
     {
@@ -298,8 +304,8 @@ public class GitMetricsTests
 
         // (B,C) sits at 1 and is dropped by the >= 2 threshold; (A,B) and (A,C) both survive at 2.
         Assert.Equal(2, deep.Coupling.Count);
-        Assert.Equal(("A.cs", "B.cs", 2), deep.Coupling[0]);
-        Assert.Equal(("A.cs", "C.cs", 2), deep.Coupling[1]);
+        Assert.Equal(("A.cs", "B.cs", 2), Triple(deep.Coupling[0]));
+        Assert.Equal(("A.cs", "C.cs", 2), Triple(deep.Coupling[1]));
     }
 
     [Fact]
@@ -313,7 +319,7 @@ public class GitMetricsTests
         var deep = GitMetrics.ParseNumstatLog(log);
 
         var pair = Assert.Single(deep.Coupling);
-        Assert.Equal(("A.cs", "Z.cs", 2), pair); // canonicalized to ordinal order
+        Assert.Equal(("A.cs", "Z.cs", 2), Triple(pair)); // canonicalized to ordinal order
     }
 
     [Fact]
@@ -331,7 +337,7 @@ public class GitMetricsTests
         // The 60-file commit would generate 1770 pairs if not skipped; the only surviving coupling is the real
         // (A,B) pair from the two small commits — proving the O(n²) guard fired.
         var pair = Assert.Single(deep.Coupling);
-        Assert.Equal(("A.cs", "B.cs", 2), pair);
+        Assert.Equal(("A.cs", "B.cs", 2), Triple(pair));
         // ...yet the bulk commit's files still count toward hotspot frequency (the cap is coupling-only).
         Assert.Contains(("bulk/File00.cs", 1), deep.Hotspots);
     }
@@ -426,7 +432,7 @@ public class GitMetricsTests
         var deep = GitMetrics.ParseNumstatLog(log);
 
         // Canonical unordered key is ordinal-sorted; "Other.cs" < "new/Renamed.cs" ordinally ('O' < 'n').
-        Assert.Contains(("Other.cs", "new/Renamed.cs", 2), deep.Coupling);
+        Assert.Contains(("Other.cs", "new/Renamed.cs", 2), deep.Coupling.Select(Triple));
     }
 
     // ---- ParseNumstatRecords + BuildInsights (Git Insights hub aggregates) [Story 3.8] ----

@@ -2943,7 +2943,10 @@ public sealed class SiteGenerator
                     ? citersList
                     : new List<(string, string)>();
                 var storyRelatedEdges = BuildStoryRelatedEdges(citersForRelative, insight);
-                var relatedRelatedEdges = BuildRelatedRelatedEdges(insight, _progress?.DeepGit?.CoChangePairs);
+                var relatedRelatedEdges = BuildRelatedRelatedEdges(
+                    insight,
+                    _progress?.DeepGit?.CoChangePairs,
+                    _progress?.DeepGit?.MinSupport ?? GitMetrics.CouplingMinSupport);
 
                 // Prev/next across sibling files in this file's directory (tooltip = filename).
                 var rel = PathUtil.NormalizeSlashes(repoRelative);
@@ -3110,11 +3113,17 @@ public sealed class SiteGenerator
     /// file's related/coupled files (<see cref="FileInsight.CoupledFiles"/>, index-aligned with the graph's
     /// related-node index) that are THEMSELVES frequently co-changed — reusing <see cref="GitMetrics.CoChangeCount"/>
     /// over the already-computed <see cref="DeepGitPulse.CoChangePairs"/> map (no new git call, no re-scan). "Frequently"
-    /// mirrors the SAME &gt;= 2 threshold <see cref="GitMetrics.ParseNumstatLog"/>'s own top-level coupling view uses,
-    /// so a related-file pair only earns a cross edge here when it would also have qualified for the hub's coupling
-    /// list. Returns empty (never throws) when there is no insight, fewer than two related files, or no pair data.</summary>
+    /// means the SAME floor <see cref="GitMetrics.ParseNumstatLog"/>'s own coupling views applied, passed in as
+    /// <paramref name="minSupport"/> from <see cref="DeepGitPulse.MinSupport"/>, so a related-file pair only earns a
+    /// cross edge here when it would also have qualified for the hub's coupling list.
+    /// <para>This used to be a bare <c>&gt;= 2</c> under a comment asserting it mirrored that threshold — an
+    /// assertion that was true only by coincidence and would have gone silently false the moment a caller passed a
+    /// different floor, which is exactly the failure <see cref="GitMetrics.CouplingMinSupport"/> was introduced to
+    /// prevent. The map itself is deliberately unfiltered (it is a general-purpose lookup), so the filtering has to
+    /// happen here and has to use the real value. [Story 24.1 code review]</para>
+    /// Returns empty (never throws) when there is no insight, fewer than two related files, or no pair data.</summary>
     private static IReadOnlyList<(int RelatedIndexA, int RelatedIndexB)> BuildRelatedRelatedEdges(
-        FileInsight? insight, IReadOnlyDictionary<(string FileA, string FileB), int>? pairs)
+        FileInsight? insight, IReadOnlyDictionary<(string FileA, string FileB), int>? pairs, int minSupport)
     {
         if (insight is null || insight.CoupledFiles.Count < 2 || pairs is null || pairs.Count == 0)
         {
@@ -3131,7 +3140,7 @@ public sealed class SiteGenerator
             for (var b = a + 1; b < files.Count; b++)
             {
                 var count = GitMetrics.CoChangeCount(pairs, normalized[a], normalized[b]);
-                if (count >= 2) result.Add((a, b));
+                if (count >= minSupport) result.Add((a, b));
             }
         }
         return result;

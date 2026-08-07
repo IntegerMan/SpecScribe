@@ -11,11 +11,9 @@ public class DeepAnalyticsTemplaterTests
 
     private static DeepGitPulse SampleDeep() => new(
         Hotspots: new (string, int)[] { ("src/SpecScribe/HtmlTemplater.cs", 9), ("src/SpecScribe/Charts.cs", 4) },
-        Coupling: new (string, string, int)[]
-        {
+        Coupling: PairsFrom(
             ("src/SpecScribe/Charts.cs", "src/SpecScribe/HtmlTemplater.cs", 5),
-            ("src/SpecScribe/Charts.cs", "src/SpecScribe/SiteGenerator.cs", 3),
-        })
+            ("src/SpecScribe/Charts.cs", "src/SpecScribe/SiteGenerator.cs", 3)))
     {
         DirectedCoupling = DirectedFrom(
             ("src/SpecScribe/Charts.cs", "src/SpecScribe/HtmlTemplater.cs", 5),
@@ -32,6 +30,16 @@ public class DeepAnalyticsTemplaterTests
             p.A, p.B, p.Support,
             Confidence: 0.9 - (0.1 * i),
             Lift: null,
+            CrossBoundary: GitMetrics.IsCrossBoundary(p.A, p.B),
+            Kind: GitMetrics.ClassifyCoupling(p.A, p.B))).ToList();
+
+    /// <summary>Builds the symmetric <see cref="DeepGitPulse.Coupling"/> population the graph draws. Classifications
+    /// are derived exactly as <c>ParseNumstatLog</c> derives them, so a fixture can never disagree with production
+    /// about whether a pair is process or cross-boundary — the pair CARRIES both flags now precisely so no view has
+    /// to re-derive them (AC #2). [Story 24.1 code review]</summary>
+    private static IReadOnlyList<CoupledPair> PairsFrom(params (string A, string B, int CoChanges)[] pairs) =>
+        pairs.Select(p => new CoupledPair(
+            p.A, p.B, p.CoChanges,
             CrossBoundary: GitMetrics.IsCrossBoundary(p.A, p.B),
             Kind: GitMetrics.ClassifyCoupling(p.A, p.B))).ToList();
 
@@ -71,7 +79,7 @@ public class DeepAnalyticsTemplaterTests
         // AnalyzedCommits + Insights.TotalFilesTouched drive honest window/ranking captions (Story 10.2).
         var deep = new DeepGitPulse(
             Hotspots: new (string, int)[] { ("src/A.cs", 9), ("src/B.cs", 4) },
-            Coupling: new (string, string, int)[] { ("src/A.cs", "src/B.cs", 5) },
+            Coupling: PairsFrom(("src/A.cs", "src/B.cs", 5)),
             AnalyzedCommits: 42)
         {
             Insights = new GitInsightsData(
@@ -118,11 +126,9 @@ public class DeepAnalyticsTemplaterTests
     [Fact]
     public void CouplingGraph_EmitsOneEdgePerPairAndOneNodePerDistinctFile()
     {
-        var coupling = new (string, string, int)[]
-        {
+        var coupling = PairsFrom(
             ("src/A.cs", "src/B.cs", 5),
-            ("src/A.cs", "src/C.cs", 3),
-        };
+            ("src/A.cs", "src/C.cs", 3));
 
         var svg = Charts.CouplingGraph(coupling);
 
@@ -139,7 +145,7 @@ public class DeepAnalyticsTemplaterTests
     [Fact]
     public void CouplingGraph_DegeneratesToFriendlyNoteWhenEmpty()
     {
-        var svg = Charts.CouplingGraph(Array.Empty<(string, string, int)>());
+        var svg = Charts.CouplingGraph(Array.Empty<CoupledPair>());
         Assert.Contains("chart-empty", svg);
         Assert.Contains("No significant change coupling detected.", svg);
         Assert.DoesNotContain("<svg", svg);
@@ -183,7 +189,7 @@ public class DeepAnalyticsTemplaterTests
     [Fact]
     public void CouplingGraph_FileHref_WrapsResolvedNodeInSvgAnchorOnly()
     {
-        var coupling = new (string, string, int)[] { ("src/A.cs", "src/B.cs", 5) };
+        var coupling = PairsFrom(("src/A.cs", "src/B.cs", 5));
         var svg = Charts.CouplingGraph(coupling, fileHref: p => p == "src/A.cs" ? "code/src/A.cs.html" : null);
 
         // Resolved node wrapped in an SVG <a>; the circle/label/title survive inside it.
@@ -212,11 +218,9 @@ public class DeepAnalyticsTemplaterTests
     {
         var deep = new DeepGitPulse(
             Hotspots: Array.Empty<(string, int)>(),
-            Coupling: new (string, string, int)[]
-            {
+            Coupling: PairsFrom(
                 ("src/A.cs", "src/B.cs", 5),               // code <-> code
-                ("sprint-status.yaml", "theme.css", 4),      // process <-> process
-            })
+                ("sprint-status.yaml", "theme.css", 4)))     // process <-> process
         {
             DirectedCoupling = DirectedFrom(
                 ("src/A.cs", "src/B.cs", 5),
@@ -320,7 +324,11 @@ public class DeepAnalyticsTemplaterTests
         var withLift = Charts.CouplingTable(new[] { Directed("src/A.cs", "src/B.cs", 4, 0.8, lift: 2.5) });
         var without = Charts.CouplingTable(new[] { Directed("src/A.cs", "src/B.cs", 4, 0.8, lift: null) });
 
-        Assert.Contains("2.5&#215; its usual rate", withLift);
+        // The tooltip now NAMES the file whose base rate lift divides by, rather than saying "its". Lift's
+        // denominator is the COUPLED file's change count, and the per-file surface was wording the identical
+        // number as "this file's usual rate" — two surfaces attributing one number to two different files.
+        // [Story 24.1 code review]
+        Assert.Contains("2.5&#215; B.cs's usual rate", withLift);
         Assert.DoesNotContain("usual rate", without);
         Assert.DoesNotContain("NaN", without);
         Assert.DoesNotContain("Infinity", without);
@@ -355,7 +363,7 @@ public class DeepAnalyticsTemplaterTests
     [Fact]
     public void CouplingGraph_ProcessEdgeIsDashedWithTitleSuffix()
     {
-        var coupling = new (string, string, int)[] { ("config.yaml", "src/A.cs", 4) };
+        var coupling = PairsFrom(("config.yaml", "src/A.cs", 4));
 
         var svg = Charts.CouplingGraph(coupling);
 

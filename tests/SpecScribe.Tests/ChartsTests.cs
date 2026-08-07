@@ -3681,4 +3681,72 @@ public class ChartsTests
         Assert.Contains(">2</span><span class=\"git-pulse-caption\">stories completed in the last 8 weeks", html);
         Assert.Contains(">3</span><span class=\"git-pulse-caption\">completed all-time", html);
     }
+
+    // ---- Shared coupling formatters [Story 24.1, hardened by its code review] ----
+    //
+    // Percent and LiftNumber exist so the hub table and the per-file text twin can never disagree about rounding.
+    // The review found the confidence formatter asserting things the data did not support at both ends, and lift
+    // being formatted two different ways on the two surfaces it was created to keep consistent.
+
+    [Fact]
+    public void Percent_RendersOrdinaryRatiosAsWholePercentsInInvariantCulture()
+    {
+        Assert.Equal("80%", Charts.Percent(0.8));
+        Assert.Equal("50%", Charts.Percent(0.5));
+        Assert.Equal("33%", Charts.Percent(1.0 / 3.0));
+        Assert.Equal("100%", Charts.Percent(1.0));
+        Assert.Equal("0%", Charts.Percent(0.0));
+    }
+
+    [Fact]
+    public void Percent_NeverRoundsUpIntoAFullHundredItDoesNotHave()
+    {
+        // "100%" is the strongest claim this label can make — that the relationship is TOTAL. A file that changed
+        // alongside another in 199 of its 200 commits has not earned it, and whole-percent rounding used to hand
+        // it over anyway.
+        Assert.Equal("99%", Charts.Percent(0.996));
+        Assert.Equal("99%", Charts.Percent(199.0 / 200.0));
+        Assert.Equal("99%", Charts.Percent(0.9999));
+        // Only a genuine 1.0 reads 100%.
+        Assert.Equal("100%", Charts.Percent(1.0));
+    }
+
+    [Fact]
+    public void Percent_NeverCollapsesARealRelationshipToZero()
+    {
+        // Rendered beside a row that simultaneously asserts a couple exists, "0%" reads as a contradiction.
+        Assert.Equal("&lt;1%", Charts.Percent(0.004));
+        Assert.Equal("&lt;1%", Charts.Percent(2.0 / 500.0));
+        // Only a genuine zero reads 0%.
+        Assert.Equal("0%", Charts.Percent(0.0));
+    }
+
+    [Fact]
+    public void Percent_ClampsMalformedRatiosAndNeverEmitsNaN()
+    {
+        Assert.Equal("100%", Charts.Percent(2.5));
+        Assert.Equal("0%", Charts.Percent(-0.4));
+        Assert.Equal("0%", Charts.Percent(double.NaN));
+        Assert.DoesNotContain("NaN", Charts.Percent(double.NaN));
+    }
+
+    [Fact]
+    public void LiftNumber_IsTheOneRoundingBothCouplingSurfacesShare()
+    {
+        // The hub used "0.##" and the per-file surfaces "0.0", so 1.25 read "1.25x" on one and "1.3x" on the other.
+        Assert.Equal("1.25", Charts.LiftNumber(1.25));
+        Assert.Equal("2", Charts.LiftNumber(2.0));
+        Assert.Equal("15", Charts.LiftNumber(15.0));
+        // Small lifts must stay visible rather than flattening to a single decimal place.
+        Assert.Equal("0.03", Charts.LiftNumber(0.03));
+    }
+
+    [Fact]
+    public void LiftLabel_IsLiftNumberPlusAnEscapedMultiplicationSign()
+    {
+        // The glyph is per-surface (markup wants the entity, the graph's JSON detail wants a literal), but the
+        // NUMBER must come from one place — that is the part that was disagreeing.
+        Assert.Equal("1.25&#215;", Charts.LiftLabel(1.25));
+        Assert.StartsWith(Charts.LiftNumber(3.7), Charts.LiftLabel(3.7), StringComparison.Ordinal);
+    }
 }

@@ -1798,9 +1798,22 @@ public static partial class Charts
             }
             // Confidence is directional and read from the FROM file: "when this file changes, the other usually
             // changes too". Lift rides the cell's title — the specialist's number, not the headline.
+            //
+            // Basenames keep the sentence short, but two coupled files routinely SHARE one (index.ts, README.md,
+            // __init__.py, mod.rs), and then the sentence names the same word twice — "When index.ts changes,
+            // index.ts changes 80% of the time" — which reads as nonsense and identifies neither file. Fall back
+            // to full paths for BOTH endpoints so the sentence stays parallel instead of mixing a bare name with
+            // a path. [Story 24.1 code review]
+            var fromLabel = Basename(couple.FromPath);
+            var toLabel = Basename(couple.ToPath);
+            if (string.Equals(fromLabel, toLabel, StringComparison.Ordinal))
+            {
+                fromLabel = couple.FromPath;
+                toLabel = couple.ToPath;
+            }
             var confidenceTitle = couple.Lift is { } lift
-                ? $" title=\"When {Html(Basename(couple.FromPath))} changes, {Html(Basename(couple.ToPath))} changes {Percent(couple.Confidence)} of the time — {F(lift)}&#215; its usual rate\""
-                : $" title=\"When {Html(Basename(couple.FromPath))} changes, {Html(Basename(couple.ToPath))} changes {Percent(couple.Confidence)} of the time\"";
+                ? $" title=\"When {Html(fromLabel)} changes, {Html(toLabel)} changes {Percent(couple.Confidence)} of the time — {LiftLabel(lift)} {Html(toLabel)}'s usual rate\""
+                : $" title=\"When {Html(fromLabel)} changes, {Html(toLabel)} changes {Percent(couple.Confidence)} of the time\"";
             sb.Append(
                 "    <tr>" +
                 $"<td class=\"coupling-file\" title=\"{Html(couple.FromPath)}\">{CodeItemLink(couple.FromPath, fileHref)}</td>" +
@@ -1821,7 +1834,7 @@ public static partial class Charts
     /// tokens via CSS classes. Pointer users get per-edge/per-node <c>&lt;title&gt;</c> tooltips; the whole
     /// graph carries a summarizing <c>role="img"</c> name, and the sibling <see cref="CouplingTable"/> is the
     /// exact text equivalent so the graph is never the sole carrier. [Story 3.2]</summary>
-    public static string CouplingGraph(IReadOnlyList<(string FileA, string FileB, int CoChanges)> coupling, int size = 460, Func<string, string?>? fileHref = null)
+    public static string CouplingGraph(IReadOnlyList<CoupledPair> coupling, int size = 460, Func<string, string?>? fileHref = null)
     {
         if (coupling.Count == 0) return "<div class=\"chart-empty\">No significant change coupling detected.</div>\n";
 
@@ -1864,13 +1877,21 @@ public static partial class Charts
 
         // Edges first so nodes render on top of them. Width + opacity scale with the co-change count. Process
         // pairs (Story 10.6, AC1) get a second class for a dashed stroke (never color-only) plus a title suffix.
-        foreach (var (a, b, w) in coupling)
+        //
+        // Both classifications are READ OFF THE PAIR, never re-derived here (AC #2): they were computed once in
+        // GitMetrics.ParseNumstatLog beside the identical computation feeding DirectedCoupling, so the graph and
+        // the table can never disagree about whether a pair crosses a module boundary. Cross-boundary rides the
+        // title as WORDS — the edge carries no colour or stroke of its own for it (UX-DR19/NFR8), and the ranked
+        // table beside this graph remains the surface that marks it in visible text. [Story 24.1 code review]
+        foreach (var pair in coupling)
         {
+            var (a, b, w) = pair;
             var (x1, y1) = Pos(order[a]);
             var (x2, y2) = Pos(order[b]);
-            var isProcess = GitMetrics.ClassifyCoupling(a, b) == GitMetrics.CouplingKind.Process;
+            var isProcess = pair.Kind == GitMetrics.CouplingKind.Process;
             var edgeClass = isProcess ? "coupling-edge process-edge" : "coupling-edge";
             var titleSuffix = isProcess ? " (process-coupling)" : string.Empty;
+            if (pair.CrossBoundary) titleSuffix += " (cross-boundary)";
             sb.Append($"  <line class=\"{edgeClass}\" x1=\"{F(x1)}\" y1=\"{F(y1)}\" x2=\"{F(x2)}\" y2=\"{F(y2)}\" " +
                       $"stroke-width=\"{F(ScaleW(w, 1.5, 6))}\" stroke-opacity=\"{F(ScaleW(w, 0.35, 0.9))}\">" +
                       $"<title>{Html(Basename(a))} &harr; {Html(Basename(b))}: {w}&times; together{titleSuffix}</title></line>\n");
@@ -2066,12 +2087,16 @@ public static partial class Charts
     private static string WorkNodeLabel(double x, double y, string shortLabel) =>
         $"<text class=\"work-label\" x=\"{F(x)}\" y=\"{F(y + 20)}\" text-anchor=\"middle\" font-size=\"12\">{Html(shortLabel)}</text>";
 
-    /// <summary>The last path segment (filename) of a forward-slash path — compact graph labels while the full
-    /// path stays in the node's tooltip.</summary>
+    /// <summary>The last path segment (filename) of a path — compact graph labels while the full path stays in the
+    /// node's tooltip. Backslashes are normalized first, exactly as <see cref="GitMetrics.IsCrossBoundary"/> does
+    /// (which has a test pinning why it matters): without it a backslash-bearing path has no <c>/</c> to find, so
+    /// the "filename" returned is the ENTIRE path and every label and tooltip built from it names a path where it
+    /// meant to name a file. [normalization: Story 24.1 code review]</summary>
     private static string Basename(string path)
     {
-        var i = path.LastIndexOf('/');
-        return i >= 0 && i < path.Length - 1 ? path[(i + 1)..] : path;
+        var normalized = path.Replace('\\', '/');
+        var i = normalized.LastIndexOf('/');
+        return i >= 0 && i < normalized.Length - 1 ? normalized[(i + 1)..] : normalized;
     }
 
     /// <summary>Ellipsis-truncates a label to <paramref name="max"/> characters for the graph's fixed geometry.</summary>
@@ -3669,13 +3694,40 @@ public static partial class Charts
     /// 24.1's directional coupling confidence, so the per-file text twin and the hub's table can never disagree
     /// about rounding. Invariant culture (matching every other numeric render here) so a comma-decimal locale can
     /// never emit "0,8". Rounds away from zero at the midpoint for stable, reproducible output, and clamps into
-    /// <c>[0,1]</c> defensively so a malformed ratio degrades to a sane label instead of "-40%"/"250%".</summary>
+    /// <c>[0,1]</c> defensively so a malformed ratio degrades to a sane label instead of "-40%"/"250%".
+    /// <para><b>Neither endpoint is allowed to lie</b> (Story 24.1 code review). Whole-percent rounding alone turned
+    /// 0.996 into "100%" — the strongest claim this label can make, asserting a relationship is TOTAL when the data
+    /// says otherwise — and 0.004 into "0%", printed beside a row that simultaneously asserts a couple exists. So a
+    /// value that is genuinely 1.0 renders "100%" and nothing else may round up into it, and a value that is
+    /// genuinely above 0 renders at least "&lt;1%" rather than collapsing to nothing.</para></summary>
     public static string Percent(double ratio)
     {
         if (double.IsNaN(ratio)) return "0%";
         var clamped = Math.Clamp(ratio, 0.0, 1.0);
-        return Math.Round(clamped * 100, MidpointRounding.AwayFromZero).ToString("0", CultureInfo.InvariantCulture) + "%";
+        if (clamped >= 1.0) return "100%";
+        if (clamped <= 0.0) return "0%";
+
+        var whole = Math.Round(clamped * 100, MidpointRounding.AwayFromZero);
+        if (whole >= 100) return "99%";
+        if (whole <= 0) return "&lt;1%";
+        return whole.ToString("0", CultureInfo.InvariantCulture) + "%";
     }
+
+    /// <summary>Formats Story 24.1's lift VALUE — the ONE place its rounding is decided, for exactly the reason
+    /// <see cref="Percent"/> is the one place confidence's is. Before this existed the hub's table rendered lift
+    /// through <c>F</c> ("0.##") while the per-file surfaces used "0.0", so a lift of 1.25 read "1.25&#215;" on one
+    /// and "1.3&#215;" on the other — the precise disagreement the confidence formatter had been introduced to
+    /// prevent, shipped for lift in the same change. Two decimals keep small differences visible (a 0.03 lift must
+    /// not flatten to "0.0") while trailing zeros stay suppressed.
+    /// <para>The multiplication sign is deliberately NOT included: HTML surfaces want the <c>&amp;#215;</c> entity
+    /// (see <see cref="LiftLabel"/>) while the relationship graph's <c>Detail</c> is JSON consumed by script, where
+    /// an entity would render literally. Sharing the number is what matters; the glyph is per-surface.</para>
+    /// [Story 24.1 code review]</summary>
+    public static string LiftNumber(double lift) => lift.ToString("0.##", CultureInfo.InvariantCulture);
+
+    /// <summary>Lift as an HTML label ("1.25&#215;"): <see cref="LiftNumber"/> plus the escaped multiplication
+    /// sign, for surfaces whose output is markup. [Story 24.1 code review]</summary>
+    public static string LiftLabel(double lift) => LiftNumber(lift) + "&#215;";
 
     private static string Html(string s) => PathUtil.Html(s);
 }

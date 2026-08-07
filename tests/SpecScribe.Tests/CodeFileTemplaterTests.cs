@@ -514,8 +514,14 @@ public class CodeFileTemplaterTests
 
         // Other.cs has lift 1.4; notes.md's lift is null (undefined denominator) and must simply not appear —
         // never as "NaN"/"∞", which is what an unguarded division would have rendered.
-        Assert.Contains("Lift 1.4&#215; this file's usual rate", html);
-        Assert.Equal(1, CountOccurrences(html, "this file's usual rate"));
+        //
+        // The caption NAMES the coupled file rather than saying "this file's usual rate". CoupledFile.Lift divides
+        // by the COUPLED file's base rate (GitMetrics passes OtherChangeCount), so the old wording attributed the
+        // number to the focal file — and the hub's table worded the identical number the other way. One number
+        // cannot belong to two different files. [Story 24.1 code review]
+        Assert.Contains("Lift 1.4&#215; src/SpecScribe/Other.cs's usual rate", html);
+        Assert.DoesNotContain("this file's usual rate", html);
+        Assert.Equal(1, CountOccurrences(html, "usual rate"));
         Assert.DoesNotContain("NaN", html);
         Assert.DoesNotContain("Infinity", html);
     }
