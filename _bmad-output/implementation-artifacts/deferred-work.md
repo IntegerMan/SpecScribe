@@ -1384,3 +1384,37 @@ Baseline SonarCloud triage of the whole codebase, performed rule-first against a
 - source_spec: `12-1-gsd-and-gsd-pi-integration-spike.md`
   summary: Story 12.1's own Acceptance Criteria in `_bmad-output/planning-artifacts/epics.md:2608-2620` were not revisited to reflect the owner-directed scope addition (Tasks 8-10 land production code — roster `Url`/`Blurb`, the `epics.md`/`sprint-status.yaml` 12.2/12.3 split, README updates) — the ACs still read as pure-spike language ("a written coverage map classifies..."). Not a functional bug: the story file's own "Owner-directed scope addition" note and Change Log disclose the deviation clearly, so this only misconstrues a reader who reads `epics.md`'s AC block in isolation. Worth a convention going forward: when a spike's scope is overridden mid-story, revisit its charter AC block in `epics.md` too, not just the story file's task list.
   evidence: Blind Hunter finding 9, code review 2026-08-02.
+
+## Deferred from: code review of story-24-1-directional-coupling-metric-foundation (2026-08-07)
+
+- source_spec: `24-1-directional-coupling-metric-foundation.md`
+  summary: `GitMetrics.BoundaryOf` treats a leading `./` or an embedded `..` as a real boundary segment. `StringSplitOptions.RemoveEmptyEntries` strips `""` but not `"."`, so `./src/A.cs` gets boundary `"."` — cross-boundary against `src/B.cs`, same-boundary as `./tests/B.cs`. A leading `/` is handled correctly. Not reachable from git's repo-relative numstat paths today, so this is defensive hardening rather than a live defect.
+  evidence: Edge Case Hunter finding 8, code review 2026-08-07.
+
+- source_spec: `24-1-directional-coupling-metric-foundation.md`
+  summary: `GitMetrics.IsCrossBoundary` compares top-level boundaries with `StringComparison.Ordinal`, so `Src/A.cs` and `src/B.cs` are reported as crossing a module boundary. Consistent with the rest of the pipeline's ordinal keying, but it makes the "architectural signal" sensitive to path casing git may report differently across platforms.
+  evidence: Edge Case Hunter finding 9 + Blind Hunter, code review 2026-08-07.
+
+- source_spec: `24-1-directional-coupling-metric-foundation.md`
+  summary: Lift is carried only in a `title` attribute, and on the per-file surface that attribute is unreachable by every user — it sits on a non-focusable `<li>` inside `<ul class="ref-list sr-only">`, so it is hidden from pointer users, not focusable for keyboard users, and `title` on a non-interactive element is not reliably announced by assistive tech. The code comment frames this as deliberate progressive disclosure; on a hidden element there is no disclosure path at all. The hub's `<td>` version is pointer-only, as is the full file path, while the class doc claims full paths are "shown as real text … so the visual graph is never the sole information carrier".
+  evidence: Blind Hunter, code review 2026-08-07. Accessibility.
+
+- source_spec: `24-1-directional-coupling-metric-foundation.md`
+  summary: The cross-boundary badge's claimed non-colour differentiator is a 1.66:1 border, and sub-10px type was introduced to fit the fifth column. `--parchment-deep` (#d4b896) on `--cream` (#f5f0e8) computes to ≈1.66:1, well below WCAG 1.4.11's 3:1 for non-text UI components, as a 1px border around ~10px text — the comment takes credit for a mechanism that does not meet the bar. The badge *words* carry the meaning independently, so AC #3 / UX-DR19 survives. Separately, `th.coupling-num`/`th.coupling-kind` sit at 0.6rem (≈9.6px) and the badges at 0.62rem; under `table-layout: fixed` the path columns land at ~117px — better than the 60px the live-browser pass fixed, but still truncating real repository paths. Resizing is an owner design call.
+  evidence: Blind Hunter, code review 2026-08-07. Accessibility + visual design.
+
+- source_spec: `24-1-directional-coupling-metric-foundation.md`
+  summary: `DeepGitPulse.DirectedCoupling` is an optional init-only property (defaulted to `Array.Empty`) beside a required positional `Coupling`, so a self-contradicting page is constructible and unenforced — any `DeepGitPulse` built or `with`-copied without setting it renders a populated coupling graph directly above "No significant change coupling detected.", because the graph gates on `deep.Coupling` while the table gates on `deep.DirectedCoupling`. That three separate test fixtures had to remember to set both is the invariant leaking into every caller.
+  evidence: Blind Hunter, code review 2026-08-07.
+
+- source_spec: `24-1-directional-coupling-metric-foundation.md`
+  summary: The hub's coupling graph and its Ranked Pairs table now rank different populations under one heading and one shared `WhyText`. `Coupling` is the top 10 pairs by shared commits; `DirectedCoupling` is the top 10 directed edges by confidence — so the table can name ten files that appear nowhere in the graph directly above it. The rewritten caption names this panel's own ranking but never tells the reader the two panels stopped being about the same rows.
+  evidence: Blind Hunter, code review 2026-08-07. Reader-disclosure/UX.
+
+- source_spec: `24-1-directional-coupling-metric-foundation.md`
+  summary: Record correction — Task 5's Story 10.2 framing subtask is ticked but shipped nothing into `CodeFileTemplater.cs`. At the landing commit the file contained no `WhyText`/`Framed`/`ChartMeta` at all, and the hub's framing predates this story unchanged, so Story 24.1 added zero framing. AC #3's "one-sentence framing per Story 10.2" was satisfied only by the surface that already had it; the per-file framing that exists now belongs to Story 24.2.
+  evidence: Acceptance Auditor finding 3, code review 2026-08-07.
+
+- source_spec: `24-1-directional-coupling-metric-foundation.md`
+  summary: A default min-support floor of 2 can silently empty every coupling surface on a short `--deep-git` window, with nothing in the rendered site indicating that a threshold was applied or what it is. The test churn is the tell: an existing single-couple assertion became `Assert.Empty`, the caps test had to pass `minSupport: 1` to observe caps at all, and `SiteGeneratorCodeInsightsTests` needed an extra commit to keep its scenario alive. Users just see "No significant change coupling detected." The floor is documented thoroughly in code and nowhere in the product.
+  evidence: Blind Hunter, code review 2026-08-07. Product decision.
