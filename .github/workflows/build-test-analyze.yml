@@ -32,7 +32,11 @@ permissions:
 concurrency:
   # Must NOT be `pages` — publish-docs-live-pages.yml owns that group, and
   # sharing it would make the two workflows cancel one another.
-  group: build-test-analyze-${{ github.ref }}
+  # `main` uses its immutable SHA rather than one shared group. GitHub retains
+  # at most one pending run per concurrency group, so a shared main group could
+  # discard an older queued merge and leave it without Stage A. PRs retain their
+  # ref group and cancellation behavior below.
+  group: ${{ github.event_name == 'push' && format('build-test-analyze-{0}', github.sha) || format('build-test-analyze-{0}', github.ref) }}
   # Superseded PR pushes are cancelled; `main` runs always complete, because a
   # cancelled run on `main` would leave a commit with no analysis.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -280,7 +284,10 @@ jobs:
         env:
           # See the ordering note above — this is what lets the install run before any IR exists.
           SPECSCRIBE_PACKAGE_BUILD: "1"
-        run: npm ci
+        # Install without lifecycle hooks, then run only this repository's required
+        # Nuxt preparation hook explicitly. This prevents dependency lifecycle
+        # scripts from gaining an implicit CI execution path.
+        run: npm ci --ignore-scripts && npm run postinstall
 
       - name: Sync runtime assets into web/public
         working-directory: web
@@ -480,7 +487,9 @@ jobs:
           # empty, which is exactly what it is for. (Same reason as the gating job above; there the cycle is
           # subtler, here the IR is simply never produced.)
           SPECSCRIBE_PACKAGE_BUILD: "1"
-        run: npm ci
+        # Match the gated job's explicit lifecycle policy: dependencies install
+        # without hooks, then this repository's Nuxt preparation runs by name.
+        run: npm ci --ignore-scripts && npm run postinstall
 
       - name: Build the project-independent renderer artefact
         working-directory: web
@@ -489,3 +498,201 @@ jobs:
       - name: Check parity on Linux (ADR 0033 §4 cross-OS proof)
         working-directory: web
         run: npm run check:parity
+
+  # ADR 0040 Stage A is deliberately in this workflow: `needs: build-test-analyze`
+  # is the structural release gate. Main runs are never cancelled by the workflow
+  # concurrency setting, so a pending merge cannot lose its eventual release.
+  stage-a-prepare:
+    name: stage-a prepare
+    needs: build-test-analyze
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      sha: ${{ steps.tag.outputs.sha }}
+      tag: ${{ steps.tag.outputs.tag }}
+      version: ${{ steps.tag.outputs.version }}
+      epoch: ${{ steps.tag.outputs.epoch }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: web/.nvmrc
+      - name: Prove release guards before allocating a tag
+        run: node .github/scripts/release/selftest.mjs
+      - id: tag
+        name: Allocate and reserve the next preview tag
+        run: |
+          set -euo pipefail
+          SHA=$(git rev-parse HEAD)
+          EPOCH=$(git log -1 --format=%ct "$SHA")
+          bash .github/scripts/release/assert-source-date-epoch.sh "$EPOCH"
+          git fetch --tags --force origin
+          # Push a lightweight tag immediately to reserve the slot. If two runs pick
+          # the same tag concurrently, only one push succeeds; the other retries with
+          # the next available number. Retry up to 5 times before giving up.
+          for i in $(seq 1 5); do
+            git fetch --tags --force origin
+            TAG=$(git tag -l | node .github/scripts/release/next-preview-tag.mjs --base-file .github/release-base)
+            git tag "$TAG" "$SHA"
+            if git push origin "refs/tags/$TAG"; then
+              break
+            fi
+            git tag -d "$TAG"
+            if [ "$i" = 5 ]; then
+              echo "::error::Could not reserve a preview tag after 5 attempts."
+              exit 1
+            fi
+          done
+          VERSION="${TAG#v}"
+          printf 'sha=%s\ntag=%s\nversion=%s\nepoch=%s\n' "$SHA" "$TAG" "$VERSION" "$EPOCH" >> "$GITHUB_OUTPUT"
+
+  stage-a-nupkg:
+    name: stage-a nupkg
+    needs: stage-a-prepare
+    runs-on: ubuntu-latest
+    env:
+      SOURCE_DATE_EPOCH: ${{ needs.stage-a-prepare.outputs.epoch }}
+      TAG: ${{ needs.stage-a-prepare.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.stage-a-prepare.outputs.sha }}
+          fetch-depth: 0
+      - name: Create the local candidate tag for MinVer
+        run: git tag --force "$TAG" '${{ needs.stage-a-prepare.outputs.sha }}'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: bash .github/scripts/release/assert-source-date-epoch.sh "$SOURCE_DATE_EPOCH"
+      - working-directory: web
+        env: { SPECSCRIBE_PACKAGE_BUILD: "1" }
+        run: npm ci --ignore-scripts && npm run postinstall
+      - working-directory: web
+        run: npm run sync:assets && npm run build:package
+      - run: dotnet pack src/SpecScribe/SpecScribe.csproj -c Release -o artifacts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stage-a-nupkg
+          path: artifacts/*.nupkg
+          if-no-files-found: error
+          retention-days: 7
+
+  stage-a-binaries:
+    name: stage-a binary (${{ matrix.rid }})
+    needs: stage-a-prepare
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: win-x64, os: windows-latest, ext: zip }
+          - { rid: linux-x64, os: ubuntu-latest, ext: tar.gz }
+          - { rid: osx-arm64, os: macos-latest, ext: tar.gz }
+    env:
+      SOURCE_DATE_EPOCH: ${{ needs.stage-a-prepare.outputs.epoch }}
+      TAG: ${{ needs.stage-a-prepare.outputs.tag }}
+      VERSION: ${{ needs.stage-a-prepare.outputs.version }}
+    defaults:
+      run: { shell: bash }
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.stage-a-prepare.outputs.sha }}
+          fetch-depth: 0
+      - name: Create the local candidate tag for MinVer
+        run: git tag --force "$TAG" '${{ needs.stage-a-prepare.outputs.sha }}'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: bash .github/scripts/release/assert-source-date-epoch.sh "$SOURCE_DATE_EPOCH"
+      - working-directory: web
+        env: { SPECSCRIBE_PACKAGE_BUILD: "1" }
+        run: npm ci --ignore-scripts && npm run postinstall
+      - working-directory: web
+        run: npm run sync:assets && npm run build:package
+      - name: Publish and archive the complete RID payload
+        run: |
+          set -euo pipefail
+          ROOT="specscribe-${VERSION}-${{ matrix.rid }}"
+          dotnet publish src/SpecScribe/SpecScribe.csproj -c Release -r '${{ matrix.rid }}' --self-contained true -p:PublishSingleFile=true -o "stage/$ROOT"
+          mkdir dist
+          if [ '${{ matrix.ext }}' = zip ]; then (cd stage && 7z a -tzip -mx=9 "../dist/$ROOT.zip" "$ROOT" > /dev/null); else tar -czf "dist/$ROOT.tar.gz" -C stage "$ROOT"; fi
+          bash .github/scripts/release/assert-archive-renderer.sh "dist/$ROOT.${{ matrix.ext }}" "$ROOT"
+      - name: Run the extracted archive from a spaced path against a foreign source tree
+        run: |
+          set -euo pipefail
+          ROOT="specscribe-${VERSION}-${{ matrix.rid }}"
+          ARCHIVE="dist/$ROOT.${{ matrix.ext }}"
+          PROBE="$RUNNER_TEMP/specscribe archive probe"
+          EXTRACT="$PROBE/extracted payload"
+          mkdir -p "$EXTRACT" "$PROBE/foreign source"
+          cp -R _bmad-output "$PROBE/foreign source/_bmad-output"
+          cp -R docs/adrs "$PROBE/foreign source/adrs"
+          if [ '${{ matrix.ext }}' = zip ]; then 7z x "$ARCHIVE" "-o$EXTRACT" > /dev/null; else tar -xzf "$ARCHIVE" -C "$EXTRACT"; fi
+          EXECUTABLE="$EXTRACT/$ROOT/specscribe"
+          [ '${{ matrix.rid }}' != win-x64 ] || EXECUTABLE="$EXECUTABLE.exe"
+          unset SPECSCRIBE_RENDERER_DIR
+          "$EXECUTABLE" generate --source "$PROBE/foreign source/_bmad-output" --adrs "$PROBE/foreign source/adrs" --output "$PROBE/site output" --project-name "Stage A probe" | tee probe.log
+          grep -rl '<main id="main-content"' "$PROBE/site output" > /dev/null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stage-a-${{ matrix.rid }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+  stage-a-release:
+    name: stage-a prerelease
+    needs: [stage-a-prepare, stage-a-nupkg, stage-a-binaries]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.stage-a-prepare.outputs.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: web/.nvmrc
+      - uses: actions/download-artifact@v4
+        with:
+          path: incoming
+      - name: Create the prerelease with durable handoff assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.stage-a-prepare.outputs.tag }}
+          VERSION: ${{ needs.stage-a-prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir dist
+          find incoming -type f \( -name '*.zip' -o -name '*.tar.gz' -o -name '*.nupkg' \) -exec cp {} dist/ \;
+          [ "$(find dist -type f \( -name '*.zip' -o -name '*.tar.gz' \) | wc -l | tr -d ' ')" = 3 ]
+          [ "$(find dist -type f -name '*.nupkg' | wc -l | tr -d ' ')" = 1 ]
+          # Every attached asset needs a consumer-verifiable digest. The nupkg is
+          # also attached as Stage B's immutable handoff, so it belongs here with
+          # the three direct-download archives.
+          (cd dist && sha256sum -- ./*.zip ./*.tar.gz ./*.nupkg > ../digests.txt)
+          node .github/scripts/release/release-body.mjs --version "$VERSION" --digests digests.txt --repo '${{ github.repository }}' > release-body.md
+          # The tag was reserved in stage-a-prepare. Verify our SHA still owns it, then
+          # promote it to an annotated tag in place so the release object has a message.
+          git fetch --tags --force origin
+          REMOTE_SHA=$(git rev-parse "refs/tags/$TAG^{}" 2>/dev/null || true)
+          [ "$REMOTE_SHA" = '${{ needs.stage-a-prepare.outputs.sha }}' ] || { echo '::error::Reserved tag is missing or was claimed externally; rerun from main for the next preview number.'; exit 1; }
+          git tag -a -f "$TAG" '${{ needs.stage-a-prepare.outputs.sha }}' -m "Stage A release $TAG"
+          git push --force origin "refs/tags/$TAG"
+          gh release create "$TAG" --prerelease --title "$TAG" --notes-file release-body.md --target '${{ needs.stage-a-prepare.outputs.sha }}' ./dist/*

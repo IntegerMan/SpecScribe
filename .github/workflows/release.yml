@@ -1,709 +1,90 @@
-# The tag-triggered release pipeline. [Story 16.4, FR32 / NFR9, ADR 0040]
-#
-# 🚨 THE FILENAME IS LOAD-BEARING. DO NOT RENAME THIS FILE.
-#
-# A nuget.org Trusted Publishing policy is bound to *repo owner + repo + workflow FILENAME + optional
-# environment*. Renaming this file silently invalidates the policy — and the failure surfaces as a rejected
-# push at the very LAST step of a release, after the version has already been consumed by any channel that
-# went first (ADR 0040 §Decision 10: a version is spent on first publish and is never reused). Nothing in this
-# repository can warn you; the binding lives on nuget.org. `docs/Releasing.md` records it as owner-mirrored
-# configuration rather than an implementation detail.
-#
-# WHAT THIS WORKFLOW DOES NOT DO, AND WHY:
-#   · It does NOT build+test. ADR 0040 §Decision 9 gates on the tagged commit ALREADY being green on `main`
-#     ("re-running invites a different result from the same source and doubles the wall-clock"), and epics.md
-#     §Story 16.2 (AMENDED 2026-07-25) forbids a second build+test workflow outright.
-#   · It does NOT assert the renderer inside the nupkg. `AssertRendererPacked` (SpecScribe.csproj:143) fires
-#     automatically AfterTargets="Pack" and already does exactly that. A second assertion here would be a
-#     second thing to keep correct. The ARCHIVES are different — nothing else can see inside those.
-#   · It does NOT publish to npm or the VS Marketplace. Stories 16.8 and 16.5. When 16.8 extends this file it
-#     must honour ADR 0040 §Decision 5's normative order: `specscribe-renderer` FIRST, then the wrapper.
-#
-# THE ASSERTIONS LIVE IN `.github/scripts/release/`, NOT INLINE HERE. Every failure mode ADR 0040 routes to
-# this story is a green pipeline that ships something wrong, so each guard has to be proven to fire on its RED
-# path — and shell embedded in YAML can only be exercised by triggering the pipeline. `selftest.mjs` drives all
-# of them from fixtures in about a second, and runs as the first job below.
-name: Release
+name: Promote Release
 
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
     inputs:
-      dry_run:
-        description: "Rehearse only: build and assert everything, publish nothing."
-        type: boolean
-        # DEFAULTS TO TRUE, deliberately (AC #8). An accidental manual invocation must not be able to publish,
-        # because publishing consumes the version number irreversibly on every channel it reaches.
-        default: true
-      ref:
-        description: "Tag (or ref) to run against. Defaults to the branch this is dispatched from."
+      tag:
+        description: "Existing Stage A prerelease tag to promote"
+        required: true
         type: string
-        required: false
 
-# Least privilege at the workflow level; the release job widens it for itself and nothing else.
 permissions:
   contents: read
 
 concurrency:
-  # NOT `pages` — publish-docs-live-pages.yml owns that group and sharing it makes the two cancel one another
-  # (build-test-analyze.yml:32-38 documents the same rule). Also distinct from `build-test-analyze-<ref>`.
-  group: release-${{ github.ref }}
-  # NEVER cancel a release in flight. A run cancelled between "pushed to nuget.org" and "published the GitHub
-  # Release" is the worst state this pipeline can be in: the version is consumed, and the only record of it is
-  # a draft nobody can install. A superseded release is not a superseded PR.
+  group: release-promote-${{ inputs.tag }}
   cancel-in-progress: false
 
 env:
   DOTNET_NOLOGO: "true"
   DOTNET_CLI_TELEMETRY_OPTOUT: "true"
-  # ADR 0040 §Decision 12. `SpecScribe` was verified unclaimed on 2026-08-07; RESERVING it is an owner action
-  # and the only release prerequisite a third party can take away. An implementer may NOT silently substitute
-  # the `SpecScribe.Cli` fallback — that is an escalation to the owner and an ADR amendment.
   NUGET_PACKAGE_ID: SpecScribe
 
 defaults:
   run:
-    # bash on all three runners, unlike build-test-analyze.yml's `pwsh` (which is Windows-only and can afford
-    # to be). This workflow's matrix spans windows/ubuntu/macos and one script per step is worth more than
-    # per-OS shell dialects. Every assertion script is POSIX sh or Node for the same reason.
     shell: bash
 
 jobs:
-  # ════════════════════════════════════════════════════════════════════════════════════════════════════════
-  # 0. Prove the guards still fire. Seconds, and it runs before anything is built or published.
-  # ════════════════════════════════════════════════════════════════════════════════════════════════════════
-  selftest:
-    name: selftest (release assertions)
+  promote:
+    name: promote Stage A release
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: web/.nvmrc
-      - name: Prove every release assertion fires red as well as green
-        # This is AC #8's three negative proofs — a malformed SOURCE_DATE_EPOCH, an archive missing its
-        # renderer, and a SHA with no green build-test-analyze — plus the rest, run on EVERY release rather
-        # than once by hand. A guard that has rotted into a no-op is indistinguishable from a guard that
-        # passes, which is how this project shipped a pruned CSS layer behind four green gates.
-        run: node .github/scripts/release/selftest.mjs
-
-  # ════════════════════════════════════════════════════════════════════════════════════════════════════════
-  # 1. Preflight: resolve everything, and refuse the release BEFORE a single byte is built.
-  # ════════════════════════════════════════════════════════════════════════════════════════════════════════
-  preflight:
-    name: preflight
-    needs: selftest
-    runs-on: ubuntu-latest
-    timeout-minutes: 25 # the gate poll alone can legitimately take 15 (ADR 0040 §Decision 9)
-    outputs:
-      sha: ${{ steps.resolve.outputs.sha }}
-      tag: ${{ steps.resolve.outputs.tag }}
-      is_tag: ${{ steps.resolve.outputs.is_tag }}
-      dry_run: ${{ steps.resolve.outputs.dry_run }}
-      version: ${{ steps.version.outputs.version }}
-      prerelease: ${{ steps.version.outputs.prerelease }}
-      source_date_epoch: ${{ steps.epoch.outputs.source_date_epoch }}
+    timeout-minutes: 30
+    env:
+      TAG: ${{ inputs.tag }}
+    permissions:
+      contents: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref || github.ref }}
-          # 🚨 MANDATORY, AND ITS ABSENCE IS SILENT. MinVer resolves the version from git TAG REACHABILITY, so
-          # a shallow clone yields a WRONG VERSION rather than an error — and `<Version>` was deleted from the
-          # csproj (ADR 0040 §Decision 5), so there is no literal to fall back to or to notice the drift
-          # against. ADR 0040 §Consequences seats this obligation here explicitly: "fetch-depth: 0 is checkout
-          # configuration, so it belongs to the stories that own the workflows — 16.2 and 16.4."
-          # The version/tag cross-check in the `version` step below is what turns a violation into a failure.
+          ref: ${{ inputs.tag }}
           fetch-depth: 0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: web/.nvmrc
-
       - uses: actions/setup-dotnet@v4
         with:
-          # Matches build-test-analyze.yml. Consistency across the two workflows is worth more here than a
-          # version bump this story has no reason to take.
           dotnet-version: "10.0.x"
-
-      - name: Resolve ref, tag and dry-run mode
-        id: resolve
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: web/.nvmrc
+      - name: Validate the Stage A tag and prerelease release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          SHA=$(git rev-parse HEAD)
-          REF='${{ inputs.ref || github.ref }}'
-
-          # A tag push always publishes. A manual dispatch honours its input, which defaults to true.
-          if [ '${{ github.event_name }}' = 'push' ]; then
-            DRY=false
-          else
-            DRY='${{ inputs.dry_run }}'
-            [ -n "$DRY" ] || DRY=true
-          fi
-
-          # Is the resolved ref actually a tag? `git describe --exact-match` answers for a dispatch against a
-          # tag name just as well as for a tag push, so the two paths converge here rather than branching on
-          # the event type for the rest of the workflow.
-          if TAG=$(git describe --tags --exact-match 2>/dev/null); then
-            IS_TAG=true
-          else
-            TAG=""
-            IS_TAG=false
-          fi
-
-          # ⛔ PUBLISHING REQUIRES A TAG. Without this, a dispatch against a branch with dry_run unticked would
-          # push a height-suffixed version (0.1.0-preview.0.424) to nuget.org and consume it forever. ADR 0040
-          # §Decision 5's scheme has no room for that, and there is no way to un-consume it.
-          if [ "$IS_TAG" != 'true' ] && [ "$DRY" != 'true' ]; then
-            echo "::error::Refusing to publish from '${REF}', which is not a tag."
-            echo "::error::Releases are cut from a v* tag on 'main' only (ADR 0040 §Decision 2, §Decision 9)."
-            exit 1
-          fi
-
-          {
-            echo "sha=$SHA"
-            echo "tag=$TAG"
-            echo "is_tag=$IS_TAG"
-            echo "dry_run=$DRY"
-          } >> "$GITHUB_OUTPUT"
-
-          echo "### Release preflight" >> "$GITHUB_STEP_SUMMARY"
-          echo "| | |" >> "$GITHUB_STEP_SUMMARY"
-          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
-          echo "| ref | \`${REF}\` |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| commit | \`${SHA}\` |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| tag | \`${TAG:-(none)}\` |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| dry run | \`${DRY}\` |" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Assert SOURCE_DATE_EPOCH (ADR 0040 §Decision 7)
-        id: epoch
-        run: |
-          set -euo pipefail
-          # THE TAGGED COMMIT'S COMMITTER TIMESTAMP — never `date +%s`, never the run's start time. A run-start
-          # value differs on every re-run and defeats the property it was set to establish. Read from the
-          # RESOLVED SHA rather than from HEAD so every downstream job stamps the same value even if the tag
-          # is moved mid-run.
-          EPOCH=$(git log -1 --format=%ct '${{ steps.resolve.outputs.sha }}')
-          bash .github/scripts/release/assert-source-date-epoch.sh "$EPOCH"
-          echo "source_date_epoch=$EPOCH" >> "$GITHUB_OUTPUT"
-
-      - name: Resolve the version from MinVer, and cross-check it against the tag
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-preview\.[1-9][0-9]*$ ]] || { echo '::error::Tag must be vMAJOR.MINOR.PATCH-preview.N.'; exit 1; }
+          git rev-parse "refs/tags/$TAG" >/dev/null
+          gh release view "$TAG" --json isPrerelease,assets --jq 'select(.isPrerelease == true)' > stage-a-release.json
+          jq -e '[.assets[].name | select(endswith(".zip") or endswith(".tar.gz"))] | length == 3' stage-a-release.json >/dev/null
+          jq -e '[.assets[].name | select(endswith(".nupkg"))] | length == 1' stage-a-release.json >/dev/null
+      - name: Resolve tagged version and preflight registry state
         id: version
         run: |
           set -euo pipefail
-
-          # ⚠️ `dotnet build --getProperty:Version` DOES NOT WORK HERE, and it fails by returning a plausible
-          # answer: MinVer assigns $(Version) inside a TARGET, while --getProperty reports the EVALUATED value,
-          # so it prints the SDK default `1.0.0`. Measured on this repo, 2026-08-08. Running MinVer's own
-          # target and reading MinVerVersion is the form that reflects the tag.
           VERSION=$(dotnet msbuild src/SpecScribe/SpecScribe.csproj -t:MinVer -getProperty:MinVerVersion | tr -d '[:space:]')
-          [ -n "$VERSION" ] || { echo "::error::MinVer produced no version."; exit 1; }
-
-          # 🚨 THE fetch-depth GUARD THAT ACTUALLY BITES. On a tag, MinVer must reproduce the tag exactly (the
-          # prefix is `v`, MinVerTagPrefix, and the package version carries no prefix). If it does not, the
-          # clone did not see the tag — which is the shallow-clone failure that "produces a wrong version
-          # rather than an error". Catching it here costs a second; not catching it publishes a mislabelled
-          # package under a version number that is then permanently consumed.
-          if [ '${{ steps.resolve.outputs.is_tag }}' = 'true' ]; then
-            EXPECTED='${{ steps.resolve.outputs.tag }}'
-            EXPECTED="${EXPECTED#v}"
-            if [ "$VERSION" != "$EXPECTED" ]; then
-              echo "::error::MinVer resolved '${VERSION}' but the tag says '${EXPECTED}'."
-              echo "::error::That is the shallow-clone signature — check fetch-depth: 0 on every checkout here."
-              exit 1
-            fi
-          fi
-
-          # ADR 0040 §Decision 5: EVERY preview release carries a SemVer pre-release label, and that is a
-          # product surface rather than cosmetics — AboutTemplater renders the About page's `Preview` badge
-          # from ProductMetadata.IsPrerelease. Derived from the version, never from a hand-set input (AC #2).
-          case "$VERSION" in
-            *-*) PRERELEASE=true ;;
-            *)   PRERELEASE=false ;;
-          esac
-
+          EXPECTED="${TAG#v}"
+          [ "$VERSION" = "$EXPECTED" ] || { echo '::error::MinVer did not resolve the requested tag.'; exit 1; }
+          bash .github/scripts/release/assert-version-unpublished.sh "$NUGET_PACKAGE_ID" "$VERSION"
+          [ -n '${{ vars.NUGET_USER }}' ] || { echo '::error::NUGET_USER is not configured.'; exit 1; }
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
-          echo "| version | \`${VERSION}\` (prerelease: \`${PRERELEASE}\`) |" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Require the tagged commit to be green on `main` (ADR 0040 §Decision 9)
-        # Runs for any TAG, including a dry run — rehearsing the gate is most of the point of a dry run. A
-        # dispatch against a branch has no run to point at by construction, so it is skipped rather than
-        # failed; `selftest` covers the decision logic in that case.
-        if: steps.resolve.outputs.is_tag == 'true'
+      - name: Download the immutable Stage A nupkg handoff asset
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bash .github/scripts/release/require-green-gate.sh "${{ github.repository }}" "${{ steps.resolve.outputs.sha }}"
-
-      - name: Warn when the gate check is out of scope
-        if: steps.resolve.outputs.is_tag != 'true'
-        run: |
-          echo "::warning::Not a tag, so ADR 0040 §Decision 9's gate check was skipped. This run cannot publish."
-
-      - name: Refuse a version that is already consumed (ADR 0040 §Decision 10)
-        # Fail in SECONDS rather than at the push step, after three ~76 MiB RIDs, a Nuxt artefact and a drafted
-        # GitHub Release. Runs on a dry run too: rehearsing a burned version proves nothing.
-        if: steps.resolve.outputs.is_tag == 'true'
-        run: bash .github/scripts/release/assert-version-unpublished.sh "$NUGET_PACKAGE_ID" "${{ steps.version.outputs.version }}"
-
-      - name: Require the nuget.org publisher identity to be configured
-        # ADR 0040 §Decision 3 + R1-A. `NuGet/login@v1`'s `user:` is the owner's nuget.org PROFILE NAME (not
-        # their email), and it is repository configuration rather than a secret — so it lives in an Actions
-        # *variable*. Checked HERE, before anything is built: a missing value would otherwise surface at the
-        # credential exchange, which sits immediately before the push, with everything already built.
-        if: steps.resolve.outputs.dry_run != 'true'
-        run: |
-          if [ -z '${{ vars.NUGET_USER }}' ]; then
-            echo "::error::Repository variable NUGET_USER is not set."
-            echo "::error::Set it to the owner's nuget.org PROFILE NAME (not an email) — see docs/Releasing.md."
-            exit 1
-          fi
-          echo "nuget.org publisher identity: ${{ vars.NUGET_USER }}"
-
-  # ════════════════════════════════════════════════════════════════════════════════════════════════════════
-  # 2. The nupkg — the channel LEADING the preview cut (ADR 0040 §Decision 2).
-  # ════════════════════════════════════════════════════════════════════════════════════════════════════════
-  nupkg:
-    name: pack (dotnet tool)
-    needs: preflight
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      SOURCE_DATE_EPOCH: ${{ needs.preflight.outputs.source_date_epoch }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          # The preflight-resolved SHA, not the ref: every job in this run must build the SAME commit even if
-          # the tag is moved while the run is in flight.
-          ref: ${{ needs.preflight.outputs.sha }}
-          fetch-depth: 0 # MinVer again — see the preflight checkout.
-
-      - name: Re-assert SOURCE_DATE_EPOCH in this job
-        # Re-asserted rather than trusted. The value crosses a job boundary as a string, and the csproj's
-        # response to a malformed one is to silently stamp TODAY. Cheap, and it means no job in this workflow
-        # can build without the guard having run in that job.
-        run: bash .github/scripts/release/assert-source-date-epoch.sh "$SOURCE_DATE_EPOCH"
-
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "10.0.x"
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: web/.nvmrc # never a hand-typed version
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-
-      # ⚠️ THE NEXT THREE STEPS ARE ORDERED, AND EACH ORDER MISTAKE HAS ITS OWN SILENT FAILURE.
-      # docs/Packaging.md § Build order is the authority; the short version is below.
-      - name: Install web dependencies
-        working-directory: web
-        env:
-          # NOT OPTIONAL on a fresh checkout. `postinstall: nuxt prepare` loads web/nuxt.config.ts, which calls
-          # loadManifest() and HARD-FAILS with "IR not found at SpecScribeOutput/spa/manifest.json" — and a
-          # release checkout never has an IR. The flag stubs the manifest empty, which is what it is for.
-          SPECSCRIBE_PACKAGE_BUILD: "1"
-        run: npm ci
-
-      - name: Sync runtime assets into web/public
-        working-directory: web
-        # web/public/ is gitignored by design and absent on every fresh checkout, and `build:package` BAKES it
-        # into .output/public. Skipping this ships an artefact with no prism/plotly assets.
-        run: npm run sync:assets
-
-      - name: Build the renderer artefact
-        working-directory: web
-        # 🚨 `build:package`, NEVER `build`. A plain `nuxt build` bakes SpecScribe's OWN pages into
-        # .output/public, and Nitro serves public/ AHEAD of the SSR route — so the packaged artefact returns
-        # SpecScribe's pages for the consumer's project, at HTTP 200. A wrong answer with a success status
-        # (ADR 0022 §2; Story 23.5 hit exactly this).
-        run: npm run build:package
-
-      - name: Pack
         run: |
           set -euo pipefail
-          # AssertRendererPacked fires automatically (AfterTargets="Pack") and unzips the produced nupkg to
-          # check the entry point is at tools/$(TargetFramework)/any/renderer/server/index.mjs. Nothing is
-          # added here — a second assertion would be a second thing to keep correct. Its OK line is the
-          # evidence, and it is asserted below rather than eyeballed.
-          dotnet pack src/SpecScribe/SpecScribe.csproj -c Release -o artifacts | tee pack.log
-
-          grep -q 'AssertRendererPacked OK' pack.log || {
-            echo '::error::dotnet pack succeeded but AssertRendererPacked did not report OK.'
-            echo '::error::The guard did not run, so this package is UNVERIFIED. Refusing to ship it.'
-            exit 1
-          }
-
-          # Read the version off the produced .nupkg — never hard-code one, and never compute it a second way
-          # (docs/Packaging.md § Versioning). This is also a cross-check against the preflight's MinVer answer.
-          PACKED=$(ls artifacts/${NUGET_PACKAGE_ID}.*.nupkg)
-          ACTUAL=$(basename "$PACKED" .nupkg)
-          ACTUAL="${ACTUAL#${NUGET_PACKAGE_ID}.}"
-          EXPECTED='${{ needs.preflight.outputs.version }}'
-          [ "$ACTUAL" = "$EXPECTED" ] || {
-            echo "::error::The packed version '${ACTUAL}' disagrees with the preflight's '${EXPECTED}'."
-            exit 1
-          }
-          echo "Packed ${PACKED} at ${ACTUAL}."
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: nupkg
-          path: artifacts/*.nupkg
-          if-no-files-found: error
-          retention-days: 7
-
-  # ════════════════════════════════════════════════════════════════════════════════════════════════════════
-  # 3. The three self-contained RIDs — each PRODUCED AND EXECUTED on its own operating system (AC #9).
-  #
-  # ADR 0040 §Decision 2 fixes the matrix at win-x64 / linux-x64 / osx-arm64 for the preview. Story 16.3
-  # proved the sibling-renderer mechanism on the HOST RID ONLY and said so: "producing and executing
-  # linux-x64 / osx-arm64 binaries on their own operating systems is 16.4's CI matrix." Extrapolating from
-  # one RID is precisely what AC #9 forbids.
-  # ════════════════════════════════════════════════════════════════════════════════════════════════════════
-  binaries:
-    name: binary (${{ matrix.rid }})
-    needs: preflight
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 45 # a ~76 MiB self-contained publish plus a Nuxt build is not a two-minute job
-    strategy:
-      # NEVER fail-fast. One RID failing must not cancel the other two: knowing that linux and macos are fine
-      # while windows is broken is a diagnosis, and "everything was cancelled" is not.
-      fail-fast: false
-      matrix:
-        include:
-          - rid: win-x64
-            os: windows-latest
-            ext: zip
-          - rid: linux-x64
-            os: ubuntu-latest
-            ext: tar.gz
-          - rid: osx-arm64
-            # macos-latest is Apple silicon, so osx-arm64 is BUILT AND RUN natively here rather than
-            # cross-compiled and hoped for. That is what makes AC #9's claim honest.
-            os: macos-latest
-            ext: tar.gz
-    env:
-      SOURCE_DATE_EPOCH: ${{ needs.preflight.outputs.source_date_epoch }}
-      VERSION: ${{ needs.preflight.outputs.version }}
-      RID: ${{ matrix.rid }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.preflight.outputs.sha }}
-          fetch-depth: 0
-
-      - name: Re-assert SOURCE_DATE_EPOCH in this job
-        run: bash .github/scripts/release/assert-source-date-epoch.sh "$SOURCE_DATE_EPOCH"
-
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "10.0.x"
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: web/.nvmrc
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-
-      - name: Install web dependencies
-        working-directory: web
-        env:
-          SPECSCRIBE_PACKAGE_BUILD: "1"
-        run: npm ci
-
-      - name: Sync runtime assets into web/public
-        working-directory: web
-        run: npm run sync:assets
-
-      - name: Build the renderer artefact
-        working-directory: web
-        # Built per-RID rather than once and shared. The artefact is platform-neutral, so sharing it would
-        # work — but `npm ci` resolves platform-specific optional dependencies (rollup/esbuild native
-        # binaries), and an artifact round-trip does not preserve file modes. Building it where it is used
-        # keeps each leg self-evidently correct at the cost of ~90s.
-        run: npm run build:package
-
-      - name: Publish self-contained
-        run: |
-          set -euo pipefail
-          ROOT="specscribe-${VERSION}-${RID}"
-          # ONE archive per RID, containing BOTH halves, under a single top-level directory. ADR 0040
-          # §Decision 5: shipping the executable and the renderer as separate assets lets a user unzip release
-          # N over N-1 and desynchronize the pair — and with the artefact version stamp still undelivered
-          # (assigned to 16.3, not done), NOTHING would detect it. A single top-level directory also means the
-          # archive cannot explode over a user's working directory.
-          #
-          # PublishSingleFile: Story 16.1 measured that it does NOT move AppContext.BaseDirectory into an
-          # extraction directory, so the sibling renderer/ still resolves. errors=0, 373 routes.
-          # The renderer payload arrives via the csproj's Content item (CopyToPublishDirectory="PreserveNewest"),
-          # and AssertRendererAvailableForPublish guards the SOURCE side before this runs.
-          dotnet publish src/SpecScribe/SpecScribe.csproj \
-            -c Release -r "$RID" --self-contained true \
-            -p:PublishSingleFile=true \
-            -o "stage/${ROOT}"
-          echo "ARCHIVE_ROOT=${ROOT}" >> "$GITHUB_ENV"
-
-      - name: Archive
-        run: |
-          set -euo pipefail
-          ROOT="$ARCHIVE_ROOT"
-          mkdir -p dist
-          # Relative paths with `-C`, never an absolute one: GNU tar reads a leading `C:`/`D:` as a REMOTE HOST
-          # spec and would try to reach a machine called `D`. See assert-archive-renderer.sh's note.
-          if [ '${{ matrix.ext }}' = 'zip' ]; then
-            ( cd stage && 7z a -tzip -mx=9 "../dist/${ROOT}.zip" "$ROOT" > /dev/null )
-          else
-            tar -czf "dist/${ROOT}.tar.gz" -C stage "$ROOT"
-          fi
-          ls -l dist
-
-      - name: Assert the renderer is INSIDE the produced archive (AC #4)
-        # Not the source directory (AssertRendererAvailableForPublish already covers that and says nothing
-        # about what landed in the archive), and not the file count or byte total — Story 16.3 measured a
-        # wrong-path package at 203 files with an IDENTICAL byte total and no entry point.
-        run: bash .github/scripts/release/assert-archive-renderer.sh "dist/${ARCHIVE_ROOT}.${{ matrix.ext }}" "$ARCHIVE_ROOT"
-
-      - name: Prove it RUNS — from a path containing a space, on this OS (AC #9, R3-1)
-        # 🚨 THIS IS THE ONLY EXERCISE OF THE SPACED-PATH DEFECT ANYWHERE IN EPIC 16.
-        #
-        # Until ADR 0040 the artefact directory was a developer's repo path or an explicit env var; this
-        # workflow is what makes it a path the CONSUMER chooses by unzipping wherever they like. NuxtPrerender
-        # spawned the renderer through the single-string ProcessStartInfo overload, which splits on whitespace,
-        # so `C:\Program Files\SpecScribe\` broke the FIRST RUN of every downloaded binary. Story 16.4 pulled
-        # the ArgumentList fix forward by owner decision (2026-08-08) because this is the story that publishes
-        # the archive. The unit tests pin the argument shape; this pins that the real binary actually runs.
-        #
-        # Everything happens under RUNNER_TEMP, OUTSIDE the checkout — that is not tidiness. Running inside
-        # this repository lets `web/.output` satisfy NuxtPrerender's THIRD resolution candidate (the developer
-        # path) and the probe reports success while proving nothing at all (docs/Packaging.md § Verifying).
-        run: |
-          set -euo pipefail
-          # Candidate 1 is an EXPLICIT override with hard-fail-on-miss semantics, so it must be genuinely
-          # absent rather than empty — and the probe below asserts that rather than assuming it.
-          unset SPECSCRIBE_RENDERER_DIR
-
-          PROBE="$RUNNER_TEMP/probe dir with spaces"
-          rm -rf "$PROBE" && mkdir -p "$PROBE"
-          if [ '${{ matrix.ext }}' = 'zip' ]; then
-            7z x "dist/${ARCHIVE_ROOT}.zip" -o"$PROBE" > /dev/null
-          else
-            tar -xzf - -C "$PROBE" < "dist/${ARCHIVE_ROOT}.tar.gz"
-          fi
-
-          # A FOREIGN repository — one that is NOT this checkout. `generate` requires an SDD marker directory
-          # (`_bmad-output`, `.planning`, `.gsd` or `.specify`) and refuses outright without one, so the probe
-          # is seeded with this repository's own planning artifacts.
-          #
-          # Seeded FULLY rather than thinly, deliberately: ADR 0040 §Decision 11 records that
-          # EpicsIndexSurface.vue hard-throws on an epics index with no child pages (Story 23.3 owns the fix
-          # and it blocks 16.7), so a half-populated BMad tree would fail this step for a reason that is not
-          # this story's. What makes the probe foreign is the absence of `web/`, not the absence of content:
-          # `web/.output` is NuxtPrerender's THIRD resolution candidate and would rescue a broken archive
-          # while reporting success (docs/Packaging.md § Verifying a package).
-          FOREIGN="$RUNNER_TEMP/foreign project"
-          rm -rf "$FOREIGN" && mkdir -p "$FOREIGN"
-          cp -r docs "$FOREIGN/docs"
-          cp -r _bmad-output "$FOREIGN/_bmad-output"
-          cp README.md "$FOREIGN/README.md"
-          git -C "$FOREIGN" init -q
-          # `git add` has no -q; the line-ending advisories are noise here and would bury the probe's output.
-          git -C "$FOREIGN" -c user.email=ci@example.invalid -c user.name=CI add -A 2>/dev/null
-          git -C "$FOREIGN" -c user.email=ci@example.invalid -c user.name=CI commit -qm "probe"
-
-          EXE="$PROBE/$ARCHIVE_ROOT/specscribe"
-          # `if`, not `[ … ] && …`. Under `set -e` a bare `test && assign` list that evaluates FALSE returns
-          # non-zero and kills the script — so on linux/macos this step would have exited 1 before running
-          # anything, and the "proof" would have been a red X with no diagnosis.
-          if [ '${{ matrix.rid }}' = 'win-x64' ]; then EXE="$EXE.exe"; fi
-          chmod +x "$EXE" 2>/dev/null || true
-
-          # Assert the preconditions rather than assuming them — this is what makes the probe genuinely foreign.
-          [ ! -d "$FOREIGN/web" ] || { echo "::error::the probe repo has a web/ directory; it is not foreign."; exit 1; }
-          [ -z "${SPECSCRIBE_RENDERER_DIR:-}" ] || { echo "::error::SPECSCRIBE_RENDERER_DIR is set."; exit 1; }
-
-          ( cd "$FOREIGN" && "$EXE" generate --project-name "Spaced Path Probe" --output "$FOREIGN/out" ) | tee probe.log
-
-          # Exit 0 is necessary and NOT sufficient. Assert the renderer actually served a page: the universal
-          # Story 1.4 landmark is what distinguishes "rendered" from "wrote an IR and produced no HTML".
-          grep -rl '<main id="main-content"' "$FOREIGN/out" > /dev/null || {
-            echo "::error::generate exited 0 but no page carries the <main id=\"main-content\"> landmark."
-            echo "::error::The renderer did not serve — this archive would install cleanly and render nothing."
-            exit 1
-          }
-          echo "Executed ${RID} from a spaced path, rendered from a foreign repository, landmark present."
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: archive-${{ matrix.rid }}
-          path: dist/*
-          if-no-files-found: error
-          retention-days: 7
-
-  # ════════════════════════════════════════════════════════════════════════════════════════════════════════
-  # 4. Publish. The ONLY job that can write anything outside this run.
-  #
-  # ORDERING IS ADR 0040 §Decision 10 POINT 3, AND IT IS THE WHOLE RISK MANAGEMENT STRATEGY:
-  #   draft the GitHub Release  →  push to nuget.org (irreversible)  →  flip the draft to published.
-  # The one REVERSIBLE step brackets the irreversible one. A failure before the flip leaves a draft nobody can
-  # install — deletable — rather than an announced release pointing at packages that do not exist.
-  # ════════════════════════════════════════════════════════════════════════════════════════════════════════
-  release:
-    name: publish
-    needs: [preflight, nupkg, binaries]
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      # Scoped to THIS JOB, never at workflow level.
-      contents: write # create the GitHub Release and upload its assets (ADR 0040 §Decision 3: nothing stored)
-      id-token: write # the OIDC token NuGet/login@v1 exchanges for a short-lived key
-    # ⚠️ NO `environment:` IS DECLARED, and that is a decision rather than an omission. A nuget.org trusted-
-    # publishing policy binds to owner + repo + workflow filename + OPTIONAL environment; if the owner sets an
-    # environment on the policy, this job MUST declare the matching one or the exchange fails even though the
-    # repo, owner and filename all match. Today the policy names none. docs/Releasing.md § Configuration the
-    # owner mirrors is where that correspondence is recorded.
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.preflight.outputs.sha }}
-          # The CHANGELOG section is read from the RELEASED commit, so the checkout must be that commit.
-          fetch-depth: 0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: web/.nvmrc
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "10.0.x"
-
-      - uses: actions/download-artifact@v4
-        with:
-          path: incoming
-
-      - name: Collect the assets and compute SHA-256 digests (AC #5)
-        id: assets
-        run: |
-          set -euo pipefail
-          mkdir -p dist
-          find incoming -type f \( -name '*.zip' -o -name '*.tar.gz' \) -exec cp {} dist/ \;
-          mkdir -p pkg
-          find incoming -type f -name '*.nupkg' -exec cp {} pkg/ \;
-
-          # THREE archives, one per RID. Fewer means a matrix leg silently produced nothing; more means an
-          # asset naming collision. Either way, do not publish a partial set.
-          count=$(find dist -type f | wc -l | tr -d ' ')
-          [ "$count" -eq 3 ] || { echo "::error::expected 3 archives, found ${count}."; exit 1; }
-          [ -n "$(ls pkg/*.nupkg 2>/dev/null)" ] || { echo "::error::no nupkg was produced."; exit 1; }
-
-          # Digests over the assets that will actually be attached. ADR 0040 §Decision 13 declines code
-          # signing, so this is the ONLY integrity guarantee this channel has — npm publishes provenance by
-          # default and NuGet carries the registry's own, but a direct download has nothing else.
-          ( cd dist && sha256sum * > ../digests.txt )
-          cat digests.txt
-
-      - name: Compose the release body (AC #5, AC #7)
-        run: |
-          set -euo pipefail
-          # NEVER hard-fails. By the time this runs on a real release the packages are moments from being
-          # pushed, and an absent CHANGELOG.md / absent section / empty section are all the same non-fatal
-          # path: "No user-visible changes in this release." and continue. `CHANGELOG.md` does not exist yet
-          # at all — Story 16.6 owns authoring it and the changelog.d assembler (ADR 0040 §Decision 6).
-          node .github/scripts/release/release-body.mjs \
-            --version '${{ needs.preflight.outputs.version }}' \
-            --changelog CHANGELOG.md \
-            --digests digests.txt \
-            --repo '${{ github.repository }}' \
-            ${{ needs.preflight.outputs.dry_run == 'true' && '--dry-run' || '' }} \
-            > release-body.md
-          cat release-body.md >> "$GITHUB_STEP_SUMMARY"
-
-      # ── DRY RUN ENDS HERE ────────────────────────────────────────────────────────────────────────────────
-      - name: Dry run — publish nothing, upload everything
-        if: needs.preflight.outputs.dry_run == 'true'
-        run: |
-          echo "::notice::DRY RUN — no GitHub Release was created and nothing was pushed to nuget.org."
-          echo "::notice::All four artifacts and the composed release body are attached to this run."
-
-      - uses: actions/upload-artifact@v4
-        if: needs.preflight.outputs.dry_run == 'true'
-        with:
-          name: dry-run-release
-          path: |
-            dist/*
-            pkg/*
-            digests.txt
-            release-body.md
-          if-no-files-found: error
-          retention-days: 7
-
-      # ── 1. The reversible step, FIRST ────────────────────────────────────────────────────────────────────
-      - name: Create the GitHub Release as a DRAFT
-        if: needs.preflight.outputs.dry_run != 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ needs.preflight.outputs.tag }}
-        run: |
-          set -euo pipefail
-          # --draft is ADR 0040 §Decision 10 point 3. Created before the irreversible nuget.org push so that a
-          # failure in between leaves something DELETABLE rather than an announced release pointing at
-          # packages that do not exist.
-          # --prerelease is derived from the version carrying a SemVer pre-release label (AC #2), never from a
-          # hand-set input — and per §Decision 5 that is EVERY preview release.
-          # `if`, not `[ … ] && …` — see the same note in the binaries job. A stable release (no pre-release
-          # label) would otherwise exit here under `set -e` instead of creating its Release.
-          PRERELEASE=""
-          if [ '${{ needs.preflight.outputs.prerelease }}' = 'true' ]; then PRERELEASE="--prerelease"; fi
-          gh release create "$TAG" \
-            --draft $PRERELEASE \
-            --title "$TAG" \
-            --notes-file release-body.md \
-            --target '${{ needs.preflight.outputs.sha }}' \
-            dist/*
-
-      # ── 2. The irreversible step ─────────────────────────────────────────────────────────────────────────
-      - name: Exchange OIDC for a short-lived nuget.org key
-        if: needs.preflight.outputs.dry_run != 'true'
+          mkdir pkg
+          gh release download "$TAG" --pattern '*.nupkg' --dir pkg
+          [ "$(find pkg -name '*.nupkg' | wc -l | tr -d ' ')" = 1 ]
+      - name: Exchange OIDC immediately before NuGet push
         id: nuget-login
-        # 🚨 IMMEDIATELY BEFORE THE PUSH, NEVER AT JOB START (ADR 0040 §Decision 3). The key is valid for ONE
-        # HOUR and is SINGLE-USE, while the run above it builds three ~76 MiB RIDs plus a Nuxt artefact. A
-        # push that fails CONSUMES the key, so a retry must re-run this exchange — which is why the supported
-        # recovery is re-running the whole job, and why this step sits here rather than beside the checkout.
-        # PINNED TO A COMMIT SHA, not the `v1` tag — this is the repository's first THIRD-PARTY action and
-        # `CiSupplyChainTests.ThirdPartyActionsMustBeShaPinned` enforces the rule (Story 17.2 Task 8): a tag is
-        # mutable and the publisher is not GitHub. Resolved 2026-08-08 from the publisher's own repository with
-        # `git ls-remote https://github.com/NuGet/login refs/tags/v1^{}`. Bump deliberately, re-resolving the SHA.
         uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1
         with:
           user: ${{ vars.NUGET_USER }}
-
-      - name: Push to nuget.org
-        if: needs.preflight.outputs.dry_run != 'true'
-        run: |
-          set -euo pipefail
-          # If the exchange above failed, this job has already stopped — nothing is published to any channel
-          # and the GitHub Release is still a draft (ADR 0040 §Decision 3's "fail before publishing to any
-          # channel"). --skip-duplicate is deliberately NOT used: a duplicate is a CONSUMED VERSION and must
-          # be a loud failure, not a shrug. The preflight already refused it in seconds.
-          dotnet nuget push pkg/*.nupkg \
-            --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" \
-            --source https://api.nuget.org/v3/index.json
-
-      # ── 3. The flip, LAST ────────────────────────────────────────────────────────────────────────────────
-      - name: Publish the draft Release
-        if: needs.preflight.outputs.dry_run != 'true'
+      - name: Push the Stage A package to nuget.org
+        run: dotnet nuget push ./pkg/*.nupkg --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json
+      - name: Append changelog notes above Stage A digest body
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ needs.preflight.outputs.tag }}
         run: |
           set -euo pipefail
-          gh release edit "$TAG" --draft=false
-          echo "::notice::Released $TAG — nuget.org and GitHub Releases."
-
-      - name: Leave a usable trail if the release failed midway
-        if: failure() && needs.preflight.outputs.dry_run != 'true'
-        env:
-          TAG: ${{ needs.preflight.outputs.tag }}
-        run: |
-          echo "::error::Release ${TAG} did not complete."
-          echo "::error::Version ${{ needs.preflight.outputs.version }} may already be CONSUMED on nuget.org."
-          echo "::error::Do NOT re-run this tag. Recovery is forward: bump -preview.N and cut a new tag."
-          echo "::error::Delete the draft Release if one exists. See docs/Releasing.md § When a release fails."
+          gh release view "$TAG" --json body --jq .body > stage-a-body.md
+          node .github/scripts/release/release-body.mjs --version '${{ steps.version.outputs.version }}' --changelog CHANGELOG.md --append-to stage-a-body.md > promoted-body.md
+          gh release edit "$TAG" --notes-file promoted-body.md

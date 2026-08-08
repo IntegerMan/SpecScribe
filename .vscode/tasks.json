@@ -1,165 +1,165 @@
 {
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "SpecScribe: Build",
-      "type": "shell",
-      "command": "dotnet",
-      "args": [
-        "build",
-        "SpecScribe.slnx"
-      ],
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      },
-      "problemMatcher": [
-        "$msCompile"
-      ]
-    },
-    {
-      "label": "SpecScribe: Generate Site",
-      "type": "shell",
-      "command": "dotnet",
-      "args": [
-        "run",
-        "--project",
-        "src/SpecScribe",
-        "--",
-        "generate",
-        "--source",
-        "_bmad-output",
-        "--adrs",
-        "docs/adrs",
-        "--output",
-        "SpecScribeOutput",
-        "--project-name",
-        "SpecScribe"
-      ],
-      "group": "build",
-      "problemMatcher": [
-        "$msCompile"
-      ]
-    },
-    {
-      "label": "SpecScribe: Watch Site",
-      "type": "shell",
-      "command": "dotnet",
-      "args": [
-        "run",
-        "--project",
-        "src/SpecScribe",
-        "--",
-        "watch",
-        "--source",
-        "_bmad-output",
-        "--adrs",
-        "docs/adrs",
-        "--output",
-        "SpecScribeOutput",
-        "--project-name",
-        "SpecScribe"
-      ],
-      "isBackground": true,
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": false
-      },
-      "runOptions": {
-        "instanceLimit": 1
-      }
-    },
-    {
-      "label": "SpecScribe: Publish Extension Binary",
-      "type": "shell",
-      "command": "dotnet",
-      "args": [
-        "publish",
-        "src/SpecScribe",
-        "-c",
-        "Debug",
-        "-o",
-        "extension/bin"
-      ],
-      "problemMatcher": [
-        "$msCompile"
-      ]
-    },
-    {
-      "label": "SpecScribe: Install Extension Deps",
-      "type": "shell",
-      "command": "npm",
-      "args": [
-        "install"
-      ],
-      "options": {
-        "cwd": "${workspaceFolder}/extension"
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "SpecScribe: Build Extension",
-      "type": "shell",
-      "command": "npm",
-      "args": [
-        "run",
-        "build"
-      ],
-      "options": {
-        "cwd": "${workspaceFolder}/extension"
-      },
-      "problemMatcher": [
-        "$esbuild"
-      ],
-      "dependsOn": [
-        "SpecScribe: Install Extension Deps"
-      ]
-    },
-    {
-      "label": "SpecScribe: Build Extension Host",
-      "dependsOrder": "sequence",
-      "dependsOn": [
-        "SpecScribe: Publish Extension Binary",
-        "SpecScribe: Build Extension"
-      ],
-      "problemMatcher": []
-    },
-    {
-      "label": "SpecScribe: Package Extension VSIX",
-      "type": "shell",
-      "command": "npm",
-      "args": [
-        "run",
-        "package",
-        "--",
-        "--allow-missing-repository",
-        "--skip-license"
-      ],
-      "options": {
-        "cwd": "${workspaceFolder}/extension"
-      },
-      "dependsOrder": "sequence",
-      "dependsOn": [
-        "SpecScribe: Build Extension Host"
-      ],
-      "problemMatcher": []
-    },
-    {
-      "label": "SpecScribe: Build + Register Extension Local",
-      "type": "shell",
-      "command": "pwsh",
-      "args": [
-        "-NoProfile",
-        "-Command",
-        "$vsix = Get-ChildItem -Path \"${workspaceFolder}/extension\" -Filter \"*.vsix\" | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if (-not $vsix) { throw 'No VSIX found in extension folder.' }; & code --install-extension $vsix.FullName --force"
-      ],
-      "dependsOrder": "sequence",
-      "dependsOn": [
-        "SpecScribe: Package Extension VSIX"
-      ],
-      "problemMatcher": []
-    }
-  ]
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "SpecScribe: Build",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"build",
+				"SpecScribe.slnx"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"label": "SpecScribe: Generate Site",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"run",
+				"--project",
+				"src/SpecScribe",
+				"--",
+				"generate",
+				"--source",
+				"_bmad-output",
+				"--adrs",
+				"docs/adrs",
+				"--output",
+				"SpecScribeOutput",
+				"--project-name",
+				"SpecScribe"
+			],
+			"group": "build",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"label": "SpecScribe: Watch Site",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"run",
+				"--project",
+				"src/SpecScribe",
+				"--",
+				"watch",
+				"--source",
+				"_bmad-output",
+				"--adrs",
+				"docs/adrs",
+				"--output",
+				"SpecScribeOutput",
+				"--project-name",
+				"SpecScribe"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"clear": false
+			},
+			"runOptions": {
+				"instanceLimit": 1
+			}
+		},
+		{
+			"label": "SpecScribe: Publish Extension Binary",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"publish",
+				"src/SpecScribe",
+				"-c",
+				"Debug",
+				"-o",
+				"extension/bin"
+			],
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"label": "SpecScribe: Install Extension Deps",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"install"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}/extension"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "SpecScribe: Build Extension",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"build"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}/extension"
+			},
+			"problemMatcher": [
+				"$esbuild"
+			],
+			"dependsOn": [
+				"SpecScribe: Install Extension Deps"
+			]
+		},
+		{
+			"label": "SpecScribe: Build Extension Host",
+			"dependsOrder": "sequence",
+			"dependsOn": [
+				"SpecScribe: Publish Extension Binary",
+				"SpecScribe: Build Extension"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "SpecScribe: Package Extension VSIX",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"package",
+				"--",
+				"--allow-missing-repository",
+				"--skip-license"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}/extension"
+			},
+			"dependsOrder": "sequence",
+			"dependsOn": [
+				"SpecScribe: Build Extension Host"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "SpecScribe: Build + Register Extension Local",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"$vsix = Get-ChildItem -Path \"${workspaceFolder}/extension\" -Filter \"*.vsix\" | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if (-not $vsix) { throw 'No VSIX found in extension folder.' }; & code --install-extension $vsix.FullName --force"
+			],
+			"dependsOrder": "sequence",
+			"dependsOn": [
+				"SpecScribe: Package Extension VSIX"
+			],
+			"problemMatcher": []
+		}
+	]
 }

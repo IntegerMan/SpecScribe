@@ -350,6 +350,15 @@ reports federated service principals failing publish on a **personally-owned** p
   | **PATCH** (`0.N.P`) | bug fixes, performance, docs, internal refactors — **no** new feature and **no** break | a rendering fix; a corrected chart label |
   | **`-preview.N`** | a **re-cut of the same target version** after a failed or withdrawn release (§ Decision 10) | `v0.1.0-preview.2` after `preview.1` half-published |
 
+  **Stage A chooses the base predictably, with an explicit owner override.** With no
+  `.github/release-base` file, every successful merge advances PATCH from the highest release base. This is
+  the normal path for fixes, internal work and documentation. To schedule a new MINOR or MAJOR base, the owner
+  commits `.github/release-base` containing exactly `MAJOR.MINOR.PATCH` — for example `0.2.0` or `1.0.0` — in
+  the merge that should begin that line. The allocator rejects a base lower than the latest release base,
+  keeps `preview.N` globally monotonic, and uses the requested base until the file is edited or removed. This
+  file is **release intent, not a second package-version source**: MinVer still derives every package version
+  exclusively from the tag. The operating procedure is documented in `docs/ReleaseSetup.md`.
+
   **MINOR deliberately carries two meanings, so MINOR alone does not signal breakage.** That is SemVer's own
   `0.x` convention (§4: anything may change below 1.0) and this policy does not pretend otherwise — which is
   exactly why the `**BREAKING:**` changelog prefix (§ Decision 6) is the load-bearing signal rather than the
