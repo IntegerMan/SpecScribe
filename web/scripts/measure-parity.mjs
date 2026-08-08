@@ -97,6 +97,11 @@ const surfaces = ir.site.paths
 const rows = []
 const deltas = []
 let missingOutput = 0
+// [Story 23.4 code review, finding F-5] Both are FAILURE counts, not bookkeeping. A row the harness could not
+// measure must never be silently absent from the denominator — that is how this gate reported success while
+// measuring nothing.
+let noGolden = 0
+let unparsed = 0
 
 for (const path of surfaces) {
   const page = ir.page(path)
@@ -109,17 +114,43 @@ for (const path of surfaces) {
     continue
   }
   if (!goldenHtml) {
+    // ⚠️ COUNTED, not merely recorded. [Story 23.4 code review, finding F-5.3]
+    // A `NO GOLDEN` row used to be excluded from `measured` and to leave `missingOutput` alone, so with every
+    // golden page absent the TOTAL printed `0/0` and the harness exited 0 — success reported over a corpus of
+    // nothing. That is reachable for real: a `--spa`-only generate, or the post-writer-deletion state.
+    noGolden += 1
     rows.push({ path, family: familyOf(path), status: 'NO GOLDEN' })
     continue
   }
 
-  const goldenMain = normalizeVolatile(mainRegion(goldenHtml) ?? '')
-  const nuxtMain = normalizeVolatile(mainRegion(nuxtHtml) ?? '')
+  // ⚠️ `mainRegion` returning null means "I could not find the landmark", which is NOT "the region is empty".
+  // [Story 23.4 code review, finding F-5.1] The previous `?? ''` collapsed both sides to '' and scored the row
+  // as a green parity match with goldenBytes 0. Story 23.4 both narrowed this pattern (it now requires `id` to
+  // be the FIRST attribute) and widened the corpus 193 -> 1,469 pages, which is what made a miss reachable.
+  const goldenRegion = mainRegion(goldenHtml)
+  const nuxtRegion = mainRegion(nuxtHtml)
+  if (goldenRegion === null || nuxtRegion === null) {
+    unparsed += 1
+    rows.push({
+      path,
+      family: familyOf(path),
+      status: 'NO LANDMARK',
+      side: goldenRegion === null && nuxtRegion === null ? 'both' : goldenRegion === null ? 'golden' : 'nuxt',
+    })
+    continue
+  }
+
+  const goldenMain = normalizeVolatile(goldenRegion)
+  const nuxtMain = normalizeVolatile(nuxtRegion)
   // The IR's own `<main>`, rebuilt from the split — `<main …>` + body + `</main>`.
   const attrs = page.region.mainAttributes
   const irMain = normalizeVolatile(`<main id="main-content"${attrs}>${page.region.mainInnerHtml}</main>`)
 
-  const verbatim = nuxtHtml.includes(page.region.mainInnerHtml)
+  // ⚠️ `String.includes('')` is ALWAYS true. [Story 23.4 code review, finding F-5.2]
+  // `splitContentRegion` returns `mainInnerHtml: ''` for every `degraded` page, so the containment oracle was
+  // vacuously satisfied on exactly the rows where the IR is provably wrong — and `stage` below then filed them
+  // as an inherited capture delta owned by Epic 22, with a zero exit. An empty body cannot be "verbatim".
+  const verbatim = page.region.mainInnerHtml.length > 0 && nuxtHtml.includes(page.region.mainInnerHtml)
 
   const row = {
     path,
@@ -140,7 +171,14 @@ for (const path of surfaces) {
   }
   rows.push(row)
 
-  if (!row.goldenVsNuxt || !row.verbatim) {
+  // ⚠️ An IR-ONLY divergence is a delta too. [Story 23.4 code review, finding F-5.4]
+  // The condition used to test `goldenVsNuxt` and `verbatim` only, so the shape where golden and Nuxt agree
+  // while the IR differs from BOTH (`goldenVsIr` false AND `irVsNuxt` false) was never pushed and never
+  // affected the exit code — the per-family table showed `golden=IR 0/n` and the run stayed green. Since this
+  // story's whole subject is replacing a SLICED IR with a COMPOSED one, a composed-region defect in any field
+  // the renderer does not read back lands exactly there.
+  const irOnly = !row.goldenVsIr && !row.irVsNuxt && row.goldenVsNuxt
+  if (!row.goldenVsNuxt || !row.verbatim || irOnly) {
     const at = firstDifference(goldenMain, nuxtMain)
     deltas.push({
       path,
@@ -216,6 +254,25 @@ say('')
 
 if (missingOutput > 0) {
   say(`⚠ ${missingOutput} migrated surface(s) were not found in .output/public — run \`npm run generate\`.`)
+  say('')
+}
+
+// [Story 23.4 code review, finding F-5] Both of these used to be invisible: a row the harness could not
+// measure simply left the denominator, so a run that measured NOTHING printed a clean 0/0 table and exited 0.
+if (noGolden > 0) {
+  say(
+    `✖ ${noGolden} surface(s) had no golden page to compare against. The golden side is not optional — ` +
+      `without it this harness measures nothing. Generate the static site, or use \`npm run check:parity\`, ` +
+      `which pins a frozen corpus and does not need one.`,
+  )
+  say('')
+}
+if (unparsed > 0) {
+  say(
+    `✖ ${unparsed} surface(s) had no locatable <main id="main-content"> landmark on one or both sides. ` +
+      `This is NOT an empty region — it is a region the harness could not find, and it must never be ` +
+      `scored as a match. See the NO LANDMARK rows above for which side failed.`,
+  )
   say('')
 }
 
@@ -295,4 +352,6 @@ writeFileSync(
 console.log('  wrote measurements/parity.txt + measurements/parity.json')
 console.log('')
 
-process.exit(migrationDeltas.length > 0 || missingOutput > 0 ? 1 : 0)
+// [Story 23.4 code review, finding F-5] `noGolden` and `unparsed` now gate the exit alongside the deltas.
+// A harness that cannot measure a row must fail rather than shrink its own denominator and report success.
+process.exit(migrationDeltas.length > 0 || missingOutput > 0 || noGolden > 0 || unparsed > 0 ? 1 : 0)

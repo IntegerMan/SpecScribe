@@ -47,13 +47,24 @@ const MANIFEST = join(import.meta.dirname, '..', 'assets', 'ir-content.manifest.
 const BUCKETS = [
   {
     key: 'prose',
-    match: /doc-body|doc-header|prose|markdown|gherkin|code-|pre|blockquote|footnote|admonition|callout/i,
+    // ⚠️ **Bounded on purpose — this bucket's size is the number that overturned owner decisions D3/D5.**
+    // [Story 23.4 code review, finding F-11] The original pattern carried the bare alternatives `code-` and
+    // `pre`, matched as substrings against raw selector text. `code-` claimed `.code-line` — the
+    // `CodeFileSurface` source-listing gutter, which is not Markdig prose and is not authorable — and `pre`
+    // matched anything merely CONTAINING those letters (`.preview`, `.prefix`, `.presentation`). An
+    // over-claiming prose bucket inflates "authorable today", which is the one figure that argues AC #4's
+    // FIRST branch is within reach. Anchored to class-name boundaries, and `code-` dropped entirely.
+    //
+    // Note which way this cuts: tightening it makes `prose` SMALLER, so the D3/D5 amendment is more strongly
+    // supported than the original measurement showed, not less. The conclusion stands; the evidence for it is
+    // now honest. The CLASSIFIER_SELFTEST below runs on every report so this cannot silently loosen again.
+    match: /(^|[.\s>+~[-])(doc-body|doc-header|prose|markdown|gherkin|pre|blockquote|footnote|admonition|callout)([\s.>+~\]:[-]|$)/i,
     blocker: 'NONE — authorable today',
     detail:
       'Markdig prose vocabulary. ADR 0016 puts rendered prose HTML in the IR, so this markup is injected ' +
       'and always will be — but its styling is generic typography that `web/` can legitimately AUTHOR ' +
       '(owner decision D5\'s "authored, owned prose stylesheet"). This is the one bucket the first branch ' +
-      'of AC #4 actually reaches, and it is 5% of the layer.',
+      'of AC #4 actually reaches, and it is a single-digit percentage of the layer.',
   },
   {
     key: 'chart',
@@ -108,10 +119,60 @@ const OTHER = {
     'HTML with no view model behind it.',
 }
 
-const manifest = JSON.parse(readFileSync(MANIFEST, 'utf8'))
+// [Story 23.4 code review, finding F-17] Actionable failures, not a bare ENOENT/TypeError three frames deep.
+// `check-ir-content.mjs` already gives this guidance for the same missing file; this script did not.
+let manifest
+try {
+  manifest = JSON.parse(readFileSync(MANIFEST, 'utf8'))
+} catch (err) {
+  console.error(
+    `✖ Could not read ${MANIFEST}\n` +
+      `  ${err.message}\n` +
+      `  The residue report derives entirely from the extracted manifest. Run \`npm run extract:ir-content\`\n` +
+      `  first (it needs a generated IR — see CLAUDE.md § Changing specscribe.css for the ordering).`,
+  )
+  process.exit(1)
+}
+if (!Array.isArray(manifest.rules)) {
+  console.error(`✖ ${MANIFEST} has no \`rules\` array — it is malformed or from an incompatible version.`)
+  process.exit(1)
+}
 const carried = manifest.rules.filter((r) => r.carried)
 
 const bucketOf = (selector) => BUCKETS.find((b) => b.match.test(selector))?.key ?? 'other'
+
+/**
+ * ⚠️ The classifier validates itself before it is trusted. [Story 23.4 code review, finding F-11]
+ *
+ * This coarse classifier produces the "prose and authorable today" percentage in the VERDICT below — the
+ * single number used to AMEND owner decisions D3/D5 and take AC #4's second branch. It had no test, is not in
+ * the coverage config, and carried substring alternatives that silently claimed non-prose vocabulary.
+ *
+ * These cases are the ones that were actually wrong, plus the boundaries most likely to rot. A misclassified
+ * headline number is worse than no number, so this ABORTS rather than warning: the report must not print a
+ * verdict its own classifier cannot pass.
+ */
+const CLASSIFIER_SELFTEST = [
+  // The two that were genuinely misfiled before the boundaries were anchored.
+  ['.code-line', 'other', 'the CodeFileSurface source gutter is not Markdig prose'],
+  ['.ir-content .preview-pane', 'other', '"pre" must not match merely because a selector contains it'],
+  // Boundaries that must keep working.
+  ['.doc-body p', 'prose', 'the canonical prose body'],
+  ['.doc-header', 'prose', 'the prose page title block'],
+  ['.ir-content pre', 'prose', 'a real <pre> element selector IS prose'],
+  ['.sunburst-legend', 'chart', 'chart vocabulary outranks nothing here but must stay classified'],
+  ['.site-nav a', 'chrome', 'nav is the permanent AC #3 bucket'],
+  ['.status-badge', 'status', 'status rides the token bridge'],
+]
+const selftestFailures = CLASSIFIER_SELFTEST.filter(([sel, want]) => bucketOf(sel) !== want)
+if (selftestFailures.length > 0) {
+  console.error('✖ The residue classifier failed its own self-test — its output would be misleading:')
+  for (const [sel, want, why] of selftestFailures) {
+    console.error(`    ${sel}  → got "${bucketOf(sel)}", expected "${want}"  (${why})`)
+  }
+  console.error('  Fix BUCKETS before trusting any percentage this script prints.')
+  process.exit(1)
+}
 
 const byBucket = new Map([...BUCKETS.map((b) => [b.key, []]), [OTHER.key, []]])
 for (const rule of carried) byBucket.get(bucketOf(rule.selector)).push(rule.selector)
@@ -123,6 +184,24 @@ const say = (s = '') => {
 }
 
 const total = carried.length
+
+// ⚠️ Zero carried rules is AC #4's FIRST-BRANCH SUCCESS STATE — the layer retired, manifest empty.
+// [Story 23.4 code review, finding F-17] The report used to divide by `total` regardless, so in exactly that
+// state it printed a table of `NaN%` under the headline "AC #4's FIRST branch is not reachable" and exited 0.
+// The script whose whole purpose is to measure whether the layer can be retired produced its most
+// authoritative-looking output at the moment the layer was already gone.
+if (total === 0) {
+  console.log('')
+  console.log('ir-content.css carries ZERO rules.')
+  console.log('')
+  console.log("This is AC #4's FIRST branch reached: the transitional layer is empty and can be DELETED,")
+  console.log('along with its manifest, its extractor, `npm run check:ir-content` and CONVENTIONS.md §10.')
+  console.log('Mark ADR 0018 Superseded/Retired with the story that did it. There is no residue to enumerate.')
+  console.log('')
+  process.exit(0)
+}
+const pct = (n) => `${((n / total) * 100).toFixed(1)}%`
+
 say('')
 say('Story 23.4 AC #4 — ir-content.css residue, enumerated with a named blocker per rule')
 say('')
@@ -130,7 +209,7 @@ say(pad('bucket', 10) + pad('rules', 8) + pad('share', 9) + 'blocker')
 say('-'.repeat(100))
 for (const b of [...BUCKETS, OTHER]) {
   const n = byBucket.get(b.key).length
-  say(pad(b.key, 10) + pad(n, 8) + pad(`${((n / total) * 100).toFixed(1)}%`, 9) + b.blocker)
+  say(pad(b.key, 10) + pad(n, 8) + pad(pct(n), 9) + b.blocker)
 }
 say('-'.repeat(100))
 say(pad('TOTAL', 10) + pad(total, 8))
@@ -138,11 +217,9 @@ say('')
 
 const authorable = byBucket.get('prose').length
 say(`VERDICT: AC #4's FIRST branch is not reachable, and the measurement is why.`)
+say(`  ${authorable} of ${total} rules (${pct(authorable)}) are prose and authorable today.`)
 say(
-  `  ${authorable} of ${total} rules (${((authorable / total) * 100).toFixed(1)}%) are prose and authorable today.`,
-)
-say(
-  `  The other ${total - authorable} (${(((total - authorable) / total) * 100).toFixed(1)}%) style INJECTED bespoke vocabulary across ` +
+  `  The other ${total - authorable} (${pct(total - authorable)}) style INJECTED bespoke vocabulary across ` +
     `${new Set(carried.map((r) => (r.selector.match(/\.([a-z0-9-]+)/i) ?? [])[1] ?? '(element)')).size} distinct classes.`,
 )
 say('  Retiring them means either ADR 0018\'s explicitly rejected hand-copy, a full visual redesign, or')

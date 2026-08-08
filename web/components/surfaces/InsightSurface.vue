@@ -25,13 +25,29 @@
  *    pre-23.4 slicer truncated at `</main>` and dropped it, so its "Expand" link resolved to nothing in the
  *    IR; the composed region restores it (Story 23.4 Task 2, pinned by `RegionCompositionCorpusProof`).
  * 3. **Every chart needs its text twin** ([ADR 0013](../../../docs/adrs/0013-text-twin-is-the-no-js-contract.md))
- *    and no state may be signalled by colour alone (UX-DR17). The twin is server-rendered into the region, so
- *    it survives here by construction — but a JS-off pass is still the gate that proves it.
+ *    and no state may be signalled by colour alone (UX-DR17). The twin is server-rendered into the region —
+ *    but "survives by construction" is exactly what the Story 23.4 code review found was never checked here.
+ *    `enforce(insightContract(...))` below is that check; a JS-off pass remains the gate that proves the
+ *    rendered result.
  */
 import type { IrPage } from '#ir'
+import { enforce, insightContract } from '../../ir/contracts'
 import IrSurface from './IrSurface.vue'
 
-defineProps<{ page: IrPage }>()
+const props = defineProps<{ page: IrPage }>()
+
+/**
+ * ADR 0013 on the eight chart singletons. [Story 23.4 code review, finding F-3]
+ *
+ * Until 2026-08-08 `enforce` was called from `DashboardSurface.vue` and nowhere else, so the project-wide rule
+ * that every chart carries an accessible text equivalent (CLAUDE.md § Verification) was asserted for exactly
+ * one of the nine chart-bearing pages. These eight were ungated.
+ *
+ * Deliberately NO `no-explorer` warning here, unlike the dashboard: most of these pages draw inline SVG from
+ * `Charts.Framed` and are complete with no explorer at all, so a missing mount point is not evidence of
+ * anything. The contract fires only when the page DOES carry a mount and the twin is missing or empty.
+ */
+enforce(insightContract(props.page))
 </script>
 
 <template>

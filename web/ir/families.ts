@@ -46,6 +46,39 @@ export type IrFamily =
   | 'pass-through'
 
 /**
+ * Every member of {@link IrFamily}, as a VALUE. [Story 23.4 code review, finding F-15]
+ *
+ * The story's stated defence against "a family added to the classifier without a component" is that
+ * `pages/[...path].vue`'s `Record<IrFamily, Component>` makes the omission a type error. It does — in an
+ * editor. There is no `typecheck` script, no `vue-tsc` dependency and no typecheck step in any workflow, and
+ * `nuxt build` goes through Vite/esbuild, which STRIPS types without checking them. So that guarantee ran
+ * nowhere, and adding a type-checker is a dependency decision `web/`'s zero-dep posture (ADR 0010) reserves
+ * for the owner.
+ *
+ * This list is the dependency-free half: a value the suite can iterate, so `test/families.test.ts` can assert
+ * the router actually handles every family. The `satisfies` clause keeps it honest in both directions — add a
+ * member to the union without adding it here and the type check fails at the same place a reviewer is already
+ * looking.
+ */
+export const ALL_FAMILIES = [
+  'dashboard',
+  'epics-index',
+  'epic-detail',
+  'story-detail',
+  'doc-prose',
+  'requirement',
+  'follow-up',
+  'commit-detail',
+  'commit-day',
+  'code-file',
+  'insight',
+  'portal-meta',
+  'sprint',
+  'retro',
+  'pass-through',
+] as const satisfies readonly IrFamily[]
+
+/**
  * The root-level singletons, by owning templater. A root page is one page, so an exact-match set is both the
  * cheapest and the most auditable form — a regex over `insight|meta` names would silently capture a future
  * page whose name merely rhymed.
@@ -100,7 +133,22 @@ const STORY_DETAIL = /^epics\/story-[^/]+\.html$/
  *   Story 23.5 is exactly the case that would break).
  */
 export function resolveFamily(path: string, entry: string): IrFamily {
+  // ⚠️ The entry check is deliberately NOT first any more. [Story 23.4 code review, finding F-20]
+  // `if (path === entry) return 'dashboard'` used to precede every other rule, so a project whose manifest
+  // entry is also a page this table names — `epics.html`, `readme.html`, `about.html` are all plausible entry
+  // points for a project without a generated dashboard — rendered that page through `DashboardSurface`,
+  // stamped it `data-ir-family="dashboard"`, and ran `dashboardContract` against it, emitting the
+  // "carries no [data-hierarchy] mount point" warning on every single build. That is precisely the
+  // project-independence case the `entry` parameter was added for (Story 23.5's two-IR experiment), failing
+  // in the other direction. A page with a family of its own keeps it; `entry` decides only the leftovers.
+  const own = resolveKnownFamily(path)
+  if (own !== null) return own
   if (path === entry) return 'dashboard'
+  return 'pass-through'
+}
+
+/** The table proper: every family this projection can name from the path alone, or `null` for none. */
+function resolveKnownFamily(path: string): IrFamily | null {
   if (path === 'epics.html') return 'epics-index'
   if (EPIC_DETAIL.test(path)) return 'epic-detail'
   if (STORY_DETAIL.test(path)) return 'story-detail'
@@ -125,8 +173,18 @@ export function resolveFamily(path: string, entry: string): IrFamily {
   if (path === 'sprint.html') return 'sprint'
   if (path === 'timeline.html') return 'commit-day'
   if (path === 'deferred-work.html') return 'follow-up'
-  if (path === 'ideas.html' || path.startsWith('ideas/')) return 'doc-prose'
-  if (path === 'test-artifacts.html') return 'doc-prose'
+  // ⚠️ `ideas*` and `test-artifacts.html` are PORTAL-META, not doc-prose. [Story 23.4 code review, F-20]
+  // They were classified `doc-prose`, which contradicts this file's own stated rule — the family IS the owning
+  // templater, and these are `IdeasTemplater`'s and `TestArtifactsTemplater`'s vocabulary (`.ta-*`,
+  // `.module-coverage-*`), not `HtmlTemplater.BuildDocPage`'s `doc-header`/`doc-body`/`toc-sidebar`. Two
+  // concrete consequences of the old mapping: `data-ir-family` reported a value that was false for those
+  // pages, misleading a live inspection and any harness bucketing by it; and owner decision D5's authored
+  // prose stylesheet, once it lands scoped to `DocProseSurface`, would have applied to two surfaces that are
+  // not prose — the "a plain scoped rule matches injected markup NOWHERE and fails silently" hazard reached
+  // from the other side. `portal-meta` is the right home: pages ABOUT the portal, sharing a plain
+  // section vocabulary, and its component makes no doc-prose structural claim.
+  if (path === 'ideas.html' || path.startsWith('ideas/')) return 'portal-meta'
+  if (path === 'test-artifacts.html') return 'portal-meta'
   if (INSIGHT_PAGES.has(path)) return 'insight'
   if (PORTAL_META_PAGES.has(path)) return 'portal-meta'
   if (DOC_PROSE_PAGES.has(path)) return 'doc-prose'
@@ -134,5 +192,5 @@ export function resolveFamily(path: string, entry: string): IrFamily {
   // so this is a prefix rather than another six entries in PORTAL_META_PAGES.
   if (path.startsWith('about-sdd-')) return 'portal-meta'
 
-  return 'pass-through'
+  return null
 }

@@ -78,7 +78,13 @@ public static class CommitDetailTemplater
             Kind = PageKind.Doc,
             OutputRelativePath = outputPath,
             Title = $"Commit {shortHash} — {nav.SiteTitle}",
-            MetaDescription = $"Commit {shortHash} in {nav.SiteTitle}: {subject}",
+            // The subject is guarded: a commit created with `--allow-empty-message` (or one whose subject parses
+            // empty) produced `"Commit abc1234 in Foo: "` — not whitespace-only, so SpaDelivery's
+            // `IsNullOrWhiteSpace` fallback to the title did NOT fire and the trailing colon reached the
+            // rendered <meta> and the manifest head. [Story 23.4 code review, finding F-21]
+            MetaDescription = string.IsNullOrWhiteSpace(subject)
+                ? $"Commit {shortHash} in {nav.SiteTitle}"
+                : $"Commit {shortHash} in {nav.SiteTitle}: {subject}",
             Nav = nav.ToNavigationView(outputPath, localContext),
             Breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
             {

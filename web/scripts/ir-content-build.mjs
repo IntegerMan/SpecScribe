@@ -65,7 +65,8 @@ export async function buildIrContentCss() {
 
   // ── 1. What the migrated families actually render ──────────────────────────────────────────────────────
   const used = { classes: new Set(), ids: new Set(), attributes: new Set(), elements: new Set() }
-  const other = { classes: new Set(), ids: new Set(), attributes: new Set(), elements: new Set() }
+  // (The `other` accumulator that used to sit here was removed by the Story 23.4 code review — see finding
+  // F-12 at the `passThroughCoveredPct` site. Nothing could write to it once the bound covered the whole site.)
 
   let migratedPages = 0
   for (const path of ir.site.paths) {
@@ -86,12 +87,12 @@ export async function buildIrContentCss() {
     // This is the third layer that dropped the same content (C# slicer → TS splitter → this harvest). Any code
     // that reconstructs "the region" from its parts must use ALL the parts.
     const markup = `${r.navHtml}${r.wayfindingHtml}${r.mainInnerHtml}${r.trailingHtml}`
-    if (isMigrated(path)) {
-      migratedPages += 1
-      harvest(markup, used)
-    } else {
-      harvest(markup, other)
-    }
+    // Every IR page is in the bound since Story 23.4 widened it — `isMigrated` is `() => true`. The
+    // `else harvest(markup, other)` arm that used to sit here was therefore dead code feeding a permanently
+    // empty set, and a "coverage" percentage was being derived from it. Deleted rather than left looking like
+    // a live comparison. [Story 23.4 code review, finding F-12]
+    migratedPages += 1
+    harvest(markup, used)
   }
   // The shell contributes these, and they are template-authored rather than injected — the region's markup
   // starts INSIDE `<main>`, so nothing in it can tell the extractor that `main`, `body` or `html` exist.
@@ -455,12 +456,17 @@ export async function buildIrContentCss() {
 
   const runtimeCss = `${runtimeBanner}\n\n${runtimeCarried.join('\n\n')}\n`
 
-  // ── 5. Pass-through coverage, reported rather than implied ─────────────────────────────────────────────
-  const otherOnly = [...other.classes].filter((c) => !used.classes.has(c))
-  const passThroughCoveredPct =
-    other.classes.size === 0
-      ? 100
-      : Math.round(((other.classes.size - otherOnly.length) / other.classes.size) * 100)
+  // ── 5. Pass-through coverage ────────────────────────────────────────────────────────────────────────────
+  //
+  // ⚠️ **This is no longer a measurement, and it must not be reported as one.**
+  // [Story 23.4 code review, finding F-12] `isMigrated` returns `true` unconditionally since the extraction
+  // bound was widened to the whole site, so the `else` branch that filled `other` is UNREACHABLE and `other`
+  // is permanently empty. The old expression then took its `=== 0` arm and yielded a confident `100`.
+  //
+  // "100% of pass-through classes covered" therefore meant "the comparison was deleted", not "nothing is
+  // uncovered" — the precise shape of vacuous gate this repository keeps shipping. `null` forces every reader
+  // to handle "not measured" instead of printing a number that cannot be wrong.
+  const passThroughCoveredPct = null
 
   const sourceBytes = Buffer.byteLength(source)
   const outBytes = Buffer.byteLength(css)

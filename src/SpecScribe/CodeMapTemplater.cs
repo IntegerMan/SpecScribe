@@ -67,6 +67,12 @@ public static class CodeMapTemplater
 
         sb.Append("</main>\n\n");
 
+        // Materialised ONCE. [Story 23.4 code review, finding F-22] This is the largest body the generator
+        // produces — `code-map.html` measured 8,012,656 B — and it was being built twice, once for the
+        // `ContainsHost` scan and once for `BodyHtml`. Every sibling templater needing the same flag hoists it
+        // first (`GitInsightsTemplater`, `HtmlTemplater`); this one did not.
+        var body = sb.ToString();
+
         return new PageView
         {
             Kind = PageKind.Structure,
@@ -85,10 +91,10 @@ public static class CodeMapTemplater
                 // it cannot use — the exact miss Story 20.7 made on four surfaces at once, every layer below the
                 // browser green while nothing mounted, which is why `SiteGeneratorSpaTests` asserts the "no
                 // fewer" half. This page emits NO boot marker, so HierarchyBootInline stays false. [Story 23.4]
-                HierarchyEngineNeeded = HierarchyExplorer.ContainsHost(sb.ToString()),
+                HierarchyEngineNeeded = HierarchyExplorer.ContainsHost(body),
             },
             Interaction = InteractionState.None,
-            BodyHtml = sb.ToString(),
+            BodyHtml = body,
         };
     }
 

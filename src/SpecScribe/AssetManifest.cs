@@ -37,7 +37,20 @@ public sealed record AssetManifest
     /// moved bytes on pages this story must leave untouched.
     /// <para>Either placement is chrome-level and therefore OUTSIDE the IR content region
     /// (<see cref="JsonSpaRenderAdapter.RenderContent"/> composes nav + wayfinding + body only) — which is why
-    /// <c>IrSurface.vue</c> re-emits it from the head. [Story 23.4 AC #3; Trap 3]</para></summary>
+    /// <c>IrSurface.vue</c> re-emits it from the head. [Story 23.4 AC #3; Trap 3]</para>
+    ///
+    /// <para>⚠️ <b>WRITE-ONLY since Story 23.6. Nothing reads this.</b> [Story 23.4 code review, finding F-6]
+    /// Its only consumer was <c>HtmlRenderAdapter.Render</c>, deleted with the C# page writer. The rendered site
+    /// now derives the boot decision structurally on the Nuxt side — <c>web/ir/adapter.ts</c>'s
+    /// <c>chromeNeeds()</c> tests the region for a <c>data-hierarchy</c> attribute, and
+    /// <c>IrSurface.vue</c> injects the boot script on that one flag — so the three-shape distinction this
+    /// property was split out to express is collapsed back into a single derived boolean downstream. Concretely:
+    /// <c>CodeMapTemplater</c> states it emits no boot marker and keeps this false, and the rendered
+    /// <c>code-map.html</c> gets the boot script anyway because the page does carry a mount.</para>
+    ///
+    /// <para><b>Do not read this as live configuration.</b> Either route it into the IR head projection so the
+    /// Nuxt side stops re-deriving it, or delete it and its five setters. That choice is deliberately left to
+    /// the owner rather than taken inside a code review — it is a contract change, not a fix.</para></summary>
     public bool HierarchyBootInline { get; init; }
 
     /// <summary>Whether this page carries at least one Story 24.2 relationship graph
@@ -66,6 +79,14 @@ public sealed record AssetManifest
     /// <summary>Page-specific <c>&lt;head&gt;</c> additions, emitted verbatim as
     /// <see cref="PathUtil.RenderHeadOpen"/>'s <c>extraHead</c>. The producer owns the exact tags. Two real users:
     /// a code page's Prism stylesheet + highlighter, and the Impact Map's head-placed hierarchy boot marker.
-    /// Null on every other page, which is why it is optional rather than required. [Story 23.4 AC #3]</summary>
+    /// Null on every other page, which is why it is optional rather than required. [Story 23.4 AC #3]
+    ///
+    /// <para>⚠️ <b>WRITE-ONLY in production since Story 23.6</b>, exactly like <see cref="HierarchyBootInline"/>
+    /// — see that property for the full account. [Story 23.4 code review, finding F-6] <c>RenderHeadOpen</c>'s
+    /// caller was the deleted C# page writer; the only remaining read of this property anywhere is an assertion
+    /// in <c>CodeFileTemplaterTests</c>. Nuxt re-derives both users heuristically instead: the Prism head from
+    /// <c>class="language-…"</c> in the region (which its own comment records as over-firing on ~20 pages the C#
+    /// side did not highlight), and the Impact Map's boot marker from <c>data-hierarchy</c>. Route it into the
+    /// IR head projection or delete it — but do not extend it believing it reaches the page.</para></summary>
     public string? ExtraHead { get; init; }
 }

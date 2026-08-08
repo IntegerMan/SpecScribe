@@ -262,6 +262,25 @@ export function splitContentRegion(contentHtml: string, path: string): IrRegion 
     throw new Error(`IR page "${path}" has an unterminated <main> element.`)
   }
 
+  // ⚠️ REFUSE an ambiguous region rather than guessing where it ends.
+  // [Story 23.4 code review, finding F-8] Three layers bounded this differently: we cut at the FIRST closer,
+  // `scripts/harness-lib.mjs`'s `mainRegion` is greedy to the LAST, and the C# invariant test counted only
+  // `<main` OPENERS and never closers — so a region with a stray `</main>` was split two different ways by the
+  // two sides of the parity comparison, and neither side failed. Worse, since 23.4 the leftover is no longer
+  // discarded: `IrSurface` renders `trailingHtml` as a SIBLING of the landmark, so a stray closer silently
+  // re-parents real page body OUT of `<main>` while `check:a11y`'s `one-main` still passes.
+  //
+  // The emitter now asserts exactly one closer, which is the real fix. This is the consumer half: the IR is
+  // produced by a separate process and a stale or foreign IR is an explicitly supported input
+  // (`SPECSCRIBE_IR_DIR`, the two-IR experiment), so the reader must not silently pick an interpretation.
+  if (contentHtml.indexOf(MAIN_CLOSER, mainClose + MAIN_CLOSER.length) >= 0) {
+    throw new Error(
+      `IR page "${path}" contains more than one </main> in its content region, so where the page body ends ` +
+        `is ambiguous. Splitting at the first closer would render everything after it OUTSIDE the <main> ` +
+        `landmark. Fix the emitter (a body must not contain a bare </main>; escape it as &lt;/main&gt;).`,
+    )
+  }
+
   // The emitter slices from the band's OUTERMOST marker (Story 22.4), so the wrapper is present whenever the
   // page has one and the breadcrumb is the whole band otherwise. Taking the EARLIEST of the two that precedes
   // <main> keeps this an inversion of the emitter's own rule rather than an assumption about which shape won.
@@ -432,7 +451,14 @@ export function page(path: string): IrPage {
     region,
     hasDataIsland: islands.some((i) => i.kind === 'data'),
     hasExecutableIsland: islands.some((i) => i.kind === 'executable'),
-    ...chromeNeeds(region.mainInnerHtml),
+    // ⚠️ The WHOLE region, not just `<main>`. [Story 23.4 code review, finding F-7]
+    // Story 23.4 added `trailingHtml` for content the emitter puts after `</main>` — `deep-analytics.html`'s
+    // `:target` lightbox is the motivating case — and then kept probing `mainInnerHtml` alone. A chart mount
+    // landing in trailing content therefore reported "no chart", which BOTH skipped the boot script (so the
+    // chart never rendered) and made `hierarchyTwinContract`'s fatal ADR 0013 check unreachable. Today's
+    // lightbox holds inline SVG so nothing is broken; one that ever carries a Plotly mount or a mermaid block
+    // would have failed silently, and no digest covers post-landmark content either.
+    ...chromeNeeds(`${region.mainInnerHtml}\n${region.trailingHtml}`),
     needsPrism: path.startsWith('code/'),
   }
   pageCache.set(path, resolved)
