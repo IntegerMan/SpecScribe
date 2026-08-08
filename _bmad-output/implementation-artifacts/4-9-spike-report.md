@@ -28,7 +28,7 @@ Seven measured findings, each of which changes what a follow-up story would othe
 |---|---|---|
 | **M1** | **0** `Skipped` diagnostics across **8** scenarios, incl. 2 real multi-adapter CORA runs and 2 constructed full-contention repos | The first-non-null merge rules and their drop-reporting have never executed. Policy must be written against root ownership, not roster order. § 3 |
 | **M2** | On CORA, the BMad adapter contributes **exactly one** field — `Module` — and only because `ModuleContext.Detect` is anchored to `RepoRoot`, not `SourceRoot` | ADR 0038 §5's "artifact families still merge into the bundle" is **false**. § 3.1 |
-| **M3** | A vestigial `.planning/` (abandoned 2020) **wins both layers** — source root *and* epics family — and the live BMad `epics.md` is absent with **no** diagnostic naming the loss | Marker probes test presence, never life. The highest-value fix in this spike. § 4.3 |
+| **M3** | A vestigial `.planning/` (abandoned 2020) **wins both layers** — source root *and* epics family — and the live BMad `epics.md` is absent with **no** diagnostic naming the loss | Marker probes test presence, never life. The highest-value finding in this spike — **diagnosed here, not fixed here**: the content probe first proposed passes the husk, so ADR 0041 §4a now specifies three per-marker predicates and leaves the recency signal to FT-1 (§ 4.3 correction). § 4.3 |
 | **M4** | Following the registry's **own printed advice** (`--source _bmad-output`) on CORA emits **2** `Source`-anchored diagnostics whose paths **escape** the root: `../.planning/STATE.md`, `../.planning/config.json` | A live defect on a contract shared with the VS Code extension (ADR 0037). Handoff H3. § 7 |
 | **M5** | `--source` at a repository root re-derives `RepoRoot` as its **parent**: on CORA, **9,510** files walked, site branded `dev`, **no** adapter matched, **0** diagnostics | Option C is not merely costly, it is not currently expressible. Kills it on measurement. § 5.3 |
 | **M6** | A monorepo with per-package frameworks **throws** `DirectoryNotFoundException` from the monorepo root | Shape (d) is unsupported, not degraded. § 4.4 |
@@ -58,7 +58,9 @@ taken. See handoff **H4** for a factual error this collision left in the index.
 
 Ground truth was re-established by reading, then **measured** with a probe harness. The harness lives **outside
 the repository** (`$CLAUDE_JOB_DIR/tmp/probe/`, a throwaway console project referencing `SpecScribe.csproj`); it
-ships nothing and appears in no File List.
+ships nothing and appears in no File List. **Its complete source is preserved in [Appendix A](#appendix-a--the-probe-harness-verbatim)**
+— added by the Story 4.9 code review, because a scratch directory is deleted with its job and every measurement
+below would otherwise be unreproducible.
 
 It replicates `SiteGenerator.EnumerateSourceFiles` **exactly** — that method is private, so the harness reproduces
 its body (`Directory.EnumerateFiles(SourceRoot, "*.md", AllDirectories)`, filtered by
@@ -258,10 +260,25 @@ roadmap** as its only epic. The live epic does not appear anywhere and nothing s
 - `BmadArtifactAdapter.AppliesTo` → `Directory.Exists(Path.Combine(options.RepoRoot, "_bmad"))`
 
 **Verdict: wrong.** This is the shape that makes "every matching adapter runs" actively incorrect, exactly as the
-story predicted — and it is cheap to fix, because **this repository already contains the right pattern**:
-`ForgeOptions.AdrFallbackProbeSubdirs` is probed by `HasMarkdownWithinOneLevel`, a deliberately bounded content
-test ("at least one markdown file within one directory level", never a whole-tree walk). Source-marker probing is
-the same question answered inconsistently. See ADR 0041 §4a.
+story predicted. `ForgeOptions.AdrFallbackProbeSubdirs` / `HasMarkdownWithinOneLevel` is the right *pattern* for
+the bounded half — root plus one level, never a whole-tree walk — and source-marker probing is the same question
+answered inconsistently.
+
+> **⚠️ Correction, Story 4.9 code review 2026-08-08.** This section originally proposed `HasMarkdownWithinOneLevel`
+> as the fix outright, and ADR 0041 §4a claimed it "removes the abandoned-framework failure at its cause, in both
+> layers". **That is wrong, and this very fixture disproves it.** The husk above holds `ROADMAP.md`, `PROJECT.md`
+> and `STATE.md` at `.planning/`'s top level — the stale `ROADMAP.md` is the artifact that *wins* the epics
+> family. A content probe therefore **passes** the husk and shape (c) resolves exactly as measured above,
+> unchanged. Content presence is a different flavour of presence, not life: a vestigial directory is by
+> definition one that still holds its artifacts. Separately, `BmadArtifactAdapter.AppliesTo` probes `_bmad/`,
+> which holds `config.toml`, `bmm/`, `core/`, `scripts/` and **no markdown at all** — on SpecScribe, on CORA, and
+> in this spike's own fixtures — so a markdown probe there returns false for every BMad repository, costing CORA
+> the `Module` identity via B4's single-adapter early return. ADR 0041 §4a now specifies **three per-marker
+> predicates** (artifact markers: bounded content probe **plus an unspecified recency signal**; `_bmad/`:
+> `config.toml` presence) and FT-1 owns choosing and pinning the recency signal. **Shape (c) is diagnosed by this
+> spike but not yet fixed by it.**
+
+See ADR 0041 §4a.
 
 ### 4.4 Shape (d): monorepo with per-package frameworks — **CONSTRUCTED**
 
@@ -375,7 +392,7 @@ Every behavior gets a verdict. "Supersedes nothing" is an allowed outcome; silen
 | **B2** | No match → `BmadArtifactAdapter` fallback alone | **stands** | The compatibility floor, and it behaved correctly in both fallback scenarios; note it is also what an Option-C-shaped root silently reaches (§ 5.3). |
 | **B3** | Roster order: framework markers first, BMad last | **stands** | Unchanged — but demoted in significance: measured, roster order decided **no** family in **any** scenario. |
 | **B4** | Single adapter → bundle returned verbatim, same instance, **no** cross-adapter diagnostic | **stands** | Deliberately re-examined per Task 3: existing BMad-only projects gain nothing and lose nothing, which is correct — a notice firing on every existing project would be the regression. No regression accepted. |
-| **B5** | Epics **family** claimed together by the first adapter that FOUND an epics source | **stands** (unit) / **refined** (tiebreak) | The unit is right and must not be split; the tiebreak changes from *roster order* to *root ownership*, which is what the code already does de facto. |
+| **B5** | Epics **family** claimed together by the first adapter that FOUND an epics source | **stands** | The unit is right and must not be split, and the rule needs no code change — root ownership is already what the code does de facto, so only the *stated basis* for the tiebreak moves from *roster order* to *root ownership*. Counted among the 7 stands; ADR 0041 §Supersedes lists the restatement under **Refined**, not superseded, and it owes no follow-through item. |
 | **B6** | `Sprint` — first non-null wins; loser gets `Skipped` | **superseded** | Sprint binds to the **epics owner**; a ledger of framework A's phases beside framework B's epics index is incoherent for the same reason requirements are. Today they coincide by accident. |
 | **B7** | `Module` — first with a real detected identity; ties to the first | **refined** | Mechanically unchanged, but reinterpreted as a **role** contribution (planning-side) rather than a won contest, and it must be attributed on the About-SDD page or the portal implies an ownership it does not have. |
 | **B8** | `Retros`/`Diagnostics` concatenate; `ConsumedSourceRelatives` unions | **stands** | Additive, no contention possible. |
@@ -397,7 +414,7 @@ AC #3's purpose is that the follow-up be *known*, not rediscovered.
 
 | Item | Change | Proof |
 |---|---|---|
-| **FT-1 — liveness probes** (B1) | `FindSourceMarker` and both `AppliesTo` require artifacts, mirroring `HasMarkdownWithinOneLevel`'s bounded content test | Unit tests over `ForgeOptions.Resolve` and each `AppliesTo` for the shape (c) fixture; a pinned test that a genuinely empty framework dir no longer wins |
+| **FT-1 — liveness probes, three per-marker predicates** (B1) | Artifact markers (`.planning/`, `_bmad-output/`, the rest of `SourceDirNames`): bounded content probe **plus a recency signal FT-1 must choose and justify**. `_bmad/`: **`config.toml` presence**, explicitly not a markdown probe. See ADR 0041 §4a — a single shared content probe does **not** work; it passes shape (c)'s husk and fails every BMad repo | Unit tests over `ForgeOptions.Resolve` and each `AppliesTo` for the shape (c) fixture; a pinned test that a **populated but abandoned** framework dir loses (the case the original prescription silently failed); a pinned test that `_bmad/` still matches on a real BMad repo, and that CORA retains `Module`; pinned tests for the 2+-level-deep and README-only bounds; and a test that an ambiguous recency verdict fails toward *keeping* the framework with a diagnostic, never toward dropping it (NFR8) |
 | **FT-2 — sprint binds to epics owner** (B6) | `AdapterRegistry.Ingest` resolves `Sprint` from the epics owner rather than first-non-null | `AdapterRegistryTests` case: two adapters both supplying a sprint, non-epics-owner's dropped |
 | **FT-3 — attribution on About-SDD** (B7, B10) | Per-family attribution row on the framework page; diagnostics-page rows retained | Region unit test + live-browser check (neither gate can see it — § 8) |
 | **FT-4 — correct the non-primary notice** (B10) | Remove the false family-merging clause; say what actually happens | `AdapterRegistryTests` assertion on the notice text |
@@ -543,12 +560,23 @@ Per CLAUDE.md § hunk attribution. Story 12.2 is still `review`, so its hunks ar
 Two pre-existing issues were **not** chased, per the story's R9: the `FileWatcherServiceTests` load flake
 (Story 12.2 §F7) and the `crossorigin`/`file://` unstyled-portal defect (Story 12.2 §F2, NFR-3-relevant).
 
+**Discoverability of H1–H3 (added by the Story 4.9 code review, 2026-08-08).** Recording a handoff only here is
+not sufficient: CLAUDE.md § hunk attribution requires it be recorded "so it cannot fall between them", and a
+reviewer scoping Story 12.2 by its File List — which the same section prescribes — has no reason to open this
+report. H1–H3 are therefore also announced on Story 12.2's own `sprint-status.yaml` key, which is the artifact
+that reviewer will read. If that pointer is ever lost, this paragraph is the backstop: **Story 12.2's code
+review owns H1 (the stale `(BMad first)` comment in `ForgeOptions.Resolve`), H2 (the false family-merging clause
+in `AppendNonPrimaryMarkerNotice`) and H3 (the escaping `Source`-anchored diagnostic paths from
+`GsdCoreArtifactAdapter.IngestSprint` / `ReportUnsupportedArtifacts`).**
+
 ---
 
 ## 11. What a reviewer should check first
 
 1. **§ 3.2's zero-`Skipped` table.** If it is wrong, the policy in ADR 0041 §1–§2 is built on sand. It is
-   reproducible from the harness described in § 1.
+   reproducible from the harness, whose complete source is preserved in **Appendix A** (§ 1 describes it; the
+   Story 4.9 code review added the appendix because the harness itself lives in an ephemeral scratch directory
+   and would otherwise be unrecoverable).
 2. **§ 4.3's shape (c) result.** It is the only "actively wrong" verdict, and it drives FT-1, the
    highest-value follow-through.
 3. **§ 5.3's Option C measurement.** Rejecting an obvious option on measurement is stronger than rejecting it on
@@ -556,3 +584,238 @@ Two pre-existing issues were **not** chased, per the story's R9: the `FileWatche
 4. **§ 6's B1–B11 table** against `AdapterRegistry.cs` at `07bdb79`. Every verdict should be checkable by symbol.
 5. **§ 0.1's number change.** ADR **0041**, not 0039. If a reviewer's notes still say 0039, they predate the
    collision.
+
+---
+
+## Appendix A — the probe harness, verbatim
+
+Added by the Story 4.9 code review (2026-08-08). The harness lives outside the repository by design (Task 7) in
+`$CLAUDE_JOB_DIR/tmp/probe/`, a job scratch directory that is deleted with the job — so the measurements this
+report rests on were, as originally written, unreproducible. The source is preserved here instead. **This is a
+listing inside a markdown document, not shipped code:** it is not compiled, not referenced by the solution, and
+Task 7's assertion (§ 9) is unaffected.
+
+To re-run it: create a console project outside the repository, add a `ProjectReference` to
+`src/SpecScribe/SpecScribe.csproj`, drop in both files, and run with `all`, `cora`, `fixtures`, or
+`yaml <path>`.
+
+### A.1 `Program.cs`
+
+```csharp
+using SpecScribe;
+
+// Story 4.9 spike probe. Lives OUTSIDE the repository on purpose (Task 7): it references
+// SpecScribe's public API and ships nothing. Replicates SiteGenerator.EnumerateSourceFiles
+// exactly (private there) so what the adapters see here is what they see in a real run.
+
+static List<string> Enumerate(string sourceRoot) =>
+    Directory.Exists(sourceRoot)
+        ? Directory.EnumerateFiles(sourceRoot, "*.md", SearchOption.AllDirectories)
+            .Where(p => !PathUtil.IsIgnoredSourceFile(p))
+            .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+            .ToList()
+        : new List<string>();
+
+static void Report(string label, ForgeOptions o)
+{
+    Console.WriteLine($"### {label}");
+    Console.WriteLine($"  RepoRoot   = {o.RepoRoot}");
+    Console.WriteLine($"  SourceRoot = {o.SourceRoot}");
+    Console.WriteLine($"  SiteTitle  = {o.SiteTitle}");
+
+    var files = Enumerate(o.SourceRoot);
+    Console.WriteLine($"  sourceFiles(*.md under SourceRoot) = {files.Count}");
+
+    var registry = new AdapterRegistry();
+    var matched = registry.Select(o, files);
+    Console.WriteLine($"  MATCHED = [{string.Join(", ", matched.Select(a => a.GetType().Name))}]");
+
+    // Per-adapter, in isolation: what each one can actually contribute under THIS root.
+    foreach (var a in matched)
+    {
+        var b = a.Ingest(o, files, null);
+        Console.WriteLine($"    - {a.GetType().Name}: Epics={(b.Epics is null ? "null" : b.Epics.Epics.Count + " epics")}"
+            + $", Sprint={(b.Sprint is null ? "null" : "present")}"
+            + $", Requirements={(b.Requirements is null ? "null" : "present")}"
+            + $", Module={b.Module.Module}"
+            + $", Retros={b.Retros.Count}"
+            + $", StoryArtifacts={b.StoryArtifactsById.Count}"
+            + $", EpicsSource={(b.EpicsSourceFullPath is null ? "null" : Path.GetFileName(b.EpicsSourceFullPath))}"
+            + $", Diagnostics={b.Diagnostics.Count}");
+    }
+
+    var merged = registry.Ingest(o, files, null);
+    Console.WriteLine($"  MERGED: Epics={(merged.Epics is null ? "null" : merged.Epics.Epics.Count + " epics")}"
+        + $", Sprint={(merged.Sprint is null ? "null" : "present")}"
+        + $", Requirements={(merged.Requirements is null ? "null" : "present")}"
+        + $", Module={merged.Module.Module}"
+        + $", Retros={merged.Retros.Count}"
+        + $", StoryArtifacts={merged.StoryArtifactsById.Count}");
+
+    // B11: does the watch-mode scoped re-ingest resolve the SAME epics owner as the full build?
+    var scoped = registry.IngestEpics(o, files, null);
+    var fullEpics = merged.Epics is null ? "null" : merged.Epics.Epics.Count + " epics";
+    var scopedEpics = scoped.Epics is null ? "null" : scoped.Epics.Epics.Count + " epics";
+    var agree = fullEpics == scopedEpics
+        && string.Equals(merged.EpicsSourceFullPath, scoped.SourceFullPath, StringComparison.OrdinalIgnoreCase)
+        && merged.StoryArtifactsById.Count == scoped.StoryArtifactsById.Count;
+    Console.WriteLine($"  B11 watch-vs-full: full=({fullEpics}, artifacts={merged.StoryArtifactsById.Count}) "
+        + $"scoped=({scopedEpics}, artifacts={scoped.StoryArtifactsById.Count}) -> {(agree ? "AGREE" : "DISAGREE <<<")}");
+
+    Console.WriteLine($"  DIAGNOSTICS ({merged.Diagnostics.Count}):");
+    foreach (var d in merged.Diagnostics)
+    {
+        var norm = PathUtil.NormalizeSlashes(d.RelativePath);
+        var escapes = PathUtil.EscapesRepoRoot(norm);
+        var flag = escapes ? "  <<< ESCAPES SOURCE ROOT" : "";
+        Console.WriteLine($"    [{d.Category}/{d.Anchor}] path='{norm}'{flag}");
+        Console.WriteLine($"        {d.Message}");
+    }
+    Console.WriteLine();
+}
+
+static string Mk(string root, string rel, string body = "")
+{
+    var p = Path.Combine(root, rel.Replace('/', Path.DirectorySeparatorChar));
+    Directory.CreateDirectory(Path.GetDirectoryName(p)!);
+    File.WriteAllText(p, body);
+    return p;
+}
+
+var mode = args.Length > 0 ? args[0] : "all";
+
+if (mode is "all" or "cora")
+{
+    // ---- SHAPE (a) OBSERVED: the real reference repository, default resolution ----
+    Report("CORA / default resolution (OBSERVED, real repo)",
+        ForgeOptions.Resolve(startDirectory: @"C:\dev\CORA", autoDetectCodeUrl: false));
+
+    // ---- The command AppendNonPrimaryMarkerNotice literally tells the user to run ----
+    Report("CORA / --source _bmad-output (OBSERVED, real repo; the notice's own advice)",
+        ForgeOptions.Resolve(source: @"C:\dev\CORA\_bmad-output", autoDetectCodeUrl: false));
+
+    // OPTION C on the real repository.
+    Report("CORA / --source = REPO ROOT — Option C simulation (OBSERVED, real repo)",
+        ForgeOptions.Resolve(source: @"C:\dev\CORA", autoDetectCodeUrl: false));
+}
+
+if (mode is "all" or "fixtures")
+{
+    var tmp = Path.Combine(Path.GetTempPath(), "ss49-" + Guid.NewGuid().ToString("N")[..8]);
+
+    // Faithful to the reference repo's shapes (copied structure, not content).
+    const string ModuleCsv =
+        "module,skill,display-name,menu-code,description,action,args,phase,after,before,required,output-location,outputs\n"
+        + "BMad Method,_meta,,,,,,,,,false,https://docs.bmad-method.org/llms.txt,\n"
+        + "BMad Method,bmad-create-story,Create Story,CS,Create the next story.,,anytime,,,false,output_folder,story\n";
+
+    static string Roadmap(string milestone, string date, string phaseTitle, string planName) =>
+        $"# Roadmap: Fixture\n\n## Overview\n\nFixture.\n\n## Phases\n\n"
+        + $"### Milestone: {milestone} (completed {date})\n\n"
+        + $"- [x] **Phase 1: {phaseTitle}** - A phase. (completed {date})\n\n"
+        + $"## Milestone: {milestone} — Phase Details\n\n"
+        + $"### Phase 1: {phaseTitle}\n"
+        + "**Goal**: A goal.\n**Depends on**: Nothing (first phase)\n**Plans**: 1 plans\nPlans:\n"
+        + $"- [x] {planName} — the only plan\n";
+
+    // ---- SHAPE (c) CONSTRUCTED: vestigial GSD marker, live BMad project ----
+    // A repo that migrated OFF GSD onto BMad and left `.planning/` behind with a stale ROADMAP.
+    var c = Path.Combine(tmp, "shape-c-vestigial");
+    Mk(c, "_bmad/bmm/module-help.csv", ModuleCsv);
+    Mk(c, "_bmad/config.toml", "project_name = \"Live BMad Project\"\n");
+    Mk(c, "_bmad-output/planning-artifacts/epics.md",
+        "# Epics\n\n## Epic 1: The LIVE Epic\n\n### Story 1.1: A live story\n\nStatus: done\n\n- [x] a task\n");
+    Mk(c, ".planning/ROADMAP.md", Roadmap("v0.1", "2020-01-01", "A STALE ABANDONED PHASE", "01-01-PLAN.md"));
+    Mk(c, ".planning/phases/01-a-stale-abandoned-phase/01-01-PLAN.md", "# Stale plan\n");
+    Mk(c, ".planning/PROJECT.md", "# StaleGsdName\n");
+    Mk(c, ".planning/STATE.md", "---\nmilestone: v0.1\n---\n");
+    Mk(c, ".planning/config.json", "{}\n");
+    Report("SHAPE (c) vestigial GSD marker over a live BMad project (CONSTRUCTED)",
+        ForgeOptions.Resolve(startDirectory: c, autoDetectCodeUrl: false));
+
+    // ---- SHAPE (b) CONSTRUCTED: migration in progress, BOTH frameworks hold a full set ----
+    var b = Path.Combine(tmp, "shape-b-migration");
+    Mk(b, "_bmad/bmm/module-help.csv", ModuleCsv);
+    Mk(b, "_bmad/config.toml", "project_name = \"Migrating Project\"\n");
+    Mk(b, "_bmad-output/planning-artifacts/epics.md",
+        "# Epics\n\n## Epic 1: BMad Epic\n\n### Story 1.1: BMad story\n\nStatus: done\n\n- [x] a task\n");
+    Mk(b, "_bmad-output/implementation-artifacts/sprint-status.yaml",
+        "development_status:\n  1-1-bmad-story: done\n");
+    Mk(b, ".planning/ROADMAP.md", Roadmap("v1.0", "2026-01-01", "A GSD PHASE", "01-01-PLAN.md"));
+    Mk(b, ".planning/phases/01-a-gsd-phase/01-01-PLAN.md", "# GSD plan\n");
+    Mk(b, ".planning/STATE.md", "---\nmilestone: v1.0\n---\n");
+    Report("SHAPE (b) migration in progress, both frameworks full (CONSTRUCTED)",
+        ForgeOptions.Resolve(startDirectory: b, autoDetectCodeUrl: false));
+
+    // Same shape (b) tree, but pointed at the BMad half — the notice's own advice.
+    Report("SHAPE (b) same tree, --source _bmad-output (CONSTRUCTED)",
+        ForgeOptions.Resolve(source: Path.Combine(b, "_bmad-output"), autoDetectCodeUrl: false));
+
+    // ---- SHAPE (d) CONSTRUCTED: monorepo, per-package frameworks, run from the monorepo root ----
+    var d = Path.Combine(tmp, "shape-d-monorepo");
+    Mk(d, "packages/alpha/_bmad/bmm/module-help.csv", "command,description\n*help,Show help\n");
+    Mk(d, "packages/alpha/_bmad-output/planning-artifacts/epics.md",
+        "# Epics\n\n## Epic 1: Alpha Epic\n\n### Story 1.1: Alpha story\n\nStatus: done\n\n- [x] a task\n");
+    Mk(d, "packages/beta/.planning/ROADMAP.md",
+        "# Roadmap\n\n## Phases\n\n### Milestone: v1.0 (completed 2026-01-01)\n\n- [x] Phase 1: Beta Phase\n");
+    Mk(d, "README.md", "# Monorepo\n");
+    try
+    {
+        Report("SHAPE (d) monorepo, per-package frameworks, run from monorepo ROOT (CONSTRUCTED)",
+            ForgeOptions.Resolve(startDirectory: d, autoDetectCodeUrl: false));
+    }
+    catch (DirectoryNotFoundException ex)
+    {
+        Console.WriteLine("### SHAPE (d) monorepo, run from monorepo ROOT (CONSTRUCTED)");
+        Console.WriteLine("  ForgeOptions.Resolve THREW DirectoryNotFoundException:");
+        Console.WriteLine("    " + ex.Message);
+        Console.WriteLine();
+    }
+
+    Report("SHAPE (d) monorepo, run from packages/alpha (CONSTRUCTED)",
+        ForgeOptions.Resolve(startDirectory: Path.Combine(d, "packages", "alpha"), autoDetectCodeUrl: false));
+
+    // ---- OPTION C SIMULATION: raise the root to RepoRoot. The ONLY configuration in which both
+    // adapters can see their own artifacts at once, i.e. the only one where the merge rules contend.
+    Report("OPTION C on shape (b): --source = REPO ROOT (CONSTRUCTED)",
+        ForgeOptions.Resolve(source: b, autoDetectCodeUrl: false));
+
+    Console.WriteLine($"(fixtures under {tmp})");
+}
+
+if (mode == "yaml") YamlCheck.Run(args[1]);
+```
+
+### A.2 `Yaml.cs` — the § 9.1 sprint-status validation
+
+```csharp
+using YamlDotNet.RepresentationModel;
+
+// Validates sprint-status.yaml with the SAME library the product parses it with (YamlDotNet).
+public static class YamlCheck
+{
+    public static void Run(string path)
+    {
+        using var reader = new StreamReader(path);
+        var stream = new YamlStream();
+        stream.Load(reader);
+        var root = (YamlMappingNode)stream.Documents[0].RootNode;
+        var status = (YamlMappingNode)root[new YamlScalarNode("development_status")];
+        Console.WriteLine("YAML OK — parsed with YamlDotNet.");
+        Console.WriteLine("  last_updated = " + root[new YamlScalarNode("last_updated")]);
+        Console.WriteLine("  development_status keys = " + status.Children.Count);
+        foreach (var k in new[] { "4-9-multi-framework-coexistence-strategy-spike", "epic-4", "epic-4-retrospective" })
+            Console.WriteLine($"  {k} = {status[new YamlScalarNode(k)]}");
+    }
+}
+```
+
+### A.3 What the appendix proves about shape (c)
+
+Read `Mk(c, ".planning/ROADMAP.md", …)`, `Mk(c, ".planning/PROJECT.md", …)` and `Mk(c, ".planning/STATE.md", …)`
+together: the vestigial fixture holds **three** markdown files at `.planning/`'s top level. That is why a
+`HasMarkdownWithinOneLevel`-style content probe cannot fix shape (c) — the husk passes it. Read
+`Mk(c, "_bmad/bmm/module-help.csv", …)` and `Mk(c, "_bmad/config.toml", …)`: the fixture's `_bmad/` holds a CSV
+and a TOML and **no markdown**, matching SpecScribe's and CORA's real `_bmad/` directories, which is why the same
+probe cannot be applied to BMad's `AppliesTo` marker. Both corrections in § 4.3 are checkable directly against
+this listing.
