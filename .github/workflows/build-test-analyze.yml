@@ -554,13 +554,19 @@ jobs:
       TAG: ${{ needs.stage-a-prepare.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
-        with: { ref: ${{ needs.stage-a-prepare.outputs.sha }}, fetch-depth: 0 }
+        with:
+          ref: ${{ needs.stage-a-prepare.outputs.sha }}
+          fetch-depth: 0
       - name: Create the local candidate tag for MinVer
         run: git tag --force "$TAG" '${{ needs.stage-a-prepare.outputs.sha }}'
       - uses: actions/setup-dotnet@v4
-        with: { dotnet-version: "10.0.x" }
+        with:
+          dotnet-version: "10.0.x"
       - uses: actions/setup-node@v4
-        with: { node-version-file: web/.nvmrc, cache: npm, cache-dependency-path: web/package-lock.json }
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
       - run: bash .github/scripts/release/assert-source-date-epoch.sh "$SOURCE_DATE_EPOCH"
       - working-directory: web
         env: { SPECSCRIBE_PACKAGE_BUILD: "1" }
@@ -569,7 +575,11 @@ jobs:
         run: npm run sync:assets && npm run build:package
       - run: dotnet pack src/SpecScribe/SpecScribe.csproj -c Release -o artifacts
       - uses: actions/upload-artifact@v4
-        with: { name: stage-a-nupkg, path: artifacts/*.nupkg, if-no-files-found: error, retention-days: 7 }
+        with:
+          name: stage-a-nupkg
+          path: artifacts/*.nupkg
+          if-no-files-found: error
+          retention-days: 7
 
   stage-a-binaries:
     name: stage-a binary (${{ matrix.rid }})
@@ -590,13 +600,19 @@ jobs:
       run: { shell: bash }
     steps:
       - uses: actions/checkout@v4
-        with: { ref: ${{ needs.stage-a-prepare.outputs.sha }}, fetch-depth: 0 }
+        with:
+          ref: ${{ needs.stage-a-prepare.outputs.sha }}
+          fetch-depth: 0
       - name: Create the local candidate tag for MinVer
         run: git tag --force "$TAG" '${{ needs.stage-a-prepare.outputs.sha }}'
       - uses: actions/setup-dotnet@v4
-        with: { dotnet-version: "10.0.x" }
+        with:
+          dotnet-version: "10.0.x"
       - uses: actions/setup-node@v4
-        with: { node-version-file: web/.nvmrc, cache: npm, cache-dependency-path: web/package-lock.json }
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
       - run: bash .github/scripts/release/assert-source-date-epoch.sh "$SOURCE_DATE_EPOCH"
       - working-directory: web
         env: { SPECSCRIBE_PACKAGE_BUILD: "1" }
@@ -628,7 +644,11 @@ jobs:
           "$EXECUTABLE" generate --source "$PROBE/foreign source/_bmad-output" --adrs "$PROBE/foreign source/adrs" --output "$PROBE/site output" --project-name "Stage A probe" | tee probe.log
           grep -rl '<main id="main-content"' "$PROBE/site output" > /dev/null
       - uses: actions/upload-artifact@v4
-        with: { name: stage-a-${{ matrix.rid }}, path: dist/*, if-no-files-found: error, retention-days: 7 }
+        with:
+          name: stage-a-${{ matrix.rid }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
 
   stage-a-release:
     name: stage-a prerelease
@@ -638,11 +658,15 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-        with: { ref: ${{ needs.stage-a-prepare.outputs.sha }}, fetch-depth: 0 }
+        with:
+          ref: ${{ needs.stage-a-prepare.outputs.sha }}
+          fetch-depth: 0
       - uses: actions/setup-node@v4
-        with: { node-version-file: web/.nvmrc }
+        with:
+          node-version-file: web/.nvmrc
       - uses: actions/download-artifact@v4
-        with: { path: incoming }
+        with:
+          path: incoming
       - name: Create the prerelease with durable handoff assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
