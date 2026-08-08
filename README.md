@@ -127,19 +127,20 @@ and Nitro serves `public/` ahead of the SSR route — so an artefact built that 
 pages for your project, with HTTP 200. A wrong answer with a success status.
 
 That puts `specscribe` on your PATH (`%USERPROFILE%\.dotnet\tools`), so you can run it from any
-project directory. To pick up a newer build later: bump the `<Version>` in
-`src/SpecScribe/SpecScribe.csproj`, re-pack, then `dotnet tool update --global SpecScribe --add-source ./artifacts`.
+project directory. To pick up a newer build later just re-pack and
+`dotnet tool update --global SpecScribe --add-source ./artifacts` — there is no version to bump by hand. The
+version comes from the nearest reachable git tag via [MinVer](https://github.com/adamralph/minver), so an
+untagged working build is `0.1.0-preview.0.<commits-since>` and a build on a `v0.1.0-preview.1` tag is exactly
+`0.1.0-preview.1` ([ADR 0040](docs/adrs/0040-release-channels-and-versioning-policy.md) § 5). Read the version
+off the produced `.nupkg` filename rather than typing one from memory.
 
-> **Running against a project other than this one?** The packaged tool does not yet carry its renderer
-> (populating `renderer/` beside the executable is Story 16.3, backlog), and the fallback search looks for
-> `web/.output` in **your** repository, where it does not exist. Point SpecScribe at the artefact you built
-> above:
->
-> ```sh
-> export SPECSCRIBE_RENDERER_DIR=/path/to/SpecScribe/web/.output
-> ```
->
-> Skip this and `generate` fails with `errors=1` and a message naming all three locations it searched.
+> **Running against a project other than this one?** That works with no extra configuration: the package
+> carries its own renderer at `tools/<tfm>/any/renderer/`, which lands beside the executable in the tool store
+> and is what `generate` resolves. `SPECSCRIBE_RENDERER_DIR` remains available as an explicit override — point
+> it at a directory containing `server/index.mjs` and SpecScribe uses that one or stops, never a different one.
+
+See [docs/Packaging.md](docs/Packaging.md) for how a package is produced and verified, and for the two ways a
+packaging change can produce a green build that ships a package which cannot render.
 
 ## Usage
 
@@ -223,6 +224,9 @@ jobs:
           repository: IntegerMan/SpecScribe
           ref: ${{ env.SPECSCRIBE_REF }}
           path: .specscribe-src
+          # REQUIRED. MinVer derives the version from tag reachability, and a shallow
+          # clone has no tags — which yields a WRONG VERSION rather than an error.
+          fetch-depth: 0
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -254,18 +258,19 @@ jobs:
 
       - name: Install the SpecScribe CLI
         # --tool-path (not --global) keeps the install explicit and off PATH-guessing.
-        # The version literal tracks <Version> in src/SpecScribe/SpecScribe.csproj.
+        # The version is derived from the git tag by MinVer, so there is no literal to
+        # keep in step with the csproj — read it off the .nupkg the pack just produced.
+        # (A hard-coded --version would break on the next commit, since an untagged
+        # build carries a commit-height suffix.)
         run: |
           dotnet pack .specscribe-src/src/SpecScribe/SpecScribe.csproj -c Release -o sspkg
-          dotnet tool install SpecScribe --version 0.1.0-preview \
+          VERSION=$(ls sspkg/SpecScribe.*.nupkg | sed 's|.*/SpecScribe\.||; s|\.nupkg$||')
+          dotnet tool install SpecScribe --version "$VERSION" \
             --tool-path sstools --add-source sspkg
 
       - name: Generate the portal
-        env:
-          # REQUIRED for an external project. Without it SpecScribe looks for `renderer/`
-          # beside the executable (not populated until Story 16.3 ships) and then for
-          # `web/.output` in YOUR repository, which does not exist.
-          SPECSCRIBE_RENDERER_DIR: ${{ github.workspace }}/.specscribe-src/web/.output
+        # No SPECSCRIBE_RENDERER_DIR: the package carries its own renderer beside the
+        # executable, so an external project needs no pointer back into this checkout.
         # Runs from your repo root, so git analysis targets your history. Exits non-zero
         # if any page errors, so a broken portal fails the job instead of publishing.
         run: |

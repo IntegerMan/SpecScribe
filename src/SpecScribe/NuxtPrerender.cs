@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace SpecScribe;
@@ -45,6 +46,13 @@ public sealed class NuxtPrerender
     private const string MainLandmark = "<main id=\"main-content\"";
 
     private static readonly Regex NodeVersionPattern = new(@"^v?(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)", RegexOptions.Compiled);
+
+    private static readonly Regex WhitespaceRun = new(@"\s+", RegexOptions.Compiled);
+
+    /// <summary>Character cap on ONE route's renderer error text. 373 routes each carrying a stack trace is not a
+    /// diagnostic, it is a denial of service against the console — and against the diagnostics surface that
+    /// carries these events.</summary>
+    private const int MaxRouteFailureDetail = 500;
 
     /// <summary>Result of one prerender pass. <paramref name="Events"/> carries one entry per route that failed
     /// plus a single summary entry; successful routes are not individually evented (1,469 Generated events would
@@ -126,22 +134,103 @@ public sealed class NuxtPrerender
             + "Or point SPECSCRIBE_RENDERER_DIR at a directory that already contains one.");
     }
 
-    private static string? FindRepoRoot(string start)
+    /// <summary>Walks up from <paramref name="start"/> to the nearest directory that IS a git repository root.
+    ///
+    /// <para>⚠️ <c>.git</c> is a DIRECTORY in a normal checkout and a FILE in a git worktree (a ~56-byte
+    /// <c>gitdir:</c> pointer). Testing only <see cref="Directory.Exists"/> — which is what this did — makes a
+    /// worktree invisible, so the walk continues PAST the worktree root and lands on the enclosing checkout.
+    /// The consequence is not a failure: candidate 3 then resolves to <b>another checkout's renderer artefact</b>
+    /// and the generate succeeds against it. Observed by Story 16.1 resolving <c>C:\Dev\SpecScribe\web\.output</c>
+    /// from inside <c>.claude/worktrees/story-16-1-dev</c> — a wrong answer with a success status, the same class
+    /// this file's other guards exist to prevent. Developer path only (candidate 2 wins on the packaged path),
+    /// but worktrees are in daily use here. [Story 16.1 § 10 item 2 → Story 16.3 AC #5]</para>
+    ///
+    /// <para><c>internal</c> rather than <c>private</c> so the walk can be tested against a temp directory whose
+    /// <c>.git</c> is a file, with no Node and no artefact.</para></summary>
+    internal static string? FindRepoRoot(string start)
     {
         var dir = new DirectoryInfo(start);
-        while (dir is not null && !Directory.Exists(Path.Combine(dir.FullName, ".git")))
+        while (dir is not null && !IsRepoRoot(dir.FullName))
         {
             dir = dir.Parent;
         }
         return dir?.FullName;
     }
 
+    /// <summary>True when <paramref name="directory"/> holds a <c>.git</c> entry of EITHER kind — a directory
+    /// (normal checkout) or a file (worktree, or a submodule's gitlink).</summary>
+    private static bool IsRepoRoot(string directory)
+    {
+        var git = Path.Combine(directory, ".git");
+        return Directory.Exists(git) || File.Exists(git);
+    }
+
+    // ── Route failure diagnostics ───────────────────────────────────────────────────────────────────────────
+
+    /// <summary>Describes a non-200 from the renderer, carrying the renderer's OWN error text rather than only
+    /// the status code.
+    ///
+    /// <para><b>Why this exists.</b> The response body was already being read and then thrown away, so a failing
+    /// route reported nothing but <c>HTTP 500</c>. Story 16.1 could only obtain the real message — <i>"The epics
+    /// index IR entry declares no child pages…"</i> — by booting the artefact by hand and re-requesting the route.
+    /// That is a diagnostic path a PACKAGED consumer does not have: no <c>web/</c> checkout, no artefact to boot,
+    /// no way to turn a status code into a cause. Shipping a package whose only failure signal is a bare status
+    /// code is a support burden Epic 16 would be creating for itself. [Story 16.1 § 4.1 → Story 16.3 AC #5]</para>
+    ///
+    /// <para>Nitro answers with JSON (<c>{"statusCode":…,"message":…,"stack":…}</c>), so the <c>message</c> is
+    /// lifted out and the stack left behind; a body that will not parse (an HTML error page, a proxy interposing
+    /// itself) falls back to the raw text. Either way the result is whitespace-collapsed and capped at
+    /// <see cref="MaxRouteFailureDetail"/> — see that constant for why bounding is not optional.</para>
+    ///
+    /// <para>A pure function of (status, body) precisely so it is testable with NO Node and NO built artefact,
+    /// which is this suite's standing constraint. The same split as
+    /// <see cref="ValidateNodeVersion"/>/<see cref="VerifyNodeAvailable"/>.</para></summary>
+    internal static string DescribeRouteFailure(HttpStatusCode status, string? body)
+    {
+        var summary = $"the renderer answered HTTP {(int)status} for a route the manifest names";
+        var detail = ExtractRendererMessage(body);
+        return detail is null ? summary + "." : $"{summary}: {detail}";
+    }
+
+    /// <summary>The renderer's own message, collapsed and capped — or null when the body carries nothing usable,
+    /// so the caller can fall back to the bare status sentence rather than appending an empty colon.</summary>
+    private static string? ExtractRendererMessage(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body)) return null;
+
+        var text = body.Trim();
+        try
+        {
+            using var doc = JsonDocument.Parse(text);
+            if (doc.RootElement.ValueKind == JsonValueKind.Object
+                && doc.RootElement.TryGetProperty("message", out var message)
+                && message.ValueKind == JsonValueKind.String
+                && message.GetString() is { Length: > 0 } extracted)
+            {
+                text = extracted;
+            }
+        }
+        catch (JsonException)
+        {
+            // Not JSON — an HTML error page, a proxy banner, a plain string. The raw body IS the diagnostic then,
+            // so it is kept rather than discarded; bounding below is what makes keeping it safe.
+        }
+
+        var collapsed = WhitespaceRun.Replace(text, " ").Trim();
+        if (collapsed.Length == 0) return null;
+        return collapsed.Length <= MaxRouteFailureDetail
+            ? collapsed
+            : collapsed[..MaxRouteFailureDetail] + "… (truncated)";
+    }
+
     // ── Node prerequisite (AC #4, ADR 0022 §Decision 5) ─────────────────────────────────────────────────────
 
     /// <summary>Verifies Node is on PATH and inside <see cref="SupportedNodeRange"/>.
-    /// <para>ADR 0022 §Decision 5 assigned Node DETECTION to Story 16.3, which has not been built — every
-    /// <c>16-*</c> key is still backlog. Until it is, this is the check, and it exists because the alternative
-    /// is the failure AC #4 names by name: a silent empty output root reported at <c>errors=0</c>.</para>
+    /// <para>ADR 0022 §Decision 5 assigned Node DETECTION to Story 16.3 and said it should run "at startup".
+    /// Story 23.6 built the check here instead, because the alternative was the failure AC #4 names by name: a
+    /// silent empty output root reported at <c>errors=0</c>. Story 16.3 has now shipped and deliberately left
+    /// this alone — the ADR's "at startup" placement is AMENDED by ADR 0040 § 8, and the consumer-facing Node
+    /// prerequisite surfaces belong to Story 16.6 (16.1 § 9). So this remains the check.</para>
     /// <para>Returns the resolved version string. Throws with an actionable message naming the range otherwise.</para></summary>
     public static string VerifyNodeAvailable()
     {
@@ -246,6 +335,11 @@ public sealed class NuxtPrerender
         var events = new List<GenerationEvent>();
         var rendered = 0;
         var failed = 0;
+        // ONCE per run, not once per route. `[render error]` lines arrive on the server's stdio channel and are
+        // often the only place the underlying cause appears; but Tail() is a rolling 40-line window over the WHOLE
+        // run, so attaching it to every failure would repeat a near-identical block up to `routes.Count` times and
+        // bury the per-route messages it was meant to explain.
+        var serverLogAttached = false;
 
         var port = FreePort();
         var psi = new ProcessStartInfo(NodeExecutable(), Path.Combine(_artefactDir, "server", "index.mjs"))
@@ -287,7 +381,8 @@ public sealed class NuxtPrerender
                     body = res.Content.ReadAsStringAsync().GetAwaiter().GetResult();
                     if (res.StatusCode != HttpStatusCode.OK)
                     {
-                        failure = $"the renderer answered HTTP {(int)res.StatusCode} for a route the manifest names.";
+                        // Carries the renderer's OWN message, not just the code — see DescribeRouteFailure.
+                        failure = DescribeRouteFailure(res.StatusCode, body);
                     }
                     else if (!body.Contains(MainLandmark, StringComparison.Ordinal))
                     {
@@ -313,6 +408,14 @@ public sealed class NuxtPrerender
                     // a per-route failure raised here has nowhere on the page to land. The PREREQUISITE class (no
                     // Node, no artefact) is checked early by SiteGenerator.PrerenderPreflight precisely so it does
                     // reach the page; per-route failures need an actual render and cannot.
+                    if (!serverLogAttached)
+                    {
+                        serverLogAttached = true;
+                        if (Tail(serverLog) is { Length: > 0 } tail)
+                        {
+                            failure += $"\n\nRenderer log (first failure this run, last 40 lines):\n{tail}";
+                        }
+                    }
                     events.Add(new GenerationEvent(GenerationOutcome.Error, route, routeSw.Elapsed, failure));
                     continue;
                 }

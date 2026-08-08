@@ -14,9 +14,9 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>specscribe</ToolCommandName>
     <PackageId>SpecScribe</PackageId>
-    <!-- Pre-release label: makes the package/assembly semver-correctly pre-release, and the About page shows a
-         "Preview" badge. The build identifier (date + commit hash) is added dynamically, not bumped by hand. -->
-    <Version>0.1.0-preview</Version>
+    <!-- NO <Version> HERE. It is derived from the nearest reachable git tag by MinVer (see below), which is
+         ADR 0040 §Decision 5: deleted rather than replaced by a second literal, so there is exactly one home
+         for the version. The build identifier (date + commit hash) is added dynamically, not bumped by hand. -->
     <Authors>Matthew-Hope Eland</Authors>
     <Description>A static site generator that builds interactive dashboards from spec-driven development projects and git repositories</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -41,8 +41,35 @@
     <AssemblyMetadata Include="BuildDate" Value="$(SpecScribeBuildDate)" />
   </ItemGroup>
 
+  <!-- Version from the git tag [ADR 0040 §Decision 5, Story 16.3]. MinVer reads the nearest reachable tag; there
+       is no version literal anywhere in the tree to drift from it. Requires tag reachability, so any CI checkout
+       that packs MUST use fetch-depth: 0 — a shallow clone yields a WRONG VERSION rather than an error
+       (build-test-analyze.yml already sets it, for SonarCloud's blame data).
+       The three properties are not new decisions; they keep untagged builds inside §Decision 5's 0.MINOR.PATCH-
+       preview.N scheme. This repository has no tags yet, and MinVer's undirected default for that state is
+       0.0.0-alpha.0 — which is not 0.x-preview, and reads on the About page as a downgrade.
+         · MinVerTagPrefix                     tags are `v0.1.0-preview.1`, not `0.1.0-preview.1`
+         · MinVerMinimumMajorMinor             floor the untagged version at 0.1, not 0.0
+         · MinVerDefaultPreReleaseIdentifiers  keep a PRE-RELEASE LABEL on untagged builds. Load-bearing, not
+                                               cosmetic: AboutTemplater renders the About page's "Preview" badge
+                                               from ProductMetadata.IsPrerelease, which needs a non-empty label.
+                                               ADR 0040: "the first release without the label is by definition
+                                               no longer a preview."
+       → untagged: 0.1.0-preview.0.<height> · tagged: the tag verbatim, zero height.
+       ONE KNOWN SIDE EFFECT, accepted deliberately: MinVer also sets AssemblyVersion to {Major}.0.0.0, so on a
+       0.x version it becomes 0.0.0.0 (it was 0.1.0.0). Nothing reads it — AboutTemplater's GetName().Version
+       branch is a fallback for when there is NO informational version, and MinVer always writes one; the
+       cache-busting token is a module hash, not a version. AssemblyFileVersion still tracks the real version. -->
+  <PropertyGroup>
+    <MinVerTagPrefix>v</MinVerTagPrefix>
+    <MinVerMinimumMajorMinor>0.1</MinVerMinimumMajorMinor>
+    <MinVerDefaultPreReleaseIdentifiers>preview.0</MinVerDefaultPreReleaseIdentifiers>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Markdig" Version="1.3.2" />
+    <!-- PrivateAssets="All": a build-time versioning tool, never a dependency of the shipped package. -->
+    <PackageReference Include="MinVer" Version="7.0.0" PrivateAssets="All" />
     <PackageReference Include="Spectre.Console" Version="0.57.2" />
     <PackageReference Include="Spectre.Console.Cli" Version="0.55.0" />
     <PackageReference Include="YamlDotNet" Version="18.1.0" />
@@ -51,6 +78,94 @@
   <ItemGroup>
     <InternalsVisibleTo Include="SpecScribe.Tests" />
   </ItemGroup>
+
+  <!-- ══ The renderer artefact rides INSIDE the package [ADR 0040 §Decision 1, Story 16.3 AC #3] ══════════════
+       Since ADR 0034 no C# code path writes content HTML: `generate` emits the JSON IR, then boots this artefact
+       and requests one route per manifest entry. A package without it installs cleanly, puts `specscribe` on
+       PATH, and then cannot render anything. NuxtPrerender.ResolveArtefactDirectory has probed `renderer/` beside
+       the executing assembly since Story 23.6 — its doc comment calls that "the Epic 16 packaging shape", and
+       until now NOTHING populated it. This is what populates it.
+
+       ⚠️ ONE ITEM SERVES BOTH CHANNELS, AND THAT IS A MEASURED RESULT, NOT AN ASSUMPTION.
+       Story 16.3's brief prescribed TWO items — a `None` with `Pack="true"` + `PackagePath` for the nupkg, and a
+       publish-time copy for the binary — on the reasoning that pack and publish are separate pipelines. Half of
+       that is right: the publish copy is invisible to a plain `dotnet pack` of a LIBRARY. But `PackAsTool` builds
+       `tools/<tfm>/any/` FROM THE PUBLISH OUTPUT, so for this project the publish copy populates the nupkg too.
+       Measured four ways at 0.1.0-preview.0.410, each a full pack + `unzip -l`:
+         · both items          → 203 files, entry point present
+         · Content only        → 203 files, byte-identical, entry point present
+         · None only           → 203 files, entry point present
+         · None WRONG-FORM + Content → 203 files, entry point present, NO doubled tree
+       That last row is the finding: with the Content item present the None item contributes NOTHING — not even
+       its damage. A broken `PackagePath` on it is therefore INVISIBLE, so shipping both means shipping one item
+       that looks load-bearing, is not, and silently absorbs its own defects. Dead configuration that a reader
+       would trust is worse than no configuration, so the None item is GONE and the guard below now watches the
+       mechanism that actually delivers. (Proven red: see § the same guard, and docs/Packaging.md § Two traps.)
+       Story 16.8's npm wrapper spawns what the publish path produces, so this item is load-bearing twice over. -->
+  <PropertyGroup>
+    <SpecScribeRendererDir>$(MSBuildThisFileDirectory)..\..\web\.output\</SpecScribeRendererDir>
+    <SpecScribeRendererEntryPoint>$(SpecScribeRendererDir)server\index.mjs</SpecScribeRendererEntryPoint>
+    <SpecScribeBuildRendererHint>cd web &amp;&amp; npm run build:package</SpecScribeBuildRendererHint>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The renderer payload, for BOTH channels:
+           · self-contained publish → a sibling `renderer/` beside the executable (candidate 2). PublishSingleFile
+             does NOT move AppContext.BaseDirectory away from it — 16.1 measured that directly, at errors=0.
+           · `dotnet pack` (PackAsTool) → the same tree at tools/<tfm>/any/renderer/, because the tool package is
+             assembled from the publish output. Asserted on every pack; never assumed.
+         Pack="false" is REQUIRED, and is not the same as "do not pack this". Content defaults to PACKABLE, and a
+         packable Content item lands in contentFiles/ — which would add a second ~190-file copy that nothing ever
+         reads, doubling the package while the tools/ copy carries on working. Turning it off is what keeps the
+         nupkg to one copy; the tools/ copy arrives via publish, not via this flag.
+         CopyToOutputDirectory="Never" keeps the inner loop fast: a local `dotnet build` must NOT copy ~190 files
+         beside the assembly, and the developer path (candidate 3, web/.output in the repo) already serves it.
+         Link controls the DESTINATION shape — `renderer/` + the source's own recursive directory. Get it wrong
+         and the payload publishes to a flat or mis-rooted directory that resolution cannot find; the guard below
+         is what turns that from a silent bad package into a failed build. -->
+    <Content Include="..\..\web\.output\**\*" Pack="false"
+             Link="renderer\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="Never" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- ══ A package that cannot render must never ship [Story 16.3 AC #4] ═══════════════════════════════════════
+       An MSBuild glob that matches NOTHING is not an error, and web/.output is gitignored and absent on every
+       fresh checkout. So the DEFAULT outcome of `dotnet pack` on a clean tree is a ~2.5 MB nupkg that installs
+       cleanly and fails at generate time. That is the worst thing this story could ship, and it ships silently.
+
+       Asserted against the PACKAGED PATH inside the produced nupkg — not against the source directory (which
+       says nothing about how the payload was laid out) and not against entry count or byte size (which the
+       doubled-path form above satisfies while shipping no entry point). MSBuild's built-in Unzip task means this
+       needs no new dependency.
+
+       AfterTargets="Pack" ONLY, so `dotnet build` and `dotnet test` are untouched: breaking the inner loop to
+       protect the release loop is not a trade worth making. -->
+  <Target Name="AssertRendererPacked" AfterTargets="Pack" Condition="'$(PackAsTool)' == 'true'">
+    <PropertyGroup>
+      <_RendererProbeDir>$(IntermediateOutputPath)renderer-pack-probe\</_RendererProbeDir>
+      <_ProducedNupkg>$([MSBuild]::EnsureTrailingSlash('$(PackageOutputPath)'))$(PackageId).$(PackageVersion).nupkg</_ProducedNupkg>
+      <_PackedRendererEntry>tools/$(TargetFramework)/any/renderer/server/index.mjs</_PackedRendererEntry>
+    </PropertyGroup>
+
+    <Error Condition="!Exists('$(_ProducedNupkg)')"
+           Text="Pack reported success but '$(_ProducedNupkg)' is not there, so the renderer payload could not be verified. This is a defect in the AssertRendererPacked target itself (the nupkg name is derived from PackageId + PackageVersion), not in your build — an unverified package must not be treated as a verified one." />
+
+    <RemoveDir Directories="$(_RendererProbeDir)" ContinueOnError="true" />
+    <Unzip SourceFiles="$(_ProducedNupkg)" DestinationFolder="$(_RendererProbeDir)" />
+
+    <Error Condition="!Exists('$(_RendererProbeDir)$(_PackedRendererEntry)')"
+           Text="The package at '$(_ProducedNupkg)' does NOT contain the renderer artefact at '$(_PackedRendererEntry)', so it would install cleanly and then fail every `specscribe generate` with 'the renderer artefact could not be found'.%0A%0ABuild the artefact first, then pack again:%0A    $(SpecScribeBuildRendererHint)%0A%0A(Expected it on disk at '$(SpecScribeRendererEntryPoint)'. If that file IS present, the payload reached the package at the WRONG PATH rather than being omitted — check the renderer Content item's Link, which is what shapes the destination, and remember that a glob matching nothing is not an MSBuild error.)" />
+
+    <RemoveDir Directories="$(_RendererProbeDir)" ContinueOnError="true" />
+    <Message Importance="high" Text="AssertRendererPacked OK — $(_PackedRendererEntry) is present in $(PackageId).$(PackageVersion).nupkg" />
+  </Target>
+
+  <!-- The publish half of the same guarantee. Checked on the SOURCE directory rather than the output, because
+       a publish has no single archive to inspect; the Content item above is what copies it. -->
+  <Target Name="AssertRendererAvailableForPublish" BeforeTargets="PrepareForPublish">
+    <Error Condition="!Exists('$(SpecScribeRendererEntryPoint)')"
+           Text="No renderer artefact at '$(SpecScribeRendererEntryPoint)', so the published binary would have no sibling renderer/ and could not render a single page.%0A%0ABuild it first:%0A    $(SpecScribeBuildRendererHint)" />
+  </Target>
 
   <ItemGroup>
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />

@@ -29,7 +29,7 @@ deliverables:
 
 # Story 16.3: CLI Packaging and Publication
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -463,92 +463,129 @@ absent diff reads as a decision rather than an oversight
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Establish the baseline before changing anything (AC: #1, #6)**
-  - [ ] `git rev-parse --short HEAD` and `git status --porcelain`; record both. Shared `main` — see CLAUDE.md.
-  - [ ] `cd web && SPECSCRIBE_PACKAGE_BUILD=1 npm ci && npm run sync:assets && npm run build:package` (R1).
-        Confirm `web/.output/server/index.mjs` now exists.
-  - [ ] `dotnet build src/SpecScribe/SpecScribe.csproj --no-incremental` (R8 — embedded assets).
-  - [ ] `dotnet test` and `cd web && npm run check`. **Record the pass/fail counts now**, so a later move is
-        attributable. Expect a `FileWatcherServiceTests` timing flake; 16.1 saw 2962/1/3 and 11/11 on re-run.
-  - [ ] Record `--version`, `-v` and `--help` exit codes on the CURRENT binary, so R2's fix is demonstrable.
+- [x] **Task 1 — Establish the baseline before changing anything (AC: #1, #6)**
+  - [x] `git rev-parse --short HEAD` and `git status --porcelain`; record both. Shared `main` — see CLAUDE.md.
+        → `c73ebcb`, tree CLEAN. (Story frontmatter `baseline_commit: 07bdb79` PRESERVED per the workflow; main
+        advanced TWO merges — `6120d2a` 23.2 and `c73ebcb`/`a2eee2a` 16.2 — between create-story and dev-story.)
+  - [x] `cd web && SPECSCRIBE_PACKAGE_BUILD=1 npm ci && npm run sync:assets && npm run build:package` (R1).
+        Confirm `web/.output/server/index.mjs` now exists. → all three OK; entry point present, 2.18 MB artefact.
+        R1 CONFIRMED: the flag is not optional (npm 11.16.0 / Node 24.18.1). No `allowScripts` warning appeared.
+  - [x] `dotnet build src/SpecScribe/SpecScribe.csproj --no-incremental` (R8 — embedded assets). → 0 warnings.
+  - [x] `dotnet test` and `cd web && npm run check`. **Record the pass/fail counts now.**
+        → `dotnet test` **2978 passed / 0 failed / 3 skipped**. NO FileWatcher flake (16.2's `FileShare.Delete`
+        fix holds). Gates: `check:tokens` OK · `check:ir-content` **-2 rules** (environmental, see notes) ·
+        `check:assets` OK · `check:parity` OK 24/24 routes, 14/14 families.
+  - [x] Record `--version`, `-v` and `--help` exit codes on the CURRENT binary. → **1 / 1 / 0**. R2 confirmed
+        verbatim: `Fatal error: Unknown option 'version'.` / `'v'.`
 
-- [ ] **Task 2 — Version from the tag via MinVer (AC: #1)**
-  - [ ] Add `<PackageReference Include="MinVer" Version="7.0.0" PrivateAssets="All" />`.
-  - [ ] **Delete** `<Version>0.1.0-preview</Version>` (`SpecScribe.csproj:19`) and the now-stale half of the
-        comment above it at `:17-18`. Do not leave a second version literal anywhere.
-  - [ ] Add `MinVerTagPrefix`, `MinVerMinimumMajorMinor`, `MinVerDefaultPreReleaseIdentifiers` (R4).
-  - [ ] Build, then **read `src/SpecScribe/obj/*/net10.0/SpecScribe.AssemblyInfo.cs`**. Assert three things:
-        the version is `0.1.0-preview.0.<height>`; the `+<40-hex>` sha suffix is **still present**; and
-        `AssemblyInformationalVersionAttribute` is what you expect. 🚨 The sha loss is silent (R4).
-  - [ ] Prove version-from-tag: `git tag v0.1.0-preview.1` on a throwaway local commit → rebuild → confirm the
-        version is exactly `0.1.0-preview.1` with **no** height. **Then `git tag -d` it.** Do **not** push a
-        tag (see § Owner actions — the first real tag is the owner's call and 16.4's trigger).
-  - [ ] Confirm the About page still shows the `Preview` badge: generate, then read the rendered `about.html`.
+- [x] **Task 2 — Version from the tag via MinVer (AC: #1)**
+  - [x] Add `<PackageReference Include="MinVer" Version="7.0.0" PrivateAssets="All" />`.
+  - [x] **Delete** `<Version>0.1.0-preview</Version>` and the now-stale half of the comment above it. No second
+        version literal anywhere (verified by grep: `<Version>` survives only inside the replacement comment).
+  - [x] Add `MinVerTagPrefix`, `MinVerMinimumMajorMinor`, `MinVerDefaultPreReleaseIdentifiers` (R4).
+  - [x] Build, then **read `SpecScribe.AssemblyInfo.cs`**. → `0.1.0-preview.0.410+c73ebcb8f2e33f9ef452afdc5c8cb5f0c18d06d8`.
+        All three assertions hold: R4's predicted shape, the `+<40-hex>` sha **still present**, and the attribute
+        is `AssemblyInformationalVersionAttribute`. ⚠️ ONE UNPREDICTED SIDE EFFECT FOUND: MinVer also sets
+        `AssemblyVersion` to `{Major}.0.0.0`, i.e. `0.1.0.0` → `0.0.0.0`. Traced every reader — only
+        `AboutTemplater.cs:70`'s `GetName().Version` fallback, which is unreachable while an informational
+        version exists (MinVer always writes one); the cache-busting token is a module hash, not a version.
+        Documented in the csproj rather than fought.
+  - [x] Prove version-from-tag: `git tag v0.1.0-preview.1` → rebuild → **exactly `0.1.0-preview.1`, NO height**,
+        sha suffix intact. **`git tag -d` executed immediately; `git tag -l` re-verified EMPTY.** Nothing pushed.
+        (Tagged HEAD rather than a throwaway commit — tags are SHARED repo state, not per-worktree, so the
+        window was kept to seconds.)
+  - [x] Confirm the About page still shows the `Preview` badge. → Read from the rendered `about.html` produced by
+        the PACKAGED tool in the foreign probe repo: `<span class="preview-badge">Preview</span>`, Version row
+        `0.1.0-preview.0.410`, **Build row `2026-08-07 · c73ebcb`** — the sha survived end to end into the page.
 
-- [ ] **Task 3 — Ship the renderer inside the package (AC: #3)**
-  - [ ] Add the `None Include` pack item in **exactly** R3's form. No `%(RecursiveDir)`. `$(TargetFramework)`.
-  - [ ] `dotnet pack src/SpecScribe/SpecScribe.csproj -c Release -o artifacts`.
-  - [ ] **List the nupkg's entries** and confirm `tools/net10.0/any/renderer/server/index.mjs` is present at
-        that exact path — the TFM substitution resolved, and the tree is not doubled (R3).
-  - [ ] Record the size delta against a no-renderer pack. 16.1 measured +1,241,709 B (+49.4%) for 3.96 MB / 187
-        files, and noted the figure **has moved twice** — § 2.6 says **derive it, do not quote it**.
-  - [ ] Wire the self-contained publish to place a sibling `renderer/`. 16.1 § 2.4 measured the publish dir
-        holding exactly 2 files (`specscribe.exe`, `.pdb`) before the payload, so `renderer/` is the only
-        sibling packaging must place, and `PublishSingleFile` does **not** move `AppContext.BaseDirectory`.
+- [x] **Task 3 — Ship the renderer inside the package (AC: #3)**
+  - [x] Add the pack item. ⚠️ **SHIPPED AS ONE `Content` ITEM, NOT R3's `None`+`PackagePath` — see Finding F1 in
+        the completion notes.** The measured outcome is identical and the `None` item was proven INERT.
+  - [x] `dotnet pack src/SpecScribe/SpecScribe.csproj -c Release -o artifacts`.
+  - [x] **List the nupkg's entries** → `tools/net10.0/any/renderer/server/index.mjs` present at exactly that
+        path, exactly once. TFM substitution resolved (`net10.0`, not `$(TargetFramework)`); no doubled tree; no
+        duplicate paths; **zero `contentFiles/` leakage** (the `Pack="false"` that prevents it is load-bearing).
+  - [x] Record the size delta against a no-renderer pack — **DERIVED, not quoted**: 2,520,789 B / 25 files →
+        3,739,917 B / 203 files = **+1,219,128 B (+48.4%)** for a 178-file payload. (16.1: +1,241,709 / +49.4%
+        / 187 files. It has moved a third time, as § 2.6 predicted.)
+  - [x] Wire the self-contained publish to place a sibling `renderer/`. → `dotnet publish -r win-x64
+        --self-contained`: sibling `renderer/` with **178 files**, entry point present, and the published binary
+        ran `generate` **from the foreign repo at `errors=0`** with `SPECSCRIBE_RENDERER_DIR` unset.
 
-- [ ] **Task 4 — Make a missing payload impossible to ship (AC: #4)**
-  - [ ] Add the post-pack assertion on the **packaged path** (R7). MSBuild's built-in `Unzip` needs no new dep.
-  - [ ] Prove it fires: move `web/.output` aside, `dotnet pack`, confirm a **failure** naming the artefact and
-        `cd web && npm run build:package`. Restore.
-  - [ ] Prove it does **not** fire on `dotnet build` or `dotnet test`.
-  - [ ] ⚠️ Also prove it would have caught R3's wrong form — temporarily reintroduce `%(RecursiveDir)`, confirm
-        the assertion goes red where a size/count check would have gone green, then revert. This is the one
-        check that validates the guard itself rather than the payload.
+- [x] **Task 4 — Make a missing payload impossible to ship (AC: #4)**
+  - [x] Add the post-pack assertion on the **packaged path** (R7). `AssertRendererPacked`, MSBuild's built-in
+        `Unzip`, no new dependency. Plus `AssertRendererAvailableForPublish` for the publish half.
+  - [x] Prove it fires: moved `web/.output` aside → `dotnet pack` **FAILED**, naming the artefact path and
+        `cd web && npm run build:package`. Restored and re-verified. ⚠️ Note which guard fires: `PackAsTool`
+        packs VIA publish, so the PUBLISH guard trips first and **no broken nupkg is produced at all** — better
+        than the designed behaviour, but worth knowing when reading the error.
+  - [x] Prove it does **not** fire on `dotnet build` or `dotnet test`. → With `web/.output` still renamed away:
+        `dotnet build --no-incremental` **succeeded**, `dotnet test` **38/38 passed**.
+  - [x] ⚠️ Prove it would have caught R3's wrong form. → Done, and it exposed Finding F1 en route. With BOTH
+        items present the wrong `%(RecursiveDir)` form stayed **GREEN** (the `Content` copy masked it); with the
+        `Content` item disabled it went **RED**. Re-proven against the mechanism actually shipped by doubling the
+        `Content` item's `Link`: the bad package had **203 files and 10,675,619 bytes — identical count AND
+        identical total size to the good one — and no entry point.** A size-or-count check passes that; the
+        packaged-path assertion fails it. Every probe edit reverted and re-verified by grep.
 
-- [ ] **Task 5 — `--version` (AC: #2)**
-  - [ ] Add `config.SetApplicationVersion(...)` in `Program.cs`, sourced from the assembly (reuse
-        `ProductMetadata.FromAssembly().Version` so the CLI and the About page cannot drift).
-  - [ ] Run `--version`, `-v`, `--help`. All three must exit **0**. If the global flag is still not intercepted
-        under `CommandApp<TDefaultCommand>` + `UseStrictParsing`, fall back to an explicit settings flag and
-        **say which you shipped** (R2).
-  - [ ] Confirm no short-option collision (`-a`, `-o`, `-p`, `-s`, `-h` are taken; `-v` is free — verified).
+- [x] **Task 5 — `--version` (AC: #2)**
+  - [x] Add `config.SetApplicationVersion(...)` in `Program.cs`, sourced from `ProductMetadata.FromAssembly()`.
+  - [x] Run `--version`, `-v`, `--help`. → **0 / 0 / 0**, all printing `0.1.0-preview.0.410`. **`SetApplicationVersion`
+        alone WAS sufficient** under `CommandApp<TDefaultCommand>` + `UseStrictParsing` — the R2 fallback (an
+        explicit settings flag) was NOT needed and was NOT shipped. Re-verified from the INSTALLED tool too.
+  - [x] Confirm no short-option collision. → `--help` diff before/after is exactly **one added line**
+        (`-v, --version  Prints version information`); nothing else moved.
 
-- [ ] **Task 6 — The two inherited defects (AC: #5)**
-  - [ ] `FindRepoRoot`: accept `.git` as a file or a directory; widen to `internal`; test with a temp dir whose
-        `.git` is a **file**.
-  - [ ] Non-200 diagnostics: add the bounded `internal static` extraction helper; use it at
-        `NuxtPrerender.cs:288-291`; emit the server-log tail once per run. Unit-test the helper against a
-        Nitro-shaped JSON body **and** a non-JSON body.
-  - [ ] Keep both tests Node-free and artefact-free (`NuxtPrerenderTests.cs:14-16`).
+- [x] **Task 6 — The two inherited defects (AC: #5)**
+  - [x] `FindRepoRoot`: accepts `.git` as a file **or** a directory; widened to `internal`; tested against a temp
+        tree with an outer `.git` DIRECTORY and a nested worktree whose `.git` is a FILE. **Red-green proven**:
+        with the fix reverted that one test fails and the other two still pass, so it discriminates the defect
+        rather than the walk. Also verified operationally — see the completion notes.
+  - [x] Non-200 diagnostics: `DescribeRouteFailure(HttpStatusCode, string?)` + `ExtractRendererMessage`, bounded
+        at 500 chars with newline collapsing; wired in at the non-200 branch; server-log tail attached **once per
+        run** via `serverLogAttached`. Unit-tested against a Nitro-shaped JSON body, a non-JSON HTML body, empty/
+        whitespace/null bodies, the 20,000-char flood, and newline collapsing.
+  - [x] Keep both tests Node-free and artefact-free. → No Node, no artefact, no network; temp dirs only.
+        The file's stale "Story 16.3 has not been built" header note was corrected without weakening the rule.
 
-- [ ] **Task 7 — Prove it end-to-end from a FOREIGN repository (AC: #2, #3)**
-  - [ ] `dotnet tool install SpecScribe --version <the MinVer version> --tool-path ./probe-tools --add-source ./artifacts`.
-        ⚠️ **Read the version from the produced nupkg filename** — under MinVer it is no longer a literal you
-        can type from memory.
-  - [ ] In a **different git repository** with **no `web/` directory** and `SPECSCRIBE_RENDERER_DIR` **unset**:
-        assert both preconditions first (16.1 asserted them rather than assuming), then `generate`, and require
-        `errors=0`. Use `$CLAUDE_JOB_DIR/tmp`, not `/tmp`.
-  - [ ] **The negative case:** rename the packaged `renderer/` away, re-run, and confirm it **fails** — proving
-        candidate 3 did not silently rescue it, i.e. that the probe repo was genuinely foreign (16.1 § 2.3).
-  - [ ] Run `specscribe --version` and `--help` from the installed tool, not just from `bin/Debug`.
+- [x] **Task 7 — Prove it end-to-end from a FOREIGN repository (AC: #2, #3)**
+  - [x] `dotnet tool install SpecScribe --version 0.1.0-preview.0.410 --tool-path … --add-source ./artifacts`.
+        Version **read off the produced nupkg filename**, never typed.
+  - [x] Foreign repo in `$CLAUDE_JOB_DIR/tmp/foreign-repo`. **Preconditions ASSERTED, not assumed**: `web/`
+        absent, `SPECSCRIBE_RENDERER_DIR` empty, real `.git`, outside the SpecScribe checkout. → `generate`
+        **errors=0, exit 0**. On-disk proof of the packaged shape:
+        `probe-tools\.store\specscribe\0.1.0-preview.0.410\specscribe\0.1.0-preview.0.410\tools\net10.0\any\renderer`.
+  - [x] **The negative case:** renamed the packaged `renderer/` away → re-run **FAILED, errors=1, exit 1**, with
+        the three-location message. Candidate 3 did **not** rescue it, so the probe repo was genuinely foreign
+        and the positive result above is not a false pass. Restored → `errors=0` again.
+  - [x] Run `specscribe --version` and `--help` from the installed tool. → **0 / 0**, `0.1.0-preview.0.410`,
+        88-line help.
 
-- [ ] **Task 8 — Documentation, only where this story falsified it (AC: #2, #6)**
-  - [ ] Fix the three README sites in R9's table. Remove the `SPECSCRIBE_RENDERER_DIR` step from the published
-        CI recipe (ADR 0040 § Consequences) and the "bump the `<Version>`" instruction.
-  - [ ] Write `docs/Packaging.md`: the build order from R1, the pack shape, how to verify a package, and R3/R7's
-        traps. This is the artifact 16.4 builds its pipeline from.
-  - [ ] Do **not** create `CHANGELOG.md`, write listing copy, or surface the Node prerequisite on listings —
-        16.6's, all three (R9).
+- [x] **Task 8 — Documentation, only where this story falsified it (AC: #2, #6)**
+  - [x] Fix the three README sites in R9's table. Removed the `SPECSCRIBE_RENDERER_DIR` step and env block from
+        the published CI recipe, and the "bump the `<Version>`" instruction. **Plus one site R9 did not list and
+        this story's own change newly falsified**: that recipe's `actions/checkout` of `.specscribe-src` was
+        shallow, and MinVer on a tagless shallow clone yields a WRONG VERSION rather than an error — added
+        `fetch-depth: 0` with the reason. (README's embedded consumer recipe, NOT `.github/**` — see AC #6.)
+        The hard-coded `--version 0.1.0-preview` became a derivation from the nupkg filename.
+  - [x] Write `docs/Packaging.md` — build order, pack shape, versioning, the two traps, the four-step
+        verification recipe including the mandatory negative case, and an explicit § What this does not cover.
+  - [x] Do **not** create `CHANGELOG.md`, write listing copy, or surface the Node prerequisite on listings.
+        → None of the three done. The nuget.org relative-link limitation is RECORDED in `docs/Packaging.md`
+        as a known limitation with the rewrite left to 16.6, rather than half-done here.
 
-- [ ] **Task 9 — Regression floor and scope guard (AC: #6)**
-  - [ ] `dotnet build --no-incremental`, `dotnet test`, `cd web && npm run check` (all four gates).
-  - [ ] If any gate moved: **establish causality before touching a baseline** (R8). Bisect into a throwaway tree
-        via `git archive HEAD` into the scratchpad — never by resetting the shared tree.
-  - [ ] `git status --porcelain .github web extension` → must be **empty**. Verify the revert of every temporary
-        probe edit **with that command**, not by remembering you made it (16.1 § 7.1).
-  - [ ] Grep for each symbol you added before relying on it — CLAUDE.md § Concurrent work: a write that returned
-        success has silently vanished in this repository before.
-  - [ ] Record in the completion notes: no structural scope change; whose commits your work sat on top of.
+- [x] **Task 9 — Regression floor and scope guard (AC: #6)**
+  - [x] `dotnet build --no-incremental`, `dotnet test`, `npm run check` (all four gates).
+        → build OK; **2989 passed / 0 failed / 3 skipped** (baseline 2978 → **+11, exactly the 11 tests added**);
+        `check:tokens` OK · `check:ir-content` **-2, IDENTICAL to baseline** · `check:assets` OK · `check:parity`
+        OK 24/24, 14/14.
+  - [x] If any gate moved: establish causality first. → **NO gate moved and NO baseline was regenerated.**
+        `check:ir-content`'s `-2` was present BEFORE any edit (proven: `git status` showed zero source changes)
+        and its cause was traced, not assumed — see the completion notes.
+  - [x] `git status --porcelain .github web extension` → **EMPTY**, re-run after all probe reverts. `git tag -l`
+        → **empty**. `artifacts/` confirmed gitignored (`!!`); all probe dirs live in `$CLAUDE_JOB_DIR/tmp`.
+  - [x] Grep for each symbol added before relying on it. → All 14 verified present at named line numbers.
+  - [x] Record in the completion notes: no structural scope change; whose commits this sat on top of.
 
 ---
 
@@ -682,8 +719,161 @@ credential posture. R4's three MinVer properties sit **inside** § Decision 5's 
 
 ### Agent Model Used
 
+Claude Opus 5 (1M context) — `claude-opus-5[1m]`, via `bmad-dev-story`, 2026-08-07.
+
 ### Debug Log References
+
+Executed in worktree `worktree-story-16-3-dev` at `c73ebcb` (story frontmatter `baseline_commit: 07bdb79`
+PRESERVED per the workflow). Probe artefacts — foreign repo, tool-path install, self-contained publish — all in
+`$CLAUDE_JOB_DIR/tmp`, never inside the repository.
+
+| # | probe | result |
+|---|---|---|
+| 1 | `--version` / `-v` / `--help` BEFORE | `1 / 1 / 0` — R2 reproduced verbatim |
+| 2 | `--version` / `-v` / `--help` AFTER | `0 / 0 / 0`; `--help` diff = exactly one added line |
+| 3 | `AssemblyInfo.cs` after MinVer | `0.1.0-preview.0.410+c73ebcb8…` — sha survived |
+| 4 | local tag `v0.1.0-preview.1` | exactly `0.1.0-preview.1`, no height; tag deleted, `git tag -l` empty |
+| 5 | pack, both items | 203 files, entry point present |
+| 6 | pack, `Content` only | 203 files, **byte-identical** |
+| 7 | pack, `None` only | 203 files, entry point present |
+| 8 | pack, `None` WRONG-FORM + `Content` | 203 files, entry point present, **no doubled tree** → F1 |
+| 9 | pack, `None` WRONG-FORM, `Content` off | **RED** — guard fires |
+| 10 | pack, `Content` `Link` doubled | **RED** — 203 files / 10,675,619 B, identical to good, no entry point |
+| 11 | pack, `web/.output` renamed away | **RED** (publish guard, before any nupkg exists) |
+| 12 | `build` + `test`, artefact absent | build OK, 38/38 tests pass — guards correctly scoped |
+| 13 | foreign repo, packaged tool | `errors=0`, exit 0 |
+| 14 | foreign repo, renderer renamed away | `errors=1`, exit 1 — probe proven genuinely foreign |
+| 15 | foreign repo, self-contained `win-x64` | `errors=0`, exit 0; sibling `renderer/` = 178 files |
+| 16 | worktree generate, env var UNSET | `errors=0`, 1553 routes — R5(a) fixed operationally |
 
 ### Completion Notes List
 
+**All 9 tasks complete. All 6 ACs satisfied.** SpecScribe now packages as a `dotnet` global tool and as a
+self-contained binary that each **carry their own renderer** and render from a foreign repository with no
+configuration; the version comes from the git tag; `--version` works for the first time; and both defects 16.1
+routed here are fixed and tested.
+
+#### 🚨 F1 — the prescribed two-item packaging shape was WRONG, and the wrong half was the one that hides defects
+
+The story's R3/R11 prescribed **two** MSBuild items — a `None` with `Pack="true"` + `PackagePath` for the nupkg,
+and a publish-time copy for the binary — reasoning that pack and publish are separate pipelines. Half of that is
+right: a publish copy is invisible to a plain `dotnet pack` of a *library*. But **`PackAsTool` builds
+`tools/<tfm>/any/` FROM THE PUBLISH OUTPUT**, so here the publish copy populates the nupkg as well.
+
+Measured four ways (probes 5–8), each a full pack plus `unzip -l`. The finding is probe 8: with the `Content`
+item present, the `None` item contributes **nothing — not even its own damage**. A deliberately broken
+`PackagePath` on it left the package *byte-identical to correct* and the guard **green**. So shipping both items
+would have shipped one item that looks load-bearing, is not, and silently absorbs its own defects.
+
+**Shipped one `Content` item instead**, proven to produce a byte-identical package (probe 6) and to serve the
+publish channel (probe 15). This is a deviation from the story's prescribed *mechanism*, not from ADR 0040:
+§ Decision 1 specifies the packaged PATH and the sibling directory, both of which are unchanged and asserted on
+every pack. Per R10 this is recorded here rather than buried, and it is **not** an ADR amendment — no ADR
+statement is contradicted. It IS a correction to 16.1 § 2.7(1)'s premise, which 16.4 should inherit;
+`docs/Packaging.md` § "One item, not two" carries the measurement table so the next story does not re-derive it.
+
+#### AC #4's guard is validated against the mechanism actually shipped
+
+Probe 10 is the one that matters, and it is the story's own trap reproduced in the real wiring: a doubled `Link`
+produced a package with **203 files and 10,675,619 bytes — identical count and identical total size to the good
+package — and no entry point.** A size-or-count check calls that a pass. The packaged-path assertion calls it a
+failure. Both guards are scoped so `dotnet build` and `dotnet test` are untouched (probe 12).
+
+One behaviour worth knowing: because `PackAsTool` packs via publish, the **publish** guard fires first on a
+missing artefact, so `dotnet pack` fails *before* producing a broken nupkg rather than after. Better than
+designed; documented in `docs/Packaging.md` so a reader is not surprised by which error they get.
+
+#### R4's silent regression checked — and one side effect the story did not predict
+
+The `+<sha>` suffix survived MinVer (probe 3) and reaches the rendered page: the About page's Build row shows
+`2026-08-07 · c73ebcb`, read from the site the PACKAGED tool generated. The `Preview` badge is present and the
+version is `0.1.0-preview.0.410`. Since no test guarded any of this, `AboutTemplaterTests` now pins commit-hash
+presence and pre-release-ness **by shape, never by literal** (both move every commit).
+
+**Unpredicted:** MinVer also sets `AssemblyVersion` to `{Major}.0.0.0`, so `0.1.0.0` → `0.0.0.0`. Every reader was
+traced before accepting it: the only one is `AboutTemplater.cs:70`'s `GetName().Version` fallback, unreachable
+while an informational version exists — and MinVer always writes one. `AssemblyFileVersion` still tracks the real
+version. Accepted and documented in the csproj rather than fought with a target.
+
+#### R5(a) is fixed, and CLAUDE.md's worktree workaround is now obsolete
+
+`.git` in this worktree is a **56-byte file** (exactly 16.1's measurement). Before the fix, an unset
+`SPECSCRIBE_RENDERER_DIR` here walked past the worktree root to `C:\Dev\SpecScribe`, whose `web/.output` does
+**not** exist — so the developer path failed outright, and in a checkout that *did* have one it would have
+rendered from another checkout's artefact. After the fix, `generate` from this worktree with the env var unset
+completes at **`errors=0` across 1553 routes** (probe 16). Project memory recording "set `SPECSCRIBE_RENDERER_DIR`
+or the prerender silently skips" is now stale and has been updated.
+
+#### R5(b) proved itself in the field within an hour of being written
+
+The first foreign-repo probe returned `errors=1`, and the new `DescribeRouteFailure` printed the cause in-band:
+*"The epics index IR entry declares no child pages…"* — **16.1 Finding #1 verbatim**, which 16.1 could only obtain
+by booting the artefact by hand. That is a renderer defect already routed to **Story 23.3** and recorded as
+**gating 16.7**; it is not a packaging fault, and it is not this story's to fix. Re-run with a corpus whose epics
+index has children: `errors=0`. This is precisely the support burden Epic 16 would otherwise have shipped.
+
+#### Gate discipline — NO baseline was regenerated
+
+`check:ir-content` is red by `-2` rules (`.mini-donut`) and was **red before any edit**, proven by `git status`
+showing zero source changes at the time. Causality established rather than assumed: `.mini-donut` is emitted only
+for a story with *partially* complete tasks (`HtmlRenderAdapter.Epics.cs:427`), and this checkout's story data has
+none — every story is 0-done or all-done. Data-dependent, no stylesheet involved, **identical before and after**.
+Two earlier red readings were also environmental and were resolved by fixing the input, not the baseline: a fresh
+worktree has no IR at all, and a generate **without `--deep-git`** produced the documented `+4/-187` deep-analytics
+signature (CI documents `+4/-182`; 16.1 saw `+4/-185`). Following the gate's own suggested fix would have deleted
+187 live rules behind a green gate.
+
+#### NFR9 — exactly one gap closed, and it is this story's
+
+ADR 0040 § 7's ledger: `npm ci` **already closed** by `0b1f561` (credited to 16.2, not here); **version-from-tag
+CLOSED by this story**; `SOURCE_DATE_EPOCH` remains 16.4's (the csproj already honours it, no workflow sets it);
+`Deterministic`/`ContinuousIntegrationBuild`/SourceLink remain deferred to 17.4's burndown; byte-identical Nuxt
+rebuilds explicitly out of scope. **No broader reproducibility claim is made.**
+
+#### Scope
+
+**Nothing was published and no tag was pushed** (R11). The tag proof used a local tag, deleted seconds later;
+`git tag -l` is empty. `.github/**`, `web/**` and `extension/**` are untouched — verified by
+`git status --porcelain` on those three paths after every probe revert, not by recollection (16.1 § 7.1). Story
+16.2 owns `.github/**` this sprint and there is no hunk-level overlap to attribute.
+
+**No structural scope change**: no story added, removed or renumbered, so neither `epics.md` nor
+`sprint-status.yaml` needed a structural edit — recorded explicitly so the absent `epics.md` diff reads as a
+decision rather than an oversight. **No new ADR**: ADR 0040 decides every shape here, and F1 changes a mechanism
+the ADR does not specify.
+
+⚠️ **One drift corrected on entry:** `sprint-status.yaml` had `16-3-cli-packaging-and-publication: backlog` while
+the story file read `ready-for-dev`. Create-story 16.3 (merged at `792b308`) landed the story file but its
+sprint-status edit did not survive the merge. The story file was treated as authoritative and the key corrected.
+
+**This work sat on top of:** `a2eee2a`/`c73ebcb` (Story 16.2 — CI gate, the `FileShare.Delete` flake fix whose
+2978-test floor this inherited), `6120d2a` (23.2), `792b308` (create-story 16.3), and `0b1f561` (the lockfile
+repair that made R1's `npm ci` precondition work).
+
+#### 👤 Owner actions still outstanding (unchanged by this story, re-flagged because a package now exists)
+
+1. **Ratify ADR 0040** — still `Proposed`. R10's reasoning for proceeding stands; the residual exposure is
+   § Decision 5's *mechanism*, which is one `PackageReference` and three properties to swap.
+2. **Decide whether the first real tag gets pushed.** Recommendation unchanged: not until 16.4 lands.
+3. **Reserve `SpecScribe` on nuget.org and the five npm names** — the only item a third party can take.
+4. **Confirm Trusted Publishing is visible on the nuget.org account** — before 16.4 starts, not during.
+
+### Change Log
+
+| date | change |
+|---|---|
+| 2026-08-07 | Story 16.3 implemented. MinVer replaces the `<Version>` literal; the renderer artefact now ships inside both the nupkg and the self-contained publish; two build-time guards make a renderer-less package impossible to produce; `--version`/`-v` work for the first time; `FindRepoRoot` recognises a git worktree; a non-200 from the renderer now carries the renderer's own error text. README corrected at four sites, `docs/Packaging.md` added. Status: ready-for-dev → in-progress → review. |
+
 ### File List
+
+| file | change |
+|---|---|
+| `src/SpecScribe/SpecScribe.csproj` | MODIFIED — `<Version>` deleted; MinVer 7.0.0 + three properties; renderer `Content` item for both channels; `AssertRendererPacked` and `AssertRendererAvailableForPublish` targets. Preserved: every `EmbeddedResource`, `PackageReadmeFile`, `PackageLicenseExpression`, the `SOURCE_DATE_EPOCH` block, `InternalsVisibleTo`. |
+| `src/SpecScribe/Program.cs` | MODIFIED — one `SetApplicationVersion` call. `UseStrictParsing`, `PropagateExceptions`, the example rules and the `CommandParseException` → menu fallback all preserved. |
+| `src/SpecScribe/NuxtPrerender.cs` | MODIFIED — `FindRepoRoot` widened to `internal` and made worktree-aware via `IsRepoRoot`; `DescribeRouteFailure` + `ExtractRendererMessage` + `MaxRouteFailureDetail` + `WhitespaceRun` added and wired into the non-200 branch; server-log tail attached once per run; two stale Story-16.3 doc-comment claims corrected. Preserved: the override's hard-fail-on-miss, Node-before-artefact ordering, the full-`MainLandmark` anchor, polled readiness, `TryKill` in `finally`. |
+| `tests/SpecScribe.Tests/NuxtPrerenderTests.cs` | MODIFIED — 10 tests added (3 × `FindRepoRoot`, 7 × `DescribeRouteFailure`) plus a `Canonical` helper; stale header note corrected without weakening the Node-free/artefact-free rule. |
+| `tests/SpecScribe.Tests/AboutTemplaterTests.cs` | MODIFIED — 1 test added pinning the `+<sha>` suffix and the pre-release label by shape (R4's two silent regressions). |
+| `README.md` | MODIFIED — four sites: the `<Version>`-bump instruction, the "does not yet carry its renderer" blockquote, the published CI recipe's hard-coded `--version` and `SPECSCRIBE_RENDERER_DIR` block, and that recipe's shallow `actions/checkout` (needs `fetch-depth: 0` under MinVer). Embedded consumer recipe only — **no `.github/**` file was touched.** |
+| `docs/Packaging.md` | **NEW** — how a package is produced and verified, the two traps, and what is out of scope. The artifact 16.4 builds its pipeline from. |
+| `_bmad-output/implementation-artifacts/16-3-cli-packaging-and-publication.md` | MODIFIED — this record. |
+| `_bmad-output/implementation-artifacts/sprint-status.yaml` | MODIFIED — `16-3` key: `backlog` (drift) → `in-progress` → `review`. |
