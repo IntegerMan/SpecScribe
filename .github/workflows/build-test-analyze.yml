@@ -610,8 +610,8 @@ jobs:
           EXECUTABLE="$EXTRACT/$ROOT/specscribe"
           [ '${{ matrix.rid }}' != win-x64 ] || EXECUTABLE="$EXECUTABLE.exe"
           unset SPECSCRIBE_RENDERER_DIR
-          "$EXECUTABLE" generate --source "$PROBE/foreign source/_bmad-output" --adrs "$PROBE/foreign source/adrs" --output "$PROBE/site output" --project-name "Stage A probe"
-          test -f "$PROBE/site output/index.html"
+          "$EXECUTABLE" generate --source "$PROBE/foreign source/_bmad-output" --adrs "$PROBE/foreign source/adrs" --output "$PROBE/site output" --project-name "Stage A probe" | tee probe.log
+          grep -rl '<main id="main-content"' "$PROBE/site output" > /dev/null
       - uses: actions/upload-artifact@v4
         with: { name: stage-a-${{ matrix.rid }}, path: dist/*, if-no-files-found: error, retention-days: 7 }
 
