@@ -41,13 +41,17 @@ deliverables:
 
 # Story 16.4: Tag-Triggered Release Pipeline
 
-Status: in-progress
+Status: done
 
 > **Reopened 2026-08-08:** This record's completed tag-triggered implementation was superseded by accepted
 > ADR 0040 §Decision 9. This pass moves automatic tag creation and prerelease GitHub Release publication into
 > the successful `build-test-analyze` run (Stage A), and converts this filename-preserved workflow into manual
 > registry promotion (Stage B). The legacy acceptance criteria and completion notes remain historical evidence;
 > they do not define the replacement execution graph.
+
+> **Completed 2026-08-08:** Stage A created `v0.1.1-preview.2` with its nupkg and three RID archives. Stage B
+> promoted that immutable nupkg through NuGet Trusted Publishing, and the owner verified the package is public
+> on nuget.org. The earlier failed preflights did not reach the package push.
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
