@@ -1348,4 +1348,90 @@ public class HtmlTemplaterTests
         Assert.True(html.IndexOf("Functional reqs", StringComparison.Ordinal) <
                     html.IndexOf("Epics drafted", StringComparison.Ordinal));
     }
+
+    // ---- Story 17.1: BmadCommands.ForStory routes through StatusStyles, not raw substring matching ---------
+
+    private static CommandCatalog NextStepCommands() => new("BMad", new Dictionary<string, string>
+    {
+        ["dev-story"] = "/bmad-dev-story",
+        ["code-review"] = "/bmad-code-review",
+        ["create-story"] = "/bmad-create-story",
+        ["correct-course"] = "/bmad-correct-course",
+    });
+
+    [Theory]
+    [InlineData("retired")]
+    [InlineData("superseded")]
+    [InlineData("cancelled")]
+    public void RenderNextSteps_RetiredStory_OffersNoWork(string status)
+    {
+        // ADR 0025 Decision 1: `retired` is TERMINAL, and StatusStyles.RetirementStatusWords maps six authored
+        // words onto it. The old raw-text chain matched none of its arms on any of them, so a retired story fell
+        // through to the default and invited the reader to `create-story` the very id that had been retired.
+        var html = BmadCommands.RenderNextSteps(Story("1.1", status), NextStepCommands());
+
+        Assert.DoesNotContain("/bmad-create-story", html);
+        Assert.DoesNotContain("/bmad-dev-story", html);
+    }
+
+    [Fact]
+    public void RenderNextSteps_AgreesWithStatusStyles_OnEveryStatusItClassifies()
+    {
+        // The SSOT property this rewrite buys: the next-step panel and every badge/chart now answer "what stage
+        // is this story in?" from ONE classifier, so they cannot drift apart.
+        //
+        // Note what this deliberately does NOT change. Story 17.1's brief offered `code-review-blocked` as a
+        // case where `Contains("review")` was wrong. Routed through StatusStyles it still resolves to `review`,
+        // because that classifier splits on `-` and `review` is a whole TOKEN there, not an accident of
+        // substring matching. Whether a *blocked* story should read as "in review" is a StatusStyles-level
+        // question that would move every badge, lane, donut and tally with it — out of scope here, and recorded
+        // in deferred-work.md rather than forked into a second opinion in this file.
+        string[] statuses =
+        [
+            "ready-for-dev", "in-progress", "review", "done", "drafted", "retired",
+            "code-review-blocked", "incomplete", "blocked", "wontfix",
+        ];
+
+        foreach (var status in statuses)
+        {
+            var story = Story("1.1", status);
+            var html = BmadCommands.RenderNextSteps(story, NextStepCommands());
+            var stage = StatusStyles.ForStory(story);
+
+            // A terminal stage never invites work ON THIS STORY — no drafting it, no implementing it. (The
+            // done/retired panel may still offer a follow-on such as correct-course, which is not story work.)
+            // Every other stage offers at least one command.
+            if (stage is "done" or "retired")
+            {
+                Assert.DoesNotContain("data-copy=\"/bmad-create-story", html);
+                Assert.DoesNotContain("data-copy=\"/bmad-dev-story", html);
+            }
+            else
+            {
+                Assert.Contains("data-copy=\"/bmad-", html);
+            }
+        }
+    }
+
+    [Fact]
+    public void RenderNextSteps_Incomplete_IsNotTreatedAsComplete()
+    {
+        // The mirror trap: `Contains("complete")` is true for "incomplete", which would have silently returned
+        // an EMPTY suggestion list for a story that has not started. StatusStyles uses token comparison for
+        // exactly this reason, and its own comment names this case.
+        var html = BmadCommands.RenderNextSteps(Story("1.1", "incomplete"), NextStepCommands());
+
+        Assert.Contains("/bmad-create-story", html);
+    }
+
+    [Fact]
+    public void RenderNextSteps_CanonicalStages_StillRouteAsBefore()
+    {
+        // The rewrite must be behaviour-preserving on every stage that already worked.
+        var commands = NextStepCommands();
+        Assert.Contains("/bmad-dev-story", BmadCommands.RenderNextSteps(Story("1.1", "ready-for-dev"), commands));
+        Assert.Contains("/bmad-dev-story", BmadCommands.RenderNextSteps(Story("1.1", "in-progress"), commands));
+        Assert.Contains("/bmad-code-review", BmadCommands.RenderNextSteps(Story("1.1", "review"), commands));
+        Assert.Contains("/bmad-create-story", BmadCommands.RenderNextSteps(Story("1.1", "drafted"), commands));
+    }
 }

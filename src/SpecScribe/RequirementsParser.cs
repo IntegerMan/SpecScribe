@@ -52,7 +52,7 @@ public static class RequirementsParser
         var mapCoverage = ParseCoverage(mapLines);
         // Second source: epic-header reverse index. Scoped per kind in ResolveCoverage so FRs stay map-only.
         var headerCoverage = ParseEpicHeaderCoverage(lines);
-        var epicsByNumber = epics.Epics.ToDictionary(e => e.Number);
+        var epicsByNumber = epics.Epics.ByFirst(e => e.Number);
 
         var functional = ParseDefs(frLines, RequirementKind.Functional, withCategories: true,
             mapCoverage, headerCoverage, epicsByNumber);
@@ -304,7 +304,7 @@ public static class RequirementsParser
     /// (routing is best-effort, never throws). [Story 3.7 Task 1.3]</summary>
     public static IReadOnlyList<StoryInfo> StoriesFor(RequirementInfo req, EpicsModel epics)
     {
-        var byNumber = epics.Epics.ToDictionary(e => e.Number);
+        var byNumber = epics.Epics.ByFirst(e => e.Number);
         return req.CoverageEpicNumbers
             .Where(byNumber.ContainsKey)
             .SelectMany(n => byNumber[n].Stories)

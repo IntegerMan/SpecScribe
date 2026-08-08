@@ -1293,4 +1293,73 @@ public class EpicsParserTests
         Assert.Equal("File List", record[1].Label);
         Assert.Contains("EpicsParser.cs", record[1].ContentHtml);
     }
+
+    // ---- Story 17.1: a duplicated epic number is a typo in a hand-authored file, not a crash ----------------
+    //
+    // Ten call sites indexed epics with a bare `ToDictionary(e => e.Number)` and threw ArgumentException on a
+    // repeated number; an eleventh had already worked around it with a first-wins GroupBy. The disagreement was
+    // the single-source-of-truth violation. `NumberIndex.ByFirst` now carries the one policy, and these pin it.
+
+    private const string DuplicateEpicNumberMd = """
+        # Epics
+
+        ## Overview
+
+        A plan whose author typed "Epic 1" twice.
+
+        ## Epic List
+
+        ### Epic 1: Foundation
+
+        Get the project standing up.
+
+        ### Epic 1: Foundation Again
+
+        The same number, by mistake.
+
+        ## Epic 1: Foundation
+
+        ### Story 1.1: Scaffold the project
+
+        As a developer, I want a skeleton, so that work can begin.
+
+        **Acceptance Criteria:**
+
+        **Given** nothing
+        **When** the project builds
+        **Then** it succeeds
+        """;
+
+    [Fact]
+    public void Parse_DuplicateEpicNumber_DoesNotThrow_AndKeepsTheFirstDeclaration()
+    {
+        // Before the fix this threw ArgumentException ("An item with the same key has already been added")
+        // out of EpicsParser's own `ParseEpicSections(...).ToDictionary(s => s.Number)`.
+        var model = EpicsParser.Parse(DuplicateEpicNumberMd);
+
+        // Both list entries survive parsing — nothing is silently dropped from the model itself.
+        Assert.Equal(2, model.Epics.Count);
+        Assert.All(model.Epics, e => Assert.Equal(1, e.Number));
+
+        // First-wins: the H2 section body attaches to the FIRST "Epic 1", the way a person reads the file.
+        Assert.Equal("Foundation", model.Epics[0].Title);
+        var story = Assert.Single(model.Epics[0].Stories);
+        Assert.Equal("1.1", story.Id);
+    }
+
+    [Fact]
+    public void DownstreamEpicNumberLookups_TolerateADuplicate_RatherThanThrowing()
+    {
+        var model = EpicsParser.Parse(DuplicateEpicNumberMd);
+
+        // The builders that index epics by number are the ones that used to throw. This must complete.
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasReadme: false);
+        var view = EpicsViewBuilder.BuildIndex(model, ProgressModel.Empty, nav, CommandCatalog.Empty);
+        Assert.NotNull(view);
+
+        // And the shared policy itself, exercised directly on the duplicate: first declaration wins.
+        var byNumber = model.Epics.ByFirst(e => e.Number);
+        Assert.Single(byNumber);
+        Assert.Equal("Foundation", byNumber[1].Title);
+    }
 }

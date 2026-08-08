@@ -106,9 +106,11 @@
   --motion-entrance-long: 0.9s; /* the progress-bar width sweep */
   --motion-ease: ease-out;
   --motion-stagger: 0.04s;      /* per-item entrance delay unit — heatmap columns wipe left-to-right */
-}
 
-:root {
+  /* ---- Planning <-> code impact-map commit-intensity ramp (Story 21.3) ----
+     Mirrors the commit heatmap's gold sequence. Declared HERE rather than beside the impact-map rules so this
+     file has exactly ONE top-level `:root`: a second one re-opened 5,700 lines away is the duplicate-selector
+     shape that hides a token override in plain sight. [Story 17.1] */
   --impact-lvl-1: #f3e8c6;
   --impact-lvl-2: #e9cd82;
   --impact-lvl-3: #dcae4d;

@@ -97,6 +97,16 @@
   --motion-entrance-long: 0.9s; /* the progress-bar width sweep */
   --motion-ease: ease-out;
   --motion-stagger: 0.04s;      /* per-item entrance delay unit — heatmap columns wipe left-to-right */
+
+  /* ---- Planning <-> code impact-map commit-intensity ramp (Story 21.3) ----
+     Mirrors the commit heatmap's gold sequence. Declared HERE rather than beside the impact-map rules so this
+     file has exactly ONE top-level `:root`: a second one re-opened 5,700 lines away is the duplicate-selector
+     shape that hides a token override in plain sight. [Story 17.1] */
+  --impact-lvl-1: #f3e8c6;
+  --impact-lvl-2: #e9cd82;
+  --impact-lvl-3: #dcae4d;
+  --impact-lvl-4: #c8912b;
+  --impact-lvl-5: #a86f1e;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1671,9 +1681,7 @@ pre.code-file code[class*="language-"] {
 /* The tablist is a real <fieldset> of radios (a visually-hidden legend names the choice for assistive tech); the
    fieldset's default chrome is stripped so it reads as a segmented control. */
 .code-tablist {
-  border: 0;
   margin: 0 0 1.25rem;
-  padding: 0;
   display: inline-flex;
   gap: 0.25rem;
   background: var(--parchment);
@@ -2001,7 +2009,6 @@ pre.code-file code[class*="language-"] {
 .ss-tabs { margin-top: 1.5rem; }
 
 .ss-tablist {
-  border: 0;
   margin: 0 0 1.25rem;
   display: inline-flex;
   gap: 0.25rem;
@@ -3679,7 +3686,7 @@ a.work-node:focus-visible {
 .next-step-card.drafted .next-step-kicker { color: var(--gold); }
 .next-step-command { min-width: 0; }
 .next-step-command .cmd-badge { max-width: 100%; }
-.next-step-command .cmd-text { white-space: normal; word-break: break-word; }
+.next-step-command .cmd-text { white-space: normal; overflow-wrap: break-word; }
 .next-step-desc {
   margin: 0;
   font-size: 0.78rem;
@@ -3879,7 +3886,8 @@ a.work-node:focus-visible {
 /* Interactive grammar (Story 1.5 D1): Now & Next cards are links, so they get the same lift the other
    interactive cards have (they previously only got a shadow). */
 .now-next-card:hover { box-shadow: 0 3px 10px var(--shadow); border-color: var(--rust-light); transform: translateY(-1px); }
-.now-next-card.active { border-left-color: var(--status-active); }
+/* `.active` is deliberately absent from this status-accent run: it is the emphasised "In development" card and
+   carries its accent together with its wash in the single block just below, so the selector is declared once. */
 .now-next-card.review { border-left-color: var(--status-review); }
 .now-next-card.ready { border-left-color: var(--status-ready); }
 .now-next-card.drafted { border-left-color: var(--status-drafted); }
@@ -3889,6 +3897,7 @@ a.work-node:focus-visible {
 /* The "In development" card is the single most important answer on the page — where the work is right now.
    Give it a subtle teal wash and a slightly bolder accent so the eye lands there first (Story 1.5 D4). */
 .now-next-card.active {
+  border-left-color: var(--status-active);
   background: linear-gradient(180deg, #e4efec, var(--cream));
   border-left-width: 4px;
 }
@@ -5742,14 +5751,8 @@ tr.unmapped .trace-row-head { background: color-mix(in srgb, var(--status-pendin
    multi-selects epics and the script merges their touched files into one squarified treemap, tiles SIZED by churn
    and COLORED by commit count. With JS off, the epic-grouped text list (the .impact-fallback <details>) is the
    content and the .impact-controls stay hidden. The epic/story pages still carry the compact "Code areas touched"
-   list widget (.code-areas-panel). Commit-intensity ramp mirrors the commit heatmap's gold sequence. */
-:root {
-  --impact-lvl-1: #f3e8c6;
-  --impact-lvl-2: #e9cd82;
-  --impact-lvl-3: #dcae4d;
-  --impact-lvl-4: #c8912b;
-  --impact-lvl-5: #a86f1e;
-}
+   list widget (.code-areas-panel). Commit-intensity ramp mirrors the commit heatmap's gold sequence — its
+   --impact-lvl-1..5 tokens live in the single top-level :root at the head of this file. */
 
 /* --- epic-grouped text list (fallback + text-equivalent, and the epic/story widgets) --- */
 .impact-epic { margin-bottom: 1.4rem; }
@@ -5781,7 +5784,6 @@ tr.unmapped .trace-row-head { background: color-mix(in srgb, var(--status-pendin
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 1rem; margin-bottom: 0.8rem;
 }
 .impact-epic-filter .impact-select-actions { display: flex; gap: 0.3rem; margin-bottom: 0.15rem; }
-.impact-shape-tabs { flex-shrink: 0; }
 .impact-legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1.4rem; font-size: 0.78rem; color: var(--ink-light); margin-left: auto; }
 .impact-legend-item { display: inline-flex; align-items: center; gap: 0.4rem; }
 .impact-legend-size { width: 1.4rem; height: 0.85rem; border: 1px solid var(--border); background:
@@ -5811,18 +5813,12 @@ tr.unmapped .trace-row-head { background: color-mix(in srgb, var(--status-pendin
 }
 .impact-treemap-empty { color: var(--ink-light); font-style: italic; padding: 2rem 0; text-align: center; }
 
-/* --- Treemap | Sunburst view toggle + the two shape panes (Code Map's board-tabs pattern) --- */
-.impact-shape-tabs { display: flex; justify-content: center; margin-bottom: 0.6rem; }
-.impact-shape { margin-top: 0.2rem; }
-.impact-shape-sunburst { display: none; }
-.impact-shapes:has(#impact-view-sunburst:checked) .impact-shape-treemap { display: none; }
-.impact-shapes:has(#impact-view-sunburst:checked) .impact-shape-sunburst { display: block; }
-#impact-view-treemap:checked ~ .board-tabbar label[for="impact-view-treemap"],
-#impact-view-sunburst:checked ~ .board-tabbar label[for="impact-view-sunburst"] {
-  background: var(--warm-white); color: var(--rust); box-shadow: 0 1px 2px var(--shadow);
-}
-#impact-view-treemap:focus-visible ~ .board-tabbar label[for="impact-view-treemap"],
-#impact-view-sunburst:focus-visible ~ .board-tabbar label[for="impact-view-sunburst"] { outline: 2px solid var(--teal); outline-offset: 2px; }
+/* The hand-rolled "Treemap | Sunburst" radio toggle that used to live here was DELETED by Story 17.1 as dead
+   code. Its markup was renamed to the Hierarchy Explorer's own vocabulary (`.impact-hierarchy-shape`,
+   `-treemap`, `-sunburst`) when ADR 0012 standardized the explorer component, and the pre-rename rules
+   (`.impact-shape-tabs`, `.impact-shape`, `.impact-shapes`, `#impact-view-treemap` / `-sunburst`) were left
+   behind styling nothing. Confirmed dead three ways: no emitter in src/, no occurrence in any generated page
+   except prose, and `extract:ir-content` already pruned every one of them (web/measurements/ir-content-drops.json). */
 
 /* --- the sunburst SVG (arcs share the impact-level commit ramp; directory ring is neutral) --- */
 .impact-sb { display: block; width: 100%; height: auto; max-width: 560px; margin: 0 auto; }
@@ -7457,7 +7453,7 @@ a.deferred-item-resolving:hover { color: var(--rust); }
 /* ====================== DIAGNOSTICS & ABOUT (Story 4.8) ======================
    The diagnostics run-log page (notices table + effective-config disclosure) and the About page. Palette
    tokens only, single parchment theme — consistent with the rest of the portal. */
-.diagnostics-source { font-family: 'Courier New', monospace; font-size: 0.82rem; word-break: break-word; }
+.diagnostics-source { font-family: 'Courier New', monospace; font-size: 0.82rem; overflow-wrap: break-word; }
 
 /* All-clear state: the done badge beside a short line when a run produced zero notices. */
 .diagnostics-clear { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; }

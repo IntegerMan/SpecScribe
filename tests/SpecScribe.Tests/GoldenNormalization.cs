@@ -4,10 +4,13 @@ namespace SpecScribe.Tests;
 
 /// <summary>The ONE volatile-token fold the byte-comparison gates share.
 ///
-/// <para>Two gates depend on it and must not be able to disagree: the
-/// <c>GoldenContentFingerprint</c> in <see cref="SiteGeneratorAdapterTests"/> (which pins full-generation
-/// output) and the Story 22.5 oracle-diff harness in <see cref="IncrementalOracleParityTests"/> (which pins
-/// incremental output AGAINST full-generation output). Story 22.5 AC #5 states the rule plainly: <i>"a second
+/// <para>Its consumers must not be able to disagree. <b>Story 17.1 correction:</b> this paragraph named
+/// <c>GoldenContentFingerprint</c> in <c>SiteGeneratorAdapterTests</c> as one of two dependent gates — that gate
+/// was RETIRED with its subject by ADR 0034 (Story 23.6) and only its tombstone comment remains. The live
+/// consumers are the Story 22.5 oracle-diff harness in <see cref="IncrementalOracleParityTests"/> (which pins
+/// incremental output AGAINST full-generation output) and the per-file snapshot in
+/// <c>TestArtifactDiscoveryTests</c>, which Story 17.1 routed onto <see cref="StripFooterClock"/> rather than
+/// leaving it on its own transcription. Story 22.5 AC #5 states the rule plainly: <i>"a second
 /// copy that folds one extra token is a hole in the gate"</i> — a fold present here but missing there would
 /// let a real staleness class read as noise, and a fold present there but missing here would make the oracle
 /// harness red on unrelated per-run churn.</para>
@@ -25,6 +28,16 @@ internal static class GoldenNormalization
     /// UTC-offset zone label, so it varies per run AND per time zone. [spec-7-3-10-4 widened this]</summary>
     private static readonly Regex FooterClock = new(
         @"on [A-Za-z]+ \d{1,2}, \d{4} at \d{1,2}:\d{2} UTC[+-]\d{2}:\d{2}", RegexOptions.Compiled);
+
+    /// <summary>Folds the footer clock for the tests that need ONLY that token rather than the whole
+    /// normalization pass — a per-file snapshot, or an A/B comparison of two runs of the same page.
+    ///
+    /// <para>They choose their own replacement text (it appears in their failure diffs), but they must not
+    /// choose their own PATTERN: this class's whole premise is that a second transcription drifts. Story 17.1
+    /// found two such transcriptions — <c>TestArtifactDiscoveryTests</c> and a <c>StripFooterClock</c> local in
+    /// <c>SiteGeneratorStatusStylesTests</c> — and routed both here.</para></summary>
+    internal static string StripFooterClock(string content, string replacement) =>
+        FooterClock.Replace(content, replacement);
 
     /// <summary>The asset cache-bust token, derived from the assembly's ModuleVersionId — new on every build.</summary>
     private static readonly Regex AssetCacheBust = new(@"\?v=[0-9a-fA-F]+", RegexOptions.Compiled);

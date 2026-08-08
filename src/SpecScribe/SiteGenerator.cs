@@ -3429,7 +3429,7 @@ public sealed class SiteGenerator
 
         try
         {
-            var progressByEpic = progress.PerEpic.ToDictionary(p => p.Number);
+            var progressByEpic = progress.PerEpic.ByFirst(p => p.Number);
             var referenceMap = BuildReferenceMap(files, model, artifactMap, PathUtil.NormalizeSlashes(epicsSourceRelative));
 
             // Cached for the webview delivery path (Story 6.4): RenderWebviewSurfaces re-renders these same
@@ -3598,7 +3598,7 @@ public sealed class SiteGenerator
             .ToList();
 
         // Deep-link every "(AC: #N)" reference in the plan to its criterion panel above.
-        var criteriaByNumber = acceptanceCriteria.ToDictionary(ac => ac.Number, ac => ac.PlainText);
+        var criteriaByNumber = acceptanceCriteria.ByFirst(ac => ac.Number, ac => ac.PlainText);
         remainderHtml = EpicsParser.LinkifyAcReferences(remainderHtml, criteriaByNumber);
 
         // Collapse Dev Notes / References last — after every flat-HTML transform — so the <details>
@@ -3766,7 +3766,7 @@ public sealed class SiteGenerator
         var families = new List<FamilySurface> { new(prelude.DashboardPage) };
         if (_epicsModel is not { } model || _progress is not { } progress) return families;
 
-        var progressByEpic = progress.PerEpic.ToDictionary(p => p.Number);
+        var progressByEpic = progress.PerEpic.ByFirst(p => p.Number);
         families.Add(new FamilySurface(
             EpicsTemplater.BuildIndexPage(model, progress, nav, _module.Commands, prelude.Counts, prelude.FollowUps, prelude.Unplanned),
             SurfaceSourcePath: _epicsSourcePath));

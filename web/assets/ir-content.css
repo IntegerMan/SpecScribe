@@ -1,7 +1,7 @@
 /* GENERATED FILE - DO NOT EDIT.
  * Extracted from src/SpecScribe/assets/specscribe.css by `npm run extract:ir-content` (Story 23.3 AC #6).
  *
- * The IR ships markup authored against that 7,041-line stylesheet; this app imports only the token
+ * The IR ships markup authored against that whole stylesheet; this app imports only the token
  * bridge. This layer carries the rules the IR surfaces actually use, re-nested under
  * `.ir-content` so they cannot reach a template-authored component.
  *
@@ -1313,9 +1313,7 @@
 }
 
 .ir-content .code-tablist {
-  border: 0;
   margin: 0 0 1.25rem;
-  padding: 0;
   display: inline-flex;
   gap: 0.25rem;
   background: var(--parchment);
@@ -1549,7 +1547,6 @@
 .ir-content .ss-tabs { margin-top: 1.5rem; }
 
 .ir-content .ss-tablist {
-  border: 0;
   margin: 0 0 1.25rem;
   display: inline-flex;
   gap: 0.25rem;
@@ -2921,7 +2918,7 @@
 
 .ir-content .next-step-command .cmd-badge { max-width: 100%; }
 
-.ir-content .next-step-command .cmd-text { white-space: normal; word-break: break-word; }
+.ir-content .next-step-command .cmd-text { white-space: normal; overflow-wrap: break-word; }
 
 .ir-content .next-step-desc {
   margin: 0;
@@ -3108,8 +3105,6 @@
 
 .ir-content .now-next-card:hover { box-shadow: 0 3px 10px var(--shadow); border-color: var(--rust-light); transform: translateY(-1px); }
 
-.ir-content .now-next-card.active { border-left-color: var(--status-active); }
-
 .ir-content .now-next-card.review { border-left-color: var(--status-review); }
 
 .ir-content .now-next-card.ready { border-left-color: var(--status-ready); }
@@ -3121,6 +3116,7 @@
 .ir-content .now-next-card.done { border-left-color: var(--status-done); }
 
 .ir-content .now-next-card.active {
+  border-left-color: var(--status-active);
   background: linear-gradient(180deg, #e4efec, var(--cream));
   border-left-width: 4px;
 }
@@ -6220,7 +6216,7 @@ body:has(main.followup-detail) .ir-content .doc-header {
 
 .ir-content .epic-retro-link:hover { color: var(--rust); }
 
-.ir-content .diagnostics-source { font-family: 'Courier New', monospace; font-size: 0.82rem; word-break: break-word; }
+.ir-content .diagnostics-source { font-family: 'Courier New', monospace; font-size: 0.82rem; overflow-wrap: break-word; }
 
 .ir-content .diagnostics-config summary { cursor: pointer; font-weight: bold; color: var(--teal-deep); }
 

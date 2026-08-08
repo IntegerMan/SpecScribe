@@ -1,7 +1,7 @@
 // Shared extraction logic for the IR-content stylesheet layer (Story 23.3, AC #6).
 //
 // The problem this solves. The Nuxt app imports ONLY `tokens.css` from the C# side (23.2 owner decision 2),
-// but the IR's `contentHtml` is markup authored against the full 7,041-line `specscribe.css`. Without a
+// but the IR's `contentHtml` is markup authored against the full `specscribe.css`. Without a
 // second layer, every migrated page renders structurally correct and visually bare — the 23.1 spike hid
 // this by importing the monolith wholesale, which is the shape 23.2 deliberately walked away from.
 //

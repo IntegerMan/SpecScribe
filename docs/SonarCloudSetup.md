@@ -330,6 +330,22 @@ Set it once **all three** of these are true. **Re-measured by Story 25.6 on 2026
 > - The 12-bug reliability sweep is **unowned**. 10 of the 12 are in `src/SpecScribe/`, which is outside
 >   Epic 23's scope entirely; the single `check-links.mjs` bug is the only one Epic 23 could be said to own.
 >   Naming it unowned is deliberate — it needs a home before the gate can be made blocking.
+>   > **CORRECTED 2026-08-07 (Story 17.1) — this bullet and `deferred-work.md` disagreed, and the code settles
+>   > it.** `deferred-work.md` scheduled 7 of those `src/SpecScribe/` bugs to Story 17.1 while this bullet
+>   > called the whole sweep unowned. Per 17.4 AC #2 (*"a cluster whose members disagree is resolved against
+>   > the code, not against the older record"*), 17.1 adjudicated all 7 against the code at `15336f4`:
+>   > **all seven are false positives of one class** — a collection or counter mutated only inside a lambda or
+>   > local function, which Sonar's dataflow does not model — and each is recorded won't-fix per issue, with
+>   > the previously-untested guards now pinned by tests. See `deferred-work.md` § *Deferred from: 25-2…* for
+>   > the per-site adjudication. **So the sweep was never 12 actionable bugs.** What remains of it after 17.1
+>   > is the `web/scripts/` `.sort()` pair (`check-links.mjs:204`, `ir-content-build.mjs:224`) plus any
+>   > residue outside `src/SpecScribe/`; those are **still unowned**, and 17.1 deliberately did not absorb
+>   > them — `web/**` is outside its AC #2 scope ("the extension TypeScript shim and the CSS"), and silently
+>   > widening scope is how a band stops being visible on the dashboard meant to prove it done.
+>   > **Consequence for the blocking-gate precondition:** an `A` `new_reliability_rating` needs *zero* open
+>   > issues of the class, and a won't-fix adjudication does not clear one — the seven must be marked resolved
+>   > as *false positive* in SonarCloud itself for the rating to move. That is a UI/API action this story
+>   > deliberately did not take on the project's behalf; it is the owner's call.
 
 **Fixing the named `web/scripts/` files does not turn the gate green.** On Sonar's scale, `A` means *zero*
 open issues of that class — not "none severe". Clearing `check-links.mjs:204` moves reliability D → C;
@@ -491,6 +507,8 @@ decision, not an omission, and the reason is worth keeping:
 | `csharpsquid:S4036` — OS command search in PATH | 1 | **Scheduled → Story 17.2**, with S6444. |
 | `githubactions:S8233` / `S8264` | 3 | **Fixed by Story 25.2** — permissions moved to job level in `publish-docs-live-pages.yml`. `build-test-analyze.yml` (Story 25.1's own workflow) carries **zero** `githubactions:*` findings, which is worth keeping as evidence the gate is already clean on our own CI. |
 | `external_roslyn:*` INFO band | 771 | **Accepted for now, not suppressed.** Revisit at Story 17.3 (the performance rules: `CA1861`, `CA1859`, `CA1822`) and as a bulk disposition for the rest. |
+| `csharpsquid:S125` — commented-out code | 18 (2026-08-07) | **Adjudicated → won't-fix, all instances (Story 17.1).** Still *not suppressed*, per the standing rule above. All 18 were read: **17 are ordinary prose comments the rule mistakes for code.** This codebase's house style is unusually comment-dense and quotes identifiers, selectors, `role="group"`, `**Given**` keywords and backticked expressions inline, so any comment line carrying a `;` or a code-shaped fragment trips it — `StatusStyles.cs:400` is a sentence about pending/ready phrasing, `SprintStatusParser.cs:47` explains why a `catch` is not bare, `Charts.cs:943` explains an `aria-hidden`. The 18th (`SiteGenerator.cs:3888`) genuinely quotes an `if (…) { …throw… }`, but deliberately, inside a "This was: … It guarded against …" block recording a removed guard and why; deleting it would destroy the explanation the rule exists to encourage. Recorded here rather than as 18 per-issue entries **because it is a systematic property of the house style, which is what makes it a rule-level decision** (ADR 0035 § Decision 5). Re-read this if the comment style ever changes. |
+| `csharpsquid:S2583` ×5 / `S4158` ×2 — constant condition / empty collection | 7 | **Adjudicated → won't-fix, per issue (Story 17.1).** All seven are one false-positive class: a collection or counter mutated **only inside a lambda or local function**, which Sonar's dataflow does not model, so it reports the guard reading it as constant. Deleting any of them removes a live guard — demonstrated, not asserted (see `deferred-work.md`). Per-issue rather than rule-level: `S2583` is a rule worth keeping sharp, and the false positives are a property of these seven call shapes, not of the codebase. This is also the correction to § *What would make the gate blocking*'s "unowned 12-bug reliability sweep". |
 | Everything else above the bar | — | Routed to Stories 17.1 / 17.3 / 17.5 — see the `25-2-quality-gate-and-findings-triage` group in `deferred-work.md`. |
 
 See [ADR 0035](adrs/0035-sonarcloud-quality-gate-and-rule-decision-policy.md) for the standing policy this table

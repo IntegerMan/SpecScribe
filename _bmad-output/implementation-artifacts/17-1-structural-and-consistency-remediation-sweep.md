@@ -1,6 +1,10 @@
+---
+baseline_commit: 15336f4
+---
+
 # Story 17.1: Structural and Consistency Remediation Sweep
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 <!-- created 2026-08-07 (create-story 17.1) at baseline_commit 07bdb79. Every line number in this file was
@@ -55,39 +59,39 @@ Reproduced verbatim from `epics.md` § Epic 17 → Story 17.1. Read the ⚠ note
 **Sequencing is load-bearing.** Task 0 must complete before any other task, and Task 3 (CSS) must not start
 until Task 0 has established whether `check:ir-content` is green at HEAD.
 
-- [ ] **Task 0 — Establish the baseline before changing anything (AC: #1, #2)**
-  - [ ] Regenerate the analysis digest: `node tools/analysis-digest/index.mjs`. **`.specscribe/analysis/` does not exist at `07bdb79`** — per CLAUDE.md that is UNKNOWN, never clean. Every Sonar count in this story is quoted from the 2026-07-27 baseline triage and is ~2 weeks stale; the digest is how you get current numbers.
-  - [ ] Record the digest's `provenance.evaluatedAtRevision` and compare to `git rev-parse HEAD`. If they differ, the digest is stale regardless of `isStale`.
-  - [ ] Run the full C# suite and record the pass count as the pre-sweep baseline: `dotnet test SpecScribe.slnx`.
-  - [ ] **Measure `check:ir-content` through the complete load-bearing order** (17.4 AC #4 records it as *believed RED* but unmeasured — and a partial run gives a confidently wrong answer either way):
+- [x] **Task 0 — Establish the baseline before changing anything (AC: #1, #2)**
+  - [x] Regenerate the analysis digest: `node tools/analysis-digest/index.mjs`. **`.specscribe/analysis/` does not exist at `07bdb79`** — per CLAUDE.md that is UNKNOWN, never clean. Every Sonar count in this story is quoted from the 2026-07-27 baseline triage and is ~2 weeks stale; the digest is how you get current numbers.
+  - [x] Record the digest's `provenance.evaluatedAtRevision` and compare to `git rev-parse HEAD`. If they differ, the digest is stale regardless of `isStale`.
+  - [x] Run the full C# suite and record the pass count as the pre-sweep baseline: `dotnet test SpecScribe.slnx`.
+  - [x] **Measure `check:ir-content` through the complete load-bearing order** (17.4 AC #4 records it as *believed RED* but unmeasured — and a partial run gives a confidently wrong answer either way):
     ```sh
     dotnet build src/SpecScribe/SpecScribe.csproj --no-incremental
     dotnet run --project src/SpecScribe -- generate
     cd web && npm run extract:ir-content && npm run check:ir-content
     ```
-  - [ ] Run `cd web && npm run check` (tokens + ir-content + assets + parity) and `npm run test` and record red/green **per gate**. If a gate is already red at HEAD, say so in the Dev Agent Record before you touch a line — otherwise you cannot distinguish your breakage from the inherited state, and CLAUDE.md forbids regenerating a baseline without first establishing causality.
-  - [ ] If `check:ir-content` is red at HEAD, **stop and report** rather than remediating CSS on top of it (Task 3 depends on this gate being a trustworthy signal).
+  - [x] Run `cd web && npm run check` (tokens + ir-content + assets + parity) and `npm run test` and record red/green **per gate**. If a gate is already red at HEAD, say so in the Dev Agent Record before you touch a line — otherwise you cannot distinguish your breakage from the inherited state, and CLAUDE.md forbids regenerating a baseline without first establishing causality.
+  - [x] If `check:ir-content` is red at HEAD, **stop and report** rather than remediating CSS on top of it (Task 3 depends on this gate being a trustworthy signal).
 
-- [ ] **Task 1 — Adjudicate the 7 first-party C# reliability findings (AC: #1)**
+- [x] **Task 1 — Adjudicate the 7 first-party C# reliability findings (AC: #1)**
   These are the highest-value items: an always-False condition guarding a render branch is a defect class this
   project has shipped and caught only in a live browser. **Do not assume they are all real** — see the
   false-positive warning in Dev Notes.
-  - [ ] `csharpsquid:S2583` (condition always evaluates to a constant, code path therefore unreachable) at 5 sites — resolve each **by symbol**, not by the drifted line number:
-    - [ ] `SiteGenerator.MutateSourceInventory` region (cited `SiteGenerator.cs:1392`, "always True")
-    - [ ] `SiteGenerator` commit-detail page loop, `pages.TryAdd` / duplicate-hash region (cited `:2441` and `:2448`, "always False")
-    - [ ] `WorkGraph` — the `if (edges.Count == 0) return null;` guard at the end of the epic-graph builder (cited `WorkGraph.cs:403`, "always True")
-    - [ ] `CapabilityStyler` — the `if (matched == 0 || leftover.Contains("<li", …))` bail-out after `CapItem.Replace` (cited `CapabilityStyler.cs:57`, "always True")
-  - [ ] `csharpsquid:S4158` (collection known to be empty where used) at 2 sites: `SiteGenerator.cs:1939`, `HtmlRenderAdapter.Dashboard.cs:235`.
-  - [ ] For each: either **fix + pin with a regression test**, or record an explicit **won't-fix rationale** in `deferred-work.md` naming why the analyser is wrong. AC #1's "a test or an explicit rationale for deferral" is satisfied by either — but not by silence.
-  - [ ] Reconcile the record conflict this exposes (see § *A record conflict to resolve*): `docs/SonarCloudSetup.md` calls the 12-bug reliability sweep **"unowned"**, while `deferred-work.md` schedules 7 of those bugs to **this story**. Resolve against the code and correct whichever record is wrong.
+  - [x] `csharpsquid:S2583` (condition always evaluates to a constant, code path therefore unreachable) at 5 sites — resolve each **by symbol**, not by the drifted line number:
+    - [x] `SiteGenerator.MutateSourceInventory` region (cited `SiteGenerator.cs:1392`, "always True")
+    - [x] `SiteGenerator` commit-detail page loop, `pages.TryAdd` / duplicate-hash region (cited `:2441` and `:2448`, "always False")
+    - [x] `WorkGraph` — the `if (edges.Count == 0) return null;` guard at the end of the epic-graph builder (cited `WorkGraph.cs:403`, "always True")
+    - [x] `CapabilityStyler` — the `if (matched == 0 || leftover.Contains("<li", …))` bail-out after `CapItem.Replace` (cited `CapabilityStyler.cs:57`, "always True")
+  - [x] `csharpsquid:S4158` (collection known to be empty where used) at 2 sites: `SiteGenerator.cs:1939`, `HtmlRenderAdapter.Dashboard.cs:235`.
+  - [x] For each: either **fix + pin with a regression test**, or record an explicit **won't-fix rationale** in `deferred-work.md` naming why the analyser is wrong. AC #1's "a test or an explicit rationale for deferral" is satisfied by either — but not by silence.
+  - [x] Reconcile the record conflict this exposes (see § *A record conflict to resolve*): `docs/SonarCloudSetup.md` calls the 12-bug reliability sweep **"unowned"**, while `deferred-work.md` schedules 7 of those bugs to **this story**. Resolve against the code and correct whichever record is wrong.
 
-- [ ] **Task 2 — Kill the repository's only BLOCKER: a test that cannot fail (AC: #1)**
-  - [ ] `tests/SpecScribe.Tests/ChartsTests.cs` → `Sunburst_CenterReportsEpicCountNotStoryCount` (line 338 at `07bdb79`). **Verified assertion-free at HEAD:** it builds `multiSvg` and `singleSvg` and then ends. Its own comment states the intent — *"the center headlines the epic count with an 'epic(s)' label (pluralized), never the story total"* — so write the assertions that comment already specifies: `multiSvg` asserts "2 epics", `singleSvg` asserts the singular form, and neither asserts the story total.
-  - [ ] Confirm the restored test actually **fails** if the pluralization/center-label behavior is broken (a test added without checking it can fail reproduces the defect in a new shape).
-  - [ ] A repo-wide scan at `07bdb79` found 14 other `[Fact]`/`[Theory]` bodies with no literal `Assert.` — **all 14 were checked and delegate to helper methods that assert internally** (e.g. `AssertPlotlyDataContract`, `HierarchyRolloutTests.cs`). They are not defects; do not "fix" them. This matches Sonar finding exactly 1 `S2699`.
+- [x] **Task 2 — Kill the repository's only BLOCKER: a test that cannot fail (AC: #1)**
+  - [x] `tests/SpecScribe.Tests/ChartsTests.cs` → `Sunburst_CenterReportsEpicCountNotStoryCount` (line 338 at `07bdb79`). **Verified assertion-free at HEAD:** it builds `multiSvg` and `singleSvg` and then ends. Its own comment states the intent — *"the center headlines the epic count with an 'epic(s)' label (pluralized), never the story total"* — so write the assertions that comment already specifies: `multiSvg` asserts "2 epics", `singleSvg` asserts the singular form, and neither asserts the story total.
+  - [x] Confirm the restored test actually **fails** if the pluralization/center-label behavior is broken (a test added without checking it can fail reproduces the defect in a new shape).
+  - [x] A repo-wide scan at `07bdb79` found 14 other `[Fact]`/`[Theory]` bodies with no literal `Assert.` — **all 14 were checked and delegate to helper methods that assert internally** (e.g. `AssertPlotlyDataContract`, `HierarchyRolloutTests.cs`). They are not defects; do not "fix" them. This matches Sonar finding exactly 1 `S2699`.
 
-- [ ] **Task 3 — Stylesheet duplicate declarations (AC: #1, #2)** — blocked on Task 0's `check:ir-content` result.
-  - [ ] All four cited duplicates **re-verified live at `07bdb79`, and every cited line number had moved** — this is the concrete proof of the drift rule:
+- [x] **Task 3 — Stylesheet duplicate declarations (AC: #1, #2)** — blocked on Task 0's `check:ir-content` result.
+  - [x] All four cited duplicates **re-verified live at `07bdb79`, and every cited line number had moved** — this is the concrete proof of the drift rule:
 
     | Selector | `deferred-work.md` cited | Actual at `07bdb79` |
     |---|---|---|
@@ -96,14 +100,14 @@ until Task 0 has established whether `check:ir-content` is green at HEAD.
     | `.now-next-card.active` | 3714 / 3723 | **3875 / 3884** |
     | `.impact-shape-tabs` | 5549 / 5580 | **5777 / 5808** |
 
-  - [ ] `:root` re-opened at `specscribe.css:5739` having been declared at line 6 — **this is the priority one.** It is the exact class of defect this project has already shipped invisibly once and caught only by reading computed styles in a live browser. Verify the fix in a live browser, not in review.
-  - [ ] `.coverage-card` duplicated (4356 / 6146) — note this touches the vocabulary collision Epic 27 is already tracking; check the two blocks are not two *different* concepts sharing a name before merging them.
-  - [ ] Remaining: duplicate `border` at ~1596/1964, duplicate `padding` at ~1598, and 3 `css:S1874` deprecated `word-break: break-word` keywords.
-  - [ ] `web/assets/ir-content.css` carries **mirrored copies** — re-verified at `07bdb79` **after** commit `0b1f561` regenerated this file: `.now-next-card.active` at **3111 / 3123** and `.coverage-card` at **3573 / ~5151** (cited at 2272/3364/3930 — moved twice now). The IR stylesheet **inherited** them from `specscribe.css`.
+  - [x] `:root` re-opened at `specscribe.css:5739` having been declared at line 6 — **this is the priority one.** It is the exact class of defect this project has already shipped invisibly once and caught only by reading computed styles in a live browser. Verify the fix in a live browser, not in review.
+  - [x] `.coverage-card` duplicated (4356 / 6146) — note this touches the vocabulary collision Epic 27 is already tracking; check the two blocks are not two *different* concepts sharing a name before merging them.
+  - [x] Remaining: duplicate `border` at ~1596/1964, duplicate `padding` at ~1598, and 3 `css:S1874` deprecated `word-break: break-word` keywords.
+  - [x] `web/assets/ir-content.css` carries **mirrored copies** — re-verified at `07bdb79` **after** commit `0b1f561` regenerated this file: `.now-next-card.active` at **3111 / 3123** and `.coverage-card` at **3573 / ~5151** (cited at 2272/3364/3930 — moved twice now). The IR stylesheet **inherited** them from `specscribe.css`.
     - `ir-content.css` is a **GENERATED FILE — DO NOT EDIT**. Fix `specscribe.css` and re-extract; hand-editing it is reverted by the next `extract:ir-content`.
     - Every rule there is re-nested under `.ir-content`, so grep unanchored (`.ir-content .coverage-card`), not for `^.coverage-card`.
     - Its header comment claims specscribe.css is "7,041-line" — it is **7,877** lines at `07bdb79`. That stale generated figure is itself AC #1 "naming/token drift"; fix it in whatever emits the header, not in the generated output.
-  - [ ] **Follow CLAUDE.md's regeneration order exactly** — two `generate` calls, deliberately. Skipping either leaves you inspecting a page whose CSS predates your edit, and the failure looks exactly like "my selector is wrong":
+  - [x] **Follow CLAUDE.md's regeneration order exactly** — two `generate` calls, deliberately. Skipping either leaves you inspecting a page whose CSS predates your edit, and the failure looks exactly like "my selector is wrong":
     ```sh
     dotnet build src/SpecScribe/SpecScribe.csproj --no-incremental
     dotnet run --project src/SpecScribe -- generate
@@ -112,32 +116,32 @@ until Task 0 has established whether `check:ir-content` is green at HEAD.
     dotnet run --project src/SpecScribe -- generate
     ```
 
-- [ ] **Task 4 — Extension TypeScript shim (AC: #2)**
+- [x] **Task 4 — Extension TypeScript shim (AC: #2)**
   `extension/src/extension.ts` — 2,398 lines, 923 ncloc, 12 unresolved issues, **0.0% coverage**. The only
   first-party source file in the project with both a bug and zero test coverage.
-  - [ ] The bug: `typescript:S5850` — regex alternation whose operator precedence is not explicit. **Cited at `:1268`; that line is now unrelated code.** Re-resolved by symbol at `07bdb79`: the terminal-profile matcher, `/git bash|bash|wsl|sh$/i` (~line 2024). The `$` anchor binds only to the final `sh` alternative, so `git bash`/`bash`/`wsl` match anywhere in the string while `sh` must be terminal — almost certainly not the intent. Make the grouping explicit and decide deliberately which alternatives anchor.
-  - [ ] The remaining 11: `typescript:S6571`, `S6551`, `S6671`, `S7778`, `S7780`, `S7781`.
-  - [ ] **Read § *Touching the extension has a quality-gate cost* before starting** — there is no TS test harness at all (no `test` script, no test runner in `devDependencies`, no test files), so you cannot pin an extension fix with a test today without first standing one up. That harness is explicitly **not** this story's (see § *Scope*). Record which route you took.
-  - [ ] Re-run `npm run typecheck` in `extension/` after each change — it is the only automated signal this file has.
+  - [x] The bug: `typescript:S5850` — regex alternation whose operator precedence is not explicit. **Cited at `:1268`; that line is now unrelated code.** Re-resolved by symbol at `07bdb79`: the terminal-profile matcher, `/git bash|bash|wsl|sh$/i` (~line 2024). The `$` anchor binds only to the final `sh` alternative, so `git bash`/`bash`/`wsl` match anywhere in the string while `sh` must be terminal — almost certainly not the intent. Make the grouping explicit and decide deliberately which alternatives anchor.
+  - [x] The remaining 11: `typescript:S6571`, `S6551`, `S6671`, `S7778`, `S7780`, `S7781`.
+  - [x] **Read § *Touching the extension has a quality-gate cost* before starting** — there is no TS test harness at all (no `test` script, no test runner in `devDependencies`, no test files), so you cannot pin an extension fix with a test today without first standing one up. That harness is explicitly **not** this story's (see § *Scope*). Record which route you took.
+  - [x] Re-run `npm run typecheck` in `extension/` after each change — it is the only automated signal this file has.
 
-- [ ] **Task 5 — Single-source-of-truth and duplication clusters in the C# core (AC: #1, #2)**
+- [x] **Task 5 — Single-source-of-truth and duplication clusters in the C# core (AC: #1, #2)**
   Verified present at `07bdb79`:
-  - [ ] **Unguarded `ToDictionary` on epic/AC numbers — 11 sites, and the codebase already disagrees with itself.** `RequirementsTemplater.cs:682` guards with `GroupBy(e => e.Number).ToDictionary(g => g.Key, g => g.First())`; the other 10 call `ToDictionary(e => e.Number)` bare and throw on a duplicate epic number in a user's `epics.md`. Sites: `Charts.cs:3137`, `Charts.cs:3357`, `EpicsParser.cs:60`, `EpicsViewBuilder.cs:65`, `RelatedWorkCards.cs:98`, `RequirementsParser.cs:55`, `RequirementsParser.cs:307`, `SiteGenerator.cs:3432`, `SiteGenerator.cs:3601`, `SiteGenerator.cs:3769`. **Pick one policy and apply it everywhere** — that is the single-source-of-truth violation, not the crash. Pin with a test that feeds a duplicate epic number through the parser.
-  - [ ] **Duplicated footer-strip regex.** `FooterClock` is declared independently in `tests/SpecScribe.Tests/GoldenNormalization.cs:26` and `tests/SpecScribe.Tests/TestArtifactDiscoveryTests.cs:612`, and `SiteGeneratorStatusStylesTests.cs:114` hand-rolls a third `StripFooterClock` local. Consolidate onto `GoldenNormalization`.
-  - [ ] **`BmadCommands` next-step classifiers route on raw status strings.** `BmadCommands.cs:505` and `:515` use `status.Contains("review")` / `status.Contains("done") || status.Contains("complete")` while the same file elsewhere routes correctly through `StatusStyles.ForStory(story)` (lines 42, 69, 105, 627). Substring matching on a free-text status is the bug shape — `"review"` matches `"code-review-blocked"`. Route through `StatusStyles`. **Check ADR 0025** (`retired` is a terminal stage in *both* classifiers) before changing classifier behavior.
-  - [ ] The `~300`-issue maintainability band (94 `S1192` duplicated string literals, 86 `S3776` cognitive complexity, 48 `S3358` nested ternaries, 29 `S3267`, 28 `S107`, 9 `S125` commented-out code, plus an `S2589`/`S1121`/`S127`/`S1066`/`S1172` tail). **This is not a to-do list — it is 2,999 minutes (~50 h) of Sonar-estimated effort and it will not fit in one story.** Take the `S125` (dead/commented-out code, 9 instances — directly AC #1's "dead or unreachable code") and the `S1192` instances that are genuine single-source-of-truth violations; explicitly defer the `S3776`/`S107` complexity band with a recorded rationale, and say so rather than leaving it looking swept. See § *Bounding this story*.
+  - [x] **Unguarded `ToDictionary` on epic/AC numbers — 11 sites, and the codebase already disagrees with itself.** `RequirementsTemplater.cs:682` guards with `GroupBy(e => e.Number).ToDictionary(g => g.Key, g => g.First())`; the other 10 call `ToDictionary(e => e.Number)` bare and throw on a duplicate epic number in a user's `epics.md`. Sites: `Charts.cs:3137`, `Charts.cs:3357`, `EpicsParser.cs:60`, `EpicsViewBuilder.cs:65`, `RelatedWorkCards.cs:98`, `RequirementsParser.cs:55`, `RequirementsParser.cs:307`, `SiteGenerator.cs:3432`, `SiteGenerator.cs:3601`, `SiteGenerator.cs:3769`. **Pick one policy and apply it everywhere** — that is the single-source-of-truth violation, not the crash. Pin with a test that feeds a duplicate epic number through the parser.
+  - [x] **Duplicated footer-strip regex.** `FooterClock` is declared independently in `tests/SpecScribe.Tests/GoldenNormalization.cs:26` and `tests/SpecScribe.Tests/TestArtifactDiscoveryTests.cs:612`, and `SiteGeneratorStatusStylesTests.cs:114` hand-rolls a third `StripFooterClock` local. Consolidate onto `GoldenNormalization`.
+  - [x] **`BmadCommands` next-step classifiers route on raw status strings.** `BmadCommands.cs:505` and `:515` use `status.Contains("review")` / `status.Contains("done") || status.Contains("complete")` while the same file elsewhere routes correctly through `StatusStyles.ForStory(story)` (lines 42, 69, 105, 627). Substring matching on a free-text status is the bug shape — `"review"` matches `"code-review-blocked"`. Route through `StatusStyles`. **Check ADR 0025** (`retired` is a terminal stage in *both* classifiers) before changing classifier behavior.
+  - [x] The `~300`-issue maintainability band (94 `S1192` duplicated string literals, 86 `S3776` cognitive complexity, 48 `S3358` nested ternaries, 29 `S3267`, 28 `S107`, 9 `S125` commented-out code, plus an `S2589`/`S1121`/`S127`/`S1066`/`S1172` tail). **This is not a to-do list — it is 2,999 minutes (~50 h) of Sonar-estimated effort and it will not fit in one story.** Take the `S125` (dead/commented-out code, 9 instances — directly AC #1's "dead or unreachable code") and the `S1192` instances that are genuine single-source-of-truth violations; explicitly defer the `S3776`/`S107` complexity band with a recorded rationale, and say so rather than leaving it looking swept. See § *Bounding this story*.
 
-- [ ] **Task 6 — Record every decision (AC: #2)**
-  - [ ] For each item touched: fix it **or** carry it forward with a recorded decision in `deferred-work.md`. AC #2 admits no third state.
-  - [ ] Strike through closed items in place with the resolution — never delete (the file's own "How to read this file" preamble makes the audit trail load-bearing, and `DeferredWorkParser` renders it into the portal).
-  - [ ] Update the stale claims this story disproves: the three closed AC #1 examples, the `GoldenContentFingerprint` blocker language, and the `SonarCloudSetup.md` "unowned" 12-bug claim (Task 1).
-  - [ ] Note in the story record whose concurrent changes your regeneration sat on top of (CLAUDE.md § *Concurrent work*).
+- [x] **Task 6 — Record every decision (AC: #2)**
+  - [x] For each item touched: fix it **or** carry it forward with a recorded decision in `deferred-work.md`. AC #2 admits no third state.
+  - [x] Strike through closed items in place with the resolution — never delete (the file's own "How to read this file" preamble makes the audit trail load-bearing, and `DeferredWorkParser` renders it into the portal).
+  - [x] Update the stale claims this story disproves: the three closed AC #1 examples, the `GoldenContentFingerprint` blocker language, and the `SonarCloudSetup.md` "unowned" 12-bug claim (Task 1).
+  - [x] Note in the story record whose concurrent changes your regeneration sat on top of (CLAUDE.md § *Concurrent work*).
 
-- [ ] **Task 7 — Prove nothing regressed (AC: #1, #2)**
-  - [ ] `dotnet build SpecScribe.slnx --no-incremental` then `dotnet test SpecScribe.slnx` — compare to Task 0's baseline count.
-  - [ ] `cd web && npm run check && npm run test`.
-  - [ ] **Live-browser verification for every CSS change** — the suite structurally cannot see containment leaks, sub-pixel collapse, or DOM corruption. Generate to `SpecScribeOutput/` (the default). Never `--output docs/live`.
-  - [ ] Confirm any regenerated gate baseline is **stable across two repeated runs** before locking it in.
+- [x] **Task 7 — Prove nothing regressed (AC: #1, #2)**
+  - [x] `dotnet build SpecScribe.slnx --no-incremental` then `dotnet test SpecScribe.slnx` — compare to Task 0's baseline count.
+  - [x] `cd web && npm run check && npm run test`.
+  - [x] **Live-browser verification for every CSS change** — the suite structurally cannot see containment leaks, sub-pixel collapse, or DOM corruption. Generate to `SpecScribeOutput/` (the default). Never `--output docs/live`.
+  - [x] Confirm any regenerated gate baseline is **stable across two repeated runs** before locking it in.
 
 ## Dev Notes
 
@@ -392,8 +396,144 @@ Saved for after the story, per workflow. None blocks `dev-story`; each has a sta
 
 ### Agent Model Used
 
+Claude Opus 5 (1M context) — `claude-opus-5[1m]`.
+
 ### Debug Log References
+
+Implemented in worktree `.claude/worktrees/story-17-1-dev` (branch `worktree-story-17-1-dev`), **starting from
+`15336f4`**, not the story's create-time `07bdb79` — 36 commits of sibling work had landed in between, which is
+why every citation was re-resolved by symbol. The frontmatter `baseline_commit` records the dev-start commit; the
+prose line near the top of this file records the create-story baseline, and the two are deliberately different.
+
+**Concurrent-work attribution (CLAUDE.md § *Concurrent work*).** The regenerations in this story sit on top of
+`15336f4` (`Merge branch 'worktree-code-review-23-2-fourth-pass'`) and, materially, on `0b1f561`'s earlier
+regeneration of both drift-gate baselines. Nothing in this story required bisecting a moved gate: every gate was
+measured green *before* the first edit, so each later movement had an established cause.
+
+**Task 0 baseline, measured at `15336f4` before any edit:**
+
+| signal | value at HEAD |
+|---|---|
+| analysis digest | 1,755 observations; `evaluatedAtRevision` **`01acf5b`**, tree `15336f4`, **36 commits behind**, `isStale: true` |
+| `dotnet test SpecScribe.slnx` | **2,991 passed / 0 failed / 3 skipped** (2,994 total) |
+| `generate --deep-git` | 809 pages, **errors=0** |
+| `check:ir-content` | **GREEN** |
+| `check:tokens` | GREEN — "45 tokens across **2** `:root` block(s)" |
+| `check:assets` | GREEN |
+| `check:parity` | GREEN — 24 routes / 14 families byte-identical |
+| `npm run test` (vitest) | GREEN — 183/183 |
+
+**`check:ir-content` is GREEN at HEAD — 17.4 AC #4's "believed RED" is stale and should not be carried forward.**
+Measured through the full load-bearing order (with `--deep-git`, per `web/CONVENTIONS.md` §10 — the story's own
+snippet omits that flag, and without it extraction prunes deep-analytics rules). The belief predates `0b1f561`,
+which regenerated the baseline; that is why the answer changed.
+
+**Final regression, all green:** `dotnet test` **3,000 passed / 0 failed / 3 skipped** (+9 vs baseline);
+`npm run check` all four gates OK; vitest 183/183; `generate --deep-git` 809 pages, errors=0. Regenerated
+baselines confirmed **stable across two consecutive extractions** (identical md5 for `tokens.css`,
+`ir-content.css`, `ir-content.manifest.json`).
 
 ### Completion Notes List
 
+**Headline: the story's own premises did not survive contact with the code, and the corrections are the
+deliverable as much as the fixes are.** Four of them:
+
+1. **All 7 reliability findings (Task 1) are FALSE POSITIVES of one class** — a collection or counter mutated
+   *only inside a lambda or local function*, which Sonar's dataflow does not model. Not two of five as the story
+   predicted: all seven. Two are not even in the region the record names (the `SiteGenerator` `S2583` pair is in
+   `TryCountCodeLines`, not the commit-detail loop). Deleting any of these conditions removes a live guard —
+   **demonstrated**: temporarily dropping `matched == 0` from `CapabilityStyler` makes the new test fail and the
+   styler replaces a real section with an empty `.capabilities` div. Disposition: won't-fix per issue (ADR 0035
+   § Decision 5), with the one previously-untested guard now pinned.
+2. **The BLOCKER test was assertion-free because Story 20.7 deleted its subject.** `ChartsTests`' own header
+   records that the centre `<text>` assertions went with `Charts.Sunburst`. The *fact* survived the engine
+   change — the centre count is now the root node's detail sentence in `HierarchyExplorer.WithDetails` — so it
+   was restored against that, and **confirmed it can fail** by breaking pluralization on purpose.
+3. **`.coverage-card` is not a duplicate — it is two components colliding on one class name, and the shipped
+   layout depends on the collision.** Verified in a live browser: a block-2 card computes `flex-direction:
+   column` sourced from block 1 alone, and block-1 cards compute `max-width: 460px` / `flex: 1 1 320px` /
+   `align-items: flex-start` sourced from block 2. Merging or scoping it changes 120 elements across 100+ pages.
+   Deferred to Epic 27 with that diagnosis rather than merged blind — which is exactly what this story's own
+   Task 3 bullet told me to check for.
+4. **17 of the 18 `S125` "commented-out code" findings are prose comments the rule misreads**, a systematic
+   consequence of this codebase's comment-dense house style; the 18th is a deliberately quoted removed-guard kept
+   as documentation. So AC #1's "dead or unreachable code" clause is **closed for C# by adjudication, not by
+   deletion**. The real dead code this sweep found was in the stylesheet.
+
+**What was actually fixed.** CSS: `:root` merged to a single top-level block (45 tokens unchanged, proven by
+`check:tokens` reporting the same 45 across 1 block); `.now-next-card.active` merged; the pre-rename
+`.impact-shape-*` toggle block **deleted as dead code** (confirmed three independent ways — no emitter, no
+occurrence in any generated page but prose, and already pruned by `extract:ir-content`); dead `border: 0` /
+`padding: 0` resets removed from `.code-tablist` / `.ss-tablist`; both deprecated `word-break: break-word` →
+`overflow-wrap`. C# single-source-of-truth: **11 epic/AC-number lookups converged onto one first-wins policy**
+(new `NumberIndex.ByFirst`) — the codebase disagreed with itself, ten throwing on a duplicate epic number and one
+already working around it; the triplicated footer-clock regex consolidated onto `GoldenNormalization`;
+`BmadCommands.ForStory` routed through `StatusStyles` instead of raw substring matching, which also fixed an
+**ADR 0025 violation surviving in a third classifier** (the six retirement words fell through to "create-story"
+on the id that had been retired). Extension: the `S5850` regex bug fixed with its anchoring asymmetry documented
+(`sh` must stay end-anchored or it matches "Power**sh**ell"), plus `S2681` ×2, `S7780`, `S7781` ×2. Drift: the
+stale "7,041-line" figure removed at its three sources rather than re-pinned to a number that would go stale
+again.
+
+**Deliberate non-fixes, each recorded.** `.coverage-card` → Epic 27 (above). `S3776`/`S107`/`S3358`/`S3267` and
+the `S1192` band → deferred to 17.4 with a rationale: ~50 h of the estimate, and complexity reduction is a
+per-method redesign with its own correctness risk, not the mechanical consistency work this story is bounded to.
+`S7778` ×2 in the extension → won't-fix; collapsing three commented `context.subscriptions.push` registrations
+into one call would strand the comments. `web/scripts/` `.sort()` bugs → left outside scope and **said so**,
+per the story's own recommendation.
+
+**Two gate findings worth the reader's attention.** (a) `web/assets/ir-content.manifest.json` carried a
+`generatedBytes` **already 12 bytes stale on `main`** before this story touched anything (committed 186,492;
+actual file 186,504) — inherited from `0b1f561`, invisible to `check:ir-content` because that gate compares rules,
+not byte counts. Corrected here and filed as a gate blind spot. (b) `web/test/tokens-lib.test.mjs` asserted the
+*real* stylesheet has `> 1` `:root` block, so a legitimate source edit turned two tests red while the extractor
+was entirely correct; re-pointed at the invariant (every declared token is carried; emitted block count **equals**
+source block count), which is strictly stronger and survives future edits.
+
+**Honest reporting of AC #1's second clause.** `check:parity` is structurally blind to the C#-side changes in
+Tasks 1/5 (frozen corpus IR), so it is **not** cited as evidence they preserved rendered output. The evidence
+used instead is unit tests over the changed regions plus **live-browser computed-style inspection** via CDP —
+which is what confirmed the `.coverage-card` diagnosis, the `:root` token resolution, the `.now-next-card.active`
+merge (accent, 4px width and gradient all intact) and the tablist chrome (`1px solid`, `4px`, radius `10px`).
+
+**Owner questions Q1–Q4 were left at their stated defaults**; none blocked the work. Q1 is now better supported:
+`epics.md`'s AC #1 examples are stale *and* its safety clause names a retired gate, so amending it would help the
+next reader.
+
 ### File List
+
+- `src/SpecScribe/NumberIndex.cs` *(new)* — first-wins epic/AC-number indexing, the one policy the 11 call sites share
+- `src/SpecScribe/BmadCommands.cs` — `ForStory` routed through `StatusStyles`; `retired` made terminal
+- `src/SpecScribe/Charts.cs` — 2 `ToDictionary` → `ByFirst`
+- `src/SpecScribe/EpicsParser.cs` — 1 `ToDictionary` → `ByFirst`
+- `src/SpecScribe/EpicsViewBuilder.cs` — 1 `ToDictionary` → `ByFirst`
+- `src/SpecScribe/RelatedWorkCards.cs` — 1 `ToDictionary` → `ByFirst`
+- `src/SpecScribe/RequirementsParser.cs` — 2 `ToDictionary` → `ByFirst`
+- `src/SpecScribe/RequirementsTemplater.cs` — `EpicsByNumberFirstWins` converged onto the shared helper
+- `src/SpecScribe/SiteGenerator.cs` — 3 `ToDictionary` → `ByFirst` (2 epic-progress, 1 AC-number)
+- `src/SpecScribe/assets/specscribe.css` — `:root` merge, `.now-next-card.active` merge, dead `.impact-shape-*` block deleted, dead `border`/`padding` resets removed, 2 × `word-break` → `overflow-wrap`
+- `extension/src/extension.ts` — `S5850` regex grouping + anchoring documented, `S2681` ×2, `S7780`, `S7781` ×2
+- `tests/SpecScribe.Tests/ChartsTests.cs` — restored the `S2699` BLOCKER's assertions against the live root-detail sentence
+- `tests/SpecScribe.Tests/CapabilityStylerTests.cs` — new test pinning the `matched == 0` guard
+- `tests/SpecScribe.Tests/EpicsParserTests.cs` — new duplicate-epic-number tests (parser + downstream builder + policy)
+- `tests/SpecScribe.Tests/HtmlTemplaterTests.cs` — new `BmadCommands`/`StatusStyles` agreement + retirement-terminal tests
+- `tests/SpecScribe.Tests/GoldenNormalization.cs` — shared `StripFooterClock`; stale `GoldenContentFingerprint` reference corrected
+- `tests/SpecScribe.Tests/TestArtifactDiscoveryTests.cs` — second `FooterClock` transcription removed
+- `tests/SpecScribe.Tests/SiteGeneratorStatusStylesTests.cs` — third `StripFooterClock` transcription removed
+- `web/scripts/ir-content-build.mjs` — stale "7,041-line" figure removed from the emitted header
+- `web/scripts/ir-content-lib.mjs` — same figure removed from prose
+- `web/scripts/sync-runtime-assets.mjs` — same figure removed from prose
+- `web/test/tokens-lib.test.mjs` — two tests re-pointed from the sheet's block COUNT to the carried-token invariant
+- `web/assets/tokens.css` *(generated)* — regenerated after the `:root` merge; 45 tokens across 1 block
+- `web/assets/ir-content.css` *(generated)* — re-extracted
+- `web/assets/ir-content.manifest.json` *(generated)* — re-extracted; corrects an inherited stale `generatedBytes`
+- `web/measurements/ir-content-drops.json` *(generated)* — re-extracted
+- `_bmad-output/implementation-artifacts/deferred-work.md` — 5 entries amended with resolutions; new 17.1 section with 3 new findings
+- `docs/SonarCloudSetup.md` — "unowned 12-bug sweep" conflict resolved; `S125` and `S2583`/`S4158` rule-level decisions added
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — status → review
+
+## Change Log
+
+| Date | Change |
+|---|---|
+| 2026-08-07 | Story 17.1 implemented at baseline `15336f4`. Adjudicated all 7 C# reliability findings as false positives of one class (lambda/local-function side effects) with won't-fix rationales and a new guard test; restored the repository's only BLOCKER test against the live successor of the deleted centre `<text>`; fixed 4 of 5 stylesheet duplicate/deprecated findings and deleted a dead pre-rename CSS block, deferring `.coverage-card` to Epic 27 with a live-browser diagnosis that it is two components colliding rather than a duplicate; converged 11 epic/AC-number lookups, a triplicated footer-clock regex and the story-status classifier onto single sources (the last also closing an ADR 0025 violation); fixed the extension's `S5850` regex bug plus 5 smells; removed a stale generated line-count figure at its three sources. Adjudicated all 18 `S125` findings as false positives and deferred the ~300-issue complexity band to 17.4 with a rationale. Reconciled the `SonarCloudSetup.md` / `deferred-work.md` ownership conflict. Tests 2,991 → 3,000 passing, 0 failing; all four web gates and vitest green; regenerated baselines stable across two runs. |

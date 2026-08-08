@@ -57,7 +57,7 @@ public static class EpicsParser
         var requirementsHtml = ExtractSectionHtml(lines, "## Requirements Inventory");
 
         var listEntries = ParseEpicList(lines);
-        var sections = ParseEpicSections(lines).ToDictionary(s => s.Number);
+        var sections = ParseEpicSections(lines).ByFirst(s => s.Number);
 
         var epics = new List<EpicInfo>();
         foreach (var entry in listEntries.OrderBy(e => e.Number))

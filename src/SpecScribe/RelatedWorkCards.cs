@@ -95,7 +95,7 @@ public static class RelatedWorkCards
         if (relationships.IsEmpty || epics is null)
             return new RelatedWorkPaneModel(project, Array.Empty<RelatedCard>(), workGraphHref, relationships.Overflow);
 
-        var epicsByNumber = epics.Epics.ToDictionary(e => e.Number);
+        var epicsByNumber = epics.Epics.ByFirst(e => e.Number);
         var storiesById = epics.Epics.SelectMany(e => e.Stories).GroupBy(s => s.Id)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
 

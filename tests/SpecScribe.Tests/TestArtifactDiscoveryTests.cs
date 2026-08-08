@@ -606,10 +606,6 @@ public class TestArtifactDiscoveryTests : IDisposable
         .EnumerateFiles(Site, "*", SearchOption.AllDirectories)
         .ToDictionary(
             p => PathUtil.NormalizeSlashes(Path.GetRelativePath(Site, p)),
-            p => FooterClock.Replace(File.ReadAllText(p), "on <generated>"),
+            p => GoldenNormalization.StripFooterClock(File.ReadAllText(p), "on <generated>"),
             StringComparer.Ordinal);
-
-    private static readonly System.Text.RegularExpressions.Regex FooterClock =
-        new(@"on [A-Za-z]+ \d{1,2}, \d{4} at \d{1,2}:\d{2} UTC[+-]\d{2}:\d{2}",
-            System.Text.RegularExpressions.RegexOptions.Compiled);
 }

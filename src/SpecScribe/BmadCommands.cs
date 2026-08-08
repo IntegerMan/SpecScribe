@@ -479,10 +479,17 @@ public static class BmadCommands
         StoryInfo story, CommandCatalog commands,
         IReadOnlyList<FollowUpDeferredSlot>? openDeferred = null)
     {
-        var status = story.Status?.Trim().ToLowerInvariant() ?? string.Empty;
+        // Route through the shared classifier rather than re-matching keywords here. `StatusStyles.ForStatus`
+        // documents itself as the one place that maps a raw "Status:" onto the lifecycle stage "rather than
+        // reimplementing the keyword match", and it uses TOKEN comparison specifically so a substring cannot
+        // invent a stage — the trap this method carried, where `status.Contains("review")` also fired on
+        // `code-review-blocked` and `Contains("complete")` on `incomplete`. Routing here also gives `retired`
+        // (and its five synonyms) the terminal treatment ADR 0025 requires; matching on raw text, the six
+        // retirement words hit none of the arms and fell through to "create this story". [Story 17.1]
+        var stage = StatusStyles.ForStory(story);
         var suggestions = new List<Suggestion>();
 
-        if (status.Contains("ready"))
+        if (stage == "ready")
         {
             Add(suggestions, commands.Command("dev-story", story.Id),
                 "Implements the story exactly as specified — tasks, acceptance criteria, and dev notes drive the work.");
@@ -490,7 +497,7 @@ public static class BmadCommands
             return suggestions;
         }
 
-        if (status.Contains("progress") || status.Contains("in-dev"))
+        if (stage == "active")
         {
             Add(suggestions, commands.Command("dev-story", story.Id),
                 "Resumes implementation from the unchecked tasks in the story plan.");
@@ -502,7 +509,7 @@ public static class BmadCommands
             return suggestions;
         }
 
-        if (status.Contains("review"))
+        if (stage == "review")
         {
             Add(suggestions, commands.Command("code-review", story.Id),
                 "Final adversarial pass over the story's changes.");
@@ -512,10 +519,12 @@ public static class BmadCommands
             return suggestions;
         }
 
-        if (status.Contains("done") || status.Contains("complete"))
+        if (stage is "done" or "retired")
         {
             // Done stories are handled by RenderNextSteps (all-done or done-with-deferred panel),
             // not this list — keep empty so callers never treat a hatch as a ForStory primary.
+            // `retired` joins it as the second TERMINAL stage (ADR 0025 Decision 1): a story removed from the
+            // active plan is owed no further work, least of all "create-story" on the id that was retired.
             return suggestions;
         }
 
