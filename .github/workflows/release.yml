@@ -59,6 +59,7 @@ jobs:
         id: version
         run: |
           set -euo pipefail
+          dotnet restore src/SpecScribe/SpecScribe.csproj
           VERSION=$(dotnet msbuild src/SpecScribe/SpecScribe.csproj -t:MinVer -getProperty:MinVerVersion | tr -d '[:space:]')
           EXPECTED="${TAG#v}"
           [ "$VERSION" = "$EXPECTED" ] || { echo '::error::MinVer did not resolve the requested tag.'; exit 1; }
