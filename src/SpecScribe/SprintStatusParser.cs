@@ -19,17 +19,17 @@ public static class SprintStatusParser
         .IgnoreUnmatchedProperties()
         .Build();
 
-    private static readonly Regex EpicKey = new(@"^epic-(?<n>\d+)$", RegexOptions.Compiled);
-    private static readonly Regex RetroKey = new(@"^epic-(?<n>\d+)-retrospective$", RegexOptions.Compiled);
-    private static readonly Regex StoryKey = new(@"^(?<epic>\d+)-(?<story>\d+)-", RegexOptions.Compiled);
-    private static readonly Regex LastUpdatedLine = new(@"(?m)^last_updated:[ \t]*(?<v>.+?)[ \t]*$", RegexOptions.Compiled);
+    private static readonly Regex EpicKey = TimedRegex.New(@"^epic-(?<n>\d+)$", RegexOptions.Compiled);
+    private static readonly Regex RetroKey = TimedRegex.New(@"^epic-(?<n>\d+)-retrospective$", RegexOptions.Compiled);
+    private static readonly Regex StoryKey = TimedRegex.New(@"^(?<epic>\d+)-(?<story>\d+)-", RegexOptions.Compiled);
+    private static readonly Regex LastUpdatedLine = TimedRegex.New(@"(?m)^last_updated:[ \t]*(?<v>.+?)[ \t]*$", RegexOptions.Compiled);
 
     // A YAML block-scalar header (`>`/`|`) plus optional chomp (`+`/`-`) and/or indent digit in either
     // order (`>-`, `|2`, `|2-`, `>1+`), with nothing else on the line — the folded/literal BODY lives on
     // the following indented lines, which this single-line regex never reads. Matching only the bare
     // indicator (not a real date) keeps `ExtractLastUpdated` from ever surfacing the indicator character
     // itself as if it were the value. [spec-epic2-deferred-debt-cleanup]
-    private static readonly Regex BlockScalarIndicatorOnly = new(
+    private static readonly Regex BlockScalarIndicatorOnly = TimedRegex.New(
         @"^[>|](?:[+-]\d*|\d+[+-]?)?$", RegexOptions.Compiled);
 
     /// <summary>Reads and parses the yaml at <paramref name="fullPath"/>. Returns <c>null</c> when the file is

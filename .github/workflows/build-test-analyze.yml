@@ -54,6 +54,16 @@ jobs:
       # Preemptive: lets it roll forward rather than fail to launch on a runner
       # image that only carries the .NET 10 runtime.
       DOTNET_ROLL_FORWARD: Major
+      # The pinned scanner version. [Story 17.2 Task 8]
+      #
+      # ONE definition, used by BOTH the install and the cache key, because the two must move together and
+      # the previous arrangement was the worst of both worlds: `dotnet tool update` (no version) installed
+      # LATEST on a cache miss, while the cache key `${{ runner.os }}-sonar-scanner` carried no version
+      # component at all — so once the cache was populated the binary was frozen indefinitely with no refresh
+      # path. Unpinned on first write, pinned forever after, and nobody could say which version was running.
+      #
+      # Bump this one value to move the scanner; the key changes with it and the next run reinstalls.
+      SONAR_SCANNER_VERSION: "11.2.1"
       DOTNET_NOLOGO: "true"
       DOTNET_CLI_TELEMETRY_OPTOUT: "true"
 
@@ -114,14 +124,19 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .\.sonar\scanner
-          key: ${{ runner.os }}-sonar-scanner
-          restore-keys: ${{ runner.os }}-sonar-scanner
+          # The version is IN the key so a bump invalidates the cache. Without it the first run to populate
+          # the cache pinned the scanner forever. [Story 17.2 Task 8]
+          key: ${{ runner.os }}-sonar-scanner-${{ env.SONAR_SCANNER_VERSION }}
+          # Deliberately NOT a bare `${{ runner.os }}-sonar-scanner` prefix: a partial restore would seed the
+          # directory with a DIFFERENT version's binary. The install step below pins explicitly, so an exact
+          # match is the only restore worth having.
+          restore-keys: ${{ runner.os }}-sonar-scanner-${{ env.SONAR_SCANNER_VERSION }}
 
       - name: Install SonarQube Cloud scanner
         if: steps.cache-sonar-scanner.outputs.cache-hit != 'true' && env.SONAR_TOKEN != ''
         run: |
           New-Item -Path .\.sonar\scanner -ItemType Directory -Force | Out-Null
-          dotnet tool update dotnet-sonarscanner --tool-path .\.sonar\scanner
+          dotnet tool update dotnet-sonarscanner --version $env:SONAR_SCANNER_VERSION --tool-path .\.sonar\scanner
 
       # ---------------------------------------------------------------------
       # begin -> build -> test -> end, in this order and no other. The scanner

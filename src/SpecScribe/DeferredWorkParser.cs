@@ -34,17 +34,17 @@ public sealed record DeferredWorkItem(
 /// schema. [Story 9.6]</summary>
 public static class DeferredWorkParser
 {
-    private static readonly Regex DeferredHeading = new(
+    private static readonly Regex DeferredHeading = TimedRegex.New(
         @"^##\s+Deferred from:\s*(?<label>.+?)\s*$",
         RegexOptions.Compiled | RegexOptions.Multiline | RegexOptions.IgnoreCase);
 
     // Bracketed forms only — bare "RESOLVED" in prose must not flip status (e.g. "not RESOLVED yet").
-    private static readonly Regex ResolvedMarker = new(
+    private static readonly Regex ResolvedMarker = TimedRegex.New(
         @"\*\*\[\s*RESOLVED\b|\[\s*RESOLVED\b",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     // Column-0 CommonMark unordered [-*+] or ordered N. / N) — nested/indented lines stay continuations.
-    private static readonly Regex TopLevelListMarker = new(
+    private static readonly Regex TopLevelListMarker = TimedRegex.New(
         @"^(?:[-*+][ \t]|\d+[.)][ \t])",
         RegexOptions.Compiled);
 
@@ -52,7 +52,7 @@ public static class DeferredWorkParser
     // nothing else — pure group-provenance metadata (already captured by SourceSpecFileFromText over the
     // whole section), not a real finding. Any trailing prose on the same line disqualifies it (kept as a
     // real item — false negatives preferred over silently dropping authored content).
-    private static readonly Regex BareSourceSpecLine = new(
+    private static readonly Regex BareSourceSpecLine = TimedRegex.New(
         @"^source_spec:\s*(`?[^`\s]+`?)?\s*$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 

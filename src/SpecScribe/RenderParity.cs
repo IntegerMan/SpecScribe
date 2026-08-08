@@ -99,20 +99,20 @@ public static class RenderParity
 {
     // The chrome regions the facts are recovered from. Scoped to their container so the footer's own <a>s (the
     // SpecScribe credit + About link) can't be mistaken for nav/breadcrumb entries.
-    private static readonly Regex NavRegion = new("<nav class=\"site-nav\".*?</nav>", RegexOptions.Compiled | RegexOptions.Singleline);
-    private static readonly Regex NavLinks = new("<div class=\"site-nav-links\"[^>]*>(?<body>.*)</div>\\s*<a class=\"site-nav-attribution\"", RegexOptions.Compiled | RegexOptions.Singleline);
-    private static readonly Regex BreadcrumbRegion = new("<div class=\"breadcrumb\".*?</div>", RegexOptions.Compiled | RegexOptions.Singleline);
-    private static readonly Regex Brand = new("<span class=\"site-nav-brand\">(?<t>.*?)</span>", RegexOptions.Compiled | RegexOptions.Singleline);
+    private static readonly Regex NavRegion = TimedRegex.New("<nav class=\"site-nav\".*?</nav>", RegexOptions.Compiled | RegexOptions.Singleline);
+    private static readonly Regex NavLinks = TimedRegex.New("<div class=\"site-nav-links\"[^>]*>(?<body>.*)</div>\\s*<a class=\"site-nav-attribution\"", RegexOptions.Compiled | RegexOptions.Singleline);
+    private static readonly Regex BreadcrumbRegion = TimedRegex.New("<div class=\"breadcrumb\".*?</div>", RegexOptions.Compiled | RegexOptions.Singleline);
+    private static readonly Regex Brand = TimedRegex.New("<span class=\"site-nav-brand\">(?<t>.*?)</span>", RegexOptions.Compiled | RegexOptions.Singleline);
     // Dark-bar menu anchors only (class before or after href); excludes the white-band key-view chips and the
     // attribution badge so the chrome Nav fact matches NavMenuOrder.
-    private static readonly Regex MenuAnchor = new(
+    private static readonly Regex MenuAnchor = TimedRegex.New(
         "<a(?=[^>]*class=\"site-menu-(?:link|item)[^\"]*\")[^>]*href=\"(?<href>[^\"]*)\"(?<attrs>[^>]*)>(?<content>.*?)</a>",
         RegexOptions.Compiled | RegexOptions.Singleline);
-    private static readonly Regex Anchor = new("<a href=\"(?<href>[^\"]*)\"(?<attrs>[^>]*)>(?<content>.*?)</a>", RegexOptions.Compiled | RegexOptions.Singleline);
-    private static readonly Regex CrumbEntry = new("<a href=\"(?<href>[^\"]*)\">(?<label>.*?)</a>|<span class=\"crumb-current\"[^>]*>(?<current>.*?)</span>", RegexOptions.Compiled | RegexOptions.Singleline);
+    private static readonly Regex Anchor = TimedRegex.New("<a href=\"(?<href>[^\"]*)\"(?<attrs>[^>]*)>(?<content>.*?)</a>", RegexOptions.Compiled | RegexOptions.Singleline);
+    private static readonly Regex CrumbEntry = TimedRegex.New("<a href=\"(?<href>[^\"]*)\">(?<label>.*?)</a>|<span class=\"crumb-current\"[^>]*>(?<current>.*?)</span>", RegexOptions.Compiled | RegexOptions.Singleline);
     // Any anchor's href, in document order — used to evidence the ACTUAL order children appear in, rather than
     // trusting the reference's own declared order (a surface that renders children out of order must be caught).
-    private static readonly Regex AnyAnchorHref = new("<a[^>]+href=\"(?<href>[^\"]*)\"", RegexOptions.Compiled);
+    private static readonly Regex AnyAnchorHref = TimedRegex.New("<a[^>]+href=\"(?<href>[^\"]*)\"", RegexOptions.Compiled);
 
     /// <summary>The facts a <see cref="PageView"/> DECLARES — the reference every surface is checked against.</summary>
     public static SemanticFacts FromPageView(PageView page) => new()
@@ -306,36 +306,36 @@ public static class RenderParity
     // one section can't leak into another (e.g. a task-badge span is not a story status stage).
     // A stat tile renders either as a static <div> or, when it has a drill target, as an <a class="stat-card
     // stat-card-link"> — the inner number/label markup is identical in both forms, so match either wrapper.
-    private static readonly Regex StatCardRegex = new(
+    private static readonly Regex StatCardRegex = TimedRegex.New(
         "<(?:div|a) class=\"stat-card[^\"]*\"[^>]*>(?:<span class=\"tile-journey-label\">.*?</span>)?<div class=\"stat-number\">(?<num>.*?)</div><div class=\"stat-label\">(?<label>.*?)</div>",
         RegexOptions.Compiled | RegexOptions.Singleline);
-    private static readonly Regex EpicChipRegex = new(
+    private static readonly Regex EpicChipRegex = TimedRegex.New(
         "<a class=\"epic-chip (?<stage>[^\"]+)\" href=\"(?<href>[^\"]*)\"><span class=\"num\">(?<num>\\d+)</span>",
         RegexOptions.Compiled);
     // The wrapper may carry a stage modifier (`story-card retired`, Story 8.9 D2), so match the class ATTRIBUTE
     // rather than an exact class value — the same tolerance StatCardRegex above already needs. The card's stage
     // fact still comes from StoryStageRegex over the body, so this stays a structural anchor, not a second
     // status source that could disagree with the badge.
-    private static readonly Regex StoryCardRegex = new(
+    private static readonly Regex StoryCardRegex = TimedRegex.New(
         "<div class=\"story-card[^\"]*\" id=\"(?<id>[^\"]+)\">(?<body>.*?)</div>\\n\\n",
         RegexOptions.Compiled | RegexOptions.Singleline);
     // A story card's OWN status stage is a single-word status-badge class; the task badge (status-badge
     // task-badge …) has a hyphenated class and is deliberately excluded. Extra progressive-enhancement classes
     // (e.g. js-tip from Story 8.2) may follow the stage token before the closing quote.
-    private static readonly Regex StoryStageRegex = new(
+    private static readonly Regex StoryStageRegex = TimedRegex.New(
         "<span class=\"status-badge (?<stage>[a-z]+)(?:\"|\\s)", RegexOptions.Compiled);
-    private static readonly Regex StoryTitleHrefRegex = new(
+    private static readonly Regex StoryTitleHrefRegex = TimedRegex.New(
         "<a class=\"story-title story-title-link\" href=\"(?<href>[^\"]*)\"", RegexOptions.Compiled);
     // Dashboard body facts (Story 6.2 review — AC #3 card/panel/drill broadening). Each class is unique WITHIN the
     // dashboard body, so extraction never crosses into another section.
-    private static readonly Regex NowNextCardRegex = new(
+    private static readonly Regex NowNextCardRegex = TimedRegex.New(
         "<a class=\"now-next-card (?<css>[^\"]*)\" href=\"(?<href>[^\"]*)\">\\s*"
         + "<span class=\"now-next-kicker\">(?<kicker>[^<]*)</span>\\s*"
         + "<span class=\"now-next-title\">(?<title>[^<]*)</span>",
         RegexOptions.Compiled | RegexOptions.Singleline);
     // The progress row pairs its label with the NEXT progress-value (non-greedy), the row structure guaranteeing
     // one value follows each label before the next row.
-    private static readonly Regex ProgressBarRegex = new(
+    private static readonly Regex ProgressBarRegex = TimedRegex.New(
         "<div class=\"progress-label\">(?<label>[^<]*)</div>.*?<div class=\"progress-value\">(?<val>[^<]*)</div>",
         RegexOptions.Compiled | RegexOptions.Singleline);
 

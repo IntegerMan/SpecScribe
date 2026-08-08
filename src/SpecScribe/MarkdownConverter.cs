@@ -5,6 +5,7 @@ using Markdig.Extensions.EmphasisExtras;
 using Markdig.Renderers;
 using Markdig.Renderers.Html;
 using Markdig.Syntax;
+using Markdig.Syntax.Inlines;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -81,12 +82,40 @@ public static class MarkdownConverter
     /// inert or invisible. [spec-epic2-deferred-debt-cleanup]</summary>
     private static string RenderDocumentHtml(MarkdownDocument document)
     {
+        NeutralizeDangerousLinks(document);
         using var writer = new StringWriter();
         var renderer = new HtmlRenderer(writer);
         Pipeline.Setup(renderer);
         renderer.Render(document);
         writer.Flush();
         return writer.ToString();
+    }
+
+    /// <summary>Blanks link destinations whose scheme can execute, BEFORE rendering. [Story 17.2 Task 1, ADR 0042]
+    ///
+    /// <para>Raw <c>&lt;a href="javascript:…"&gt;</c> is handled by <see cref="HtmlSafety.SanitizeRawHtml"/> on the
+    /// HTML-passthrough path, but that path never sees this one: ordinary markdown link syntax
+    /// (<c>[text](javascript:alert(1))</c>) parses to a <see cref="LinkInline"/>, and Markdig writes its
+    /// <c>Url</c> into an <c>href</c> with no raw HTML involved at all. Measured on a hostile fixture during
+    /// Task 1 — this vector needs NO raw HTML in the source markdown, which makes it the cheaper of the two to
+    /// exploit and the easier one to miss.</para>
+    ///
+    /// <para>The destination is emptied rather than the link removed: the link text is the author's content and
+    /// keeping it visible preserves the prose, while an empty <c>href</c> resolves to the current page and
+    /// cannot navigate anywhere. Applied to every rendering entry point because all three
+    /// (<see cref="Convert"/>, <see cref="RenderBlock"/>, <see cref="RenderInline"/>) funnel through
+    /// <see cref="RenderDocumentHtml"/>.</para></summary>
+    private static void NeutralizeDangerousLinks(MarkdownDocument document)
+    {
+        foreach (var link in document.Descendants<LinkInline>())
+        {
+            if (HtmlSafety.IsDangerousUrl(link.Url)) link.Url = string.Empty;
+        }
+
+        foreach (var auto in document.Descendants<AutolinkInline>())
+        {
+            if (HtmlSafety.IsDangerousUrl(auto.Url)) auto.Url = string.Empty;
+        }
     }
 
     /// <summary>Installs the mermaid-aware code-block renderer and the comment-aware HTML renderers onto every
@@ -195,7 +224,7 @@ public static class MarkdownConverter
     /// <c>&lt;table&gt;</c> tags for pipe tables, so the plain replace is unambiguous.</summary>
     private static string TagTables(string html) => html.Replace("<table>", "<table class=\"md-table\">");
 
-    private static readonly Regex FrontmatterPattern = new(
+    private static readonly Regex FrontmatterPattern = TimedRegex.New(
         @"\A---\r?\n(?<yaml>.*?)\r?\n---\r?\n?",
         RegexOptions.Singleline | RegexOptions.Compiled);
 

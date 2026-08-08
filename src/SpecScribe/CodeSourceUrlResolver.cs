@@ -13,7 +13,7 @@ namespace SpecScribe;
 public static class CodeSourceUrlResolver
 {
     // SSH scp-like form: git@host:owner/repo(.git) — the one remote shape that is not a normal URI.
-    private static readonly Regex ScpLike = new(
+    private static readonly Regex ScpLike = TimedRegex.New(
         @"^(?<user>[^@]+)@(?<host>[^:]+):(?<path>.+)$", RegexOptions.Compiled);
 
     /// <summary>Best-effort detection from the environment: CI context first, then the git remote at

@@ -14,7 +14,7 @@ public static class AbbreviationExpander
 {
     // Same protected-split grammar as RequirementLinkifier, extended with <abbr>…</abbr> so an
     // already-expanded (or hand-authored) abbreviation is never re-wrapped or matched inside its own title.
-    private static readonly Regex ProtectedSplit = new(
+    private static readonly Regex ProtectedSplit = TimedRegex.New(
         "(<a\\b[^>]*>.*?</a>|<code\\b[^>]*>.*?</code>|<pre\\b[^>]*>.*?</pre>|<abbr\\b[^>]*>.*?</abbr>|<svg\\b[^>]*>.*?</svg>"
         + "|<head\\b[^>]*>.*?</head>|<script\\b[^>]*>.*?</script>|<style\\b[^>]*>.*?</style>|<[^>]*>)",
         RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.IgnoreCase);
@@ -45,7 +45,11 @@ public static class AbbreviationExpander
         // Trailing (?![\s\-\u2013\u2014]*\d{2,}|[./:]\d{2,}) skips numbered references like "ADR-0005" / "ADR 0005"
         // (and en/em-dash variants): `\b` alone treats those separators as a boundary, so bare "ADR"
         // would otherwise wrap mid-reference on the first hit. Require ≥2 digits so "ADR 5 years" still expands.
-        var pattern = new Regex(
+        // [Story 17.2 Task 3] Bounded like every other pattern \u2014 and this one earns it more than most: the
+        // alternation is BUILT FROM PARSED REPOSITORY CONTENT (every discovered abbreviation term), so its size
+        // and shape are third-party-controlled rather than authored here. `Regex.Escape` keeps the terms
+        // literal, but nothing bounds how many there are.
+        var pattern = TimedRegex.New(
             @"\b(" + string.Join("|", unique.OrderByDescending(a => a.Term.Length).Select(a => Regex.Escape(a.Term))) + @")\b(?![\s\-\u2013\u2014]*\d{2,}|[./:]\d{2,})",
             RegexOptions.Compiled | RegexOptions.CultureInvariant);
         var byTerm = unique.ToDictionary(a => a.Term, StringComparer.Ordinal);

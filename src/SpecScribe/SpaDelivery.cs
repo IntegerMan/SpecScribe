@@ -144,18 +144,18 @@ public static class SpaDelivery
     };
 
     private static readonly Regex TitleRegex =
-        new("<title>(?<t>.*?)</title>", RegexOptions.Compiled | RegexOptions.Singleline);
+        TimedRegex.New("<title>(?<t>.*?)</title>", RegexOptions.Compiled | RegexOptions.Singleline);
 
     // Matches the breadcrumb markup HtmlRenderAdapter.RenderBreadcrumb produces, in document order: either a
     // linked crumb (<a href="...">Label</a>) or the current, unlinked crumb (<span class="crumb-current" ...>Label</span>).
-    private static readonly Regex CrumbRegex = new(
+    private static readonly Regex CrumbRegex = TimedRegex.New(
         "<a href=\"(?<href>[^\"]*)\">(?<alabel>[^<]*)</a>|<span class=\"crumb-current\"[^>]*>(?<clabel>[^<]*)</span>",
         RegexOptions.Compiled);
 
-    private static readonly Regex MetaDescriptionRegex = new(
+    private static readonly Regex MetaDescriptionRegex = TimedRegex.New(
         "<meta name=\"description\" content=\"(?<d>[^\"]*)\">", RegexOptions.Compiled);
 
-    private static readonly Regex NavBlockRegex = new(
+    private static readonly Regex NavBlockRegex = TimedRegex.New(
         "<nav class=\"site-nav\".*?</nav>\\n?", RegexOptions.Compiled | RegexOptions.Singleline);
 
     /// <summary>One embedded <c>&lt;script&gt;</c> a consumer of a page's content region must deal with — the
@@ -174,13 +174,13 @@ public static class SpaDelivery
     /// <summary>Kind for a script the browser executes — no <c>type</c>, or a JavaScript/module type.</summary>
     public const string ExecutableScriptKind = "executable";
 
-    private static readonly Regex ScriptTagRegex = new(
+    private static readonly Regex ScriptTagRegex = TimedRegex.New(
         "<script(?<attrs>[^>]*)>", RegexOptions.Compiled);
 
-    private static readonly Regex ScriptTypeAttrRegex = new(
+    private static readonly Regex ScriptTypeAttrRegex = TimedRegex.New(
         "\\btype=\"(?<v>[^\"]*)\"", RegexOptions.Compiled);
 
-    private static readonly Regex ScriptIdAttrRegex = new(
+    private static readonly Regex ScriptIdAttrRegex = TimedRegex.New(
         "\\bid=\"(?<v>[^\"]*)\"", RegexOptions.Compiled);
 
     /// <summary>Declares every <c>&lt;script&gt;</c> embedded in a page's CONTENT REGION, classified into the

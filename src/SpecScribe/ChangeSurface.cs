@@ -7,8 +7,8 @@ namespace SpecScribe;
 public static class ChangeSurface
 {
     // Bullet or backtick-wrapped path in the File List subsection.
-    private static readonly Regex FileListBullet = new(@"^\s*[-*]\s+`?([^`\n]+?)`?\s*$", RegexOptions.Compiled);
-    private static readonly Regex FileListBacktick = new(@"`([^`\n]+)`", RegexOptions.Compiled);
+    private static readonly Regex FileListBullet = TimedRegex.New(@"^\s*[-*]\s+`?([^`\n]+?)`?\s*$", RegexOptions.Compiled);
+    private static readonly Regex FileListBacktick = TimedRegex.New(@"`([^`\n]+)`", RegexOptions.Compiled);
 
     /// <summary>One row from the Dev Agent Record File List — normalized path for classification/links plus the
     /// authored label (may include annotations like <c>(new)</c>).</summary>

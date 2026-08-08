@@ -52,7 +52,7 @@ public sealed class BmadArtifactAdapter : IArtifactAdapter
             .Any(s => string.Equals(s, ImplementationArtifactsDirName, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static readonly Regex ArtifactFilenamePattern = new(@"^(?<epic>\d+)-(?<story>\d+)-", RegexOptions.Compiled);
+    private static readonly Regex ArtifactFilenamePattern = TimedRegex.New(@"^(?<epic>\d+)-(?<story>\d+)-", RegexOptions.Compiled);
 
     /// <summary>BMad's self-selection signal is the framework's marker directory: an <c>_bmad/</c> install
     /// root at the repo root — the same signal <see cref="ModuleContext.Detect"/> keys off.

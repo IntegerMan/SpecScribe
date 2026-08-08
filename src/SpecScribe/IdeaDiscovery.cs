@@ -66,17 +66,20 @@ public static class IdeaDiscovery
     // with JS would be a portal surface with no text twin.
     // [Story 18.4 review] Widened: the handler branch no longer requires a quote immediately after `=`, so an
     // UNQUOTED handler (`onerror=alert(1)`) is caught too — the quote-required form let exactly that through.
-    private static readonly Regex UnsafeReportPattern = new(
-        @"<\s*(?:script|iframe|object|embed)\b|\son[a-z]+\s*=|javascript\s*:",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    //
+    // [Story 17.2] The PATTERN moved to HtmlSafety so the repository states this policy once; the DECISION to
+    // reject stays here. Story 17.2 found the repo's own markdown reaching the same rendered output through
+    // `v-html` with no check at all — same threat, opposite treatment — and closing that needed the identical
+    // definition of "executable". A second copy of the regex is the SSOT defect Story 17.1 is sweeping up.
+    private static bool IsUnsafeReport(string html) => HtmlSafety.ContainsExecutableMarkup(html);
 
     // [Story 18.4 review] Widened: `srcset=` and CSS `url(...)` (inline `<style>`/`@import`/`style="...url(...)"`)
     // are both real ways to reach an external origin that `src=`/`href=` alone missed.
-    private static readonly Regex ExternalSubresourcePattern = new(
+    private static readonly Regex ExternalSubresourcePattern = TimedRegex.New(
         @"\b(?:src|href|srcset)\s*=\s*[""']?\s*(?:https?:)?//|url\s*\(\s*[""']?\s*(?:https?:)?//",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    private static readonly Regex MarkdownLinkPattern = new(
+    private static readonly Regex MarkdownLinkPattern = TimedRegex.New(
         @"\[(?<text>[^\]]*)\]\((?<href>[^)\s]+)(?:\s+""[^""]*"")?\)", RegexOptions.Compiled);
 
     /// <summary>Scans <paramref name="sourceRoot"/> for forge workspaces. <paramref name="diagnostics"/> collects
@@ -314,7 +317,7 @@ public static class IdeaDiscovery
             }
 
             var raw = MarkdownConverter.ReadAllTextShared(reportFullPath);
-            if (UnsafeReportPattern.IsMatch(raw) || ExternalSubresourcePattern.IsMatch(raw))
+            if (IsUnsafeReport(raw) || ExternalSubresourcePattern.IsMatch(raw))
             {
                 diagnostics?.Add(new AdapterDiagnostic(
                     AdapterDiagnosticCategory.Skipped, reportRelative,

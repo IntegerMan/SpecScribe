@@ -7,30 +7,30 @@ namespace SpecScribe;
 public static class FollowUpRefs
 {
     // Story artifact filenames: "8-8-generation-time-recency-signals" or with .md suffix.
-    private static readonly Regex StoryKeyPattern = new(
+    private static readonly Regex StoryKeyPattern = TimedRegex.New(
         @"\b(?<epic>\d+)-(?<story>\d+)-[a-z0-9][a-z0-9-]*(?:\.md)?\b",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     // Quick-dev / one-shot specs: "spec-webview-doc-page-surfaces" or with .md.
-    private static readonly Regex SpecKeyPattern = new(
+    private static readonly Regex SpecKeyPattern = TimedRegex.New(
         @"\bspec-[a-z0-9][a-z0-9-]*(?:\.md)?\b",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     // "RESOLVED in 6.11" / "RESOLVED in Story 6.4" (trailing punctuation/em-dash OK via \b)
-    private static readonly Regex ResolvedInStory = new(
+    private static readonly Regex ResolvedInStory = TimedRegex.New(
         @"RESOLVED\s+in\s+(?:Story\s+)?(?<epic>\d+)\.(?<story>\d+)\b",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     // After a RESOLVED marker: backtick story-key or spec-* token (live notes: **RESOLVED …** (`spec-…`)).
-    private static readonly Regex ResolvedThenBacktickRef = new(
+    private static readonly Regex ResolvedThenBacktickRef = TimedRegex.New(
         @"RESOLVED\b[^`\n]{0,120}`(?<token>(?:\d+-\d+-[a-z0-9][a-z0-9-]*|spec-[a-z0-9][a-z0-9-]*)(?:\.md)?)`",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    private static readonly Regex SourceSpecLine = new(
+    private static readonly Regex SourceSpecLine = TimedRegex.New(
         @"source_spec:\s*`?(?<file>[^`\s\n]+)`?",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    private static readonly Regex DottedStoryId = new(
+    private static readonly Regex DottedStoryId = TimedRegex.New(
         @"^\d+\.\d+$",
         RegexOptions.Compiled);
 

@@ -82,19 +82,19 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
     // zero-padded phase numbers, em-dash AND hyphen separators on the same kind of line, and `(INSERTED)`/
     // `(BACKLOG)` suffixes on detail headings.
 
-    private static readonly Regex MilestoneOverviewHeading = new(
+    private static readonly Regex MilestoneOverviewHeading = TimedRegex.New(
         @"^###\s+Milestone:\s*(?<name>.+?)\s*(?:\(completed\s+(?<date>[^)]+)\))?\s*$",
         RegexOptions.Compiled);
 
-    private static readonly Regex PhaseDetailsSectionHeading = new(
+    private static readonly Regex PhaseDetailsSectionHeading = TimedRegex.New(
         @"^##\s+Milestone:\s*(?<name>.+?)\s+[—–-]\s+Phase\s+Details\s*$",
         RegexOptions.Compiled);
 
-    private static readonly Regex PhaseOverviewLine = new(
+    private static readonly Regex PhaseOverviewLine = TimedRegex.New(
         @"^\s*-\s*\[(?<mark>[ xX])\]\s*\*\*Phase\s+(?<num>\d+(?:\.\d+)?)\s*:\s*(?<title>.+?)\*\*\s*(?:[—–-]\s*(?<desc>.*?))?\s*$",
         RegexOptions.Compiled);
 
-    private static readonly Regex PhaseDetailHeading = new(
+    private static readonly Regex PhaseDetailHeading = TimedRegex.New(
         @"^###\s+Phase\s+(?<num>\d+(?:\.\d+)?)\s*:\s*(?<title>.+?)\s*$",
         RegexOptions.Compiled);
 
@@ -103,24 +103,24 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
     /// does not match <c>02.1-01-PLAN.md</c>. Both the em-dash and the hyphen separator occur in the same file.
     /// Backlog placeholders (<c>- [ ] TBD (promote with …)</c>) deliberately do not match: they name no plan file,
     /// so they are not plans.</summary>
-    private static readonly Regex PlanLine = new(
+    private static readonly Regex PlanLine = TimedRegex.New(
         @"^\s*-\s*\[(?<mark>[ xX])\]\s*(?<file>(?<phase>\d+(?:\.\d+)?)-(?<plan>\d+)-PLAN\.md)\s*(?:[—–-]\s*(?<desc>.*?))?\s*$",
         RegexOptions.Compiled);
 
     /// <summary>The plan/summary filename grammar, used to identify files on disk (never frontmatter).</summary>
-    private static readonly Regex PlanFilePattern = new(
+    private static readonly Regex PlanFilePattern = TimedRegex.New(
         @"^(?<phase>\d+(?:\.\d+)?)-(?<plan>\d+)-PLAN\.md$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    private static readonly Regex SummaryFilePattern = new(
+    private static readonly Regex SummaryFilePattern = TimedRegex.New(
         @"^(?<phase>\d+(?:\.\d+)?)-(?<plan>\d+)-SUMMARY\.md$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    private static readonly Regex GoalLine = new(@"^\*\*Goal:?\*\*:?\s*(?<v>.+?)\s*$", RegexOptions.Compiled);
-    private static readonly Regex RequirementsLine = new(@"^\*\*Requirements:?\*\*:?\s*(?<v>.+?)\s*$", RegexOptions.Compiled);
-    private static readonly Regex CompletedSuffix = new(@"\s*\(completed\s+(?<date>[^)]+)\)\s*$", RegexOptions.Compiled);
-    private static readonly Regex PhaseMarkerSuffix = new(@"\s*\((?:INSERTED|BACKLOG)\)\s*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex LeadingPhaseNumber = new(@"^(?<num>\d+(?:\.\d+)?)-", RegexOptions.Compiled);
+    private static readonly Regex GoalLine = TimedRegex.New(@"^\*\*Goal:?\*\*:?\s*(?<v>.+?)\s*$", RegexOptions.Compiled);
+    private static readonly Regex RequirementsLine = TimedRegex.New(@"^\*\*Requirements:?\*\*:?\s*(?<v>.+?)\s*$", RegexOptions.Compiled);
+    private static readonly Regex CompletedSuffix = TimedRegex.New(@"\s*\(completed\s+(?<date>[^)]+)\)\s*$", RegexOptions.Compiled);
+    private static readonly Regex PhaseMarkerSuffix = TimedRegex.New(@"\s*\((?:INSERTED|BACKLOG)\)\s*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex LeadingPhaseNumber = TimedRegex.New(@"^(?<num>\d+(?:\.\d+)?)-", RegexOptions.Compiled);
 
     /// <summary>The band name for phases GSD lists under <c>## Backlog</c> — a peer of the milestone groups in
     /// <c>## Phases</c>, carrying GSD's own word rather than an invented one.</summary>
@@ -546,9 +546,9 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
 
     private sealed record StateProgress(int CompletedPlans, int TotalPlans);
 
-    private static readonly Regex StateCompletedPlans = new(@"^\s*completed_plans:\s*(?<v>\d+)\s*$", RegexOptions.Multiline | RegexOptions.Compiled);
-    private static readonly Regex StateTotalPlans = new(@"^\s*total_plans:\s*(?<v>\d+)\s*$", RegexOptions.Multiline | RegexOptions.Compiled);
-    private static readonly Regex StateLastUpdated = new("^\\s*last_updated:\\s*\"?(?<v>[^\"\\r\\n]+?)\"?\\s*$", RegexOptions.Multiline | RegexOptions.Compiled);
+    private static readonly Regex StateCompletedPlans = TimedRegex.New(@"^\s*completed_plans:\s*(?<v>\d+)\s*$", RegexOptions.Multiline | RegexOptions.Compiled);
+    private static readonly Regex StateTotalPlans = TimedRegex.New(@"^\s*total_plans:\s*(?<v>\d+)\s*$", RegexOptions.Multiline | RegexOptions.Compiled);
+    private static readonly Regex StateLastUpdated = TimedRegex.New("^\\s*last_updated:\\s*\"?(?<v>[^\"\\r\\n]+?)\"?\\s*$", RegexOptions.Multiline | RegexOptions.Compiled);
 
     /// <summary>Reads only the two roll-up scalars this adapter needs out of <c>STATE.md</c>'s frontmatter, with
     /// line regexes rather than a whole-document deserialize — the house pattern <c>SprintStatusParser</c> already

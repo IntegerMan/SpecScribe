@@ -378,7 +378,7 @@ public sealed class ForgeOptions
         return folder is { Length: > 0 } ? folder : DefaultSiteTitle;
     }
 
-    private static readonly Regex ProjectDocTitlePattern = new(
+    private static readonly Regex ProjectDocTitlePattern = TimedRegex.New(
         @"^\#\s+(?<name>\S.*?)\s*$", RegexOptions.Multiline | RegexOptions.Compiled);
 
     /// <summary>The first level-1 heading of <c>&lt;sourceRoot&gt;/PROJECT.md</c> — GSD Core's project brief, whose
@@ -401,7 +401,7 @@ public sealed class ForgeOptions
         }
     }
 
-    private static readonly Regex ProjectNamePattern = new(
+    private static readonly Regex ProjectNamePattern = TimedRegex.New(
         "^\\s*project_name\\s*=\\s*\"(?<name>.+?)\"",
         RegexOptions.Multiline | RegexOptions.Compiled);
 

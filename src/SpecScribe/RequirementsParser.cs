@@ -19,22 +19,22 @@ namespace SpecScribe;
 public static class RequirementsParser
 {
     // Shared def-line matcher for FR / NFR / UX-DR — one ParseDefs path; kind filter keeps sections honest. [Story 9.2 deferred]
-    private static readonly Regex DefLine = new(@"^(FR|NFR|UX-DR)(\d+):\s*(.+)$", RegexOptions.Compiled);
+    private static readonly Regex DefLine = TimedRegex.New(@"^(FR|NFR|UX-DR)(\d+):\s*(.+)$", RegexOptions.Compiled);
     // FR Coverage Map lines may name FR, NFR, or UX-DR (Task 2 header∪map union for Design). [Story 9.2 review]
-    private static readonly Regex CoverageMapLine = new(@"^(FR|NFR|UX-DR)(\d+):\s*(.+)$", RegexOptions.Compiled);
-    private static readonly Regex CategoryLine = new(@"^\*\*(.+?)\*\*$", RegexOptions.Compiled);
+    private static readonly Regex CoverageMapLine = TimedRegex.New(@"^(FR|NFR|UX-DR)(\d+):\s*(.+)$", RegexOptions.Compiled);
+    private static readonly Regex CategoryLine = TimedRegex.New(@"^\*\*(.+?)\*\*$", RegexOptions.Compiled);
     // Matches the leading "Epic 4" / "Epics 1 & 2" / "Epics 1, 2 and 3" coverage clause. Only confirms the
     // clause names epic(s) at all (plural "Epics" and multi-number lists are real in epics.md — FR2/FR5/FR7:
     // "Epics 1 & 2" — which the old singular "Epic\s+(\d+)" first-match pattern silently dropped entirely, no
     // whitespace after "Epic"s). The actual numbers are pulled from the WHOLE clause via NumberRef below, not
     // from this pattern's capture group, so any separator between numbers ("&", ",", "and", ", and") works —
     // a narrower digits/comma/ampersand-only capture group would silently drop numbers after the word "and".
-    private static readonly Regex EpicClause = new(@"^Epics?\b", RegexOptions.Compiled);
-    private static readonly Regex NumberRef = new(@"\d+", RegexOptions.Compiled);
-    private static readonly Regex ListEpicHeading = new(@"^### Epic (\d+):", RegexOptions.Compiled);
+    private static readonly Regex EpicClause = TimedRegex.New(@"^Epics?\b", RegexOptions.Compiled);
+    private static readonly Regex NumberRef = TimedRegex.New(@"\d+", RegexOptions.Compiled);
+    private static readonly Regex ListEpicHeading = TimedRegex.New(@"^### Epic (\d+):", RegexOptions.Compiled);
     // FR\d+ / NFR\d+ / UX-DR\d+ tokens on epic-header coverage lines — ordered by appearance for deterministic
     // CoverageEpicNumbers. [Story 9.2 Task 2]
-    private static readonly Regex ReqIdToken = new(@"\b(?:FR|NFR|UX-DR)(\d+)\b", RegexOptions.Compiled);
+    private static readonly Regex ReqIdToken = TimedRegex.New(@"\b(?:FR|NFR|UX-DR)(\d+)\b", RegexOptions.Compiled);
 
     private sealed record Coverage(IReadOnlyList<int> EpicNumbers, bool Deferred, string? Note);
 

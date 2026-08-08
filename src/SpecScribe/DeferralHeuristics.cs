@@ -19,13 +19,13 @@ public static class DeferralHeuristics
     // do not broaden (e.g. bare "defer") without an intentional ActionItemsTemplater behavior change.
     // [Story 2.3 review; Story 9.3 review]
     private static readonly Regex DebtWords =
-        new(@"\b(deferred|tech(nical)?\s+debt)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        TimedRegex.New(@"\b(deferred|tech(nical)?\s+debt)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     // A single "Epic N" mention — enough to resolve a retro link, deliberately NOT a generalized reference
     // parser. "Epics 1 & 2" does not match (trailing "s" on "Epics" breaks Epic\s+), by design. Case-insensitive
     // so a note like "deferred from epic 1" still resolves. [Story 9.3 Task 5; review]
     private static readonly Regex EpicMentionRe =
-        new(@"\bEpic\s+(\d+)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        TimedRegex.New(@"\bEpic\s+(\d+)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>True when text is about deferred work / tech debt — the signal for surfacing a link to the
     /// deferred-work backlog page beside it.</summary>

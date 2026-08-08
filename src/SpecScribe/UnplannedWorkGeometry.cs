@@ -34,10 +34,10 @@ public sealed record UnplannedWorkGeometry(
     string? DeferredListHref = null,
     string LinkPrefix = "")
 {
-    private static readonly Regex StoryMention = new(
+    private static readonly Regex StoryMention = TimedRegex.New(
         @"\bStory\s+(\d+)\.(\d+)\b(?!\.\d)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    private static readonly Regex EpicMention = new(
+    private static readonly Regex EpicMention = TimedRegex.New(
         @"\bEpic\s+(\d+)\b(?!\.\d)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     public static UnplannedWorkGeometry Empty { get; } = new(
@@ -153,7 +153,7 @@ public sealed record UnplannedWorkGeometry(
         return new UnplannedWorkGeometry(quickDev, unattributedDeferred, DeferredListHref: followUps.DeferredHref, linkPrefix);
     }
 
-    private static readonly Regex ProvenanceParen = new(
+    private static readonly Regex ProvenanceParen = TimedRegex.New(
         @"\(([^)]+)\)", RegexOptions.Compiled);
 
     /// <summary>Best-effort epic attribution: text heuristics first (title, filename, deferred cue that

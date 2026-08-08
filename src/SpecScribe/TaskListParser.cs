@@ -10,7 +10,7 @@ public sealed record TaskItem(string Text, bool Done, IReadOnlyList<TaskItem> Su
 /// (dev notes tucked under a task) are skipped — only real `- [ ]`/`- [x]` lines count.</summary>
 public static class TaskListParser
 {
-    private static readonly Regex ChecklistLine = new(
+    private static readonly Regex ChecklistLine = TimedRegex.New(
         @"^(?<indent>\s*)-\s*\[(?<mark>[ xX])\]\s*(?<text>.+)$",
         RegexOptions.Compiled);
 

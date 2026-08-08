@@ -10,18 +10,18 @@ namespace SpecScribe;
 /// unrecognized status word, leaves the HTML unchanged. [Story 2.3 retro pages]</summary>
 public static class RetroActionStyler
 {
-    private static readonly Regex Section = new(
+    private static readonly Regex Section = TimedRegex.New(
         "(?<head><h2[^>]*\\bid=\"action-items\"[^>]*>.*?</h2>)\\s*(?<table><table[^>]*>.*?</table>)",
         RegexOptions.Compiled | RegexOptions.Singleline);
 
     // A bare Status cell — the only <td>s whose entire content is a lifecycle word are the table's Status column.
-    private static readonly Regex StatusCell = new(
+    private static readonly Regex StatusCell = TimedRegex.New(
         "<td>\\s*(?<s>open|in-progress|in progress|done)\\s*</td>",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    private static readonly Regex Row = new("<tr[^>]*>.*?</tr>", RegexOptions.Compiled | RegexOptions.Singleline);
-    private static readonly Regex Cell = new("<t(?<k>[hd])\\b[^>]*>.*?</t\\k<k>>", RegexOptions.Compiled | RegexOptions.Singleline);
-    private static readonly Regex Tags = new("<[^>]+>", RegexOptions.Compiled);
+    private static readonly Regex Row = TimedRegex.New("<tr[^>]*>.*?</tr>", RegexOptions.Compiled | RegexOptions.Singleline);
+    private static readonly Regex Cell = TimedRegex.New("<t(?<k>[hd])\\b[^>]*>.*?</t\\k<k>>", RegexOptions.Compiled | RegexOptions.Singleline);
+    private static readonly Regex Tags = TimedRegex.New("<[^>]+>", RegexOptions.Compiled);
 
     public static string Style(string html)
     {

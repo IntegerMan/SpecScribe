@@ -9,7 +9,7 @@ namespace SpecScribe;
 /// pass through untouched, so the styling can never fire outside the authored convention.</summary>
 public static class GherkinStyler
 {
-    private static readonly Regex KeywordStrong = new(
+    private static readonly Regex KeywordStrong = TimedRegex.New(
         "<strong>(Given|When|Then|And|But)</strong>",
         RegexOptions.Compiled);
 
@@ -17,7 +17,7 @@ public static class GherkinStyler
     // Markdig <p> wrappers because RenderInline only strips a single enclosing pair. Chips-per-line must
     // then be applied within each paragraph's own inline flow — slicing across a <p> boundary would emit
     // overlapping tags. <p> can't nest in HTML, so the lazy pair-match is unambiguous.
-    private static readonly Regex Paragraph = new(
+    private static readonly Regex Paragraph = TimedRegex.New(
         "<p>(.*?)</p>",
         RegexOptions.Compiled | RegexOptions.Singleline);
 

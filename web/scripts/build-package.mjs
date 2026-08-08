@@ -27,6 +27,7 @@
 // at server runtime.
 
 import { spawnSync } from 'node:child_process'
+import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
@@ -51,11 +52,28 @@ const sync = spawnSync(process.execPath, [join(here, 'sync-runtime-assets.mjs')]
 })
 if (sync.status !== 0) process.exit(sync.status ?? 1)
 
-// `shell: true` so the `nuxt` bin resolves through npm's PATH shim on Windows as well as POSIX.
-const build = spawnSync('nuxt', ['build'], {
+// Resolve nuxt's own entry point and run it under THIS node, rather than spawning the bare name `nuxt`
+// through a shell. [Story 17.2 Task 2, javascript:S4036]
+//
+// The previous form was `spawnSync('nuxt', ['build'], { shell: true })`, which asked the shell to find `nuxt`
+// on PATH — the surface Sonar flags ("make sure the PATH variable only contains fixed, unwriteable
+// directories"), and the same class of defect the C# side had at `GitMetrics`/`NuxtPrerender`. Resolving the
+// module removes the PATH search AND the shell from the path entirely; `process.execPath` is already the
+// trusted interpreter the two spawns above use.
+//
+// Resolved via nuxt's OWN `bin` field rather than a hard-coded `node_modules/nuxt/bin/nuxt.mjs`, so it keeps
+// working if nuxt relocates the file.
+//
+// ⚠️ `require.resolve('nuxt/bin/nuxt.mjs')` does NOT work and was tried first: `require.resolve` honours the
+// package's `exports` map, and nuxt does not export its bin path — it fails with ERR_PACKAGE_PATH_NOT_EXPORTED.
+// `package.json` IS exported, so resolving that and reading `bin.nuxt` relative to its directory is the form
+// that respects both the `exports` map and nuxt's own declaration of where its entry point lives.
+const require_ = createRequire(import.meta.url)
+const nuxtPkgPath = require_.resolve('nuxt/package.json')
+const nuxtBin = join(dirname(nuxtPkgPath), require_(nuxtPkgPath).bin.nuxt)
+const build = spawnSync(process.execPath, [nuxtBin, 'build'], {
   cwd: join(here, '..'),
   stdio: 'inherit',
-  shell: true,
   env: { ...process.env, SPECSCRIBE_PACKAGE_BUILD: '1' },
 })
 process.exit(build.status ?? 1)

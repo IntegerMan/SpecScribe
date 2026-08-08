@@ -27,20 +27,20 @@ public static class CodeReferenceLinkifier
 {
     // Any anchor; the evaluator decides whether its href is a resolvable code reference. Singleline so a label may
     // span lines. Attribute order is not assumed (href may sit anywhere in the tag).
-    private static readonly Regex AnchorPattern = new(
+    private static readonly Regex AnchorPattern = TimedRegex.New(
         "<a\\b[^>]*?\\bhref=\"(?<href>[^\"]*)\"[^>]*>(?<label>.*?)</a>",
         RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.IgnoreCase);
 
     // Splits out whole anchor spans so the plain-text matcher only rewrites the non-anchor segments (mirrors
     // RequirementLinkifier) — never re-linking the href rewriter's own output or any nav/req-ref link.
-    private static readonly Regex AnchorSplit = new(
+    private static readonly Regex AnchorSplit = TimedRegex.New(
         "(<a\\b[^>]*>.*?</a>)",
         RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.IgnoreCase);
 
     // Inert "[Source: <path>]" citation in plain text — optionally wrapped in a <code> span (a rendered code-span)
     // or literal backticks (the shape a citation keeps INSIDE an HTML-escaped comment aside). The path stops before
     // any '<' so it never swallows an adjacent tag. Mirrors CodeReferenceScanner.SourceInline over rendered HTML.
-    private static readonly Regex InlineCitation = new(
+    private static readonly Regex InlineCitation = TimedRegex.New(
         "\\[Source:\\s*(?<inner>(?:<code>)?`?(?<path>[^\\[\\]`)\\r\\n<]+?)`?(?:</code>)?)\\s*\\]",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 

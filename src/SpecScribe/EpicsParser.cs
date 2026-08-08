@@ -13,21 +13,21 @@ namespace SpecScribe;
 /// An epic with a full H2 section is "Drafted"; an Epic-List-only epic is "Pending".</summary>
 public static class EpicsParser
 {
-    private static readonly Regex ListEpicHeading = new(@"^### Epic (\d+):\s*(.+)$", RegexOptions.Compiled);
-    private static readonly Regex SectionEpicHeading = new(@"^## Epic (\d+):\s*(.+)$", RegexOptions.Compiled);
-    private static readonly Regex StoryHeading = new(@"^### Story (\d+)\.(\d+):\s*(.+)$", RegexOptions.Compiled);
-    private static readonly Regex AcHeading = new(@"^\*\*Acceptance Criteria:?\*\*\s*$", RegexOptions.Compiled);
-    private static readonly Regex AcKeywordLine = new(@"^\*\*(Given|When|Then|And|But)\*\*\s*(.*)$", RegexOptions.Compiled);
-    private static readonly Regex AcBareNumberLine = new(@"^(\d+)\.$", RegexOptions.Compiled);
-    private static readonly Regex MetaLine = new(@"^\*\*(FRs|NFRs) covered:\*\*\s*(.*)$", RegexOptions.Compiled);
-    private static readonly Regex StatusLine = new(@"^Status:\s*(.+)$", RegexOptions.Multiline | RegexOptions.Compiled);
+    private static readonly Regex ListEpicHeading = TimedRegex.New(@"^### Epic (\d+):\s*(.+)$", RegexOptions.Compiled);
+    private static readonly Regex SectionEpicHeading = TimedRegex.New(@"^## Epic (\d+):\s*(.+)$", RegexOptions.Compiled);
+    private static readonly Regex StoryHeading = TimedRegex.New(@"^### Story (\d+)\.(\d+):\s*(.+)$", RegexOptions.Compiled);
+    private static readonly Regex AcHeading = TimedRegex.New(@"^\*\*Acceptance Criteria:?\*\*\s*$", RegexOptions.Compiled);
+    private static readonly Regex AcKeywordLine = TimedRegex.New(@"^\*\*(Given|When|Then|And|But)\*\*\s*(.*)$", RegexOptions.Compiled);
+    private static readonly Regex AcBareNumberLine = TimedRegex.New(@"^(\d+)\.$", RegexOptions.Compiled);
+    private static readonly Regex MetaLine = TimedRegex.New(@"^\*\*(FRs|NFRs) covered:\*\*\s*(.*)$", RegexOptions.Compiled);
+    private static readonly Regex StatusLine = TimedRegex.New(@"^Status:\s*(.+)$", RegexOptions.Multiline | RegexOptions.Compiled);
 
     /// <summary>Matches one or more HTML comments (each lazily closed at its first <c>--&gt;</c>) at the very
     /// start of a story's user-story region, plus any trailing blank space, so they can be peeled off and
     /// rendered as their own block. Singleline so a comment spans lines; anchored at start so only *leading*
     /// comments are lifted — narrative after the close marker, and an unterminated <c>&lt;!--</c>, are left
     /// alone.</summary>
-    private static readonly Regex LeadingHtmlComments = new(@"\A\s*(?:<!--.*?-->\s*)+", RegexOptions.Singleline | RegexOptions.Compiled);
+    private static readonly Regex LeadingHtmlComments = TimedRegex.New(@"\A\s*(?:<!--.*?-->\s*)+", RegexOptions.Singleline | RegexOptions.Compiled);
 
     /// <summary>Tolerant retirement/superseded detector (Story 10.5 AC3) over a peeled leading-comment's raw
     /// text — word-boundaried, case-insensitive, no new authoring schema (recognizes the free-text seat-mapping
@@ -44,7 +44,7 @@ public static class EpicsParser
     /// <c>won't fix</c> that <c>ForStatus</c> tolerates — this side reads authored PROSE about a story, where the
     /// canonical spelling is what gets written, while that side reads a machine-ish <c>Status:</c> value a human
     /// may punctuate freely.</para></summary>
-    private static readonly Regex RetirementKeyword = new(
+    private static readonly Regex RetirementKeyword = TimedRegex.New(
         @"\b(" + string.Join("|", StatusStyles.RetirementStatusWords.Select(Regex.Escape)) + @")\b",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
@@ -101,7 +101,7 @@ public static class EpicsParser
     // Leading ISO date on a change-log row: list bullet ("- 2026-07-08 …") or table cell ("| 2026-07-08 | …").
     // Prefix required so prose lines that merely open with yyyy-MM-dd cannot poison the max. [Review][Patch]
     private static readonly Regex ChangeLogLeadingIsoDate =
-        new(@"^\s*(?:[-*]\s+|\|\s*)(\d{4}-\d{2}-\d{2})\b", RegexOptions.Compiled);
+        TimedRegex.New(@"^\s*(?:[-*]\s+|\|\s*)(\d{4}-\d{2}-\d{2})\b", RegexOptions.Compiled);
 
     /// <summary>Returns the latest ISO <c>yyyy-MM-dd</c> date found in the artifact's <c>## Change Log</c>
     /// (or <c>### Change Log</c>) section (table or list form), or null when the section is absent / has no
@@ -134,7 +134,7 @@ public static class EpicsParser
 
     // "586 tests green" / "759 C# tests green" / "429 tests pass" / "440 tests passing" — free-text tallies
     // living in Dev Agent Record Completion Notes (and occasionally elsewhere). [Story 9.4]
-    private static readonly Regex TestEvidencePhrase = new(
+    private static readonly Regex TestEvidencePhrase = TimedRegex.New(
         @"\b(\d[\d,]*)\s+(?:C#\s+)?tests?\s+(green|pass|passing)\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
@@ -143,11 +143,11 @@ public static class EpicsParser
     // or "| 2026-07-11 | Code review passed… |". Distinct from Story 8.8's max-date scan — the evidence
     // strip wants the top dated-shape entry (abort if that date is unparseable) + whether its action
     // reads as verification. [Story 9.4]
-    private static readonly Regex ChangeLogTopEntry = new(
+    private static readonly Regex ChangeLogTopEntry = TimedRegex.New(
         @"^\s*(?:[-*]\s+|\|\s*)(?<date>\d{4}-\d{2}-\d{2})\b(?:\s*\|\s*|\s+[—–-]\s+|\s*:\s*)(?:\*\*(?<bold>[^*]+)\*\*|(?<plain>.*?))(?:\s*\|)?\s*$",
         RegexOptions.Compiled);
 
-    private static readonly Regex ChangeLogVerificationAction = new(
+    private static readonly Regex ChangeLogVerificationAction = TimedRegex.New(
         @"\b(verif(?:y|ied|ication|ications?)|reviewed|review\s+(?:passed|complete(?:d)?|done)|tests?\s+(?:green|pass(?:ed|ing)?)|Status\s*(?:→|->)\s*(?:done|review))\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
@@ -308,9 +308,9 @@ public static class EpicsParser
     // the OUTER wrapper stripped; a naive ".*?" would stop at the first inner label's "]" and corrupt the link
     // into visible "[X.cs:1(../x.cs)" markdown. "[^\[\]]" (a non-bracket run) and "\[[^\]]*\]" (a balanced pair)
     // are disjoint per position, so the match is linear — no catastrophic backtracking.
-    private static readonly Regex SourceCitationBrackets = new(@"\[Source:\s*((?:[^\[\]]|\[[^\]]*\])*)\]", RegexOptions.Compiled);
+    private static readonly Regex SourceCitationBrackets = TimedRegex.New(@"\[Source:\s*((?:[^\[\]]|\[[^\]]*\])*)\]", RegexOptions.Compiled);
 
-    private static readonly Regex DevAgentSubHeading = new(@"^### (.+)$", RegexOptions.Compiled);
+    private static readonly Regex DevAgentSubHeading = TimedRegex.New(@"^### (.+)$", RegexOptions.Compiled);
 
     /// <summary>Pulls the Dev Agent Record section's subsections (Agent Model Used, Debug Log
     /// References, Completion Notes List, File List) into label/content pairs for a compact table,
@@ -353,7 +353,7 @@ public static class EpicsParser
         return result;
     }
 
-    private static readonly Regex AcNumberedItem = new(@"^(\d+)\.\s+(.*)$", RegexOptions.Compiled);
+    private static readonly Regex AcNumberedItem = TimedRegex.New(@"^(\d+)\.\s+(.*)$", RegexOptions.Compiled);
 
     /// <summary>Parses the "## Acceptance Criteria" numbered list into per-criterion (number, html, plain
     /// text) tuples, so the story page can render each one in its own anchored panel row and turn
@@ -392,8 +392,8 @@ public static class EpicsParser
     }
 
     // "AC: #1" or "AC #1, #2" — the leading "AC" with an optional colon, then one or more "#N" numbers.
-    private static readonly Regex AcReferenceGroup = new(@"\bAC:?\s*#\d+(?:\s*,\s*#\d+)*", RegexOptions.Compiled);
-    private static readonly Regex AcReferenceNumber = new(@"#(\d+)", RegexOptions.Compiled);
+    private static readonly Regex AcReferenceGroup = TimedRegex.New(@"\bAC:?\s*#\d+(?:\s*,\s*#\d+)*", RegexOptions.Compiled);
+    private static readonly Regex AcReferenceNumber = TimedRegex.New(@"#(\d+)", RegexOptions.Compiled);
 
     /// <summary>Rewrites every "(AC: #N)" reference in already-rendered story HTML into a link to the
     /// matching criterion's "#ac-N" anchor, with that criterion's full text as a hover tooltip. Numbers
@@ -474,7 +474,7 @@ public static class EpicsParser
 
     // A change-log list item that leads with an ISO date: "- 2026-07-06: <text>" (bullet may be - or *).
     private static readonly Regex ChangeLogDatedItem =
-        new(@"^(?<bullet>\s*[-*]\s+)(?<date>\d{4}-\d{2}-\d{2})\s*:(?<rest>.*)$", RegexOptions.Compiled);
+        TimedRegex.New(@"^(?<bullet>\s*[-*]\s+)(?<date>\d{4}-\d{2}-\d{2})\s*:(?<rest>.*)$", RegexOptions.Compiled);
 
     /// <summary>Tolerant same-day sequencing for the Change Log (Story 10.4 AC2). Recognizes the shipped
     /// "- YYYY-MM-DD: text" list shape: reformats each visible date through <see cref="PortalDates.Day"/> and, for a
@@ -545,7 +545,7 @@ public static class EpicsParser
     // Any markdown list-item bullet (dated or not), used to detect a distinct entry sitting between two dated items.
     // Captures its own leading indentation so a nested sub-bullet (more indented than the item bullets themselves)
     // can be told apart from a sibling top-level entry.
-    private static readonly Regex ChangeLogBullet = new(@"^(?<indent>\s*)[-*]\s", RegexOptions.Compiled);
+    private static readonly Regex ChangeLogBullet = TimedRegex.New(@"^(?<indent>\s*)[-*]\s", RegexOptions.Compiled);
 
     /// <summary>True when a list-item bullet line sits strictly between <paramref name="fromLine"/> and
     /// <paramref name="toLine"/> AT THE SAME (OR SHALLOWER) INDENTATION as the item bullets themselves — i.e. a

@@ -1484,7 +1484,14 @@ public static class GitMetrics
         {
             var psi = new ProcessStartInfo
             {
-                FileName = "git",
+                // ABSOLUTE path, resolved from PATH only. A bare "git" here reaches CreateProcessW, whose
+                // search order includes the CALLING process's current directory — and SpecScribe's own cwd is
+                // normally inside the repository being analyzed (`cd some-cloned-repo && specscribe generate`),
+                // so a `git.exe` committed at a hostile repo root was preferred over the real one. Reproduced
+                // on Windows 11 at baseline e8a689d; see ToolResolver's remarks for both arms of the
+                // measurement. `WorkingDirectory` below is NOT the protection — it never was.
+                // [Story 17.2 Task 2, csharpsquid:S4036]
+                FileName = ToolResolver.Resolve("git"),
                 Arguments = arguments,
                 WorkingDirectory = workingDirectory,
                 RedirectStandardOutput = true,

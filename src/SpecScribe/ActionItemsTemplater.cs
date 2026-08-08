@@ -281,7 +281,7 @@ public static class ActionItemsTemplater
         "those", "it", "its", "now", "rather", "than", "across", "two", "same",
     };
 
-    private static readonly Regex TokenSplit = new(@"[^a-z0-9]+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex TokenSplit = TimedRegex.New(@"[^a-z0-9]+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private static HashSet<string> SignificantTokens(string text)
     {

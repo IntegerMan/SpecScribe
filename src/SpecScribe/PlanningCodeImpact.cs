@@ -63,18 +63,18 @@ public static class PlanningCodeImpact
     // stop an ISO date's leading 4-digit year from ever validating (epic 2026 is never on any roster). A bare
     // pair is deliberately caught (branch names carry no "Story " keyword) — the roster validation in the caller
     // is what keeps a stray "2.5" or "4-8" from misattributing.
-    private static readonly Regex WorkPair = new(
+    private static readonly Regex WorkPair = TimedRegex.New(
         @"(?<!\d)(\d+)[.-](\d+)(?!\d)", RegexOptions.Compiled);
 
     // An epic-only mention ("Epic 19", "epic-24") — one number, no story part. The pair regex above needs two
     // numbers, so epic-level references need their own pattern.
-    private static readonly Regex EpicOnly = new(
+    private static readonly Regex EpicOnly = TimedRegex.New(
         @"\bEpic[\s-]+(\d+)(?![.\-]?\d)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     // A merge commit — git's default merge messages ("Merge branch 'x'", "Merge pull request #n from o/x",
     // "Merge remote-tracking branch 'origin/x'"). Its branch-name text is a zero-cost Tier-2 signal even though
     // its own numstat file set is always empty (git doesn't diff merges under the shared --numstat fetch).
-    private static readonly Regex MergeSubject = new(
+    private static readonly Regex MergeSubject = TimedRegex.New(
         @"^Merge\b", RegexOptions.Compiled);
 
     /// <summary>Extracts every work-item reference candidate from one piece of free text (a commit subject+body,

@@ -110,7 +110,7 @@ public static class WorkGraphBuilder
     /// above any real epic's follow-up fan-out this generator has run against; the default dogfood never trips it.</summary>
     public const int MaxFollowUpsPerEpic = 40;
 
-    private static readonly Regex DottedStoryId = new(@"^\d+\.\d+$", RegexOptions.Compiled);
+    private static readonly Regex DottedStoryId = TimedRegex.New(@"^\d+\.\d+$", RegexOptions.Compiled);
 
     /// <summary>Projects the whole work graph. <paramref name="followUps"/> must be the project-wide geometry
     /// (root-relative hrefs) — the page lives at the site root, so no re-prefixing is needed. Never throws:

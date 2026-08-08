@@ -70,3 +70,34 @@ This is enforced in three places rather than trusted: `HierarchyExplorer`'s boot
 **Leave ADR 0005 §4 as-is, since no policy string changes.** Rejected: the "body carries no scripts of its own" sentence is now literally false of the shipped page, and a reader checking the CSP against the artefact would find a contradiction and have to guess which side is stale. An amendment that only corrects a claim is still worth landing.
 
 **Write the amendment as two ADRs (one for charting, one for the projection).** Rejected by ADR 0012 §Decision 5's "landed once, not twice" — two records of one posture is how they drift.
+
+## Re-verification, and a ratification request (Story 17.2, 2026-08-08, baseline `e8a689d`)
+
+Story 17.2 AC #1 requires the webview CSP/nonce posture to be **verified**. It was re-measured at this
+baseline rather than taken on this record's word, on both sides of the seam, matching real `<script>` **tags**
+and never a substring (this portal renders its own source, so `application/json` and `__NUXT__` appear as
+prose on real pages):
+
+| | IR side | rendered site |
+| --- | --- | --- |
+| units scanned | 1,268 region strings | 1,262 pages |
+| **executable `<script>` in-region** | **0** | **0** (inside `<main id="main-content">`) |
+| inert `type="application/json"` islands | 348 | 343 |
+| pages flagged `hasExecutableIsland` | **0** | — |
+
+The island COUNT has moved since this ADR was written (163 over 1,469 pages on 2026-07-29 → 348 over 1,268
+today); the site changed underneath it. **The invariant this ADR actually asserts — zero executable script in
+the region — is unchanged.** The policy string at `WebviewRenderAdapter.cs` is byte-identical to the one
+recorded above, and `WebviewRenderAdapterTests` already asserts its three security-critical clauses
+(`script-src 'nonce-…'`, `style-src 'unsafe-inline'`, and the absence of `script-src 'unsafe-inline'`).
+
+**Ratification is requested.** AC #1 asks for a *verified* posture, and verifying against a record that is
+itself unratified is half a job. Nothing in this re-measurement contradicts the ADR; the status is left
+`Proposed` because flipping it is the owner's call, not this story's.
+
+**One thing this ADR did NOT cover, now recorded elsewhere.** Its scope is the webview. The generated static
+site has no CSP at all, which Story 17.2 measured as a live stored-XSS vector — see
+[ADR 0042](0042-raw-html-in-the-repositorys-own-markdown-is-neutralized.md) (the source-level fix, shipped)
+and [ADR 0043](0043-the-generated-static-site-carries-no-csp.md) (the CSP question, deliberately referred to
+the owner). The script-island invariant above is exactly the thing that did **not** catch it: it keys on
+script islands only and never looks at event-handler attributes.

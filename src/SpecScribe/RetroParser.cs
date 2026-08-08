@@ -23,11 +23,11 @@ public static class RetroParser
     // then rejects — the same silent-drop hole by another route.
     // CultureInvariant is required with IgnoreCase: under tr-TR/az the dotted/dotless `I` makes `EPIC-…` fail
     // to case-fold onto `epic`, which would make a whole retro invisible on a Turkish-locale machine or CI box.
-    private static readonly Regex FileName = new(
+    private static readonly Regex FileName = TimedRegex.New(
         @"^epics?-(?<nums>[0-9]{1,3}(?:(?:-and-|[-+&])[0-9]{1,3})*)-retro\b",
         RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
-    private static readonly Regex Number = new(@"[0-9]+", RegexOptions.Compiled);
+    private static readonly Regex Number = TimedRegex.New(@"[0-9]+", RegexOptions.Compiled);
 
     // An `epic…retro…` name we could NOT parse — reported as an Unsupported diagnostic rather than silently
     // dropped, because a silent drop is exactly the bug this spec fixes (a whole retro vanished, and with it two
@@ -36,19 +36,19 @@ public static class RetroParser
     // Requires a DIGIT right after the epic prefix, so a deliberate non-retro like `epics-retro-process.md`
     // stays quiet while `epic-3-retrospective-notes.md` — which really does name an epic and claim a retro,
     // yet won't parse — is still reported.
-    private static readonly Regex RetroLooking = new(
+    private static readonly Regex RetroLooking = TimedRegex.New(
         @"^epics?-[0-9].*retro", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-    private static readonly Regex DateLine = new(@"(?m)^\*\*Date:\*\*\s*(?<v>.+?)\s*$", RegexOptions.Compiled);
-    private static readonly Regex ParticipantsLine = new(@"(?m)^\*\*Participants:\*\*\s*(?<v>.+?)\s*$", RegexOptions.Compiled);
+    private static readonly Regex DateLine = TimedRegex.New(@"(?m)^\*\*Date:\*\*\s*(?<v>.+?)\s*$", RegexOptions.Compiled);
+    private static readonly Regex ParticipantsLine = TimedRegex.New(@"(?m)^\*\*Participants:\*\*\s*(?<v>.+?)\s*$", RegexOptions.Compiled);
 
     // The rendered date/participants paragraphs — removed from the narrative since they move to the header.
-    private static readonly Regex RenderedMeta = new(
+    private static readonly Regex RenderedMeta = TimedRegex.New(
         @"<p><strong>(?:Date|Participants):</strong>.*?</p>\s*",
         RegexOptions.Compiled | RegexOptions.Singleline);
 
     // The leading <h1> (the file's title) — dropped from the body since the styled page header already carries
     // it; leaving it in duplicated the title as an oversized in-body heading. [Story 2.3 retro standardize]
-    private static readonly Regex LeadingH1 = new(
+    private static readonly Regex LeadingH1 = TimedRegex.New(
         @"\A\s*<h1[^>]*>.*?</h1>\s*",
         RegexOptions.Compiled | RegexOptions.Singleline);
 
