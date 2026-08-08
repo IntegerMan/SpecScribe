@@ -203,7 +203,7 @@ public sealed class ModuleContext
         _ => Array.Empty<GlossaryTerm>(),
     };
 
-    private static readonly Regex ManifestModulePattern = new(
+    private static readonly Regex ManifestModulePattern = TimedRegex.New(
         @"^\s*-\s*name:\s*(?<name>[A-Za-z0-9_-]+)",
         RegexOptions.Multiline | RegexOptions.Compiled);
 

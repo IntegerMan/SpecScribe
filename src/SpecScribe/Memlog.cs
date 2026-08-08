@@ -28,7 +28,7 @@ public static class Memlog
 
     // The memlog frontmatter's single "updated: <date>" field — a one-line regex read (like ForgeOptions'
     // project_name read), NOT a full YAML parse. Captures just the yyyy-MM-dd prefix of the timestamp.
-    private static readonly Regex UpdatedPattern = new(
+    private static readonly Regex UpdatedPattern = TimedRegex.New(
         @"^\s*updated:\s*(?<date>\d{4}-\d{2}-\d{2})", RegexOptions.Multiline | RegexOptions.Compiled);
 
     /// <summary>The memlog's <c>updated:</c> day, or null when the field is absent or unparseable. Never throws:

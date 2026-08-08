@@ -28,7 +28,7 @@ public static class StoryEpicLinkifier
     //   inject a raw <a>…</a> into the attribute value and corrupt the tag. Matching every standalone tag
     //   here — after the element-pair alternatives above have first claim — restricts replacement to real
     //   text nodes only, never tag markup. [bugfix: sprint board card tooltip HTML corruption]
-    private static readonly Regex ProtectedSplit = new(
+    private static readonly Regex ProtectedSplit = TimedRegex.New(
         "(<a\\b[^>]*>.*?</a>|<code\\b[^>]*>.*?</code>|<pre\\b[^>]*>.*?</pre>|<svg\\b[^>]*>.*?</svg>"
         + "|<head\\b[^>]*>.*?</head>|<script\\b[^>]*>.*?</script>|<style\\b[^>]*>.*?</style>|<[^>]*>)",
         RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.IgnoreCase);
@@ -36,8 +36,8 @@ public static class StoryEpicLinkifier
     // Capitalized mention forms only — "Story 1.5" / "Epic 2" — matching how the artifacts are authored.
     // \s+ (not a literal space) so a mention hard-wrapped across a source line ("Story\n1.5") still links.
     // The (?!\.\d) tail stops a three-part id ("Story 1.5.2") from partially matching as "Story 1.5".
-    private static readonly Regex StoryPattern = new(@"\bStory\s+(\d+)\.(\d+)\b(?!\.\d)", RegexOptions.Compiled);
-    private static readonly Regex EpicPattern = new(@"\bEpic\s+(\d+)\b(?!\.\d)", RegexOptions.Compiled);
+    private static readonly Regex StoryPattern = TimedRegex.New(@"\bStory\s+(\d+)\.(\d+)\b(?!\.\d)", RegexOptions.Compiled);
+    private static readonly Regex EpicPattern = TimedRegex.New(@"\bEpic\s+(\d+)\b(?!\.\d)", RegexOptions.Compiled);
 
     /// <summary>The generated page path for an epic, relative to the output root.</summary>
     public static string EpicPagePath(int epicNumber) => $"epics/epic-{epicNumber}.html";

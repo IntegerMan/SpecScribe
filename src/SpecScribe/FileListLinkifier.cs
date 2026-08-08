@@ -6,7 +6,7 @@ namespace SpecScribe;
 /// [ADR 0007; Story 9.4]</summary>
 public static class FileListLinkifier
 {
-    private static readonly Regex ListItem = new(@"<li>([^<]*)</li>", RegexOptions.Compiled);
+    private static readonly Regex ListItem = TimedRegex.New(@"<li>([^<]*)</li>", RegexOptions.Compiled);
 
     /// <summary>Rewrites plain-text <c>&lt;li&gt;path&lt;/li&gt;</c> entries into links when
     /// <paramref name="resolveLink"/> returns a link.</summary>

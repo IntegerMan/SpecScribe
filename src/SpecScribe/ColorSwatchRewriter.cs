@@ -16,15 +16,15 @@ public static class ColorSwatchRewriter
     // <pre><code>); it tolerates attributes on <pre> and whitespace between the tags so the exclusion doesn't
     // hinge on Markdig's exact spacing. The fenced variant carries a class so it never matches attribute-less
     // <code>. Content is HTML-escaped text with no nested tags.
-    private static readonly Regex InlineCodePattern = new(
+    private static readonly Regex InlineCodePattern = TimedRegex.New(
         @"(?<!<pre[^>]*>\s*)<code>(?<value>[^<]*)</code>",
         RegexOptions.Compiled);
 
-    private static readonly Regex HexPattern = new(
+    private static readonly Regex HexPattern = TimedRegex.New(
         @"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$",
         RegexOptions.Compiled);
 
-    private static readonly Regex RgbFunctionPattern = new(
+    private static readonly Regex RgbFunctionPattern = TimedRegex.New(
         @"^rgba?\(\s*(?<r>\d{1,3})\s*,\s*(?<g>\d{1,3})\s*,\s*(?<b>\d{1,3})\s*(?:,\s*(?<a>\d{1,3}(?:\.\d{1,6})?|\.\d{1,6})\s*)?\)$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 

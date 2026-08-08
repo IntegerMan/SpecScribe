@@ -20,9 +20,21 @@ public sealed class HtmlBlockCommentRenderer : HtmlObjectRenderer<HtmlBlock>
 
     protected override void Write(HtmlRenderer renderer, HtmlBlock obj)
     {
-        if (!renderer.EnableHtmlForBlock || obj.Type != HtmlBlockType.Comment)
+        if (!renderer.EnableHtmlForBlock)
         {
             _fallback.Write(renderer, obj);
+            return;
+        }
+
+        if (obj.Type != HtmlBlockType.Comment)
+        {
+            // Raw HTML passthrough — the injection channel Story 17.2 Task 1 measured end to end. Markdig's
+            // default renderer writes these lines verbatim, ADR 0016 carries them verbatim into the IR, and
+            // `v-html` injects them into a static page with no CSP; a hostile repository's `<img onerror>`
+            // therefore executed on whoever opened the generated site. Neutralize here, at the one seam every
+            // raw block passes through, rather than post-hoc over rendered HTML — see HtmlSafety's class
+            // remarks for why a pass over finished output would corrupt this portal's own documentation.
+            renderer.WriteLine(HtmlSafety.SanitizeRawHtml(ExtractSource(obj)));
             return;
         }
 
@@ -85,6 +97,15 @@ public sealed class HtmlInlineCommentRenderer : HtmlObjectRenderer<HtmlInline>
             var text = (innerEnd > innerStart ? tag[innerStart..innerEnd] : string.Empty).Trim();
             var encoded = PathUtil.Html(text);
             renderer.Write("<span class=\"md-comment-inline\">").Write(encoded).Write("</span>");
+            return;
+        }
+
+        // Raw inline HTML passthrough — the inline half of the same channel the block renderer above closes.
+        // `<img src=x onerror="…">` mid-paragraph is an HtmlInline, not an HtmlBlock, and was the vector that
+        // actually reproduced first during Task 1's measurement. [Story 17.2 Task 1, ADR 0042]
+        if (renderer.EnableHtmlForInline && tag is not null)
+        {
+            renderer.Write(HtmlSafety.SanitizeRawHtml(tag));
             return;
         }
 

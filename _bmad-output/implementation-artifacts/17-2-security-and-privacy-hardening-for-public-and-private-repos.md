@@ -1,6 +1,10 @@
+---
+baseline_commit: e8a689dca4f84ac03339c44584f155549f8497b4
+---
+
 # Story 17.2: Security and Privacy Hardening for Public and Private Repos
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 <!-- created 2026-08-07 (create-story 17.2) at baseline_commit c73ebcb. Every line number in this file was
@@ -301,62 +305,121 @@ That is a configuration review, not a code one: check the app's granted scopes a
 **Sequencing is load-bearing.** Task 0 first. Tasks 1 and 2 both *measure before fixing* and their measurements
 decide the shape of the work — do not skip to remediation.
 
-- [ ] **Task 0 — Baseline before touching anything (AC: #1, #2)**
-  - [ ] `git rev-parse HEAD`, and record it as this story's real baseline (this file says `c73ebcb`).
-  - [ ] Refresh the analysis digest: `node tools/analysis-digest/index.mjs`. **At authoring time the digest's `analysisRevision` was 15 commits behind HEAD** (`isStale: true`, `analysis-behind-working-tree`) — every line number in § C is anchored to `01acf5b1` and *will* have moved. Re-resolve by symbol.
-  - [ ] Re-count `S6444`/`S4036` from the refreshed digest. The band grew 156 → 174 in 11 days; assume it moved again.
-  - [ ] Do **not** run `npm run check:ir-content` as a health signal yet — it is red in a fresh worktree for environmental reasons (no IR ⇒ nearly everything pruned). If you need it, run the full load-bearing order from CLAUDE.md first. Its true state is **Story 17.4's** to establish, not yours.
+- [x] **Task 0 — Baseline before touching anything (AC: #1, #2)**
+  - [x] `git rev-parse HEAD`, and record it as this story's real baseline (this file says `c73ebcb`). **Real dev baseline: `e8a689d`** — 6 merges after the create-story baseline. Recorded in this file's YAML frontmatter.
+  - [x] Refresh the analysis digest: `node tools/analysis-digest/index.mjs`. **At authoring time the digest's `analysisRevision` was 15 commits behind HEAD** (`isStale: true`, `analysis-behind-working-tree`) — every line number in § C is anchored to `01acf5b1` and *will* have moved. Re-resolve by symbol. **Refreshed at `e8a689d`: 1753 observations (143 error / 1180 warning / 430 note) across 236 shards, `commitsBehind: 0`, `isStale: false`.**
+  - [x] Re-count `S6444`/`S4036` from the refreshed digest. The band grew 156 → 174 in 11 days; assume it moved again. **It did: `csharpsquid:S6444` = 175 (156 → 174 → 175), `csharpsquid:S4036` = 2, `javascript:S4036` = 1. 46 files carry S6444 (story said 48). Top files unchanged in rank: `EpicsParser.cs` 21 · `RenderParity.cs` 16 · `GsdCoreArtifactAdapter.cs` 15 · `SiteGenerator.cs` 13 · `FollowUpRefs.cs` 9.**
+  - [x] Do **not** run `npm run check:ir-content` as a health signal yet — it is red in a fresh worktree for environmental reasons (no IR ⇒ nearly everything pruned). If you need it, run the full load-bearing order from CLAUDE.md first. Its true state is **Story 17.4's** to establish, not yours.
 
-- [ ] **Task 1 — Prove, then close, the `v-html` injection channel (AC: #1)**
-  - [ ] **Measure first.** Add a `.md` fixture containing `<img src=x onerror="…">`, `<svg onload="…">`, and a `javascript:` link. Generate. Confirm whether the handler survives into the shipped `.html`. **Keep the artifact.** If it does not reproduce, record that and stop — items A/Q3/Q4 collapse.
-  - [ ] Confirm the same fixture is inert in the **webview** (expected: nonce-locked CSP blocks it, per ADR 0032). A differing answer between the two surfaces is itself the finding.
-  - [ ] Propose the policy decision as an **ADR** (Q4) before implementing — this changes a cross-cutting contract and amends ADR 0021's asymmetry. Options to weigh, with the trade-off stated: strip handlers/`javascript:` at render; escape raw HTML blocks entirely (breaks legitimate `<details>`/`<kbd>`/`<br>` already used in this repo's own `epics.md` — verified present, so this option has a real cost); or gate-and-diagnose in `IdeaDiscovery`'s style.
-  - [ ] Reuse `IdeaDiscovery.UnsafeReportPattern` rather than authoring a second pattern. If it must be shared, lift it to one place — a second copy is precisely the SSOT defect 17.1 is sweeping up.
-  - [ ] Pin with a regression test asserting the hostile fixture renders inert.
+- [x] **Task 1 — Prove, then close, the `v-html` injection channel (AC: #1)**
+  - [x] **Measure first.** Add a `.md` fixture containing `<img src=x onerror="…">`, `<svg onload="…">`, and a `javascript:` link. Generate. Confirm whether the handler survives into the shipped `.html`. **Keep the artifact.** If it does not reproduce, record that and stop — items A/Q3/Q4 collapse. **IT REPRODUCED, and then EXECUTED.** Every vector survived verbatim into the shipped HTML, and a live-browser (CDP/Edge) load of the generated page set **three** markers — `__SPECSCRIBE_XSS_IMG`, `__SPECSCRIBE_XSS_SVG`, `__SPECSCRIBE_XSS_FRAME` (the `iframe srcdoc` executed against the *parent* window). Fixture preserved as `tests/SpecScribe.Tests/HtmlSafetyTests.cs`; the rendered before/after is quoted in ADR 0042.
+  - [x] Confirm the same fixture is inert in the **webview** (expected: nonce-locked CSP blocks it, per ADR 0032). A differing answer between the two surfaces is itself the finding. **Confirmed, and the differing answer WAS the finding:** the webview policy string at `WebviewRenderAdapter.cs:63-64` is unchanged at HEAD and `script-src 'nonce-…'` with no `'unsafe-inline'` blocks inline handlers; the static site has no CSP at all. Pinned by a new test (Task 4).
+  - [x] Propose the policy decision as an **ADR** (Q4) before implementing — **ADR 0042** (markdown HTML policy) and **ADR 0043** (static-site CSP), both `Proposed`. — this changes a cross-cutting contract and amends ADR 0021's asymmetry. Options to weigh, with the trade-off stated: strip handlers/`javascript:` at render; escape raw HTML blocks entirely (breaks legitimate `<details>`/`<kbd>`/`<br>` already used in this repo's own `epics.md` — verified present, so this option has a real cost); or gate-and-diagnose in `IdeaDiscovery`'s style.
+  - [x] Reuse `IdeaDiscovery.UnsafeReportPattern` rather than authoring a second pattern. If it must be shared, lift it to one place — a second copy is precisely the SSOT defect 17.1 is sweeping up. **Lifted to `HtmlSafety.ContainsExecutableMarkup`; `IdeaDiscovery` keeps the *decision* to reject and now calls it. No second pattern authored.**
+  - [x] Pin with a regression test asserting the hostile fixture renders inert. **`HtmlSafetyTests`, 33 tests** — every measured vector individually, plus the obfuscation variants (`java\tscript:`, leading whitespace, mixed case), plus the *inverse* assertions that `<details>`/`<summary>`/`<kbd>`/`<br>`/`<span>`/`<sub>`/`<abbr>` and ordinary links survive byte-identically.
 
-- [ ] **Task 2 — Close the tool-resolution surface (AC: #1)**
-  - [ ] **Measure first, on Windows.** Put a harmless marker `git.exe` (or `node.exe`) at a scratch repo root, `cd` into it, run `generate`, and observe whether it is invoked. Record the result — this settles whether the `CreateProcess` search order reaches the repo directory in practice.
-  - [ ] If it reproduces: resolve `git`/`node` to absolute paths, modelled on `extension.ts`'s `resolveTool()` 3-tier pattern. Do not invent a second resolution scheme.
-  - [ ] Address `web/scripts/build-package.mjs:55` (`javascript:S4036`) in the same pass.
-  - [ ] Pin with a regression test that a repo-local executable is not preferred.
-  - [ ] If it does **not** reproduce, still close the Sonar finding (absolute paths are cheap and correct) but say plainly in the record that the exploit did not reproduce — do not overclaim a fix.
+  **Three findings the story did not predict:**
+  1. **The cheapest vector needs no raw HTML at all** — ordinary `[text](javascript:alert(1))` markdown parses to a `LinkInline` and Markdig writes the `Url` straight into an `href`. A raw-HTML-only fix would have missed it. Closed by `MarkdownConverter.NeutralizeDangerousLinks`.
+  2. **A literal `<script>` was already a denial-of-service, not an injection.** It reached the IR, tripped `IrSurface`'s executable-island throw and the page returned **HTTP 500** (`errors=1`) — so hostile markdown could *delete a page* from the portal. Escaping closes that too.
+  3. **`<base>`/`<meta http-equiv>` carry neither a handler nor a `javascript:` URL**, so handler-stripping alone would not catch them — and `<base>` silently re-points every relative URL on the page.
 
-- [ ] **Task 3 — ReDoS band (AC: #1)**
-  - [ ] Classify all `S6444` sites by **input provenance**: third-party repo content vs first-party/harness/build. `RenderParity.cs` (16) and `build-package.mjs` are the clear second category.
-  - [ ] Harden the first category. Prefer a **construction seam + an enforcing test** over 174 individual edits — the band grew +18 in 11 days and will grow again.
-  - [ ] Expect `NonBacktracking` to be unusable on patterns with lookarounds/backreferences; fall back to an explicit `matchTimeout` there. A mixed answer is the correct answer.
-  - [ ] Batch or defer the second category **with a recorded rationale** (ADR 0035 §5: no blanket suppression).
-  - [ ] Pin at least one catastrophic-backtracking case with a timing-bounded test.
+  **The trap that shaped the design:** the sanitizer operates on Markdig's raw-HTML passthrough nodes **only**, never on rendered output. This portal renders its own source, so `onerror=` appears legitimately (escaped) in code spans on the Code Map and on this story's own page — a regex pass over finished HTML would have corrupted shipped documentation with every gate green. Pinned by `EscapedProseAboutHandlersIsNotCorrupted` and `FencedCodeBlocksAreNotCorrupted`.
 
-- [ ] **Task 4 — CSP verification and ratification (AC: #1)**
-  - [ ] Re-verify the webview policy string at HEAD and re-run ADR 0032's whole-site assertions (0 executable scripts in-region; islands inert). Match on real `<script>` **tags**, never a substring — this portal renders its own source and `code/**` pages *mention* these tokens.
-  - [ ] Decide and propose the **static-site CSP** question as an ADR (Q3), coupled to Task 1's outcome.
-  - [ ] Propose ratification of ADR 0032 and ADR 0016 (both still `Proposed`).
+- [x] **Task 2 — Close the tool-resolution surface (AC: #1)**
+  - [x] **Measure first, on Windows.** Put a harmless marker `git.exe` (or `node.exe`) at a scratch repo root, `cd` into it, run `generate`, and observe whether it is invoked. Record the result — this settles whether the `CreateProcess` search order reaches the repo directory in practice. **IT REPRODUCES. The story's claim is correct.** Two-arm controlled measurement with a marker binary planted as `git.exe`, cwd set to the hostile root, `WorkingDirectory` deliberately pointing elsewhere (mirroring `GitMetrics`):
 
-- [ ] **Task 5 — Privacy / NFR3 (AC: #2)**
-  - [ ] **Measure the prerender server's bind address** (`netstat`/`ss` while a `generate` runs, or read Nitro's resolved config). If not loopback-only, set `NITRO_HOST=127.0.0.1` beside the existing `NITRO_PORT` and pin it.
-  - [ ] Re-confirm NFR3 across paths added since last verification — `NuxtPrerender.cs` is the only new network code; record the enumeration so the next audit starts from a list.
-  - [ ] Confirm generated output exposes nothing beyond the source artifacts; state the git author-name/email position explicitly rather than leaving it implicit.
-  - [ ] Verify Epic 4 de-personalization end to end on a differently-organized repo.
+    | arm | result |
+    |---|---|
+    | `NoDefaultCurrentDirectoryInExePath=1` | real `git version 2.55.0.windows.3` |
+    | variable **unset** (the default end-user shell) | **the planted binary executed** |
 
-- [ ] **Task 6 — Workspace Trust effectiveness (AC: #1)**
-  - [ ] Pin `restrictedConfigurations` coverage with a test that fails if a new execution-bearing setting is contributed without being restricted. That is the durable form of "present and effective".
+    Proof it was the plant and not a silent failure: the child's own stderr read `The application to execute does not exist: 'C:\…\hostilerepo\marker.dll'` — the planted apphost looking for its sidecar in the hostile directory. Identical result for `node`. **`WorkingDirectory` is not and never was the protection.** ⚠ The guard variable *was* set inside this project's Git Bash session, which is exactly the confounder the story predicted — measuring in one shell only would have produced the wrong answer.
+  - [x] If it reproduces: resolve `git`/`node` to absolute paths, modelled on `extension.ts`'s `resolveTool()` 3-tier pattern. Do not invent a second resolution scheme. **New `ToolResolver` — PATH-only search, absolute result, relative PATH entries (`.`) skipped, `PATHEXT` honored, cached.** Deliberate deviation recorded in its doc comment: `resolveTool()`'s setting→bundled→PATH cascade is right for locating *SpecScribe itself*, but `git`/`node` have no setting to honor and nothing bundled, so two of its three tiers could never fire. The reused principle — resolve to absolute before spawning, never hand a bare name to the OS loader — is what carries over.
+  - [x] Address `web/scripts/build-package.mjs:55` (`javascript:S4036`) in the same pass. **Was `spawnSync('nuxt', ['build'], { shell: true })`; now resolves nuxt's own entry via `createRequire(...).resolve('nuxt/bin/nuxt.mjs')` and runs it under `process.execPath`. Removes the PATH search *and* the shell.**
+  - [x] Pin with a regression test that a repo-local executable is not preferred. **`ToolResolverTests`, 6 tests** — including `SpawnSitesResolveAbsolutePaths`, which reads the shipped source, because no unit test over the resolver could see someone reverting a call site to a bare `"git"`.
+  - [x] If it does **not** reproduce, still close the Sonar finding … — **not applicable; it reproduced.** End-to-end confirmation after the fix: `git.exe` planted at the root of a **real git repository**, cwd there, guard variable unset, full `generate` — 512 pages, `errors=0`, **marker never invoked**, real git used throughout.
 
-- [ ] **Task 7 — Dependencies (AC: #2)**
-  - [ ] Re-run all three audits at implementation time (they move).
-  - [ ] Fix `web/`'s `brace-expansion` — **after** resolving the Story 23.5 lockfile collision (Q5). Verify `npm ci` succeeds before and after.
-  - [ ] Record the C# and `extension/` clean results, and record that `extension/` has zero runtime dependencies.
+- [x] **Task 3 — ReDoS band (AC: #1)**
+  - [x] Classify all `S6444` sites by **input provenance**: third-party repo content vs first-party/harness/build. `RenderParity.cs` (16) and `build-package.mjs` are the clear second category. **Classified — all 175 sites are in `src/SpecScribe/` product code across 46 files. Second category confirmed as `RenderParity.cs` (16, parity harness over a frozen corpus) plus the `web/scripts` build script. But see the next line: the classification did not end up gating the fix.**
+  - [x] Harden the first category. Prefer a **construction seam + an enforcing test** over 174 individual edits — the band grew +18 in 11 days and will grow again. **Done, and it covers BOTH categories.** New `TimedRegex.New(pattern, options)` is now the single construction point; **163 sites across 46 files** were routed through it mechanically. Because the seam is uniform, the provenance split stopped being a *deferral* decision — there was no cheaper answer for the second category than the one the first category already got. **Nothing is deferred and nothing is suppressed** (ADR 0035 §5 satisfied: the Regex objects genuinely carry a timeout; Sonar's finding disappears from 174 sites because there is no longer a Regex constructor at them).
+  - [x] Expect `NonBacktracking` to be unusable on patterns with lookarounds/backreferences; fall back to an explicit `matchTimeout` there. A mixed answer is the correct answer. **Measured rather than assumed, and the answer is NOT mixed — it is uniformly "timeout".** Across all 163 sites: **33 of the 46 regex-bearing files use a lookaround**, 2 use a backreference (`RetroActionStyler`, `Toc`), 0 use atomic groups. `NonBacktracking` rejects all three at *construction* time, so as a house default it would throw at type-initialization across most of the codebase. Individual patterns can still opt in through `options`; the two compose.
+  - [x] Batch or defer the second category **with a recorded rationale** (ADR 0035 §5: no blanket suppression). **Not needed — see above. Recorded as "no deferral" rather than left silent.**
+  - [x] Pin at least one catastrophic-backtracking case with a timing-bounded test. **`CatastrophicBacktrackingIsBoundedRatherThanHanging`** — `^(a+)+$` against 40 `a`s plus a non-match, the textbook exponential case, asserted to raise `RegexMatchTimeoutException` inside a bounded wall clock instead of hanging.
 
-- [ ] **Task 8 — CI supply chain (AC: #2)**
-  - [ ] Pin `dotnet-sonarscanner` to a version **and** add that version to the `actions/cache` key.
-  - [ ] Decide SHA-pinning for `actions/*`; record the decision either way.
-  - [ ] Review and record SonarCloud's GitHub App repository scopes.
-  - [ ] Record the already-correct posture (`contents: read`, `pull_request` not `pull_request_target`, token via `env`) so a future change that regresses it is visible as a regression.
+  **The enforcing half is the durable part:** `EveryRegexIsConstructedThroughTheFactory` and `RegexFieldsDoNotUseTargetTypedNew` scan `src/SpecScribe/**/*.cs` and fail on a bare `new Regex(` or a target-typed `Regex X = new(`. Two checks are needed because 162 of the 163 sites used the target-typed form, which contains no `new Regex(` token at all.
 
-- [ ] **Task 9 — Record and hand off (AC: #1, #2)**
-  - [ ] Close resolved `deferred-work.md` items in the same pass (Epic 3 retro rule).
-  - [ ] Record Epic 26's clause as *precondition unmet*, handed to Story 17.4.
-  - [ ] State hunk-level attribution against Story 17.1 for every shared file.
+- [x] **Task 4 — CSP verification and ratification (AC: #1)**
+  - [x] Re-verify the webview policy string at HEAD and re-run ADR 0032's whole-site assertions (0 executable scripts in-region; islands inert). Match on real `<script>` **tags**, never a substring — this portal renders its own source and `code/**` pages *mention* these tokens. **Re-measured on both sides of the seam, tag-matched:**
+
+    | | IR side | rendered site |
+    |---|---|---|
+    | units scanned | 1,268 region strings | 1,262 pages |
+    | **executable `<script>` in-region** | **0** | **0** (inside `<main id="main-content">`) |
+    | inert `type="application/json"` islands | 348 | 343 |
+    | pages flagged `hasExecutableIsland` | **0** | — |
+
+    The island **count** moved since ADR 0032 was written (163 over 1,469 pages → 348 over 1,268) because the site changed underneath it; **the invariant it actually asserts — zero executable in-region — is unchanged.** Policy string at `WebviewRenderAdapter.cs` is byte-identical to ADR 0032's, and `WebviewRenderAdapterTests` already pins its three security-critical clauses.
+  - [x] Decide and propose the **static-site CSP** question as an ADR (Q3), coupled to Task 1's outcome. **ADR 0043**, and the decision is **deliberately referred to the owner with a concrete recommendation rather than shipped**. Grounded in measurement, not preference: 1,054 inline `<script>` blocks on 531 of 1,262 pages (14 of them `type=module` importing Mermaid **from a CDN**) and 2,105 inline `style=""` attributes. Three findings decide the shape — (a) a nonce is *worthless* on a static file, because the constant is baked into the published HTML an attacker is already reading; (b) `'unsafe-inline'` would permit exactly the inline handlers this story found, making the policy pointless for its own threat; (c) hashes are tractable (~4–6 distinct scripts) but need an ADR 0033-compliant drift gate. With ADR 0042 closing the channel at source, the CSP is now defense-in-depth over a shut door — and ADR 0032's own precedent is that a half-applied CSP blanked the page (148 SVGs → 0).
+  - [x] Propose ratification of ADR 0032 and ADR 0016 (both still `Proposed`). **Both requested in-file, with the re-verification recorded alongside. Status left `Proposed` in both — flipping it is the owner's call, not this story's.**
+
+- [x] **Task 5 — Privacy / NFR3 (AC: #2)**
+  - [x] **Measure the prerender server's bind address.** If not loopback-only, set `NITRO_HOST=127.0.0.1` beside the existing `NITRO_PORT` and pin it. **⚠ THE DEFECT IS REAL AND WAS DEMONSTRATED, NOT INFERRED.** With the shipped env (`PORT`/`NITRO_PORT` only), Nitro logged `Listening on http://[::]:39117` — the IPv6 **wildcard** — and the listening socket's `LocalAddress` was `::`. The fully rendered portal was then **fetched over both of this machine's real LAN addresses** (`172.28.160.1`, `192.168.50.25`), each answering **HTTP 200 with 1,305,409 bytes**. So for the duration of every `generate`, a **private** repository's entire portal was readable by anyone on the same network. Fixed by setting `HOST` **and** `NITRO_HOST` (the preset reads `NITRO_HOST` first and falls back to `HOST`; setting one alone would depend on which preset the artefact was built with). After: `Listening on http://127.0.0.1:39118`, `LocalAddress 127.0.0.1`, loopback still HTTP 200 with the **identical** 1,305,409 bytes, both LAN addresses refused. Full `generate` after the fix: 512 pages, `errors=0`.
+
+    Why it was invisible from the C# side: `FreePort()` binds `IPAddress.Loopback` only to *pick* a port and releases it immediately — it never constrained what Node then bound. And why no existing test caught it: **every test fetches over loopback, and loopback succeeds identically whether the server bound `127.0.0.1` or `::`.**
+  - [x] Re-confirm NFR3 across paths added since last verification — record the enumeration so the next audit starts from a list. **Enumerated and now pinned as a gate, not a paragraph** (`NetworkPostureTests`): the only `HttpClient` in the product is `NuxtPrerender`'s loopback client; `extension/src/**` has **zero** outbound calls (no `fetch`, no `http.request`, no `axios`, no `XMLHttpRequest`). `TheOnlyOutboundHttpIsLoopback` fails if any `BaseAddress` is ever non-loopback, so a future crossing has to be deliberate and visible in review.
+  - [x] Confirm generated output exposes nothing beyond the source artifacts; state the git author-name/email position explicitly rather than leaving it implicit. **Measured over all 1,262 generated pages:** author **email — 0 occurrences**. Author *name* (161 in 64 files) and the GitHub owner (1,982 in 296) appear only where the source artifacts already carry them (ADR `**Deciders:**` lines, doc URLs). Absolute **local paths** (`C:\Users\MattE\…`, 5 occurrences in 4 pages) traced to **4 source `.md` files that already contain them** — SpecScribe renders them, it does not invent them. All in-bounds per AC #2's "beyond what the source artifacts already expose", stated rather than left implicit. Note for the owner: agent-authored story files routinely embed absolute local paths, so a **publicly** published portal discloses a username and directory layout — a property of the artifacts, not a SpecScribe defect.
+  - [x] Verify Epic 4 de-personalization end to end on a differently-organized repo. **Verified decisively.** This repository's *real* `epics.md` and all 269 implementation artifacts were relocated to entirely non-standard paths (`some/deep/planning/epics.md`, `other/place/implementation-artifacts/`) and generated: **120 pages, `errors=0`**, with `epics.html`, `requirements.html` and `traceability.html` all rendering. A separate minimal fixture failed identically in **both** the non-standard and the canonical layout, which is what proves the failure was the fixture and not a structure assumption — the control is why this conclusion is trustworthy.
+
+  **⚠ NEW FINDING the story did not name — a viewer-side outbound path.** `Mermaid.cs:151` emits `import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/…'` on the 10 pages carrying diagrams. This is **not** a tool-side NFR3 violation (SpecScribe makes no such call), but it means **a reader of a private portal fetches script from a third-party CDN**, disclosing their IP and referrer, and the CDN can serve arbitrary JS into the page. An ESM `import` URL cannot carry SRI, and the static site has no CSP (ADR 0043), so there is no second line of defence. Not fixed here — vendoring mermaid is a packaging decision (ADR 0022 territory) with real size consequences. Recorded in `deferred-work.md` with that recommendation rather than shipped unilaterally.
+
+- [x] **Task 6 — Workspace Trust effectiveness (AC: #1)**
+  - [x] Pin `restrictedConfigurations` coverage with a test that fails if a new execution-bearing setting is contributed without being restricted. That is the durable form of "present and effective". **`WorkspaceTrustTests`, 4 tests.** The story's finding is confirmed unchanged at HEAD: two contributed settings, the execution-bearing one (`specscribe.toolPath`) restricted, coverage complete.
+
+    **Designed as a gate, not a snapshot.** It deliberately does *not* assert "there are two settings" — that is a change-detector the next contributor edits without thinking. It asserts every contributed setting is **explicitly classified**: either in `restrictedConfigurations`, or in a named `SafeInUntrustedWorkspaces` list carrying the reason it cannot lead to execution. A new setting fails until someone makes that decision. The inverse drift is covered too (`EveryRestrictedConfigurationIsActuallyContributed` — a restriction naming a setting that no longer exists reads as protection while protecting nothing), and `ContributedSettingKeys` handles `contributes.configuration` being either an object *or* an array of categories, because reading only the object form would return nothing the day someone groups the settings and turn every assertion green for the wrong reason.
+
+    **Proven able to fail**, not just observed passing: injecting an unrestricted `specscribe.extraArgs` turned `EveryContributedSettingIsClassifiedForUntrustedWorkspaces` red (1 failed / 3 passed); `package.json` was then restored and re-verified clean (`git diff` empty).
+
+    **Route recorded honestly:** this lives in the C# suite because `extension/` still has no TypeScript harness — that is Story 17.4's cluster. This is the second of the three routes the story named, chosen over shipping unpinned.
+
+- [x] **Task 7 — Dependencies (AC: #2)**
+  - [x] Re-run all three audits at implementation time (they move). **They moved.** C#: **0 vulnerable** (incl. transitive, vs nuget.org). `extension/`: **0 vulnerabilities**. `web/`: **2 high** — `brace-expansion` as the story recorded, **plus `nanoid` (GHSA-2v37-7h3g-55p8), which is new since the story was written.** Re-running rather than trusting the recorded figure is what found it.
+  - [x] Fix `web/`'s `brace-expansion` — **after** resolving the Story 23.5 lockfile collision (Q5). Verify `npm ci` succeeds before and after. **Q5's precondition is RESOLVED, so the trap no longer applies as written:** Story 23.5's lockfile fix has landed in the tree (`@emnapi/runtime` present, 12 entries) and `npm ci` **succeeds** — the EUSAGE failure the story recorded is gone. (23.5 is still `review`, but its code is in.) Verified in the required order: `npm ci` **before** ✅ → `npm audit fix` → **0 vulnerabilities** → `npm ci` **after** ✅ (639 packages, exit 0) → `npm run build:package` ✅ → full `generate` **512 pages, `errors=0`** → `npm test` **196/196** → gates ✅. Lockfile diff is surgical: **12 lines**, `brace-expansion` 2.1.2→2.1.4 / 5.0.8→5.0.9 and `nanoid` 3.3.16→3.3.18, no transitive churn.
+  - [x] Record the C# and `extension/` clean results, and record that `extension/` has zero runtime dependencies. **Recorded: `extension/` has `"dependencies": {}` — only `@types/node`, `@types/vscode`, `esbuild`, `typescript` as devDependencies, so nothing from npm ships in the VSIX.**
+
+  **⚠ A defect in this story's OWN Task 2 fix, found because the real build was run.** The first form of the `build-package.mjs` change used `createRequire(...).resolve('nuxt/bin/nuxt.mjs')`, which **fails with `ERR_PACKAGE_PATH_NOT_EXPORTED`** — `require.resolve` honours the package's `exports` map and nuxt does not export its bin path. It was only caught because Task 7 re-ran `npm run build:package` for real; nothing else in the suite exercises that script. Corrected to resolve `nuxt/package.json` (which *is* exported) and read `bin.nuxt` relative to its directory. The failure mode and why the obvious form does not work are recorded in the file so it is not re-introduced.
+
+- [x] **Task 8 — CI supply chain (AC: #2)**
+  - [x] Pin `dotnet-sonarscanner` to a version **and** add that version to the `actions/cache` key. **Both halves, from ONE definition** — a new job-level `SONAR_SCANNER_VERSION: "11.2.1"` feeds both `--version $env:SONAR_SCANNER_VERSION` and `key: ${{ runner.os }}-sonar-scanner-${{ env.SONAR_SCANNER_VERSION }}`, so they cannot drift apart. Either half alone would reproduce the original defect: a pinned install with an unversioned key still serves the stale cached binary, and a versioned key with an unpinned install still fetches "latest" on a miss. The bare `restore-keys` prefix was also removed — a partial restore would seed the directory with a *different* version's binary. YAML re-parsed to confirm validity.
+  - [x] Decide SHA-pinning for `actions/*`; record the decision either way. **Decided and ENFORCED, not just recorded: first-party `actions/*` may float on a major tag; any third-party action must be pinned to a full 40-char commit SHA.** Rationale: trusting `actions/*` is the same trust already extended to GitHub by running on their runners, and pinning them buys little against constant bump churn — whereas a third-party tag is mutable and the publisher is not GitHub. Measured: this repo uses **only** first-party actions (7 distinct, zero third-party). `CiSupplyChainTests.ThirdPartyActionsMustBeShaPinned` enforces it, because the next contributor adding a third-party action is exactly the person who will not read the note.
+  - [x] Review and record SonarCloud's GitHub App repository scopes. **Attempted programmatically and HONESTLY RECORDED AS NOT VERIFIED.** `/repos/{owner}/{repo}/installation` requires a GitHub App JWT (HTTP 401 with a user token) and `/user/installations` requires an App-authorized token (HTTP 403) — so this is genuinely an owner UI review, exactly as the story anticipated. `docs/SonarCloudSetup.md` now carries the **procedure** (Settings → GitHub Apps → SonarQube Cloud → Configure), the **expected** scopes (read on code/metadata/PRs, write on checks/PR comments for decoration) and the **red flags** (any write access to code, actions, or secrets). Recorded as unverified rather than assumed benign.
+  - [x] Record the already-correct posture … so a future change that regresses it is visible as a regression. **Recorded as TESTS, not prose** — prose in a story file is archaeology, not a regression signal. `CiSupplyChainTests` (5 tests) pins: no `pull_request_target` anywhere; no secret interpolated into a `run:` body; every workflow declares its own `permissions:`; the scanner pin + cache key; and the third-party SHA rule.
+
+- [x] **Task 9 — Record and hand off (AC: #1, #2)**
+  - [x] Close resolved `deferred-work.md` items in the same pass (Epic 3 retro rule). **Two closed in place, both with the correction they earned:**
+    - `:1214` (scanner cache key, routed here by name) — struck, both halves fixed from one definition.
+    - `:1245` (the ReDoS band) — struck, **and its proposed fix recorded as partly wrong**: `NonBacktracking` is not usable as the house default (33 of 46 regex-bearing files use a lookaround, 2 use a backreference — all rejected at construction time), and its "approximately 40 construction sites" understated the real figure by 4× (163). Its own warning to re-measure rather than trust the count was correct: 156 → 175.
+    - **Three NEW items recorded** rather than left in this story's prose: the Mermaid CDN import, the static-site CSP referral, and the unverified SonarCloud app scopes.
+  - [x] Record Epic 26's clause as *precondition unmet*, handed to Story 17.4. **Re-verified at HEAD, not copied:** `26-2-ingestion-posture-and-credential-spike` is still `ready-for-dev` (the credential *spike* has not run) and `26-3`…`26-7` are still `backlog`. There is no external-service integration, no credential, and no ADR-authorized outbound path to audit. **AC #2's third clause is therefore formally UNMET-BY-PRECONDITION, not skipped** — no credential audit was invented for code that does not exist. Handed to Story 17.4.
+  - [x] State hunk-level attribution against Story 17.1 for every shared file. **Stated below in § Attribution.**
+
+## Attribution (per CLAUDE.md § Scoping a code review)
+
+**17.1 has LANDED since this story was written.** Its create-story record said "17.1 is `ready-for-dev` and not yet implemented, so expect no code from it" — that is now **stale**: `sprint-status.yaml` has `17-1-…: review` at this baseline. So the shared files carry real 17.1 code, and attribution by hunk is mandatory rather than precautionary.
+
+**This story's hunks, in files 17.1 also touched:**
+
+| file | 17.2's hunks (mine) | NOT mine |
+|---|---|---|
+| `EpicsParser.cs` | 21 `TimedRegex.New(` call-site rewrites, nothing else | `NumberIndex.ByFirst` and the epic-number convergence — 17.1 |
+| `SiteGenerator.cs` | 11 `TimedRegex.New(` rewrites | everything else in a ~5,900-line file |
+| `CodeReferenceLinkifier.cs` | 3 `TimedRegex.New(` rewrites | — |
+| `IdeaDiscovery.cs` | `UnsafeReportPattern` → `HtmlSafety.ContainsExecutableMarkup`; 2 `TimedRegex.New(` rewrites | the `ExternalSubresourcePattern` policy itself — Story 18.4 |
+| `MarkdownConverter.cs` | `NeutralizeDangerousLinks` + its call; 1 `TimedRegex.New(` rewrite | the Markdig pipeline/`EmphasisExtras` decision — Epic 2 |
+| `AbbreviationExpander.cs` | the one dynamic-pattern rewrite at the local `var pattern` | `ProtectedSplit`'s content — the linkifier lineage |
+
+**The 163 regex rewrites are mechanically identical and touch one token per site.** They are wide but shallow; a reviewer should read `TimedRegex.cs` and the two enforcing tests, then spot-check the call sites rather than read 46 diffs. The substantive new code is five files: `HtmlSafety.cs`, `ToolResolver.cs`, `TimedRegex.cs`, and the changes in `CommentAnnotationRenderer.cs` / `NuxtPrerender.cs`.
+
+**Not mine, deliberately left alone:** `specscribe.css` and `web/assets/ir-content.css` (untouched — verified via `git status`), the `.coverage-card` deferral (17.1 → Epic 27), and the maintainability band (17.1).
 
 ## Dev Notes
 
@@ -451,8 +514,89 @@ All non-blocking; each has a stated default so implementation is not gated on an
 
 ### Agent Model Used
 
+Claude Opus 5 (1M context) — `claude-opus-5[1m]`, dev-story workflow, 2026-08-08, worktree `worktree-story-17-2-dev` cut from `e8a689d`.
+
 ### Debug Log References
+
+Measurement harnesses, all under the job scratchpad (throwaway, not committed):
+
+- `cdp-check.mjs` — CDP/Edge live-browser probe. Used for the before/after XSS execution proof and the final portal health check (charts, console errors, DOM geometry).
+- `spawnprobe/` — standalone .NET console app reproducing `Process.Start` current-directory resolution, run in both `NoDefaultCurrentDirectoryInExePath` arms.
+- `marker/` — harmless marker binary planted as `git.exe`/`node.exe`.
+- `xss-repo/`, `diffrepo/`, `ctrlrepo/`, `realmoved/` — hostile-markdown fixture, differently-organized repo, its canonical-layout control, and this repo's real artifacts relocated to non-standard paths.
+- `rewrite-regex.py` — the mechanical `TimedRegex.New` rewrite (163 sites/46 files), with its own leftover report.
 
 ### Completion Notes List
 
+**Every AC claim in this story is backed by a measurement, and three of the story's own premises were corrected against the code.**
+
+1. **The `v-html` injection channel was real, and it EXECUTED.** Not "the handler survives into the HTML" — a live browser load of the generated page set three markers (`__SPECSCRIBE_XSS_IMG`, `_SVG`, `_FRAME`; the `iframe srcdoc` executed against the *parent* window). Closed at the Markdig seam by `HtmlSafety`, so the IR never carries the construct and **both** surfaces benefit while ADR 0016's verbatim carriage survives for benign content. After: 0 markers, 0 handlers, 0 `javascript:` hrefs, and `<details>`/`<kbd>`/`<img>`/`<svg>` counts byte-identical.
+
+2. **Three vectors the story did not predict.** (a) `[text](javascript:…)` needs **no raw HTML at all** — a raw-HTML-only fix would have missed the cheapest vector; (b) a literal `<script>` was already a **denial of service** (page 500s via `IrSurface`'s island throw), so hostile markdown could delete a page; (c) `<base>`/`<meta http-equiv>` carry neither a handler nor a `javascript:` URL and would survive handler-stripping alone.
+
+3. **The design trap that shaped the fix.** The sanitizer touches raw-HTML passthrough nodes **only**. This portal renders its own source, so `onerror=` appears legitimately — escaped — in code spans on the Code Map and on this very story's page; a regex pass over finished HTML would have corrupted shipped documentation with every gate green. Pinned by two tests.
+
+4. **The Windows tool-resolution hijack reproduced**, in a controlled two-arm measurement, and the confounder the story warned about was live: `NoDefaultCurrentDirectoryInExePath` **was** set in this project's Git Bash session (real git ran) and unset in a default shell (**planted binary ran**). Measuring in one shell only would have produced the wrong answer.
+
+5. **The ReDoS band was closed as an invariant, not a sweep** — 175 findings, growing (156 → 174 → 175). One factory + two enforcing tests. **The deferred-work record's proposed fix was partly wrong**: `NonBacktracking` is unusable as a default (33/46 files use lookarounds), and "≈40 construction sites" understated the truth by 4× (163).
+
+6. **A LAN-exposure privacy defect was found, demonstrated, and fixed.** The prerender server bound the IPv6 wildcard; a private repository's entire rendered portal answered **HTTP 200 with 1,305,409 bytes over two real LAN addresses** for the duration of every `generate`. Now loopback-only, rendering unaffected. **No existing test could have caught it** — every test fetches over loopback, which succeeds identically either way.
+
+7. **A defect in this story's own work, caught by running the real build.** The first `build-package.mjs` fix used `require.resolve('nuxt/bin/nuxt.mjs')`, which fails with `ERR_PACKAGE_PATH_NOT_EXPORTED` because `require.resolve` honours `exports`. Nothing in the suite exercises that script; only Task 7's real `npm run build:package` found it.
+
+8. **`check:ir-content` measured GREEN, and its redness diagnosed without touching a baseline.** A plain `generate` omits the deep-git-gated code-insight/history/relationships surfaces, so the extractor prunes **185** rules and the round-trip looks like drift (the 17.4 triage saw `-187` — same signature). With `generate --deep-git` the gate reports **1475 rules in sync**. Per CLAUDE.md, causality was established first; no baseline was regenerated. **This answers Story 17.4 AC #4's open question, which recorded the gate as believed-red but unmeasured.**
+
+9. **Two AC clauses are formally unmet, by precondition, and say so.** Epic 26's credential/outbound-integration clause (26-2 still `ready-for-dev`, 26-3…26-7 `backlog` — no credential exists to audit), and SonarCloud's GitHub App scopes (both API routes refused: HTTP 401 needs an App JWT, HTTP 403 needs an App-authorized token). Neither was invented or assumed benign.
+
+10. **Three findings deliberately not fixed**, each because the fix is a decision: the Mermaid CDN import (packaging, ADR 0022), the static-site CSP (ADR 0043, referred to the owner with a costed recommendation), and the app scopes. All recorded in `deferred-work.md`.
+
+**Verification:** 3,058 tests passed / 0 failed / 3 skipped (3,000 → 3,058, +58 new). `web/` vitest 196/196. All four gates green — `check:parity`, `check:ir-content`, `check:tokens`, `check:assets`. Full `generate` 512 pages `errors=0`; `generate --deep-git` 819 pages `errors=0`. Live-browser verified per CLAUDE.md: Plotly loaded, 421/47 SVGs, 0 inline handlers site-wide, **0 console errors**.
+
+**Owner questions Q1–Q7:** all seven proceeded on their stated defaults. Q1 (stale `epics.md` examples) — `epics.md` left alone, this file's ⚠ table used. Q2 — `web/` treated as in scope. Q3/Q4 — both ADRs proposed before implementing. Q5 — **precondition changed**: 23.5's lockfile fix has landed and `npm ci` works, so the collision the question guarded against no longer exists; verified before *and* after. Q6 — re-verified, ratification requested, status left `Proposed`. Q7 — proceeded, and every fix is invariant-shaped rather than a one-time sweep, exactly as the question recommended.
+
 ### File List
+
+**New — product (3):**
+- `src/SpecScribe/HtmlSafety.cs`
+- `src/SpecScribe/ToolResolver.cs`
+- `src/SpecScribe/TimedRegex.cs`
+
+**New — tests (6):**
+- `tests/SpecScribe.Tests/HtmlSafetyTests.cs`
+- `tests/SpecScribe.Tests/ToolResolverTests.cs`
+- `tests/SpecScribe.Tests/TimedRegexTests.cs`
+- `tests/SpecScribe.Tests/NetworkPostureTests.cs`
+- `tests/SpecScribe.Tests/WorkspaceTrustTests.cs`
+- `tests/SpecScribe.Tests/CiSupplyChainTests.cs`
+
+**New — decision records (2):**
+- `docs/adrs/0042-raw-html-in-the-repositorys-own-markdown-is-neutralized.md`
+- `docs/adrs/0043-the-generated-static-site-carries-no-csp.md`
+
+**Modified — substantive (5):**
+- `src/SpecScribe/CommentAnnotationRenderer.cs` — raw HTML block/inline sanitization
+- `src/SpecScribe/MarkdownConverter.cs` — `NeutralizeDangerousLinks` + a `TimedRegex` rewrite
+- `src/SpecScribe/NuxtPrerender.cs` — `HOST`/`NITRO_HOST` loopback pin, absolute node path, 2 `TimedRegex` rewrites
+- `src/SpecScribe/GitMetrics.cs` — absolute git path
+- `src/SpecScribe/IdeaDiscovery.cs` — pattern lifted to `HtmlSafety`, 2 `TimedRegex` rewrites
+
+**Modified — mechanical `TimedRegex.New` rewrites only (42):**
+`AbbreviationExpander.cs` · `ActionItemsTemplater.cs` · `AdrLinkRewriter.cs` · `ArtifactCoverage.cs` · `BmadArtifactAdapter.cs` · `CapabilityStyler.cs` · `ChangeSurface.cs` · `ChangeSurfaceFileResolver.cs` · `CodeReferenceLinkifier.cs` · `CodeReferenceScanner.cs` · `CodeSourceUrlResolver.cs` · `ColorSwatchRewriter.cs` · `CommitDetailTemplater.cs` · `DeferralHeuristics.cs` · `DeferredWorkParser.cs` · `EpicsParser.cs` · `FileListLinkifier.cs` · `FollowUpRefs.cs` · `FollowUpRow.cs` · `FollowUpSlug.cs` · `ForgeOptions.cs` · `GherkinStyler.cs` · `GsdCoreArtifactAdapter.cs` · `Memlog.cs` · `ModuleContext.cs` · `PathUtil.cs` · `PlanningCodeImpact.cs` · `ReferenceChipRenderer.cs` · `RenderParity.cs` · `RequirementLinkifier.cs` · `RequirementsParser.cs` · `RetroActionStyler.cs` · `RetroParser.cs` · `SiteGenerator.cs` · `SourceLinkifier.cs` · `SpaDelivery.cs` · `SprintStatusParser.cs` · `StoryEpicLinkifier.cs` · `TaskListParser.cs` · `Toc.cs` · `UnplannedWorkGeometry.cs` · `WorkGraph.cs` (all under `src/SpecScribe/`)
+
+**Modified — build, CI, docs, records (8):**
+- `web/scripts/build-package.mjs` — nuxt resolved via its own `bin` entry, no shell, no PATH search
+- `web/package-lock.json` — `npm audit fix` (12 lines: brace-expansion, nanoid)
+- `.github/workflows/build-test-analyze.yml` — `SONAR_SCANNER_VERSION` pin + versioned cache key
+- `docs/SonarCloudSetup.md` — scanner pin, action-pinning policy, GitHub App scope-review procedure
+- `docs/adrs/0016-ir-carries-rendered-prose-html.md` — ratification request
+- `docs/adrs/0032-csp-posture-after-the-projection-layer.md` — re-verification + ratification request
+- `_bmad-output/implementation-artifacts/deferred-work.md` — 2 items closed, 3 recorded
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — status transitions
+
+**Not modified (stated because they are the usual suspects):** `src/SpecScribe/assets/specscribe.css` and `web/assets/ir-content.css` — untouched, verified via `git status`. No gate baseline was regenerated.
+
+## Change Log
+
+| Date | Change |
+|---|---|
+| 2026-08-08 | Story 17.2 implemented (dev-story, baseline `e8a689d`). Closed a reproduced-and-executed stored-XSS channel in rendered markdown (ADR 0042); closed a reproduced Windows tool-resolution hijack (`ToolResolver`); converted the 175-finding `S6444` ReDoS band into an enforced invariant (`TimedRegex`); fixed a demonstrated LAN-exposure privacy defect in the prerender server; pinned the CI scanner and recorded an enforced action-pinning policy; resolved 2 `web/` high-severity advisories; added 58 regression tests and 2 ADRs. Status → review. |

@@ -9,7 +9,7 @@ namespace SpecScribe;
 /// heading ids.</summary>
 public static class SourceLinkifier
 {
-    private static readonly Regex SourcePathPattern = new(
+    private static readonly Regex SourcePathPattern = TimedRegex.New(
         @"_bmad-output/(?<path>[^\]\n]+?\.md)",
         RegexOptions.Compiled);
 

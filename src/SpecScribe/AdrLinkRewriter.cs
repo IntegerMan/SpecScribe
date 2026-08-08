@@ -10,7 +10,7 @@ public static class AdrLinkRewriter
 {
     // href to any *.md (optionally with a #fragment). Absolute URLs never end in ".md" here, so this
     // only ever catches the repo-relative links markdig emitted from the ADR source.
-    private static readonly Regex MdHrefPattern = new(
+    private static readonly Regex MdHrefPattern = TimedRegex.New(
         "href=\"(?<path>[^\":#]+\\.md)(?<frag>#[^\"]*)?\"",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 

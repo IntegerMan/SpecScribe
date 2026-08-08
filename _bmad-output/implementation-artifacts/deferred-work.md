@@ -1213,6 +1213,7 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 - source_spec: `25-1-sonarcloud-onboarding-and-ci-analysis.md`
   summary: The `actions/cache@v4` key for the SonarQube Cloud scanner (`${{ runner.os }}-sonar-scanner`) has no version component, so once a run populates the cache, `dotnet tool update dotnet-sonarscanner` never executes again and the cached scanner binary is pinned indefinitely with no built-in refresh mechanism.
   evidence: Blind Hunter + Edge Case Hunter, verified during triage. This is the flip side of an open question the story already routes to Story 17.2 ("[scanner tool] is installed... unversioned... pinning it is a legitimate 17.2 call... flagged here rather than decided unilaterally") rather than a new defect — deferred to that story. [`.github/workflows/build-test-analyze.yml:100-113`]
+  ~~**RESOLVED 2026-08-08 (Story 17.2 Task 8).**~~ Both halves fixed together, as the item required. A single job-level `SONAR_SCANNER_VERSION: "11.2.1"` now feeds **both** the install (`dotnet tool update dotnet-sonarscanner --version $env:SONAR_SCANNER_VERSION`) and the cache key (`${{ runner.os }}-sonar-scanner-${{ env.SONAR_SCANNER_VERSION }}`), so the two cannot drift apart — either half alone reproduces the defect (a pinned install with an unversioned key still serves the stale cached binary; a versioned key with an unpinned install still fetches "latest" on a miss). The bare `restore-keys` prefix was removed as well: a partial restore would seed the tool directory with a *different* version's binary. Pinned by `CiSupplyChainTests.TheSonarScannerIsPinnedAndItsVersionIsInTheCacheKey`.
 
 ## Deferred from: code review of 18-1-bmad-module-landscape-and-coverage-spike (2026-07-26)
 
@@ -1244,6 +1245,7 @@ Baseline SonarCloud triage of the whole codebase, performed rule-first against a
 - source_spec: `25-2-quality-gate-and-findings-triage.md`
   summary: Regex denial-of-service hardening — 156 `csharpsquid:S6444` ("regular expressions should be executed with a timeout") plus 1 `csharpsquid:S4036` ("use an absolute path for this command", `GitMetrics.cs:1154`). Together these are 157 of the project's 160 unresolved vulnerabilities and the sole driver of its security rating **C**. MINOR severity understates them here: SpecScribe parses markdown, epics, and sprint files from arbitrary third-party repositories, so catastrophic backtracking is an input-driven surface rather than a theoretical one. Deliberately NOT suppressed — the fix is `RegexOptions.NonBacktracking` or an explicit timeout at the approximately 40 construction sites, not a rule deactivation.
   evidence: Sonar baseline triage, verified with `resolved=false` against analysis `2026-07-27T17:49:06Z`. Scheduled to **Story 17.2** (Security and Privacy Hardening), whose AC #2 already covers this ground. **Corrected 2026-07-31** (this story's own code review; independently re-derived by Story 25.6 on 2026-07-29): the `csharpsquid:S6444`/`S4036` band is confirmed **Story 17.2's**, never Epic 23's, and still drives both the project-level and (as of the last re-measurement) the new-code security rating — but the specific instance count and file:line locations move under the `days: 30` sliding new-code window (it went from "five instances in `SpaDelivery.cs`" to "161 of 164 new-code vulnerabilities, mostly `src/`" within days) and should be re-measured rather than trusted from this record. See [ADR 0035](../../docs/adrs/0035-sonarcloud-quality-gate-and-rule-decision-policy.md) for the standing gate/rule-decision policy this band is scheduled against. [`src/SpecScribe/GitMetrics.cs:1154`, `src/SpecScribe/SpaDelivery.cs:190`]
+  ~~**RESOLVED 2026-08-08 (Story 17.2, Tasks 2 and 3).**~~ The record's own warning was right — **re-measured at baseline `e8a689d` the band was 175 `S6444`, not 156** (156 → 174 → 175 across eleven days), plus 2 `csharpsquid:S4036` and a new `javascript:S4036`. It was still growing while the story was being written, which is why the fix is a **construction seam rather than a sweep**: `TimedRegex.New(...)` is now the single construction point and **163 sites across 46 files** were routed through it, with `TimedRegexTests.EveryRegexIsConstructedThroughTheFactory` / `RegexFieldsDoNotUseTargetTypedNew` failing the build on a bare `new Regex(` or a target-typed `Regex X = new(`. Nothing is suppressed (ADR 0035 §5 holds — the Regex objects genuinely carry a timeout; the finding disappears from the other sites because there is no longer a constructor at them). **This record's proposed fix was partly wrong and the correction is worth keeping:** `RegexOptions.NonBacktracking` is NOT usable as the house default — measured across all 163 sites, **33 of the 46 regex-bearing files use a lookaround** and 2 use a backreference, all of which `NonBacktracking` rejects at *construction* time. And "approximately 40 construction sites" understated the real count by 4×. The `S4036` half is closed separately by `ToolResolver` (Task 2), where the Windows `CreateProcess` current-directory hijack was **reproduced end to end** before being fixed.
 
 - source_spec: `25-2-quality-gate-and-findings-triage.md`
   summary: Structural remediation band — 94 `csharpsquid:S1192` (duplicated string literals), 86 `S3776` (cognitive complexity, CRITICAL), 48 nested ternaries across `S3358` in C#/TS/JS, 29 `S3267` (loops that should be LINQ), 28 `S107` (too many parameters), 9 `S125` (commented-out code), plus the smaller `S2589`/`S1121`/`S127`/`S1066`/`S1172` tail. Approximately 300 issues, all maintainability, all in first-party C#.
@@ -1642,3 +1644,44 @@ the 25.2 entries above, where the original claims live; only genuinely new work 
 - source_spec: `24-2-per-file-ego-coupling-graph.md`
   summary: Lift reaches the code page's sr-only text twin only through a `title` attribute on a non-interactive `<li>`, which screen readers announce unreliably. The consequence is an ADR 0013 §2 completeness gap with an unusual shape: a sighted mouse user can read lift from BOTH the chart's hover tooltip and the twin's hover title, while an assistive-technology user may get it from neither. The in-code comment shows the placement is deliberate and predates this story (Story 24.1 chose it so that spending sr-only reading time on lift would not bury the confidence the row is actually about), so the right fix is a decision about where the specialist's number belongs across every coupling surface, not a drive-by change inside a rendering story.
   evidence: Acceptance Auditor B (ADR 0013 §2 channel-by-channel twin audit), code review 2026-08-07. Pre-existing, inherited from Story 24.1.
+
+## Deferred from: 17-2-security-and-privacy-hardening-for-public-and-private-repos (2026-08-08)
+
+Three items Story 17.2 surfaced and deliberately did **not** fix, each because the fix is a decision rather
+than a defect repair. Every one was measured at baseline `e8a689d`, not inferred.
+
+- source_spec: `17-2-security-and-privacy-hardening-for-public-and-private-repos.md`
+  summary: **The rendered portal imports Mermaid from a third-party CDN.** `Mermaid.cs` emits
+  `import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs'` on the 10 pages
+  carrying diagrams. This is **not** a tool-side NFR3 violation — SpecScribe itself makes no such call — but a
+  reader of a **private** repository's portal fetches script from an external origin, disclosing their IP and
+  referrer, and the CDN can serve arbitrary JavaScript into the page. An ESM `import` URL cannot carry
+  Subresource Integrity, and the static site has no CSP ([ADR 0043](../../docs/adrs/0043-the-generated-static-site-carries-no-csp.md)),
+  so there is no second line of defence. The fix is to vendor Mermaid alongside `plotly-hierarchy.min.js`,
+  which is a packaging decision with real artefact-size consequences and belongs with
+  [ADR 0022](../../docs/adrs/0022-node-is-a-build-toolchain-and-a-generate-time-runtime.md) — not a drive-by
+  change inside a hardening story.
+  evidence: Story 17.2 Task 5, measured over a full generate (1,262 pages). [`src/SpecScribe/Mermaid.cs:151`]
+
+- source_spec: `17-2-security-and-privacy-hardening-for-public-and-private-repos.md`
+  summary: **The generated static site carries no Content-Security-Policy.** Referred to the owner with a
+  concrete recommended policy rather than shipped, because ADR 0042 closes the measured injection channel at
+  its source (so a CSP is now defense-in-depth over a shut door), because ADR 0032's own precedent is that a
+  half-applied CSP blanked the page (148 SVGs → 0), and because a hash-based policy needs an
+  [ADR 0033](../../docs/adrs/0033-content-drift-gates-are-targeted-and-regenerable.md)-compliant drift gate.
+  The measurements a future attempt needs are already recorded so nobody re-derives them: 1,054 inline
+  `<script>` blocks on 531 of 1,262 pages (14 `type=module`, importing the CDN above), 2,105 inline `style=""`
+  attributes, zero `<style>` blocks; a nonce is worthless on a static file; `'unsafe-inline'` would permit the
+  very inline handlers this story found. **Residual risk, stated plainly:** nothing enforces that a future
+  emitter routes new raw-HTML paths through `HtmlSafety`, and that is the strongest argument for eventually
+  shipping the policy.
+  evidence: Story 17.2 Task 4. Full reasoning in [ADR 0043](../../docs/adrs/0043-the-generated-static-site-carries-no-csp.md).
+
+- source_spec: `17-2-security-and-privacy-hardening-for-public-and-private-repos.md`
+  summary: **SonarCloud's GitHub App repository scopes are UNVERIFIED, not verified-benign.** Enumerating them
+  programmatically is not possible with the credentials available: `/repos/{owner}/{repo}/installation`
+  requires a GitHub App JWT (HTTP 401 with a user token) and `/user/installations` requires an App-authorized
+  token (HTTP 403). It is genuinely an owner UI review. The procedure, the expected scopes (read on
+  code/metadata/pull-requests, write on checks/PR comments for decoration) and the red flags (**any** write
+  access to code, actions, or secrets) are now written into `docs/SonarCloudSetup.md` § Security notes.
+  evidence: Story 17.2 Task 8, both API routes attempted and refused.

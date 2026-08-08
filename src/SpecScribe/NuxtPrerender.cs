@@ -45,9 +45,9 @@ public sealed class NuxtPrerender
     /// reporting it as a success is how a silently broken page ships.</summary>
     private const string MainLandmark = "<main id=\"main-content\"";
 
-    private static readonly Regex NodeVersionPattern = new(@"^v?(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)", RegexOptions.Compiled);
+    private static readonly Regex NodeVersionPattern = TimedRegex.New(@"^v?(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)", RegexOptions.Compiled);
 
-    private static readonly Regex WhitespaceRun = new(@"\s+", RegexOptions.Compiled);
+    private static readonly Regex WhitespaceRun = TimedRegex.New(@"\s+", RegexOptions.Compiled);
 
     /// <summary>Character cap on ONE route's renderer error text. 373 routes each carrying a stack trace is not a
     /// diagnostic, it is a denial of service against the console — and against the diagnostics surface that
@@ -237,7 +237,10 @@ public sealed class NuxtPrerender
         string output;
         try
         {
-            var psi = new ProcessStartInfo("node", "--version")
+            // ABSOLUTE path — a bare "node" is resolved by CreateProcessW against the CALLING process's current
+            // directory ahead of PATH, and SpecScribe's cwd is normally inside the repository being analyzed.
+            // Reproduced for `node` as well as `git` at baseline e8a689d. [Story 17.2 Task 2, csharpsquid:S4036]
+            var psi = new ProcessStartInfo(NodeExecutable(), "--version")
             {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -355,6 +358,20 @@ public sealed class NuxtPrerender
         psi.Environment["SPECSCRIBE_PACKAGE_BUILD"] = string.Empty;
         psi.Environment["PORT"] = port.ToString();
         psi.Environment["NITRO_PORT"] = port.ToString();
+        // BIND LOOPBACK ONLY. [Story 17.2 Task 5 — NFR3]
+        //
+        // Measured, not assumed: with only PORT/NITRO_PORT set, Nitro's node-server preset logged
+        // `Listening on http://[::]:39117` — the IPv6 WILDCARD, i.e. every interface. Confirmed by fetching
+        // the rendered portal over this machine's real LAN addresses (172.28.160.1 and 192.168.50.25), both
+        // answering HTTP 200 with the full 1,305,409-byte page. So for the duration of every `generate`, a
+        // PRIVATE repository's entire rendered portal was readable by anyone on the same network.
+        //
+        // `FreePort()` binds IPAddress.Loopback only to PICK a free port and immediately releases it — it
+        // never constrained what the Node server then bound, which is why the defect was invisible from the
+        // C# side. HOST and NITRO_HOST are both set because the preset reads NITRO_HOST first and falls back
+        // to HOST; setting one alone would depend on which preset the artefact was built with.
+        psi.Environment["HOST"] = "127.0.0.1";
+        psi.Environment["NITRO_HOST"] = "127.0.0.1";
 
         Process? proc = null;
         var serverLog = new List<string>();
@@ -442,7 +459,10 @@ public sealed class NuxtPrerender
         return new Result(rendered, failed, sw.Elapsed, events);
     }
 
-    private static string NodeExecutable() => "node";
+    /// <summary>The node executable, resolved to an ABSOLUTE path from <c>PATH</c> only. Never a bare name —
+    /// see <see cref="ToolResolver"/> for the measured Windows search-order vector this closes.
+    /// [Story 17.2 Task 2, csharpsquid:S4036]</summary>
+    private static string NodeExecutable() => ToolResolver.Resolve("node");
 
     private static void WaitForReady(Process proc, HttpClient http, List<string> serverLog)
     {

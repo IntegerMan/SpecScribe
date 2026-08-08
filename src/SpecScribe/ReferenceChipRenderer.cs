@@ -23,7 +23,7 @@ public static class ReferenceChipRenderer
     // carry raw, unrendered task text inside an SVG subtree, where injected <span> markup would show as
     // literal visible text (SVG <title> has no HTML sub-parsing) rather than a styled chip — so the whole
     // subtree is skipped, not just individual tags.
-    private static readonly Regex ProtectedSplit = new(
+    private static readonly Regex ProtectedSplit = TimedRegex.New(
         "(<a\\b[^>]*>.*?</a>|<code\\b[^>]*>.*?</code>|<pre\\b[^>]*>.*?</pre>|<kbd\\b[^>]*>.*?</kbd>|<samp\\b[^>]*>.*?</samp>"
         + "|<svg\\b[^>]*>.*?</svg>|<head\\b[^>]*>.*?</head>|<script\\b[^>]*>.*?</script>|<style\\b[^>]*>.*?</style>|<[^>]*>)",
         RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.IgnoreCase);
@@ -35,7 +35,7 @@ public static class ReferenceChipRenderer
     //                           (mirrors CodeReferenceLinkifier.IsRelativeCodeHref) so an extension-less false
     //                           positive ("note: 3") never matches, and is bounded on both sides so it never
     //                           grabs a fragment of a longer token.
-    private static readonly Regex Combined = new(
+    private static readonly Regex Combined = TimedRegex.New(
         @"\[\[(?<wiki>[^\[\]\r\n]+)\]\]" +
         @"|\[ASSUMPTION\s*:\s*(?<assump>[^\[\]\r\n]+)\]" +
         @"|(?<![\w/\\.-])(?<file>[A-Za-z0-9_][\w\-./\\]*\.[A-Za-z][A-Za-z0-9]{0,9}):(?<line>\d{1,6})(?!\d)",

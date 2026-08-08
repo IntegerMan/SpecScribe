@@ -650,3 +650,29 @@ record's.
   with write-scoped credentials.
 - The workflow requests least privilege (`permissions: contents: read`). PR decoration is performed by the
   SonarQube Cloud GitHub App using its own installation token.
+- **The scanner is version-pinned** (`SONAR_SCANNER_VERSION` in the workflow's job `env:`), and that same value
+  is part of the `actions/cache` key. Both halves are load-bearing and must move together: before Story 17.2
+  the install used `dotnet tool update` with no version *and* the cache key had no version component, so the
+  scanner was unpinned on the first run that populated the cache and then frozen indefinitely with no refresh
+  path. Bump the one `env:` value to move it. Pinned by `CiSupplyChainTests`.
+- **Action pinning policy** (Story 17.2, recorded decision): first-party `actions/*` may use a floating major
+  tag — trusting them is the same trust already extended to GitHub by running on their runners, and pinning
+  them buys little against ongoing bump churn. **Any third-party action must be pinned to a full 40-character
+  commit SHA**, because a tag is mutable and the publisher is not GitHub. This repository uses only
+  first-party actions today (checkout, setup-dotnet, setup-node, setup-java, cache, upload-pages-artifact,
+  deploy-pages — zero third-party). The rule is enforced by
+  `CiSupplyChainTests.ThirdPartyActionsMustBeShaPinned`, not just written here.
+
+### Third-party repository access — the owner's review, not a code review
+
+The SonarQube Cloud GitHub App holds **installation-level** access to the repository. That access is granted
+in GitHub's settings, not in this repository's files, so nothing in a code review can confirm or constrain it.
+
+Story 17.2 attempted to enumerate the granted scopes programmatically and **could not**: `/repos/{owner}/{repo}/installation`
+requires a GitHub App JWT (HTTP 401 with a user token) and `/user/installations` requires a token authorized
+to a GitHub App (HTTP 403). Recorded as *not verified* rather than assumed benign.
+
+**To review it:** GitHub → repository **Settings → GitHub Apps → SonarQube Cloud → Configure**, and confirm
+the granted permissions and repository selection. Expect roughly: read access to code, metadata, and pull
+requests, plus write access to checks/pull-request comments for decoration. Anything granting **write access
+to code, actions, or secrets** would be well beyond what PR decoration needs and should be narrowed.

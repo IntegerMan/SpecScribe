@@ -8,7 +8,7 @@ namespace SpecScribe;
 public sealed class ChangeSurfaceFileResolver
 {
     private static readonly Regex StoryArtifactName =
-        new(@"^(?<epic>\d+)-(?<story>\d+)-(?<slug>.+)\.md$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        TimedRegex.New(@"^(?<epic>\d+)-(?<story>\d+)-(?<slug>.+)\.md$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     // Same allowlist spirit as SiteGenerator.PrettyLabel — keep known acronyms shouty in story chip titles.
     private static readonly HashSet<string> AcronymLabels = new(StringComparer.OrdinalIgnoreCase)

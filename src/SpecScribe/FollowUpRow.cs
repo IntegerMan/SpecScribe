@@ -9,17 +9,17 @@ namespace SpecScribe;
 /// disclosure. [Story 9.10]</summary>
 public static class FollowUpRow
 {
-    private static readonly Regex SummaryField = new(
+    private static readonly Regex SummaryField = TimedRegex.New(
         @"^\s*summary:\s*(?<text>.+?)\s*$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Multiline);
 
     /// <summary>Whole-line evidence fields (values often contain spaces).</summary>
-    private static readonly Regex EvidenceLine = new(
+    private static readonly Regex EvidenceLine = TimedRegex.New(
         @"^[ \t]*evidence\s*:.*?\r?$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Multiline);
 
     /// <summary><c>source_spec:</c> path (optionally backtick-wrapped); trailing same-line prose is kept.</summary>
-    private static readonly Regex SourceSpecLine = new(
+    private static readonly Regex SourceSpecLine = TimedRegex.New(
         @"^[ \t]*source_spec\s*:\s*(?:`[^`\r\n]+`|\S+)(?<trail>[ \t]+\S.*?)?\r?$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Multiline);
 

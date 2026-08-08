@@ -23,20 +23,20 @@ public static class CodeReferenceScanner
 {
     // Markdown-link form inside a [Source: …] citation — the href (resolved relative to the citing artifact's dir).
     // e.g. [Source: [X.cs:76-99](../../src/SpecScribe/X.cs)] -> ../../src/SpecScribe/X.cs
-    private static readonly Regex SourceMarkdownLink = new(
+    private static readonly Regex SourceMarkdownLink = TimedRegex.New(
         @"\[Source:[^\]]*\]\(\s*(?<href>[^)\s]+)\s*\)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     // Inline/code-span (or bare) form — a repo-relative path. The path may not start with '[' (that is the
     // markdown-link shape, captured above) and may not contain brackets, backticks, ')', or newlines.
     // e.g. [Source: `src/SpecScribe/X.cs:15-17`] or [Source: src/SpecScribe/X.cs:15]
-    private static readonly Regex SourceInline = new(
+    private static readonly Regex SourceInline = TimedRegex.New(
         @"\[Source:\s*`?(?<path>[^\[\]`)\r\n]+?)`?\s*\]",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     // A trailing ":line" or ":line-line" locator (GitHub-style ranges) stripped before the path is resolved. A
     // Windows drive prefix ("C:\…") never matches — the colon there is followed by a separator, not digits.
-    private static readonly Regex LineSuffix = new(@":\d+(?:-\d+)?$", RegexOptions.Compiled);
+    private static readonly Regex LineSuffix = TimedRegex.New(@":\d+(?:-\d+)?$", RegexOptions.Compiled);
 
     /// <summary>Extracts every citation target from one artifact's raw markdown, tagged with its resolution base.
     /// Pure and disk-free: only the <c>[Source: …]</c> citation shapes are matched, never arbitrary prose links,

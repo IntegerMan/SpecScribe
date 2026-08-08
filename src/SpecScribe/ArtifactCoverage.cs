@@ -249,7 +249,7 @@ public sealed class ArtifactCoverage
 
     // A story/epic artifact filename: leading <epic>-<story>- (mirrors SiteGenerator.ArtifactFilenamePattern),
     // so epic-N-retrospective.md / deferred-work.md / spec-*.md are correctly excluded.
-    private static readonly Regex StoryFileName = new(@"^\d+-\d+-.+\.md$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex StoryFileName = TimedRegex.New(@"^\d+-\d+-.+\.md$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static bool IsStoryArtifact(string normalizedPath)
     {

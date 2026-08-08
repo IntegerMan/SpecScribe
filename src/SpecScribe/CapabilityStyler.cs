@@ -16,19 +16,19 @@ public static class CapabilityStyler
     // lazy `.*?</ul>` would stop at the first (inner) close — instead we lazily extend to the </ul> that sits
     // just before the next heading (or end of doc), which is the outer list's close. Singleline so `.` spans
     // newlines.
-    private static readonly Regex Section = new(
+    private static readonly Regex Section = TimedRegex.New(
         "(?<head><h2[^>]*\\bid=\"capabilities\"[^>]*>.*?</h2>)\\s*<ul>(?<body>.*?)</ul>\\s*(?=<h[1-6]|\\z)",
         RegexOptions.Compiled | RegexOptions.Singleline);
 
     // One capability list item: a bold CAP-id (Markdig wraps it in <p> for a loose/blank-line-separated list,
     // so the <p>/</p> are optional), then the nested list of label/body rows.
-    private static readonly Regex CapItem = new(
+    private static readonly Regex CapItem = TimedRegex.New(
         "<li>\\s*(?:<p>)?\\s*<strong>(?<id>CAP-[^<]+)</strong>\\s*(?:</p>)?\\s*<ul>(?<rows>.*?)</ul>\\s*</li>",
         RegexOptions.Compiled | RegexOptions.Singleline);
 
     // One detail row inside a capability: a bold label (optionally colon-terminated) then its body text, again
     // tolerating an optional <p> wrapper for a loose sub-list.
-    private static readonly Regex Row = new(
+    private static readonly Regex Row = TimedRegex.New(
         "<li>\\s*(?:<p>)?\\s*<strong>(?<label>[^<]+?):?</strong>\\s*(?<body>.*?)\\s*(?:</p>)?\\s*</li>",
         RegexOptions.Compiled | RegexOptions.Singleline);
 

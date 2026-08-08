@@ -18,7 +18,7 @@ namespace SpecScribe;
 public static class CommitDetailTemplater
 {
     // Blank-line (optionally whitespace-only) paragraph boundary in a commit body.
-    private static readonly Regex ParagraphBreak = new(@"\n[ \t]*\n", RegexOptions.Compiled);
+    private static readonly Regex ParagraphBreak = TimedRegex.New(@"\n[ \t]*\n", RegexOptions.Compiled);
 
     /// <summary>The default short-hash length git abbreviates <c>%h</c> to (git's floor). The generator derives the
     /// page filename from <c>Hash[..ShortHashLength]</c> and only widens it on the astronomically-unlikely event of a

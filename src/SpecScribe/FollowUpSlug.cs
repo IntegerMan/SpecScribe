@@ -12,7 +12,7 @@ public static class FollowUpSlug
     public const string Folder = "follow-ups";
     public const int MaxWords = 8;
 
-    private static readonly Regex NonSlug = new(@"[^a-z0-9]+", RegexOptions.Compiled);
+    private static readonly Regex NonSlug = TimedRegex.New(@"[^a-z0-9]+", RegexOptions.Compiled);
 
     /// <summary>Output-root-relative path: <c>follow-ups/{slug}.html</c>.</summary>
     public static string OutputPath(string slug) => $"{Folder}/{slug}.html";

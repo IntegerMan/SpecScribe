@@ -25,20 +25,20 @@ public sealed class SiteGenerator
     // ADR numbers derive from several mainstream filename schemes — 0001-x, ADR-0001-x, adr-1-x, adr_001_x,
     // 1-x: an optional adr token, separators, then the first integer. A filename with no derivable number
     // still renders (sorted last) rather than dropping. [Story 4.2 Task 2]
-    private static readonly Regex AdrNumberPattern = new(@"^(?:adr)?[-_\s]*(?<num>\d+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex AdrStatusPattern = new(@"^\*\*Status:\*\*\s*(?<status>.+)$", RegexOptions.Multiline | RegexOptions.Compiled);
+    private static readonly Regex AdrNumberPattern = TimedRegex.New(@"^(?:adr)?[-_\s]*(?<num>\d+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex AdrStatusPattern = TimedRegex.New(@"^\*\*Status:\*\*\s*(?<status>.+)$", RegexOptions.Multiline | RegexOptions.Compiled);
 
     // The MADR-style "## Status" (or "### Status") section heading whose next non-blank line carries the
     // status value — the second of the three tolerated status shapes. [Story 4.2 Task 2]
-    private static readonly Regex AdrStatusHeadingPattern = new(@"^#{2,3}\s+Status\s*$", RegexOptions.Multiline | RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex MarkdownLinkPattern = new(@"\[(?<text>[^\]]+)\]\([^)]+\)", RegexOptions.Compiled);
+    private static readonly Regex AdrStatusHeadingPattern = TimedRegex.New(@"^#{2,3}\s+Status\s*$", RegexOptions.Multiline | RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex MarkdownLinkPattern = TimedRegex.New(@"\[(?<text>[^\]]+)\]\([^)]+\)", RegexOptions.Compiled);
 
     // ADR date + summary extraction (Story 10.4), mirroring the tolerant status shapes: a "**Date:**" bold line
     // (the shape all six real ADRs use), a "## Date" MADR heading fallback, and the "## Context" section whose
     // first prose paragraph becomes the one-line summary (the most prevalent shape across the real ADRs).
-    private static readonly Regex AdrDatePattern = new(@"^\*\*Date:\*\*\s*(?<date>.+)$", RegexOptions.Multiline | RegexOptions.Compiled);
-    private static readonly Regex AdrDateHeadingPattern = new(@"^#{2,3}\s+Date\s*$", RegexOptions.Multiline | RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex AdrContextHeadingPattern = new(@"^#{2,3}\s+Context\s*$", RegexOptions.Multiline | RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex AdrDatePattern = TimedRegex.New(@"^\*\*Date:\*\*\s*(?<date>.+)$", RegexOptions.Multiline | RegexOptions.Compiled);
+    private static readonly Regex AdrDateHeadingPattern = TimedRegex.New(@"^#{2,3}\s+Date\s*$", RegexOptions.Multiline | RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex AdrContextHeadingPattern = TimedRegex.New(@"^#{2,3}\s+Context\s*$", RegexOptions.Multiline | RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private readonly ForgeOptions _options;
     private readonly Dictionary<string, DocModel> _docs = new(StringComparer.OrdinalIgnoreCase);
@@ -2106,7 +2106,7 @@ public sealed class SiteGenerator
     // Matches common ADR template-scaffolding stems: "template", "adr-template"/"adr_template", and a
     // numbered variant like "0000-template" — an optional leading digits+separator, an optional "adr"
     // token+separator, then "template". [Review][Patch]
-    private static readonly Regex AdrTemplateStemPattern = new(@"^(?:\d+[-_])?(?:adr[-_])?template$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex AdrTemplateStemPattern = TimedRegex.New(@"^(?:\d+[-_])?(?:adr[-_])?template$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     /// <summary>True when an ADR-tree file (path relative to the ADR root) is a decision RECORD — i.e. a card
     /// on the home index and a hit for the <see cref="AdrsExist"/> nav gate. READMEs (landing/index prose at
@@ -2812,9 +2812,9 @@ public sealed class SiteGenerator
     // First Markdown H1 ("# Title") as an artifact's display title for the "Referenced by" back-links; falls back
     // to the source-relative path when a doc has no heading. A cheap single-line read (like the project_name /
     // memlog-date reads), not a full parse.
-    private static readonly Regex ArtifactTitlePattern = new(
+    private static readonly Regex ArtifactTitlePattern = TimedRegex.New(
         @"^\s{0,3}#\s+(?<title>.+?)\s*#*\s*$", RegexOptions.Compiled);
-    private static readonly Regex FenceMarker = new(@"^\s{0,3}(```|~~~)", RegexOptions.Compiled);
+    private static readonly Regex FenceMarker = TimedRegex.New(@"^\s{0,3}(```|~~~)", RegexOptions.Compiled);
 
     /// <summary>The first real ATX heading in the document, skipping lines inside a fenced code block (``` or ~~~)
     /// and a leading YAML frontmatter block (--- ... ---) — [Review][Patch] a "# ..." line inside either of those
@@ -5430,7 +5430,7 @@ public sealed class SiteGenerator
         return links;
     }
 
-    private static readonly Regex HandoffAnchorPattern = new(
+    private static readonly Regex HandoffAnchorPattern = TimedRegex.New(
         @"<a\s+href=""(?<href>[^""]*)""(?<rest>[^>]*)>(?<text>.*?)</a>",
         RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.IgnoreCase);
 

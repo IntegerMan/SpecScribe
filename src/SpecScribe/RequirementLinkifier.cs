@@ -16,7 +16,7 @@ public static class RequirementLinkifier
     // replacement stays in text nodes only. Without the standalone-tag arm, a mention inside data-copy /
     // data-tip would get an <a href="…"> injected into the attribute and shatter the tag.
     // [spec-address-deferred-next-steps UX]
-    private static readonly Regex ProtectedSplit = new(
+    private static readonly Regex ProtectedSplit = TimedRegex.New(
         "(<a\\b[^>]*>.*?</a>|<code\\b[^>]*>.*?</code>|<pre\\b[^>]*>.*?</pre>|<svg\\b[^>]*>.*?</svg>"
         + "|<head\\b[^>]*>.*?</head>|<script\\b[^>]*>.*?</script>|<style\\b[^>]*>.*?</style>|<[^>]*>)",
         RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.IgnoreCase);
@@ -25,7 +25,7 @@ public static class RequirementLinkifier
     // lowercase/mixed-case prose refs align with ById (OrdinalIgnoreCase); authored casing is
     // preserved in the link text via m.Value. UX-DR is a single alternation arm, so it cannot be
     // partially matched as a bare "DR{n}". [Story 9.2 Task 5; spec-epic1-deferred-debt-cleanup]
-    private static readonly Regex RefPattern = new(
+    private static readonly Regex RefPattern = TimedRegex.New(
         @"\b(FR|NFR|UX-DR)(\d+)\b",
         RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 

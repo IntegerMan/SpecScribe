@@ -76,3 +76,21 @@ So the two ADRs currently disagree with the code, with each other's premises, an
 - **The story that implements it:** Story 22.2 (`_bmad-output/implementation-artifacts/22-2-canonical-ir-schema-and-versioning.md`); `src/SpecScribe/SpaDelivery.cs`; `tests/SpecScribe.Tests/CanonicalIrSerializationTests.cs`.
 - **Architecture:** [ARCHITECTURE-SPINE.md](../../_bmad-output/specs/spec-specscribe/ARCHITECTURE-SPINE.md) — AD-1/AD-2 (shared core; adapters translate, never reinterpret), AD-8 (canonical interaction state, adapter-specific transport), NFR4 (additive), NFR9 (reproducible CI).
 - **The rule that required this ADR to exist:** `CLAUDE.md` § Decision records.
+
+## A ratification request, and one clause Story 17.2 exercised (2026-08-08, baseline `e8a689d`)
+
+Story 17.2 depended on this ADR's central clause — that the IR carries Markdig-rendered prose HTML
+**verbatim** — and found that the clause had a security consequence nobody had written down: whatever the IR
+carries is injected into the page with `v-html`, so "verbatim" makes the IR an injection sink for any raw HTML
+a third-party repository puts in its markdown. That was measured, reproduced, and executed in a live browser.
+
+[ADR 0042](0042-raw-html-in-the-repositorys-own-markdown-is-neutralized.md) closes it **without weakening this
+ADR**: the neutralization happens on the Markdig side, BEFORE the IR is built, so the IR still carries its
+payload verbatim and `v-html` is still byte-faithful — the IR simply never contains an executable construct in
+the first place. Benign structural HTML (`<details>`, `<summary>`, `<kbd>`, `<br>`, `<span>`, `<sub>`,
+`<abbr>`) passes through byte-identically, pinned by test, so the property Epic 23 bought with this decision
+(no Vue reimplementation of ~889 LOC of custom renderers) is intact.
+
+**Ratification is requested.** Two shipped stories now bind to this record and a third ADR amends around it;
+leaving the contract they depend on in `Proposed` is the gap. The status is left as-is because flipping it is
+the owner's call.
