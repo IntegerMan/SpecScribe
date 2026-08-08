@@ -1,10 +1,18 @@
 # The repository's FIRST build+test gate (Story 25.1, Epic 25 / NFR11).
 #
-# Story 16.2 EXTENDS this workflow — branch protection, required-status-check
-# configuration, release-branch coverage. It must NOT create a second build+test
-# workflow. The required-check string 16.2 needs is the job name, verbatim:
+# Story 16.2 EXTENDED this workflow — branch protection and required-status-check
+# configuration. It must NOT create a second build+test workflow. The
+# required-check string is the job name, verbatim:
 #
 #     build-test-analyze
+#
+# NOTE [code review 2026-08-08]: this header used to also claim "release-branch
+# coverage". It is removed because 16.2 DECIDED against it (§R10): there are no
+# release/* branches and none are planned — releases are tag-triggered (16.4,
+# ADR 0040 §9), and a tag inherits the gate by pointing at a commit already green
+# on `main`. Targeting ~DEFAULT_BRANCH is the whole of the coverage, on purpose.
+# The stale phrasing invited exactly the "singular target = shortfall" misreading
+# R10 was written to prevent. See docs/CiGate.md.
 #
 # The quality gate itself is Story 25.2's, and 25.2 decided it: the applied gate
 # is SonarCloud's built-in `Sonar way` (id 9), kept rather than replaced, and

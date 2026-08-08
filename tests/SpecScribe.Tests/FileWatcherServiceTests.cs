@@ -167,6 +167,24 @@ public class FileWatcherServiceTests : IDisposable
         catch (IOException) { return false; }
         catch (UnauthorizedAccessException) { return false; }
         catch (JsonException) { return false; }
+        // [code review 2026-08-08] THE SAME TRANSIENT STATE, ARRIVING AS TWO MORE EXCEPTION TYPES. The list above
+        // covers a read that fails or tears; it does NOT cover a read that succeeds against a COHERENT but
+        // mid-rebuild IR, which is a distinct and routine state:
+        //   * SiteRegion.Read throws InvalidOperationException when the manifest parses but does not carry the
+        //     route (SiteRegion.cs:49-52) — Story 16.2's own captured diagnosis shows exactly this, "route in
+        //     IR : False", while a rebuild was in flight; and
+        //   * it throws KeyNotFoundException when the manifest names the route but the CHUNK on disk is still the
+        //     previous pass's file (SiteRegion.cs:57). The manifest is written before the chunks, so that window
+        //     is structural, not hypothetical.
+        // Neither derives from IOException, so both escaped this guard and failed the test instead of costing one
+        // more 25 ms poll — the identical defect shape the JsonException catch above was added to close.
+        // (The manifest-ABSENT case needs nothing here: it throws FileNotFoundException, which is an IOException.)
+        // This does not weaken any assertion. WaitFor re-evaluates after the deadline and a route that is
+        // genuinely never emitted still returns false, failing through the caller's Assert.Fail(Diagnose(…)) —
+        // which now reports whether the route was missing or the IR was unreadable, so a real defect is not
+        // silently polled away.
+        catch (InvalidOperationException) { return false; }
+        catch (KeyNotFoundException) { return false; }
     }
 
     /// <summary>Renders the state a timed-out <see cref="WaitFor"/> left behind. A bare "should refresh the board"
@@ -175,27 +193,51 @@ public class FileWatcherServiceTests : IDisposable
     /// different fixes. Since <see cref="Evaluate"/> swallows the transient read failures, an exhausted bound is
     /// now the ONLY way this class reports a non-convergence, so it has to carry its own evidence. [Story 16.2]
     /// <para>Failure path only: nothing here runs while the poll is succeeding, so it costs a passing test
-    /// nothing and cannot itself become a source of flake.</para></summary>
-    private string Diagnose(string because, string route, string sourcePath)
+    /// nothing and cannot itself become a source of flake.</para>
+    /// <para>[code review 2026-08-08] <paramref name="settled"/> is the caller's own predicate, re-evaluated once
+    /// so a convergence that lands DURING diagnosis is labelled rather than reported as a contradiction.</para></summary>
+    private string Diagnose(string because, string route, string sourcePath, Func<bool> settled)
     {
         string source;
         try { source = File.Exists(sourcePath) ? File.ReadAllText(sourcePath) : "<absent from disk>"; }
         catch (Exception ex) { source = $"<unreadable: {ex.GetType().Name}>"; }
 
-        bool routeInIr;
-        try { routeInIr = SiteRegion.Exists(Site, route); }
-        catch (Exception ex) { return $"{because}\n  IR unreadable at diagnosis time: {ex.GetType().Name}: {ex.Message}"; }
+        // [code review 2026-08-08] Tri-state, and NEVER an early return. A throw here means the IR was mid-wipe,
+        // delete-pending or torn at diagnosis time — which is the MOST likely state when the poll has just timed
+        // out for that very reason, i.e. exactly when the report matters most. Returning early discarded both the
+        // already-computed source AND the events list, and the events list is what actually root-caused this bug
+        // (`Error … pages-root.json … used by another process` was the decisive line). Report the failure as one
+        // more field and carry on.
+        string routeInIr;
+        bool routePresent = false;
+        try { routePresent = SiteRegion.Exists(Site, route); routeInIr = routePresent.ToString(); }
+        catch (Exception ex) { routeInIr = $"<undeterminable: {ex.GetType().Name}: {ex.Message}>"; }
+
+        // [code review 2026-08-08] `Exists` is false both when the manifest is GONE and when it is present but
+        // lacks the route. Those are two different fixes — an aborted wipe versus a route the generator never
+        // emitted — and telling them apart is this helper's whole reason to exist.
+        string manifest;
+        try { manifest = SiteRegion.ManifestExists(Site) ? "present" : "ABSENT (output root wiped or wipe aborted)"; }
+        catch (Exception ex) { manifest = $"<undeterminable: {ex.GetType().Name}>"; }
 
         string page;
-        try { page = routeInIr ? SiteRegion.Read(Site, route) : "<route absent from IR>"; }
+        try { page = routePresent ? SiteRegion.Read(Site, route) : "<route absent from IR>"; }
         catch (Exception ex) { page = $"<unreadable: {ex.GetType().Name}: {ex.Message}>"; }
 
         var marker = page.Contains("MARKER-V2") ? "MARKER-V2"
             : page.Contains("MARKER-V1") ? "MARKER-V1 (STALE — the edit never reached the page)"
             : "<neither marker present>";
 
+        // [code review 2026-08-08] The watcher is still converging while this runs, so the predicate can come true
+        // in the milliseconds Diagnose spends reading. Without this line the report can show a perfectly correct
+        // final state attached to an Assert.Fail, which reads as a harness bug rather than the timing result it is.
+        var late = Evaluate(settled) ? "  ⚠ LATE CONVERGENCE : the condition became TRUE during diagnosis — the "
+                                     + "bound was too short for this machine, not a stuck rebuild\n" : "";
+
         return $"{because}\n"
+             + late
              + $"  source on disk : {source.ReplaceLineEndings("\\n")}\n"
+             + $"  IR manifest    : {manifest}\n"
              + $"  route in IR    : {routeInIr}\n"
              + $"  marker in page : {marker}\n"
              + $"  events         : [{string.Join(", ", Observed().Select(e => $"{e.Outcome} {e.RelativePath} \"{e.Message}\""))}]";
@@ -243,8 +285,14 @@ public class FileWatcherServiceTests : IDisposable
         // removes entries one at a time. So there is a real window in which epics.html and epics/ are already gone
         // while requirements.html has not been reached yet, and a wait that stops at the first two lands the next
         // three assertions inside it. Waiting for the settled state asserts the same thing without racing the wipe.
+        // [code review 2026-08-08] ManifestExists FIRST, and it is load-bearing rather than defensive. All four
+        // conditions below short-circuit to `false` when the manifest file is missing (SiteRegion.cs:65, :100),
+        // and the wipe this comment describes DELETES that manifest — so without this gate the four-way wait is
+        // satisfied MID-WIPE, by the very window it was written to step over, and passes without the removal
+        // having converged. That is a vacuous gate: it would stay green if the deletion never propagated at all.
         Assert.True(WaitFor(() =>
-                !SiteRegion.Exists(Site, "epics.html")
+                SiteRegion.ManifestExists(Site)
+                && !SiteRegion.Exists(Site, "epics.html")
                 && !SiteRegion.HasRoutesUnder(Site, "epics/")
                 && !SiteRegion.Exists(Site, "requirements.html")
                 && !SiteRegion.HasRoutesUnder(Site, "requirements/")),
@@ -263,22 +311,32 @@ public class FileWatcherServiceTests : IDisposable
         using var watcher = StartedWatcher(gen);
 
         File.WriteAllText(SprintPath, SprintYaml);
-        if (!WaitFor(() => SiteRegion.Exists(Site, "sprint.html")
-                && SiteRegion.Read(Site, "sprint.html").Contains("MARKER-V1")))
+        Func<bool> added = () => SiteRegion.Exists(Site, "sprint.html")
+            && SiteRegion.Read(Site, "sprint.html").Contains("MARKER-V1");
+        if (!WaitFor(added))
         {
-            Assert.Fail(Diagnose("adding sprint-status.yaml should produce the sprint page", "sprint.html", SprintPath));
+            Assert.Fail(Diagnose("adding sprint-status.yaml should produce the sprint page", "sprint.html", SprintPath, added));
         }
 
         File.WriteAllText(SprintPath, SprintYaml.Replace("MARKER-V1", "MARKER-V2"));
-        if (!WaitFor(() => SiteRegion.Read(Site, "sprint.html").Contains("MARKER-V2")))
+        // [code review 2026-08-08] `Exists &&` is not redundant with the Read below. Without it, a poll landing
+        // while the route is transiently out of the IR reaches SiteRegion.Read's deliberate "not in the IR
+        // manifest" throw; that is now caught by Evaluate, but stating the precondition keeps the predicate
+        // honest about what it is waiting for rather than relying on the guard to absorb it.
+        Func<bool> refreshed = () => SiteRegion.Exists(Site, "sprint.html")
+            && SiteRegion.Read(Site, "sprint.html").Contains("MARKER-V2");
+        if (!WaitFor(refreshed))
         {
-            Assert.Fail(Diagnose("editing sprint-status.yaml should refresh the board", "sprint.html", SprintPath));
+            Assert.Fail(Diagnose("editing sprint-status.yaml should refresh the board", "sprint.html", SprintPath, refreshed));
         }
 
         File.Delete(SprintPath);
-        if (!WaitFor(() => !SiteRegion.Exists(Site, "sprint.html")))
+        // [code review 2026-08-08] Gated on the manifest being PRESENT: `!Exists` is also true while the output
+        // root is mid-wipe, so an ungated absence-wait can be satisfied before the removal has converged.
+        Func<bool> removed = () => SiteRegion.ManifestExists(Site) && !SiteRegion.Exists(Site, "sprint.html");
+        if (!WaitFor(removed))
         {
-            Assert.Fail(Diagnose("removing sprint-status.yaml should remove the sprint page", "sprint.html", SprintPath));
+            Assert.Fail(Diagnose("removing sprint-status.yaml should remove the sprint page", "sprint.html", SprintPath, removed));
         }
         Assert.DoesNotContain(Observed(), e => e.Outcome == GenerationOutcome.Error);
     }
