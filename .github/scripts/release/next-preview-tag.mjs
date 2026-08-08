@@ -8,11 +8,12 @@
 // are ignored: they must not turn a maintenance or experimental tag into a release version.
 
 import { existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 const Bootstrap = { major: 0, minor: 1, patch: 0 };
 const NumberPart = String.raw`(?:0|[1-9]\d*)`;
-const BasePattern = new RegExp(`^(?<major>${NumberPart})\\.(?<minor>${NumberPart})\\.(?<patch>${NumberPart})$`);
-const TagPattern = new RegExp(`^v(?<major>${NumberPart})\\.(?<minor>${NumberPart})\\.(?<patch>${NumberPart})-preview\\.(?<preview>[1-9]\\d*)$`);
+const BasePattern = new RegExp(String.raw`^(?<major>${NumberPart})\.(?<minor>${NumberPart})\.(?<patch>${NumberPart})$`);
+const TagPattern = new RegExp(String.raw`^v(?<major>${NumberPart})\.(?<minor>${NumberPart})\.(?<patch>${NumberPart})-preview\.(?<preview>[1-9]\d*)$`);
 
 function compareBase(left, right) {
   return left.major - right.major || left.minor - right.minor || left.patch - right.patch;
@@ -42,8 +43,8 @@ async function readStdin() {
   return Buffer.concat(chunks).toString('utf8');
 }
 
-const baseFile = baseFileArgument(process.argv.slice(2));
-const tags = (await readStdin())
+export function allocateNextPreviewTag(tagInput, requestedBaseText = null) {
+  const tags = tagInput
   .split(/\r?\n/)
   .map((tag) => tag.trim())
   .filter(Boolean)
@@ -59,15 +60,22 @@ const tags = (await readStdin())
   })
   .filter(Boolean);
 
-const latest = tags.toSorted((left, right) => compareBase(left, right) || left.preview - right.preview).at(-1);
-const highestPreview = tags.reduce((highest, tag) => Math.max(highest, tag.preview), 0);
-const requestedBase = baseFile && existsSync(baseFile) ? parseBase(readFileSync(baseFile, 'utf8'), baseFile) : null;
+  const latest = tags.toSorted((left, right) => compareBase(left, right) || left.preview - right.preview).at(-1);
+  const highestPreview = tags.reduce((highest, tag) => Math.max(highest, tag.preview), 0);
+  const requestedBase = requestedBaseText === null ? null : parseBase(requestedBaseText, 'release base');
 
-if (requestedBase && latest && compareBase(requestedBase, latest) < 0) {
-  throw new Error(`${baseFile} requests ${requestedBase.major}.${requestedBase.minor}.${requestedBase.patch}, which is below the latest release base ${latest.major}.${latest.minor}.${latest.patch}.`);
+  if (requestedBase && latest && compareBase(requestedBase, latest) < 0) {
+    throw new Error(`release base requests ${requestedBase.major}.${requestedBase.minor}.${requestedBase.patch}, which is below the latest release base ${latest.major}.${latest.minor}.${latest.patch}.`);
+  }
+
+  const base = requestedBase ?? (latest
+    ? { major: latest.major, minor: latest.minor, patch: latest.patch + 1 }
+    : Bootstrap);
+  return `v${base.major}.${base.minor}.${base.patch}-preview.${highestPreview + 1}`;
 }
 
-const base = requestedBase ?? (latest
-  ? { major: latest.major, minor: latest.minor, patch: latest.patch + 1 }
-  : Bootstrap);
-process.stdout.write(`v${base.major}.${base.minor}.${base.patch}-preview.${highestPreview + 1}\n`);
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const baseFile = baseFileArgument(process.argv.slice(2));
+  const requestedBaseText = baseFile && existsSync(baseFile) ? readFileSync(baseFile, 'utf8') : null;
+  process.stdout.write(`${allocateNextPreviewTag(await readStdin(), requestedBaseText)}\n`);
+}

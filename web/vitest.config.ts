@@ -39,6 +39,7 @@ export default defineConfig({
       // reported number, and dropping the Sonar exclusion later would have revealed a cliff nobody
       // predicted. Both sides now count `.vue`. [Story 23.5 code review 2026-08-08, owner decision D3]
       include: [
+        '../.github/scripts/release/next-preview-tag.mjs',
         'ir/**/*.ts',
         'scripts/*.mjs',
         'server/**/*.ts',
