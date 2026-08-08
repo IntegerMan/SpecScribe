@@ -69,6 +69,66 @@ public class SiteGeneratorDesignSystemTests : IDisposable
         Assert.Contains(nav.QuickLinks, q => q.OutputRelativePath == SiteNav.DesignSystemOutputPath && q.Group == "Help");
     }
 
+    /// <summary>The status vocabulary as a reader should see it, pinned INDEPENDENTLY of the production
+    /// switches that generate it. [Story 23.2 review 2026-08-07]
+    ///
+    /// <para>Asserting <c>StatusStyles.LegendWord(stage)</c> against a page rendered from
+    /// <c>StatusStyles.LegendWord(stage)</c> is satisfied by construction — it cannot fail while the seam is
+    /// wrong, only while the page stops using it. Both switches fall through to a default arm
+    /// (<c>StoryLabel</c>'s is "Pending", <c>StageMeaning</c>'s is "Status stage"), so a new canonical stage
+    /// added without its own arm rendered plausible-looking wrong words on the page whose entire subject is
+    /// this vocabulary. These tables are the second opinion; the completeness assertion below is what forces
+    /// them to be extended rather than silently bypassed.</para></summary>
+    private static readonly IReadOnlyDictionary<string, string> ExpectedWords =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["pending"] = "Pending",
+            ["drafted"] = "Drafted",
+            ["ready"] = "Ready for dev",
+            ["active"] = "In development",
+            ["review"] = "In review",
+            ["done"] = "Done",
+            ["deferred"] = "Deferred",
+            ["unmapped"] = "Not yet mapped",
+            ["retired"] = "Retired",
+            ["unrecognized"] = "Unrecognized",
+        };
+
+    private static readonly IReadOnlyDictionary<string, string> ExpectedMeanings =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["pending"] = "Not yet ready to pick up",
+            ["drafted"] = "Stories or a plan exist; work has not started",
+            ["ready"] = "Task plan exists and dependencies met",
+            ["active"] = "Actively being developed",
+            ["review"] = "Implementation complete; awaiting review or retrospective",
+            ["done"] = "Finished and closed",
+            ["deferred"] = "Shelved on purpose for later",
+            ["unmapped"] = "Listed, but not yet mapped to any epic or story",
+            ["retired"] = "Removed from the active plan; kept for ledger history",
+            ["unrecognized"] = "Native status word has no canonical mapping",
+        };
+
+    /// <summary>A new canonical stage must arrive with its word and meaning spelled out here, not inherit a
+    /// fallback. Without this, extending <c>LegendStages</c> would simply skip the pinned tables.
+    /// [Story 23.2 review 2026-08-07]</summary>
+    [Fact]
+    public void DesignSystem_PinnedVocabulary_CoversEveryCanonicalStage()
+    {
+        Assert.NotEmpty(StatusStyles.LegendStages);
+        foreach (var stage in StatusStyles.LegendStages)
+        {
+            Assert.True(ExpectedWords.ContainsKey(stage), $"No pinned WORD for canonical stage '{stage}'.");
+            Assert.True(ExpectedMeanings.ContainsKey(stage), $"No pinned MEANING for canonical stage '{stage}'.");
+        }
+
+        // ...and nothing pinned here has fallen out of the canonical list, which would leave a dead expectation.
+        foreach (var stage in ExpectedWords.Keys)
+        {
+            Assert.Contains(stage, StatusStyles.LegendStages);
+        }
+    }
+
     [Fact]
     public void DesignSystem_DocumentsEveryCanonicalStatusStage_ByNameNotColourAlone()
     {
@@ -91,31 +151,40 @@ public class SiteGeneratorDesignSystemTests : IDisposable
             // every `--status-*` the page NAMES must actually be declared in the generated stylesheet.
             if (stage is not ("unmapped" or "retired"))
             {
-                Assert.Contains($"--status-{stage}", html);
+                // ⚠️ WHOLE token, not a prefix. `Assert.Contains($"--status-{stage}", html)` was satisfied by
+                // the FILL token the same list item also prints: `--status-ready` is a strict substring of
+                // `--status-ready-bg`, and likewise for done/active/review. Dropping the accent from
+                // `StatusBody` for any of those four left this green. The closing `</code>` is what makes it
+                // the whole name. [Story 23.2 review 2026-08-07]
+                Assert.Contains($"--status-{stage}</code>", html);
             }
             // ...the human WORD (UX-DR17: never colour alone)...
-            Assert.Contains(PathUtil.Html(StatusStyles.LegendWord(stage)), html);
-            // ...and the plain-language meaning, from the same seam the portal's legend uses.
-            Assert.Contains(PathUtil.Html(StatusStyles.StageMeaning(stage)), html);
+            //
+            // ⚠️ Against EXPECTED_WORDS, not `StatusStyles.LegendWord(stage)`. Asserting the templater's own
+            // call reproduces the page's derivation, so it could only ever detect the page ABANDONING the
+            // seam — never the seam returning the wrong word. `LegendWord` falls through to `StoryLabel`,
+            // whose fallback is "Pending", so an eleventh stage would have rendered "Pending" on the page
+            // whose whole subject is the status vocabulary, green. The same by-construction vacuity this
+            // file already fixed for `--status-{stage}` above. [Story 23.2 review 2026-08-07]
+            Assert.Contains(PathUtil.Html(ExpectedWords[stage]), html);
+            // ...and the plain-language meaning, pinned the same way and for the same reason.
+            Assert.Contains(PathUtil.Html(ExpectedMeanings[stage]), html);
         }
     }
 
+    /// <summary>The reduce contract is stated on the page, not just implied — a reader must learn that motion
+    /// has an opt-out.
+    ///
+    /// <para>⚠️ Token COVERAGE deliberately does not live here. It used to, as a hand-typed five-element array
+    /// — the exact second copy `MotionTokens` was made `internal` to abolish — and it survived beside its own
+    /// derived replacement (<see cref="DesignSystem_DocumentsEveryMotionToken_AndNamesNoneThatIsInvented"/>),
+    /// whose comment already described it in the past tense. Renaming a token reddened it for the wrong
+    /// reason and invited re-typing the new name in. The array is gone; this test keeps only the assertion
+    /// that is genuinely its own. [Story 23.2 review 2026-08-07]</para></summary>
     [Fact]
-    public void DesignSystem_DocumentsTheMotionTokenFamily()
+    public void DesignSystem_StatesTheReducedMotionContract()
     {
-        var html = Generate();
-
-        foreach (var token in new[]
-                 {
-                     "--motion-fast", "--motion-entrance", "--motion-entrance-long",
-                     "--motion-ease", "--motion-stagger",
-                 })
-        {
-            Assert.Contains(token, html);
-        }
-
-        // The reduce contract is stated, not just implied — a reader must learn that motion has an opt-out.
-        Assert.Contains("prefers-reduced-motion", html);
+        Assert.Contains("prefers-reduced-motion", Generate());
     }
 
     [Fact]
@@ -177,6 +246,39 @@ public class SiteGeneratorDesignSystemTests : IDisposable
         }
     }
 
+    /// <summary>The same class guarantee for the BADGE, which had none.
+    ///
+    /// <para>The swatch half above was closed on 2026-08-07 and the badge half was not, though it takes the
+    /// identical <c>_ =&gt;</c> path and emits <c>class="status-badge &lt;stage&gt;"</c> twice per stage.
+    /// <c>StylesheetTests</c> pins only <c>.status-badge.unrecognized</c> and <c>.status-badge.retired</c>, so
+    /// a new stage's badge fell through to the base <c>.status-badge</c> rule and rendered visually identical
+    /// to <c>pending</c> — on the page whose subject is the colour vocabulary. [Story 23.2 review
+    /// 2026-08-07]</para></summary>
+    [Fact]
+    public void DesignSystem_EveryBadgeStageClassResolvesToARuleInTheStylesheet()
+    {
+        var html = MainOf(Generate());
+        var css = File.ReadAllText(Path.Combine(Site, ForgeOptions.StylesheetName));
+
+        // `StatusStyles.Badge` emits `class="status-badge <stage> js-tip"`, so the stage modifier sits between
+        // the base class and the tooltip hook — matched explicitly rather than by "the next word", which
+        // captured `js-tip` on a bare badge and made this list empty.
+        var badgeClasses = Regex.Matches(html, @"class=""status-badge ([a-z0-9-]+) js-tip""", RegexOptions.IgnoreCase)
+            .Select(m => m.Groups[1].Value)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.NotEmpty(badgeClasses);
+        foreach (var cls in badgeClasses)
+        {
+            Assert.True(
+                Regex.IsMatch(css, $@"\.status-badge\.{Regex.Escape(cls)}\b"),
+                $"The design-system page renders a badge with class `{cls}`, but {ForgeOptions.StylesheetName} "
+                + $"has no `.status-badge.{cls}` rule — so it falls through to the base badge rule and reads as "
+                + "`pending`. Add the rule, or give the stage an explicit remap in DesignSystemTemplater.");
+        }
+    }
+
     [Fact]
     public void DesignSystem_NamesNoTokenTheStylesheetDoesNotDeclare()
     {
@@ -223,7 +325,11 @@ public class SiteGeneratorDesignSystemTests : IDisposable
         }
 
         // And the other direction: no `--motion-*` declared in the stylesheet is missing from the page.
-        foreach (Match m in Regex.Matches(css, @"(--motion-[a-z0-9-]+)\s*:", RegexOptions.IgnoreCase))
+        // Guarded, like the forward loop above it — a rename of the token PREFIX empties the match set and
+        // makes this direction vacuous while it still reports success. [Story 23.2 review 2026-08-07]
+        var declared = Regex.Matches(css, @"(--motion-[a-z0-9-]+)\s*:", RegexOptions.IgnoreCase);
+        Assert.NotEmpty(declared);
+        foreach (Match m in declared)
         {
             Assert.Contains(m.Groups[1].Value, html);
         }
@@ -252,7 +358,11 @@ public class SiteGeneratorDesignSystemTests : IDisposable
 
         // The other direction: every `--status-*-bg` the stylesheet declares is documented here. Adding a fifth
         // fill without teaching it is the same silent-omission failure the motion family already guards.
-        foreach (Match m in Regex.Matches(css, @"(--status-[a-z0-9-]+-bg)\s*:", RegexOptions.IgnoreCase))
+        // Guarded, like the forward loop above it: a rename of the `--status-*-bg` convention empties the
+        // match set and this direction passes without executing a body. [Story 23.2 review 2026-08-07]
+        var declaredFills = Regex.Matches(css, @"(--status-[a-z0-9-]+-bg)\s*:", RegexOptions.IgnoreCase);
+        Assert.NotEmpty(declaredFills);
+        foreach (Match m in declaredFills)
         {
             Assert.Contains(m.Groups[1].Value, html);
         }
@@ -273,15 +383,20 @@ public class SiteGeneratorDesignSystemTests : IDisposable
             .Where(g => g.Count() > 1)
             .ToArray();
         Assert.NotEmpty(sharedFills);
+        // ⚠️ Assert the RENDERED note, not `shared with {other}` per member. The templater joins sharers with
+        // "/" (`shared with drafted/ready`), so a substring probe for each member passed only because a
+        // TWO-member group's join equals its single other name. A third stage on one fill emits correct output
+        // that this assertion calls a failure — the guard written to stop pinning "the one pair that happened
+        // to be spelled out" was itself pinned to a pair. [Story 23.2 review 2026-08-07]
         foreach (var group in sharedFills)
         {
-            foreach (var stage in group.Select(kv => kv.Key))
+            var members = group.Select(kv => kv.Key).ToArray();
+            foreach (var stage in members)
             {
-                var others = group.Select(kv => kv.Key).Where(s => s != stage);
-                foreach (var other in others)
-                {
-                    Assert.Contains($"shared with {other}", html);
-                }
+                var others = members
+                    .Where(s => !string.Equals(s, stage, StringComparison.Ordinal))
+                    .OrderBy(StatusStyles.CanonicalRank);
+                Assert.Contains($"shared with {string.Join("/", others)}", html);
             }
         }
     }

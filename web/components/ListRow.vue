@@ -75,8 +75,29 @@ const chipList = computed(() => {
     }
     return []
   }
-  return raw.filter((c) => typeof c === 'string' && c.trim() !== '')
+  // ⚠️ Coerce rather than drop. The prop's own doc names "a count" as a legitimate chip, so `[3, 'Epic 1']`
+  // silently losing the `3` was the documented use case failing quietly — and the dev warning above fires
+  // only on the non-array branch, so the per-element drop was invisible even in dev. Numbers and booleans
+  // stringify; objects and nullish values are still dropped, because there is no sensible rendering for them.
+  // [Story 23.2 review 2026-08-07]
+  return raw
+    .map((c) => (typeof c === 'string' ? c : typeof c === 'number' || typeof c === 'boolean' ? String(c) : ''))
+    .filter((c) => c.trim() !== '')
 })
+
+/**
+ * `summary` is declared required, but required-ness erases at runtime and `withDefaults` substitutes for
+ * `undefined` only, so a JSON IR's `null` reached the template. Rendering the row's own text as an empty
+ * span produced a styled row that says nothing. [Story 23.2 review 2026-08-07]
+ */
+const summaryText = computed(() => (typeof props.summary === 'string' ? props.summary.trim() : ''))
+
+if (import.meta.dev && !summaryText.value) {
+  console.warn(
+    `[ListRow] missing or empty \`summary\` (received ${JSON.stringify(props.summary)}) — the row's own text ` +
+      `is the one thing it cannot do without, so the summary span is omitted rather than rendered blank.`,
+  )
+}
 
 /**
  * `??` passes `''` through, so `primary-label=""` (an IR field present but empty) rendered an anchor whose
@@ -104,8 +125,15 @@ if (import.meta.dev && props.accent && !KNOWN_ACCENTS.includes(props.accent)) {
 <template>
   <li class="list-row" :class="[accentClass, { resolved }]">
     <div class="list-row-scan">
-      <span class="list-row-summary">{{ summary }}</span>
-      <div v-if="$slots.badge || chipList.length || primaryHref" class="list-row-meta">
+      <!-- `summary` was the one required prop in this family with neither guard nor dev warning, so
+           `:summary="null"` shipped a bordered, padded, accented row with no text in it.
+           [Story 23.2 review 2026-08-07] -->
+      <span v-if="summaryText" class="list-row-summary">{{ summaryText }}</span>
+      <!-- ⚠️ `$slots.badge?.()?.length`, not `$slots.badge`: slot PRESENCE is not slot CONTENT, so
+           `<template #badge><StatusBadge v-if="cond"/></template>` with a falsy `cond` rendered an empty
+           `.list-row-meta` (`margin-left: auto`) — the empty-but-present wrapper this component's header
+           says it never emits (NFR8). [Story 23.2 review 2026-08-07] -->
+      <div v-if="$slots.badge?.()?.length || chipList.length || primaryHref" class="list-row-meta">
         <slot name="badge" />
         <!-- Keyed by INDEX, not by text: `chips` is a plain `string[]` with no uniqueness constraint, and two
              identical facts (`['3 tasks', '3 tasks']`) produced duplicate keys and node reuse on reorder. -->

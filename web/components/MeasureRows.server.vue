@@ -9,11 +9,22 @@
 import { buildRows } from '~/utils/measure-rows'
 
 const props = withDefaults(defineProps<{ count?: number }>(), { count: 200 })
-const rows = buildRows(props.count)
+
+/**
+ * `withDefaults` substitutes for `undefined` only, so `:count="null"` reached `Array.from({ length: null })`
+ * and produced zero rows — an empty `<ul class="measure-list">`, i.e. an empty list landmark rather than no
+ * list. A negative or non-integer value did the same. Clamped to a non-negative integer here, and the list
+ * itself is omitted when there is nothing in it. [Story 23.2 review 2026-08-07]
+ */
+const rowCount = computed(() => {
+  const n = Number(props.count)
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0
+})
+const rows = computed(() => buildRows(rowCount.value))
 </script>
 
 <template>
-  <ul class="measure-list">
+  <ul v-if="rows.length" class="measure-list">
     <ListRow v-for="row in rows" :key="row.id" :summary="row.summary" :chips="row.chips">
       <template #badge>
         <StatusBadge :stage="row.stage" :label="row.label" />

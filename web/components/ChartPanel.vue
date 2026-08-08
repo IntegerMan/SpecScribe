@@ -5,9 +5,18 @@
  *
  * The point of the C# helper is that title / window / ranking / note / why are metadata-consistent BY
  * CONSTRUCTION — no call site hand-writes the frame. Props here carry the same contract, in the same
- * render order, so a panel authored in Vue cannot grow a different anatomy from one authored in C#:
+ * render order, so a panel authored in Vue carries the same anatomy as one authored in C# for every region
+ * the C# frame has:
  *
  *   head (title + window) -> ranking -> note -> body -> why
+ *
+ * ⚠️ With ONE enumerated exception, stated here rather than left to be discovered in the template: `legend`.
+ * `Charts.Framed` has no legend slot and renders a legend inside `body`. Ours is additive and guarded on
+ * rendered content, so it cannot change the anatomy of a panel that does not fill it — but a panel that DOES
+ * fill it has a region the C# frame does not emit, and the blanket claim this comment used to make ("cannot
+ * grow a different anatomy") was therefore already untrue when it was written. Keeping the slot was the
+ * owner's call on 2026-07-28; narrowing the sentence to match is Story 23.2's fourth review pass. If a legend
+ * ever needs styling from the shared sheet, add the slot to `Charts.Framed` first so both frames agree.
  *
  * `legend` is a named slot rather than a prop because a legend is markup, not metadata.
  */
@@ -38,7 +47,9 @@ if (import.meta.dev && (typeof props.title !== 'string' || props.title.trim() ==
 </script>
 
 <template>
-  <!-- `<div>`, matching `Charts.Framed` (`Charts.cs:168`) exactly. This was a `<section>` with an inner
+  <!-- `<div>`, matching `Charts.Framed` (`Charts.Framed` in `Charts.cs` — by SYMBOL, not by line: this said
+       `Charts.cs:168` and had already drifted six lines by the time anyone checked, which is precisely what
+       CLAUDE.md means by "confirm by symbol"). This was a `<section>` with an inner
        `.chart-panel-body` wrapper — neither of which the C# frame emits, and neither of which has any rule in
        specscribe.css. The wrapper was the load-bearing half: it inserted a DOM level the portal has no
        counterpart for, so any `.chart-panel > …` child-combinator rule would apply on the generated portal
@@ -48,7 +59,11 @@ if (import.meta.dev && (typeof props.title !== 'string' || props.title.trim() ==
        unfilled slot renders nothing. [Story 23.2 re-review 2026-07-28] -->
   <div class="chart-panel">
     <div class="chart-frame-head">
-      <h3>{{ title }}</h3>
+      <!-- `title` is required, but required-ness erases at runtime and covers `undefined` only — `:title="null"`
+           or `title=""` rendered an empty <h3>: an unlabelled heading inside a landmark-bearing panel, and the
+           one field in this frame with no guard while every other region is `v-if`ed.
+           [Story 23.2 review 2026-08-07] -->
+      <h3 v-if="title">{{ title }}</h3>
       <span v-if="window" class="chart-frame-window">{{ window }}</span>
     </div>
 
@@ -59,8 +74,13 @@ if (import.meta.dev && (typeof props.title !== 'string' || props.title.trim() ==
 
     <!-- The one region the C# frame has no concept of. Additive and always guarded, so it cannot change the
          anatomy of a panel that does not use it; `Charts.Framed` renders its legend inside `body`. If a
-         legend ever needs to be styled from the shared sheet, add the slot to `Charts.Framed` first. -->
-    <div v-if="$slots.legend" class="chart-panel-legend">
+         legend ever needs to be styled from the shared sheet, add the slot to `Charts.Framed` first.
+
+         ⚠️ `$slots.legend?.()?.length`, not `$slots.legend`: the latter is truthy whenever the slot was
+         PASSED, regardless of whether it rendered anything, so `<template #legend><X v-if="cond"/></template>`
+         with a falsy `cond` emitted an empty `.chart-panel-legend` carrying `margin-top: 0.75rem` — the
+         empty-but-present wrapper this file's contract forbids. [Story 23.2 review 2026-08-07] -->
+    <div v-if="$slots.legend?.()?.length" class="chart-panel-legend">
       <slot name="legend" />
     </div>
 
