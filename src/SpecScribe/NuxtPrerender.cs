@@ -345,33 +345,7 @@ public sealed class NuxtPrerender
         var serverLogAttached = false;
 
         var port = FreePort();
-        var psi = new ProcessStartInfo(NodeExecutable(), Path.Combine(_artefactDir, "server", "index.mjs"))
-        {
-            WorkingDirectory = _artefactDir,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-        };
-        psi.Environment["SPECSCRIBE_IR_DIR"] = Path.GetFullPath(_outputRoot);
-        // Must NOT leak into the server: it stubs the manifest EMPTY, which is correct for BUILDING the artefact
-        // and catastrophic for SERVING with it — every route would render an empty shell at HTTP 200.
-        psi.Environment["SPECSCRIBE_PACKAGE_BUILD"] = string.Empty;
-        psi.Environment["PORT"] = port.ToString();
-        psi.Environment["NITRO_PORT"] = port.ToString();
-        // BIND LOOPBACK ONLY. [Story 17.2 Task 5 — NFR3]
-        //
-        // Measured, not assumed: with only PORT/NITRO_PORT set, Nitro's node-server preset logged
-        // `Listening on http://[::]:39117` — the IPv6 WILDCARD, i.e. every interface. Confirmed by fetching
-        // the rendered portal over this machine's real LAN addresses (172.28.160.1 and 192.168.50.25), both
-        // answering HTTP 200 with the full 1,305,409-byte page. So for the duration of every `generate`, a
-        // PRIVATE repository's entire rendered portal was readable by anyone on the same network.
-        //
-        // `FreePort()` binds IPAddress.Loopback only to PICK a free port and immediately releases it — it
-        // never constrained what the Node server then bound, which is why the defect was invisible from the
-        // C# side. HOST and NITRO_HOST are both set because the preset reads NITRO_HOST first and falls back
-        // to HOST; setting one alone would depend on which preset the artefact was built with.
-        psi.Environment["HOST"] = "127.0.0.1";
-        psi.Environment["NITRO_HOST"] = "127.0.0.1";
+        var psi = BuildServerStartInfo(_artefactDir, _outputRoot, port);
 
         Process? proc = null;
         var serverLog = new List<string>();
@@ -463,6 +437,57 @@ public sealed class NuxtPrerender
     /// see <see cref="ToolResolver"/> for the measured Windows search-order vector this closes.
     /// [Story 17.2 Task 2, csharpsquid:S4036]</summary>
     private static string NodeExecutable() => ToolResolver.Resolve("node");
+
+    /// <summary>Builds the <see cref="ProcessStartInfo"/> that boots the renderer artefact's Nitro server.
+    ///
+    /// <para><b>The script path goes through <see cref="ProcessStartInfo.ArgumentList"/>, never through the
+    /// single-string <c>arguments</c> overload, and that is load-bearing rather than stylistic.</b> The
+    /// single-string form hands one command line to the OS, which splits it on whitespace — so an artefact under
+    /// <c>C:\Program Files\SpecScribe\</c> reaches Node as three arguments and the process fails looking for
+    /// <c>C:\Program</c>. <c>ArgumentList</c> escapes each element per the platform's own quoting rules.</para>
+    ///
+    /// <para><b>Why it matters here and did not before.</b> Until <see href="../../docs/adrs/0040-release-channels-and-versioning-policy.md">ADR 0040</see>
+    /// §Decision 1, <c>artefactDir</c> was a developer's repo path or an explicit <c>SPECSCRIBE_RENDERER_DIR</c>.
+    /// It is now <c>AppContext.BaseDirectory + "renderer"</c> — <b>a path the consumer chooses at install time</b>
+    /// by unzipping a GitHub Release asset wherever they like. The ADR assigned this fix to Story 16.3 and it was
+    /// not taken; Story 16.4 pulled it forward by owner decision (2026-08-08) because 16.4 is the story that
+    /// actually publishes the archive, and a first run that dies on a spaced path is the failure it would ship.
+    /// The Story 16.1 spike probed a path with no spaces, which is why this was never exercised.</para>
+    ///
+    /// <para>Extracted as an internal seam so the argument shape is unit-testable without spawning Node — the
+    /// C# suite is deliberately Node-free and artefact-free (see <c>NuxtPrerenderTests</c>).</para></summary>
+    internal static ProcessStartInfo BuildServerStartInfo(string artefactDir, string outputRoot, int port)
+    {
+        var psi = new ProcessStartInfo(NodeExecutable())
+        {
+            WorkingDirectory = artefactDir,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        psi.ArgumentList.Add(Path.Combine(artefactDir, "server", "index.mjs"));
+        psi.Environment["SPECSCRIBE_IR_DIR"] = Path.GetFullPath(outputRoot);
+        // Must NOT leak into the server: it stubs the manifest EMPTY, which is correct for BUILDING the artefact
+        // and catastrophic for SERVING with it — every route would render an empty shell at HTTP 200.
+        psi.Environment["SPECSCRIBE_PACKAGE_BUILD"] = string.Empty;
+        psi.Environment["PORT"] = port.ToString();
+        psi.Environment["NITRO_PORT"] = port.ToString();
+        // BIND LOOPBACK ONLY. [Story 17.2 Task 5 — NFR3]
+        //
+        // Measured, not assumed: with only PORT/NITRO_PORT set, Nitro's node-server preset logged
+        // `Listening on http://[::]:39117` — the IPv6 WILDCARD, i.e. every interface. Confirmed by fetching
+        // the rendered portal over this machine's real LAN addresses (172.28.160.1 and 192.168.50.25), both
+        // answering HTTP 200 with the full 1,305,409-byte page. So for the duration of every `generate`, a
+        // PRIVATE repository's entire rendered portal was readable by anyone on the same network.
+        //
+        // `FreePort()` binds IPAddress.Loopback only to PICK a free port and immediately releases it — it
+        // never constrained what the Node server then bound, which is why the defect was invisible from the
+        // C# side. HOST and NITRO_HOST are both set because the preset reads NITRO_HOST first and falls back
+        // to HOST; setting one alone would depend on which preset the artefact was built with.
+        psi.Environment["HOST"] = "127.0.0.1";
+        psi.Environment["NITRO_HOST"] = "127.0.0.1";
+        return psi;
+    }
 
     private static void WaitForReady(Process proc, HttpClient http, List<string> serverLog)
     {

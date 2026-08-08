@@ -252,7 +252,30 @@ it is unavailable on the owner's account, the NuGet channel falls back to a clas
 **repository secret `NUGET_API_KEY`**, scoped to the `release` environment so it is unreachable from PR
 workflows, rotated by the owner, and set to nuget.org's shortest offered expiry. Under the fallback the
 "stores nothing" claim weakens for that channel only, and this ADR's § Decision 3 headline must be read with
-that caveat. **Confirm which path applies before Story 16.4 begins.**
+that caveat.
+
+✅ **CONFIRMED 2026-08-08 (owner, at the start of Story 16.4): Trusted Publishing applies. The fallback is NOT
+taken, and the "stores nothing" headline above stands unqualified for all three shipping channels.**
+`.github/workflows/release.yml` implements the Trusted Publishing path only — there is no `NUGET_API_KEY`
+reference anywhere in the repository, and no code path that could consume one. The fallback stays recorded
+above because it is the answer if the policy is ever revoked, but taking it would be a change to this decision
+rather than a configuration switch.
+
+**Two things this binds that are NOT visible from inside the repository**, recorded here and mirrored in
+`docs/Releasing.md` § Configuration the owner mirrors:
+
+1. **The workflow FILENAME is part of the policy.** A trusted-publishing policy binds to
+   *repo owner + repo + workflow filename + optional environment*. The filename is fixed as **`release.yml`**
+   and renaming it silently invalidates the policy — surfacing as a rejected push at the LAST step of a
+   release, after the version has already been consumed by any channel that went first (§ Decision 10).
+2. **No `environment:` is declared on the release job**, matching a policy that names none. If the owner ever
+   sets an environment on the nuget.org side, the job **must** declare the matching one or the exchange fails
+   even though repo, owner and filename all match.
+
+The publisher identity — the owner's nuget.org **profile name**, not their email — is the Actions *variable*
+`NUGET_USER`. It is configuration rather than a credential, which is why it is a variable and not a secret,
+and the release preflight refuses to proceed without it **before anything is built** rather than discovering
+it at the exchange step.
 
 For VS Marketplace (§ Decision 4, out of the preview): Entra workload identity federation stores **no
 secret** either — the repository holds the client and tenant IDs as plain Actions *variables*, and the trust
@@ -463,6 +486,21 @@ The empty-release sentence is a **changelog section**, never a whole body. Readi
 delete the digest block, and § Decision 13 names that digest *"the compensating control"* for the only
 channel shipping without a signature — so the mistake would strip the sole integrity guarantee from the
 direct-download channel, precisely when a release carried no changelog to distract from it.
+
+✅ **AMENDED by Story 16.4 (2026-08-08): a MISSING `CHANGELOG.md` is the same non-fatal path as an empty
+section.** The decision above covered an empty section but not an absent file, and they are different states —
+the absent one is the state the repository is *actually* in, because Story 16.6 owns authoring the file and is
+scheduled behind 16.4. Leaving it unstated meant the release job's last step could crash on a missing file
+*after* the packages were pushed, burning a version over a `readFileSync`.
+
+> **File absent, section absent and section empty are ONE path:** write *"No user-visible changes in this
+> release."*, emit a workflow **warning**, and continue. `release-body.mjs` guards every read and cannot throw.
+
+**Story 16.4 deliberately does NOT seed a `CHANGELOG.md` skeleton or a `changelog.d/` directory** (owner
+decision, 2026-08-08). Authoring either would take this decision's format choices with it, and those are
+16.6's. The invocation seam is named in `release-body.mjs`: when 16.6 lands the assembler, the release job
+runs it **before** composing the body and this script keeps reading the assembled `CHANGELOG.md` unchanged.
+So 16.4 discharges "owns invoking it" as far as there is anything to invoke, and no further.
 
 **Stories write fragments, not the file. `CHANGELOG.md` is assembled, never hand-merged.** The Story 16.1
 code review (2026-08-07) identified the hazard the original decision left open: a single hand-edited file at

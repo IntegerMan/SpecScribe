@@ -99,6 +99,67 @@ public class NuxtPrerenderTests
         Assert.Contains(NuxtPrerender.SupportedNodeRange, ex.Message);
     }
 
+    // ── The renderer spawn is ARGUMENT-LIST BUILT, never a single command string ────────────────────────────
+    //
+    // [Story 16.4, R3-1 — pulled forward from Story 16.3 by owner decision 2026-08-08.]
+    //
+    // ADR 0040 §Decision 1 flagged this and assigned it to Story 16.3, which did not take it. Story 16.4 is what
+    // makes it bite: until ADR 0040 the artefact directory was a developer's repo path or an explicit env var,
+    // and 16.4 publishes a self-contained archive that a consumer unzips WHEREVER THEY LIKE. `C:\Program Files\
+    // SpecScribe\`, `C:\Users\Matt Eland\Downloads\`, `~/My Tools/` are all ordinary destinations and all contain
+    // a space.
+    //
+    // ProcessStartInfo(fileName, arguments) takes ONE command string and splits it on whitespace, so a spaced
+    // path is handed to Node as several arguments: node sees `C:\Program`, cannot find it, and the FIRST RUN of
+    // every downloaded binary fails. The 16.1 spike probed a path with no spaces, so this was never exercised.
+    //
+    // ArgumentList escapes each element per the platform's own rules, which is the only correct answer for a
+    // path chosen by someone other than us.
+
+    [Theory]
+    [InlineData(@"C:\Program Files\SpecScribe\renderer")]
+    [InlineData(@"C:\Users\Matt Eland\Downloads\specscribe-0.1.0-preview.1-win-x64\renderer")]
+    [InlineData("/home/matt/My Tools/specscribe/renderer")]
+    [InlineData("/opt/specscribe/renderer")]                 // the no-space control: it must not regress either
+    [InlineData(@"C:\tools\spec scribe\ünïcodé dir\renderer")]
+    public void BuildServerStartInfo_PassesTheScriptPathAsONEArgument_WhateverIsInIt(string artefactDir)
+    {
+        var psi = NuxtPrerender.BuildServerStartInfo(artefactDir, outputRoot: ".", port: 41234);
+
+        // THE ASSERTION THAT MATTERS. One element, verbatim, un-split. A single-string `Arguments` would make
+        // this three elements for the first case and there would be no exception to notice it by.
+        var expected = Path.Combine(artefactDir, "server", "index.mjs");
+        Assert.Equal(new[] { expected }, psi.ArgumentList);
+
+        // ...and the single-string channel is EMPTY. .NET throws if both are populated, but it does not stop you
+        // populating only the wrong one — so assert the overload that was used, not merely the result.
+        Assert.Equal(string.Empty, psi.Arguments);
+    }
+
+    [Fact]
+    public void BuildServerStartInfo_CarriesTheEnvironmentTheServerNeeds()
+    {
+        var artefactDir = Path.Combine(Path.GetTempPath(), "spec scribe artefact");
+        var outputRoot = Path.Combine(Path.GetTempPath(), "spec scribe out");
+
+        var psi = NuxtPrerender.BuildServerStartInfo(artefactDir, outputRoot, port: 41235);
+
+        Assert.Equal(artefactDir, psi.WorkingDirectory);
+        Assert.False(psi.UseShellExecute);
+        Assert.True(psi.RedirectStandardOutput);
+        Assert.True(psi.RedirectStandardError);
+
+        // The IR directory is passed FULLY QUALIFIED — the server resolves it at module scope from its own
+        // working directory, which is the artefact, not ours.
+        Assert.Equal(Path.GetFullPath(outputRoot), psi.Environment["SPECSCRIBE_IR_DIR"]);
+        Assert.Equal("41235", psi.Environment["PORT"]);
+        Assert.Equal("41235", psi.Environment["NITRO_PORT"]);
+
+        // Must NOT leak into the server: it stubs the manifest EMPTY, which is correct for BUILDING the artefact
+        // and catastrophic for SERVING with it — every route would render an empty shell at HTTP 200.
+        Assert.Equal(string.Empty, psi.Environment["SPECSCRIBE_PACKAGE_BUILD"]);
+    }
+
     // ── AC #4, failure path 3: the artefact directory is missing ────────────────────────────────────────────
 
     [Fact]

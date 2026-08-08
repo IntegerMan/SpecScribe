@@ -2996,11 +2996,33 @@ So that releases are one action and never depend on a local machine's state.
 **Then** it builds and tests on a clean checkout, packages per Story 16.3, publishes to the chosen channel(s), and attaches the release artifacts to the corresponding GitHub Release
 **And** publishing is gated on the build+test step passing (NFR9).
 
+<!-- AC #2 AMENDED 2026-08-08 (Story 16.4 dev, owner decision) — the second clause was UNACHIEVABLE as
+     originally written and is now stated as ADR 0040 §Decision 10 resolves it.
+
+     It used to read: "a failed publish leaves no partially-released state (the pipeline is safe to re-run)".
+     That cannot be built. The constraint is external and non-negotiable: nuget.org REJECTS a duplicate
+     version and permits only unlisting, never deletion; npm rejects publishing over an existing version and
+     its unpublish window is time-limited. A multi-channel release is therefore NOT transactional, and
+     re-running the SAME tag is a request the registry will refuse — so "safe to re-run" could only ever mean
+     "safe to re-run on a NEW tag".
+
+     ADR 0040 §Decision 10 decides that policy (version burn / forward-only recovery) and adds the two
+     mechanisms that make the reworded clause true rather than aspirational: a registry preflight that
+     refuses a consumed version in seconds instead of 409-ing at the push step, and a DRAFT GitHub Release
+     that brackets the irreversible registry pushes so a mid-flight failure leaves something deletable.
+     Recorded here rather than as a note in the story file, per CLAUDE.md § Decision records. -->
+
 2.
 **Given** a `-preview` / pre-release tag
 **When** the pipeline publishes
 **Then** the release is marked as a pre-release / preview channel per Story 16.1's policy
-**And** a failed publish leaves no partially-released state (the pipeline is safe to re-run).
+**And** a failed publish is recoverable **forward** — the version number is consumed on first publish to any
+channel and is never reused, so the pipeline is safe to re-run **on a new tag** (ADR 0040 §Decision 10)
+**And** the pipeline refuses a version that is already consumed **before it builds anything**, rather than
+failing at the push step
+**And** the GitHub Release is created as a **draft** before the registry pushes and published only after they
+succeed, so a failure in between leaves a deletable draft rather than an announced release pointing at
+packages that do not exist.
 
 ### Story 16.5: VS Code Extension Packaging and Marketplace Publication
 
