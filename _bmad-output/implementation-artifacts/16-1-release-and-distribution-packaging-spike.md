@@ -372,6 +372,159 @@ no-product-code spike and that needs a checkable assertion.
   - [x] `cd web && npm run check` green. → all four gates **OK** (`check:parity` 24 routes / 14 families byte-identical).
   - [x] If a gate moved: **establish causality before touching any baseline.** → `check:ir-content` went red **twice** and **no baseline was regenerated**. Cause 1: fresh worktree had no IR. Cause 2: a plain `generate` omits `--deep-git`, giving `+4 / -185` — the signature `build-test-analyze.yml:281-290` documents in advance as `+4 / -182`. Running `extract:ir-content` at that point would have **deleted 185 rules** and turned the gate green over a real regression.
 
+### Review Findings
+
+Code review 2026-08-07 (`bmad-code-review`), three parallel layers — Blind Hunter (adversarial),
+Edge Case Hunter, Acceptance Auditor — over commit `9837e67`. **Scope:** that commit alone; its five-file
+diff matches this story's File List 1:1, so **no sibling story is bundled** and no hunk attribution was
+needed (unusual for this repository — recorded per CLAUDE.md § Scoping a code review). 56 raw findings →
+44 after dedup, 1 dismissed. Every claim below was re-verified at the reviewer's `HEAD` (`c73ebcb`) **by
+symbol**, not by the line numbers in the report.
+
+**Two positives worth recording, since a review record that only lists faults misreads the work:** all
+three routed defects genuinely landed in their target story files (23.3 / 16.3 / 16.2) rather than being
+merely claimed, and the `npm ci` finding proved real and has since been repaired by `0b1f561`. All
+arithmetic across the five documents reconciles with no numeric contradiction.
+
+#### Decision needed
+
+- [ ] [Review][Decision] **ADR 0040 stands at `Proposed`; AC #4 requires ratified** — this is the one AC the
+  implementation cannot close by itself, and it is disclosed honestly (Completion Note 10, ADR lines 4-6).
+  But AC #4 and § Owner actions item 5 contradict each other, and only you can resolve it. Note the
+  pressure is real: Story 16.2 has **already merged** against § Decision 9 while the record is unratified.
+- [ ] [Review][Decision] **MinVer is unshippable exactly as specified** — the repository has **0 git tags**
+  (verified), § Decision 5 **deletes** `<Version>` from `SpecScribe.csproj` (still present at `:19`), no
+  bootstrap tag is named, and `MinVerTagPrefix` appears in neither document — so the report's own worked
+  example `v0.1.0-preview.1` does **not** match MinVer's default empty prefix. Both failure modes are
+  silent (`dotnet pack` exits 0) and land as `0.0.0-alpha.0.N`, which also breaks `README.md:260`'s
+  published install recipe. Decide the tag prefix and the first tag.
+- [ ] [Review][Decision] **No re-publish, rollback, yank or version-burn policy** — `retag`, `rollback`,
+  `yank`, `unlist`, `idempotent` and `409` are absent from both documents, yet Story 16.4 AC #2 requires
+  *"a failed publish leaves no partially-released state (the pipeline is safe to re-run)"*. nuget.org and
+  npm both reject republishing a version. As written that AC is unachievable.
+- [ ] [Review][Decision] **§ Decision 9 ("the tagged commit already passed on `main`") names no mechanism
+  and no failure branch** — and `build-test-analyze.yml` triggers only on `main` push/PR (verified), so no
+  release-branch or hotfix commit is ever built by the gating workflow. A hotfix to a released version is
+  structurally impossible without first merging to `main`.
+- [ ] [Review][Decision] **A new cross-epic blocking gate exists only as prose in a spike report** — § 4.1/§ 9
+  make the `EpicsIndexSurface` fix a precondition for Story 16.7, but ADR 0040 never mentions it, and
+  Task 8 simultaneously certifies *"No structural scope change … Neither file structurally edited."* Per
+  CLAUDE.md a new cross-epic gate belongs in `epics.md` **and** `sprint-status.yaml`. Compounding it,
+  **Story 23.3 was already at `review`** when the work was routed to it (verified in the sprint status at
+  `838d591` and still today). Decide where the gate lands and which story implements it.
+- [ ] [Review][Decision] **The recorded fallback package IDs silently change the product's documented
+  command** — § 5.4 offers `specscribe-cli` as a drop-in, but `npx specscribe` is printed in ADR 0006,
+  `epics.md` § 16.8 and the README. Taking the fallback invalidates all three with no escalation rule.
+- [ ] [Review][Decision] **A single hand-edited root `CHANGELOG.md` becomes the highest-contention file in
+  the repo** — generation was rejected because commits bundle stories, which is sound, but the alternative's
+  known local failure mode (CLAUDE.md: *"A `Charts.cs` edit has silently vanished this way before"*) is not
+  addressed. No fragment directory or verify-after-edit rule is specified.
+- [ ] [Review][Decision] **The VS Marketplace exception permits exactly one VSIX publish ever** — the
+  extension is frozen at a plain `0.1.0` with the Marketplace Preview flag carrying prerelease status, but
+  the Marketplace requires each publish to be strictly greater. No CLI↔extension version correspondence
+  rule exists.
+- [ ] [Review][Decision] **Only one change class is mapped to a version component** — "minor = breaking"
+  inside `0.x`. PATCH has no stated meaning, a non-breaking feature has no assigned component, and there is
+  no `0.x` exit criterion. Every tag decision after the first is a judgement call.
+
+#### Patch
+
+- [ ] [Review][Patch] The "0039 was taken by Story 4.9" claim is **false** — ADR 0039 is the runtime-attached
+  body-level-classes record authored from the owner's sunburst verify round; Story 4.9 took **0041**.
+  Repeated in 5 places incl. the permanent index and commit history [`docs/adrs/README.md`, story Task 6 +
+  Completion Note 4, `16-1-spike-report.md` § 11]
+- [ ] [Review][Patch] "`gh` is not installed on this machine" is **false** — `C:\Program Files\GitHub CLI\gh.exe`
+  verified present, and project memory already records it as installed-but-not-on-PATH. It is the sole
+  stated reason the NFR9-breaking item shipped **unverified-on-CI** [`16-1-spike-report.md` § 6.1, open item 3]
+- [ ] [Review][Patch] ADR 0040 contradicts itself on ADR 0022's owner questions — the `Amends:` header and
+  § Relationship lead say **both** closed; the trailing clause says Question 2 *"remains open"*. The README
+  index propagates the wrong half [`docs/adrs/0040-…md:9,202-204`; `docs/adrs/README.md`]
+- [ ] [Review][Patch] ADR 0040 carries no **`Deciders`** field; both sibling ADRs from the same week (0039,
+  0041) do. For a record whose only open item is who ratifies it, that is the wrong field to drop
+  [`docs/adrs/0040-…md:1-11`]
+- [ ] [Review][Patch] The self-contained-binary / GitHub Releases channel has **no credential row at all** —
+  a channel in the shipping cut with an uninventoried publish credential (AC #2). Zero hits for
+  `GITHUB_TOKEN` or `contents: write` in either document [`16-1-spike-report.md` § 5.1]
+- [ ] [Review][Patch] "Where stored" is unanswered on both fallback paths — the NuGet API-key fallback has no
+  secret name, scope, owner or rotation rule, and the Marketplace federation's stored material is unstated.
+  The headline *"two of three channels need no stored secret"* drops the caveat [§ 5.1, § 5.2, § 5.3]
+- [ ] [Review][Patch] The ADR records the pack path as a glob (`tools/<tfm>/any/renderer/**`) while the
+  proven-correct exact `PackagePath` survives only in the report, and `net10.0` is hard-coded with no
+  TFM-derivation rule — a TFM bump silently relocates the assembly away from the payload [ADR § Decision 1]
+- [ ] [Review][Patch] Nothing requires the packed renderer to be **verified complete**, though § 2.7 measured
+  exactly that false pass (*"187 entries, right count, right total bytes, exit 0 — and `renderer/server/index.mjs`
+  did not exist"*). Combined with the discarded renderer error text, 16.4 can publish a broken package green
+- [ ] [Review][Patch] The renderer is spawned via the single-string `ProcessStartInfo` overload, not
+  `ArgumentList`, and § Decision 1 moves that path to a consumer-chosen install directory — a username or
+  install path containing a space breaks the lead channel's first run [`src/SpecScribe/NuxtPrerender.cs:251`]
+- [ ] [Review][Patch] npm publish **ordering** is unspecified, so the exact `=X.Y.Z` pin has an
+  install-breaking window if the wrapper lands before the renderer package [ADR § Decision 5]
+- [ ] [Review][Patch] The 1-hour single-use NuGet key has no stated placement in the job and no re-exchange
+  rule; a retried publish has no credential [§ 5.1]
+- [ ] [Review][Patch] The **.NET 10 prerequisite appears nowhere** in the preview promises or in § Decision 8's
+  listing surfaces, while Node does — the likeliest install blocker for the channel leading the cut [§ 6.6]
+- [ ] [Review][Patch] No supported-platform matrix in the promises, and no required message for the
+  unmatched-platform case in the `optionalDependencies` wrapper (`linux-arm64` / `osx-x64` are deferred) [§ 6.6, § 3.2]
+- [ ] [Review][Patch] Keep a Changelog has no **Breaking** section, yet "breaking changes are recorded in
+  `CHANGELOG.md`" is a stated preview promise — breaking and non-breaking become indistinguishable [§ 6.5, § 6.6]
+- [ ] [Review][Patch] `SOURCE_DATE_EPOCH` is marked **CLOSED** with no value or derivation specified, and the
+  csproj **silently stamps today's date** on an unset or malformed value rather than failing
+  [ADR § Decision 7; `src/SpecScribe/SpecScribe.csproj:36-38`]
+- [ ] [Review][Patch] The binary channel's "structural" CLI↔renderer pin is **two filesystem objects** with no
+  version stamp — reproducing exactly the mismatch Story 16.9 AC #2 exists to prevent [ADR § Decision 5 vs § Decision 1]
+- [ ] [Review][Patch] The only unsigned channel also has **no published digest or attestation**, and 16.4's
+  release-asset naming/archive format is unspecified [§ 5.5]
+- [ ] [Review][Patch] Decisions a downstream story must implement live only in the report, not the ADR —
+  § 6.6 preview promises (17.4's sign-off checklist), § 5.4 fallback IDs + RID naming (16.8), and the
+  code-signing consequences AC #2 demanded. CLAUDE.md § Decision records names this pattern by name
+- [ ] [Review][Patch] The Node-check amendment promotes a **self-described interim stand-in** to permanent
+  without engaging the code's own doc comment (*"Until it is, this is the check"*)
+  [`src/SpecScribe/NuxtPrerender.cs:143-145`; ADR § Decision 8]
+- [ ] [Review][Patch] "Amends ADR 0006" is hollow where loud and silent where real — adding the packaging
+  shape is an extension, while the genuine departure (this ADR ships `dotnet tool` **first**; ADR 0006 calls
+  npx *primary*) is framed as **not** an amendment [`docs/adrs/0006-…md:202`]
+- [ ] [Review][Patch] The `npm ci` root cause handed to 16.2 points at the wrong half of the lockfile — the
+  peer dependencies **were** declared at `838d591`; the missing item was the top-level
+  `node_modules/@emnapi/runtime` tree entry, which is what `0b1f561` added [§ 6.1]
+- [ ] [Review][Patch] The probe repository's composition is documented nowhere, and the two probe runs are
+  irreconcilable on the report's face — § 2.2 reports **373 routes**, § 2.7/§ 4.1 report a first probe at
+  **21**. The composition is load-bearing for AC #5's central claim [§ 2.1]
+- [ ] [Review][Patch] No pre-story baseline was recorded, so AC #6's *"unchanged from the pre-story baseline"*
+  is unprovable; the suite was **1 failing** and the task box asserts "green"; attribution is to a flake
+  class, not *"to a concurrent session by name"* as AC #6 words it [§ 7.2, Task 9]
+- [ ] [Review][Patch] Channel version **parity** is unstated — a version resolvable on NuGet may not exist on
+  npm, leaving 16.9's Action with no authoritative channel for "a released version" [ADR § Decision 2]
+- [ ] [Review][Patch] Provenance table points to § 3 for commands that are in § 2.1 — a broken pointer in the
+  one table whose purpose is auditability [§ 1]
+- [ ] [Review][Patch] The probe item called "reproduced **verbatim**" is recorded two different ways —
+  § 2.1 carries `CopyToOutputDirectory="Never"`, the Debug Log does not [§ 2.1, § 11]
+- [ ] [Review][Patch] "**three of the four** produced a green-looking or self-consistent wrong answer" —
+  only one did; (2) threw, (3) reported `errors=1`, (4) turned the gate red [§ 2.7]
+- [ ] [Review][Patch] `generated=18` is mislabelled "**18 pages**" — the prerendered page count is 373;
+  `GenerationSummary.Count` tallies something else [story Task 2]
+- [ ] [Review][Patch] A transient defect repaired the same day (`npm ci`, fixed by `0b1f561`) is written into
+  the **permanent ADR index**, where it will read as a standing defect indefinitely [`docs/adrs/README.md`]
+- [ ] [Review][Patch] Non-goal count mismatch — Task 3 claims *"eleven named"*; § 3.2 enumerates **ten**
+  [story Task 3 vs § 3.2]
+
+#### Deferred
+
+- [x] [Review][Defer] Packaging shape measured on **Windows / `win-x64` only** but asserted for three RIDs and
+  both packing hosts — deferred, verification belongs to 16.3/16.4 on Linux/macOS runners
+- [x] [Review][Defer] The regression-floor gates were run from a worktree the report itself proves resolved
+  the **main checkout's** artefact (§ 4.2), and the two facts are never reconciled — deferred, pre-existing;
+  the underlying `FindRepoRoot` defect has since been fixed by Story 16.3
+- [x] [Review][Defer] The `-185` vs documented `-182` gate delta is dispositioned as "corpus growth" **by
+  assertion**, with the exact `+4` match on the other side left unexamined — deferred, pre-existing
+- [x] [Review][Defer] First-ever-publish ID claiming vs trusted-publishing policy creation ordering is
+  unaddressed, so § 8's owner-action order may be unexecutable — deferred, resolves at 16.4 wiring time
+
+#### Dismissed (1)
+
+The npm channel's per-channel AC #5 answer being reasoned-from-a-measured-property rather than run
+end-to-end: honestly self-labelled **unmeasured** in open item 5 and seated against Story 16.8. Handled
+elsewhere, not a defect.
+
 ---
 
 ## Owner actions (not the dev agent's)
