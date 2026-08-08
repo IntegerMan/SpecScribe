@@ -557,7 +557,86 @@ development_status:
                    # extension/src (508 LTC, 0% covered) and web/ sit in the same denominator; 17.5's large-file
                    # premise is corroborated (SiteGenerator.cs 82 issues, Charts.cs 76, RenderParity.cs 48 on 309
                    # lines). SonarJS blind spot STILL LIVE: specscribe.js lines=2954, no ncloc.
-  25-3-agent-facing-findings-contract-spike: review # -> review 2026-07-28 (dev-story, story baseline 40c7ee9;
+  25-3-agent-facing-findings-contract-spike: done # -> done 2026-08-07 (code review, scoped to this story's own
+                   # File List; docs/adrs/README.md attributed BY HUNK -- only the ADR 0023 index line; the
+                   # 0020/0021/0022/0024 lines belong to Stories 18.5/18.4/23.5/22.4 and were excluded. Three
+                   # layers in parallel. ALL FOUR ACs CONFIRMED MET and all nine checklist items discharged by
+                   # durable content, not merely claimed. The ADR's STRUCTURAL decisions all survived review; the
+                   # EVIDENTIARY LAYER beneath them did not. 7 decision-needed + 13 patch APPLIED, 2 deferred,
+                   # 9 dismissed. ADR 0023 AMENDED (stays Accepted, owner-approved -- structural decisions
+                   # unchanged, so no re-ratification and six stories keep binding).
+                   # (1) OWNER CHOSE RE-MEASURE for the double-counted corpus. spike/findings/remeasure_dedup.py
+                   # paginates to exhaustion and REFUSES to report a truncated corpus (the shipped map_to_model.py
+                   # capped at 3 pages = 1500; the live backlog is now 1755, so that cap WOULD silently truncate
+                   # today). DOUBLE-COUNT CONFIRMED: overlap 390 on exact (rule,path,line), 810 on the
+                   # line-drift-tolerant (rule,path) key -- the latter reconciling with the report's own 995
+                   # external_roslyn:* imports, so the naive union inflates ~45%. BUT THE SIZING ERROR RAN THE
+                   # OTHER WAY AND WON: the mandatory attachment+provenance blocks were never sized, doubling
+                   # B/obs 511 -> 1012, while dedup removes only ~15% of rows. The digest is LARGER than reported
+                   # (2.12 MB, median shard 4.2 KB), not smaller. Sharding is MORE justified, not less.
+                   # (2) HEADLINE: ADR DECISION 3'S "2.6x THE BYTES" ARGUMENT IS WITHDRAWN. It compared INDENTED
+                   # JSON against MINIFIED JSON and sized a record missing the mandatory blocks. Like-for-like,
+                   # SARIF minifies to 1006 B/result (indentation alone is 42.4% of the file) vs 1012 B for a full
+                   # observation -- ~1.0x. THE PROFILE IS NOT SMALLER THAN SARIF. Decision 3's other two reasons
+                   # (no planning vocabulary; a result carries only a ruleIndex into an out-of-line catalogue so it
+                   # is not self-describing) stand and are sufficient -- the DECISION survives, its arithmetic does
+                   # not. Also: 1793 B/result is unreproducible from the committed files (1455266/834 = 1745).
+                   # (3) attachment.basis COULD NOT PRODUCE THE DISTINCTION IT EXISTS FOR: F7's own timeout returns
+                   # errors=0 AND ZERO COMMITS, byte-identical at the cited gate to --deep-git being off. Split into
+                   # basis.method + basis.outcome {computed, not-attempted, degraded, failed, no-planning-model};
+                   # an emitter that cannot tell computed from failed MUST emit degraded (fail closed). NOTE: the
+                   # shipped miner cannot emit `computed` today -- that is a MINER DEFECT, named in the ADR.
+                   # (4) NEW DECISION 9 -- observation IDENTITY + DEDUP MERGE, which the original omitted entirely
+                   # while recommending Sonar's MCP server run ALONGSIDE the digest. Stated honestly: identity is
+                   # content-derived, so cross-run new-vs-resolved is STILL NOT SUPPORTED and is named as such.
+                   # (5) NEW DECISION 10 -- BMad-neutrality (NFR8, the property the spike exists to establish) was
+                   # ONE TABLE CELL while basis was mandatory non-nullable with BMad-named keys. Adds
+                   # `no-planning-model`, and states that the OBSERVATION is framework-neutral while ATTACHMENT is
+                   # framework-shaped, rather than claiming both.
+                   # (6) NEW DECISION 11 -- SARIF suppressions[] was never read, so a #pragma warning disable would
+                   # reach story pages via 26.5 as a live finding. Suppressed results and kind != fail are not
+                   # emitted.
+                   # (7) NEW NORMATIVE SCHEMA SECTION -- the original left confidence unenumerated, entityCount a
+                   # scalar over a TWO-granularity attachment (7.33 epics vs 10.02 stories), null paths undeclared,
+                   # the repo-relative rule not extended to relatedLocations, and the digest's SHARD KEY rules
+                   # (traversal, Windows-illegal chars, MAX_PATH, case collision) entirely unspecified -- 25.4 would
+                   # have derived a filesystem write path from untrusted provider strings.
+                   # (8) provenance gains workingTreeDirty + staleReasons + null commitsBehind on a non-ancestor
+                   # revision. NOT invented by the review: the SHIPPED downstream digest already carries the first
+                   # two because the implementation could not do without them. The contract was corrected to match
+                   # what implementing it actually required -- THE DRIFT IS THE FINDING.
+                   # (9) FLAGGED, NOT FIXED: this Accepted record binds Epic 26's channel to ADR 0016, WHICH IS
+                   # STILL PROPOSED -- the exact argument AC #4 used to require 0023's own ratification. The 25.4
+                   # half (sharded digest) depends only on Accepted records and is unaffected; 26.4 should not be
+                   # planned as though the IR shape is settled.
+                   # REPORT CORRECTIONS: F3's summary row crossed granularities (1765 epic-attached paired with
+                   # 15758 STORY edges; 7.3 has it right at 1572); 7.6's directory breakdown summed to 535 (epic)
+                   # under a 728 (story) sentence -- ONE granularity swap, not two errors; SECTION 14 MISQUOTED
+                   # SECTION 11 to manufacture a hedge section 11 did not contain (11 claimed the contract "does
+                   # generalize -- proven, not asserted"; 14 reported it as "proven on two, not proven general" --
+                   # the honesty section described a DIFFERENT DOCUMENT, and 11 is what 26.7 actually reads);
+                   # Commands.SerializeDiagnostics does not resolve (it is WebviewCommand.SerializeDiagnostics)
+                   # while 13.1 boasted "cited by symbol"; "<h3>Review Findings</h3> on EVERY story page" is false
+                   # (guarded on the section being non-empty), and that overstatement carried ADR Decision 1, the
+                   # NAMING decision; `tags` was described as folded into a field that was never defined and that
+                   # the mapper appended to its LOSS list. The README index entry is corrected in all the same
+                   # places, including dropping "genuinely independent second source class" -- section 8.1 always
+                   # conceded the two sources are the SAME ANALYZER FAMILY, exactly what R3 warned would prove
+                   # nothing. AC #1's loss ledger is HAND-WRITTEN not derived, with one UNCONDITIONAL CONSTANT
+                   # manufacturing the "No analogue at all | 834" row -- so "the asymmetry is the finding" is
+                   # substantially an artifact of the instrument. Softened rather than re-proven (owner's call).
+                   # spike/README.md gained the missing `spike/findings` quarantine-index section (both prior spikes
+                   # have one) and now records the originals' known defects as deliberately-unedited artifacts.
+                   # A 633 KB minimal Sonar snapshot is committed so the re-measurement reproduces WITH NO NETWORK
+                   # -- the review found the Sonar half of the original evidence shipped with no payload at all.
+                   # DEFERRED (2, in deferred-work.md): the two original scripts' robustness (zero-findings crashes,
+                   # no encoding=, git returncodes failing OPEN, the 1500 cap, %20-only decoding, the absolute-path
+                   # fallback the "0 escaped" check is blind to) -- disposable, quarantined, tested byte-inert; and
+                   # section 12's "first Accepted ADR since 0015", which aged out when 0020/0021 were ratified
+                   # 2026-07-29, one day after the report.
+                   # NON-GOALS HELD BY THE REVIEW ITSELF: no src/tests/web/extension edits; only docs/adrs/,
+                   # _bmad-output/ and spike/ were touched.
+                   # prior status: review # -> review 2026-07-28 (dev-story, story baseline 40c7ee9;
                    # session HEAD 06b300c). THE CONTRACT IS DECIDED AND RATIFIED. Deliverables: 25-3-spike-report.md
                    # + ADR 0023 at **Accepted** (owner ratified in-pass per AC #4 — the FIRST Accepted ADR since
                    # 0015; 0016-0018 + 0020-0022 all still Proposed, worth a retro note). ADR NUMBER CORRECTED: the

@@ -22,7 +22,7 @@ Six things this spike measured that change what a downstream story would otherwi
 |---|---|---|
 | **F1** | **54.6 %** of live issues (800 / 1,466) normalize to a **different** level depending on which Sonar severity axis you read | The axis is not a detail. Pin it in the ADR or two surfaces disagree by design. § 5 |
 | **F2** | **14** issues carry **two** `impacts[]` entries today — and the `impactSeverities` facet **counts issues, not impact pairs**, so it can never reveal this | A scalar severity field is lossy on **live** data now, not hypothetically. The story's own R5 inferred the opposite from the facet. § 5 |
-| **F3** | Observation-weighted attachment fan-out is **7.33 epics** / **10.02 stories** per attached observation; 1,765 attached observations generate **15,758** story edges | Story 26.5's "use the existing miner as the join" ships a 10× amplification unless bounded. **The single most consequential handoff in this report.** § 7 |
+| **F3** | Observation-weighted attachment fan-out is **7.33 epics** / **10.02 stories** per attached observation; 1,572 attached observations generate **15,758** story edges | Story 26.5's "use the existing miner as the join" ships a 10× amplification unless bounded. **The single most consequential handoff in this report.** § 7 |
 | **F4** | Multi-location is **source-class dependent**: 15.5 % of Sonar issues carry secondary locations (max **52**); raw Roslyn carries them on **0.1 %** | A model designed against either source alone gets this wrong. § 6 |
 | **F5** | The shipped agent-facing channel is **2-level** (`"error"`\|`"warning"`) — `Info` silently becomes `"warning"` | R1's "reuse the existing serialization" is cheaper on paper than in fact. § 2 |
 | **F6** | Latest analysis timestamp reads **today**; its revision is **2 commits behind** HEAD | Staleness by timestamp is not merely imprecise, it is **actively wrong**. § 9 |
@@ -95,7 +95,7 @@ never-color-alone rendering, and an agent-facing JSON-lines serialization all al
 production.
 
 **What tipped it — F5, which the story's R1 table does not record.** The existing agent-facing serialization is
-not 3-level. `Commands.SerializeDiagnostics` emits:
+not 3-level. `WebviewCommand.SerializeDiagnostics` emits:
 
 ```csharp
 severity = notice.Severity == DiagnosticSeverity.Error ? "error" : "warning",
@@ -125,7 +125,7 @@ through a 2-level serializer (silently mislabelling every `note`), or widening a
 |---|---|
 | `EpicsParser.cs:253` | carves `"## Review Findings"` out of the story body |
 | `EpicsView.cs:303` | carries it as `ReviewFindingsHtml` |
-| `HtmlRenderAdapter.Epics.cs:609` | renders `<h3>Review Findings</h3>` on **every** story page |
+| `HtmlRenderAdapter.Epics` (`RenderStory`) | renders `<h3>Review Findings</h3>` on **any story page that has one** — guarded on `ReviewFindingsHtml` being non-empty; review is an epic-end activity, so most story pages do not carry it *(corrected 2026-08-07 from “every”)* |
 
 Story 26.5 puts analysis findings **on those same story pages**. Two sections both called "Findings", one from a
 human code review and one from a static analyzer, is the `ArtifactCoverage`-vs-FR42 collision repeating knowingly.
@@ -156,8 +156,15 @@ authored, part of the story record) vs **"Analysis Observations"** (machine, ing
 
 - **No planning vocabulary.** SARIF has no epic, story, or requirement. Attachment (§ 7) would live in
   `properties`, i.e. it would be a profile anyway — just an undocumented one.
-- **Verbosity, measured.** Raw SARIF costs **1,793 B/result** (1.43 MB for 834 results), against **678 B** for the
-  same information as an observation — **2.6× smaller**. Most of the difference is the out-of-line rule catalogue:
+- **Verbosity — ⚠ WITHDRAWN 2026-08-07.** This originally read: "Raw SARIF costs **1,793 B/result**
+  (1.43 MB for 834 results), against **678 B** for the same information as an observation — **2.6×
+  smaller**." The comparison measured *indented* SARIF against *minified* observations, and sized a
+  record omitting the `attachment` and `provenance` blocks ADR 0023 makes mandatory. Re-measured
+  like-for-like by [`remeasure_dedup.py`](../../spike/findings/remeasure_dedup.py): SARIF minifies to
+  **1,006 B/result** (indentation alone is **42.4 %** of the on-disk file) against **1,012 B** for a
+  complete observation — **~1.0×. The profile is not smaller than SARIF.** The 1,793 B figure is also
+  unreproducible from the committed files (1,455,266 ÷ 834 = **1,745 B**). The *decision* stands on its
+  other two reasons; this one does not. Most of the difference is the out-of-line rule catalogue:
   331 and 420 rule descriptors for 261 and 573 results respectively.
 - **Results are not self-describing.** A SARIF `result` carries `ruleIndex`, an integer into
   `tool.driver.rules[]`. Hand an agent one result and it has no rule name, no help URI, no category. The profile
@@ -356,8 +363,7 @@ cannot become one without a new node kind. Listed, evaluated, rejected.
 ### 7.6 The unattached route
 
 Unattached is **not** an edge case: **728 observations (31.7 %)** at story granularity with `--deep-git` **on**, and
-**2,300 (100 %)** with it off — which is the default. By top-level directory the unattached set is `src` 264,
-`tests` 234, `web` 37.
+**2,300 (100 %)** with it off — which is the default. By top-level directory the **epic-granularity** unattached set (535 = 2,300 − 1,765) is `src` 264, `tests` 234, `web` 37. *(Corrected 2026-08-07: these three sum to 535, not to the 728 in the sentence above — 728 is the STORY-granularity count. Same granularity swap as the F3 summary row.)*
 
 **Destination: Story 26.6's analysis hub.** It is the only surface with no entity precondition. The contract's
 obligation is that unattached observations are a **routed population with a named home**, not a residue — and that
@@ -393,7 +399,7 @@ And the two sources are **not** subsets of one another in either direction:
 | `hash` | 1,466 | Sonar's line-content hash; not portable. |
 | `key` | 1,466 | Server-assigned and **not stable across re-analysis of a moved line** — carrying it would imply an identity it does not have. |
 | `cleanCodeAttribute` / Category | 1,466 | MQR taxonomy with no SARIF or Roslyn analogue; carrying it would make the model Sonar-shaped. |
-| `tags[]` | 600 | Folded into the optional `tags` field where present. |
+| `tags[]` | 600 | **Dropped** — provider taxonomy with no cross-provider meaning, same ruling as `cleanCodeAttribute` (ADR 0023 Decision 4, amended 2026-08-07). *This row previously read “folded into the optional `tags` field”, a field that was never defined and that the mapper never emitted.* |
 | **`rule.name` / `helpUri`** | **1,466** | **Not in the payload at all** — needs a second call, `api/rules/show?organization=…&key=…`. § 10 prices this. |
 
 ### 8.3 Losses, raw Roslyn SARIF → Observation
@@ -478,7 +484,17 @@ purpose.
 
 ### 10.1 The digest, concretely (not a category)
 
-Measured by [`measure_channels.py`](../../spike/findings/measure_channels.py) on all 2,300 observations:
+> ⚠ **Superseded 2026-08-07 by the code review.** The figures below were measured by
+> [`measure_channels.py`](../../spike/findings/measure_channels.py) on a corpus and a record that were **both wrong,
+> in opposite directions**: the 2,300 observations are a *union* of the Sonar and raw-SARIF sets with **no
+> deduplication**, when § 1.1 of this report already establishes that most raw results are defects Sonar had already
+> imported; and the record sized omits the `attachment` and `provenance` blocks ADR 0023 makes **mandatory** and
+> carries `rule.name`/`helpUri` = null on every Sonar row. Re-measured with both corrections by
+> [`remeasure_dedup.py`](../../spike/findings/remeasure_dedup.py) — see the corrected table below. **The
+> record error dominates: the digest is larger than stated, not smaller.** The *conclusion* — shard, do not ship a
+> monolith — survives and is in fact strengthened.
+
+Original measurement, on 2,300 un-deduplicated observations with a truncated record:
 
 | Shape | Size |
 |---|---|
@@ -486,10 +502,27 @@ Measured by [`measure_channels.py`](../../spike/findings/measure_channels.py) on
 | **Index** (`path → count`) | **9,138 B (8.9 KB)** |
 | **Per-file shards** | **201 shards**; median **3,691 B**, mean 7,758 B, max 95.7 KB |
 
-**This is what makes the digest win for 25.4.** The use case is *"the files I am about to touch"*, not *"the whole
-project"*. An agent reads an **8.9 KB index**, picks the 1–5 paths it cares about, and reads shards at a **median
-3.7 KB** — never the 1.49 MB whole. A monolithic digest would be a poor agent payload; a sharded one is a good one.
-Concretely: **~20 KB** for a typical dev-story pass touching three files, against 1.49 MB.
+**Corrected measurement (2026-08-07)** — live Sonar re-fetched complete (1,755 issues) and deduplicated against the
+committed 834 raw SARIF results, with the full ADR 0023 record. Each correction isolated so the direction of each is
+visible:
+
+| Corpus | Record | Observations | Whole digest | B/obs | Index | Median shard |
+|---|---|---|---|---|---|---|
+| union | truncated *(as originally shipped)* | 2,589 | 1.26 MB | 511 | 9,943 B | 2,822 B |
+| **distinct** | truncated | 2,199 | 1.09 MB | 520 | 9,943 B | 2,267 B |
+| union | **full ADR 0023 record** | 2,589 | 2.48 MB | 1,003 | 9,943 B | 5,289 B |
+| **distinct** | **full ADR 0023 record** | **2,199** | **2.12 MB** | **1,012** | **9,943 B** | **4,243 B** |
+
+Deduplication removes ~15 % of rows; the mandatory blocks **double** the per-observation cost. Overlap measured at
+**390** on an exact `(rule, path, line)` key and **810** on a line-drift-tolerant `(rule, path)` key — the latter
+reconciling with this report's own 995 `external_roslyn:*` imports, so the true overlap sits near the upper bound and
+the naive union inflates by roughly **45 %**.
+
+**This is still what makes the digest win for 25.4**, and by a wider margin than first stated. The use case is *"the
+files I am about to touch"*, not *"the whole project"*. An agent reads a **~10 KB index**, picks the 1–5 paths it
+cares about, and reads shards at a **median 4.2 KB** — never the **2.12 MB** whole. Concretely: **~22 KB** for a
+typical dev-story pass touching three files, against 2.12 MB. A bigger whole digest makes sharding *more* necessary,
+not less.
 
 - **Where it lands:** `.specscribe/analysis/` — the ADR 0014 settings **folder**, which already exists for exactly
   "future per-repository state".
@@ -622,7 +655,7 @@ mid-implementation. Raw SARIF has this **for free** — the rule catalogue ships
 - The word is **"Observations"**, never "Findings", on story pages that already render `<h3>Review Findings</h3>`.
 
 ### Note to **Story 26.7** (provider survey)
-The contract **does generalize** — proven, not asserted: two providers with disjoint serializations, disjoint
+The contract is **proven on two providers, not proven general** *(corrected 2026-08-07; this read “does generalize — proven, not asserted”, which § 14 then contradicted)*: two providers with disjoint serializations, disjoint
 severity scales, and partially disjoint rule sets both mapped into it (§ 8). The seam is a **normalizer per
 provider**: split a path, pick a severity axis, flatten related locations, stamp provenance. What does *not*
 generalize is provider-specific taxonomy (`cleanCodeAttribute`, `effort`) — deliberately dropped rather than made
@@ -762,7 +795,7 @@ Named as unmeasured rather than half-measured, per the story's timebox disciplin
    correct in principle and untested in practice. Flagged for 25.4.
 4. **Digest emission cost** — sizes are measured, wall-clock to produce one is not. 25.4 owns it.
 5. **Non-.NET providers** — ESLint, Bandit, and the like emit SARIF, so the profile *should* hold, but only two
-   providers were proven. The § 11 note to 26.7 says "proven on two", not "proven general".
+   providers were proven. The § 11 note to 26.7 is corrected to say **"proven on two, not proven general"** — as originally written it claimed the contract "**does generalize** — proven, not asserted", which this section then quoted as though it said the opposite. The ADR's Consequences always carried the honest form.
 6. **Sonar MCP server behavior** — its documentation was read; **the server was not run**. § 10.3's tool-surface
    claims are documentation-grade, not measured.
 7. **A private-repository posture** — this project is public; no token was needed for any call here. 26.2's.

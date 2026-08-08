@@ -23,7 +23,7 @@ deliverables:
 
 # Story 25.3: SPIKE — A Framework-Neutral Findings Contract for AI Agents in SDD Workflows
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -689,4 +689,102 @@ Modifications present in those paths belong to a **concurrent session's Story 22
 | Date | Change |
 |---|---|
 | 2026-07-27 | Story created by `create-story` at baseline `40c7ee9`. Nine reconciliations recorded against shipped code and live Sonar data. |
+| 2026-08-07 | `code-review` pass, three layers in parallel (Blind Hunter, Edge Case Hunter, Acceptance Auditor). Scoped by File List; `docs/adrs/README.md` attributed **by hunk** — only the ADR 0023 index line is in scope, the 0020/0021/0022/0024 lines belong to Stories 18.5/18.4/23.5/22.4. All four ACs confirmed substantively met and all nine checklist items discharged by durable content, not merely claimed. The ADR's structural decisions hold; the **evidentiary layer beneath them** does not. 7 decision-needed, 11 patch, 2 deferred, 9 dismissed. See § Review Findings. |
 | 2026-07-28 | `dev-story` pass at session HEAD `06b300c`. Tasks 1–8 complete except owner ratification of ADR 0023. Contract decided: **`AnalysisObservation`**, a named profile of SARIF 2.1.0, parallel to `DiagnosticNotice`, severity read from `impacts[]` and normalized to SARIF's `level` enum. Evidence: 1,466 live Sonar issues + 834 raw Roslyn SARIF results mapped both ways. Seven numbered findings (F1–F7), seven axes named unmeasured. Four of this story's own facts corrected: the gate sites moved (`:388`/`:774`), the `impactSeverities` facet cannot reveal the impacts array (and 14 issues carry two), the work graph has no requirement nodes either, and the ADR number is 0023 not 0021. Suite 2,658 passed / 0 failed / 3 skipped; `GoldenContentFingerprint` unmoved; `spike/findings/` proved byte-inert. |
+
+### Review Findings
+
+<!-- Deliberately an h3. `## Review Findings` is a PARSED section (EpicsParser -> EpicsView.ReviewFindingsHtml
+     -> <h3> on the story page) — this story's own R2. An h2 here would inject the code review into the portal. -->
+
+**Code review 2026-08-07** — three layers in parallel. Scoped by this story's File List per CLAUDE.md § Scoping a
+code review; `docs/adrs/README.md` attributed **by hunk** (only the ADR 0023 index line — the 0020/0021/0022/0024
+lines are Stories 18.5/18.4/23.5/22.4 and are excluded). The two `.sarif` files were verified by property (counts,
+sizes, path leakage), not read line by line. Everything else in commits `c1a6ee5` / `b696485` excluded.
+
+All four ACs are substantively met and all nine of the checklist items above are discharged by real content in the
+durable deliverables. The ADR's *structural* decisions — parallel-not-merged, profile-not-SARIF, labelled
+attachment, revision-first provenance — are sound and well argued. What did not hold up is the **evidentiary layer
+beneath them**, and the number of load-bearing fields a *ratified* contract leaves undefined.
+
+#### Decision needed
+
+- [x] [Review][Decision] **The attachment and sizing corpus double-counts ~819 defects** — § 1.1 measures 834 raw SARIF against Sonar's 819 `external_roslyn:*` imports and calls them reconciled (CA1861 339 vs 338), then §§ 7 and 10.1 **union** both sets with no dedup (`map_to_model.py:250-251`, `measure_channels.py:36`) for N = 2,300 where the distinct population is ~1,481. Inflated: 1,765 (76.7 %), 1,572 (68.3 %), 728 (31.7 %), 535 (23.3 %), the 12,931 / **15,758** edges and the 7.33 / **10.02** means — **including F3, "the single most consequential handoff in this report"** — plus all of § 10.1's sizing (1.49 MB, 201 shards, 8.9 KB index, 3.7 KB median). ADR Context fact 3, Decision 7 and the README entry restate them as measured fact. Riding along: the **2.6× SARIF claim compares indented JSON against minified JSON**; 1,793 B/result is unreproducible from the shipped files (1,455,266 ÷ 834 = **1,745**); "18 of 19 epics" uses the subset-with-data as denominator (§ 7.2 records 19 of **27** epic pages). Compounding in the **opposite** direction: the sized record omits the mandatory `attachment` and `provenance` blocks and carries `rule.name`/`helpUri` = null on all 1,466 Sonar rows (`:148-149`) — the field § 4 calls "the single biggest agent-ergonomics change". Net error unknown. **Options:** (a) re-measure with dedup — but `sonar_p1..3.json` was never committed and `resolved=false` is as-of-now, so that snapshot is unrecoverable; (b) caveat the ADR/report/README and demote the figures to order-of-magnitude; (c) accept and record the limitation.
+- [x] [Review][Decision] **The contract defines no observation identity and no deduplication rule** — the spike measured ~819 same-defect duplicates across its own two providers; § 11 tells 26.7 to build "pluggable normalizers, one shared `AnalysisObservation`"; § 10 recommends running Sonar's MCP server *alongside* the digest. ADR 0023 never uses the word "duplicate", and Decision 4 drops Sonar's `key` as unstable — sound — without putting anything in its place. 26.4 and 26.6 each invent a merge rule or ship every Roslyn defect twice, and no two digests can be compared for new-vs-resolved. Not a legitimate deferral: it is the one thing multi-provider support cannot be built without, and the spike had the data to settle it.
+- [x] [Review][Decision] **`attachment.basis` cannot produce the three-way distinction it exists for** — Decision 5 mandates it so consumers can separate *genuinely unattached* / *never computed* / *attempted and failed*, but **F7's own evidence defeats it**: the deep-git timeout returns `errors=0` **and zero commits**, byte-identical at the cited gate (`progress?.DeepGit?.Commits is { Count: > 0 }`) to deep-git being off. The enum also mixes one *method* value with two *outcome* values, so "ran, mined, matched nothing" is legally expressible two ways; partial success (the 300-commit horizon) has no value; and attachment mined against a different revision than the observations describe — the normal case, since `isStale: true` is expected — has no representation.
+- [x] [Review][Decision] **AC #1's source-agnosticism proof is weaker than the ADR and README claim** — (i) the `_lost` ledger is **hand-written, not derived**: nothing enumerates the provider's key set and subtracts the mapped ones. `from_sonar` makes 8 `lost.append` calls; `from_sarif` makes 4 plus one **unconditional constant** (`:212`) which is what manufactures § 8.3's "No analogue at all | **834**" row — a hard-coded string in a table of measurements. Never counted on the SARIF side: `suppressions[]`, `baselineState`, `rank`, `fingerprints`, `codeFlows`, `logicalLocations`, `region.snippet`, per-location `message`, `rule.fullDescription`; on the Sonar side: `creationDate`/`updateDate`, `status`/`resolution`, `author`, `quickFixAvailable`. So § 8.3's "**The asymmetry is the finding**" is substantially an artifact of the instrument — and it is the sole evidence offered for AC #1. (ii) § 8.1 concedes the two sources are the same analyzer family, exactly what **R3** warned would prove nothing, yet the README entry reads "**genuinely independent** second source class" and the ADR says "disjoint serializations, disjoint severity scales" without noting they are the same analyzers. The qualifying concession stays in the body; the unqualified claim travels.
+- [x] [Review][Decision] **`severity.provider` — the ADR's designated escape hatch — is specified only in Sonar's vocabulary** — Decision 4 defines it as `{softwareQuality, severity}` pairs plus legacy `severity`/`type`; all three are Sonar concepts, and the ADR never states the shape for a non-Sonar producer. The SARIF branch emits an unrelated `{axis: "sarif", level, defaultLevel}` (`:220-221`) the ADR does not describe. Yet the ADR routes the **entire stated collapse cost** through this field ("the single BLOCKER … survives only in `severity.provider`") and § 11 tells 26.6 to read it for the dashboard. Six stories parse a field whose only documented schema is one provider's.
+- [x] [Review][Decision] **BMad-neutrality is asserted in a table cell and specified nowhere** — AC #3 bound it explicitly ("state what the contract does in a repo using Spec Kit, GSD, or no framework at all"). The entire treatment is one cell at report `:469`. Neither report nor ADR contains "Spec Kit", "GSD", "no framework", or any reference to Epics 11–15. Contradicted by the schema too: `basis` is **mandatory and non-nullable**, yet none of its values means "this repo has no planning model" — `unavailable` conflates that with "deep-git was off" — and `epics`/`stories` are BMad vocabulary with no omission rule. NFR8 is the property the spike exists to establish.
+- [x] [Review][Decision] **SARIF `suppressions[]` is never read and the contract never mentions it** — the Sonar side is filtered `resolved=false`; the SARIF side has no equivalent, so a `#pragma warning disable` or `[SuppressMessage]` diagnostic enters the model indistinguishable from an open one and reaches story pages via 26.5. For a record whose stated posture is "a third party's claim about the code, not a verdict the project has accepted", ingesting the developer's explicit *rejection* of that claim is a product decision, not an oversight to patch silently.
+
+#### D1 resolved — re-measured with deduplication, 2026-08-07
+
+Owner chose **re-measure**. Executed by [`spike/findings/remeasure_dedup.py`](../../spike/findings/remeasure_dedup.py),
+which paginates to exhaustion and **refuses to report a corpus it knows is truncated** (the shipped
+`map_to_model.py` capped at 3 pages = 1,500; the live backlog is now **1,755**, so that cap would silently truncate
+today — the deferred self-invalidation finding, confirmed in practice).
+
+**This is a fresh measurement at today's revision, not a reconstruction of 2026-07-28.** `sonar_p1..3.json` was
+never committed and `resolved=false` is an as-of-now query, so the original 1,466-issue snapshot is unrecoverable.
+The raw-SARIF half *is* the committed 2026-07-28 evidence.
+
+**The double-count is confirmed and large.** Matching raw SARIF results against live Sonar issues:
+
+| Dedup key | Overlap | Distinct population | Inflation of the naive union |
+|---|---|---|---|
+| `(rule, path, line)` — exact | 390 | 2,199 | 17.7 % |
+| `(rule, path)` — line-drift tolerant | **810** | **1,779** | **45.5 %** |
+
+The exact key undercounts because the SARIF is 10 days older than the live Sonar data and lines have moved; the
+looser key's **810** reconciles with the report's own 995 `external_roslyn:*` imports and its § 1.1 claim of ~819.
+So the true overlap sits near the upper bound, and `map_to_model.py`'s union inflates by roughly **45 %**, not the
+~35 % first estimated. Applied to the report's own corpus, N = 2,300 corresponds to ~1,481 distinct.
+
+**But the sizing error runs the other way, and the other way wins.** Isolating each correction:
+
+| Corpus | Record | Observations | Whole digest | B/obs | Median shard |
+|---|---|---|---|---|---|
+| union | truncated (as shipped) | 2,589 | 1.26 MB | 511 | 2,822 B |
+| **distinct** | truncated | 2,199 | 1.09 MB | 520 | 2,267 B |
+| union | **full ADR 0023 record** | 2,589 | 2.48 MB | 1,003 | 5,289 B |
+| **distinct** | **full ADR 0023 record** | **2,199** | **2.12 MB** | **1,012** | **4,243 B** |
+
+Adding the mandatory `attachment` and `provenance` blocks and a populated `rule.name`/`helpUri` **doubles** the
+per-observation cost (511 → 1,012 B). Dedup removes ~15 % of rows. **Net: the digest is larger than § 10.1 reports,
+not smaller** — so "net error unknown" resolves as *the truncated-record error dominated the double-count*.
+
+> ⚠ **This partially invalidates ADR 0023 Decision 3's first measured reason for rejecting plain SARIF.**
+> The "**2.6×** the bytes at 1,793 B/result vs 678" comparison is indented JSON against minified JSON.
+> Like for like: the SARIF minifies to **838,725 B = 1,006 B/result** (indentation alone is **42.4 %** of the file),
+> against **1,012 B** for a full ADR-0023 observation. **The ratio is ~1.0×, not 2.6× — the profile is not smaller
+> than SARIF at all.** Decision 3's *other* reasons stand untouched (no planning vocabulary; a `result` carries only
+> a `ruleIndex` into an out-of-line catalogue and so is not self-describing), and they are sufficient on their own —
+> but the byte argument must be withdrawn rather than restated.
+
+Also corrected: `1,793 B/result` is not reproducible from the shipped files — 557,605 + 897,661 = 1,455,266 ÷ 834 =
+**1,745 B**.
+
+#### Patch
+
+- [x] [Review][Patch] Withdraw the 2.6× byte argument from ADR 0023 Decision 3, the options table and the README entry; like-for-like it is ~1.0× (SARIF minified 1,006 B/result vs a full observation 1,012 B). Decision 3's other two reasons stand and are sufficient [docs/adrs/0023-agent-facing-analysis-observation-contract.md:50]
+- [x] [Review][Patch] Correct § 10.1's sizing to the deduplicated, full-record figures (2,199 observations, 2.12 MB whole, 1,012 B/obs, 4,243 B median shard) and state that the shipped figures omitted the mandatory `attachment`/`provenance` blocks [25-3-spike-report.md]
+- [x] [Review][Patch] F3's executive-summary row crosses granularities — 1,765 (epic-attached) paired with 15,758 (story edges); § 7.3 correctly pairs 1,572 ↔ 15,758 and 1,765 ↔ 12,931, so a summary reader computes 8.9× instead of 10.02× [25-3-spike-report.md:25]
+- [x] [Review][Patch] § 7.6's directory breakdown is the wrong population — `src` 264 + `tests` 234 + `web` 37 = **535**, the *epic*-granularity unattached set, under the *story*-granularity 728 sentence; same root cause as the F3 swap [25-3-spike-report.md:358-360]
+- [x] [Review][Patch] § 14 misquotes § 11 to manufacture a hedge § 11 does not contain — § 14 claims the 26.7 note says "proven on two", but § 11 reads "The contract **does generalize** — proven, not asserted". The ADR's Consequences already carry the honest wording; align § 11 to it [25-3-spike-report.md:625, :765]
+- [x] [Review][Patch] `Commands.SerializeDiagnostics` does not resolve — the symbol is `WebviewCommand.SerializeDiagnostics` (class `Commands.cs:78`, member `:565`); appears in ADR Decision 2, the options table, the README entry and report § 2, while § 13.1 boasts "cited **by symbol**". F5's substance is confirmed live at `Commands.cs:593` [docs/adrs/0023-agent-facing-analysis-observation-contract.md:42]
+- [x] [Review][Patch] "`<h3>Review Findings</h3>` on **every** story page" is false — guarded by `if (view.ReviewFindingsHtml.Length > 0)`, and review findings are an epic-end activity, so most story pages lack it. The bolded "every" carries ADR **Decision 1**, the naming decision, and appears identically in report § 3 and the README entry [src/SpecScribe/HtmlRenderAdapter.Epics.cs:680]
+- [x] [Review][Patch] `directory` — one of AC #1's five named keys — is dropped with no record in the ADR (zero occurrences of "director*"); `requirement` got a full options-table rejection row, `directory` needs the same [docs/adrs/0023-agent-facing-analysis-observation-contract.md:110-123]
+- [x] [Review][Patch] `relatedLocationsTruncated` is mandated by Decision 4 but named only in the disposable report, and its semantics (count dropped vs original total) are undefined — guaranteeing an off-by-one at an unstated boundary across 26.4 and 26.6 [docs/adrs/0023-agent-facing-analysis-observation-contract.md:69]
+- [x] [Review][Patch] `tags` is in neither state — report § 8.2 says Sonar tags are "folded into the optional `tags` field", but `observation()` has no `tags` key, `from_sonar` appends them to `_lost`, and the ADR neither defines the field nor lists it among Decision 4's deliberate drops [spike/findings/map_to_model.py:67-83, :140-141]
+- [x] [Review][Patch] `spike/README.md` has no `spike/findings` section — both `spike/vscode` and `spike/graph-engine` carry one naming the durable output and when the evidence may be deleted; 1.46 MB of committed SARIF has nothing on disk recording it is disposable. The inertness *guarantee* holds (`SpecScribe.slnx` matches "spike" zero times); the *index* does not [spike/README.md]
+- [x] [Review][Patch] ADR 0023 schema-completeness pass — fields left undefined for six binding implementers: `confidence` constrained but never enumerated (and its "for epic or story" qualifier names an unreachable case); `entityCount` a single scalar over a **two-granularity** attachment (7.33 epics vs 10.02 stories) and undefined when `basis` is `unavailable`; `severity.normalized` undefined when the provider supplies none; `location.path` declared non-null but null in practice for project-level issues, with no behavior on violation; the repo-relative rule stated for `location.path` and **silently not extended** to `relatedLocations[].path`; the sharded digest's shard key, filename encoding, traversal sanitization, MAX_PATH and case-collision rules all unspecified; `level: none` unreachable from Sonar while a `None` label is mandated; `kind` pinned to `fail` with no disposition for a non-`fail` input; rule identity not namespaced across providers with `provider` an unenumerated free string and no tool version anywhere [docs/adrs/0023-agent-facing-analysis-observation-contract.md]
+- [x] [Review][Patch] An **Accepted** ADR binds a load-bearing decision to a still-**Proposed** one — AC #4 required 0023's ratification on the grounds that "a Proposed ADR is not a contract they can bind to", yet Decision 7 routes Epic 26 to the IR field and the Amendment-surface clause binds that to **ADR 0016, still Proposed**. Same argument, unapplied. (0002/0011/0014 are Accepted; 0020 was Proposed at authoring, ratified 2026-07-29) [docs/adrs/0023-agent-facing-analysis-observation-contract.md:102, :145]
+
+#### Deferred
+
+- [x] [Review][Defer] Throwaway-script robustness — crashes on the **clean-repo / zero-findings path** (five `ZeroDivisionError` sites, `sar_obs[0]` `IndexError`, a bare `next()` `StopIteration`, `median([])`), i.e. the state a 25.4 implementer most needs to see is the one that aborts; no `encoding=` on six `open()` calls (cp1252 mojibake on the host it ran on); unchecked `subprocess.run` return codes making the staleness probe fail **open** (blank "commit(s) BEHIND" on a shallow clone, meaningless count after a force-push); hard-coded 3-page pagination capping input at **1,500** against 1,466 growing ~50/day, so the evidence self-invalidates within a day while reporting the truncated total as complete; a missing intermediate page silently unionised at exit 0; `%20`-only decoding where § 8.4 specifies un-percent-encoding; the `except ValueError` fallback re-emitting the absolute build-machine path — the exact leak Decision 4 forbids — which the "0 paths escaped" check is structurally blind to since it tests only a `..` prefix; `relatedLocations` in the SARIF direction never re-rooted or decoded at all; negative `ruleIndex` → `rules[-1]`; unknown severity silently normalizing to the **quietest** level (fails open, contradicting the fail-closed posture mandated for `isStale`); missing SARIF `level` ignoring `rule.defaultConfiguration.level`, falsifying "lossless on severity" on that path [spike/findings/map_to_model.py] — deferred: `spike/findings/` is disposable, quarantined and tested byte-inert; the contract consequences are captured in the schema-completeness patch and the corpus decision
+- [x] [Review][Defer] § 12's "0023 is the first Accepted ADR since 0015 — 0016–0018 and 0020–0022 all remain Proposed" has aged out — ADR 0020 and 0021 were ratified 2026-07-29 at the Epic 18 retrospective, one day after this report [25-3-spike-report.md] — deferred: correct when written; worth a line at the Epic 25 retro
+
+#### Dismissed (9)
+
+Recorded so a future review does not re-raise them: the 836 `file:///C:/…` URIs in the committed SARIF (`spike/findings/**` is spec-sanctioned evidence); ratification being self-attested (no violation, unverifiable from the diff by construction); stale line-number citations in §§ 3 and 7.1 (CLAUDE.md treats lines as approximate under concurrent work — the cite-by-symbol defects are patched above); the README entry restating the contract in prose (inherits, no independent defect); F1/F6/F7 being quantifications of the story's own R5/R6 rather than discoveries (the body is explicit — "The story's R5 **holds** and is now quantified" — only the § 0 table strips the hedge); self-congratulatory phrasing; the `relatedLocations` fidelity asymmetry (Sonar 6 keys, SARIF 2, no message — contract half patched, script half deferred); the Sonar MCP row stated as fact in the ADR while § 14 marks it unrun (the claims are drawn from published docs and are accurate); assorted crash-on-malformed-input paths folded into the deferred script item.
