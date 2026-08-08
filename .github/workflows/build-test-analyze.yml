@@ -519,14 +519,29 @@ jobs:
       - name: Prove release guards before allocating a tag
         run: node .github/scripts/release/selftest.mjs
       - id: tag
-        name: Allocate the next preview tag without publishing it
+        name: Allocate and reserve the next preview tag
         run: |
           set -euo pipefail
           SHA=$(git rev-parse HEAD)
           EPOCH=$(git log -1 --format=%ct "$SHA")
           bash .github/scripts/release/assert-source-date-epoch.sh "$EPOCH"
           git fetch --tags --force origin
-          TAG=$(git tag -l | node .github/scripts/release/next-preview-tag.mjs --base-file .github/release-base)
+          # Push a lightweight tag immediately to reserve the slot. If two runs pick
+          # the same tag concurrently, only one push succeeds; the other retries with
+          # the next available number. Retry up to 5 times before giving up.
+          for i in $(seq 1 5); do
+            git fetch --tags --force origin
+            TAG=$(git tag -l | node .github/scripts/release/next-preview-tag.mjs --base-file .github/release-base)
+            git tag "$TAG" "$SHA"
+            if git push origin "refs/tags/$TAG"; then
+              break
+            fi
+            git tag -d "$TAG"
+            if [ "$i" = 5 ]; then
+              echo "::error::Could not reserve a preview tag after 5 attempts."
+              exit 1
+            fi
+          done
           VERSION="${TAG#v}"
           printf 'sha=%s\ntag=%s\nversion=%s\nepoch=%s\n' "$SHA" "$TAG" "$VERSION" "$EPOCH" >> "$GITHUB_OUTPUT"
 
@@ -644,14 +659,11 @@ jobs:
           # the three direct-download archives.
           (cd dist && sha256sum *.zip *.tar.gz *.nupkg > ../digests.txt)
           node .github/scripts/release/release-body.mjs --version "$VERSION" --digests digests.txt --repo '${{ github.repository }}' > release-body.md
-          # The candidate remained local until all four verified assets existed. A main run is serialized by
-          # the workflow concurrency group; an unexpected external collision is a forward-only retry.
+          # The tag was reserved in stage-a-prepare. Verify our SHA still owns it, then
+          # promote it to an annotated tag in place so the release object has a message.
           git fetch --tags --force origin
-          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
-            REMOTE_SHA=$(git rev-parse "refs/tags/$TAG^{}")
-            [ "$REMOTE_SHA" = '${{ needs.stage-a-prepare.outputs.sha }}' ] || { echo '::error::Candidate tag was claimed externally; rerun from main for the next preview number.'; exit 1; }
-          else
-            git tag -a "$TAG" '${{ needs.stage-a-prepare.outputs.sha }}' -m "Stage A release $TAG"
-            git push origin "refs/tags/$TAG"
-          fi
+          REMOTE_SHA=$(git rev-parse "refs/tags/$TAG^{}" 2>/dev/null || true)
+          [ "$REMOTE_SHA" = '${{ needs.stage-a-prepare.outputs.sha }}' ] || { echo '::error::Reserved tag is missing or was claimed externally; rerun from main for the next preview number.'; exit 1; }
+          git tag -a -f "$TAG" '${{ needs.stage-a-prepare.outputs.sha }}' -m "Stage A release $TAG"
+          git push --force origin "refs/tags/$TAG"
           gh release create "$TAG" --prerelease --title "$TAG" --notes-file release-body.md --target '${{ needs.stage-a-prepare.outputs.sha }}' dist/*
