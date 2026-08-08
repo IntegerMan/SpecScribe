@@ -693,6 +693,8 @@ jobs:
           git fetch --tags --force origin
           REMOTE_SHA=$(git rev-parse "refs/tags/$TAG^{}" 2>/dev/null || true)
           [ "$REMOTE_SHA" = '${{ needs.stage-a-prepare.outputs.sha }}' ] || { echo '::error::Reserved tag is missing or was claimed externally; rerun from main for the next preview number.'; exit 1; }
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git tag -a -f "$TAG" '${{ needs.stage-a-prepare.outputs.sha }}' -m "Stage A release $TAG"
           git push --force origin "refs/tags/$TAG"
           gh release create "$TAG" --prerelease --title "$TAG" --notes-file release-body.md --target '${{ needs.stage-a-prepare.outputs.sha }}' ./dist/*
