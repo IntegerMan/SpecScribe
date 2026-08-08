@@ -145,8 +145,17 @@ public static class CouplingLayout
 
         // The relaxation is BOUNDED: a node may drift at most `MaxDriftFraction` of the natural spacing away from
         // its evenly-spaced home angle. Because homes are evenly spaced and the bound is symmetric, two adjacent
-        // nodes can close at most 2 x that fraction of the gap between them — so a bound below 0.5 makes collision
-        // IMPOSSIBLE BY CONSTRUCTION rather than merely unlikely.
+        // nodes can close at most 2 x that fraction of the gap between them, so a bound below 0.5 guarantees that a
+        // fixed proportion of the natural ANGULAR spacing always survives.
+        //
+        // ⚠ That guarantee is ANGULAR, and angular is not the same as "markers cannot stack" — an earlier revision
+        // of this comment claimed the stronger thing. Whether two markers overlap is a question about PIXELS, and
+        // pixels are arc length x radius: at this surface's own caps (40 ring markers, RingOuter = 0.46, a 520 px
+        // host) the surviving 30% of a 2π/40 spacing is roughly 10 px of centre-to-centre separation, against
+        // markers the client sizes between 9 and 24 px across. So what the bound actually buys is that drift can
+        // never eat MORE than 70% of the natural spacing; the spacing itself has to be adequate, and it is kept so
+        // by the marker-size cap and the host height rather than by this constant. Measured on the real page after
+        // both were tuned: 4 grazing pairs, worst ratio 0.82. [code review 24.2]
         //
         // This exists because the unbounded version shipped a defect a live browser found and no assertion did:
         // on this repository's own Charts.cs page, the 203 ring-to-ring cross edges dragged the coupled arc into a
@@ -242,10 +251,16 @@ public static class CouplingLayout
     private const double AttractionScale = 0.02;
 
     /// <summary>The furthest a ring node may drift from its evenly-spaced home angle, as a fraction of the natural
-    /// spacing between neighbours. <b>Strictly below 0.5, and that is the whole guarantee</b>: two adjacent nodes
-    /// drifting toward each other can close at most <c>2 x 0.35 = 0.7</c> of the gap between them, so at least 30%
-    /// of the natural spacing always survives and markers cannot stack. Large enough that a genuine cluster still
-    /// visibly leans together; small enough that "ring" remains an honest description of the shape.</summary>
+    /// spacing between neighbours. <b>Strictly below 0.5</b>: two adjacent nodes drifting toward each other can
+    /// close at most <c>2 x 0.35 = 0.7</c> of the gap between them, so at least 30% of the natural ANGULAR spacing
+    /// always survives. Large enough that a genuine cluster still visibly leans together; small enough that "ring"
+    /// remains an honest description of the shape.
+    ///
+    /// <para><b>This does not by itself mean markers cannot stack</b> — an earlier revision said it did. Overlap is
+    /// a pixel question (arc length x radius), and the surviving 30% of the spacing is only ~10 px at this surface's
+    /// own caps, against markers up to 24 px across. Adequate spacing comes from the marker-size cap and the host
+    /// height; this constant's job is to guarantee the relaxation cannot destroy it. See the fuller note at the
+    /// relaxation site. [code review 24.2]</para></summary>
     private const double MaxDriftFraction = 0.35;
 
     /// <summary>Strength → radius. Linear, so the reading "nearer the hub means a stronger couple" is uniform

@@ -2634,10 +2634,31 @@
     root.style.height = "";
     var cleanup = root.__ssRelGraphCleanup;
     if (typeof cleanup === "function") { try { cleanup(); } catch (e) { /* best effort */ } }
+    // The caller pushes the root into the registry SYNCHRONOUSLY, but `Plotly.newPlot` can reject asynchronously and
+    // route here afterwards. Leaving it registered means the next init re-mounts it and pushes a SECOND entry for the
+    // same node, after which `Plotly.Plots.resize` and the cleanup handle each run twice per host. [code review 24.2]
+    var at = relGraphMounts.indexOf(root);
+    if (at !== -1) relGraphMounts.splice(at, 1);
     var panel = relGraphPanelOf(root);
     if (panel && panel.setAttribute) {
       panel.removeAttribute("data-relgraph-mounted");
       panel.setAttribute("data-relgraph-failed", "1");
+      // Re-hide everything the mount revealed. `controls.hidden = false` runs BEFORE `newPlot` and the legend is
+      // revealed straight after it, so an unwind restoring only the host leaves a filter bar and a full eight-row
+      // legend standing over a `display:none` chart host — the exact JS-off defect this story's live pass closed,
+      // re-entering through the failure path instead. Disabling the inputs as well as hiding them is deliberate: a
+      // surviving `change` listener would otherwise call `Plotly.restyle` on a purged div. [code review 24.2]
+      var deadControls = panel.querySelector(".ss-relgraph-controls");
+      if (deadControls) {
+        deadControls.hidden = true;
+        Array.prototype.forEach.call(deadControls.querySelectorAll("[data-relgraph-filter]"), function (input) {
+          input.disabled = true;
+        });
+      }
+      var deadLegend = panel.querySelector(".ss-relgraph-legend");
+      if (deadLegend) deadLegend.hidden = true;
+      var deadNote = panel.querySelector(".ss-relgraph-legend-note");
+      if (deadNote) deadNote.hidden = true;
     }
   }
 
@@ -2657,8 +2678,21 @@
         if (initRelationshipGraph(root)) {
           root.setAttribute("data-relgraph-ready", "1");
           relGraphMounts.push(root);
+        } else {
+          // Decline handling has to mirror the eager path, or a blocked bundle leaves "Initializing graph…" standing
+          // over an empty box for the rest of the boot script's expiry window instead of handing back to the twin
+          // immediately. [code review 24.2]
+          var declined = relGraphPanelOf(root);
+          if (declined && declined.setAttribute) declined.setAttribute("data-relgraph-failed", "1");
         }
-      } catch (err) { /* one bad instance must not down the others; the text twin stands */ }
+      } catch (err) {
+        // A throw can land here AFTER `Plotly.newPlot` already succeeded, exactly as in the eager path — and with an
+        // Insights panel present THIS is the default path for every rich `--deep-git` page, not a corner case, since
+        // the Relationships panel starts `display:none` and every instance defers. A bare catch left the instance
+        // plotted but absent from the purge registry, its window `resize` listener closing over the whole payload,
+        // and the ready flag unset so a later pass mounted a SECOND plot over the same div. [code review 24.2]
+        unwindRelGraph(root);
+      }
     }
     relGraphPending = still;
 
@@ -2730,7 +2764,14 @@
         if (!k || !k.phrase) return "";
         var a = NODES[e.a], b = NODES[e.b];
         if (!a || !b) return "";
-        return k.phrase.replace("{a}", a.p).replace("{b}", b.p);
+        // ONE pass with a FUNCTION replacer, deliberately. Two separate string `replace` calls were wrong twice
+        // over: with a string pattern the REPLACEMENT is still scanned for `$&`, "$`", `$'` and `$$`, so a path
+        // containing `$&` spliced the matched placeholder back into the prose; and since a string pattern replaces
+        // only the FIRST occurrence, a path containing a literal `{b}` was hit by the second call before the real
+        // placeholder, corrupting both endpoints. Paths are author-controlled and `$` and braces are both legal in
+        // them. A single pass never rescans substituted text, and a function replacer does no `$` expansion at all.
+        // [code review 24.2]
+        return k.phrase.replace(/\{([ab])\}/g, function (_m, which) { return which === "a" ? a.p : b.p; });
     }
 
     /* --- Filter state. Owner decision D3: BOTH toggles survive as edge-visibility filters over the ONE solved
@@ -2892,7 +2933,19 @@
       for (var i = 0; i < pts.length; i++) {
         var el = pts[i];
         var n = NODES[drawnNodes[i]];
-        if (!n) continue;
+        if (!n) {
+          // A bare `continue` left a PREVIOUSLY-labelled marker wearing the previous node's accessible name, tooltip
+          // and href — an accessible name on the wrong marker, which is worse than none. Reachable on the same
+          // `pts.length > drawnNodes.length` skew the one-call-restyle comment below was written for, so it is not
+          // hypothetical. Strip the stamp instead of skipping it. [code review 24.2]
+          el.removeAttribute("aria-label");
+          el.removeAttribute("data-tip-html");
+          el.removeAttribute("data-relgraph-href");
+          el.removeAttribute("data-relgraph-index");
+          el.setAttribute("tabindex", "-1");
+          el.setAttribute("role", "presentation");
+          continue;
+        }
         el.setAttribute("role", n.h ? "link" : "img");
         el.setAttribute("tabindex", i === focusIndex ? "0" : "-1");
         // Prose composed SERVER-side, so the accessible name, the tooltip and the twin's row are one string in one
@@ -2968,17 +3021,32 @@
       else if (ev.key === "Home") { ev.preventDefault(); focusAt(0); }
       else if (ev.key === "End") { ev.preventDefault(); focusAt(-1); }
       else if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); activate(ev.currentTarget); }
-      else if (ev.key === "Escape") { ev.preventDefault(); root.blur(); hideTip(); }
+      // `ev.currentTarget`, not `root`: the focused element is the `path.point` marker. `root` carries no tabindex
+      // and is never `document.activeElement`, so `root.blur()` was a no-op and Escape only hid the tooltip while
+      // leaving focus sitting on the marker. [code review 24.2]
+      else if (ev.key === "Escape") { ev.preventDefault(); ev.currentTarget.blur(); hideTip(); }
     }
 
     /* --- The two filters. They RESTYLE — they never re-plot and never re-lay-out. Positions are data; a filter
            changes which of them are drawn, not what they are (ADR 0030 §4). */
+
+    /* Guards the a11y layer across a MULTI-CALL restyle. The node trace's own geometry and marker arrays were
+       already folded into one call (see below), but `drawnEdges` is assigned before BOTH calls while the midpoint
+       trace is only updated by the SECOND — so the afterplot fired by the first mapped the new edge list onto the
+       old midpoint DOM. It self-corrected on the next afterplot, which is precisely why it survived review: the
+       settled state is right and only the window is wrong. Reordering the two calls would just move the window from
+       the edges to the nodes, so the fix is to skip the reapply while a restyle sequence is in flight and run it
+       once when the whole sequence has landed. [code review 24.2] */
+    var restyling = false;
+
     function applyFilters() {
       var eg = edgeCoords();
       var mg = midpoints();
       var ng = nodeGeom();
       drawnNodes = ng.members;
       drawnEdges = mg.members;
+      restyling = true;
+      try {
       // The NODE trace's geometry and its marker arrays go in ONE call. Splitting them left a window in which the
       // trace held 40 positions and 35 marker entries, and `plotly_afterplot` fires inside that window — so the
       // a11y layer could stamp labels against a DOM that had not caught up, mapping a node's accessible name onto
@@ -2993,9 +3061,21 @@
       for (var i = 0; i < STYLES.length; i++) { xs.push(eg.xs[i]); ys.push(eg.ys[i]); idx.push(i); }
       xs.push(mg.x); ys.push(mg.y); idx.push(STYLES.length);
       Plotly.restyle(root, { x: xs, y: ys }, idx);
+      } finally {
+        // Cleared in a `finally` so a throw from either restyle cannot wedge the layer off permanently.
+        restyling = false;
+      }
+      applyA11yLayer();
       announce(drawnNodes.length + " items and " + drawnEdges.length + " connections shown");
     }
 
+    // Every trace above was built against the INITIAL `filters` state (both off). If the browser restores a checked
+    // box — a Firefox reload, or a back/forward navigation in either engine — seeding `filters` from `input.checked`
+    // silently desynchronises the state from the geometry already built: the box reads checked while no epic hub is
+    // drawn, the ready announcement reports the unfiltered count, and the reader has to toggle TWICE to recover
+    // (the first click sets the flag back to false and correctly hides what was never shown). Track the divergence
+    // and reconcile once after the plot lands. [code review 24.2]
+    var seededDirty = false;
     if (controls) {
       // Revealed only NOW, because both filters need script: the server ships the bar [hidden] precisely so a
       // JS-off, webview, SPA or engine-blocked reader never sees two checkboxes that do nothing. Caught in the live
@@ -3006,6 +3086,7 @@
       Array.prototype.forEach.call(controls.querySelectorAll("[data-relgraph-filter]"), function (input) {
         var key = input.getAttribute("data-relgraph-filter");
         filters[key] = !!input.checked;
+        if (filters[key]) seededDirty = true;
         input.addEventListener("change", function () {
           filters[key] = !!input.checked;
           applyFilters();
@@ -3034,8 +3115,12 @@
             a host-driven relayout, a bare `Plotly.react`) — which is what "the layer survives" has to mean;
          2. Plotly resolves its own promises off an animation frame, so awaiting one never settles in a
             non-compositing tab. Measured in the 24.6 spike, not assumed. */
-    if (root.on) root.on("plotly_afterplot", function () { applyA11yLayer(); });
+    if (root.on) root.on("plotly_afterplot", function () { if (!restyling) applyA11yLayer(); });
     applyA11yLayer();
+
+    // Reconcile browser-restored checkbox state with the geometry (see `seededDirty` above). One restyle, only when
+    // the two actually diverged, so the common cold-load path is untouched. [code review 24.2]
+    if (seededDirty) applyFilters();
 
     // Already-mounted hosts whose container later changes size. `responsive: true` refits on a WINDOW resize only,
     // so a CSS-only reveal (switching tabs) leaves the plot at whatever width it was drawn with.

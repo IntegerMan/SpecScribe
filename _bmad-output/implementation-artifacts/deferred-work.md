@@ -1579,3 +1579,9 @@ Baseline SonarCloud triage of the whole codebase, performed rule-first against a
 - source_spec: `24-1-directional-coupling-metric-foundation.md`
   summary: A default min-support floor of 2 can silently empty every coupling surface on a short `--deep-git` window, with nothing in the rendered site indicating that a threshold was applied or what it is. The test churn is the tell: an existing single-couple assertion became `Assert.Empty`, the caps test had to pass `minSupport: 1` to observe caps at all, and `SiteGeneratorCodeInsightsTests` needed an extra commit to keep its scenario alive. Users just see "No significant change coupling detected." The floor is documented thoroughly in code and nowhere in the product.
   evidence: Blind Hunter, code review 2026-08-07. Product decision.
+
+## Deferred from: code review of 24-2-per-file-ego-coupling-graph (2026-08-07)
+
+- source_spec: `24-2-per-file-ego-coupling-graph.md`
+  summary: Lift reaches the code page's sr-only text twin only through a `title` attribute on a non-interactive `<li>`, which screen readers announce unreliably. The consequence is an ADR 0013 §2 completeness gap with an unusual shape: a sighted mouse user can read lift from BOTH the chart's hover tooltip and the twin's hover title, while an assistive-technology user may get it from neither. The in-code comment shows the placement is deliberate and predates this story (Story 24.1 chose it so that spending sr-only reading time on lift would not bury the confidence the row is actually about), so the right fix is a decision about where the specialist's number belongs across every coupling surface, not a drive-by change inside a rendering story.
+  evidence: Acceptance Auditor B (ADR 0013 §2 channel-by-channel twin audit), code review 2026-08-07. Pre-existing, inherited from Story 24.1.
