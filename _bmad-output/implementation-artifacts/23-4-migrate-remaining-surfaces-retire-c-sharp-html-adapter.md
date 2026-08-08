@@ -412,6 +412,34 @@ retirement condition._
   - [x] ✅ **Stated plainly: NOTHING was deleted.** Survived and still in use — `HtmlRenderAdapter.Render` (page composition), `RenderNavMarkup`, `RenderWayfinding`, `RenderBreadcrumb`, `WriteOutput`'s HTML writes, and the whole `SpaDelivery.Extract*` family (now the proof oracle rather than the IR's producer). **Added** — `SiteGenerator.WritePage`, `CapturedPageView`, `RegionCompositionDeltas`, `RegionParityDelta`, `SpaDelivery.MainLandmark`. **Changed** — `CapturedRegions` composes instead of slicing; `Degraded` computed structurally. Say plainly which C# symbols were deleted and which survived. "Retired the HtmlRenderAdapter" is not
         a finding; a list is.
 
+### Review Findings
+
+⚠️ **PARTIAL REVIEW, 2026-08-08 — do not read as a clean review.** All five adversarial layers (Blind Hunter
+×2, Edge Case Hunter ×2, Acceptance Auditor) terminated on an account session limit before returning any
+findings. The three items below are the orchestrating session's own reading only; whole areas of this story —
+the 25 templater migrations, the harness widening, and the AC audit — were **not reviewed by any layer**.
+Full record, scope statement and the five resumable reviewer prompts:
+[`23-4-code-review-2026-08-08.md`](23-4-code-review-2026-08-08.md).
+
+Scoped by this story's File List over `32fd282..a8c97f3`, sibling hunks (Stories 22.4, 24.1, 24.2, 8.9 in
+`SiteGenerator.cs` / `SpaDelivery.cs` / `DeepAnalyticsTemplater.cs` / `CodeFileTemplater.cs`) excluded by
+attribution. Generated artefacts (`ir-content.css`, `ir-content.manifest.json`, `measurements/*.json`)
+excluded as machine-derived; their derivation is in scope. Build at review time: **0 errors, 0 warnings**.
+
+- [ ] [Review][Patch] `splitContentRegion` cuts at the FIRST `</main>` while nothing asserts there is only one — a stray closer relocates the rest of the page body OUTSIDE the `<main>` landmark via `trailingHtml` [web/ir/adapter.ts:260]. The C# invariant test counts `<main` openers only and never counts closers [tests/SpecScribe.Tests/SiteGeneratorSpaTests.cs:948]. Fix at the emitter — add `Assert.Equal(1, CountOccurrences(html, "</main>"))` — NOT by switching the consumer to `lastIndexOf`, which would corrupt the `trailingHtml` case this story exists to support.
+- [ ] [Review][Patch] `enforce()` throws before its `console.warn` loop, so any fatal contract violation silently discards every accompanying warning — the build fails with one message and none of the context explaining it [web/ir/contracts.ts:87].
+- [x] [Review][Defer] `bodyStart` scans for `<div class="breadcrumb"` from index 0, so a breadcrumb-classed div inside the nav would reclassify nav content as wayfinding [web/ir/adapter.ts:268] — deferred, pre-existing structural fragility inherited from Story 22.4's split rule; not currently reachable and the C# side mirrors the identical logic.
+
+**Considered and not reported:** `dashboardContract`'s early return before the fatal ADR 0013 twin check when
+`needsHierarchyEngine` is false [web/ir/contracts.ts:50] is owner decision **D6** — accepted risk, documented
+in place. `resolveFamily`'s `pass-through` fallback [web/ir/families.ts:137] is guarded by a completeness gate
+asserting the real manifest leaves it empty, which is the correct shape.
+
+**Superseded at HEAD, noted so a later reader does not chase them:** Story 23.6 deleted `WriteOutput` and
+`_spaCapture`, so this story's largest hazard — drift between two parallel captures across six eviction sites
+— no longer exists; and commit `70b72ab` removed `GoldenIrFingerprint`, this story's entire recorded answer to
+AC #5, leaving AC #5 satisfied in the record and **not in the tree**.
+
 ## Dev Notes
 
 ### Owner decisions locked at create-story 2026-07-27 (do not re-litigate)

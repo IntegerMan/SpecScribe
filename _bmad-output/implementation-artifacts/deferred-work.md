@@ -1732,3 +1732,15 @@ than a defect repair. Every one was measured at baseline `e8a689d`, not inferred
   code/metadata/pull-requests, write on checks/PR comments for decoration) and the red flags (**any** write
   access to code, actions, or secrets) are now written into `docs/SonarCloudSetup.md` § Security notes.
   evidence: Story 17.2 Task 8, both API routes attempted and refused.
+
+## Deferred from: code review of 23-4 (2026-08-08)
+
+- source_spec: `23-4-migrate-remaining-surfaces-retire-c-sharp-html-adapter.md`
+  summary: **`splitContentRegion`'s `bodyStart` scans for `<div class="breadcrumb"` from index 0**
+  ([web/ir/adapter.ts:268](../../web/ir/adapter.ts)), so a breadcrumb-classed div appearing inside the NAV —
+  before the real wayfinding band — would become the body boundary and silently reclassify nav markup as
+  wayfinding. Not currently reachable: no nav shape emits that class. Not caught by any gate either, because
+  the C#-side invariant test mirrors the identical scan-from-zero logic, so both sides would agree while both
+  were wrong. Pre-existing structural fragility inherited from Story 22.4's split rule, not introduced by 23.4.
+  evidence: Code review of Story 23.4 (PARTIAL — five adversarial layers died on a session limit; see
+  `23-4-code-review-2026-08-08.md`).
