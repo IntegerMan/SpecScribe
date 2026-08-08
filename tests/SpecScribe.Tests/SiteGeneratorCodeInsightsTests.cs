@@ -331,6 +331,18 @@ public class SiteGeneratorCodeInsightsTests : IDisposable
         // Every coupled node's sentence carries the metric as WORDS and numbers, never as a colour.
         Assert.Contains("changed together", island);
         Assert.Contains("confidence", island);
+
+        // EDGES. The test asserted none of this despite its name, so a payload emitting an empty edge array would
+        // have passed it — `"w":` and `"t":` are both NODE fields, and they were the only things standing between
+        // this test and a vacuous pass. Since this is one third of ADR 0013 §6's replacement for the retired
+        // fingerprint, a hole here means edge regressions ship un-netted. [code review 24.2]
+        Assert.Contains("\"edges\":[", island);
+        Assert.Contains("\"a\":", island);                        // an edge's source ordinal
+        Assert.Contains("\"b\":", island);                        // an edge's target ordinal
+        Assert.Contains("\"e\":\"cite\"", island);                // a citation spoke was classified and emitted
+        Assert.Contains("\"e\":\"couple\"", island);              // a coupling spoke likewise
+        Assert.Contains("\"s\":", island);                        // every edge resolves to a server-side style class
+
         // No coordinate degenerated. An unguarded division upstream would reach the payload as literal text.
         Assert.DoesNotContain("NaN", island);
         Assert.DoesNotContain("Infinity", island);
@@ -406,6 +418,28 @@ public class SiteGeneratorCodeInsightsTests : IDisposable
         // NON-COLOUR: every distinction the chart draws with a dash, a shape or a width band is also a WORD here.
         // This is the property the SVG's retirement puts the most weight on, and the one that a chart-shaped
         // assertion could never have checked.
+        //
+        // The line below used to be the WHOLE of this section, and it is a NAVIGABILITY check — it proves a link
+        // resolves, not that a drawn distinction has words. Neither `cross-boundary` nor `process coupling` — the
+        // two phrases this story added precisely because the chart could draw facts the twin could not say — was
+        // asserted anywhere in the replacement set. Now the implication is checked directly against the payload the
+        // chart actually renders from: whatever the style table encodes as a DASH must appear here as words. Stated
+        // as an implication rather than a flat assertion because a fixture whose one pair is same-directory code
+        // coupling legitimately draws neither, and a test that demanded both would be pinning the fixture rather
+        // than the contract. [code review 24.2]
+        var island = Between(html, "<script type=\"application/json\" id=\"relgraph-", "</script>");
+        Assert.NotEqual("", island);
+        if (island.Contains("-xb-", StringComparison.Ordinal))
+        {
+            Assert.Contains("cross-boundary", twin);
+        }
+
+        if (island.Contains("couple-proc-", StringComparison.Ordinal))
+        {
+            Assert.Contains("process coupling", twin);
+        }
+
+        // NAVIGABLE, restated where it belongs: the coupled file's row is a real resolving anchor to its own page.
         Assert.Contains("code/src/Lib/Sibling.cs.html", twin);
     }
 

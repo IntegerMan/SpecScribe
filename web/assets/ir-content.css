@@ -1415,7 +1415,7 @@
   grid-column: 1 / -1;
 }
 
-.ir-content .code-relationships {
+.ir-content .chart-panel.code-relationships {
   padding: 1.1rem 1.2rem;
   border: 1px solid var(--border);
   border-left: 3px solid var(--gold);

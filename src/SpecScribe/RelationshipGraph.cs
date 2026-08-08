@@ -92,12 +92,26 @@ public static class RelationshipGraph
         "<script>(function(){var r=document.documentElement;r.setAttribute('data-ss-relgraph-boot','1');"
         + $"setTimeout(function(){{r.removeAttribute('data-ss-relgraph-boot');}},{BootTimeoutMs});}})();</script>\n";
 
+    /// <summary>The host div's closing signature — <see cref="HostMarker"/> as the LAST attribute, immediately before
+    /// the tag closes. This, not the bare marker, is what <see cref="ContainsHost"/> matches.
+    ///
+    /// <para><b>Why the bare marker was not safe.</b> <c>data-relgraph</c> is a PREFIX of seven sibling attributes
+    /// (<c>-panel</c>, <c>-filter</c>, <c>-reveal</c>, <c>-mounted</c>, <c>-failed</c>, <c>-href</c>, <c>-ready</c>),
+    /// and — the reachable half — a code page embeds the file's own text through <c>BuildSource</c>, so every page
+    /// rendering this component's own source, or <c>specscribe.js</c>, or <c>specscribe.css</c>, contained the
+    /// literal string and claimed a host it did not have. That page would then pull the 1.2 MB engine bundle and
+    /// emit the boot handshake for a chart that does not exist, against the byte-identical contract
+    /// <see cref="AssetManifest"/> states. Escaping is what makes the narrow match sound: <c>BuildSource</c> runs
+    /// source text through <c>PathUtil.Html</c>, so an embedded <c>&gt;</c> arrives as <c>&amp;gt;</c> and cannot
+    /// complete this signature. [code review 24.2]</para></summary>
+    internal const string HostSignature = HostMarker + ">";
+
     /// <summary>Whether a rendered body carries a relationship-graph host. The producer of an
     /// <see cref="AssetManifest"/> calls this over the FINISHED body, mirroring
     /// <see cref="HierarchyExplorer.ContainsHost"/> and <c>Mermaid.ContainsBlock</c> — a flag derived from the page
     /// cannot disagree with the page.</summary>
     public static bool ContainsHost(string bodyHtml) =>
-        bodyHtml.Contains(HostMarker, StringComparison.Ordinal);
+        bodyHtml.Contains(HostSignature, StringComparison.Ordinal);
 
     // -----------------------------------------------------------------------------------------------------------
     // Model

@@ -147,7 +147,10 @@ public class CouplingLayoutTests
     }
 
     [Fact]
-    public void Solve_AngularDriftIsBoundedSoMarkersCannotStack()
+    // Renamed from Solve_AngularDriftIsBoundedSoMarkersCannotStack: the assertion below is purely angular, so it
+    // proved the arithmetic clause and not the claim its old name made. Whether markers stack is a PIXEL question
+    // (arc length x radius) that this test does not and cannot see. [code review 24.2]
+    public void Solve_AngularDriftStaysWithinItsBoundSoRelaxationCannotDestroyRingSpacing()
     {
         // THE COLLISION GUARANTEE, and it is the reason the relaxation is bounded rather than free. An unbounded
         // version shipped and a live browser found it: on this repository's own Charts.cs page the 203 ring-to-ring

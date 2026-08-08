@@ -1822,8 +1822,15 @@ pre.code-file code[class*="language-"] {
    hand-written <section>, so the card keeps its gold left rule and parchment field while the heading, the framing
    sentence and the caveat come from the ONE Story 10.2 frame instead of bespoke markup. The old
    `.code-relationships > h2` and `.code-relationships-note` rules went with the markup they styled — the frame's
-   own `.chart-frame-head h3` / `.chart-frame-why` / `.chart-frame-note` carry those now. */
-.code-relationships {
+   own `.chart-frame-head h3` / `.chart-frame-why` / `.chart-frame-note` carry those now.
+
+   ⚠ The compound selector is LOAD-BEARING, not stylistic. As a bare `.code-relationships` this rule had the same
+   (0,1,0) specificity as `.chart-panel`, which is defined LATER in this file — so the later rule won every
+   conflicting declaration, its `border` shorthand reset `border-left`, and `background: var(--warm-white)`
+   replaced the parchment. Every declaration here was dead and the comment above claimed the opposite. Qualifying
+   with `.chart-panel` takes it to (0,2,0) so it wins regardless of source order, the same way
+   `.chart-panel.review-findings` and `.chart-panel.change-log` further down already do. [code review 24.2] */
+.chart-panel.code-relationships {
   padding: 1.1rem 1.2rem;
   border: 1px solid var(--border);
   border-left: 3px solid var(--gold);

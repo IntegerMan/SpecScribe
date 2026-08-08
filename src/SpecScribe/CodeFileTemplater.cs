@@ -422,8 +422,6 @@ public static class CodeFileTemplater
             refEpics.Add(epic is { } e ? (e.Number, e.Title) : null);
         }
 
-        var hasRelated = related.Count > 0;
-
         var twin = BuildRelationshipsTwin(nodes, refEpics, related, storyRelatedEdges, relatedRelatedEdges);
         var model = RelationshipGraphModel(
             repoRelativePath, outputRelativePath, nodes, refEpics, related,
@@ -751,8 +749,55 @@ public static class CodeFileTemplater
     /// <para>Story 24.2 renamed this from <c>RefGraphGroupSlug</c> and it now carries MORE weight than it did: the
     /// retired pure-CSS toggles keyed their show/hide off shared checkbox CLASSES and needed the slug only for label
     /// semantics, whereas the component resolves its island BY id. A collision is now a mis-rendered chart, not a
-    /// mis-labelled checkbox.</para></summary>
-    private static string RelGraphDomSlug(string outputRelativePath) => Slugify(outputRelativePath);
+    /// mis-labelled checkbox.</para>
+    ///
+    /// <para><b>And that stake is why the bare slug is not enough.</b> <see cref="SoftSlugify"/>'s <c>x2f</c> escape
+    /// guards path SEPARATORS only; every other non-alphanumeric run still collapses to one hyphen and every letter
+    /// is lowercased, so <c>src/a-b.cs</c>, <c>src/a_b.cs</c> and (on a case-sensitive filesystem) <c>src/A-B.cs</c>
+    /// all produce the same token. Under the very SPA/webview consolidation this slug exists to defend against, the
+    /// second graph would resolve the FIRST file's island and silently draw the wrong file's relationships. A
+    /// stable fingerprint of the original path is appended so the id is collision-free regardless of which
+    /// characters the slug flattened. [code review 24.2]</para></summary>
+    private static string RelGraphDomSlug(string outputRelativePath) =>
+        Slugify(outputRelativePath) + "-" + PathFingerprint(outputRelativePath);
+
+    /// <summary>A short, stable, case- and separator-sensitive fingerprint of a path, used to disambiguate DOM ids
+    /// whose slug is lossy. FNV-1a over the ordinal UTF-16 code units, rendered base-36.
+    ///
+    /// <para><b>Deliberately not <see cref="string.GetHashCode()"/>:</b> .NET randomizes string hashing per process,
+    /// so ids would differ between two generations of the same site and every content-drift gate would go red on
+    /// nothing. This is the same determinism requirement ADR 0030 §3 imposes on the layout solver, for the same
+    /// reason.</para></summary>
+    internal static string PathFingerprint(string outputRelativePath)
+    {
+        unchecked
+        {
+            const uint offsetBasis = 2166136261;
+            const uint prime = 16777619;
+            var hash = offsetBasis;
+            foreach (var c in outputRelativePath)
+            {
+                hash ^= c;
+                hash *= prime;
+            }
+
+            var value = hash;
+            if (value == 0)
+            {
+                return "0";
+            }
+
+            const string alphabet = "0123456789abcdefghijklmnopqrstuvwxyz";
+            var sb = new StringBuilder(7);
+            while (value > 0)
+            {
+                sb.Insert(0, alphabet[(int)(value % 36)]);
+                value /= 36;
+            }
+
+            return sb.ToString();
+        }
+    }
 
     /// <summary>A per-page-unique radio-group name for the view tabs, derived from the page's output-relative path.
     /// Uniqueness matters when several code pages are captured into one document (SPA/webview consolidation): a

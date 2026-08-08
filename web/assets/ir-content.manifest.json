@@ -1239,7 +1239,7 @@
       "carried": true
     },
     {
-      "selector": ".code-relationships",
+      "selector": ".chart-panel.code-relationships",
       "carried": true
     },
     {

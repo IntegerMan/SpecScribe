@@ -1611,3 +1611,9 @@ Baseline SonarCloud triage of the whole codebase, performed rule-first against a
 - source_spec: `16-1-release-and-distribution-packaging-spike.md`
   summary: First-ever-publish ID claiming versus trusted-publishing policy creation is unaddressed, so the owner-action ordering in report § 8 (reserve ID → confirm rollout → configure policy) may be unexecutable as written. § 5.2 records the gradual rollout and the 7-day "temporarily active" window for private repos (dismissed as inapplicable to a public repo) but never says which identity claims an ID that has never been published, nor whether a policy can be created before the package exists on the registry.
   evidence: Edge Case Hunter, code review 2026-08-07. Resolves at Story 16.4 wiring time, or sooner if the owner reserves the IDs first.
+
+## Deferred from: code review of 24-2-per-file-ego-coupling-graph (2026-08-07)
+
+- source_spec: `24-2-per-file-ego-coupling-graph.md`
+  summary: Lift reaches the code page's sr-only text twin only through a `title` attribute on a non-interactive `<li>`, which screen readers announce unreliably. The consequence is an ADR 0013 §2 completeness gap with an unusual shape: a sighted mouse user can read lift from BOTH the chart's hover tooltip and the twin's hover title, while an assistive-technology user may get it from neither. The in-code comment shows the placement is deliberate and predates this story (Story 24.1 chose it so that spending sr-only reading time on lift would not bury the confidence the row is actually about), so the right fix is a decision about where the specialist's number belongs across every coupling surface, not a drive-by change inside a rendering story.
+  evidence: Acceptance Auditor B (ADR 0013 §2 channel-by-channel twin audit), code review 2026-08-07. Pre-existing, inherited from Story 24.1.
