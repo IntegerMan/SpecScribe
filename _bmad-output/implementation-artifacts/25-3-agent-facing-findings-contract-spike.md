@@ -717,8 +717,57 @@ beneath them**, and the number of load-bearing fields a *ratified* contract leav
 - [ ] [Review][Decision] **BMad-neutrality is asserted in a table cell and specified nowhere** — AC #3 bound it explicitly ("state what the contract does in a repo using Spec Kit, GSD, or no framework at all"). The entire treatment is one cell at report `:469`. Neither report nor ADR contains "Spec Kit", "GSD", "no framework", or any reference to Epics 11–15. Contradicted by the schema too: `basis` is **mandatory and non-nullable**, yet none of its values means "this repo has no planning model" — `unavailable` conflates that with "deep-git was off" — and `epics`/`stories` are BMad vocabulary with no omission rule. NFR8 is the property the spike exists to establish.
 - [ ] [Review][Decision] **SARIF `suppressions[]` is never read and the contract never mentions it** — the Sonar side is filtered `resolved=false`; the SARIF side has no equivalent, so a `#pragma warning disable` or `[SuppressMessage]` diagnostic enters the model indistinguishable from an open one and reaches story pages via 26.5. For a record whose stated posture is "a third party's claim about the code, not a verdict the project has accepted", ingesting the developer's explicit *rejection* of that claim is a product decision, not an oversight to patch silently.
 
+#### D1 resolved — re-measured with deduplication, 2026-08-07
+
+Owner chose **re-measure**. Executed by [`spike/findings/remeasure_dedup.py`](../../spike/findings/remeasure_dedup.py),
+which paginates to exhaustion and **refuses to report a corpus it knows is truncated** (the shipped
+`map_to_model.py` capped at 3 pages = 1,500; the live backlog is now **1,755**, so that cap would silently truncate
+today — the deferred self-invalidation finding, confirmed in practice).
+
+**This is a fresh measurement at today's revision, not a reconstruction of 2026-07-28.** `sonar_p1..3.json` was
+never committed and `resolved=false` is an as-of-now query, so the original 1,466-issue snapshot is unrecoverable.
+The raw-SARIF half *is* the committed 2026-07-28 evidence.
+
+**The double-count is confirmed and large.** Matching raw SARIF results against live Sonar issues:
+
+| Dedup key | Overlap | Distinct population | Inflation of the naive union |
+|---|---|---|---|
+| `(rule, path, line)` — exact | 390 | 2,199 | 17.7 % |
+| `(rule, path)` — line-drift tolerant | **810** | **1,779** | **45.5 %** |
+
+The exact key undercounts because the SARIF is 10 days older than the live Sonar data and lines have moved; the
+looser key's **810** reconciles with the report's own 995 `external_roslyn:*` imports and its § 1.1 claim of ~819.
+So the true overlap sits near the upper bound, and `map_to_model.py`'s union inflates by roughly **45 %**, not the
+~35 % first estimated. Applied to the report's own corpus, N = 2,300 corresponds to ~1,481 distinct.
+
+**But the sizing error runs the other way, and the other way wins.** Isolating each correction:
+
+| Corpus | Record | Observations | Whole digest | B/obs | Median shard |
+|---|---|---|---|---|---|
+| union | truncated (as shipped) | 2,589 | 1.26 MB | 511 | 2,822 B |
+| **distinct** | truncated | 2,199 | 1.09 MB | 520 | 2,267 B |
+| union | **full ADR 0023 record** | 2,589 | 2.48 MB | 1,003 | 5,289 B |
+| **distinct** | **full ADR 0023 record** | **2,199** | **2.12 MB** | **1,012** | **4,243 B** |
+
+Adding the mandatory `attachment` and `provenance` blocks and a populated `rule.name`/`helpUri` **doubles** the
+per-observation cost (511 → 1,012 B). Dedup removes ~15 % of rows. **Net: the digest is larger than § 10.1 reports,
+not smaller** — so "net error unknown" resolves as *the truncated-record error dominated the double-count*.
+
+> ⚠ **This partially invalidates ADR 0023 Decision 3's first measured reason for rejecting plain SARIF.**
+> The "**2.6×** the bytes at 1,793 B/result vs 678" comparison is indented JSON against minified JSON.
+> Like for like: the SARIF minifies to **838,725 B = 1,006 B/result** (indentation alone is **42.4 %** of the file),
+> against **1,012 B** for a full ADR-0023 observation. **The ratio is ~1.0×, not 2.6× — the profile is not smaller
+> than SARIF at all.** Decision 3's *other* reasons stand untouched (no planning vocabulary; a `result` carries only
+> a `ruleIndex` into an out-of-line catalogue and so is not self-describing), and they are sufficient on their own —
+> but the byte argument must be withdrawn rather than restated.
+
+Also corrected: `1,793 B/result` is not reproducible from the shipped files — 557,605 + 897,661 = 1,455,266 ÷ 834 =
+**1,745 B**.
+
 #### Patch
 
+- [ ] [Review][Patch] Withdraw the 2.6× byte argument from ADR 0023 Decision 3, the options table and the README entry; like-for-like it is ~1.0× (SARIF minified 1,006 B/result vs a full observation 1,012 B). Decision 3's other two reasons stand and are sufficient [docs/adrs/0023-agent-facing-analysis-observation-contract.md:50]
+- [ ] [Review][Patch] Correct § 10.1's sizing to the deduplicated, full-record figures (2,199 observations, 2.12 MB whole, 1,012 B/obs, 4,243 B median shard) and state that the shipped figures omitted the mandatory `attachment`/`provenance` blocks [25-3-spike-report.md]
 - [ ] [Review][Patch] F3's executive-summary row crosses granularities — 1,765 (epic-attached) paired with 15,758 (story edges); § 7.3 correctly pairs 1,572 ↔ 15,758 and 1,765 ↔ 12,931, so a summary reader computes 8.9× instead of 10.02× [25-3-spike-report.md:25]
 - [ ] [Review][Patch] § 7.6's directory breakdown is the wrong population — `src` 264 + `tests` 234 + `web` 37 = **535**, the *epic*-granularity unattached set, under the *story*-granularity 728 sentence; same root cause as the F3 swap [25-3-spike-report.md:358-360]
 - [ ] [Review][Patch] § 14 misquotes § 11 to manufacture a hedge § 11 does not contain — § 14 claims the 26.7 note says "proven on two", but § 11 reads "The contract **does generalize** — proven, not asserted". The ADR's Consequences already carry the honest wording; align § 11 to it [25-3-spike-report.md:625, :765]
