@@ -143,6 +143,7 @@ public class StylesheetTests
         // Innermost rule blocks: this stylesheet nests at-rules one level deep, so a body containing no
         // braces is exactly one rule, prelude included (possibly preceded by its @media prelude fragment).
         var offenders = new List<string>();
+        var inspected = 0;
         foreach (var rule in Regex.Matches(css, @"([^{}]+)\{([^{}]*)\}", RegexOptions.Singleline).Cast<Match>())
         {
             var prelude = rule.Groups[1].Value;
@@ -152,17 +153,44 @@ public class StylesheetTests
                 continue;
             }
 
-            foreach (var decl in Regex.Matches(rule.Groups[2].Value, @"background(?:-color)?\s*:\s*([^;}]+)").Cast<Match>())
+            inspected++;
+
+            // ⚠️ EVERY colour-bearing property, not `background` alone. The mechanism this guard exists to
+            // enforce — "the token bridge structurally cannot carry a literal" — is a property of the BRIDGE,
+            // not of `background`. A literal `color:` or `border-color:` on `.status-badge.<stage>` is the
+            // identical failure: the Vue counterpart binds a token, the portal binds a hex, and the two badge
+            // families render as visibly different objects with every gate green. That is precisely how the
+            // border half of this divergence survived the fill fix. [Story 23.2 review 2026-08-07]
+            const string colourProps = @"(background(?:-color)?|border(?:-[a-z]+)?-color|border|color|outline-color)";
+            foreach (var decl in Regex.Matches(rule.Groups[2].Value, colourProps + @"\s*:\s*([^;}]+)").Cast<Match>())
             {
+                var property = decl.Groups[1].Value;
+                var value = decl.Groups[2].Value;
+
+                // ⚠️ EVERY notation CSS permits, not 6-digit hex alone — the same widening the sibling guard
+                // `DesignSystem_NeverStatesATokenValueAsALiteral` received on this pass. `#fff`, `#rrggbbaa`,
+                // `rgb()`, `hsl()` and `oklch()` are all legal ways to inline a colour the bridge cannot carry.
                 // A gradient may legitimately name several colours; what matters is that none is a literal.
-                if (decl.Groups[1].Value.Contains('#'))
+                if (Regex.IsMatch(value, @"#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab|lab|lch)\("))
                 {
-                    offenders.Add($"{prelude.Trim().ReplaceLineEndings(" ")} => background: {decl.Groups[1].Value.Trim()}");
+                    offenders.Add($"{prelude.Trim().ReplaceLineEndings(" ")} => {property}: {value.Trim()}");
                 }
             }
         }
 
         Assert.Empty(offenders);
+
+        // ⚠️ NON-VACUITY. Everything above is `Assert.Empty` over a list built inside a loop, so the whole
+        // guard reported success whenever it examined NOTHING — a rename of `.status-badge.`/`.epic-status.`,
+        // or a nesting-depth change that breaks the innermost-rule regex above (whose own comment concedes it
+        // assumes exactly one level of at-rule nesting), silently retired the check while leaving it green.
+        // Its four siblings in SiteGeneratorDesignSystemTests each open with this guard; this one was missed
+        // through three review passes. [Story 23.2 review 2026-08-07]
+        Assert.True(
+            inspected >= 8,
+            $"Only {inspected} `.status-badge.*` / `.epic-status.*` rules were inspected, so this guard is "
+            + "not looking at the families it claims to cover. Either the selectors were renamed or the "
+            + "innermost-rule pattern stopped matching — fix the pattern rather than lowering this bound.");
 
         // ...and the four fill tokens the families now share actually exist, paired with their accents.
         foreach (var token in new[] { "--status-done-bg", "--status-active-bg", "--status-review-bg", "--status-ready-bg" })

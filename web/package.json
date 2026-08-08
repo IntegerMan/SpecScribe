@@ -2,7 +2,7 @@
   "name": "specscribe-web",
   "private": true,
   "type": "module",
-  "description": "SpecScribe's Vue/Nuxt 3 presentation layer (Epic 23). Production-intent, but NOT in SpecScribe.slnx and NOT wired into `specscribe generate` — packaging is Story 23.5.",
+  "description": "SpecScribe's Vue/Nuxt 4 presentation layer (Epic 23). Renders every content page under ADR 0034; not in SpecScribe.slnx, but wired into `specscribe generate` via NuxtPrerender.",
   "engines": {
     "node": "^22.19.0 || ^24.11.0 || >=26.0.0"
   },

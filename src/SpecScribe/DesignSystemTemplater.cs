@@ -21,10 +21,15 @@ namespace SpecScribe;
 /// rather than through <c>ApplyReferenceLinks</c>, so a page about the portal's vocabulary never self-expands
 /// its own terms. [Story 23.2 AC #6; Help nav]
 /// <para>
-/// Deliberately simple markup: Story 23.4 retires the C# HTML renderer and this page is re-authored as the
-/// Nuxt <c>/design-system</c> route (see <c>web/pages/design-system.vue</c>, which mirrors it). The owner
-/// accepted that duplication to get the design system documented in the portal now; keeping the markup plain
-/// is what keeps that removal cheap.
+/// Deliberately simple markup. This originally read "Story 23.4 retires the C# HTML renderer and this page is
+/// re-authored as the Nuxt <c>/design-system</c> route (see <c>web/pages/design-system.vue</c>, which mirrors
+/// it)" — <b>that plan was WITHDRAWN</b>. Story 23.2's third review pass deleted <c>web/pages/design-system.vue</c>
+/// outright: under ADR 0034 the page a user gets is composed HERE and rendered by Node through
+/// <c>PortalMetaSurface</c>, so there was no second design system left to converge with. The retirement is
+/// recorded in <c>web/nuxt.config.ts</c> (the deliberate absence from <c>prerender.routes</c>),
+/// <c>web/pages/component-library.vue</c> and <c>web/CONVENTIONS.md</c> §5; this comment was the one copy that
+/// still pointed a reader at a deleted file. Keeping the markup plain remains right — it is what keeps the
+/// region cheap to compose. [Story 23.2 review 2026-08-07]
 /// </para></summary>
 public static class DesignSystemTemplater
 {
@@ -98,7 +103,12 @@ public static class DesignSystemTemplater
         sb.Append(Charts.Framed(
             new Charts.ChartMeta(
                 "Motion tokens",
-                Ranking: "Five named timings; no surface invents its own.",
+                // DERIVED, not the literal "Five". `MotionBody` renders every entry of `MotionTokens`, and
+                // `DesignSystem_DocumentsEveryMotionTokenTheStylesheetDeclares` asserts in the reverse
+                // direction that every `--motion-*` in specscribe.css appears here — so adding one to the
+                // stylesheet FORCES a sixth entry, and the page would have rendered six definitions under a
+                // caption reading "Five", whole suite green. [Story 23.2 review 2026-08-07]
+                Ranking: $"A vocabulary of {MotionTokens.Length} named timings; no surface invents its own.",
                 Note: "Every timing below is switched off for readers whose system asks for reduced motion (the prefers-reduced-motion setting). Motion never carries meaning on its own.",
                 Why: "Naming the timings makes motion a vocabulary instead of a scattering of one-off numbers, so the whole portal accelerates and settles with one feel."),
             MotionBody()));
@@ -142,7 +152,7 @@ public static class DesignSystemTemplater
             Breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
             {
                 ("Home", SiteNav.HomeOutputPath),
-                ("Design System", null),
+                (SiteNav.DesignSystemLabel, null),
             }),
             Assets = new AssetManifest
             {
@@ -183,7 +193,15 @@ public static class DesignSystemTemplater
             var (swatchClass, tokenNote) = stage switch
             {
                 "unmapped" => ("pending", "shares <code>--status-pending</code>"),
-                "retired" => ("deferred", "shares <code>--status-deferred</code>"),
+                // ⚠️ `retired` keeps its OWN swatch class. It shares deferred's *token*, which is what the note
+                // says — but `.status-legend-key-swatch.retired` is a real rule of its own in specscribe.css,
+                // and `StatusStyles.LegendKey` (the production legend this page claims to mirror) remaps ONLY
+                // `unmapped`. Emitting `deferred` here produced a class no production caller emits, on the page
+                // whose load-bearing claim is "built from the ACTUAL primitives, never look-alike markup" —
+                // byte-identical output today, wrong by construction, and the exact defect the 2026-07-28
+                // re-review fixed for BadgeBody while leaving the swatch half behind.
+                // [Story 23.2 review 2026-08-07]
+                "retired" => (stage, "shares <code>--status-deferred</code>"),
                 _ => (stage, $"<code>--status-{stage}</code>"),
             };
 
@@ -207,10 +225,16 @@ public static class DesignSystemTemplater
                 // and moving the sharing to another pair would have printed the wrong two stage names.
                 // Ordered by LegendStages — the canonical, explicitly-ordered vocabulary — rather than by
                 // Dictionary enumeration order, which is an implementation detail this page must not depend on.
+                // `CanonicalRank`, not `LegendStages.ToList().IndexOf(s)`: the latter materialised a fresh
+                // List<string> on EVERY key-selector invocation inside a per-stage loop, and — the substantive
+                // half — `IndexOf` returns -1 for a stage absent from LegendStages, sorting an unknown stage
+                // AHEAD of every real one instead of flagging it. `CanonicalRank` already ranks an unknown
+                // token after every known stage, which is the ordering this note wants.
+                // [Story 23.2 review 2026-08-07]
                 var sharers = StageFillTokens
                     .Where(kv => kv.Value == fill && !string.Equals(kv.Key, stage, StringComparison.Ordinal))
                     .Select(kv => kv.Key)
-                    .OrderBy(s => StatusStyles.LegendStages.ToList().IndexOf(s))
+                    .OrderBy(StatusStyles.CanonicalRank)
                     .ToArray();
                 var shared = sharers.Length > 0 ? $", shared with {string.Join("/", sharers)}" : string.Empty;
                 tokenNote += $" on <code>{fill}</code>{shared}";

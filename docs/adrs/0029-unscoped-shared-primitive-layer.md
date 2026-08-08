@@ -1,7 +1,9 @@
 # ADR 0029: A Bounded Unscoped Layer for Shared Primitive Classes
 
-**Status:** Proposed (authored 2026-07-29 by Story 23.2's re-review follow-up; ratification is the owner's)
-**Date:** 2026-07-29
+**Status:** **Accepted** 2026-08-07 (authored 2026-07-29 by Story 23.2's re-review follow-up; ratified by the
+owner at Story 23.2's fourth review pass)
+**Date:** 2026-07-29 (authored) · 2026-08-07 (ratified; § Admissions has moved since authoring — the
+allowlist grew to two on 2026-08-07, before ratification)
 **Deciders:** Matthew-Hope Eland
 **Amends:** [ADR 0018](0018-transitional-ir-content-style-layer.md) — specifically its property **3 (Scoped)**, which states that *every* rule in the generated layer is nested under `.ir-content` so it "cannot reach a template-authored component even by accident". This ADR carves out a bounded, enumerated exception and leaves the other three properties intact.
 **Relates to:** [ADR 0009](0009-frontend-framework-for-projection-layer.md) (the projection layer); [ADR 0016](0016-ir-carries-rendered-prose-html.md) (why injected markup exists); [ADR 0026](0026-generated-layers-derive-from-templates-not-project-data.md) (generated layers derive from templates, not project data — the allowlist here is a template-side constant, not harvested from a run); AD-7 in ARCHITECTURE-SPINE.md; Story 23.2 (the token bridge and the component library), Story 23.4 (retires both layers)

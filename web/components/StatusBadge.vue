@@ -86,6 +86,13 @@ const stageClass = computed(() =>
   KNOWN_STAGES.includes(props.stage) ? `is-${props.stage}` : 'is-unrecognized',
 )
 
+/**
+ * `label: string` erases at runtime and a JSON IR emits `null` for an absent field, so the required-ness
+ * declaration guards `undefined` and nothing else. This is the render precondition, not just a dev check —
+ * see the template. [Story 23.2 review 2026-08-07]
+ */
+const hasLabel = computed(() => typeof props.label === 'string' && props.label.trim() !== '')
+
 if (import.meta.dev) {
   if (!KNOWN_STAGES.includes(props.stage)) {
     console.warn(
@@ -99,7 +106,7 @@ if (import.meta.dev) {
   // breach. Note the ORDER: `props.label.trim()` was called unguarded, so a `null` label threw a TypeError
   // and failed the whole route's SSR in dev, while in production the dev block is compiled out and the same
   // input shipped the colour-only badge silently. [Story 23.2 review 2026-08-07]
-  if (typeof props.label !== 'string' || props.label.trim() === '') {
+  if (!hasLabel.value) {
     console.warn(
       `[StatusBadge] missing or empty label for stage "${props.stage}" (received ${JSON.stringify(props.label)}) ` +
         `— this renders a colour-only badge and breaks UX-DR17. Pass the status WORD ` +
@@ -110,7 +117,12 @@ if (import.meta.dev) {
 </script>
 
 <template>
-  <span class="status-badge" :class="stageClass" :title="meaning">{{ label }}</span>
+  <!-- `v-if="hasLabel"`: a badge with no word is a badge that signals by COLOUR ALONE, which UX-DR17 forbids
+       and this component's header calls the one thing it must never render. The 2026-08-07 guard was a
+       `console.warn` inside `import.meta.dev`, so production shipped exactly that output silently — the
+       component's own comment conceded it. Rendering nothing is the honest degradation: an absent status is
+       absent, rather than an unlabelled colour chip a reader cannot decode. [Story 23.2 review 2026-08-07] -->
+  <span v-if="hasLabel" class="status-badge" :class="stageClass" :title="meaning">{{ label }}</span>
 </template>
 
 <style scoped>

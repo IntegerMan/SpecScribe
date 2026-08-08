@@ -5,9 +5,12 @@ Nuxt 3 and the wording lagged the bump). Established by Story 23.2 (component li
 bridge); Story 23.3 migrated the first real surfaces onto it — the dashboard and the whole epics tree — and
 prerenders the rest of the site as pass-throughs so the link graph resolves end to end.
 
-**Not shipped yet.** This app is deliberately not in `SpecScribe.slnx` and not wired into
-`specscribe generate` — how the Node build reaches users is Story 23.5's decision, which is sequenced ahead
-of 23.4 for that reason.
+**This app IS the shipping path.** It is deliberately not in `SpecScribe.slnx` — that half is still true —
+but it is no longer "not wired into `specscribe generate`": `src/SpecScribe/NuxtPrerender.cs` boots
+`web/.output/` as part of `generate`, and under [ADR 0034](../docs/adrs/0034-the-ir-is-the-product-and-the-site-is-rendered-from-it.md)
+**no C# code path emits a content page at all** — Node renders every page a user sees. Story 23.5 answered
+the packaging question; 23.6 retired the C# writer. See `CONVENTIONS.md` for the authoritative description of
+the render path. [corrected by Story 23.2's fourth review pass, 2026-08-07]
 
 ## Getting started
 

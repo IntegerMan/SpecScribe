@@ -3,8 +3,10 @@
 // Universal/SSR + full prerender — ADR 0009's ratified Axis 1 = Option B. `nuxt generate` must emit
 // fully-rendered HTML per route (NFR-5/NFR6), never a hydration shell.
 //
-// NOT wired into `specscribe generate` and NOT in SpecScribe.slnx. How this ships is Story 23.5's decision,
-// which is sequenced AHEAD of 23.4 precisely because it is Epic 23's load-bearing unknown.
+// NOT in SpecScribe.slnx — but this app IS wired into `specscribe generate`: `NuxtPrerender.cs` boots
+// `web/.output/` as part of a run, and under ADR 0034 no C# code path emits a content page, so Node renders
+// every page a user sees. (This comment read "NOT wired into `specscribe generate`" until Story 23.2's
+// fourth review pass; 23.5 answered the packaging question and 23.6 retired the C# writer.)
 
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname as dirnameOf, resolve as resolvePath, sep } from 'node:path'

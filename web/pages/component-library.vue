@@ -8,9 +8,13 @@ useHead({ title: 'SpecScribe — component library' })
 </script>
 
 <template>
+  <!-- The subtitle said "Not yet wired into `specscribe generate` — packaging is Story 23.5" until Story
+       23.2's fourth review pass. It was false, and it was the one copy of that claim RENDERED TO A READER:
+       23.5 answered packaging, `NuxtPrerender.cs` boots this app during `generate`, and ADR 0034 made Node
+       the renderer of every content page. -->
   <PageShell
     title="Component library"
-    subtitle="SpecScribe's Vue/Nuxt presentation layer (Epic 23). Not yet wired into `specscribe generate` — packaging is Story 23.5."
+    subtitle="SpecScribe's Vue/Nuxt presentation layer (Epic 23). This app renders every page of the generated portal (ADR 0034)."
   >
     <ChartPanel title="Routes">
       <ul class="route-list">

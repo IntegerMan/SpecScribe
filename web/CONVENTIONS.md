@@ -427,8 +427,13 @@ npm run extract:ir-content   # writes BOTH ir-content.css and shared-primitives.
 npm run check:ir-content     # gates BOTH, and names which one drifted
 ```
 
-**The allowlist is the boundary.** `SHARED_PRIMITIVES` in `scripts/ir-content-lib.mjs` — one entry today,
-`pill`. A rule is carried only when **every** class its selector names is on the list, so `.pill.status-draft`
+**The allowlist is the boundary.** `SHARED_PRIMITIVES` in `scripts/ir-content-lib.mjs` — **two** entries
+today: `pill` and `skip-link`. (`skip-link` was admitted by Story 23.2's third review pass, when the portal's
+rule and `PageShell`'s scoped copy were found tying on specificity with the winner decided by chunk order;
+ADR 0029's § Admissions table records it. This sentence said "one entry today" for a week afterwards — and
+ADR 0029's § Consequences names exactly that failure: the containment property "erodes anyway if nobody
+counts", so the count is load-bearing, not trivia.) A rule is carried only when **every** class its selector
+names is on the list, so `.pill.status-draft`
 and `.pill.pill-link` stay scoped. A shared rule is **removed** from `ir-content.css`, never duplicated into
 both: an unscoped rule still matches inside `.ir-content`, so the app has exactly one definition.
 
@@ -576,7 +581,7 @@ second is not, and has not been since ADR 0034.** `web/` **is** the shipping pat
 
 - `src/SpecScribe/NuxtPrerender.cs` boots `web/.output/` (or `renderer/` beside the executable) as part of
   `specscribe generate`.
-- Per [ADR 0034](../docs/adrs/0034-node-renders-every-content-page.md), **no C# code path emits a content
+- Per [ADR 0034](../docs/adrs/0034-the-ir-is-the-product-and-the-site-is-rendered-from-it.md), **no C# code path emits a content
   `.html`** any more — `SiteGenerator.WritePage` says so in as many words. Node renders every content page,
   so Node is a hard prerequisite of `generate`, not an optional accelerator.
 - `web/` is still absent from `SpecScribe.slnx`, which is a build-system fact, not a shipping one.

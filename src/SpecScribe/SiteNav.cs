@@ -185,6 +185,16 @@ public sealed class SiteNav
     /// <see cref="HasTestArtifacts"/> predicate can never disagree about the string. [Story 18.5]</summary>
     internal const string TestArtifactsLabel = "Test Artifacts";
 
+    /// <summary>The one home for the Design System nav/quick-link label. [Story 23.2 review 2026-08-07]
+    /// <para>The label is an ICON KEY and a QUICK-LINK FAMILY KEY, not just display text:
+    /// <see cref="Icons.ForConcept"/> matches on it exactly and its unknown-key arm is
+    /// <c>_ =&gt; string.Empty</c> ("graceful"), and the dashboard's <c>QuickLinkFamily</c> classifier falls back
+    /// to <c>family-planning</c>. So a one-character drift between the nav entry, the quick link, the glyph
+    /// key and the classifier silently drops the icon and files the link under the wrong family, with no test
+    /// covering either. It was hand-typed in five places; this is the same fix
+    /// <see cref="TestArtifactsLabel"/> above already applies for exactly this hazard.</para></summary>
+    internal const string DesignSystemLabel = "Design System";
+
     /// <summary>Assembles the journey-organized top nav (Home · Delivery · Insights · Follow-ups · Project).
     /// Every child is added only when its availability signal is true; an empty group is omitted; a group with
     /// exactly one available child collapses to a flat top-level link. [Story 10.1]</summary>
@@ -228,12 +238,12 @@ public sealed class SiteNav
         // product/support pages that follow answer a different question. Framework sub-pages ride the white
         // local-context bar, not this dropdown. [Help nav; Story 23.2]
         help.Add(("How to use SpecScribe", HowToReadOutputPath));
-        help.Add(("Design System", DesignSystemOutputPath));
+        help.Add((DesignSystemLabel, DesignSystemOutputPath));
         help.Add(("About Spec-Driven Development", AboutSddOutputPath));
         help.Add(("About", AboutOutputPath));
         help.Add(("Logs", DiagnosticsOutputPath));
         quickLinks.Add(("How to use SpecScribe", HowToReadOutputPath, "Reading order, how to generate the site, and glossary.", "Help"));
-        quickLinks.Add(("Design System", DesignSystemOutputPath, "Status and motion tokens, and the shared visual primitives.", "Help"));
+        quickLinks.Add((DesignSystemLabel, DesignSystemOutputPath, "Status and motion tokens, and the shared visual primitives.", "Help"));
         quickLinks.Add(("About Spec-Driven Development", AboutSddOutputPath, "Frameworks, support matrix, and getting started with SDD.", "Help"));
         quickLinks.Add(("About", AboutOutputPath, "SpecScribe version, build, and product details.", "Help"));
         quickLinks.Add(("Logs", DiagnosticsOutputPath, "Generation diagnostics and the run log.", "Help"));

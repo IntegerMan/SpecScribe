@@ -595,7 +595,9 @@ public sealed partial class HtmlRenderAdapter
         if (label.Equals("Help", StringComparison.OrdinalIgnoreCase)
             || label.Equals("About", StringComparison.OrdinalIgnoreCase)
             || label.Equals("Logs", StringComparison.OrdinalIgnoreCase)
-            || label.Equals("Design System", StringComparison.OrdinalIgnoreCase)
+            // The const, not a fifth hand-typed copy: this classifier's fallback is `family-planning`, so a
+            // drift here files the Design System quick link under the wrong family silently. [Story 23.2 review]
+            || label.Equals(SiteNav.DesignSystemLabel, StringComparison.OrdinalIgnoreCase)
             || label.Equals("How to use SpecScribe", StringComparison.OrdinalIgnoreCase)
             || label.Equals("About Spec-Driven Development", StringComparison.OrdinalIgnoreCase)
             || label.Equals("Spec-Driven Development", StringComparison.OrdinalIgnoreCase))

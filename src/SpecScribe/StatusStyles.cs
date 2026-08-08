@@ -452,8 +452,11 @@ public static class StatusStyles
     }
 
     /// <summary>The display word for a canonical legend stage — the single label seam, delegating to
-    /// <see cref="StoryLabel"/> / <see cref="RequirementLabel"/> / <see cref="SprintLabel"/> so no caller
-    /// grows a parallel stage→word switch that can drift from its siblings. Extracted from
+    /// <see cref="RequirementLabel"/> for the two requirement-level states and otherwise falling through to
+    /// <see cref="StoryLabel"/>, so no caller grows a parallel stage→word switch that can drift from its
+    /// siblings. (This previously also named <c>SprintLabel</c>; that arm was removed in the same edit — see
+    /// the comment on the fallback below — leaving the summary describing a delegation the body no longer
+    /// performs. [Story 23.2 review 2026-08-07]) Extracted from
     /// <see cref="LegendKey"/> when the design-system page became a second consumer — a page whose whole
     /// subject is the status vocabulary is the last place a second copy of it belongs.
     /// [spec-epic8-deferred-debt-cleanup; Story 23.2]</summary>
