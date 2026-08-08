@@ -4,7 +4,7 @@ baseline_commit: 7ff3b13921b0c00c885f3b37719f18a9478ea9c3
 
 # Story 4.9: Multi-Framework Coexistence Strategy Spike
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -612,8 +612,161 @@ pre-existing issues flagged in R9 were not chased; handoffs H1–H5 recorded rat
 **Modified under `src/`, `tests/`, `web/`, `extension/`: NONE.** That is Task 7's assertion; the evidence is
 pasted in report § 9.
 
+### Review Findings
+
+*Code review 2026-08-07 (3-layer: Blind Hunter, Edge Case Hunter, Acceptance Auditor — run sequentially
+in-context at owner direction, not as parallel subagents). Scoped to commit `dce188c`, whose file set matches
+this story's File List exactly (5 files, zero production code). `docs/adrs/README.md` and `sprint-status.yaml`
+are shared files and were **attributed by hunk** — only 4.9's hunks were reviewed; sibling stories' 86 lines in
+README and 138 in sprint-status since baseline `7ff3b13` are excluded.*
+
+**Verification performed against shipped code at HEAD `15336f4`.** Every falsifiable measurement in the report
+was independently re-checked and **all of them hold exactly**: `.SourceRoot` 46 / `.AdrSourceRoot` 29 /
+`tests` 20, four `ToSourceRelative` definitions behind 41 call sites (21/12/8), the full per-file breakdown,
+`EnumerateSourceFiles` at `SiteGenerator.cs:6456` and `EnumerateAdrFiles` at `:6604` with 4 call sites each,
+`PathUtil.EscapesRepoRoot` 1 definition + 3 production call sites, and CORA's **9,510** markdown files. The
+harness's replication of the private `EnumerateSourceFiles` is faithful — `SiteGenerator.IsIgnored` is a pure
+delegate to `PathUtil.IsIgnoredSourceFile`. H1 (stale `(BMad first)` comment) and H5 (ADR 0037 absent from the
+index) both re-confirmed still open. Task 7 verified: `dce188c` touches zero files under `src/`, `tests/`,
+`web/`, `extension/`. AC #1's "per `ArtifactBundle` family" coverage is **complete** — all nine bundle fields
+are ruled on.
+
+**Decision needed (1 — resolved 2026-08-08):**
+
+- [x] [Review][Decision] **ADR §4a — the spike's self-declared "highest value-per-line item" — does not fix the
+  failure it was written for, and if implemented as written it breaks BMad detection on every BMad repository**
+  [ADR 0041 §4a, §Consequences; report § 4.3, § 6.2 FT-1] — §4a directs that "`FindSourceMarker` and **both**
+  `AppliesTo` implementations must require that the framework has *artifacts*, not merely a directory", naming
+  `HasMarkdownWithinOneLevel` as the predicate ("at least one markdown file within one directory level"), and
+  claims "This single change removes the abandoned-framework failure at its cause, in both layers." Two
+  independent defects:
+
+  **(a) The predicate does not fix shape (c).** The spike's own vestigial fixture is a `.planning/` "holding a
+  2020 roadmap", and the measured output names `EpicsSource=ROADMAP.md` — the husk's winning artifact **is** a
+  top-level markdown file. `HasMarkdownWithinOneLevel(.planning)` therefore returns **true**, both layers still
+  match, and the portal still shows the 2020 roadmap while the live `epics.md` still vanishes undiagnosed. The
+  report diagnoses the cause correctly ("marker probes test *presence*, never *life*") and then prescribes a fix
+  that tests a different flavour of presence — content rather than directory — which an abandoned-but-populated
+  framework passes by definition. A directory that is *vestigial* is precisely one that still holds its
+  artifacts. Nothing in the ADR closes this gap, and §4a's "removes the failure at its cause" claim is false
+  against the spike's own measurement.
+
+  **(b) The predicate misfires on BMad's marker.** `BmadArtifactAdapter.AppliesTo` probes `_bmad/`, a
+  tooling/config directory holding **no markdown at all** — verified on both SpecScribe
+  (`_config, bmm, config.toml, config.user.toml, core, custom, scripts`) and CORA (same plus `tea`): zero `.md`
+  at root or one level down. Applied literally, on **CORA** BMad stops matching → only GsdCore matches →
+  `bundles.Count == 1` → B4's early return → **`Module` is lost**, destroying §2's "Module — retained and
+  attributed" and leaving §3's About-SDD attribution row with nothing to attribute. On a BMad-only repository
+  detection silently reroutes through B2's no-match fallback, becoming indistinguishable from a framework-less
+  repo in `DescribeMatchSet`. The asymmetry the spike missed: GSD's marker (`.planning/`) **is** the artifact
+  directory, whereas BMad's `AppliesTo` marker (`_bmad/`) is not — BMad's artifacts live under `_bmad-output/`,
+  a *different* marker, used by `FindSourceMarker`, which does pass the probe.
+
+  Two secondary costs are also unstated: a live framework whose markdown sits **2+ levels deep** would be
+  demoted, and `HasMarkdownWithinOneLevel` **excludes `README.md`**, so a framework directory whose only shallow
+  markdown is a README also fails. §Consequences claims only that the probe "changes resolution for a repository
+  whose framework directory is genuinely empty" — which is neither the full cost nor, per (a), the actual
+  benefit.
+
+  > **Owner decision 2026-08-08 — "fix the probe properly now."** §4a is to specify **per-marker liveness
+  > predicates** rather than one shared content probe: `.planning/` and `_bmad-output/` get a content probe
+  > **plus a recency signal** (a content probe alone cannot catch shape (c), per (a)); `_bmad/` is tested by
+  > `config.toml` presence, **not** by a markdown probe (per (b)). §Consequences must state the real cost —
+  > including the 2+-level-deep and README-only failure modes — and FT-1 grows accordingly, with its own pinned
+  > tests. Carried below as patch **P7**.
+
+**Patch findings (7):**
+
+- [x] [Review][Patch] **P7 — rewrite ADR §4a as per-marker liveness predicates with a recency signal**
+  [ADR 0041 §4a, §Consequences; report § 4.3, § 6.2 FT-1] — implements the owner decision above. Remove the
+  claim that `HasMarkdownWithinOneLevel` "removes the abandoned-framework failure at its cause, in both layers";
+  replace with the three-way predicate table (`.planning/` and `_bmad-output/` → content + recency; `_bmad/` →
+  `config.toml`); state in §Consequences that a bounded one-level content probe also demotes a live framework
+  whose markdown sits 2+ levels deep or whose only shallow markdown is a `README.md` (which
+  `HasMarkdownWithinOneLevel` excludes); and widen FT-1's scope and proof accordingly — it now needs a pinned
+  test that a *populated but abandoned* framework directory loses, which is the case the original prescription
+  silently failed.
+
+- [x] [Review][Patch] The "role, not rivalry" thesis rests on `Module` crossing the root boundary, but ADR 0038
+  §5 — eight lines below the sentence ADR 0041 supersedes — already explains that crossing without role
+  [ADR 0041 §Context ¶1, §1, §2 Module row] — ADR 0038 §5 states `ModuleContext` "is BMad-typed to a closed
+  `BmadModule` enum keyed on `_bmad/{code}/`, so a non-BMad adapter can only return `ModuleContext.None`".
+  `Module` could therefore never have come from GSD under any root layout or any policy, so its crossing is
+  evidence of BMad-typing, not of a planning/delivery role split. The ADR attributes it solely to
+  `ModuleContext.Detect` being `RepoRoot`-anchored and reads a role signal off it. The *decision* (describe root
+  ownership; do not add a role vocabulary) survives either reading, but the argument needs the reconciliation —
+  the spike engaged closely enough with §5 to supersede one of its claims while leaving an adjacent claim that
+  undercuts its own thesis unaddressed.
+- [x] [Review][Patch] B5's verdict is inconsistent across three places, and AC #3 requires exactly one
+  [report § 6 B5 row, § N6 tally; ADR 0041 §Supersedes] — the B-table says "**stands** (unit) / **refined**
+  (tiebreak)", the headline tally ("7 stand, 3 refined, 1 superseded") counts it among the **stands**, and ADR
+  §Supersedes lists "§2's implicit *roster-order* tiebreak for the epics family → root ownership" among the
+  **supersedes**. Pick one classification and make all three agree; note also that no FT item covers the epics
+  tiebreak change, which is defensible only if it is genuinely a no-op in code.
+- [x] [Review][Patch] ADR §2 labels `Module`'s policy "**Merge**" when the shipped mechanism is precedence
+  [ADR 0041 §2 table] — B7 is "mechanically unchanged": first adapter with a real detected identity wins, ties
+  to the first (`HasModuleIdentity`). `Module` is single-valued and cannot merge. AC #1 demands the verdict in
+  the vocabulary "precedence, merge, or explicit refusal", so this is a category error in the ADR's central
+  policy table. "Precedence, retained across the root boundary, and attributed" says what is meant.
+- [x] [Review][Patch] The measurement apparatus is unreproducible, while § 11 makes it the first thing a
+  reviewer should check [report § 1, § 11 item 1] — the harness lives at `$CLAUDE_JOB_DIR/tmp/probe/`, an
+  ephemeral job scratch directory deleted with the job, and the report carries **zero** code blocks of its
+  source. For a spike whose stated authority is "answered by measurement, not by reading intent", M1/M3/M5
+  cannot be re-run by anyone. Task 7 forbids shipping production code but nothing prevents an appendix: paste
+  `Program.cs` into the report as a fenced block. (Everything independently checkable *was* checked and holds —
+  see the verification note above — but the eight-scenario harness results are not among them.)
+- [x] [Review][Patch] Handoffs H1–H3 are recorded only in 4.9's own spike report, so Story 12.2's reviewer has
+  no pointer to them [report § 10] — CLAUDE.md § hunk attribution requires recording a handoff "so it cannot
+  fall between them", and a reviewer scoping Story 12.2 by its File List (which is what the same section
+  prescribes) will never open `4-9-spike-report.md`. Verified: neither `12-2-gsd-core-baseline-adapter-coverage.md`
+  nor its `sprint-status.yaml` key note references 4.9's findings — their only mentions of 4.9 predate this
+  story's development. Add a one-line pointer to the 12-2 sprint key note or story file. The decision to record
+  rather than adopt is correct; only its discoverability is at fault.
+- [x] [Review][Patch] ADR 0015 is mis-parenthesized in ADR 0041's header [ADR 0041 header, `Relates to:`] —
+  cited as "[ADR 0015] (module identity is BMad-typed)", but ADR 0015 is **Accepted** and titled "BMad Module
+  Identity Is **Open-World and Multi-Valued**", explicitly holding that "No closed enumeration of module codes
+  can be correct." The BMad-typed claim's actual home is ADR 0038 §5. A reader navigating from 0041 to 0015
+  lands on a record arguing the opposite direction.
+
+**Dismissed as noise (2):** H4's incorrect ADR-0040 index entry has already been corrected at HEAD (README now
+reads "Story 4.9 — which had reserved 0039 — ultimately landed as **0041**"), so the handoff is closed; and ADR
+§§4a–4c issuing imperatives over Story 12.2's live hunks is correct ADR behavior, since policy records bind code
+regardless of which story is mid-review and the handoffs were properly recorded.
+
 ## Change Log
 
+- 2026-08-08 — **Code review of Story 4.9 (worktree `worktree-code-review-4-9` off `15336f4`).** `review → done`.
+  Three layers (Blind Hunter, Edge Case Hunter, Acceptance Auditor) run **sequentially in-context** at owner
+  direction rather than as parallel subagents. Scoped to commit `dce188c`, whose file set matches the File List
+  exactly; `docs/adrs/README.md` and `sprint-status.yaml` are shared and were **attributed by hunk** (sibling
+  stories' 86 + 138 lines since baseline excluded). **1 decision-needed, 7 patches (all applied), 0 deferred,
+  2 dismissed.** **The evidence held up under independent re-verification** — every counted call site
+  (46 / 29 / 20, four `ToSourceRelative` definitions behind 41 sites at 21/12/8), both line anchors
+  (`SiteGenerator.cs:6456` / `:6604`, 4 call sites each), `EscapesRepoRoot`'s 1 definition + 3 production sites,
+  and CORA's **9,510** files reproduce exactly at `15336f4`; the harness's replication of the private
+  `EnumerateSourceFiles` is faithful (`IsIgnored` is a pure delegate to `PathUtil.IsIgnoredSourceFile`); H1 and
+  H5 re-confirmed open; Task 7 re-verified; AC #1's nine-field bundle coverage is complete. **The one serious
+  finding was in the spike's own headline recommendation:** ADR §4a prescribed `HasMarkdownWithinOneLevel` as the
+  liveness probe and claimed it "removes the abandoned-framework failure at its cause, in both layers" — but
+  **(a)** shape (c)'s husk holds `ROADMAP.md`, `PROJECT.md` and `STATE.md` at `.planning/`'s top level, so a
+  content probe **passes** it and shape (c) is unfixed (a vestigial directory is by definition one that still
+  holds its artifacts), and **(b)** `BmadArtifactAdapter.AppliesTo` probes `_bmad/`, which holds **no markdown at
+  all** on SpecScribe, on CORA and in the spike's own fixtures, so the probe would fail every BMad repository and
+  cost CORA the `Module` identity via B4's single-adapter early return — nullifying §2's own decision. Owner chose
+  **"fix the probe properly now"**: §4a is rewritten as **three per-marker predicates** (artifact markers get a
+  bounded content probe **plus a recency signal**; `_bmad/` is tested by `config.toml`), §Consequences now states
+  the 2+-level-deep and README-only failure modes and the fail-toward-keeping rule, and FT-1's scope and proof
+  grow accordingly. Six further patches: the role thesis now reconciles with ADR 0038 §5's BMad-typing (only a
+  BMad adapter can *ever* supply `Module`, so the crossing is not by itself evidence of a role split); B5's
+  verdict settled as **stands** and made consistent across the report table, the tally and §Supersedes;
+  `Module`'s policy relabelled **precedence** (it is single-valued and cannot merge) in AC #1's vocabulary; the
+  probe harness preserved verbatim as **report Appendix A** (it lived in an ephemeral job scratch directory, so
+  the measurements were unreproducible while § 11 named them the first thing to check); handoffs **H1–H3
+  announced on Story 12.2's own sprint key** so its reviewer will actually see them; and ADR 0015's citation
+  corrected (it is "open-world and multi-valued", not the BMad-typing claim). Dismissed: H4 is already fixed at
+  HEAD, and §§4a–4c issuing imperatives over 12.2's live hunks is correct ADR behavior. **No production code
+  touched** — this review changed four markdown/YAML files and nothing under `src/`, `tests/`, `web/`,
+  `extension/`, so no gate was run and none could move.
 - 2026-08-07 — **Story 4.9 implemented (dev-story, worktree `worktree-story-4-9-dev` off `07bdb79`).**
   `ready-for-dev → in-progress → review`. All 7 tasks complete; ACs #1–#3 satisfied. **Ships no production code**
   — two new markdown files, three modified, zero changes under `src/`, `tests/`, `web/`, `extension/` (Task 7

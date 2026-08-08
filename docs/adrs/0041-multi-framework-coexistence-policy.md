@@ -16,7 +16,8 @@
   [ADR 0014](0014-specscribe-settings-folder-format.md) / [ADR 0003](0003-directory-scoped-settings-and-read-only-helpers.md)
   (settings shape); [ADR 0037](0037-extension-authors-settings-through-the-core.md) (the diagnostic-anchor
   contract shared with the extension); [ADR 0015](0015-bmad-module-identity-open-world-and-multi-valued.md)
-  (module identity is BMad-typed).
+  (module identity is open-world and multi-valued *within* BMad — it is **ADR 0038 §5**, not 0015, that records
+  the separate fact that `ModuleContext` is BMad-**typed**, so only a BMad adapter can ever supply it).
 
 ## Context
 
@@ -38,6 +39,18 @@ that they are unreachable. Every adapter is handed the same `sourceFiles` list, 
 non-primary framework therefore has nothing to lose, so nothing is reported as lost. On CORA the BMad adapter
 contributes **exactly one** field — `Module` — and only because `ModuleContext.Detect` happens to be anchored to
 `RepoRoot` rather than `SourceRoot`.
+
+> **What `Module` crossing does and does not prove.** Two independent facts let it cross, and only one of them
+> is about roots. ADR 0038 §5 records the other: `ModuleContext` "is BMad-typed to a closed `BmadModule` enum
+> keyed on `_bmad/{code}/`, so a non-BMad adapter can only return `ModuleContext.None`." `Module` could
+> therefore never have come from GSD under *any* root layout or *any* merge policy. Its crossing is evidence of
+> BMad-typing plus a `RepoRoot` anchor — **not**, on its own, evidence that the frameworks occupy distinct
+> planning/delivery roles. The role reading below is argued from the *shape of the repositories* (CORA plans in
+> one framework and delivers in another) and from the coherence objection in §2, not from this single measured
+> crossing. Read the other way round, the measurement's honest minimum is narrower and worth stating plainly:
+> **exactly one family crosses the root boundary, and it is the one family a non-primary adapter is
+> definitionally incapable of contending for.** That is why §1 declines to add a role vocabulary to the adapter
+> contract: the evidence supports *describing* what root ownership already decides, not *encoding* roles.
 
 **2. The resolution axis in shipped code is neither adapter order nor artifact role. It is the source root.**
 Roster order (`B3`) decided nothing in any measured scenario. Whichever framework owns the resolved root supplies
@@ -83,7 +96,7 @@ Answered against the **three** real resolution units in shipped code, not the fi
 |---|---|---|
 | **Epics family** (`Epics` + `Requirements` + `EpicsSourceFullPath`) | **Precedence** — owner is the framework owning the resolved source root | Kept as a unit: requirements roll up from the epics source, so a split pair is incoherent. The tiebreak changes from *roster order* to *root ownership*, which is what the code does de facto. |
 | **`Sprint`** | **Precedence, bound to the epics owner** | A sprint ledger enumerating framework A's phases beside framework B's epics index is incoherent in exactly the way ADR 0038 §2 identified for requirements. Today they coincide by accident; this makes it structural. |
-| **`Module`** | **Merge, retained, and attributed** | This is the one genuinely cross-role contribution and it is *correct* under a role model: module identity is a planning-side fact, and on CORA BMad really does own planning. It is incoherent only under a rivalry model. It must be **labelled** (§3), never presented as the delivery framework's identity. |
+| **`Module`** | **Precedence** (first real identity wins, ties to the first) — **retained across the root boundary, and attributed** | `Module` is single-valued and cannot merge; the shipped mechanism is `HasModuleIdentity`'s first-non-`Unknown` wins, and that stands (B7). What this record decides is not the tiebreak but that the contribution is **kept** when it comes from outside the resolved root, rather than being refused for consistency with the other families. It is *correct* to keep: module identity is a planning-side fact, and on CORA BMad really does own planning. Note the contest is nominal — per ADR 0038 §5 only a BMad adapter can ever supply a real identity — so "precedence" here almost always has one candidate. It must be **labelled** (§3), never presented as the delivery framework's identity. |
 | **`Retros`, `Diagnostics`** | **Merge** (concatenate in adapter order) | Additive; no contention possible. |
 | **`StoryArtifactsById`** | **Merge** (union; duplicate id keeps the earlier adapter's artifact and emits `Skipped`) | Correct as shipped. Two frameworks numbering independently can collide, and reporting beats overwriting. |
 | **`ConsumedSourceRelatives`** | **Merge** (union) | Additive. |
@@ -139,16 +152,48 @@ repository — its `_bmad-output` holds planning prose, no epics source, and no 
 **The far more valuable finding is that the root count is not what is broken.** Three defects measured in this
 spike are independent of multi-rooting and cost a fraction of any of B/C/D:
 
-#### 4a. Marker probes become LIVENESS probes
+#### 4a. Marker probes become LIVENESS probes — and the predicate is PER-MARKER
 
-`FindSourceMarker` and both `AppliesTo` implementations must require that the framework has *artifacts*, not
-merely a directory. **This repository already contains the pattern and the precedent:**
-`ForgeOptions.AdrFallbackProbeSubdirs` is probed by `HasMarkdownWithinOneLevel`, which requires
-"at least one markdown file within one directory level" — a content test, deliberately bounded, never a whole-tree
-walk. Source-marker probing is the same problem answered inconsistently.
+`FindSourceMarker` and both `AppliesTo` implementations must stop resolving on a bare `Directory.Exists`. That
+much is settled by shape (c) (spike report § 4.3), where a `.planning/` abandoned in 2020 takes both the source
+root and the epics family while a live BMad `epics.md` vanishes undiagnosed.
 
-This single change removes the abandoned-framework failure at its cause, in both layers, and it is the highest
-value-per-line item this spike found.
+**What the predicate is, is not one rule.** A single shared content probe was the obvious answer and it is the
+wrong one, in two separate ways — both measured against this spike's own fixtures during the Story 4.9 code
+review:
+
+- **A content probe does not detect abandonment.** `HasMarkdownWithinOneLevel` asks for "at least one markdown
+  file within one directory level". Shape (c)'s husk holds `ROADMAP.md`, `PROJECT.md` and `STATE.md` at its top
+  level — the stale `ROADMAP.md` is precisely the artifact that wins the epics family. The husk **passes** a
+  content probe, so shape (c) would resolve exactly as before. A vestigial directory is by definition one that
+  still holds its artifacts; content presence is a different flavour of presence, not life.
+- **`_bmad/` is not an artifact directory.** `BmadArtifactAdapter.AppliesTo` probes `_bmad/`, which holds
+  tooling and configuration — `config.toml`, `bmm/`, `core/`, `scripts/` — and **no markdown at all** on
+  SpecScribe, on CORA, and in this spike's own fixtures. A markdown probe there returns false for every BMad
+  repository in existence. On CORA that costs the `Module` identity §2 just decided to keep: BMad stops
+  matching, one adapter remains, `Ingest`'s `bundles.Count == 1` early return (B4) hands back GSD's bundle
+  verbatim, and `Module` is `Unknown`. On a BMad-only repository detection silently reroutes through B2's
+  no-match fallback and becomes indistinguishable from a framework-less repo in `DescribeMatchSet`.
+
+**Decision — three predicates, keyed to what each marker actually is:**
+
+| Marker | Probed by | Predicate |
+|---|---|---|
+| `.planning/` (and the other framework artifact markers in `SourceDirNames`) | `FindSourceMarker`, `GsdCoreArtifactAdapter.AppliesTo` | bounded content probe **plus a recency signal** — content alone cannot separate live from abandoned |
+| `_bmad-output/` | `FindSourceMarker` | same: bounded content probe **plus a recency signal** |
+| `_bmad/` | `BmadArtifactAdapter.AppliesTo` | **`config.toml` present** — a config marker, tested as a config marker. Explicitly **not** a markdown probe |
+
+`ForgeOptions.AdrFallbackProbeSubdirs` / `HasMarkdownWithinOneLevel` remains the precedent for the *bounded*
+half — root plus one level, never a whole-tree walk — but it is the floor of the artifact-marker predicate, not
+the whole of it, and it is not the predicate for `_bmad/` at all.
+
+**The recency signal is deliberately left unspecified here** and belongs to FT-1, which must choose it and pin
+it: newest artifact mtime against a threshold, a git-log probe, an explicit opt-out marker, or a refusal to
+guess coupled with 4b-style diagnosis. What this record fixes is that the question exists and that a content
+probe does not answer it.
+
+This is still the highest value-per-line item the spike found, and it is now bounded correctly rather than
+optimistically.
 
 #### 4b. Diagnostics must not emit paths that escape their anchor
 
@@ -195,7 +240,8 @@ region and with live-browser inspection, per CLAUDE.md § Verification.
 
 - The stated policy and the shipped behaviour agree. A rule that looked like it arbitrated (roster order) is
   demoted to what it is, and the rule that actually decides (root ownership) is named.
-- The abandoned-framework failure has a cheap, precedented fix that needs no architectural change.
+- The abandoned-framework failure is localized to the marker predicate and needs no architectural change —
+  though it is **not** as cheap as one shared content probe, which §4a shows would not have worked.
 - Multi-rooting is neither adopted prematurely nor mis-priced as unprecedented; the option that would be taken
   (B) is identified, along with the trigger and the reason it beats C on URL stability.
 - Two live correctness defects and one false reader-facing claim are named with reproductions.
@@ -205,16 +251,36 @@ region and with live-browser inspection, per CLAUDE.md § Verification.
 - A two-framework repository still renders one framework's loose documents. On CORA that remains six files.
 - `Module` crossing the root boundary is retained as a role contribution, which means the About-SDD page must
   carry attribution or the portal implies a framework ownership it does not have. That is work, not a freebie.
-- The liveness probe changes resolution for a repository whose framework directory is genuinely empty. That is
-  the intended behaviour, but it is a behaviour change and needs its own pinned test.
+- **The liveness predicate is three rules, not one, and one of them is unspecified.** §4a fixes the shape of the
+  answer; FT-1 must still choose and pin the recency signal. Until it does, shape (c) is diagnosed but not
+  fixed.
+- **The liveness probe is a behaviour change with a wider blast radius than "empty directory".** It changes
+  resolution for a genuinely empty framework directory (intended), but a *bounded* content probe also demotes a
+  live framework whose markdown sits **two or more levels deep**, and `HasMarkdownWithinOneLevel` additionally
+  **excludes `README.md`**, so a directory whose only shallow markdown is a README fails it too. Each needs its
+  own pinned test, and FT-1 must decide whether either is acceptable or whether the bound must widen.
+- **A recency signal can be wrong in the safe direction and the unsafe one.** A freshly cloned repository has
+  uniform mtimes; a long-dormant but still-current framework looks abandoned. Whatever FT-1 picks must fail
+  toward *keeping* a framework and diagnosing the ambiguity, never toward silently dropping one — that is the
+  failure mode shape (c) already demonstrates and NFR8 forbids.
 
 **Supersedes** (in ADR 0038):
 
-- §2's `Sprint` rule "first non-null wins" → sprint binds to the epics owner.
-- §2's implicit *roster-order* tiebreak for the epics family → root ownership. The family remains one unit.
-- §5's statement that in a two-framework repository "the non-primary framework's artifact families still merge
-  into the bundle" → measured false in both directions on the reference repository; only `Module` crosses.
-- §1's "every matching adapter runs" is **refined**, not superseded: matching must mean *live*, not *present*.
+Exactly one behavior is **superseded**; the rest of this list records **refinements** and one **factual
+correction**, kept here so the whole amendment reads in one place. The B1–B11 verdicts in spike report § 6 use
+these same three words and are authoritative — where a behavior appears below, the label matches that table.
+
+- **Superseded — B6.** §2's `Sprint` rule "first non-null wins" → sprint binds to the epics owner.
+- **Refined — B5.** §2's implicit *roster-order* tiebreak for the epics family → root ownership. The family
+  remains one unit, which is why B5 counts as a **stand** in report § 6's tally: the rule itself is untouched and
+  needs no code change, because root ownership is already what the code does de facto. Only the *stated* basis
+  for the tiebreak moves, so nothing is superseded and no follow-through item is owed. (Recorded here because
+  the wording in ADR 0038 §2 implies roster order arbitrates, and it does not.)
+- **Factual correction — not a decision.** §5's statement that in a two-framework repository "the non-primary
+  framework's artifact families still merge into the bundle" is **measured false** in both directions on the
+  reference repository; only `Module` crosses, and per §5's own next paragraph only a BMad adapter ever could.
+- **Refined — B1.** §1's "every matching adapter runs" is refined, not superseded: matching must mean *live*,
+  not *present* (§4a).
 
 **Stands, explicitly:** ADR 0038 §1's ordered registry and BMad-last fallback, §3's marker order and the reason
 `_bmad-output` probes last, and §4's lift of the scoped epics re-ingest onto `IArtifactAdapter`. The watch/full
