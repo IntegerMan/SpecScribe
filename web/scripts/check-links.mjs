@@ -9,23 +9,49 @@
 // the rest RELATIVE TO THE PAGE'S OWN PATH — which is the whole point of routes mirroring the IR's
 // output-relative paths verbatim — and asserts the target exists in the emitted output.
 //
-// ── It runs over BOTH trees, and gates only on the difference ──────────────────────────────────────────
+// ── It gates against a PINNED BASELINE of the dangling links that already existed ───────────────────────
 //
-// The golden site does not have a clean link graph, and a harness that ignored that would have failed this
-// story for defects it did not cause. 1,013 of its own internal hrefs dangle: source-file links the portal
-// never rewrites (`…/epics.md`), and a renderer bug that emits NESTED anchors
-// (`<a href="../../<a href="…">…</a>">`), which is a real pre-existing defect worth its own follow-up.
+// ⚠️ THIS GATE COULD NOT FAIL BETWEEN STORY 23.6 AND 2026-08-08. [Story 23.3 code review]
 //
-// So the gate is: a link that RESOLVES in the golden site and DANGLES in the Nuxt output is a migration
-// regression and fails. A link that dangles in both is inherited, reported by count, and not this story's.
-// A link that dangles in the golden and resolves here is reported too — silently "fixing" things is its own
-// way of hiding a difference.
+// It used to compare two trees and fail on a REGRESSION — a link that resolved in the golden site C# wrote
+// and dangled in the Nuxt output. Story 23.6 deleted the C# page writer, so both sides collapsed onto the
+// same directory (`goldenFiles = nuxtFiles = siteFiles`). The classifier and the exit condition were left
+// untouched, and because `scan()` is deterministic in `(root, files)`, the two link maps became the SAME MAP:
+// the gating bucket `!resolved && goldenResolved` reduced to `!x && x` and became unreachable. Every dangling
+// link was filed as `inherited` ("not this story's") and `process.exit(regressions.length > 0)` was a
+// constant 0. Proven by running the classifier over a single dangling link: regressions 0, exit 0. That is
+// the vacuous-oracle class ADR 0033 §Decision 5 forbids.
 //
-// Run `npm run generate` first.
+// The replacement keeps the property that made the original design right — the site carries ~1,000 dangling
+// internal links that predate this story (source-file `…/epics.md` targets the portal never rewrites, and a
+// renderer bug emitting NESTED anchors, `<a href="../../<a href="…">…</a>">`), and a gate that failed on
+// those would fail this story for defects it did not cause. So the known set is PINNED, and the gate asks the
+// one question that is actually about regression:
+//
+//   does this build introduce a dangling link that was not already in the baseline?
+//
+// A newly-dangling link FAILS, named with its page. A link in the baseline that now resolves is reported as
+// `fixed` — not a failure, but a prompt to re-pin, because a baseline that is never shrunk decays into a
+// permanent exemption.
+//
+// ── How this sits against ADR 0033 ──────────────────────────────────────────────────────────────────────
+//
+//   localizes failure   yes — every failure names the page and the href, never a bare count.
+//   reviewable diff     yes — `npm run pin:links` rewrites a sorted JSON list, so re-pinning shows WHICH
+//                       links changed, not a hex bump.
+//   sibling-proof       ⚠️ PARTIALLY, and unlike `check:parity` this is deliberate. `check:parity` freezes
+//                       its corpus so a doc edit cannot redden it. A link gate cannot do that and still be a
+//                       link gate: it has to run over the live site, so a sibling story that adds a page
+//                       with a broken link WILL turn this red. That is the gate working — but it means a red
+//                       run here is not automatically YOUR bug. The failure list names the page, so check
+//                       whose surface it is before assuming.
+//
+// Run `npm run generate` first, then `npm run pin:links` once to establish the baseline.
 
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { join, posix } from 'node:path'
-import { assertFullRun, MEASUREMENTS_DIR, pad, walk } from './harness-lib.mjs'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { assertFullRun, DANGLING_BASELINE, MEASUREMENTS_DIR, pad, readOrNull, walk } from './harness-lib.mjs'
+import { assertRealCorpus, classifyAgainstBaseline, scan } from './links-lib.mjs'
 
 assertFullRun('check:links')
 
@@ -47,104 +73,34 @@ const ir = await import('../ir/adapter.ts')
  * resolve? That is what this now asks, over the real emitted pages, with a hard failure when there are none.
  */
 const siteFiles = walk(ir.IR_DIR)
-const sitePages = siteFiles.filter((f) => f.endsWith('.html'))
-if (sitePages.length < 50) {
-  console.error(
-    `check:links — VACUOUS: only ${sitePages.length} page(s) under ${ir.IR_DIR}. "No dangling links" over an `
-      + 'empty set proves nothing. Re-run the generate before trusting this gate.',
-  )
+assertRealCorpus('check:links', ir.IR_DIR, siteFiles)
+
+const nuxt = scan(ir.IR_DIR, siteFiles)
+
+// ── Compare against the pinned baseline ────────────────────────────────────────────────────────────────
+//
+// One scan, one tree. The second `scan()` that used to stand in for the golden site was removed with the
+// classifier it fed: after Story 23.6 it read the same directory with the same file list, so it could only
+// ever produce the same map.
+
+const baselineRaw = readOrNull(DANGLING_BASELINE)
+if (baselineRaw === null) {
+  console.error('check:links — NO BASELINE PINNED.')
+  console.error(`  Expected: ${DANGLING_BASELINE}`)
+  console.error('')
+  console.error('  This gate fails on a dangling link that is NOT already in the baseline, so without one it')
+  console.error('  cannot tell a pre-existing defect from a new one. It fails CLOSED rather than passing,')
+  console.error('  because a link gate that silently passes is exactly the defect this replaced.')
+  console.error('')
+  console.error('  Fix: generate the site, then run `npm run pin:links` and commit the result.')
   process.exit(1)
 }
-const nuxtFiles = siteFiles
-const goldenFiles = siteFiles
 
-/** External, in-page, or non-navigational. Not this harness's business. */
-function isSkippable(href) {
-  return (
-    href === '' ||
-    href.startsWith('#') ||
-    href.startsWith('mailto:') ||
-    href.startsWith('tel:') ||
-    href.startsWith('javascript:') ||
-    /^[a-z][a-z0-9+.-]*:/i.test(href) ||
-    href.startsWith('//')
-  )
-}
+/** `{ generatedBy, count, dangling: ["<page>\t<href>", …] }` — sorted, so re-pinning gives a reviewable diff. */
+const baseline = JSON.parse(baselineRaw)
+const known = new Set(baseline.dangling ?? [])
 
-/** Entity-decodes the handful of entities an href can carry. No parser, no dependency. */
-function decodeHref(href) {
-  return href
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-}
-
-/**
- * Every internal link on every page of one tree, as `page\thref` -> resolved | null.
- *
- * Keyed by page AND href so the two trees can be compared link-for-link rather than only by totals — a
- * count that happens to match can still be hiding one broken link and one newly-working one.
- */
-function scan(root, files, label) {
-  const emitted = new Set(files)
-  const pages = files.filter((f) => f.endsWith('.html'))
-  const links = new Map()
-  const counts = { total: 0, skipped: 0, internal: 0, resolved: 0, dangling: 0 }
-
-  for (const page of pages) {
-    const html = readFileSync(join(root, page), 'utf8')
-    const dir = posix.dirname(page)
-
-    for (const m of html.matchAll(/<a\b[^>]*?\shref\s*=\s*(?:"([^"]*)"|'([^']*)')/gi)) {
-      counts.total += 1
-      const raw = decodeHref(m[1] ?? m[2] ?? '')
-      if (isSkippable(raw)) {
-        counts.skipped += 1
-        continue
-      }
-      counts.internal += 1
-
-      const target = raw.split('#')[0].split('?')[0]
-      const resolvedPath =
-        target === ''
-          ? page
-          : target.startsWith('/')
-            ? posix.normalize(target).replace(/^\/+/, '')
-            : posix.normalize(posix.join(dir === '.' ? '' : dir, target))
-
-      // A directory-style target resolves to its index, the way a static server serves it.
-      const ok =
-        emitted.has(resolvedPath) || emitted.has(`${resolvedPath.replace(/\/$/, '')}/index.html`)
-      counts[ok ? 'resolved' : 'dangling'] += 1
-      links.set(`${page}\t${raw}`, ok ? resolvedPath : null)
-    }
-  }
-  return { label, root, pages: pages.length, files: files.length, counts, links }
-}
-
-const nuxt = scan(ir.IR_DIR, nuxtFiles, 'nuxt')
-const golden = scan(ir.IR_DIR, goldenFiles, 'golden')
-
-// ── Compare ────────────────────────────────────────────────────────────────────────────────────────────
-
-const regressions = []
-const inherited = []
-const repaired = []
-const nuxtOnly = []
-
-for (const [key, resolved] of nuxt.links) {
-  const [page, href] = key.split('\t')
-  const goldenResolved = golden.links.has(key) ? golden.links.get(key) : undefined
-  if (goldenResolved === undefined) {
-    if (!resolved) nuxtOnly.push({ page, href })
-    continue
-  }
-  if (!resolved && goldenResolved) regressions.push({ page, href })
-  else if (!resolved && !goldenResolved) inherited.push({ page, href })
-  else if (resolved && !goldenResolved) repaired.push({ page, href })
-}
+const { newlyDangling, stillDangling, fixed } = classifyAgainstBaseline(nuxt.links, known)
 
 const distinct = (rows) => new Set(rows.map((r) => r.href)).size
 
@@ -171,24 +127,35 @@ say(pad('  resolved', 26) + nuxt.counts.resolved)
 say(pad('  dangling', 26) + nuxt.counts.dangling)
 say('')
 
-if (regressions.length > 0) {
-  say(`${regressions.length} link(s) that dangle:`)
+say(pad('  baseline pinned', 26) + `${known.size}  (${baseline.pinnedAt ?? 'date not recorded'})`)
+say(pad('  still dangling', 26) + stillDangling.length)
+say(pad('  NEWLY dangling', 26) + `${newlyDangling.length}${newlyDangling.length > 0 ? '   <-- fails' : ''}`)
+say(pad('  fixed since pinning', 26) + fixed.length)
+say('')
+
+if (newlyDangling.length > 0) {
+  say(`${newlyDangling.length} link(s) dangle that were NOT in the baseline — this build introduced them:`)
   say('')
   say(pad('href', 62) + 'on page')
   say('-'.repeat(110))
-  for (const r of regressions.slice(0, 40)) say(pad(r.href.slice(0, 60), 62) + r.page)
-  if (regressions.length > 40) say(`… and ${regressions.length - 40} more (all in measurements/links.json).`)
+  for (const r of newlyDangling.slice(0, 40)) say(pad(r.href.slice(0, 60), 62) + r.page)
+  if (newlyDangling.length > 40) {
+    say(`… and ${newlyDangling.length - 40} more (all in measurements/links.json).`)
+  }
+  say('')
+  say('  If one of these is a page a SIBLING story owns, it is theirs to fix — this gate runs over the live')
+  say('  site and cannot be frozen the way `check:parity` is. If they are genuinely accepted debt, re-pin')
+  say('  with `npm run pin:links` and say in the story record what you accepted and why.')
   say('')
 } else {
-  say(`Every internal link that has a target resolves. ${nuxt.counts.dangling} dangling reference(s) remain —`)
-  say('pre-existing and unchanged by this story; see the two known causes below.')
+  say(`No new dangling links. ${stillDangling.length} known reference(s) remain from the baseline.`)
   say('')
 }
 
-if (inherited.length > 0) {
+if (stillDangling.length > 0) {
   const byHref = new Map()
-  for (const r of inherited) byHref.set(r.href, (byHref.get(r.href) ?? 0) + 1)
-  say('Inherited dangling targets (present in the golden site, reproduced faithfully here):')
+  for (const r of stillDangling) byHref.set(r.href, (byHref.get(r.href) ?? 0) + 1)
+  say('Known dangling targets, carried from the baseline:')
   say('')
   for (const [href, n] of [...byHref].sort((a, b) => b[1] - a[1]).slice(0, 12)) {
     say(`  ${pad(n, 6)}${href.slice(0, 96)}`)
@@ -201,6 +168,16 @@ if (inherited.length > 0) {
   say('')
 }
 
+if (fixed.length > 0) {
+  say(`${fixed.length} baseline entr(y/ies) no longer dangle — re-pin so the baseline shrinks with the debt:`)
+  say('')
+  for (const f of fixed.slice(0, 10)) say(`  ${pad(f.href.slice(0, 60), 62)}${f.page}`)
+  if (fixed.length > 10) say(`  … and ${fixed.length - 10} more (all in measurements/links.json).`)
+  say('')
+  say('  `npm run pin:links`. A baseline that only ever grows is an exemption, not a record.')
+  say('')
+}
+
 mkdirSync(MEASUREMENTS_DIR, { recursive: true })
 writeFileSync(join(MEASUREMENTS_DIR, 'links.txt'), `${lines.join('\n')}\n`, 'utf8')
 writeFileSync(
@@ -208,12 +185,12 @@ writeFileSync(
   `${JSON.stringify(
     {
       generatedBy: 'web/scripts/check-links.mjs',
-      nuxt: { pages: nuxt.pages, files: nuxt.files, counts: nuxt.counts },
-      golden: { pages: golden.pages, files: golden.files, counts: golden.counts },
-      regressions,
-      repaired,
-      nuxtOnly,
-      inheritedDistinct: [...new Set(inherited.map((r) => r.href))].sort(),
+      site: { pages: nuxt.pages, files: nuxt.files, counts: nuxt.counts },
+      baseline: { file: 'web/measurements/links-baseline.json', count: known.size, pinnedAt: baseline.pinnedAt ?? null },
+      newlyDangling,
+      fixed,
+      stillDanglingCount: stillDangling.length,
+      stillDanglingDistinct: [...new Set(stillDangling.map((r) => r.href))].sort(),
     },
     null,
     2,
@@ -223,4 +200,4 @@ writeFileSync(
 console.log('  wrote measurements/links.txt + measurements/links.json')
 console.log('')
 
-process.exit(regressions.length > 0 ? 1 : 0)
+process.exit(newlyDangling.length > 0 ? 1 : 0)

@@ -20,6 +20,7 @@
     "sync:assets": "node scripts/sync-runtime-assets.mjs",
     "check:assets": "node scripts/sync-runtime-assets.mjs --check",
     "check:links": "node scripts/check-links.mjs",
+    "pin:links": "node scripts/pin-links.mjs",
     "check:a11y": "node scripts/check-a11y.mjs",
     "measure:payload": "node scripts/measure-payload.mjs",
     "measure:parity": "node scripts/measure-parity.mjs",

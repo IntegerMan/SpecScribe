@@ -11,6 +11,24 @@ import { join, posix, relative, resolve, sep } from 'node:path'
 export const PUBLIC_DIR = resolve(process.cwd(), '.output', 'public')
 export const MEASUREMENTS_DIR = resolve(process.cwd(), 'measurements')
 
+/**
+ * The pinned set of internal links that already dangle. [Story 23.3 code review 2026-08-08]
+ *
+ * `check:links` fails on a dangling link that is NOT in here; `pin:links` rewrites it. Committed, sorted, and
+ * one key per line in JSON so re-pinning produces a diff a reviewer can actually read — ADR 0033 §Decision 3's
+ * "a command, not a constant-bump".
+ */
+export const DANGLING_BASELINE = resolve(MEASUREMENTS_DIR, 'links-baseline.json')
+
+/**
+ * The baseline's key for one dangling link: the page it sits on, then the href, tab-separated.
+ *
+ * Keyed by BOTH on purpose. Keying by href alone would let a broken link migrate to a new page unnoticed;
+ * keying by page alone cannot survive a page gaining a second bad link. The tab is safe as a separator
+ * because neither an output-relative path nor an `href` attribute value can contain a raw tab.
+ */
+export const danglingKey = (page, href) => `${page}\t${href}`
+
 /** Every file under a directory, as output-relative POSIX paths. */
 export function walk(dir, root = dir, out = []) {
   for (const name of readdirSync(dir)) {

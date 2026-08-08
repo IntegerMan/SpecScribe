@@ -4,7 +4,7 @@ baseline_commit: 261b3008545a066ae1b08174b77df5b4abd4fb73
 
 # Story 23.3: Migrate Baseline Surfaces (Dashboard, Epics) to Vue/Nuxt over the IR
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -237,6 +237,99 @@ graph — AC 4) and the six owner decisions locked at create-story (see Dev Note
   - [x] Update `sprint-status.yaml` **and** `epics.md` in the same change if any structural scope drift is
         recorded (CLAUDE.md — a change recorded in only one artifact is a drift bug). This story's ACs 3–8
         extend the epic's two; note that drift explicitly.
+
+### Review Findings
+
+_Code review 2026-08-07 (`/bmad-code-review 23.3`). **Scoped by this story's File List**, not by a commit
+range: 23.3 landed in `32fd282` ("Overnight work"), which also carries 16 `src/`+`tests/` C# files. Those were
+attributed by hunk and **excluded** — spot-checked `tests/SpecScribe.Tests/SiteGeneratorSpaTests.cs`, whose
+hunk self-attributes to **Story 20.6** (the `ss-hierarchy-twin` presentation change), and
+`src/SpecScribe/ModuleContext.cs` + `ModuleContextTests.cs` to **Story 18.2**. AC #8's "no production C#
+ships" claim therefore **holds**. AC #3 was re-verified independently: no SpaDelivery field name appears
+anywhere in `web/` outside `ir/adapter.ts` (the two grep hits, in `ir/types.ts` and `CONVENTIONS.md`, are
+prose stating the rule, not field reads). Findings below were verified against **HEAD `15336f4`**, not against
+the landing commit, so nothing already fixed by a sibling story is reported as open._
+
+- [x] [Review][Decision] **RESOLVED — owner chose (a), pin a baseline and fail on any increase.** Applied
+      2026-08-08. `check:links` now scans one tree once, compares the dangling set against a pinned
+      `web/measurements/links-baseline.json`, and **exits non-zero on a dangling link that is not in the
+      baseline**. `npm run pin:links` is the ADR 0033 §Decision 3 regeneration command (sorted JSON, so a
+      re-pin is a reviewable diff naming the links, not a count bump); it prints newly-accepted entries before
+      you commit them. Entries that start resolving are reported as `fixed` so the baseline shrinks with the
+      debt rather than ossifying into an exemption. The duplicate `scan()` call and the dead classifier are
+      gone; `scan()` and the classifier moved to `web/scripts/links-lib.mjs`, shared by gate and pin command
+      so the two cannot disagree about what "dangling" means. **Proven red and green end-to-end** against a
+      synthetic 60-page site: no baseline → fail-closed; known dangling → green; **newly dangling → RED**;
+      repaired → green; a baseline entry that resolves → reported and still green. `test/links-lib.test.mjs`
+      (10 tests) pins the classifier, including the exact bucket that had become unreachable.
+      ⚠️ **The baseline is not pinned yet** — it needs a real generated site, which this review had no way to
+      produce (`SpecScribeOutput/` is absent here). `check:links` therefore fails closed with instructions
+      until someone runs `npm run generate` then `npm run pin:links` and commits the result. Blast radius is
+      small: `check:links` is not in the `npm run check` chain and this repo has no tracked CI workflow.
+- [x] [Review][Decision] ~~**`npm run check:links` — the AC #4 gate cannot fail; every dangling link exits 0**~~ —
+      `web/scripts/check-links.mjs:58-59,144,226`. Story 23.6 collapsed both sides of the comparison onto one
+      tree (`const nuxtFiles = siteFiles; const goldenFiles = siteFiles`) after C# stopped writing pages, and
+      added a good vacuous-corpus guard (`sitePages.length < 50`) — but did **not** update the classifier or
+      the exit condition, which are still Story 23.3's. Because `scan()` is deterministic in `(root, files)`
+      and both calls now receive identical arguments, `nuxt.links` and `golden.links` are the same map, so the
+      only gating bucket — `regressions` = `!resolved && goldenResolved` — reduces to `!x && x` and is
+      **structurally unreachable**. Proven by running the classifier verbatim over one dangling link: 1
+      dangling, `regressions` 0, exit **0**. Every dangling link is now filed as `inherited` ("not this
+      story's") and the `${regressions.length} link(s) that dangle:` report section can never print, so
+      dangling links are absent from the human-readable output too. The script's own header meanwhile claims
+      it asks "does every internal link on the GENERATED SITE resolve? ... with a hard failure when there are
+      none" — that hard failure is only the page-count guard. This is the vacuous-oracle class ADR 0033
+      §Decision 5 forbids, in a **live** gate. **Decision needed on the gating policy**, because the site
+      carries ~1,009 pre-existing dangling internal links (source-file `…/epics.md` targets and the
+      double-rewritten nested-anchor defect), so gating on total `dangling` would redden CI for defects this
+      story did not cause. Options: (a) **pin the current dangling count as a baseline and fail on any
+      increase** (recommended — matches how this repo already handles inherited defects, and localizes failure
+      per ADR 0033); (b) gate on `nuxtOnly` only; (c) keep it report-only and correct the header prose plus
+      the report sections so it stops claiming to be a gate.
+- [x] [Review][Patch] **APPLIED 2026-08-08.** `lineAt` now binary-searches a newline index built once per
+      call, and the prelude indent is counted in place instead of slicing the whole remaining stylesheet
+      twice. **445 ms → 7 ms, a 62× speedup, 438 ms saved per call**, with the block array proven
+      **byte-identical** to the old implementation across all 1,783 top-level blocks and every nested
+      at-rule body. Three tests added to `test/ir-content-harvest.test.mjs` pinning the semantics against an
+      independent slice-and-count oracle; **proven red** by a one-character off-by-one before being restored.
+      Original finding: —
+- [x] [Review][Patch] ~~**`readBlocks` spends 99% of its runtime computing line spans no caller reads**~~
+      [`web/scripts/ir-content-lib.mjs:430,454,455,467,468`]. `lineAt(offset)` is
+      `css.slice(0, offset).split('\n').length` — a full prefix copy plus split **per call**, twice per block,
+      plus two more whole-tail slices per block for the `startLine` trimStart arithmetic on line 454. That is
+      O(n²) over a stylesheet that has grown to 333 KB / 7,885 lines / 1,783 top-level blocks. Measured on the
+      current source: `readBlocks` takes **445 ms**, of which **440 ms (99%)** is the line spans; with `lineAt`
+      stubbed it is **5 ms**. Nothing consumes `startLine`/`endLine` — `ir-content-build.mjs`'s own manifest
+      comment records that the per-rule `lines` span was **deliberately removed** from the committed manifest
+      (it reddened CI on `specscribe.css` edits that could not move the layer), and the only other
+      `startLine` references in `web/` belong to `tokens-lib.mjs`, a different module with its own `lineOf`.
+      The cost is paid on every `extract:ir-content` **and** every `check:ir-content`, and grows quadratically
+      as the stylesheet does. Fix: keep the documented block shape but compute the spans in O(n) from a
+      newline-offset table built once per `readBlocks` call.
+
+**Verified and already closed by sibling stories — recorded so the handoff is not lost, not open findings:**
+
+- **`readGoldenChrome`'s bare `catch` silently degraded the whole head projection** (favicon, `?v=` cache-bust
+  and the anti-flash boot marker all vanish, every gate green). Found independently by this review and already
+  fixed by **Story 23.6**, which replaced the scrape with `SpaDelivery.ManifestChrome` and documented the
+  near-miss at `web/ir/adapter.ts:355-375`.
+- **`measure:parity` was a vacuous oracle** — with the golden tree gone every row takes the `NO GOLDEN` branch,
+  `measured` is empty and it exits 0 while comparing nothing. Found independently here and already documented
+  and superseded by **Story 23.6** (`check:parity` / `pin:parity` over a pinned corpus); `measure:parity` is
+  out of the `npm run check` chain and kept only as the record of how the oracle was produced.
+- **`web/scripts/ir-content-build.mjs` shipped with a raw NUL byte** (a Map-key separator written as a literal
+  `\0` rather than the `\u0000` escape), so Git sniffed the whole file as binary: it landed in `32fd282` as
+  `Bin 0 -> 10433 bytes` with **no reviewable diff**, and was exempt from `.gitattributes` text normalization.
+  Fixed in `811ba17`; the current source carries a comment at line 311-314 explaining exactly why the escape
+  form is mandatory.
+
+_Dismissed as noise (7): the three above (fixed); `parseAttributes` rendering a valueless `<main>` attribute as
+`attr=""` (latent, no such attribute exists today, and `measure:parity` fails loudly if one appears);
+`createStaticVNode(html, 1)`'s node count being wrong for multi-root runs (unreachable — IR routes carry
+`noScripts: true` and `#ir` resolves to a throwing client stub, so hydration cannot run); `error.vue`'s
+absolute `/index.html` (defensible — an error page renders at arbitrary depth and cannot compute a relative
+prefix); and the dead bare-`*` branch in `ROOT_HEADS` caused by the trailing `\b` (harmless — the fallthrough
+scopes `*` under `.ir-content`, which is containment, not leakage)._
 
 ## Dev Notes
 
