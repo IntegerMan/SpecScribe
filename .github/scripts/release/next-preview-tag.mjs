@@ -10,7 +10,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 
 const Bootstrap = { major: 0, minor: 1, patch: 0 };
-const NumberPart = '(?:0|[1-9]\\d*)';
+const NumberPart = String.raw`(?:0|[1-9]\d*)`;
 const BasePattern = new RegExp(`^(?<major>${NumberPart})\\.(?<minor>${NumberPart})\\.(?<patch>${NumberPart})$`);
 const TagPattern = new RegExp(`^v(?<major>${NumberPart})\\.(?<minor>${NumberPart})\\.(?<patch>${NumberPart})-preview\\.(?<preview>[1-9]\\d*)$`);
 
@@ -38,7 +38,7 @@ function baseFileArgument(args) {
 
 async function readStdin() {
   const chunks = [];
-  for await (const chunk of process.stdin) chunks.push(chunk);
+  for await (const chunk of process.stdin) chunks[chunks.length] = chunk;
   return Buffer.concat(chunks).toString('utf8');
 }
 

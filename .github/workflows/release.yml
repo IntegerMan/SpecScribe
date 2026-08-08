@@ -29,6 +29,8 @@ jobs:
     name: promote Stage A release
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      TAG: ${{ inputs.tag }}
     permissions:
       contents: write
       id-token: write
@@ -46,7 +48,6 @@ jobs:
       - name: Validate the Stage A tag and prerelease release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
           [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-preview\.[1-9][0-9]*$ ]] || { echo '::error::Tag must be vMAJOR.MINOR.PATCH-preview.N.'; exit 1; }
@@ -59,7 +60,7 @@ jobs:
         run: |
           set -euo pipefail
           VERSION=$(dotnet msbuild src/SpecScribe/SpecScribe.csproj -t:MinVer -getProperty:MinVerVersion | tr -d '[:space:]')
-          EXPECTED='${{ inputs.tag }}'; EXPECTED="${EXPECTED#v}"
+          EXPECTED="${TAG#v}"
           [ "$VERSION" = "$EXPECTED" ] || { echo '::error::MinVer did not resolve the requested tag.'; exit 1; }
           bash .github/scripts/release/assert-version-unpublished.sh "$NUGET_PACKAGE_ID" "$VERSION"
           [ -n '${{ vars.NUGET_USER }}' ] || { echo '::error::NUGET_USER is not configured.'; exit 1; }
@@ -67,7 +68,6 @@ jobs:
       - name: Download the immutable Stage A nupkg handoff asset
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
           mkdir pkg
@@ -79,11 +79,10 @@ jobs:
         with:
           user: ${{ vars.NUGET_USER }}
       - name: Push the Stage A package to nuget.org
-        run: dotnet nuget push pkg/*.nupkg --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json
+        run: dotnet nuget push ./pkg/*.nupkg --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json
       - name: Append changelog notes above Stage A digest body
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
           gh release view "$TAG" --json body --jq .body > stage-a-body.md

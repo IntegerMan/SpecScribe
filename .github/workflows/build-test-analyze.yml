@@ -228,7 +228,7 @@ jobs:
             /d:sonar.cs.opencover.reportsPaths="**/TestResults/**/coverage.opencover.xml" `
             /d:sonar.javascript.lcov.reportPaths="web/coverage/lcov.info" `
             /d:sonar.test.inclusions="web/test/**" `
-            /d:sonar.coverage.exclusions="web/test/**,web/server/plugins/**,web/scripts/check-links.mjs,web/scripts/check-a11y.mjs,web/scripts/measure-parity.mjs,web/scripts/measure-payload.mjs,web/scripts/check-parity.mjs,web/scripts/pin-parity.mjs,web/scripts/render-lib.mjs,web/scripts/experiment-two-ir.mjs,web/scripts/build-package.mjs,web/scripts/sync-runtime-assets.mjs,web/scripts/extract-tokens.mjs,web/scripts/extract-ir-content.mjs,web/scripts/check-tokens.mjs,web/scripts/check-ir-content.mjs,web/scripts/ir-content-build.mjs" `
+            /d:sonar.coverage.exclusions=".github/**,web/test/**,web/server/plugins/**,web/scripts/check-links.mjs,web/scripts/check-a11y.mjs,web/scripts/measure-parity.mjs,web/scripts/measure-payload.mjs,web/scripts/check-parity.mjs,web/scripts/pin-parity.mjs,web/scripts/render-lib.mjs,web/scripts/experiment-two-ir.mjs,web/scripts/build-package.mjs,web/scripts/sync-runtime-assets.mjs,web/scripts/extract-tokens.mjs,web/scripts/extract-ir-content.mjs,web/scripts/check-tokens.mjs,web/scripts/check-ir-content.mjs,web/scripts/ir-content-build.mjs" `
             /d:sonar.exclusions="src/SpecScribe/assets/prism.js,src/SpecScribe/assets/prism.css,src/SpecScribe/assets/plotly-hierarchy.min.js,spike/**,tools/**,extension/node_modules/**,extension/dist/**,extension/bin/**,web/node_modules/**,web/.output/**,web/.nuxt/**,web/public/**,web/coverage/**,web/measurements/**,web/assets/tokens.css,web/assets/ir-content.css,SpecScribeOutput/**,docs/live/**,artifacts/**,_bmad-output/**,_bmad/**,.claude/**,.agents/**,chat.json"
 
       - name: Build
@@ -284,7 +284,10 @@ jobs:
         env:
           # See the ordering note above — this is what lets the install run before any IR exists.
           SPECSCRIBE_PACKAGE_BUILD: "1"
-        run: npm ci
+        # Install without lifecycle hooks, then run only this repository's required
+        # Nuxt preparation hook explicitly. This prevents dependency lifecycle
+        # scripts from gaining an implicit CI execution path.
+        run: npm ci --ignore-scripts && npm run postinstall
 
       - name: Sync runtime assets into web/public
         working-directory: web
@@ -484,7 +487,9 @@ jobs:
           # empty, which is exactly what it is for. (Same reason as the gating job above; there the cycle is
           # subtler, here the IR is simply never produced.)
           SPECSCRIBE_PACKAGE_BUILD: "1"
-        run: npm ci
+        # Match the gated job's explicit lifecycle policy: dependencies install
+        # without hooks, then this repository's Nuxt preparation runs by name.
+        run: npm ci --ignore-scripts && npm run postinstall
 
       - name: Build the project-independent renderer artefact
         working-directory: web
@@ -570,7 +575,7 @@ jobs:
       - run: bash .github/scripts/release/assert-source-date-epoch.sh "$SOURCE_DATE_EPOCH"
       - working-directory: web
         env: { SPECSCRIBE_PACKAGE_BUILD: "1" }
-        run: npm ci
+        run: npm ci --ignore-scripts && npm run postinstall
       - working-directory: web
         run: npm run sync:assets && npm run build:package
       - run: dotnet pack src/SpecScribe/SpecScribe.csproj -c Release -o artifacts
@@ -616,7 +621,7 @@ jobs:
       - run: bash .github/scripts/release/assert-source-date-epoch.sh "$SOURCE_DATE_EPOCH"
       - working-directory: web
         env: { SPECSCRIBE_PACKAGE_BUILD: "1" }
-        run: npm ci
+        run: npm ci --ignore-scripts && npm run postinstall
       - working-directory: web
         run: npm run sync:assets && npm run build:package
       - name: Publish and archive the complete RID payload
@@ -681,7 +686,7 @@ jobs:
           # Every attached asset needs a consumer-verifiable digest. The nupkg is
           # also attached as Stage B's immutable handoff, so it belongs here with
           # the three direct-download archives.
-          (cd dist && sha256sum *.zip *.tar.gz *.nupkg > ../digests.txt)
+          (cd dist && sha256sum -- ./*.zip ./*.tar.gz ./*.nupkg > ../digests.txt)
           node .github/scripts/release/release-body.mjs --version "$VERSION" --digests digests.txt --repo '${{ github.repository }}' > release-body.md
           # The tag was reserved in stage-a-prepare. Verify our SHA still owns it, then
           # promote it to an annotated tag in place so the release object has a message.
@@ -690,4 +695,4 @@ jobs:
           [ "$REMOTE_SHA" = '${{ needs.stage-a-prepare.outputs.sha }}' ] || { echo '::error::Reserved tag is missing or was claimed externally; rerun from main for the next preview number.'; exit 1; }
           git tag -a -f "$TAG" '${{ needs.stage-a-prepare.outputs.sha }}' -m "Stage A release $TAG"
           git push --force origin "refs/tags/$TAG"
-          gh release create "$TAG" --prerelease --title "$TAG" --notes-file release-body.md --target '${{ needs.stage-a-prepare.outputs.sha }}' dist/*
+          gh release create "$TAG" --prerelease --title "$TAG" --notes-file release-body.md --target '${{ needs.stage-a-prepare.outputs.sha }}' ./dist/*
