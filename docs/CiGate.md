@@ -175,8 +175,21 @@ constrains writes to a ref, so it cannot block a deployment.
 
 Per [ADR 0040 §9](adrs/0040-release-channels-and-versioning-policy.md), the release pipeline does **not**
 re-run build+test inside the release job. It requires that **the tagged commit is already green on `main`**.
-That is Story 16.4's to implement; this document's job is to make "green on `main`" mean something. The query
-shape is:
+This document's job is to make "green on `main`" mean something.
+
+**Implemented by Story 16.4** in [`.github/workflows/release.yml`](../.github/workflows/release.yml)'s
+`preflight` job, which runs before anything is built and before any credential exchange. The decision logic is
+[`.github/scripts/release/gate-verdict.mjs`](../.github/scripts/release/gate-verdict.mjs) and the polling
+wrapper is `require-green-gate.sh`; both are driven red and green from fixtures by `selftest.mjs`, which runs
+as the first job of every release. See [docs/Releasing.md](Releasing.md) § How publishing is gated on build +
+test for the failure branches (no run found, in progress, red re-run) and what the operator sees for each.
+
+> ⚠️ **The shipped implementation uses the CHECK-RUNS API, not the workflow-runs query below.** Both answer the
+> question; the check-runs form answers it in one call and cannot express the job-vs-run trap at all, because
+> check runs are already per-job. The query below is kept because it is the shape to reach for at a terminal,
+> and because it documents the trap that motivated the choice.
+
+The query shape is:
 
 ```sh
 # Latest build-test-analyze conclusion for the exact commit a tag points at

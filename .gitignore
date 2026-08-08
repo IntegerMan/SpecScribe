@@ -24,6 +24,15 @@ mono_crash.*
 [Dd]ebugPublic/
 [Rr]elease/
 [Rr]eleases/
+
+# 🚨 EXEMPTION, AND IT IS LOAD-BEARING. `[Rr]elease/` above is the stock .NET build-output rule, and it
+# matches ANY directory called `release/` at ANY depth — including `.github/scripts/release/`, which holds the
+# release pipeline's assertion scripts. Without this line those eight files are silently absent from every
+# commit, `git status` reports a clean tree, and the failure surfaces on the runner as "No such file or
+# directory" DURING A RELEASE. Caught in Story 16.4 by checking `git status` against the File List rather than
+# trusting it. Do not remove, and do not reorder it above the rule it exempts — a negation only works after
+# the pattern it undoes.
+!.github/scripts/release/
 x64/
 x86/
 [Ww][Ii][Nn]32/

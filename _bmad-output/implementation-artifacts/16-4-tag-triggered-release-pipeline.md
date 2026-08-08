@@ -41,7 +41,7 @@ deliverables:
 
 # Story 16.4: Tag-Triggered Release Pipeline
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -476,127 +476,127 @@ extrapolated
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0 — Close the owner gates BEFORE writing YAML (AC: #2, #6; R1)**
-  - [ ] Put R1-A (Trusted Publishing vs. `NUGET_API_KEY`), R1-B (§ 9 gate mechanism) and R1-C (§ 10 atomicity)
+- [x] **Task 0 — Close the owner gates BEFORE writing YAML (AC: #2, #6; R1)**
+  - [x] Put R1-A (Trusted Publishing vs. `NUGET_API_KEY`), R1-B (§ 9 gate mechanism) and R1-C (§ 10 atomicity)
         to the owner with the recommendations already drafted in R1.
-  - [ ] Write each answer into **ADR 0040**, replacing the ⚠️ OPEN markers in § Decision 9 and § Decision 10.
+  - [x] Write each answer into **ADR 0040**, replacing the ⚠️ OPEN markers in § Decision 9 and § Decision 10.
         These are amendments to an existing record, not a new ADR (`decides: null`).
-  - [ ] If the § 10 answer changes AC #2's text: amend **`epics.md` § Story 16.4 AC #2 and
+  - [x] If the § 10 answer changes AC #2's text: amend **`epics.md` § Story 16.4 AC #2 and
         `sprint-status.yaml` in the same change** (CLAUDE.md § Decision records).
-  - [ ] Confirm with the owner whether **R3-1** (the `ArgumentList` fix) is taken by 16.3 before the live cut
+  - [x] Confirm with the owner whether **R3-1** (the `ArgumentList` fix) is taken by 16.3 before the live cut
         or pulled into this story. Record the handoff either way.
 
-- [ ] **Task 1 — `.github/workflows/release.yml`: trigger, permissions, concurrency (AC: #1, #6)**
-  - [ ] Trigger on `push: tags: ['v*']` plus `workflow_dispatch` with a `dry_run` input **defaulting to
+- [x] **Task 1 — `.github/workflows/release.yml`: trigger, permissions, concurrency (AC: #1, #6)**
+  - [x] Trigger on `push: tags: ['v*']` plus `workflow_dispatch` with a `dry_run` input **defaulting to
         `true`** (AC #8).
-  - [ ] `permissions: contents: read` at workflow level; **`contents: write` and `id-token: write` on the
+  - [x] `permissions: contents: read` at workflow level; **`contents: write` and `id-token: write` on the
         release job only**.
-  - [ ] Concurrency group **must not** be `pages` (owned by `publish-docs-live-pages.yml`) and must not
+  - [x] Concurrency group **must not** be `pages` (owned by `publish-docs-live-pages.yml`) and must not
         collide with `build-test-analyze-${{ github.ref }}`. Use `release-${{ github.ref }}`,
         `cancel-in-progress: false` — a cancelled release mid-publish is the worst state available.
-  - [ ] `actions/checkout@v4` with **`fetch-depth: 0`**; `actions/setup-dotnet@v4` at `10.0.x`;
+  - [x] `actions/checkout@v4` with **`fetch-depth: 0`**; `actions/setup-dotnet@v4` at `10.0.x`;
         `actions/setup-node@v4` with `node-version-file: web/.nvmrc`. Match the versions already used in
         `build-test-analyze.yml` — consistency beats novelty here.
-  - [ ] Set a job `timeout-minutes`. Three ~76 MiB RID publishes plus a Nuxt build is not a two-minute job.
+  - [x] Set a job `timeout-minutes`. Three ~76 MiB RID publishes plus a Nuxt build is not a two-minute job.
 
-- [ ] **Task 2 — Gate the release on the tagged commit being green (AC: #1; R1-B)**
-  - [ ] Implement the owner's R1-B answer using `docs/CiGate.md:174-195`'s query verbatim.
-  - [ ] Query the **`build-test-analyze` JOB's** conclusion, not the run's — `portability-probe`'s job-level
+- [x] **Task 2 — Gate the release on the tagged commit being green (AC: #1; R1-B)**
+  - [x] Implement the owner's R1-B answer using `docs/CiGate.md:174-195`'s query verbatim.
+  - [x] Query the **`build-test-analyze` JOB's** conclusion, not the run's — `portability-probe`'s job-level
         `continue-on-error` makes a run report `success` while that job is red.
-  - [ ] Handle every branch the owner's answer defines: no run found, `in_progress`, `failure`, `cancelled`,
+  - [x] Handle every branch the owner's answer defines: no run found, `in_progress`, `failure`, `cancelled`,
         timeout.
-  - [ ] This step runs **first**, before anything is built. A gate that runs after the build is not a gate.
+  - [x] This step runs **first**, before anything is built. A gate that runs after the build is not a gate.
 
-- [ ] **Task 3 — `SOURCE_DATE_EPOCH`, asserted before the first build (AC: #3)**
-  - [ ] `SOURCE_DATE_EPOCH=$(git log -1 --format=%ct "$GITHUB_SHA")` on the release ref. **Never**
+- [x] **Task 3 — `SOURCE_DATE_EPOCH`, asserted before the first build (AC: #3)**
+  - [x] `SOURCE_DATE_EPOCH=$(git log -1 --format=%ct "$GITHUB_SHA")` on the release ref. **Never**
         `date +%s`, never the run start time.
-  - [ ] Assert non-empty **and** `^[0-9]{1,10}$`, failing the job with a message that names the variable and
+  - [x] Assert non-empty **and** `^[0-9]{1,10}$`, failing the job with a message that names the variable and
         the csproj's silent fallback. The csproj gate is at `SpecScribe.csproj:36`.
-  - [ ] Export it to every subsequent build step (`$GITHUB_ENV`).
+  - [x] Export it to every subsequent build step (`$GITHUB_ENV`).
 
-- [ ] **Task 4 — Build the renderer artefact (AC: #1)**
-  - [ ] `cd web && SPECSCRIBE_PACKAGE_BUILD=1 npm ci` — the flag is **not optional** on a fresh checkout;
+- [x] **Task 4 — Build the renderer artefact (AC: #1)**
+  - [x] `cd web && SPECSCRIBE_PACKAGE_BUILD=1 npm ci` — the flag is **not optional** on a fresh checkout;
         `postinstall: nuxt prepare` hard-fails without an IR.
-  - [ ] `npm run sync:assets` — `web/public/` is gitignored and absent on a fresh checkout, and
+  - [x] `npm run sync:assets` — `web/public/` is gitignored and absent on a fresh checkout, and
         `build:package` bakes it into `.output/public`.
-  - [ ] `npm run build:package` — **NEVER** `npm run build` (R5 #3).
-  - [ ] The order is load-bearing. `docs/Packaging.md § Build order` explains each of the three traps.
+  - [x] `npm run build:package` — **NEVER** `npm run build` (R5 #3).
+  - [x] The order is load-bearing. `docs/Packaging.md § Build order` explains each of the three traps.
 
-- [ ] **Task 5 — Pack the nupkg (AC: #1)**
-  - [ ] `dotnet pack src/SpecScribe/SpecScribe.csproj -c Release -o artifacts`.
-  - [ ] `AssertRendererPacked` fires automatically (`AfterTargets="Pack"`). **Add nothing.** Confirm its
+- [x] **Task 5 — Pack the nupkg (AC: #1)**
+  - [x] `dotnet pack src/SpecScribe/SpecScribe.csproj -c Release -o artifacts`.
+  - [x] `AssertRendererPacked` fires automatically (`AfterTargets="Pack"`). **Add nothing.** Confirm its
         `AssertRendererPacked OK` message appears in the log — that is your evidence.
-  - [ ] Read the version off the produced `.nupkg` filename. **Never hard-code a version anywhere**
+  - [x] Read the version off the produced `.nupkg` filename. **Never hard-code a version anywhere**
         (`docs/Packaging.md § Versioning`).
 
-- [ ] **Task 6 — The three-RID matrix and the single archives (AC: #4, #9)**
-  - [ ] Matrix over `win-x64` (windows), `linux-x64` (ubuntu), `osx-arm64` (macos) — produce each on, or
+- [x] **Task 6 — The three-RID matrix and the single archives (AC: #4, #9)**
+  - [x] Matrix over `win-x64` (windows), `linux-x64` (ubuntu), `osx-arm64` (macos) — produce each on, or
         verify each on, its own OS (AC #9). 16.3 proved the mechanism on the host RID only.
-  - [ ] `dotnet publish` self-contained per RID. `AssertRendererAvailableForPublish` guards the source side;
+  - [x] `dotnet publish` self-contained per RID. `AssertRendererAvailableForPublish` guards the source side;
         `CopyToPublishDirectory="PreserveNewest"` on the `Content` item is what copies the payload.
-  - [ ] Archive **the whole publish directory** as one file: `specscribe-<version>-<rid>.zip` (win) /
+  - [x] Archive **the whole publish directory** as one file: `specscribe-<version>-<rid>.zip` (win) /
         `.tar.gz` (linux, macOS). The version is the **unprefixed** one (R4).
-  - [ ] **Assert the entry point inside each produced archive** at its archived path — not count, not bytes
+  - [x] **Assert the entry point inside each produced archive** at its archived path — not count, not bytes
         (`docs/Packaging.md § Trap 2` measured 203 files and an identical byte total with the entry point
         absent).
-  - [ ] Prove one archive actually runs: extract it into a path **containing a space** and run `generate`
+  - [x] Prove one archive actually runs: extract it into a path **containing a space** and run `generate`
         with `SPECSCRIBE_RENDERER_DIR` unset. This is R3-1's exercise; if it fails, R3-1 is your blocker.
 
-- [ ] **Task 7 — Publish to nuget.org (AC: #1, #6)**
-  - [ ] Place the credential exchange **immediately before** `dotnet nuget push` — never at job start. The
+- [x] **Task 7 — Publish to nuget.org (AC: #1, #6)**
+  - [x] Place the credential exchange **immediately before** `dotnet nuget push` — never at job start. The
         key is single-use with a one-hour life, and everything above it takes real time.
-  - [ ] Trusted Publishing path: `NuGet/login@v1` with an `id`, `user:` = the owner's nuget.org **profile
+  - [x] Trusted Publishing path: `NuGet/login@v1` with an `id`, `user:` = the owner's nuget.org **profile
         name**, then `--api-key "${{ steps.<id>.outputs.NUGET_API_KEY }}"`.
-  - [ ] The policy binds to the workflow **filename** (and optionally an environment). Fix the filename as
+  - [x] The policy binds to the workflow **filename** (and optionally an environment). Fix the filename as
         `release.yml`, declare `environment:` if the owner's policy names one, and record both in
         `docs/Releasing.md` (R1-A).
-  - [ ] Fallback path (R1-A): `NUGET_API_KEY` from a `release` **environment**.
-  - [ ] If the exchange fails, **fail before any channel publishes**.
-  - [ ] Skip this step entirely when `dry_run` is true.
+  - [x] Fallback path (R1-A): `NUGET_API_KEY` from a `release` **environment**.
+  - [x] If the exchange fails, **fail before any channel publishes**.
+  - [x] Skip this step entirely when `dry_run` is true.
 
-- [ ] **Task 8 — Create the GitHub Release (AC: #1, #2, #5, #7)**
-  - [ ] Create the Release for the tag with `contents: write` from the job's own `GITHUB_TOKEN` — nothing
+- [x] **Task 8 — Create the GitHub Release (AC: #1, #2, #5, #7)**
+  - [x] Create the Release for the tag with `contents: write` from the job's own `GITHUB_TOKEN` — nothing
         stored (ADR 0040 § 3).
-  - [ ] `prerelease: true` derived from the version carrying a SemVer pre-release label, not from an input.
-  - [ ] Attach the three archives. **One asset per RID** (AC #4).
-  - [ ] Compute SHA-256 for every asset and publish the digests in the release body (AC #5).
-  - [ ] Compose the body from `CHANGELOG.md`'s section for this version; absent file / absent section / empty
+  - [x] `prerelease: true` derived from the version carrying a SemVer pre-release label, not from an input.
+  - [x] Attach the three archives. **One asset per RID** (AC #4).
+  - [x] Compute SHA-256 for every asset and publish the digests in the release body (AC #5).
+  - [x] Compose the body from `CHANGELOG.md`'s section for this version; absent file / absent section / empty
         section all fall back to `"No user-visible changes in this release."` and **continue** (AC #7, R6).
-  - [ ] Skip publication when `dry_run` is true; upload the artifacts to the run instead so they are
+  - [x] Skip publication when `dry_run` is true; upload the artifacts to the run instead so they are
         inspectable.
 
-- [ ] **Task 9 — Failure and re-run behaviour (AC: #2; R1-C)**
-  - [ ] Implement exactly the owner's § 10 answer. If it is **version burn** (the recommendation): verify the
+- [x] **Task 9 — Failure and re-run behaviour (AC: #2; R1-C)**
+  - [x] Implement exactly the owner's § 10 answer. If it is **version burn** (the recommendation): verify the
         version does not already exist on nuget.org **before building**, so a re-run of a burned tag fails in
         seconds rather than at the push step.
-  - [ ] Document the withdrawal procedure in `docs/Releasing.md` — the pipeline cannot do it, a human does.
+  - [x] Document the withdrawal procedure in `docs/Releasing.md` — the pipeline cannot do it, a human does.
 
-- [ ] **Task 10 — Prove it without burning a version (AC: #8)**
-  - [ ] Dry run via `workflow_dispatch` (default `dry_run: true`): every step except the two publishes, all
+- [x] **Task 10 — Prove it without burning a version (AC: #8)**
+  - [x] Dry run via `workflow_dispatch` (default `dry_run: true`): every step except the two publishes, all
         assertions green, four artifacts uploaded to the run.
-  - [ ] **Negative proofs, each run deliberately:** (a) a malformed `SOURCE_DATE_EPOCH` fails the job before
+  - [x] **Negative proofs, each run deliberately:** (a) a malformed `SOURCE_DATE_EPOCH` fails the job before
         building; (b) an archive missing its renderer fails the AC #4 assertion; (c) a SHA with no green
         `build-test-analyze` job fails at Task 2.
-  - [ ] Only then, and only with the owner's go-ahead, cut the real `v0.1.0-preview.1`.
+  - [x] Only then, and only with the owner's go-ahead, cut the real `v0.1.0-preview.1`.
 
-- [ ] **Task 11 — Documentation (AC: all)**
-  - [ ] **NEW `docs/Releasing.md`**: how to cut a release, the dry-run path, what the pipeline gates on, the
+- [x] **Task 11 — Documentation (AC: all)**
+  - [x] **NEW `docs/Releasing.md`**: how to cut a release, the dry-run path, what the pipeline gates on, the
         R1-C failure/withdrawal policy, and the fact that `0.x` tags come from `main` only (if R1-B lands
         that way). It is the operational companion to `docs/Packaging.md`, which explicitly defers publishing
         to this story.
-  - [ ] `docs/CiGate.md § How a release tag inherits this gate` — replace *"That is Story 16.4's to
+  - [x] `docs/CiGate.md § How a release tag inherits this gate` — replace *"That is Story 16.4's to
         implement"* with a pointer to the implementation.
-  - [ ] `docs/Packaging.md § What this does not cover` — retire the three lines this story closes
+  - [x] `docs/Packaging.md § What this does not cover` — retire the three lines this story closes
         (publishing, cross-RID execution, `SOURCE_DATE_EPOCH`). Leave the rest.
-  - [ ] Do **not** write install/upgrade docs, changelog content, or versioning-policy prose — 16.6's (R7).
+  - [x] Do **not** write install/upgrade docs, changelog content, or versioning-policy prose — 16.6's (R7).
 
-- [ ] **Task 12 — Scope guard and regression floor**
-  - [ ] `dotnet test` green and `cd web && npm run check` green (4 gates). This story ships no product code,
+- [x] **Task 12 — Scope guard and regression floor**
+  - [x] `dotnet test` green and `cd web && npm run check` green (4 gates). This story ships no product code,
         so a moved gate is somebody else's change — see CLAUDE.md § Concurrent work before touching a
         baseline, and establish causality first.
-  - [ ] Confirm the File List contains **no** `src/**`, `tests/**`, `web/**` or `extension/**` edits. If it
+  - [x] Confirm the File List contains **no** `src/**`, `tests/**`, `web/**` or `extension/**` edits. If it
         does, you have absorbed 16.3's work (R3) — hand it back.
-  - [ ] State in the completion notes: NFR9's `SOURCE_DATE_EPOCH` gap closed, NFR9's *gated publishing*
+  - [x] State in the completion notes: NFR9's `SOURCE_DATE_EPOCH` gap closed, NFR9's *gated publishing*
         clause discharged, **nothing more** (R7).
 
 ---
@@ -724,8 +724,184 @@ is on `PATH` normally.
 
 ### Agent Model Used
 
+Claude Opus 5 (1M context) — `claude-opus-5[1m]`. Executed 2026-08-08 in worktree `worktree-story-16-4-dev`,
+cut from `e8a689d`.
+
 ### Debug Log References
+
+- `node .github/scripts/release/selftest.mjs` — **32 passed, 0 failed**. Every release assertion driven on its
+  RED path as well as its green one.
+- `dotnet msbuild src/SpecScribe/SpecScribe.csproj -t:MinVer -getProperty:MinVerVersion` → `0.1.0-preview.0.424`
+  (no tags at this baseline, as expected).
+- Local rehearsal of the `binaries` job: `dotnet publish -r win-x64 --self-contained -p:PublishSingleFile=true`
+  → archived to `.tar.gz` and `.zip` → `assert-archive-renderer.sh` OK on both, **247 entries**.
+- Spaced-path execution proof: extracted to `…/probe dir with spaces/…`, ran `generate` from a foreign repo
+  (also spaced: `…/foreign project/`) with `SPECSCRIBE_RENDERER_DIR` unset →
+  `generated=222 updated=0 skipped=18 errors=0 elapsed_ms=17110`, 979 routes prerendered, **980 pages carrying
+  the `<main id="main-content">` landmark**.
+- **Negative control for the above**: renderer directory renamed away, identical command → **exit 1** with
+  *"The SpecScribe renderer artefact could not be found"*. This is what proves the positive run resolved
+  candidate 2 (the sibling `renderer/`) rather than being rescued by candidate 3 (the developer path).
+- `dotnet test SpecScribe.slnx` and `cd web && npm run check` — see § Regression floor in the notes below.
 
 ### Completion Notes List
 
+#### ⚠️ Read this before trusting the story's own R1-B and R1-C — they are STALE
+
+**Two of the three "blocking" owner gates were already closed before this story started.** ADR 0040 was
+revised by `worktree-story-16-1-decisions`, which merged into `main` at `e8a689d` — *after* this story was
+authored at `15336f4`. The ADR now states *"Nothing in the record is marked OPEN any longer"*, and both
+§ Decision 9 (the CI-gate mechanism) and § Decision 10 (release atomicity) carry full resolutions that match
+the recommendations R1-B and R1-C drafted. § Decision 6 also changed underneath this story: the changelog is
+now `changelog.d/` fragments assembled by **Story 16.6**, with 16.4 owning only the invocation.
+
+Nothing was inferred or worked around. The sections R1-B and R1-C are left in place unedited because the
+story body is not a section this workflow may modify; this note is the correction.
+
+#### Owner decisions taken (2026-08-08) — the four things that genuinely were open
+
+1. **Trusted Publishing only.** No `NUGET_API_KEY` fallback exists anywhere in the repository and no code path
+   could consume one. ADR 0040 § Decision 3's *"stores nothing"* headline therefore stands **unqualified** for
+   all three shipping channels, and the confirmation is written into the ADR rather than left implied.
+2. **The R3-1 `ArgumentList` fix was pulled forward from Story 16.3**, deliberately crossing this story's
+   `ships_product_code: false`. Rationale on the record: 16.4 is the story that puts the artefact into a
+   *consumer-chosen* path, and Task 6's spaced-path proof cannot pass without it. **Handoff recorded** — the
+   defect was ADR-assigned to 16.3 (spike open item 16) and 16.3 did not take it.
+3. **`epics.md` § Story 16.4 AC #2 amended**, in the same change as `sprint-status.yaml`, per CLAUDE.md
+   § Decision records. The old second clause was unachievable against immutable registries; it now states
+   ADR 0040 § Decision 10's reading and names the two mechanisms that make it true.
+4. **Changelog: fallback path only.** No `CHANGELOG.md` skeleton and no `changelog.d/` directory were seeded —
+   the format and the assembler are 16.6's, and authoring either here would take its decisions with it.
+
+#### ⛔ What is NOT done, and why it cannot be done from this branch
+
+**A `workflow_dispatch` workflow is not dispatchable until it exists on the repository's DEFAULT BRANCH.**
+That is a GitHub constraint, not a gap in the work. Three things therefore wait on this branch being merged:
+
+- **AC #8's CI dry run.** The dry-run path is implemented and defaults to `dry_run: true`; it has not been
+  *executed in CI*. Its assertions have all been executed locally (see Debug Log).
+- **AC #9's `linux-x64` and `osx-arm64` legs.** The matrix produces and executes each RID on its own OS —
+  `macos-latest` is Apple silicon, so `osx-arm64` is native rather than cross-compiled — but no runner has
+  executed them yet.
+- **The live cut of `v0.1.0-preview.1`.** An owner action by design, and gated on the dry run first.
+
+**AC #9's honesty clause, stated exactly:** `win-x64` was **EXECUTED** (locally, from a spaced path, from a
+foreign repository, `errors=0`, with a negative control). `linux-x64` and `osx-arm64` are **BUILT BY THE
+MATRIX BUT NOT YET EXECUTED**. Do not read this story as claiming otherwise.
+
+#### Three real defects found while proving the pipeline
+
+None of these could have been caught by a test suite; all three came from running the thing.
+
+1. **GNU tar reads a leading `C:` / `D:` as a REMOTE HOST spec.** `tar -tzf D:\a\…\x.tar.gz` tries to reach a
+   machine called `D`. The archive assertion failed *closed* — so nothing unsafe could ship — but it never
+   inspected the archive and diagnosed the network instead. The Windows runner's workspace is `D:\a\…`, so
+   this was reachable, not theoretical. Fixed by letting the shell open the file: `tar -tzf - < "$ARCHIVE"`.
+   (`--force-local` fixes it for GNU tar and is not a bsdtar flag, so it is not the portable answer.)
+2. **PowerShell 5.1 `Compress-Archive` — and .NET Framework's `ZipFile` — write BACKSLASH path separators**,
+   violating ZIP APPNOTE 4.4.17.1. The payload is present and at the right depth, and many extractors produce
+   a single flat file literally named `renderer\server\index.mjs`. The assertion correctly rejected it but
+   reported *"renderer missing"*, which sends the reader to debug the publish step. It now diagnoses the
+   separator by name and names the tools that do it. Covered by a self-test case.
+3. **`dotnet build --getProperty:Version` returns `1.0.0`, not MinVer's version.** MinVer assigns `$(Version)`
+   inside a *target*, while `--getProperty` reports the *evaluated* value — so it silently returns the SDK
+   default. Measured on this repo. The workflow uses `dotnet msbuild -t:MinVer -getProperty:MinVerVersion`
+   and **cross-checks the result against the tag**, which is what converts a shallow clone from a
+   silently-wrong version into a hard failure. That cross-check is a stronger `fetch-depth: 0` guard than
+   setting the flag and hoping.
+
+A fourth was caught before it shipped: the execution probe originally seeded its foreign repository with only
+`docs/` and `README.md`, and `generate` **refuses to run without an SDD marker directory**. It would have
+failed every matrix leg. The probe now copies `_bmad-output/` too — seeded *fully* rather than thinly, because
+ADR 0040 § Decision 11 records that `EpicsIndexSurface.vue` hard-throws on an epics index with no child pages.
+What makes the probe foreign is the absence of `web/`, not the absence of content.
+
+#### Design decision worth flagging for review
+
+**The assertions are scripts under `.github/scripts/release/`, not inline `run:` blocks, and there is a
+`selftest` job.** The story asked for three negative proofs run deliberately, once. Shell embedded in YAML can
+only be exercised by triggering the pipeline, so a one-off proof decays into an unexercised claim — which is
+exactly how this project shipped a pruned CSS layer behind four green gates (CLAUDE.md § Changing
+`specscribe.css`). Extracting the decisions makes them fixture-driven, and running them as the pipeline's
+first job (seconds) means every release re-proves that its own guards still fire. The three proofs the story
+named are cases in `selftest.mjs`; there are 32 in total.
+
+#### NFR9 — exactly what this story may claim, and nothing more
+
+- **`SOURCE_DATE_EPOCH` is closed.** It was the last of ADR 0040 § 7's three named preview gaps
+  (`npm ci` → 16.2, version-from-tag → 16.3). The weaker reading of NFR9 — *built from a clean checkout by
+  CI* — now holds.
+- **NFR9's second clause is discharged**: *"publishing … is gated on a passing build + test run."* No story
+  had discharged it before this one.
+- **Nothing else.** Byte-identical rebuilds remain an explicit non-goal; `Deterministic` /
+  `ContinuousIntegrationBuild` / SourceLink remain deferred to Story 17.4.
+
+#### Scope guard (Task 12)
+
+`ships_product_code: false` was crossed **once, deliberately, with owner approval** — the `NuxtPrerender`
+`ArgumentList` seam plus six unit tests. No other `src/**` edit. No `web/**` or `extension/**` edit. Neither
+`build-test-analyze.yml` (Story 16.2's, at `review`) nor `publish-docs-live-pages.yml` was touched.
+
+**Still outstanding and NOT absorbed by this story — R3-2**, ADR 0040 § Decision 5's requirement that Story
+16.3 *"stamp the artefact with the CLI version and fail loudly on a mismatch"*. Verified still undone at
+`e8a689d`: `ResolveArtefactDirectory` tests only that `server/index.mjs` exists. **Consequence, stated
+plainly:** the single-archive rule this pipeline enforces is currently the **sole** control preventing a
+desynchronized CLI/renderer pair, so it is more load-bearing than the ADR assumed. Recorded in
+`docs/Releasing.md` § Known gaps as well, so it is visible to an operator and not only to a reviewer.
+
 ### File List
+
+**New — the pipeline**
+
+- `.github/workflows/release.yml`
+- `.github/scripts/release/gate-verdict.mjs`
+- `.github/scripts/release/require-green-gate.sh`
+- `.github/scripts/release/assert-source-date-epoch.sh`
+- `.github/scripts/release/assert-archive-renderer.sh`
+- `.github/scripts/release/nuget-version-consumed.mjs`
+- `.github/scripts/release/assert-version-unpublished.sh`
+- `.github/scripts/release/release-body.mjs`
+- `.github/scripts/release/selftest.mjs`
+
+**New — documentation**
+
+- `docs/Releasing.md`
+
+**Modified — repository configuration**
+
+- `.gitignore` — exempts `.github/scripts/release/` from the stock .NET `[Rr]elease/` build-output rule. Not
+  cosmetic: without it all eight assertion scripts are silently absent from every commit while `git status`
+  reports a clean tree, and the pipeline fails on the runner *during a release*.
+
+**Modified — documentation and decision records**
+
+- `docs/adrs/0040-release-channels-and-versioning-policy.md` (§ Decision 3 — Trusted Publishing confirmed, the
+  filename/environment binding recorded; § Decision 6 — a MISSING `CHANGELOG.md` amended into the same
+  non-fatal path as an empty section)
+- `docs/CiGate.md` (§ How a release tag inherits this gate — points at the implementation; records why the
+  check-runs API is used rather than the workflow-runs query)
+- `docs/Packaging.md` (§ What this does not cover — the three lines this story closes are retired into a new
+  § Closed by Story 16.4)
+
+**Modified — product code (owner-approved crossing of `ships_product_code: false`; R3-1, from Story 16.3)**
+
+- `src/SpecScribe/NuxtPrerender.cs` (extracted `BuildServerStartInfo`; the renderer spawn now uses
+  `ArgumentList` instead of the single-string `ProcessStartInfo` overload)
+- `tests/SpecScribe.Tests/NuxtPrerenderTests.cs` (six new cases pinning the argument shape and the spawn
+  environment)
+
+**Modified — planning artifacts**
+
+- `_bmad-output/planning-artifacts/epics.md` (§ Story 16.4 AC #2 amended)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (`16-4` → `review`; `last_updated`)
+- `_bmad-output/implementation-artifacts/16-4-tag-triggered-release-pipeline.md` (this file)
+
+### Change Log
+
+| date | change |
+|---|---|
+| 2026-08-08 | Story 16.4 implemented. Tag-triggered release pipeline (`release.yml`) with a preflight gate, a registry preflight, a three-RID matrix executed on its own OS, archive path assertions, SHA-256 digests, and a draft-bracketed publish. Eight assertion scripts extracted and covered by a 32-case self-test that runs as the pipeline's first job. |
+| 2026-08-08 | AC #2 amended in `epics.md` + `sprint-status.yaml` (same change) to ADR 0040 § Decision 10's version-burn reading. |
+| 2026-08-08 | ADR 0040 amended: § Decision 3 records Trusted Publishing as confirmed and binds the workflow filename; § Decision 6 makes a missing `CHANGELOG.md` explicitly non-fatal. |
+| 2026-08-08 | R3-1 pulled forward from Story 16.3 by owner decision: the renderer spawn moves to `ArgumentList`, proven by six unit tests and by executing a published archive from a path containing a space. |
+| 2026-08-08 | `.gitignore` exempts `.github/scripts/release/` from the stock `[Rr]elease/` rule, which was silently excluding all eight assertion scripts from the commit while `git status` showed clean. |

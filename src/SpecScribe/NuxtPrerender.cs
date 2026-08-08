@@ -342,19 +342,7 @@ public sealed class NuxtPrerender
         var serverLogAttached = false;
 
         var port = FreePort();
-        var psi = new ProcessStartInfo(NodeExecutable(), Path.Combine(_artefactDir, "server", "index.mjs"))
-        {
-            WorkingDirectory = _artefactDir,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-        };
-        psi.Environment["SPECSCRIBE_IR_DIR"] = Path.GetFullPath(_outputRoot);
-        // Must NOT leak into the server: it stubs the manifest EMPTY, which is correct for BUILDING the artefact
-        // and catastrophic for SERVING with it — every route would render an empty shell at HTTP 200.
-        psi.Environment["SPECSCRIBE_PACKAGE_BUILD"] = string.Empty;
-        psi.Environment["PORT"] = port.ToString();
-        psi.Environment["NITRO_PORT"] = port.ToString();
+        var psi = BuildServerStartInfo(_artefactDir, _outputRoot, port);
 
         Process? proc = null;
         var serverLog = new List<string>();
@@ -443,6 +431,43 @@ public sealed class NuxtPrerender
     }
 
     private static string NodeExecutable() => "node";
+
+    /// <summary>Builds the <see cref="ProcessStartInfo"/> that boots the renderer artefact's Nitro server.
+    ///
+    /// <para><b>The script path goes through <see cref="ProcessStartInfo.ArgumentList"/>, never through the
+    /// single-string <c>arguments</c> overload, and that is load-bearing rather than stylistic.</b> The
+    /// single-string form hands one command line to the OS, which splits it on whitespace — so an artefact under
+    /// <c>C:\Program Files\SpecScribe\</c> reaches Node as three arguments and the process fails looking for
+    /// <c>C:\Program</c>. <c>ArgumentList</c> escapes each element per the platform's own quoting rules.</para>
+    ///
+    /// <para><b>Why it matters here and did not before.</b> Until <see href="../../docs/adrs/0040-release-channels-and-versioning-policy.md">ADR 0040</see>
+    /// §Decision 1, <c>artefactDir</c> was a developer's repo path or an explicit <c>SPECSCRIBE_RENDERER_DIR</c>.
+    /// It is now <c>AppContext.BaseDirectory + "renderer"</c> — <b>a path the consumer chooses at install time</b>
+    /// by unzipping a GitHub Release asset wherever they like. The ADR assigned this fix to Story 16.3 and it was
+    /// not taken; Story 16.4 pulled it forward by owner decision (2026-08-08) because 16.4 is the story that
+    /// actually publishes the archive, and a first run that dies on a spaced path is the failure it would ship.
+    /// The Story 16.1 spike probed a path with no spaces, which is why this was never exercised.</para>
+    ///
+    /// <para>Extracted as an internal seam so the argument shape is unit-testable without spawning Node — the
+    /// C# suite is deliberately Node-free and artefact-free (see <c>NuxtPrerenderTests</c>).</para></summary>
+    internal static ProcessStartInfo BuildServerStartInfo(string artefactDir, string outputRoot, int port)
+    {
+        var psi = new ProcessStartInfo(NodeExecutable())
+        {
+            WorkingDirectory = artefactDir,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        psi.ArgumentList.Add(Path.Combine(artefactDir, "server", "index.mjs"));
+        psi.Environment["SPECSCRIBE_IR_DIR"] = Path.GetFullPath(outputRoot);
+        // Must NOT leak into the server: it stubs the manifest EMPTY, which is correct for BUILDING the artefact
+        // and catastrophic for SERVING with it — every route would render an empty shell at HTTP 200.
+        psi.Environment["SPECSCRIBE_PACKAGE_BUILD"] = string.Empty;
+        psi.Environment["PORT"] = port.ToString();
+        psi.Environment["NITRO_PORT"] = port.ToString();
+        return psi;
+    }
 
     private static void WaitForReady(Process proc, HttpClient http, List<string> serverLog)
     {

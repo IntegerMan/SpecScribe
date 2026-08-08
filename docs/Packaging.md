@@ -220,15 +220,31 @@ Derive these figures rather than quoting them — the payload has moved twice al
 
 ## What this does *not* cover
 
-- **Publishing.** No registry push, no git tag. Story 16.4 (tag-triggered pipeline), Story 16.7 (re-verify
-  end-to-end from the *published* artifact on a clean environment).
-- **Cross-RID execution.** The sibling-copy mechanism is RID-agnostic and was proven on the **host RID only**.
-  Producing and *running* `linux-x64` / `osx-arm64` binaries on their own operating systems is 16.4's CI matrix.
-- **`SOURCE_DATE_EPOCH`.** The csproj already honours it; no workflow sets it. Story 16.4's.
 - **Byte-identical rebuilds.** Explicitly out of scope — ADR 0040 § 7 claims the weaker reading of NFR9
-  ("built from a clean checkout by CI"). Of its three named gaps, `npm ci` is closed and version-from-tag is
-  closed by Story 16.3; `SOURCE_DATE_EPOCH` and `Deterministic`/SourceLink remain.
+  ("built from a clean checkout by CI"). All three of its named preview gaps are now closed — `npm ci` (16.2),
+  version-from-tag (16.3) and `SOURCE_DATE_EPOCH` (16.4) — so the weak reading holds. `Deterministic` /
+  `ContinuousIntegrationBuild` / SourceLink are deferred past the preview to Story 17.4.
 - **The npm and VS Marketplace channels.** Stories 16.8 and 16.5.
+- **Re-verifying from the *published* artifact** on a clean environment. Story 16.7.
+
+### Closed by Story 16.4 — see [docs/Releasing.md](Releasing.md)
+
+These three were listed here as gaps and are now covered by
+[`.github/workflows/release.yml`](../.github/workflows/release.yml):
+
+- **Publishing.** The tag-triggered pipeline pushes to nuget.org through a Trusted Publishing credential
+  exchange and attaches the three self-contained archives to a GitHub Release.
+- **Cross-RID execution.** `win-x64`, `linux-x64` and `osx-arm64` are each **produced on, and executed on,
+  their own operating system** in the release matrix — including a run from a path containing a space, from a
+  foreign repository, with `SPECSCRIBE_RENDERER_DIR` unset. 16.3's host-RID-only proof is superseded.
+- **`SOURCE_DATE_EPOCH`.** Set from the **tagged commit's committer timestamp** and asserted before the first
+  build step, because the csproj's response to a malformed value is to silently stamp today's date.
+
+One thing this document's guards still do **not** cover, and the release pipeline adds: `AssertRendererPacked`
+inspects the produced **nupkg** and `AssertRendererAvailableForPublish` inspects the **source** directory.
+Neither can see inside a produced `.zip` / `.tar.gz`, so the archives carry their own path assertion
+(`assert-archive-renderer.sh`) — asserting the **archived path**, never the entry count or byte total, for
+exactly the reason § Trap 2 measured.
 
 ## Known limitation: the README on nuget.org
 
