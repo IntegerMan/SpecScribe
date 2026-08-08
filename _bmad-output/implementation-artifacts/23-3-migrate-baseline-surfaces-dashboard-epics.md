@@ -4,7 +4,7 @@ baseline_commit: 261b3008545a066ae1b08174b77df5b4abd4fb73
 
 # Story 23.3: Migrate Baseline Surfaces (Dashboard, Epics) to Vue/Nuxt over the IR
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
