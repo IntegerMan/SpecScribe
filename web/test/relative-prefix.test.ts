@@ -34,7 +34,29 @@ describe('relativePrefixFor — route space', () => {
   })
 
   it('ignores a query string', () => {
-    expect(relativePrefixFor('/epics/epic-3.html')).toBe('../')
+    // This assertion used to carry NO query string — it was a byte-for-byte duplicate of the case above, so
+    // the `split('?')` branch had zero coverage while appearing tested: deleting the split left the suite
+    // green. A gate that cannot fail for its stated reason. [Story 23.5 code review 2026-08-08]
+    expect(relativePrefixFor('/epics/epic-3.html?v=2')).toBe('../')
+    expect(relativePrefixFor('/measure/async?debug=1')).toBe('../../')
+  })
+
+  it('ignores a fragment', () => {
+    // Same class as the query string: `#risks` made the route miss the `.html` branch entirely and yielded
+    // '../../' — one level too deep — for a page that is one directory down.
+    expect(relativePrefixFor('/epics/epic-3.html#risks')).toBe('../')
+    expect(relativePrefixFor('/epics/epic-3.html?v=2#risks')).toBe('../')
+  })
+
+  it('strips a TRAILING slash instead of counting it as a directory', () => {
+    // Vue Router is non-strict by default, so `GET /component-library/` resolves to a real 200 page. The
+    // empty final segment was counted as a directory, giving '../../' where the output file
+    // `component-library/index.html` needs '../' — and every asset on that response 404'd, which is exactly
+    // the failure the module exists to prevent. [Story 23.5 code review 2026-08-08]
+    expect(relativePrefixFor('/component-library/')).toBe('../')
+    expect(relativePrefixFor('/design-system/')).toBe('../')
+    expect(relativePrefixFor('/measure/async/')).toBe('../../')
+    expect(relativePrefixFor('/epics/epic-3.html/')).toBe('../')
   })
 
   it('tolerates a doubled leading slash rather than counting it as depth', () => {
@@ -50,7 +72,16 @@ describe('agreement with the adapter (and, through it, PathUtil.RelativePrefix)'
   // Three implementations of one rule — C# `PathUtil.RelativePrefix`, `ir/adapter.ts`'s `relativePrefix`,
   // and the Nitro plugin's route-space variant — is one too many. This pins the two JS ones together so a
   // change to either fails here instead of silently diverging in emitted markup.
-  const irPaths = [
+  //
+  // ⚠️ READ WHAT THIS CAN AND CANNOT DO. It pins AGREEMENT, not correctness: both functions could share the
+  // same bug and stay green. The depth arithmetic itself is pinned by the route-space suite above.
+  //
+  // It used to be eight hand-written literals, which could not detect divergence at depth ≥4, on a segment
+  // containing a dot, or on an extension-less route — and extension-less is the one case the module docblock
+  // says they differ on BY DESIGN, i.e. precisely where an unintended divergence would hide. The corpus is
+  // now generated across depth 0–6 and the documented divergence is pinned as an explicit expectation rather
+  // than left as an untested assumption. [Story 23.5 code review 2026-08-08]
+  const realIrPaths = [
     'index.html',
     'epics.html',
     'epics/epic-3.html',
@@ -61,7 +92,25 @@ describe('agreement with the adapter (and, through it, PathUtil.RelativePrefix)'
     'specs/spec-specscribe/ARCHITECTURE-SPINE.html',
   ]
 
-  it.each(irPaths)('agrees on %s', (irPath) => {
+  // Depth 0–6, including segments carrying dots (`Charts.cs.html`, `harness-lib.mjs.html` are real shapes)
+  // and a doubled extension, which the literal list could not reach.
+  const generatedIrPaths = Array.from({ length: 7 }, (_, depth) => {
+    const dirs = Array.from({ length: depth }, (_, i) => `seg${i}.dir`)
+    return [...dirs, 'Page.name.with.dots.html'].join('/')
+  })
+
+  it.each([...realIrPaths, ...generatedIrPaths])('agrees on %s', (irPath) => {
     expect(relativePrefixFor(`/${irPath}`)).toBe(relativePrefix(irPath))
+  })
+
+  it('diverges by exactly one level on extension-less routes, as documented', () => {
+    // The adapter never sees these (every IR route carries `.html` verbatim), and the route-space function
+    // must add a level because Nitro writes `<route>/index.html`. The divergence is intentional — pinned so
+    // that a change which ACCIDENTALLY aligns or widens it fails here instead of silently altering markup.
+    for (const route of ['design-system', 'component-library', 'measure/async', 'a/b/c']) {
+      const routeSpace = relativePrefixFor(`/${route}`)
+      const adapterSpace = relativePrefix(route)
+      expect(routeSpace).toBe(`../${adapterSpace}`)
+    }
   })
 })

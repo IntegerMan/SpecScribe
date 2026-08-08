@@ -4968,8 +4968,14 @@ So that Epic 16's packaging/release story isn't broken by the presentation-layer
      that RENDERS with it. Measured: build toolchain 201.9 MB with 14 native `.node` bindings requiring dlopen;
      shipped artefact 3.78 MB of PURE JS with ZERO native bindings. The two-IR experiment nobody had run — one
      artefact, built with NO IR present, isolated to a directory holding only `.output/` — rendered 1,056/1,056
-     routes of this repo and 32/33 of a DIFFERENT project via SPECSCRIBE_IR_DIR, at ~4 ms/route (full pass 6.3 s vs
+     routes of this repo and 32/33 of a DIFFERENT project via SPECSCRIBE_IR_DIR, at ~4 ms/route (full pass 6.2 s vs
      `nuxt generate` 25-30 s vs the spike's ~130 s cold). Net new shipped bytes ~2.40 MB.
+
+     ⚠️ SAY IT THE WAY THE EVIDENCE DOES [code review 2026-08-08, owner decision D1]: the HYPOTHESIS holds, and the
+     HARNESS's own verdict is REFUTED — it applies a strict binary, so CORA's one HTTP 500 (`DashboardSurface.vue`
+     throwing on a dashboard with no Hierarchy Explorer, raised to 23.3) refutes it. "CONFIRMED with one documented
+     exception" is the accurate phrasing; the bare "CONFIRMED" this note used to carry contradicted the committed
+     `two-ir.json`. Timings above are transcribed from that file (an earlier revision published a different run's).
 
      AC #2 CORRECTION: it names two channels and ADR 0012's formula has three; npx and the extension host BOTH run
      on Node by construction, so the standalone binary (16.3) is the only channel a Node dependency breaks. It takes

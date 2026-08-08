@@ -69,13 +69,41 @@ verbatim** — the same oracle `measure:parity` uses.
 
 | IR | project | routes | passed | boot | median | p95 | full pass |
 |---|---|---|---|---|---|---|---|
-| A | SpecScribe (1,056 pages) | 1,056 | **1,056 / 1,056** | 713 ms | 3.8 ms | 14.6 ms | **6.3 s** |
-| B | CORA (a different repo) | 33 | 32 / 33 | 518 ms | 4.5 ms | 17.0 ms | 1.0 s |
+| A | SpecScribe (1,056 pages) | 1,056 | **1,056 / 1,056** | 540 ms | 3.7 ms | 13.2 ms | **6.2 s** |
+| B | CORA (a different repo) | 33 | 32 / 33 | 528 ms | 5.9 ms | 17.6 ms | 1.1 s |
 
-**Confirmed.** The route table baked into `nitro.prerender.routes` at config-load time does not bind the
-artefact when the caller drives the routes.
+> **Every figure in this table is transcribed from the committed `web/measurements/two-ir.json`.**
+> It previously published 713 ms / 3.8 / 14.6 / **6.3 s** for A and 518 / 4.5 / 17.0 / 1.0 s for B — numbers
+> from a run other than the committed one (A's boot off by 32%, B's median by 31%), while §1 claimed the
+> table was "Harness-derived". The pass counts were always correct. Corrected by the Story 23.5 code review,
+> 2026-08-08.
 
-Against the 23.1 baselines: a full pass is **6.3 s**, versus `nuxt generate` at 25–30 s on this machine and
+**Confirmed, with one documented exception — and the harness itself reads REFUTED.** Say both, because they
+are both true and the second is the machine-checkable one:
+
+- **The hypothesis under test holds.** The route table baked into `nitro.prerender.routes` at config-load
+  time does **not** bind the artefact when the caller drives the routes. One artefact, built with no IR
+  present at all, rendered 1,056/1,056 routes of this repo and 32/33 of a genuinely different project.
+- **The harness's own verdict is `REFUTED`**, recorded in `two-ir.json` and `two-ir.txt`, because it applies
+  a strict binary: any failing route on any IR refutes. The single failure is `index.html` on CORA, HTTP 500,
+  caused by `DashboardSurface.vue` hard-throwing on a project whose dashboard carries no Hierarchy Explorer
+  — a component-level project-independence defect, raised to Story 23.3 rather than patched here. It does
+  not bear on whether a prebuilt artefact can serve many projects, which is what AC #4 asked.
+
+The earlier revision of this report said only "Confirmed" and the word REFUTED appeared in no human-facing
+artifact, while the committed evidence it pointed readers at said exactly that. The shortfall itself was
+always disclosed; the verdict was not. [Story 23.5 code review 2026-08-08, owner decision D1]
+
+⚠️ **These numbers predate a correction to the harness's correctness oracle.** The same review found that the
+oracle compared the IR's bytes against the WHOLE PAGE (`html.includes`) rather than the `<main>` region it
+documents (`emitted.includes`), so it could not detect IR content re-parented outside `<main>`. That is fixed
+(`experiment-two-ir.mjs`), but the run above has **not** been re-executed under the corrected oracle — IR B
+requires the CORA tree, which is not part of this repository. The result is corroborated independently:
+`measure:parity` applies the correct `<main>`-scoped oracle and recorded **190/190 verbatim** on the same
+build, so the outcome is unlikely to move. Treat it as corroborated but not re-derived, and re-run before
+citing these figures as fresh evidence.
+
+Against the 23.1 baselines: a full pass is **6.2 s**, versus `nuxt generate` at 25–30 s on this machine and
 the spike's 37.1 s warm / ~130 s cold. **The cold path stops existing** — no `npm ci`, no Vite build, no
 `node_modules` at generate time.
 

@@ -39,18 +39,42 @@ const here = dirname(fileURLToPath(import.meta.url))
 // closes a local/packaging gap rather than an unguarded pipeline, but the artefact is the wrong thing to
 // leave to CI. Run it first: a drifted token is cheaper to catch before a full prerender than after.
 // [Story 23.2 review 2026-08-07]
+/**
+ * Exit on a failed step, saying WHY.
+ *
+ * Branching on `.status` alone loses the whole spawn-failure class: when the spawn itself fails (`ENOENT` —
+ * e.g. this script run as `node scripts/build-package.mjs` rather than through `npm run`, so
+ * `node_modules/.bin` is off PATH) `status` is `null`, `error` is populated and never read, and
+ * `stdio: 'inherit'` prints nothing. The process exited 1 with no output whatsoever, which is indis-
+ * tinguishable from a gate that ran and failed. [Story 23.5 code review 2026-08-08]
+ */
+function exitIfFailed(step, result) {
+  if (result.error) {
+    console.error(`\n✗ ${step} could not be started: ${result.error.message}`)
+    if (result.error.code === 'ENOENT') {
+      console.error(`  The executable was not found. Run this through \`npm run build:package\` so npm puts`)
+      console.error(`  node_modules/.bin on PATH, or run \`npm ci\` first.`)
+    }
+    process.exit(1)
+  }
+  if (result.status !== 0) {
+    console.error(`\n✗ ${step} failed (exit ${result.status ?? 'signal ' + result.signal}).`)
+    process.exit(result.status ?? 1)
+  }
+}
+
 const tokens = spawnSync(process.execPath, [join(here, 'check-tokens.mjs')], {
   cwd: join(here, '..'),
   stdio: 'inherit',
 })
-if (tokens.status !== 0) process.exit(tokens.status ?? 1)
+exitIfFailed('check-tokens', tokens)
 
 // Static assets still come from the C# source of truth — the artefact ships them, so they must be current.
 const sync = spawnSync(process.execPath, [join(here, 'sync-runtime-assets.mjs')], {
   cwd: join(here, '..'),
   stdio: 'inherit',
 })
-if (sync.status !== 0) process.exit(sync.status ?? 1)
+exitIfFailed('sync-runtime-assets', sync)
 
 // Resolve nuxt's own entry point and run it under THIS node, rather than spawning the bare name `nuxt`
 // through a shell. [Story 17.2 Task 2, javascript:S4036]
@@ -76,4 +100,4 @@ const build = spawnSync(process.execPath, [nuxtBin, 'build'], {
   stdio: 'inherit',
   env: { ...process.env, SPECSCRIBE_PACKAGE_BUILD: '1' },
 })
-process.exit(build.status ?? 1)
+exitIfFailed('nuxt build', build)

@@ -13,11 +13,17 @@
  * same story for the packaging artefact) stubs the manifest empty, so the module imports cleanly with no IR
  * present. Any test that needs real IR DATA must therefore build its own fixture rather than read one.
  */
+import vue from '@vitejs/plugin-vue'
 import { defineConfig } from 'vitest/config'
 
 process.env.SPECSCRIBE_PACKAGE_BUILD = '1'
 
 export default defineConfig({
+  // Required for the `.vue` files in `coverage.include` below to be TRANSFORMED at all. Without it v8 has
+  // nothing to instrument and every component is silently dropped from the report rather than reported at
+  // 0% — which is the shape of the defect owner decision D3 exists to close, so leaving the plugin out
+  // would reintroduce it by another route. [Story 23.5 code review 2026-08-08]
+  plugins: [vue()],
   test: {
     env: { SPECSCRIBE_PACKAGE_BUILD: '1' },
     include: ['test/**/*.test.{ts,mjs}'],
@@ -26,7 +32,21 @@ export default defineConfig({
       // `lcov` is what Sonar consumes; `text` keeps a local run readable without opening a file.
       reporter: ['text', 'lcov'],
       reportsDirectory: 'coverage',
-      include: ['ir/**/*.ts', 'scripts/*.mjs', 'server/**/*.ts', 'components/**/*.ts'],
+      // ⚠️ `.vue`, not `.ts`, for components. This used to read `components/**/*.ts` — components are `.vue`
+      // files, so that glob matched NOTHING and no component ever reached `lcov.info`. Sonar independently
+      // excluded `web/**/*.vue`, so the "honest gap" both configs claimed to document was in neither
+      // denominator: it contributed zero rather than 0%, adding component tests would have LOWERED the
+      // reported number, and dropping the Sonar exclusion later would have revealed a cliff nobody
+      // predicted. Both sides now count `.vue`. [Story 23.5 code review 2026-08-08, owner decision D3]
+      include: [
+        'ir/**/*.ts',
+        'scripts/*.mjs',
+        'server/**/*.ts',
+        'components/**/*.{ts,vue}',
+        'pages/**/*.vue',
+        'layouts/**/*.vue',
+        'app.vue',
+      ],
       // Harnesses that exist to DRIVE a built site rather than to be unit-tested: they spawn servers, walk
       // `.output/`, and assert on a full generate. Excluded from the coverage denominator deliberately and
       // named here so the exclusion is a decision on the record rather than a silent gap.
