@@ -414,31 +414,52 @@ retirement condition._
 
 ### Review Findings
 
-⚠️ **PARTIAL REVIEW, 2026-08-08 — do not read as a clean review.** All five adversarial layers (Blind Hunter
-×2, Edge Case Hunter ×2, Acceptance Auditor) terminated on an account session limit before returning any
-findings. The three items below are the orchestrating session's own reading only; whole areas of this story —
-the 25 templater migrations, the harness widening, and the AC audit — were **not reviewed by any layer**.
-Full record, scope statement and the five resumable reviewer prompts:
-[`23-4-code-review-2026-08-08.md`](23-4-code-review-2026-08-08.md).
+**Code review 2026-08-08 — complete.** Five adversarial layers (Blind Hunter ×2, Edge Case Hunter ×2,
+Acceptance Auditor) plus the orchestrating session: 62 raw findings → **32 after dedupe and triage**
+(2 decision-needed, 20 patch, 5 defer, 35 dismissed). Full record, scope statement, per-AC verdict table and
+the dismissal rationale: [`23-4-code-review-2026-08-08.md`](23-4-code-review-2026-08-08.md).
 
-Scoped by this story's File List over `32fd282..a8c97f3`, sibling hunks (Stories 22.4, 24.1, 24.2, 8.9 in
-`SiteGenerator.cs` / `SpaDelivery.cs` / `DeepAnalyticsTemplater.cs` / `CodeFileTemplater.cs`) excluded by
-attribution. Generated artefacts (`ir-content.css`, `ir-content.manifest.json`, `measurements/*.json`)
-excluded as machine-derived; their derivation is in scope. Build at review time: **0 errors, 0 warnings**.
+Scoped by this story's File List over `32fd282..a8c97f3`; sibling hunks (Stories 22.4, 22.5, 22.6, 18.4–18.6,
+20.9/20.10, 24.1, 8.9, 23.2) excluded by hunk attribution. Generated artefacts excluded as machine-derived;
+their derivation is in scope. Build at review time: **0 errors, 0 warnings**. Every finding re-verified at HEAD
+`85d4c5c`; 23.4-era defects that Story 23.6 has since resolved are dismissed in the record rather than listed
+here.
 
-- [ ] [Review][Patch] `splitContentRegion` cuts at the FIRST `</main>` while nothing asserts there is only one — a stray closer relocates the rest of the page body OUTSIDE the `<main>` landmark via `trailingHtml` [web/ir/adapter.ts:260]. The C# invariant test counts `<main` openers only and never counts closers [tests/SpecScribe.Tests/SiteGeneratorSpaTests.cs:948]. Fix at the emitter — add `Assert.Equal(1, CountOccurrences(html, "</main>"))` — NOT by switching the consumer to `lastIndexOf`, which would corrupt the `trailingHtml` case this story exists to support.
-- [ ] [Review][Patch] `enforce()` throws before its `console.warn` loop, so any fatal contract violation silently discards every accompanying warning — the build fails with one message and none of the context explaining it [web/ir/contracts.ts:87].
-- [x] [Review][Defer] `bodyStart` scans for `<div class="breadcrumb"` from index 0, so a breadcrumb-classed div inside the nav would reclassify nav content as wayfinding [web/ir/adapter.ts:268] — deferred, pre-existing structural fragility inherited from Story 22.4's split rule; not currently reachable and the C# side mirrors the identical logic.
+**Per-AC verdict:** #6, #7 satisfied · #2 satisfied with a documented caveat · #1, #3, #4, #8 partially
+satisfied · **#5 satisfied-in-record-only**.
 
-**Considered and not reported:** `dashboardContract`'s early return before the fatal ADR 0013 twin check when
-`needsHierarchyEngine` is false [web/ir/contracts.ts:50] is owner decision **D6** — accepted risk, documented
-in place. `resolveFamily`'s `pass-through` fallback [web/ir/families.ts:137] is guarded by a completeness gate
-asserting the real manifest leaves it empty, which is the correct shape.
+- [ ] [Review][Decision] **AC #5 — no content-drift gate exists over the C# region output at HEAD.** `GoldenIrFingerprint`, `GoldenContentFingerprint`, `RegionCompositionDeltas` and both proof gates this story landed are all gone; `check:parity` runs a frozen corpus and structurally cannot see a C#-side composer change. Accept as 23.6/Epic 28 work, or gate this story on closing it? Cannot be patched unilaterally — ADR 0033 constrains the shape and the last two attempts were reverted for non-determinism.
+- [ ] [Review][Decision] **The ADR 0013 twin contract's severity model — D6 asked for "not fatal for a chart-less project"; what shipped is "not detectable for any project".** The fatal check is satisfied by an 18-char substring; a project that HAS epics whose explorer vanished is now one `console.warn` among 1,469 routes with a zero exit; "no chart + no twin" and "no chart + twin" are byte-identical outcomes. The IR can separate those states and nothing does.
+- [ ] [Review][Patch] Family regions are composed LAZILY, violating this story's own eager-composition invariant — `AddSpaSurface` and `WebviewSurfaceFor` compose and linkify at bundle time while `WritePage` does it at write time; `OnFirstPaintReady` fires before `_codePages` is populated, so one run can emit two different regions for the same page [src/SpecScribe/SiteGenerator.cs:4504, :4323 vs :4396]
+- [ ] [Review][Patch] `TrimEnd` asymmetry puts two region shapes back into one IR right after `SchemaVersion` was bumped to 2 to unify them; the seam comment misstates what `TrimEnd` does [src/SpecScribe/SiteGenerator.cs:4396 vs :4504]
+- [ ] [Review][Patch] ADR 0013's text-twin contract is enforced on 1 of the 9 chart-bearing pages — `enforce` is called only in `DashboardSurface.vue`; the 8 insight singletons carry chart mounts and are ungated [web/components/surfaces/DashboardSurface.vue:36]
+- [ ] [Review][Patch] The only defence against a silent `pass-through` regression is disabled by `SPECSCRIBE_IR_DIR` (env branch omits `spa/`, so `describe.skipIf` skips) and passes vacuously on a zero-page manifest [web/test/families.test.ts:23, :84]
+- [ ] [Review][Patch] `measure:parity` can exit 0 while measuring nothing — `mainRegion(...) ?? ''`, `.includes('')` always true for degraded pages, `NO GOLDEN` rows uncounted, IR-only divergence never a delta; and the committed digest oracle is written by one script and read by nothing [web/scripts/measure-parity.mjs:116, :122, :161, :143]
+- [ ] [Review][Patch] `AssetManifest.HierarchyBootInline` and `ExtraHead` are write-only — five setters, zero production readers; the three head shapes collapse to one derived boolean and `code-map.html` gets a boot script C# deliberately excluded [src/SpecScribe/AssetManifest.cs:41, :70]
+- [ ] [Review][Patch] `needsHierarchyEngine` is derived from `mainInnerHtml` only, excluding the `trailingHtml` this story added — a mount point there skips the chart boot AND makes the fatal twin check unreachable [web/ir/adapter.ts:340]
+- [ ] [Review][Patch] The `</main>` split boundary is inconsistent across three layers and the suite pins both sides — fix at the emitter with a closer-count assertion AND delete whichever unit test pins the loser [web/ir/adapter.ts:260, web/scripts/harness-lib.mjs:62, tests/SpecScribe.Tests/SiteGeneratorSpaTests.cs:948]
+- [ ] [Review][Patch] `Degraded` is a predicate that cannot return true, dropped the slice's closer condition, and `Contains` matches a page that merely quotes the landmark string [src/SpecScribe/SiteGenerator.cs:3925]
+- [ ] [Review][Patch] `_spaPageViews[path] = …` silently overwrites; a route claimed by two producers vanishes from the manifest and the site with no event [src/SpecScribe/SiteGenerator.cs:4403]
+- [ ] [Review][Patch] The residue classifier that produced the ~6.5 %-prose figure used to amend D3/D5 is unvalidated — bare `code-`/`pre` alternatives claim non-prose rules; 27.9 % of the residue is blocked by classifier fall-through; the owner-facing `.txt` has no per-rule listing [web/scripts/report-ir-content-residue.mjs]
+- [ ] [Review][Patch] `isMigrated = () => true` leaves `harvest(markup, other)` unreachable, so "0 uncovered classes" means "the comparison was removed"; its test cannot fail for any input [web/scripts/ir-content-lib.mjs:221]
+- [ ] [Review][Patch] The AC #4 count is stated as 1,423 / 1,416 / 1,420 across three artifacts and is now 55 short of the manifest's 1,475, with nothing gating manifest↔residue; ADR 0018 also says `chrome` 97 and 92 in one paragraph [web/assets/ir-content.manifest.json, docs/adrs/0018-transitional-ir-content-style-layer.md:81]
+- [ ] [Review][Patch] AC #8's page count is stated as both 1,408 and 1,469 from the same command and never reconciled — it propagated into `epics.md`, ADR 0018, and Story 23.6's tombstone, which cites the wrong one in the sentence licensing its deletion
+- [ ] [Review][Patch] The exhaustive `Record<IrFamily, Component>` is enforced by nothing that runs — no `typecheck` script, no `vue-tsc`, no typecheck step in any workflow; the guarantee exists only in an editor [web/package.json]
+- [ ] [Review][Patch] `enforce()` throws before its `console.warn` loop, discarding the context that explains the failure, and `find` drops the 2nd..nth error [web/ir/contracts.ts:87]
+- [ ] [Review][Patch] `report-ir-content-residue.mjs` prints `NaN%` and exits 0 on a zero-rule manifest — AC #4's own first-branch success state — and throws bare `TypeError`/ENOENT where its sibling gives actionable guidance [web/scripts/report-ir-content-residue.mjs:125]
+- [ ] [Review][Patch] `CapturedPageView`'s doc comment describes skip-id fields the record does not have, and `WritePage`'s `<param>` cites a non-existent `CapturedPageView.Linkify` [src/SpecScribe/SiteGenerator.cs:222, :4381]
+- [ ] [Review][Patch] The File List still claims `FingerprintIr` as delivered; it returns zero hits across `tests/` [this file:1232]
+- [ ] [Review][Patch] `families.ts`: the entry check precedes every other rule, so a project whose entry is also a named page renders it as the dashboard; and `test-artifacts.html`/`ideas*` are classified `doc-prose` against the file's own one-family-per-templater rule [web/ir/families.ts:103, :128]
+- [ ] [Review][Patch] `CommitDetailTemplater` interpolates an unguarded subject into the meta description, shipping a trailing-colon description for an empty-message commit [src/SpecScribe/CommitDetailTemplater.cs:81]
+- [ ] [Review][Patch] `CodeMapTemplater.BuildPage` materialises the generator's largest body twice where every sibling hoists it [src/SpecScribe/CodeMapTemplater.cs:909]
+- [ ] [Review][Patch] `region-split.test.ts` pins `data-ir-family="epicDetail"` on `<main>` — an attribute no C# templater emits, in a casing this story abolished [web/test/region-split.test.ts]
+- [x] [Review][Defer] `bodyStart` scans for `<div class="breadcrumb"` from index 0 [web/ir/adapter.ts:268] — deferred, pre-existing; inherited from 22.4's split rule, not currently reachable, and the C# side mirrors the identical logic so both would agree while both were wrong
+- [x] [Review][Defer] `selectorIsUsed` still drops rules naming unharvested classes with no manifest entry and no gate — recurred five separately-recorded times, each found only in a live browser [web/scripts/ir-content-lib.mjs:579] — deferred, later stories own the mitigation
+- [x] [Review][Defer] `trailingHtml` may be truthy whitespace (`"\n\n"`) given only `WritePage` trims, rendering an empty static vnode outside the landmark [web/components/surfaces/IrSurface.vue:176] — deferred, UNVERIFIED; needs a generated IR, tied to the `TrimEnd` patch
+- [x] [Review][Defer] `.TrimEnd()` allocates a second copy of the 8 MB `code-map.html` on every pass including every watch save [src/SpecScribe/SiteGenerator.cs:4396] — deferred, O(n) with a large constant, no quadratic term
+- [x] [Review][Defer] `measurements/links.*` and `a11y.*` no longer corroborate this story — 23.6 regenerated them and links is now explicitly one-sided — deferred, caused by a later story
 
-**Superseded at HEAD, noted so a later reader does not chase them:** Story 23.6 deleted `WriteOutput` and
-`_spaCapture`, so this story's largest hazard — drift between two parallel captures across six eviction sites
-— no longer exists; and commit `70b72ab` removed `GoldenIrFingerprint`, this story's entire recorded answer to
-AC #5, leaving AC #5 satisfied in the record and **not in the tree**.
+## Dev Notes
 
 ## Dev Notes
 
