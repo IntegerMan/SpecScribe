@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet test *)",
+      "PowerShell(dotnet test *)",
+      "Bash(dotnet build *)",
+      "PowerShell(dotnet build *)",
+      "Bash(npm run check:*)",
+      "PowerShell(npm run check:*)",
+      "Bash(npx vitest *)",
+      "PowerShell(npx vitest *)",
+      "Bash(npx vue-tsc *)",
+      "PowerShell(npx vue-tsc *)",
+      "Bash(npx eslint *)",
+      "PowerShell(npx eslint *)",
+      "Bash(npm run typecheck)",
+      "PowerShell(npm run typecheck)",
+      "Bash(npm run lint)",
+      "PowerShell(npm run lint)",
+      "Bash(dotnet --version)",
+      "PowerShell(dotnet --version)",
+      "Bash(npm --version)",
+      "PowerShell(npm --version)",
+      "mcp__Claude_Browser__navigate",
+      "mcp__Claude_Browser__read_console_messages"
+    ]
+  }
+}
