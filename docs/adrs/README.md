@@ -127,7 +127,7 @@ Each record is numbered by its filename prefix and carries a `**Status:**` line.
   **reported, not gated**, because it is a whole-source function that would redden CI on edits that cannot move the
   layer. ⚠️ The round-trip gate **cannot** catch a bug in its own derivation — it stayed green through all four
   incidents — so `web/test/ir-content-harvest.test.mjs` pins the derivation directly, both directions.)
-- [ADR 0040 — Release Channels, Packaging Shape, Credential Posture and Versioning Policy](0040-release-channels-and-versioning-policy.md) — **Proposed** 2026-08-07
+- [ADR 0040 — Release Channels, Packaging Shape, Credential Posture and Versioning Policy](0040-release-channels-and-versioning-policy.md) — **Accepted** 2026-08-08 (authored 2026-08-07)
   (authored by [Story 16.1](../../_bmad-output/implementation-artifacts/16-1-release-and-distribution-packaging-spike.md),
   the Epic 16 packaging spike; evidence in [16-1-spike-report.md](../../_bmad-output/implementation-artifacts/16-1-spike-report.md)).
   Answers the question [ADR 0006](0006-delivery-architecture-and-distribution.md) and
@@ -149,10 +149,13 @@ Each record is numbered by its filename prefix and carries a `**Status:**` line.
   **2026-03-15**, and `vsce` requires exactly that token shape — so 16.5 must use an **organization**-owned
   publisher with Entra federation; and `npm ci` failed on a clean checkout at `838d591`, breaking even the
   weak reading of NFR9 (✅ since repaired by `0b1f561`).
-  ⚠️ **Open: ratification, and nothing else.** Story 16.1 AC #4 requires this ADR **Accepted**, and Stories
-  16.2–16.9 + 17.4 all build on it — **16.2 and 16.3 have both already shipped against it** (16.3 implementing
-  §Decision 1's pack item and §Decision 5's MinVer derivation directly) while this record is still `Proposed`,
-  and this ADR amends ADR 0022, which is itself `Proposed`. Numbering note: **0039 was already taken** by the
+  ✅ **Ratified 2026-08-08** at the Story 16.1 code review, closing that story's AC #4. Stories 16.2–16.9 +
+  17.4 all build on it, and **16.2 and 16.3 had both already shipped against it while it stood `Proposed`**
+  (16.3 implementing §Decision 5's MinVer derivation directly, and driving the 2026-08-08 **amendment** of
+  §Decision 1's pack item, whose originally-normative form it measured and rejected) — which is what made
+  ratification urgent. ⚠️ **It is `Accepted` while the record it amends, ADR 0022, is still `Proposed`**;
+  ratifying this one did not ratify that one, and **ADR 0022's ratification is the next release-chain one to
+  make**. Numbering note: **0039 was already taken** by the
   runtime-attached-body-level-classes record above (authored from the owner's sunburst verify round), so this
   ADR took 0040; Story 4.9 — which had reserved 0039 — ultimately landed as **0041**. 0019 remains
   claimed-but-unwritten by Story 18.3.

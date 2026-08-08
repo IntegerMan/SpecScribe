@@ -2939,8 +2939,23 @@ So that release builds start from a known-green baseline and regressions are cau
 1.
 **Given** the build+test+analyze workflow established by Story 25.1
 **When** this story runs
-**Then** it is extended and configured as a **required** status check for release-relevant branches — covering pull requests and pushes — restoring, building, and executing the `tests/SpecScribe.Tests` suite on a clean checkout and failing on any build or test failure
+**Then** it is extended and configured as a **required** status check for `main` — covering pull requests and pushes — restoring, building, and executing the `tests/SpecScribe.Tests` suite on a clean checkout and failing on any build or test failure
 **And** it does **not** introduce a second workflow that duplicates the build or test steps.
+
+<!-- ⚠️ AMENDED 2026-08-08 (owner decision, Story 16.1 second code review). AC #1 read "release-relevant
+     branches"; it now reads `main`. THIS IS A DEFERRAL, NOT A DELETION — see § Story 16.10.
+
+     Why: ADR 0040 § Decision 9 was amended the same day to MERGE-TRIGGERED releasing. Stage A is the only
+     tagger and it runs only on `main`, so a release branch has no path to a release at all — release-branch
+     coverage would describe a capability the pipeline cannot use. ADR 0040 § Decision 2 carries the matching
+     non-goal ("the preview is forward-fix only").
+
+     Honesty note, because this AC belongs to a story that has ALREADY MERGED: Story 16.2 shipped `main`-only
+     triggers, so the AC as originally worded was never satisfied. The second code review caught the
+     mismatch between the shipped workflow, this AC and the ADR's new non-goal. Amending the AC to match what
+     shipped — and seating the dropped capability on a named successor — is the honest resolution; silently
+     leaving an unmet AC on a merged story is not. `.github/workflows/build-test-analyze.yml`'s header still
+     names "release-branch coverage" as this story's job and is Story 16.2's to correct. -->
 
 2.
 **Given** the gate is green
@@ -3068,8 +3083,11 @@ So that I can install, run, configure, and contribute to SpecScribe without insi
      added, removed or renumbered. Story 16.1's Task 8 originally certified "no structural scope
      change"; that certification was corrected on this one point. -->
 
-**Depends on:** Story 17.4 (hardening sign-off gates the cut) · **Story 23.3** (the thin-repository
-`errors=1` defect above must be fixed before readiness can pass).
+**Depends on:** Story 17.4 (hardening sign-off gates the cut) · **Story 23.7** (the thin-repository
+`errors=1` defect above must be fixed before readiness can pass). ⚠️ **RE-SEATED 2026-08-08** — this edge
+originally pointed at **Story 23.3**, which closed `done` on 2026-08-08 without shipping the fix, orphaning
+the gate. Owner decision at the Story 16.1 second code review: the work gets its own story,
+**[Story 23.7](#story-237-empty-state-hardening-for-the-migrated-surfaces)**.
 
 As a maintainer,
 I want a final readiness pass before announcing the preview,
@@ -3170,6 +3188,49 @@ So that I can adopt SpecScribe without vendoring its source tree or reproducing 
 **When** the action completes
 **Then** it outputs the generated directory path for a following `upload-pages-artifact`/deploy step
 **And** the repository documents the end-to-end example, replacing README.md's hand-rolled recipe rather than sitting beside it.
+
+### Story 16.10: Release-Branch Coverage (post-preview)
+
+<!-- ⛔ ADDED 2026-08-08 (owner decision, Story 16.1 second code review). STRUCTURAL: a new story, recorded
+     here and in sprint-status.yaml in the same change per CLAUDE.md § Decision records.
+
+     THIS STORY EXISTS SO A DEFERRAL IS NOT A DELETION. Story 16.2's AC #1 originally required the CI gate on
+     "release-relevant branches". ADR 0040 § Decision 9 (amended 2026-08-08) made releasing MERGE-TRIGGERED
+     from `main` — Stage A is the only tagger and runs only on `main` — so under the preview model a release
+     branch has no path to a release, and § Decision 2 carries the matching non-goal. Story 16.2's AC was
+     amended to `main` rather than left unmet, and the dropped capability lands here.
+
+     DO NOT SCHEDULE THIS FOR THE PREVIEW. It is deliberately post-preview: forward-fix-only is what makes
+     ADR 0040 § Decision 9's model total, and adding release branches before there is a stable release to
+     branch FROM would add a path nothing uses. Its natural trigger is the `0.x` → `1.0.0` exit criterion in
+     ADR 0040 § Decision 5, where "a defect in a released version that cannot wait for the next cut" becomes
+     a real scenario for the first time. -->
+
+**Depends on:** Story 16.2 (owns `build-test-analyze.yml`) · ADR 0040 § Decision 5's `0.x` → `1.0.0` exit
+criterion reached, or an earlier owner decision that a hotfix path is needed.
+
+As a maintainer supporting a released version,
+I want a defect fixable without shipping everything else that has landed on `main` since,
+So that a hotfix is a possibility rather than a forced choice between shipping unrelated work and shipping nothing.
+
+**Acceptance Criteria:**
+
+1.
+**Given** `build-test-analyze.yml` triggers only on `main`
+**When** this story runs
+**Then** its `push` trigger covers the release-branch pattern and the gate is a **required** status check on those branches
+**And** it still does not introduce a second workflow that duplicates the build or test steps (epics.md § Story 16.2, AMENDED 2026-07-25).
+
+2.
+**Given** ADR 0040 § Decision 9 Stage A tags only `main`
+**When** a release branch must produce a release
+**Then** the ADR is **amended** to say how — this story does not invent a second, undocumented release path
+**And** ADR 0040 § Decision 2's "release branches and hotfixes" non-goal is amended in the same change, because removing a non-goal is as much a decision as adding one.
+
+3.
+**Given** forward-fix-only is what currently makes § Decision 9's model total
+**When** release branches exist
+**Then** the record states what replaces that totality — which commits may be tagged, and how a branch release's version relates to `main`'s — so the versioning scheme does not fork silently.
 
 <!-- Epic 17 added 2026-07-11 (SCP 2026-07-11, correct-course): pre-publication hardening. Runs after feature
      completion (Epics 1–15, 18) and Epic 5, and BEFORE Epic 16's publish/cut stories — its sign-off (Story 17.4)
@@ -4509,6 +4570,7 @@ Replace SpecScribe's C# presentation/templating layer (~4,691 LOC templaters) wi
 - **Story 23.3 — Migrate baseline surfaces (dashboard, epics) to Vue/Nuxt over the IR**, proving parity with the golden output.
 - **Story 23.5 — Packaging reconciliation** — Node build step in distribution (Epic 16 touchpoint); resolve the self-contained-binary vs. Node-toolchain story. **⚠️ RESEQUENCED AHEAD OF 23.4** by the Story 23.1 spike gate — see the note below.
 - **Story 23.6 — Retire the C# HTML writer** — ⛔ **ADDED 2026-07-30** (owner decision **D7** at Story 23.4's dev-story session 4). The deletion of `HtmlRenderAdapter.Render`'s page composition and `WriteOutput`'s `.html` writes, **carved out of Story 23.4** so that story could close on the work it actually finished. Both original gates are **cleared as of create-story 2026-07-30**: the owner confirmed the verify-and-iterate pass over 23.4's 1,276 migrated pages is finished (D4), and the replacement content-drift gate satisfying [ADR 0033](../../docs/adrs/0033-content-drift-gates-are-targeted-and-regenerable.md) is decided — a new `check:parity` reading back the committed `web/measurements/parity.json` (D2). Status **`ready-for-dev`**, and the scope grew: `--spa` proved to be off by default, so the story now also makes the IR unconditional and drives the prerender from `generate` per ADR 0022 §Decision 3 (D1). See the story section below.
+- **Story 23.7 — Empty-state hardening for the migrated surfaces** — ⛔ **ADDED 2026-08-08** (owner decision at the Story 16.1 second code review). `EpicsIndexSurface.vue` hard-throws when the epics index has no child pages, so a thin or non-BMad repository generates with `errors=1`. Originally routed to Story 23.3, which closed `done` without shipping it and orphaned the gate; it now has its own story so it cannot close silently. **Blocks Story 16.7.** See the story section below.
 - **Story 23.4 — Migrate remaining surfaces + retire the C# `HtmlRenderAdapter` for content** (charts remain C#-SVG in the IR). ~~**Blocked until 23.5 lands.**~~ **UNBLOCKED 2026-07-27** — Story 23.5 is complete and [ADR 0022](../../docs/adrs/0022-node-is-a-build-toolchain-and-a-generate-time-runtime.md) settles packaging: the Node toolchain is build/CI-time only, the shipped artefact is a project-independent 3.78 MB prebuilt `.output/` that renders any project's IR at server runtime, and the standalone binary takes a documented Node prerequisite. The 23.1 gate's binary ("client-rendered SPA *or* Node at run time") was **false** — see the [packaging strategy report](../implementation-artifacts/23-5-packaging-strategy-report.md).
 
 <!-- 2026-07-23 (Story 23.1 spike gate, owner-confirmed in code review): EXECUTION ORDER IS 23.2 → 23.3 → 23.5 → 23.4.
@@ -4568,16 +4630,27 @@ So that visual consistency — status/motion tokens, AD-7 — survives the frame
 
 ### Story 23.3: Migrate Baseline Surfaces (Dashboard, Epics) to Vue/Nuxt over the IR
 
-<!-- 2026-08-07 (Story 16.1, ADR 0040 §Decision 11): THIS STORY NOW GATES STORY 16.7 (cross-epic).
-     Story 16.1's packaging probe reproduced, twice, that `EpicsIndexSurface.vue` HARD-THROWS when
-     the epics index has no child pages — a thin or non-BMad repository generates with `errors=1`
-     and no `epics.html`. It is the same defect class this story already fixed on the sibling
-     surface: `DashboardSurface.vue` handles its own empty case gracefully IN THE SAME RUN, so the
-     correct behaviour is modelled one component over. Routed here rather than patched by 16.1
-     (which ships no product code) and rather than opened as a new story — this story owns the
-     surface and is at `review`, which in this project's lifecycle is still an iterating state.
-     16.7's launch-readiness pass cannot certify "a working install" until this ships.
-     Reciprocal seat recorded at § Story 16.7 and in sprint-status.yaml. -->
+<!-- ~~2026-08-07 (Story 16.1, ADR 0040 §Decision 11): THIS STORY NOW GATES STORY 16.7.~~
+     ⛔ SUPERSEDED 2026-08-08 — THE GATE MOVED TO STORY 23.7. DO NOT re-route work here.
+
+     What happened, recorded because the failure mode is instructive rather than embarrassing:
+     Story 16.1 routed the `EpicsIndexSurface.vue` empty-epics hard-throw to this story on 2026-08-07,
+     on the explicit reasoning that this story owned the surface and was at `review`, which in this
+     project's lifecycle is an ITERATING state. That reasoning was sound when written. But this story
+     then closed `done` at its own code review on 2026-08-08 WITHOUT shipping the fix, and that
+     review's sprint-status note OVERWROTE the reciprocal seat 16.1 had placed on the 23-3 key — so
+     the edge survived only on the 16-7 side, pointing at a closed story, with the defect unfixed.
+     Nothing was watching for the state change. Caught by the Story 16.1 second code review.
+
+     Owner decision (2026-08-08): the work gets its own story rather than reopening this one, so the
+     gate cannot be silently closed again — closing Story 23.7 IS shipping the fix.
+     See § Story 23.7 and § Story 16.7. This story keeps its `done` status and its own review record. -->
+
+<!-- HISTORICAL, for the reader who arrives from a 2026-08-07 citation: the defect is that
+     `EpicsIndexSurface.vue` HARD-THROWS when the epics index has no child pages, so a thin or
+     non-BMad repository generates with `errors=1` and no `epics.html`. It is the same defect class
+     this story DID fix on the sibling surface — `DashboardSurface.vue` handles its own empty case
+     gracefully, in the same run — which is why the sibling was the obvious home for it. -->
 
 As a maintainer validating the migration approach on real surfaces,
 I want the dashboard and epics pages rendered via Vue/Nuxt from the canonical IR,
@@ -4918,6 +4991,63 @@ So that Epic 16's packaging/release story isn't broken by the presentation-layer
      AMENDS ADR 0006 §Decision: its "self-contained packaging ... stand[s]" clause no longer stands unqualified.
      The binary is still self-contained w.r.t. .NET, but acquires an external Node runtime prerequisite. ADR 0006's
      NFR6 ruling is UPHELD IN FULL -- nothing client-renders. -->
+
+### Story 23.7: Empty-State Hardening for the Migrated Surfaces
+
+<!-- ⛔ ADDED 2026-08-08 (owner decision at the Story 16.1 second code review). STRUCTURAL: a new story plus a
+     new cross-epic blocking edge, recorded HERE and in sprint-status.yaml in the same change per
+     CLAUDE.md § Decision records.
+
+     WHY IT EXISTS. Story 16.1's packaging probe reproduced, twice, that `EpicsIndexSurface.vue` HARD-THROWS
+     when the epics index has no child pages, so a thin or non-BMad repository generates with `errors=1` and
+     no `epics.html`. 16.1 ships no product code, so it routed the fix to Story 23.3 — which owned the
+     surface and was then at `review`, an iterating state in this project's lifecycle.
+
+     WHY IT MOVED HERE. Story 23.3 closed `done` at its own code review on 2026-08-08 WITHOUT shipping the
+     fix, and that review's sprint-status note overwrote the reciprocal seat 16.1 had placed on the 23-3 key.
+     The routing argument ("`review` is an iterating state") expired the moment 23.3 left `review`, and
+     nothing was watching for it. The Story 16.1 second code review caught the orphan; the owner's call was
+     to give the work its own story rather than reopen a closed one or bury a Vue fix inside a
+     launch-readiness story. **This is the story that keeps the edge honest: it cannot silently close, because
+     closing it is the whole of its scope.**
+
+     THE CORRECT BEHAVIOUR IS ALREADY MODELLED ONE COMPONENT OVER. `DashboardSurface.vue` handles its own
+     empty case gracefully, fixed in the same run by Story 23.3 after Story 23.5 raised it the same way (see
+     that story's "TWO FINDINGS RECORDED RATHER THAN SMOOTHED", finding 2, immediately above). This story is
+     the sibling fix that did not land, plus a sweep for the same defect class across the other migrated
+     surfaces so the pattern is closed rather than patched twice.
+
+     Reciprocal seat recorded at § Story 16.7 and on both the `23-7` and `16-7` keys in sprint-status.yaml. -->
+
+**Depends on:** nothing. **Blocks:** Story 16.7 (launch readiness cannot certify "a working install" while a
+thin repository fails to generate).
+
+As a maintainer publishing a preview that strangers will run on their own repositories,
+I want every migrated surface to render an honest empty state instead of throwing,
+So that a thin or non-BMad repository produces a working site rather than `errors=1`.
+
+**Acceptance Criteria:**
+
+1.
+**Given** a repository whose epics index has no child pages
+**When** `specscribe generate` runs
+**Then** it completes with `errors=0` and produces an `epics.html` carrying an explicit empty state
+**And** the failure Story 16.1 reproduced twice is covered by a regression test that is proven red before it is proven green.
+
+2.
+**Given** `DashboardSurface.vue` already handles its own empty case gracefully
+**When** this story fixes `EpicsIndexSurface.vue`
+**Then** the two surfaces present their empty states consistently — the same component, copy register and visual treatment, not two independent solutions.
+
+3.
+**Given** this defect class has now surfaced twice on two different surfaces (Story 23.5 → dashboard, Story 16.1 → epics index)
+**When** this story closes
+**Then** every other migrated surface has been audited for the same "hard-throw on empty collection" pattern, and the audit's result is recorded — including the surfaces found already safe, so a future reader knows the sweep was exhaustive rather than incidental.
+
+4.
+**Given** the thin-repository case is the first impression an external adopter gets
+**When** the fix lands
+**Then** it is verified against a real repository with no epics — not a fixture alone — per CLAUDE.md § Verification, and the drift gates are unmoved.
 
 ## Epic 24: File Relationship & Change-Coupling Insights — Directional Metric + Multi-Form Coupling Graphs
 

@@ -52,7 +52,8 @@ the weak reading now holds. It was a live finding, not a theoretical gap.
 > the arithmetic throughout all **stand** — they were re-verified independently.
 >
 > ✅ **Its nine open items were closed on 2026-08-07** by the dev-story pass that followed. **Eight are
-> resolved as decisions in ADR 0040** and tracked in § 10 (items 11–14, 17–19) — release atomicity, the CI
+> resolved as decisions in ADR 0040** and tracked in § 10 (items **1** and 11–14, 17–19 — eight in total; the `EpicsIndexSurface` gate's
+> ownership is item 1, outside the two ranges) — release atomicity, the CI
 > gate's lookup rule and hotfix scope, the MinVer bootstrap, version-component semantics and the `0.x` exit
 > criterion, extension versioning, changelog contention, package-ID escalation, and the `EpicsIndexSurface`
 > gate's ownership. One structural correction came with them: this spike **did** create a cross-epic blocking
@@ -60,8 +61,11 @@ the weak reading now holds. It was a live finding, not a theoretical gap.
 >
 > **The ninth is not a decision but an act — ADR 0040's ratification (AC #4) — and it remains open**, because
 > an agent cannot ratify on the owner's behalf. Note also that the MinVer item was closed largely by
-> *implementation*: **Story 16.3 has shipped since this report was written**, taking § Decision 1's pack item
-> and § Decision 5's MinVer derivation into the tree. Where this report and the live tree disagree, the tree
+> *implementation*: **Story 16.3 has shipped since this report was written**, taking § Decision 5's MinVer
+> derivation into the tree and **measuring § Decision 1's prescribed pack item to be wrong** — one `Content`
+> item serves both channels, so the separate `None`/`PackagePath` item was redundant *and* absorbed its own
+> defects invisibly. § Decision 1 was **amended to the shipped form on 2026-08-08** by owner decision at code
+> review. Where this report and the live tree disagree, the tree
 > is newer — §§ 6.1–6.4 are read as the evidence behind the decision, not as the current state.
 
 ---
@@ -322,7 +326,14 @@ dependency precisely, and § 2 is the evidence it is now satisfiable.
 
 ### 3.2 Explicit non-goals for the preview (AC #1 requires these by name)
 
-**Out, by name:** a stable/1.0 release · Homebrew · winget · Chocolatey · Scoop · a container image
+**Out, by name.** ⚠️ **ADR 0040 § Decision 2 carries the authoritative list; this one is a snapshot and has
+already fallen behind twice.** Do not count from here — the ADR is the single folded list, which is what the
+2026-08-07 code review's patch #30 established, and the 2026-08-08 review found the divergence had recurred.
+As of 2026-08-08 the ADR names **twelve**: the ten below, plus `linux-arm64`/`osx-x64` (stated in the RID
+paragraph that follows), plus **release branches and hotfixes to an already-published preview** (added
+2026-08-08 with the merge-triggered release model, § Decision 9).
+
+The ten recorded here: a stable/1.0 release · Homebrew · winget · Chocolatey · Scoop · a container image
 (recorded but deliberately unseated in epics.md §Story 16.9) · Open VSX · code-signing (§ 5.5) · byte-identical
 reproducible builds (§ 6) · publishing from any CI system other than GitHub Actions.
 
@@ -336,7 +347,9 @@ costs one binary, not one binary plus 1.10 MB.
 
 ## 4. Defects found, raised not patched
 
-This spike ships no product code. Both findings below were reproduced, and both are routed.
+This spike ships no product code. **All three** findings below were reproduced, and all three are routed.
+*(Corrected 2026-08-08: this read "Both findings below" when § 4.3 was added in the second pass and the
+sentence was not updated.)*
 
 ### 4.1 `EpicsIndexSurface.vue` hard-throws on a project with no epics — **the same class as 23.5's `DashboardSurface.vue`**
 
@@ -393,7 +406,18 @@ CLAUDE.md's "worktrees are not available" statement is now stale and should be c
 
 ---
 
-### 4.3 🔴 `main`'s CI is red on a REQUIRED check — a stale 12-byte number in a committed manifest *(found 2026-08-07, second pass)*
+### 4.3 ~~🔴 `main`'s CI is red on a REQUIRED check~~ — a stale 12-byte number in a committed manifest *(found 2026-08-07, second pass; ✅ **RESOLVED 2026-08-08**)*
+
+> ✅ **CLOSED before this section was ever acted on.** `d6ba8f2` (**Story 17.1**, structural and consistency
+> remediation sweep), merged as `9432ff2`, corrected the manifest. At `e8a689d` the committed
+> `web/assets/ir-content.css` measures **186,428 bytes** and the manifest's `stats.generatedBytes` reads
+> **186,428** — note this is off **both** numbers recorded below (186,492 and 186,504), so the sheet moved
+> too, not just the field. `Build, Test & Analyze` is **green** on `main`.
+>
+> **The finding was correct and is kept in full below**, because the diagnosis is the reusable part: the
+> contradiction was provable from the repository alone, it reproduced in CI (which ruled out the usual
+> fresh-worktree pruning cause), and **no baseline was regenerated** to make it go away. That discipline is
+> what CLAUDE.md § Concurrent work asks for, and it is why the defect was routed rather than absorbed.
 
 **Not environmental, not this story's, and it blocks the release preflight this very ADR defines.**
 
@@ -671,11 +695,20 @@ weak reading of NFR9 now holds.
   falls through to `0.0.0-alpha.0.<height>`. Compounding it, **this repository currently has zero git tags**
   (verified 2026-08-07), so deleting `<Version>` before a bootstrap tag exists produces that same default on
   every build — and `README.md:260`'s published recipe installs `--version 0.1.0-preview`, which would then
-  resolve nothing. Every failure mode here is **silent**: `dotnet pack` exits 0. Both prerequisites are now
-  recorded as ⚠️ OPEN in ADR 0040 § Decision 5, and **Story 16.3 must not delete `<Version>` until they are
-  settled.** Also unaddressed: MinVer appends commit height on untagged commits, producing
-  `0.1.0-preview.1.7` — a **fourth** version shape outside the documented `0.MINOR.PATCH-preview.N` scheme,
-  with no rule stating whether such a build may publish.
+  resolve nothing. Every failure mode here is **silent**: `dotnet pack` exits 0.
+
+  ⛔ **SUPERSEDED 2026-08-08 — this paragraph ended with a live instruction that has been overtaken twice.**
+  It read: *"Both prerequisites are now recorded as ⚠️ OPEN in ADR 0040 § Decision 5, and **Story 16.3 must
+  not delete `<Version>` until they are settled.** Also unaddressed: MinVer appends commit height on untagged
+  commits, producing `0.1.0-preview.1.7` — a fourth version shape outside the documented scheme, with no rule
+  stating whether such a build may publish."* At `e8a689d`: **(a)** ADR 0040 § Decision 5 marks neither
+  prerequisite OPEN — both are closed, `MinVerTagPrefix=v` and the `0.1` floor shipped in
+  `SpecScribe.csproj:64-66`, and `<Version>` **is** deleted (`:17`, "NO `<Version>` HERE"), so the
+  instruction now forbids something already done. `README.md`'s literal is gone too — the recipe reads the
+  version off the produced `.nupkg`. **(b)** The height shape is no longer unaddressed: § Decision 5 item 3
+  states the rule, and § Decision 9's merge-triggered tagging **removes** the condition — `main`'s head is
+  always at height 0, so a height-suffixed version occurs only on an untagged branch, which cannot be
+  promoted. Read ADR 0040 § Decision 5, not this paragraph.
 - **Nerdbank.GitVersioning** is more capable and needs a committed `version.json` — a second place a version
   lives, which is the thing R7 warns about.
 - **Plain `-p:Version=` from the tag** works but only in CI; a local `dotnet pack` then produces `1.0.0` and
@@ -723,7 +756,7 @@ pair *"fails as wrong output rather than as an error"* — and a caret range is 
 | where | today | after this policy |
 |---|---|---|
 | `src/SpecScribe/SpecScribe.csproj:19` | `0.1.0-preview` | **Deleted.** MinVer supplies it from the tag. |
-| `extension/package.json:5` | `0.1.0` | **Unchanged for the preview** — the VSIX is out of the cut. When 16.5 runs: the Marketplace has no SemVer pre-release concept, so the version stays plain `0.1.0` and pre-release status is carried by the Marketplace's own **Preview flag** + `vsce publish --pre-release`. Recorded so nobody "fixes" it into `0.1.0-preview` and breaks the Marketplace parse. ⚠️ **OPEN (code review 2026-08-07):** as written this permits **exactly one VSIX publish ever** — the Marketplace requires each publish to carry a strictly greater version, and "stays plain `0.1.0`" gives 16.5 no way to ship a second. It also leaves the extension version fully decoupled from the MinVer-derived CLI version with **no stated correspondence rule**. Owner decision needed before 16.5. |
+| `extension/package.json:5` | `0.1.0` | **Unchanged for the preview** — the VSIX is out of the cut. When 16.5 runs: the Marketplace has no SemVer pre-release concept, so the version stays plain `0.1.0` and pre-release status is carried by the Marketplace's own **Preview flag** + `vsce publish --pre-release`. Recorded so nobody "fixes" it into `0.1.0-preview` and breaks the Marketplace parse. ✅ **DECIDED 2026-08-07, ADR 0040 § Decision 5** (extended 2026-08-08): the extension's MINOR mirrors the CLI's MINOR and its PATCH is its own counter, resetting to 0 on a MINOR bump — so strictly-greater is always satisfiable and the one-publish-ever trap is gone. Storage, the MINOR-bump reset and the missing Marketplace withdrawal step are all specified there. *(This cell previously read "OPEN … owner decision needed before 16.5", contradicting the ADR, § 10 item 14 and the Change Log; corrected 2026-08-08.)* |
 | `README.md:260` | hard-coded `0.1.0-preview` inside the published CI recipe | **Story 16.6's**, not fixed here (Dev Notes excludes README deliberately). Story 16.9 replaces this recipe with the composite Action, which should take the version as an input defaulting to the Action's own tag — removing the literal rather than updating it. |
 | npm wrapper + platform + renderer packages | do not exist | Created at the same version from the same tag, exact-pinned (§ 6.3) |
 
@@ -845,6 +878,11 @@ No file under `src/`, `tests/`, `web/` or `extension/` appears in this story's F
 
 ### 7.2 Gates
 
+⚠️ **The table below is the FIRST PASS's, at `838d591`. It was not updated for the second pass and is
+superseded — the second-pass figures are immediately after it.** *(Recorded 2026-08-08: the Story 16.1 second
+code review found this section, which is AC #6's evidence, contradicting § 4.3 and Task 9 inside the same
+document. Every other stale passage in this report carries an inline correction marker; this one did not.)*
+
 | gate | result |
 |---|---|
 | `dotnet test SpecScribe.slnx` | **2,962 passed / 1 failed / 3 skipped** — see below |
@@ -879,12 +917,34 @@ suggests — **185 rules would have been deleted from the shipped stylesheet lay
 green**. The measured `-185` here versus the workflow's documented `-182` is corpus growth, not a new
 defect.
 
+### 7.2b Gates — SECOND PASS, at `15336f4` (2026-08-07), and the state at `e8a689d` (2026-08-08)
+
+| gate | second pass, `15336f4` | at `e8a689d` |
+|---|---|---|
+| `dotnet test SpecScribe.slnx` | **2,991 passed / 0 failed / 3 skipped** — literally green, no flake, no isolated re-run | unchanged by this story (no code touched) |
+| `npm run check:tokens` | **OK** | OK |
+| `npm run check:ir-content` | 🔴 **RED** — and red on `main` itself, in CI (§ 4.3). Attributed by name to `3b085e7`; **no baseline regenerated** | ✅ **GREEN** — fixed by `d6ba8f2` (Story 17.1); sheet and manifest agree at **186,428 bytes** |
+| `npm run check:assets` | **OK** | OK |
+| `npm run check:parity` | **OK** — 24 routes / 14 families byte-identical | OK |
+
+The second pass changed **no code at all** — its File List is `.md` and `.yaml` only — so the suite is
+unchanged *by construction*. Movement from the previously recorded floor of 2,978 is attributed **by name**
+to merges landed in between: `8faa08c` (Story 16.3), `69c4fe7` (25.3), `4571a2e` (24.2), `15336f4` (23.2).
+
+`Build, Test & Analyze` is **green on `main` at `e8a689d`**, so the § 4.3 blocker is closed — see § 8 action 8.
+
 ### 7.3 Concurrency
 
 This ran in a dedicated worktree (`worktree-story-16-1-dev`, branched from `838d591`), so the shared tree was
 never written to. No `git reset --hard`, `git checkout --` or `git clean` was used at any point. No
-concurrent session's changes were reverted or absorbed; nothing needed to be attributed to one, because the
-only tracked file this story modified outside its own deliverables is `sprint-status.yaml`.
+concurrent session's changes were reverted or absorbed.
+
+⚠️ **Corrected 2026-08-08.** This paragraph continued *"nothing needed to be attributed to one, because the
+only tracked file this story modified outside its own deliverables is `sprint-status.yaml`"* — which the
+**second pass contradicted in this same document**. Two things were attributed to a named session, exactly as
+CLAUDE.md § Concurrent work requires: the red `check:ir-content` gate to **`3b085e7`** (Story 24.2's code
+review) in § 4.3 and Completion Note 17, and the test-count movement to `8faa08c` / `69c4fe7` / `4571a2e` /
+`15336f4` in § 7.2b. The attribution discipline held; only this sentence failed to record it.
 
 ---
 
@@ -906,17 +966,31 @@ Ordered by urgency. The dev agent inventoried these and performed none of them.
    under it.
 6. **Ratify ADR 0040** (AC #4). It is authored and complete at `Proposed`; ratification is yours. **This is
    now the only thing standing between Story 16.1 and done** — the eight technical decisions the code review
-   left open were resolved on 2026-08-07 and are in the record (§ 10, items 11–14 and 17–19). Urgency is not
+   left open were resolved on 2026-08-07 and are in the record (§ 10, items **1** and 11–14 and 17–19 —
+   eight in total; the eighth is item 1, the `EpicsIndexSurface` gate). Urgency is not
    ceremonial: Stories **16.2 and 16.3 have both already shipped against this ADR**, 16.3 implementing
-   § Decision 1's pack item and § Decision 5's MinVer derivation directly.
+   § Decision 5's MinVer derivation directly and driving the 2026-08-08 **amendment** of § Decision 1's pack
+   item, whose originally-normative form it measured and rejected.
 7. **Create the bootstrap tag `v0.1.0-preview.1`** before the first release publishes (§ 10 item 12). Not a
    blocker for anything shipped so far: Story 16.3's MinVer properties make an untagged build emit
    `0.1.0-preview.0.<height>`, which is inside the scheme and keeps the About page's Preview badge. Do it at
    **16.4** time, on a commit that is green on `main`.
-8. 🔴 **URGENT — regenerate the `ir-content` manifest; `main`'s CI is red on a required check** (§ 4.3).
-   `cd web && npm run extract:ir-content`, then commit. One field, 12 bytes; every CSS sheet is
-   byte-identical, so nothing shipped changes. **This is listed above the signing item deliberately: while
-   `main` is red, § Decision 9's release preflight can never pass and no release can be cut at all.**
+8. ~~🔴 **URGENT — regenerate the `ir-content` manifest; `main`'s CI is red on a required check** (§ 4.3).~~
+   ✅ **DONE — resolved by someone else before this action was ever read.** Verified at `e8a689d`
+   (2026-08-08): `d6ba8f2` (**Story 17.1**, structural and consistency remediation sweep) corrected
+   `stats.generatedBytes` and the committed `web/assets/ir-content.css` now measures **186,428 bytes**
+   against a manifest claiming **186,428** — they agree. `Build, Test & Analyze` is **green** on `main`.
+   Note the numbers moved off **both** values recorded here (186,492 and 186,504), so the condition this
+   action described is gone rather than merely fixed at the margin.
+
+   ⚠️ **The command as originally written here was unsafe, and that is worth recording rather than deleting.**
+   It read, in full, `cd web && npm run extract:ir-content`, then commit. That omits the load-bearing
+   preconditions CLAUDE.md devotes three paragraphs to — `dotnet build --no-incremental` → a `generate
+   --deep-git` → *then* extract — because the extractor **prunes every selector it cannot find in the IR**.
+   An owner running it literally on a clean tree would have deleted most of the shipped stylesheet layer and
+   turned the gate green over it: the exact anti-pattern § 4.3 and this story's own Completion Note 8 warn
+   about, handed to the owner as a one-liner. The session itself ran it correctly (see the Debug Log's
+   `generate --deep-git` immediately prior); only the instruction was wrong.
 9. No signing certificate is needed for the preview (§ 5.5) — listed so its absence is a decision on the
    record rather than an omission.
 
@@ -956,7 +1030,7 @@ Everything else in this section remains AC refinement *within* existing stories,
 | 1 | `EpicsIndexSurface.vue` hard-throws on a project with no epics | reproduced twice. ✅ **The gate now has an owner and is landed structurally** — `epics.md` § Story 16.7 **and** § Story 23.3 **and** `sprint-status.yaml`, per CLAUDE.md. 23.3 keeps it: `review` is an iterating state here, and it already fixed the identical class on `DashboardSurface.vue` in the same run | **Story 23.3**, gating **16.7** — *resolved 2026-08-07* |
 | 2 | `FindRepoRoot` does not detect git worktrees (`.git` as a file) | ✅ **FIXED** since, by Story 16.3 | ~~Story 16.3~~ closed |
 | 3 | `npm ci` fails at `838d591` locally | ✅ **FIXED** by `0b1f561`. *The original "CI status unverified (`gh` not installed)" was a **false** limit — `gh` is installed at `C:\Program Files\GitHub CLI\gh.exe`, just not on `PATH` (§ 6.1)* | ~~Story 16.2~~ closed |
-| 4 | SpecScribe discards the renderer's error text behind "HTTP 500" | observed. **Raised in priority** — it is what a consumer sees when an incomplete renderer payload ships (§ 2.7 (1)) | **Story 16.3** |
+| 4 | SpecScribe discards the renderer's error text behind "HTTP 500" | ✅ **FIXED** by Story 16.3 — `NuxtPrerender.DescribeRouteFailure` (`:188`, called at `:385`) now carries the renderer's own message. *Verified in the tree 2026-08-08; this row read "observed, raised in priority" against a story that had already shipped it.* ~~observed. **Raised in priority**~~ — it is what a consumer sees when an incomplete renderer payload ships (§ 2.7 (1)) | **Story 16.3** |
 | 5 | npx end-to-end install proof (§ 2.5 decided the shape from a measured property; no wrapper was published) | **unmeasured** | **Story 16.8** |
 | 6 | `linux-arm64` / `osx-x64` RIDs | deferred by decision | 16.8, on demand |
 | 7 | `extension/package.json`'s `"private": true` vs. `vsce package` | **unconfirmed** — deliberately not tested; R9 forbids editing the manifest here | **Story 16.5** |
@@ -972,19 +1046,25 @@ Everything else in this section remains AC refinement *within* existing stories,
 | **17** | **`CHANGELOG.md` contention** — a single hand-edited root file becomes the highest-contention file in a repository whose CLAUDE.md records a silently-vanished edit | ✅ **DECIDED 2026-08-07** (ADR 0040 § Decision 6). Per-story fragments in **`changelog.d/<story-key>.md`**, assembled at release time and deleted in the release commit. Each story creates a **distinct new file**, so the vanishing-edit failure mode becomes a *missing file* — visible in `git status` | **16.6** format + assembler, **16.4** invokes |
 | **18** | **Fallback package IDs silently changed the documented command** — `specscribe-cli` was offered as a drop-in while `npx specscribe` is printed in three documents | ✅ **DECIDED 2026-08-07** (ADR 0040 § Decision 12). An implementer **may not substitute** — escalate to the owner. The asymmetry is now explicit: losing the **NuGet** ID is cheap (`ToolCommandName` keeps the invocation `specscribe`); losing the **npm** ID is **not recoverable by rename**, because `npx` resolves the *package* name | **owner** decides if it happens; reservation stays action #1 |
 | **19** | **Version-component semantics** — only "minor = breaking inside `0.x`" was defined, leaving every tag after the first to judgement, with no `0.x` exit criterion | ✅ **DECIDED 2026-08-07** (ADR 0040 § Decision 5). MINOR = breaking **or** new feature; PATCH = fixes/perf/docs/internal; `-preview.N` = a re-cut of the same target version. MINOR deliberately carries both meanings (SemVer's own `0.x` rule), which is **why the `**BREAKING:**` changelog prefix is the load-bearing signal**, not the digits. Plus a three-part `0.x` → `1.0.0` exit criterion | **17.4** tests the exit criterion |
-
-| **20** | 🔴 **`main`'s CI is RED on the required `build-test-analyze` check** — `check:ir-content` fails because the committed `ir-content.manifest.json` claims `generatedBytes: 186492` while the committed `ir-content.css` beside it is **186,504 bytes** (§ 4.3) | **OPEN — blocking.** Not environmental (reproduces in CI, run `31234945903`), not this story's (no product-code change). Attributed to **`3b085e7`**. **Blocks ADR 0040 § Decision 9's release preflight**, so no release can be cut while it stands | **owner**, one command — § 8 action 8 |
+| **20** | 🔴 **`main`'s CI is RED on the required `build-test-analyze` check** — `check:ir-content` fails because the committed `ir-content.manifest.json` claims `generatedBytes: 186492` while the committed `ir-content.css` beside it is **186,504 bytes** (§ 4.3) | ✅ **CLOSED 2026-08-08 — fixed by `d6ba8f2` (Story 17.1) before this action was read.** The finding was real: not environmental (reproduced in CI, run `31234945903`), not this story's (no product-code change), attributed to **`3b085e7`**, and it did block § Decision 9's preflight. At `e8a689d` the sheet and manifest agree at **186,428 bytes** — off *both* recorded numbers — and `Build, Test & Analyze` is green | ~~owner~~ — done, § 8 action 8 |
 
 *Items 11–16 added by the code review of 2026-08-07; 17–19 are that review's remaining decision items, given
-numbers here so every one of its nine has a tracked home. **Items 11–14 and 17–19 were resolved on 2026-08-07**
+numbers here so every one of its nine has a tracked home. **Items 1, 11–14 and 17–19 were resolved on
+2026-08-07**
 by the dev-story pass that followed the review. Items 2 and 3 closed by work that landed since.*
 
-**Nothing on this list is an open owner *decision* any more.** Two items remain, and both are **acts** rather
-than decisions — neither is something an agent can perform on the owner's behalf, and neither needs further
+⚠️ **Corrected 2026-08-08.** This read *"Nothing on this list is an open owner **decision** any more"*, which
+the table above does not support: **item 8** (Trusted Publishing visibility on the owner's nuget.org account,
+gating Story 16.4's credential path) and **item 9** both name the owner, and item 8 is a genuine open
+decision. ADR 0040's Status header now records item 8 as the one condition still open inside that record.
+
+What *is* true: no item on this list is an open **technical** decision for an agent to make — what remains is
+owner acts and owner-only facts. Two items were called out as acts rather — neither is something an agent can perform on the owner's behalf, and neither needs further
 deliberation:
 
 1. **ADR 0040's ratification** (AC #4, § 8 action 6) — the story's only remaining acceptance gap.
-2. 🔴 **Regenerating the `ir-content` manifest** (item 20, § 8 action 8) — one command, and **more urgent
+2. ~~🔴 **Regenerating the `ir-content` manifest**~~ — ✅ **DONE 2026-08-08** by `d6ba8f2` (Story 17.1);
+   `main` is green. Kept for the record: it was (item 20, § 8 action 8) one command, and **was more urgent
    than the ratification in wall-clock terms**, because `main` is red on a required check *right now* and
    § Decision 9's release preflight cannot pass until it is green.
 
@@ -1001,8 +1081,11 @@ deliberation:
   it on 2026-08-06."* It did not. **0039 is `0039-runtime-attached-body-level-classes.md`** — "A Second
   Bounded Unscoped Layer, for Runtime-Attached Body-Level Classes" — authored from **the owner's verify round
   on the sunburst surfaces**, Deciders: Matthew-Hope Eland, landed in `76e5e42`/`6a7bc71`. Story 4.9 had
-  merely *reserved* 0039 in its own story file and ultimately landed as **ADR 0041**, whose header states:
-  *"Took 0041 because 0039 **and** 0040 were both claimed after the story's baseline."* Story 4.9's own code
+  merely *reserved* 0039 in its own story file and ultimately landed as **ADR 0041**. The
+  provenance line — *"Took 0041 because 0039 **and** 0040 were both claimed after the story's baseline"* —
+  is in **`docs/adrs/README.md`'s index entry for 0041**, not in ADR 0041's own header, which contains no
+  such line. *(Corrected 2026-08-08: a correction whose purpose was to fix a false provenance claim was
+  itself mis-citing its source.)* Story 4.9's own code
   review had already caught this and assigned the correction to this story. It was repeated in five places —
   here, the story file's Task 6 and Completion Note 4, the `docs/adrs/README.md` index entry, and the commit
   message of `9837e67`. All except the immutable commit message are now corrected. The conclusion — that 0040
