@@ -1645,6 +1645,11 @@ the 25.2 entries above, where the original claims live; only genuinely new work 
 
 ## Deferred from: code review of 24-6-graph-engine-spike (2026-08-08)
 
+> **All three RESOLVED on the same day, by removal rather than by fix.** The owner chose to prune
+> `spike/graph-engine/` during the same code review, so the throwaway probe code these entries describe no longer
+> exists. They are retained as a record of what was found, not as open work. Nothing shipped was affected — the
+> project was never in `SpecScribe.slnx` and its `ProjectReference` to `src/SpecScribe` was one-way.
+
 - source_spec: `24-6-graph-engine-spike.md`
   summary: `FilterProbe` calls `supportBreakpoints.Max()` with no empty-sequence guard, so it throws `InvalidOperationException` on any repo where no pair meets the support floor — a shallow clone, `--window 1`, a fresh repo, or a `git log` returning empty output (which `RunGit` returns as `""`, not null, so the existing `logText is null` guard does not fire). It dies after writing all 11 fixture files but before `scale.json`, leaving a half-written measurement set that looks complete.
   evidence: Edge Case Hunter, code review 2026-08-08. `spike/graph-engine/layout/Program.cs:723-725`. Throwaway probe code under `spike/`; ships nothing. Only actionable if the probe is kept and re-run (see the spike-pruning decision in the story's Review Findings).

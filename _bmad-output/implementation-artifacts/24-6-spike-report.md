@@ -27,6 +27,107 @@
 
 ---
 
+## 0. Corrections from the code review of 2026-08-08 — read before any number below
+
+Three adversarial layers reviewed this report and ADR 0030. **The decision survived: candidate (a) at 0 marginal
+bytes is correct, and the 0 B is real.** The corrections below are to the *evidence and the wording*, and they are
+recorded here rather than silently patched in place. Where a section is corrected, the correction is repeated
+inline at that section. Items marked ⚠ change how a number should be read.
+
+**⚠ 1 — Almost every live-browser number in §5 and §6 was measured on ONE fixture, and it is unrepresentative in
+two independent ways.** `fixtures/ego-top20.json` is hubbed on
+`_bmad-output/implementation-artifacts/sprint-status.yaml` — the file §7.3 singles out as coupled to **92%** of the
+graph — where Epic 24's ego graph renders on **code pages**, whose hub is always a code file. Task 2 asked
+explicitly for a code hub (*"`GitMetrics.cs` / `Charts.cs` / `SiteGenerator.cs`… A quiet file proves nothing"*);
+`Program.PickHub` just takes max degree, which lands on the YAML. **And that fixture is a complete graph** — 21
+nodes, 210 edges = C(21,2), every node at degree exactly 20. So the a11y survival series, the per-edge channel
+census, the colour audit, the CSP render verdict and the filter timings were taken on a surface with no sparse
+structure, no periphery and no separable clusters. Verdicts topology cannot affect (CSP, no `'unsafe-eval'`, the
+DOM census, per-edge dash/width control) are unaffected; **legibility, the 20,253 B payload and anything about
+reading order are exposed.** The report never names the hub. *Owner decision: annotate, do not re-measure.*
+
+**⚠ 2 — "Top-20 by confidence" (§7.4) is arithmetically top-20 by raw co-change count.** The cap computes
+`Confidence = Support / hubChanges` with `hubChanges` constant for a fixed hub — a monotone rescaling of support,
+so the tiebreaker can never fire. The discriminating direction, `conf(neighbour → hub) = support /
+changeCount[neighbour]`, is never used. ADR 0030 now says **"by support"**, and recommends 24.3 rank by true
+neighbour→hub confidence.
+
+**⚠ 3 — §6.2's Tab order is misattributed, and was never exercised.** The report says degree-descending
+*"deliberately matching the text twin's order (Story 24.1's Q4 ordering)"*. **Story 24.1's Q4 settled on
+*confidence*-descending**, not degree. The probe's own comment claims confidence while its code sorts
+`(b.d - a.d) || (b.w - a.w) || path`. And because every node in the fixture has degree 20, the first key was a
+constant tie, so the recommended order never actually ran. **Story 24.2 contradicted this hand-off** and was right
+to: it used the server's own emission order, because the twin lists citing artifacts first and then coupled files,
+which a degree ranking would disagree with. This is the one hand-off 24.2 did not honour.
+
+**⚠ 4 — §6.3's Plotly container row overstates what was measured, in the direction that later mattered.** The
+table lists three zero-size cases as *"OK, 21 points drawn every time"*.
+`measurements/session.json § candidateA_plotlyScatter.containerRobustness` holds **two** zero-size cases plus a
+*sized* control: `sized1100x640`, `zeroHeight`, `zeroWidthAndHeight`. **The zero-*width*-only case was never
+measured for Plotly** — and Story 24.2 subsequently found that *"Plotly cannot lay out in a zero-width container,
+and it does not complain: it draws a chart of the wrong size"*, which is exactly the code page's pure-CSS tab
+condition and cost 24.2 deferred-mount, reveal-flush and resize machinery. Plotly's zero-size robustness is one of
+four stated reasons for rejecting ECharts (§5.4), so the comparison was unfair in both directions. The measurement
+that *was* taken counted **points**, not geometry or size — the same "assert on geometry, not attributes" error
+§6.4 hands forward as a lesson.
+
+**⚠ 5 — Determinism was proven on one platform only, and that boundary is not in §11.** The solver uses
+`Math.Cos`/`Math.Sin` and `Math.Log` in the coordinate path; .NET does not guarantee bit-exactness for
+transcendentals, and `dx*dx + dy*dy` is FMA-fusable on the host's ISA. FR31 is a *cross-platform* claim. ADR 0030
+§3 now bans both hazards normatively and records the scope.
+
+**⚠ 6 — Node positions have no stability across regenerations.** Initial placement is seeded from node *ordinal*
+(`theta = 2π·i/n`), not identity, so one added file moves every node. FR31 still holds. ADR 0030 §2 now requires
+identity-seeded placement.
+
+**⚠ 7 — §7.2's rejection arithmetic is worst-cased and was unlabelled.** *"236 layouts × 2.6 s ≈ 10 minutes"* and
+*"236 × 460,817 B ≈ 108 MB"* carry no provenance label in a report whose §1 promises every number has one. The
+108 MB assumes each state duplicates the **entire** payload; a per-state precompute needs coordinates only
+(≈1.3 MB, ~80× less), and the 10 minutes charges every filtered state the *unfiltered* solve time when §7.3 shows
+129 nodes solving in 286 ms. **The conclusion still stands** — an FR layout is a function of nodes *and* edges, so
+236 edge sets is the right denominator — but the figures are advocacy, not measurement. Relatedly,
+`nodePositionsMoved: false` was a **hardcoded literal**, not a read-back: survivors not moving is true *by
+construction*, not "provably".
+
+**⚠ 8 — §2's `IsProcessish` disclaimer is false.** It reads *"a mismatch changes a **stroke**, not a
+measurement."* The local classifier drives `ProcessEdges` **and the entire code-only filter**, so it moves the
+46%-Process finding, the `whole-repo-code-only` row, and the Code-only lens ADR 0030 ratifies for 24.3. The real
+classification was also reachable — `ClassifyCoupling` is private, but its *result* is public on
+`CoupledPair.Kind` / `DirectedCouple.Kind`, widened by 24.1's own review so the surfaces could not disagree.
+
+**Provenance and citation corrections.** §4.1's shipped-Plotly gzip reads 413,461 B; `bundles.json` says
+**414,130 B**. Every gzip ×-multiple divided by `prism.js`'s *minified* size (100,409 B) instead of its gzip
+(**33,934 B**), understating gzip cost ~3× — corrected below and in ADR 0030; the error flattered the *rejected*
+candidates, so the decision is unaffected. §7.3's five-point O(n²) fit and the whole degree distribution are
+labelled **[HARNESS]** but exist in **no committed artifact** — the `--window all` run was never persisted, and
+§13's recipe never passes `--window all`; they are **[SESSION]**. §7.2's *"independently recomputed in
+JavaScript"* cross-check is recorded nowhere. The CSP policy is at `WebviewRenderAdapter.cs:64`, not `:140`;
+the Plotly `<EmbeddedResource>` is at `SpecScribe.csproj:182`, not `:67` (`:67` is `</PropertyGroup>`) — both
+propagated into ADR 0030 and Story 24.2's record, and this report takes explicit credit for fixing that exact
+class of failure. §6.5's *"per R3"* means Story **20.4's** R3, not this story's.
+
+**Accessibility evidence, scoped.** The survival predicate inspects only `[data-graph-node]`, so it cannot see
+that **edge** accessible names misalign after any filter (the descriptor is built from the *unfiltered* edge list),
+and it checks `tabindexZero === 1`, which stays satisfied when a re-render drops focus to `<body>`. Read "INTACT
+11/11, 8/8 survived" as *the node layer survived*, not *focus was preserved*. **ECharts' UX-DR7 "PASS (configured
+around)" was never tested against the survival rule** — one snapshot, no re-render series — and §6.4 establishes
+that that snapshot was taken while the chart drew nothing; it should read **UNMEASURED**. **Candidate (a)'s
+UX-DR18 cell cites `reducedMotion() ? 0 : 600` "both exercised", but those helpers are wired only in the ECharts
+probe**; (a)'s pass rests solely on there being no animation to suppress. The colour audit asks *"is this **a**
+token"*, not *"is this a **permitted** token"* — it passed on four `--status-*` tokens that
+`RelationshipGraph.cs` declares off-limits on code surfaces; UX-DR17 is evidenced by the dash/width census, not by
+the colour audit. Two Cytoscape cells read "not reached" where the report's own rule forbids non-verdicts.
+
+**The probe has been pruned.** Per the owner's decision, `spike/graph-engine/` and its five `.claude/launch.json`
+probe-server entries are removed — see §12 and §13. Its reproduce path had already decayed: Dependabot bumped the
+tracked lockfile (esbuild 0.24.2 → 0.28.1) the day after the spike landed, so §13 no longer rebuilt §4.1's byte
+figures; the CSP harness silently matched the `__CSP__` placeholder after `WebviewRenderAdapter` moved its policy
+into a const, enforcing **no policy at all** with its own wrong-nonce control disabled; and the `file://`
+"reproduce in one step" never worked as committed, because `probe/vendor/` is gitignored and the page carried a
+literal `nonce="__NONCE__"`. **The numbers in this report are now the record of the measurement.**
+
+---
+
 ## 1. Context and discipline
 
 [ADR 0012 §4](../../docs/adrs/0012-plotly-hierarchy-chart-engine-and-standardized-explorer-component.md) deferred
@@ -137,14 +238,27 @@ spike's ADR is **0030**. §12 scopes non-invasiveness to my own changes.
 | Candidate | min | min+gzip | ×`prism.js` (min) | ×`prism.js` (gzip) | Engine-family consequence |
 |---|---:|---:|---:|---:|---|
 | **(a) Plotly `scatter` + generation-time C# layout** | **0** | **0** | **0.00×** | **0.00×** | **No new family.** Extends family 1. |
-| (b) ECharts `graph`+`chord`, **SVG** renderer | 552,268 | 188,594 | 5.50× | 1.88× | **Second family** (or first-and-only if it also replaces Plotly) |
-| (b′) ECharts `graph`+`chord`, canvas renderer | 544,779 | 184,890 | 5.43× | 1.84× | as above |
-| (b″) **ECharts unified** — `graph`+`chord`+`sunburst`+`treemap`+`heatmap`, SVG | 657,660 | 223,108 | 6.55× | 2.22× | **Collapses to ONE family — supersedes ADR 0012** |
-| (c) Cytoscape.js | 443,319 | 141,961 | 4.42× | 1.41× | **Second family**, and serves neither 24.4's chord nor 24.5's matrix |
-| *(reference)* shipped `plotly-hierarchy.min.js` | 1,223,563 | 413,461 | 12.19× | 4.12× | family 1, **already paid for** |
+| (b) ECharts `graph`+`chord`, **SVG** renderer | 552,268 | 188,594 | 5.50× | 5.56× | **Second family** (or first-and-only if it also replaces Plotly) |
+| (b′) ECharts `graph`+`chord`, canvas renderer | 544,779 | 184,890 | 5.43× | 5.45× | as above |
+| (b″) **ECharts unified** — `graph`+`chord`+`sunburst`+`treemap`+`heatmap`, SVG | 657,660 | 223,108 | 6.55× | 6.57× | **Collapses to ONE family — supersedes ADR 0012** |
+| (c) Cytoscape.js | 443,319 | 141,961 | 4.42× | 4.18× | **Second family**, and serves neither 24.4's chord nor 24.5's matrix |
+| *(reference)* shipped `plotly-hierarchy.min.js` | 1,223,563 | 414,130 | 12.19× | 12.20× | family 1, **already paid for** |
 
 **[HARNESS]** — `npm run bundles`, `measurements/bundles.json`. Versions: **echarts 6.1.0**, **cytoscape 3.34.0**,
 esbuild 0.24.2, Node v24.11.1. All Apache-2.0 / MIT.
+
+**Two corrections from the code review of 2026-08-08.** The `min` multiples divide by `prism.js` **minified**
+(100,409 B), which is right; the `gzip` multiples originally divided by that same minified figure instead of
+`prism.js` **gzipped** (**33,934 B**, recorded in `measurements/bundles.json § yardsticks`), understating every
+gzip multiple roughly 3× — ECharts SVG read 1.88× where it is 5.56×. The figures above are corrected and are now
+like-for-like. The error ran **in favour of the rejected candidates**, so it never threatened the decision:
+candidate (a) is 0 B on both axes. Separately the shipped-Plotly gzip cell read **413,461 B**, a figure that
+appears nowhere in the harness output; `bundles.json` reports **414,130 B** in both `yardsticks` and
+`plotlyShipped`, and that is what is shown now.
+
+**On the toolchain line:** `esbuild 0.24.2` is what produced these bytes. The spike's tracked lockfile was
+subsequently bumped to `^0.28.1` by Dependabot (`f4f5629`, 2026-07-30), so a re-run would **not** have reproduced
+these figures even before the probe was pruned. Treat the table as the record, not as something to regenerate.
 
 Two things in that table deserve to be said out loud rather than left for a reader to notice:
 
@@ -351,7 +465,19 @@ replayed from the console with a sized container. Bisected to a deterministic ca
 | 1100 × **0** | **THROWS** `TypeError: Cannot read properties of null (reading '0')` |
 | **0 × 0** | **THROWS** — same |
 | 0 × 640 (zero width only) | OK — renders at width 100 |
-| *Plotly, all three zero-size cases* | **OK, 21 points drawn every time** |
+| *Plotly, the two zero-size cases measured* | **OK, 21 points** (`zeroHeight`, `zeroWidthAndHeight`) |
+
+> **⚠ Corrected 2026-08-08 by code review.** This row previously read *"Plotly, all three zero-size cases — OK, 21
+> points drawn every time."* `measurements/session.json § candidateA_plotlyScatter.containerRobustness` contains
+> only `sized1100x640` (a **sized control**, not a zero-size case), `zeroHeight` and `zeroWidthAndHeight`. **The
+> zero-*width*-only case was never measured for Plotly** — and it is the one that mattered: Story 24.2 later found
+> that *"Plotly cannot lay out in a zero-width container, and it does not complain: it draws a chart of the wrong
+> size,"* which is precisely the code page's pure-CSS tab state (`display:none` at mount ⇒ zero width) and cost
+> 24.2 deferred-mount, reveal-flush and resize machinery. Because Plotly's zero-size robustness is one of the four
+> stated reasons for rejecting ECharts (§5.4), the comparison was unfair in **both** directions. Note also that
+> what was measured is a **point count**, not geometry or size — the same attributes-not-geometry error §6.4 hands
+> forward as a lesson. **The ECharts finding is unaffected:** its zero-height `TypeError` was reproduced
+> deterministically and is a hard throw, not a silent mis-size.
 
 **It is not a CSP failure** — it reproduces with CSP entirely **off**. It is a *layout race*: on some loads `#chart`
 had not yet been laid out when the inline script ran.
@@ -560,10 +686,26 @@ reader** — which is the whole point of treating position as data.
 | **24.3 whole-repo default** | **support ≥ 5**, Code-only lens **on** | 129 nodes / 937 edges / 95,514 B / 286 ms. Floor 2 is 391 nodes with one 359-degree node — unreadable, and 460,817 B. |
 | **24.3 hairball threshold** | **≈ 150 nodes** | Above it, median degree 14 with hubs at 100+ produces a solid mass. Floor 5 sits just under; floor 3 (267 nodes) is already over. |
 | **24.3 solver bound** | Bound nodes, or Barnes–Hut **above ~500** | O(n²): ~17 s at 1,000 nodes. |
-| **24.2 ego default** | **top-20 by confidence** | 21 nodes / 210 edges / **20,253 B** — almost exactly 23.1's measured 20,915 B sunburst island, so it costs what an already-accepted payload costs. The uncapped neighbourhood is **360 nodes**. |
+| **24.2 ego default** | **top-20 by support** *(corrected — see below)* | 21 nodes / 210 edges / **20,253 B** — almost exactly 23.1's measured 20,915 B sunburst island, so it costs what an already-accepted payload costs. The uncapped neighbourhood is **360 nodes**. |
 | **24.2 hard floor** | Never uncapped | The shipped `FileInsightCoupledCap = 8` gives 4,297 B if 20 is judged too dense. |
-| **Both** | Filters **hide**, never re-layout | §7.2 |
-| **Both** | Tab order = **text-twin order** | §6.2 |
+| **Both** | Filters **hide**, never re-layout | §7.2 — **threshold filtering only**; directory grouping is unprobed and open (ADR 0030 §4) |
+| **Both** | Tab order = **text-twin order** | §6.2 — the *principle* holds; the **degree-descending rule does not** (see below) |
+
+> **⚠ Two corrections from the code review of 2026-08-08, both to recommendations this table ratifies.**
+>
+> **"Top-20 by confidence" was arithmetically top-20 by raw co-change count.** `BuildCappedEgo` computes
+> `Confidence = Support / hubChanges`; `hubChanges` is constant for a fixed hub, so ordering by confidence is a
+> monotone rescaling of ordering by support and the `ThenByDescending(Support)` tiebreaker can never fire. The
+> directional quantity that makes Story 24.1's metric worth having — `conf(neighbour → hub) = support /
+> changeCount[neighbour]` — was never used for the cap. Ranking by support systematically favours the highest-churn
+> files, which is why the resulting node list is dominated by exactly the bookkeeping §7.3 tells 24.3 to filter out.
+> **Story 24.3 should rank by neighbour→hub confidence and say so.** Story 24.2 has already shipped its cap.
+>
+> **"Tab order = text-twin order" is right; "degree-descending" is not.** §6.2 attributed degree-descending to
+> Story 24.1's Q4, which actually settled on **confidence**-descending. Because every node in the measured fixture
+> has degree 20, the recommended ordering was a constant tie and never ran. Story 24.2 deviated to the server's own
+> emission order and was correct to — the twin lists citing artifacts first, then coupled files, and a degree
+> ranking would disagree with the listing directly beneath the chart. **Take the principle, not the rule.**
 
 ---
 
@@ -640,7 +782,8 @@ MIT**. The probe workspace installed **6 packages**, throwaway and gitignored.
 | To | Hand-off |
 |---|---|
 | **Story 24.2** (ego graph) | Engine: **Plotly `scatter`** over generation-time C# coordinates — **0 new bytes**. **SUPERSEDE `ReferenceGraph`** (§8) and absorb its six capabilities; the four pure-CSS variants are the scope driver. Default **top-20 by confidence** (20,253 B). Hang the a11y layer on **`plotly_afterplot`**, never on a promise. **Clamp the roving index on every reapply.** Tab order = text-twin order. Use the real `ClassifyCoupling`, not the probe's path-shape approximation. **Server-render the twin.** Call `IsCrossBoundary` / `CouplingMinSupport`, don't re-derive. |
-| **Story 24.3** (whole-repo explorer) | Default **support ≥ 5 + Code-only** (129/937/95,514 B). Hairball threshold **≈150 nodes**. Filters **hide, never re-layout** — measured `nodePositionsMoved: false` in 44–75 ms. O(n²) solver: bound nodes or use Barnes–Hut above ~500. Expect **62% cross-boundary / 46% Process** edges and a 359-degree `sprint-status.yaml`; say so in the UI rather than letting a reader think the repo is that entangled. |
+| **Story 24.3** (whole-repo explorer) | Default **support ≥ 5 + Code-only** (129/937/95,514 B). Hairball threshold **≈150 nodes**. Filters **hide, never re-layout** for the *threshold* axis, in 44–75 ms. O(n²) solver: bound nodes or use Barnes–Hut above ~500. Expect **62% cross-boundary / 46% Process** edges and a 359-degree `sprint-status.yaml`; say so in the UI rather than letting a reader think the repo is that entangled. **Use the real `ClassifyCoupling` result** via `CoupledPair.Kind` / `DirectedCouple.Kind` — the code-only lens above was computed with a local path-shape approximation (§2 correction). **Rank by neighbour→hub confidence**, not support. |
+| **Story 24.3** — *added by the 2026-08-08 code review* | Six things this spike did **not** settle, now named rather than inherited silently. **(1) Directory grouping is unprobed** — a collapsed group node has no precomputed coordinate, and both escapes are closed by ADR 0030 (§2/§4); likely answer is a second generation-time solve over the collapsed graph, but it is unmeasured. **(2) Seed placement from node identity, not ordinal** — the spike's `theta = 2π·i/n` means one added file moves every node, so the payload diffs wholesale and a reader's mental map resets each commit (ADR 0030 §2). **(3) No transcendental in the coordinate path and no host-decided FP contraction**, and verify determinism on **two operating systems** — the spike proved it on one machine only (ADR 0030 §3). **(4) Define the orphan-node state** — when the last edge of a node is filtered out, the spike left it painted, in tab order, with a stale pre-filter accessible name. **(5) Define the empty state** — a threshold above maximum confidence was unreachable in the probe and no fixture below 9 nodes exists, so the empty graph's live-region text, message and focus target are unspecified. **(6) Guard NaN in the solver** — one NaN silently collapses every node onto 0.5 and still emits well-formed JSON, so no gate can see it. |
 | **Story 24.4** (chord) | Plotly has **no chord trace**. Either hand-draw SVG arcs — and **read `docs/adrs/` first**: three arc renderers already exist and [[adr-consultation-gap-three-arc-renderers]] is about exactly this — or re-price ECharts with §4.1's numbers. **Do not improvise a second engine inside 24.4**; that is what this spike exists to prevent. If the arc work looks large, a focused re-opening of ADR 0030 is the correct move, not a quiet dependency. |
 | **Story 24.5** (matrix) | **Unchanged: rides Plotly `heatmap`**, which §2 confirms is registered in the shipped bundle. ADR 0012 §4 already freed it and nothing here changes that. |
 | **The unowned twin audit** | §8.3. Needs an owner before any `ReferenceGraph` SVG is retired. |
@@ -738,6 +881,19 @@ This story's own changes are confined to:
 
 **The load-bearing evidence is that File List, confirmed by `git status`.** Not the golden fingerprint (R10).
 
+> **⚠ 2026-08-08, code review — the quarantine held, but the containment did not.** Everything below was verified
+> and is accurate as far as it goes: the project really is absent from `SpecScribe.slnx` (CI builds the `.slnx`
+> explicitly rather than globbing `**/*.csproj`, so the spike could not have reached the build gate), the
+> `ProjectReference` really is one-way, and deleting the directory really did leave the shipped tool
+> byte-identical. What the claim missed is that **directory quarantine is not dependency quarantine.**
+> `spike/graph-engine/package.json` and `package-lock.json` were **tracked** — and absent from the story's File
+> List — so GitHub's automatic security updates picked them up immediately: `f4f5629` *"Bump esbuild from 0.24.2 to
+> 0.28.1 in /spike/graph-engine"* landed on 2026-07-30, one day after the spike. A declared-throwaway probe had
+> become a permanent dependency-alert surface guarding nothing shippable, and the bump silently invalidated §13's
+> reproduce path. The File List also declared `probe/*.html` *"generated, gitignored"* when `.gitignore` never
+> listed them and four were tracked. **Per the owner's decision, `spike/graph-engine/` and the five
+> `graph-24-6-*` entries in `.claude/launch.json` have been removed.**
+
 **Quarantine, verified:** `spike/graph-engine/layout/GraphEngineSpike.csproj` is **not** in `SpecScribe.slnx`, is
 not built by `dotnet build src/SpecScribe`, is not packed, and is not in the `extension/` bundle. It holds a
 **one-way** `ProjectReference` to `src/SpecScribe` so the fixture reads the real Story 24.1 metric; nothing in
@@ -764,7 +920,32 @@ Flagged for the owner as a judgment call, not presented as compliance.
 
 ---
 
-## 13. Reproducing every number
+## 13. Reproducing every number — SUPERSEDED, the probe has been pruned
+
+> **⚠ 2026-08-08, code review.** `spike/graph-engine/` has been **removed** by owner decision, together with its
+> five `.claude/launch.json` probe-server entries. The commands below no longer run, and are kept only as a record
+> of how the numbers were obtained. **This report and ADR 0030 are the durable record of the measurement.**
+>
+> The section's title was never accurate in any case, and that is part of why pruning was chosen. It reproduced
+> the fixtures, the determinism check, the bundles and the probe pages — but **not one figure in §5 or §6**, which
+> is the whole of AC #2: the a11y survival table, the per-edge channel census, the CSP matrix, the container rows,
+> the ECharts bisections and the colour audit were hand-transcribed `[SESSION]` observations with nothing driving
+> or persisting them. §7.2's *"independently recomputed in JavaScript"* cross-check was likewise never recorded.
+>
+> Three of the five commands had also decayed since the spike ran:
+> * **Step 3** — Dependabot bumped the tracked lockfile to esbuild `^0.28.1` (`f4f5629`, the day after this spike
+>   landed) while the recorded toolchain is `0.24.2`, so it would no longer rebuild §4.1's byte figures.
+> * **Step 5** — `WebviewRenderAdapter` moved its policy into a `CspPolicy` const, leaving `content="__CSP__"` in
+>   the template. The harness regex still **matched** that placeholder, so its loud-failure guard never fired and
+>   it served `Content-Security-Policy: __CSP__` — one unrecognised directive, i.e. **no policy enforced at all** —
+>   with the `wrong-nonce` control silently reduced to a copy of the `webview` variant. The harness's own comment
+>   claimed *"an upstream policy change cannot silently invalidate this report."* It could, and it did.
+> * **§11's `file://` "reproduce in one step"** never worked as committed: the page loads `./vendor/…`, and
+>   `probe/vendor/` is gitignored and absent, with a literal `nonce="__NONCE__"` still in the markup. Step 4 had to
+>   run first.
+>
+> None of this invalidates the measurements as taken — the CSP verdict was recorded when the policy was still
+> inline in the template, and was correct then. It invalidates the claim that they could be re-derived on demand.
 
 ```sh
 # 1. the C# fixture builder + deterministic layout (references src/SpecScribe one-way)
