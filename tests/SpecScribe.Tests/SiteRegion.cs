@@ -57,6 +57,16 @@ internal static class SiteRegion
         return chunk.RootElement.GetProperty(path).GetString()!;
     }
 
+    /// <summary>True when the IR manifest itself is on disk. [code review 2026-08-08]
+    /// <para><b>Why an ABSENCE test needs this.</b> <see cref="Exists"/> and <see cref="HasRoutesUnder"/> both
+    /// return <c>false</c> when the manifest file is missing, which is indistinguishable from "the route was
+    /// removed as intended". <c>GenerateAll</c>'s whole-tree routes delete the output root before repopulating it,
+    /// so a poll that waits only for absences can be satisfied MID-WIPE and pass without the removal having
+    /// converged. Gate any such wait on this first: it makes "the IR exists and does not carry the route" —
+    /// the actual claim — expressible.</para></summary>
+    public static bool ManifestExists(string siteRoot) =>
+        File.Exists(Path.Combine(siteRoot, SpaDelivery.ManifestPath.Replace('/', Path.DirectorySeparatorChar)));
+
     /// <summary>True when the IR carries a route — the region-side replacement for
     /// <c>File.Exists(Path.Combine(Site, "….html"))</c>.</summary>
     public static bool Exists(string siteRoot, string outputRelativePath)
@@ -288,11 +298,32 @@ internal static class SiteRegion
     /// <c>FileShare.Delete</c> lets the generator's wipe proceed against an open read handle, which is exactly
     /// the "do not perturb what you are asserting about" property the paragraph above was reaching for.</para>
     ///
+    /// <para><b>⚠️ [code review 2026-08-08] TWO SCOPE CORRECTIONS to the paragraph above. Both matter to whoever
+    /// touches this next.</b>
+    /// <list type="number">
+    /// <item><b>On Windows this NARROWS the race; it does not close it.</b> <c>FileShare.Delete</c> lets
+    /// <c>DeleteFile</c> succeed, but the deletion is only <i>pending</i> until the last handle closes and the
+    /// directory entry survives until then — so <c>RemoveDirectory</c> on the parent can still fail with
+    /// <c>ERROR_DIR_NOT_EMPTY</c> and abort the pass exactly as before. The 50-iteration proof bounds the residual
+    /// rate; it cannot show it is zero. Do not read "lets the wipe proceed" as unconditional.</item>
+    /// <item><b>On Linux this changes NOTHING.</b> There is no mandatory locking; <c>FileShare</c> is advisory and
+    /// <c>FileShare.Delete</c> carries no meaning, because <c>unlink</c> always succeeded and an open fd keeps
+    /// reading the unlinked inode. The Linux half of the torn-read class is covered <i>solely</i> by
+    /// <c>FileWatcherServiceTests.Evaluate</c>'s exception guard. <b>Do not delete that guard on the strength of
+    /// this fix</b> — the two cover different platforms, which is the same over-narrow-rationale trap finding F2
+    /// already corrected once in this file.</item>
+    /// </list></para>
+    ///
     /// <para><b>This does not mask a generator defect — it stops the TEST from causing one.</b> A rebuild that
-    /// fails for a reason the test did not create still surfaces as a <c>GenerationOutcome.Error</c> event, and
-    /// every watch-mode test asserts <c>DoesNotContain(Observed(), … Error)</c>. What is fixed here is only the
-    /// contention this helper itself introduced. That a failed pass is never retried is a REAL product-side gap
-    /// and is recorded as a finding by Story 16.2, not absorbed here.</para></summary>
+    /// fails for a reason the test did not create still surfaces as a <c>GenerationOutcome.Error</c> event.
+    /// <b>⚠️ [code review 2026-08-08] That safety net is NOT universal, and this comment previously claimed it
+    /// was.</b> Of the 11 tests in <c>FileWatcherServiceTests</c>, 7 assert
+    /// <c>DoesNotContain(Observed(), … Error)</c>; the other 4 do not, and 3 of those construct the watcher with a
+    /// discarding sink (<c>_ =&gt; { }</c>), so generator errors there are not merely unasserted but structurally
+    /// UNOBSERVABLE. Those 3 are the concurrency-race guards — where a masked error would matter most. Treat the
+    /// net as covering the 7, not the class. What is fixed here is only the contention this helper itself
+    /// introduced. That a failed pass is never retried is a REAL product-side gap and is recorded as a finding by
+    /// Story 16.2, not absorbed here.</para></summary>
     private static string ReadShared(string path)
     {
         using var stream = new FileStream(

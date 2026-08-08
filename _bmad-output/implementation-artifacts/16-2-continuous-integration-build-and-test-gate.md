@@ -521,6 +521,91 @@ scope guard.
   - [x] Findings raised-but-not-fixed recorded with routes: **F1** (no retry after a failed generation pass →
         Epic 6) and **F2/F3** (documentation corrections) in § Dev Agent Record and § Handoff.
 
+### Review Findings
+
+_Code review 2026-08-08, worktree `code-review-16-2`, cut from `85d4c5c`._
+
+**Outcome: 1 decision resolved (owner chose to ACCEPT the `integration_id` risk, recorded in `docs/CiGate.md`),
+13 patches applied, 2 deferred, 4 dismissed. All 14 applied and verified.** Suite after: **3064 passed / 0
+failed / 3 skipped** (`dotnet build SpecScribe.slnx --no-incremental` → 0 errors first). The higher count than
+the story's 2978 floor is sibling stories merged since `a2eee2a`, not this review. `FileWatcherServiceTests` —
+the class three of the patches touch — was run **five times clean** (11/11 each, once inside the full suite),
+because this story's own standard of proof for that class is repetition, not a single green run.
+
+**⚠️ STATUS DELIBERATELY LEFT AT `review`, NOT `done`.** The workflow's rule would set `done` once every finding
+is resolved, and every finding is. It is being held back anyway because **two of the three review layers never
+ran** (see below) — marking a story `done` at epic-end review asserts it was reviewed, and one third of this one
+was. Flipping to `done` is a one-line change once the Blind Hunter and Acceptance Auditor layers are re-run and
+come back clean. Nothing else is outstanding.
+
+**Scope.** Reviewed by **File List and hunk**, not commit range (CLAUDE.md § Scoping a code review). The subject
+is `07bdb79..a2eee2a` — four commits, **all exclusively Story 16.2**; no sibling story is bundled in that range.
+**Excluded:** Story 16.4's later +17 lines to `docs/CiGate.md` (commit `e0ea4b2`) are 16.4's to review, not this
+story's. **Attribution handoff:** finding **R9(b)** below is evidenced by tagging code that exists only in the
+16.4 session's *uncommitted* working tree — `build-test-analyze.yml` was 424 lines at `a2eee2a` and is 698 lines
+now. It is recorded here because 16.2 authored the query being broken, and routed to 16.4 so it cannot fall
+between the two reviews.
+
+**⚠️ Two of three review layers failed and this review is therefore INCOMPLETE.** The Blind Hunter (general
+adversarial) and Acceptance Auditor subagents both terminated on an API session limit before returning findings.
+Only the Edge Case Hunter completed. The reviewer independently performed much of the acceptance-audit checklist
+inline — see § "Independently verified" below — so the acceptance dimension is partly covered, but **the general
+adversarial dimension is entirely unexamined**. Re-run those two layers before treating this story as reviewed.
+The Blind Hunter's last recorded action was an intent to *empirically* settle the Windows delete-sharing question
+that finding **R4** raises analytically; that measurement was never taken.
+
+**Independently verified by the reviewer (holds — recorded so a re-run need not redo it):** AC #6's scope guard
+(`git diff 07bdb79..a2eee2a -- src web extension` is **empty**); AC #3's lockfile bound (`0b1f561` adds exactly
+one `version` and one `resolved` line, both `@emnapi/runtime@1.11.3`, zero removals); the exported ruleset JSON
+matches every literal the record claims (`target`, `enforcement`, `~DEFAULT_BRANCH`, sole context
+`build-test-analyze`, `portability-probe` absent, `RepositoryRole 5 always`); the required context equals
+`jobs.<id>.name` (`build-test-analyze.yml:42`) and not the workflow name; `continue-on-error` placement matches
+the doc (`:218`, `:399`, job-level `:457`, absent on Build/Test); cited SHAs `0b1f561`, `48c050c`, `f7e812f`,
+`07bdb79` are real and do what the record says; the re-apply recipe correctly strips server-assigned fields.
+**Task 7's still-unchecked "`<id>` placeholder remains" subitem is stale bookkeeping, not a defect** — the only
+`<id>` in `docs/CiGate.md` is `jobs.<id>.name` YAML notation at `:26`; Completion Note 9 is correct.
+
+- [x] [Review][Decision] **The required check is satisfiable by a check run the workflow never produced** — `required_status_checks[0]` in `.github/rulesets/main-required-checks.json:29-31` carries no `integration_id`, so GitHub matches the context by **name only**. Any GitHub App or user holding `checks: write` can `POST /check-runs` a green `build-test-analyze` and satisfy the gate without the workflow running. Pinning `integration_id` to the GitHub Actions app closes it, but that is a change to live repository settings only the owner can apply, and on a single-maintainer public repo the owner may reasonably accept the risk. **Owner's call: pin it, or record the acceptance in `docs/CiGate.md`.**
+
+- [x] [Review][Patch] `Evaluate`'s catch set misses two exceptions the poll path really throws [tests/SpecScribe.Tests/FileWatcherServiceTests.cs:164-170] — `SiteRegion.Read` throws `InvalidOperationException` when the manifest exists but lacks the route (`SiteRegion.cs:49-52`) and `KeyNotFoundException` when the chunk lacks it (`SiteRegion.cs:57`); neither is caught. `FileWatcherServiceTests.cs:273` — **a line this story rewrote** — polls `Read(Site, "sprint.html")` with **no `Exists` guard**, and this story's own captured diagnosis proves `route in IR : False` occurs mid-rebuild. This re-opens the exact loud-failure class the story closed for `JsonException`, on the exact test it fixed. (The manifest-absent path is already safe: it throws `FileNotFoundException`, which is an `IOException`.)
+
+- [x] [Review][Patch] `Diagnose`'s early return discards the evidence that actually solved this bug [tests/SpecScribe.Tests/FileWatcherServiceTests.cs:186-187] — if `SiteRegion.Exists` throws at diagnosis time (mid-wipe / delete-pending / torn — the *most likely* state when the poll just timed out for that reason), `Diagnose` returns immediately with only the exception type, dropping the already-computed `source` **and** the events list. The events list is precisely what identified the root cause (`Error … pages-root.json … used by another process`). Fall through to the full report with a tri-state instead of returning. Same site: because `Diagnose` runs after the bound with the watcher still converging, it can also report `route in IR : True` / `marker in page : MARKER-V2` attached to an `Assert.Fail` — re-evaluate the predicate once and label a late convergence explicitly.
+
+- [x] [Review][Patch] The share-mode widening's safety argument rests on coverage that does not exist [tests/SpecScribe.Tests/SiteRegion.cs:290-293] — the new doc comment argues the change cannot mask a generator defect because "every watch-mode test asserts `DoesNotContain(Observed(), … Error)`". That is **false for 4 of the 11 tests** in the class (`FileWatcherServiceTests.cs:422, 478, 542, 615`), and in three of them the events are structurally *unobservable* because the watcher is constructed with a discarding sink `_ => { }` (`:486`, `:566`, `:630`). Those three are the concurrency-race guards — `ConcurrentDebouncedPasses_LeaveTheDeltaSidecarCoherent`, `ATopologyPass_RacingConcurrentOrdinaryPasses_NeitherStealsNorLeaksTheFullDeltaFlag`, `RunTopologyPass_SetsTheSharedTriggerLabel_EvenWhenNoFileLevelPassRanFirst` — i.e. exactly where a masked generator error would matter most. Correct the claim, or add the assertion to those four.
+
+- [x] [Review][Patch] On Windows, `FileShare.Delete` narrows the wipe race but does not close it, and the comment states the property unconditionally [tests/SpecScribe.Tests/SiteRegion.cs:278-289] — `FileShare.Delete` lets `DeleteFile` succeed, but the deletion is only *pending* until the last handle closes and the directory entry persists, so `Directory.Delete(OutputRoot, recursive: true)`'s `RemoveDirectory` on the parent can still fail with `ERROR_DIR_NOT_EMPTY` → `IOException`, aborting the pass exactly as before. The 50-iteration proof bounds the residual rate but cannot show it is zero. Soften the comment to the property Windows actually provides. The product-side "a failed pass is never retried" half is already correctly routed as **F1** → Epic 6; this is only the doc claim. **⚠️ This finding is analytic, not measured** — the layer that intended to measure it died before doing so.
+
+- [x] [Review][Patch] The fix is a no-op on Linux, yet is presented as closing a class first observed on Linux [tests/SpecScribe.Tests/SiteRegion.cs:278-289] — .NET on Unix has no mandatory locking; `FileShare` is advisory and `FileShare.Delete` carries no meaning, since `unlink` always succeeded and an open fd keeps reading the unlinked inode. Linux coverage of the torn-read class therefore remains **solely** the `catch (JsonException)` at `FileWatcherServiceTests.cs:169`. State the platform scope, or a future maintainer reads the flake as fixed and removes that catch — the same trap finding **F2** already corrected once in this file.
+
+- [x] [Review][Patch] `DeletingEpicsFile_…`'s four-way wait can pass vacuously mid-wipe [tests/SpecScribe.Tests/FileWatcherServiceTests.cs:246-251] — all four conditions short-circuit to `false` when the manifest is absent (`SiteRegion.cs:65`, `:100`), and `GenerateAll`'s wipe deletes the manifest. So the "settled state" the comment at `:240-245` says it is waiting for is indistinguishable from "sampled mid-wipe", and the wait can return true without the removal having converged. Require the manifest to be present (or N consecutive stable readings, as `OutputRootInsideTheSourceRoot_…` already does at `:451-461`). Pre-existing, but this story's change makes the wipe complete cleanly rather than abort, so the window is now routinely reachable.
+
+- [x] [Review][Patch] The only documented recovery path in `docs/CiGate.md` cannot run on this machine [docs/CiGate.md:113] — it opens with `jq`, and `jq` is **measured absent** from both PowerShell and Git Bash here. No prerequisite is stated. Use `gh api --jq` or a `node -e` filter, both already available, or declare the dependency.
+
+- [x] [Review][Patch] `docs/CiGate.md`'s commands are POSIX sh, but this project's primary shell is PowerShell [docs/CiGate.md:113-118, 138-139, 206-207] — three measured breakages: (a) `/tmp/ruleset.json` resolves to `C:\tmp\…`, which does not exist, so the redirect fails and `--input` then reads a missing file; (b) the trailing `\` is not a PowerShell line continuation, so the `jq` line and the redirect parse as separate statements; (c) PowerShell strips the embedded double quotes in `--jq 'select(.type=="required_status_checks")'`, so `jq` sees an undefined function — **this is the identical trap this story's own Dev Agent Record records as F3**, and the doc ships the unescaped form with no note. Mark the block Git-Bash-only or escape for PowerShell.
+
+- [x] [Review][Patch] The 16.4 handoff query can report a **false green**, two independent ways [docs/CiGate.md:196-198] — (a) `SHA=$(…)` is a POSIX assignment; under PowerShell it is a parse error, and if only the second line runs, `$SHA` interpolates to empty, GitHub ignores an empty `head_sha`, and the query returns **every** run of the workflow — an operator can read a green conclusion off an unrelated commit and gate a release on it. (b) `.object.sha` on an **annotated** tag returns the tag object's SHA, not the commit's, so `head_sha=` matches nothing and the empty result reads as "no green run". Dereference via `.object.type == "tag"` → `git/tags/<sha>`, and assert non-empty before use. **Attribution:** the annotated-tag evidence (`git tag -a -f`) lives in the 16.4 session's uncommitted work, not in 16.2's baseline — **routed to Story 16.4**, raised here because 16.2 authored the query.
+
+- [x] [Review][Patch] The ruleset id is hardcoded in five places with no staleness path [docs/CiGate.md:105, 110, 118, 134 and .github/rulesets/main-required-checks.json:8] — if the ruleset is ever deleted, the documented `POST` mints a **new** id and every one of those literals silently points at a ruleset that no longer exists. Resolve by name instead (`gh api …/rulesets --jq '.[] | select(.name=="main: require build-test-analyze") | .id'`) and note that the committed `id`/`node_id`/timestamps go stale after any recreate.
+
+- [x] [Review][Patch] Two lockout/stall scenarios are undocumented, and both look like a misconfigured context string [docs/CiGate.md:35-37, 75-76] — (a) if the check is never reported (workflow renamed or deleted on a PR branch, a `cancelled` conclusion from `concurrency.cancel-in-progress`, or a fork PR skipping the job) the PR blocks indefinitely and only the bypass clears it; (b) if `bypass_actors` is ever lost, a required check binds pushes too and a new commit can never carry a passing check, so **the repair cannot itself be pushed** — the doc says "fix the actor" without saying the repair is API/UI-only and pointing at the `PUT` at `:118`. Document the diagnosis (`gh api …/commits/<sha>/check-runs`) and that the resolution is the bypass, never weakening the rule.
+
+- [x] [Review][Patch] A default-branch rename silently splits the ruleset from the workflow [.github/rulesets/main-required-checks.json:14-20 vs .github/workflows/build-test-analyze.yml:20-23] — the ruleset follows `~DEFAULT_BRANCH` automatically; the workflow is pinned to `branches: ["main"]`. After a rename the gate never runs on the new default branch, the required context stays permanently pending, **every** PR blocks, and every verification command in `CiGate.md` hardcodes `main` and reports `protected: false`. A one-line note is enough; no config change is required today.
+
+- [x] [Review][Patch] The workflow header still claims this story delivers "release-branch coverage" [.github/workflows/build-test-analyze.yml:3-5] — §R10 deliberately decided `main` is the only target and that no release-branch pattern should be invented. The comment is now stale and invites exactly the misreading R10 was written to prevent. Update it to say `~DEFAULT_BRANCH` is the whole of the coverage, by decision.
+
+- [x] [Review][Defer] `Diagnose` is wired to only 3 of the 12 `WaitFor` sites in the class [tests/SpecScribe.Tests/FileWatcherServiceTests.cs:222, 246, 298, 300, 318, 352, 389, 412, 417] — deferred, pre-existing. Its own doc comment argues an exhausted bound is "now the ONLY way this class reports a non-convergence", but the other nine waits still fail mute with a bare `Assert.True(WaitFor(…), "message")`, including `:412`/`:417` which exercise the same delete-during-regeneration race. Generalizing is not a mechanical change — `Diagnose` hardcodes the `MARKER-V1`/`MARKER-V2` heuristic at `:193-195` and would need parameterizing — so it is a follow-up, not a patch.
+
+- [x] [Review][Defer] `BurstOfSaves`'s post-wait coherence sweep reads the IR entirely outside `Evaluate` [tests/SpecScribe.Tests/FileWatcherServiceTests.cs:362-368] — deferred, pre-existing. After the wait settles, `Routes(Site)` and a per-route `Read` loop run with the watcher still live and no retry, so a late debounce fire can surface `FileNotFoundException` or the `SiteRegion.cs:49-52` throw with nothing to poll through it. Snapshot the IR before asserting over it, or wrap the sweep in the same retry.
+
+**Dismissed as noise (4):** the ruleset "missing release-branch coverage" as a *gap* (§R10 locked `main`-only
+deliberately and pre-warned reviewers; only the stale workflow comment survives, above);
+`ArgumentNullException`/`NullReferenceException` from the `!`-suppressed nulls at `SiteRegion.cs:54,57` (requires
+the generator to emit JSON `null` for a chunk path, which no code path produces); `InvalidOperationException`
+from `GetProperty("pages")` on a non-object manifest root (a truncated write cannot parse as a valid scalar and
+still reach that call — `JsonException` covers the realistic torn read); and `Diagnose`'s unguarded
+`string.Join(… Observed() …)` as a concurrency hazard (`Observed()` returns `_events.ToArray()` under
+`_eventsLock` at `:99-101`, so it is safe).
+
 ---
 
 ## Dev Notes

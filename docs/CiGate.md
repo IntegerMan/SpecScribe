@@ -36,6 +36,40 @@ So the required context is `build-test-analyze` — **not** `Build, Test & Analy
 `name:` and matches nothing. Getting this wrong produces a rule that is permanently pending (a check that never
 reports) and blocks every pull request forever, which looks exactly like a broken gate.
 
+### ⚠️ Matching is by NAME ONLY — an accepted risk, not an oversight
+
+**[code review 2026-08-08, owner decision]** The rule carries no `integration_id`, so GitHub matches the context
+purely on the string `build-test-analyze`. **Any** GitHub App or user holding `checks: write` on this repository
+could `POST /check-runs` a green `build-test-analyze` and satisfy the gate without the workflow ever running.
+
+Pinning `integration_id` to the GitHub Actions app would close that. **The owner has reviewed this and accepted
+the risk**: this is a single-maintainer public repository whose only installed app with `checks: write` is
+SonarCloud's, and the bypass actor already means the owner is trusted on `main` by design — so an attacker able
+to forge a check run would already need write access that defeats the gate anyway.
+
+**Revisit this if any of those change** — a second maintainer, a new GitHub App with `checks: write`, or an
+outside contributor with elevated permissions. The fix is one field on the rule:
+
+```jsonc
+{ "context": "build-test-analyze", "integration_id": <the GitHub Actions app id> }
+```
+
+### If the check is never reported at all
+
+A permanently-pending required context blocks every PR and has **four** reachable causes, not just a mistyped
+string. All four look identical from the PR page, so diagnose before "fixing" the rule:
+
+1. the context string does not match `jobs.<id>.name` (above);
+2. the workflow file was renamed or deleted on the PR's branch, so the job never ran;
+3. the run was **cancelled** — `concurrency.cancel-in-progress` is on for pull requests, so a superseded push
+   leaves a cancelled run whose check is not a success;
+4. a fork PR skipped the job (secrets are unavailable to forks).
+
+Diagnose with `gh api repos/IntegerMan/SpecScribe/commits/<sha>/check-runs --jq '.check_runs[].name'` — if
+`build-test-analyze` is absent from that list, the check was never reported and no amount of rule editing will
+help. **The resolution is the admin bypass, or pushing a commit that triggers a real run — never weakening or
+deleting the rule.**
+
 ## Why `portability-probe` must never be required
 
 `portability-probe (ubuntu, non-gating)` carries `continue-on-error: true` **at the job level**:
@@ -75,6 +109,28 @@ The ruleset therefore names the repository **admin role** as a `bypass_actors` e
 - If a direct push to `main` is ever **rejected**, that is the bypass actor being misconfigured — a bug in this
   configuration. Fix the actor; do **not** disable the rule.
 
+> ⚠️ **If `bypass_actors` is ever lost, you cannot push the repair. [code review 2026-08-08]** With no bypass,
+> the required check binds pushes too, and a brand-new commit can never already carry a passing
+> `build-test-analyze` — so the fix cannot travel through `git push`. **The repair is API- or UI-only:** use the
+> `PUT` in § Re-applying it (or the ruleset's Settings page) to restore the `bypass_actors` entry. This is worth
+> knowing in advance, because from the terminal it presents as being locked out of your own default branch, and
+> the tempting move — deleting the rule — throws the gate away to fix a one-field mistake.
+
+## ⚠️ Renaming the default branch splits the ruleset from the workflow
+
+**[code review 2026-08-08]** These two do not move together, and nothing warns you:
+
+- the **ruleset** targets `~DEFAULT_BRANCH`, so it re-points at the new branch automatically;
+- the **workflow** is pinned to `branches: ["main"]` (`push` and `pull_request` alike), so it stops running there.
+
+The result is the worst combination: the rule still applies, but the check it requires is never reported, so
+**every pull request blocks permanently** with the "never reported" signature above. Every verification command
+in this document also hardcodes `main` and will report `protected: false` on what is now an ordinary branch.
+
+No change is needed today — the default branch is `main` and there are no plans to rename it. But **a rename
+requires editing `.github/workflows/build-test-analyze.yml`'s triggers in the same change**, and this note exists
+so that is discovered before the rename rather than after every PR is stuck.
+
 ## `strict_required_status_checks_policy` is `false`, on purpose
 
 `true` ("require branches to be up to date before merging") forces every pull request to be rebased onto the
@@ -104,19 +160,46 @@ guessed.
 
 The live ruleset is **id `20567252`**, created 2026-08-07.
 
+> ⚠️ **Two prerequisites, both of which have bitten. [code review 2026-08-08]**
+>
+> 1. **`jq` is NOT installed on the owner's machine** — measured absent from both PowerShell and Git Bash. The
+>    commands below therefore use `node`, which this repository already requires, instead of `jq`.
+> 2. **Run this block in Git Bash, not PowerShell.** PowerShell resolves `/tmp/…` to `C:\tmp\…`, which does not
+>    exist; it does not treat a trailing `\` as a line continuation; and it strips the embedded double quotes out
+>    of a `--jq` expression, so `jq` sees `select(.type==required_status_checks)` and fails with
+>    `function not defined`. That last one is the same trap this story's own Dev Agent Record recorded as F3.
+>    PowerShell equivalents are given underneath each block.
+
 ```sh
+# --- Git Bash ---
 # Inspect what is live today
 gh api repos/IntegerMan/SpecScribe/rulesets
-gh api repos/IntegerMan/SpecScribe/rulesets/20567252
+gh api "repos/IntegerMan/SpecScribe/rulesets/$(gh api repos/IntegerMan/SpecScribe/rulesets \
+  --jq '.[] | select(.name=="main: require build-test-analyze") | .id')"
 
 # Recreate from the committed record (strip the server-assigned fields first)
-jq 'del(.id, .node_id, .created_at, .updated_at, ._links, .source, .source_type, .current_user_can_bypass)' \
-  .github/rulesets/main-required-checks.json > /tmp/ruleset.json
-gh api --method POST repos/IntegerMan/SpecScribe/rulesets --input /tmp/ruleset.json
+node -e 'const o=require("./.github/rulesets/main-required-checks.json"); \
+  for (const k of ["id","node_id","created_at","updated_at","_links","source","source_type","current_user_can_bypass"]) delete o[k]; \
+  process.stdout.write(JSON.stringify(o,null,2))' > "$TEMP/ruleset.json"
+gh api --method POST repos/IntegerMan/SpecScribe/rulesets --input "$TEMP/ruleset.json"
 
-# Update in place instead of recreating
-gh api --method PUT repos/IntegerMan/SpecScribe/rulesets/20567252 --input /tmp/ruleset.json
+# Update in place instead of recreating (resolve the id by NAME — see the warning below)
+gh api --method PUT "repos/IntegerMan/SpecScribe/rulesets/$RULESET_ID" --input "$TEMP/ruleset.json"
 ```
+
+```powershell
+# --- PowerShell equivalent ---
+$id = gh api repos/IntegerMan/SpecScribe/rulesets --jq '.[] | select(.name==\"main: require build-test-analyze\") | .id'
+gh api "repos/IntegerMan/SpecScribe/rulesets/$id"
+gh api --method PUT "repos/IntegerMan/SpecScribe/rulesets/$id" --input "$env:TEMP\ruleset.json"
+```
+
+⚠️ **Resolve the id by NAME, not by the literal below. [code review 2026-08-08]** The id `20567252` is written
+into this document in several places and into the committed JSON's `"id"` field. **Deleting and recreating the
+ruleset mints a NEW id**, at which point every one of those literals silently points at a ruleset that no longer
+exists — `gh api …/rulesets/20567252` simply 404s and exits non-zero, which reads like a broken command rather
+than a stale id. After any recreate, the committed JSON's `id`, `node_id`, `created_at` and `updated_at` are all
+stale and should be re-exported. The name is the stable key; the id is not.
 
 `gh ruleset` is **read-only** (`list` / `view` / `check`), so `gh api` is the write path. Recreating with the
 same `name` returns **`422 name must be unique`** — that error means the rule already exists, not that the
@@ -130,6 +213,7 @@ exported live object, so the id in it is observed, not asserted.
 ### Verifying it
 
 ```sh
+# --- Git Bash ---
 # THE authoritative bypass check — does the CALLING user bypass this rule?
 gh api repos/IntegerMan/SpecScribe/rulesets/20567252 --jq '.current_user_can_bypass'   # -> "always"
 
@@ -137,6 +221,14 @@ gh api repos/IntegerMan/SpecScribe/rulesets/20567252 --jq '.current_user_can_byp
 gh api repos/IntegerMan/SpecScribe/branches/main --jq '.protected'                     # -> true
 gh api repos/IntegerMan/SpecScribe/rules/branches/main \
   --jq '.[] | select(.type=="required_status_checks") | .parameters.required_status_checks[].context'
+```
+
+```powershell
+# --- PowerShell: the embedded quotes MUST be escaped as \" or PowerShell strips them and jq reports
+# `function not defined: required_status_checks/0`. [code review 2026-08-08] ---
+gh api repos/IntegerMan/SpecScribe/rulesets/20567252 --jq '.current_user_can_bypass'
+gh api repos/IntegerMan/SpecScribe/branches/main --jq '.protected'
+gh api repos/IntegerMan/SpecScribe/rules/branches/main --jq '.[] | select(.type==\"required_status_checks\") | .parameters.required_status_checks[].context'
 ```
 
 ⚠️ **Do not read `rules/branches/main` as a bypass check.** It lists the rules that apply to the **branch**,
@@ -182,6 +274,45 @@ Stage B is manual [`.github/workflows/release.yml`](../.github/workflows/release
 selected Stage A tag and prerelease Release rather than polling a CI API.
 
 The old check-run polling procedure is retired. A release with no Stage A prerelease Release is not promotable.
+
+The query shape is:
+
+> 🚨 **This query has TWO ways of reporting a FALSE GREEN. Both are fixed below; do not copy an older form of
+> it. [code review 2026-08-08]**
+>
+> 1. **An empty `head_sha` returns EVERY run of the workflow.** `SHA=$(…)` is a POSIX assignment. Run this block
+>    in PowerShell and it is a parse error; run only the second line and `$SHA` interpolates to the empty string,
+>    which GitHub *ignores* rather than rejects — so the query happily lists every run the workflow has ever had
+>    and an operator can read a green conclusion off a completely unrelated commit. **Assert the SHA is non-empty
+>    before using it.**
+> 2. **`.object.sha` on an ANNOTATED tag is the tag object's SHA, not the commit's.** Annotated tags
+>    (`git tag -a`) point at a tag object which in turn points at the commit, so `head_sha=<tag-object-sha>`
+>    matches no run at all and the empty result reads as "no green run for this tag" — a false RED that will look
+>    like the gate failing. Dereference when `.object.type == "tag"`.
+
+```sh
+# Latest build-test-analyze conclusion for the exact commit a tag points at.
+# Git Bash. Handles both lightweight and annotated tags, and refuses to query on an empty SHA.
+REF=$(gh api "repos/IntegerMan/SpecScribe/git/refs/tags/<tag>" --jq '.object.sha + " " + .object.type')
+SHA=${REF% *}; TYPE=${REF#* }
+# An annotated tag points at a tag OBJECT — dereference it to reach the commit.
+if [ "$TYPE" = "tag" ]; then
+  SHA=$(gh api "repos/IntegerMan/SpecScribe/git/tags/$SHA" --jq '.object.sha')
+fi
+[ -n "$SHA" ] || { echo "refusing to query on an empty SHA — the tag did not resolve" >&2; exit 1; }
+
+gh api "repos/IntegerMan/SpecScribe/actions/workflows/build-test-analyze.yml/runs?head_sha=$SHA" \
+  --jq '.workflow_runs[] | [.run_number, .conclusion] | @tsv'
+```
+
+Note that a **run-level** conclusion is not sufficient on its own: `portability-probe`'s job-level
+`continue-on-error` means the run can report `success` while that job is red. Query the **`build-test-analyze`
+job's** conclusion, not the run's, exactly as this document's required-context rule does:
+
+```sh
+gh api repos/IntegerMan/SpecScribe/actions/runs/<run_id>/jobs \
+  --jq '.jobs[] | select(.name == "build-test-analyze") | .conclusion'
+```
 
 ## Deliberately absent: a README CI badge
 
