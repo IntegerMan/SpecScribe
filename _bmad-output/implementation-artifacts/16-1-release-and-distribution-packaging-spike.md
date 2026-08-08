@@ -24,7 +24,11 @@ deliverables:
 
 # Story 16.1: SPIKE — Release & Distribution Packaging
 
-Status: review
+Status: in-progress
+
+<!-- Code review 2026-08-07: returned from `review` to `in-progress`. 30 patch findings applied; **9 owner
+     decisions remain open** (see § Review Findings), chief among them ADR 0040's ratification — which is
+     AC #4 and cannot be closed by an agent. 4 findings deferred to `deferred-work.md`. -->
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -320,7 +324,7 @@ no-product-code spike and that needs a checkable assertion.
 - [x] **Task 2 — Decide the renderer packaging shape, empirically (AC: #1, #5)** ← *protect this one*
   - [x] Build the artefact. Used `build:package`, never `build`; artefact verified to carry **0** prerendered HTML files in `public/`. `npm ci` had to be replaced with `npm install --no-save --no-package-lock` because `npm ci` **fails at HEAD** — recorded as a finding, report § 6.1.
   - [x] Add a **temporary** `<None Include=... />` to `SpecScribe.csproj`, `dotnet pack -c Release -o artifacts`, and inspect the nupkg layout. → **`%(RecursiveDir)` double-applies**; correct form omits it (report § 2.7 finding 1).
-  - [x] `dotnet tool install ... --tool-path ./probe-tools`, then run `generate` **from a different repository** with `SPECSCRIBE_RENDERER_DIR` unset. → **`errors=0`**, 373 routes @ 4.9 ms/route, 18 pages. Resolved artefact path proven by negative case (report § 2.3).
+  - [x] `dotnet tool install ... --tool-path ./probe-tools`, then run `generate` **from a different repository** with `SPECSCRIBE_RENDERER_DIR` unset. → **`errors=0`**, 373 routes @ 4.9 ms/route. Resolved artefact path proven by negative case (report § 2.3). ⚠️ **Corrected 2026-08-07:** this line previously read "18 pages". It should not — `generated=18` is `GenerationSummary.Count`, which tallies something other than prerendered pages; the prerendered page count is **373**, and `NuxtPrerender`'s own doc comment notes that *"successful routes are not individually evented"*.
   - [x] Record the nupkg size before and after the payload. → baseline **2,515,650 B / 25 entries** → **3,757,359 B / 212 entries**; delta **+1,241,709 B (+49.4%)**. Artefact re-measured at **3.96 MB / 187 files** (23.5 recorded 3.78 MB / 185).
   - [x] Answer the self-contained-binary case. → **MEASURED, not deferred:** `PublishSingleFile` does **not** move `AppContext.BaseDirectory`; sibling `renderer/` resolves; `errors=0`, 373 routes @ 5.0 ms/route. Exe = **79,742,177 B (76.0 MiB)**.
   - [x] Answer the npm case. → **one shared `specscribe-renderer` package, not per-RID.** Decided from a measured property (0 native bindings, 0 platform binaries in the artefact). Marked **unmeasured** for the end-to-end npx install, seated against 16.8 (report § 10 item 5).
@@ -328,7 +332,7 @@ no-product-code spike and that needs a checkable assertion.
 
 - [x] **Task 3 — Choose the preview cut and the non-goals (AC: #1)**
   - [x] Decide which channels ship in the **first preview** and in what order. → dotnet tool → npx → self-contained binaries; **VSIX OUT** (report § 3.1, ADR 0040 § Decision 2)
-  - [x] Write the **explicit non-goals** AC #1 demands. → eleven named, report § 3.2
+  - [x] Write the **explicit non-goals** AC #1 demands. → **ten** named in report § 3.2's "Out, by name" list (stable/1.0, Homebrew, winget, Chocolatey, Scoop, container image, Open VSX, code-signing, byte-identical reproducible builds, non-GitHub-Actions CI); the eleventh — `linux-arm64`/`osx-x64` — is stated in the following RID paragraph and folded into the single non-goals list in ADR 0040 § Decision 2. ⚠️ *Corrected 2026-08-07: this line previously claimed "eleven named, report § 3.2", which § 3.2's own list does not support.*
   - [x] State the **RID matrix**. → **three**: `win-x64`, `linux-x64`, `osx-arm64`; `linux-arm64`/`osx-x64` named and deferred. Deferral is cheap *because* the renderer is shared.
 
 - [x] **Task 4 — Credential and prerequisite inventory (AC: #2)**
@@ -350,7 +354,7 @@ no-product-code spike and that needs a checkable assertion.
   - [x] Name the four existing version numbers and state what happens to each. → report § 6.4
 
 - [~] **Task 6 — Author and ratify the ADR (AC: #4)** — authored; **ratification is the owner's act and remains open**
-  - [x] Verify the next free ADR number at authoring time. → **0039 was NOT free** — Story 4.9 claimed it 2026-08-06. Next free is **0040**. (The story said "confirm, do not assume"; this is why.)
+  - [x] Verify the next free ADR number at authoring time. → **0039 was NOT free.** Next free is **0040**. (The story said "confirm, do not assume"; this is why.) ⚠️ **Corrected by code review 2026-08-07:** 0039 was taken by **ADR 0039 — A Second Bounded Unscoped Layer, for Runtime-Attached Body-Level Classes**, authored from the owner's sunburst verify round. Story 4.9 had merely *reserved* 0039 in its story file and ultimately landed as **0041**. The original note ("Story 4.9 claimed it") misattributed the owner's own ADR.
   - [x] Author `docs/adrs/0040-release-channels-and-versioning-policy.md` in the house shape.
   - [x] State explicitly what it amends. → § Relationship to ADR 0006 and § Relationship to ADR 0022, both in the shape ADR 0022 models.
   - [x] Add one line to `docs/adrs/README.md` in the existing format.
@@ -368,7 +372,7 @@ no-product-code spike and that needs a checkable assertion.
 
 - [x] **Task 9 — Scope guard (AC: #6)**
   - [x] `git status` shows no modification under `src/`, `tests/`, `web/`, `extension/`. → **empty.** Ran in a dedicated worktree, so no concurrent session's work was in the tree to attribute or disturb.
-  - [x] `dotnet test SpecScribe.slnx` green. → **2,962 passed / 1 failed / 3 skipped.** The one failure is `FileWatcherServiceTests.EditingAStoryFile_…`, a known-class timing flake: **11/11 green on isolated re-run**, and this story changed no product code.
+  - [~] `dotnet test SpecScribe.slnx` green. → **2,962 passed / 1 failed / 3 skipped.** The one failure is `FileWatcherServiceTests.EditingAStoryFile_…`, a known-class timing flake: **11/11 green on isolated re-run**, and this story changed no product code. ⚠️ **Downgraded from `[x]` by code review 2026-08-07 — the box asserted a condition that did not hold.** Two shortfalls against AC #6's actual wording: (a) the run was **not literally green**, and (b) AC #6 requires movement be *"attributed to a concurrent session **by name**"* — the attribution given is to a flake class plus machine load, not to a named session. Additionally **no pre-story baseline figure was recorded anywhere**, so *"unchanged from the pre-story baseline"* is unprovable in either direction. The disposition is reasonable and was disclosed; the certification was stronger than the evidence.
   - [x] `cd web && npm run check` green. → all four gates **OK** (`check:parity` 24 routes / 14 families byte-identical).
   - [x] If a gate moved: **establish causality before touching any baseline.** → `check:ir-content` went red **twice** and **no baseline was regenerated**. Cause 1: fresh worktree had no IR. Cause 2: a plain `generate` omits `--deep-git`, giving `+4 / -185` — the signature `build-test-analyze.yml:281-290` documents in advance as `+4 / -182`. Running `extract:ir-content` at that point would have **deleted 185 rules** and turned the gate green over a real regression.
 
@@ -429,82 +433,82 @@ arithmetic across the five documents reconciles with no numeric contradiction.
 
 #### Patch
 
-- [ ] [Review][Patch] The "0039 was taken by Story 4.9" claim is **false** — ADR 0039 is the runtime-attached
+- [x] [Review][Patch] The "0039 was taken by Story 4.9" claim is **false** — ADR 0039 is the runtime-attached
   body-level-classes record authored from the owner's sunburst verify round; Story 4.9 took **0041**.
   Repeated in 5 places incl. the permanent index and commit history [`docs/adrs/README.md`, story Task 6 +
   Completion Note 4, `16-1-spike-report.md` § 11]
-- [ ] [Review][Patch] "`gh` is not installed on this machine" is **false** — `C:\Program Files\GitHub CLI\gh.exe`
+- [x] [Review][Patch] "`gh` is not installed on this machine" is **false** — `C:\Program Files\GitHub CLI\gh.exe`
   verified present, and project memory already records it as installed-but-not-on-PATH. It is the sole
   stated reason the NFR9-breaking item shipped **unverified-on-CI** [`16-1-spike-report.md` § 6.1, open item 3]
-- [ ] [Review][Patch] ADR 0040 contradicts itself on ADR 0022's owner questions — the `Amends:` header and
+- [x] [Review][Patch] ADR 0040 contradicts itself on ADR 0022's owner questions — the `Amends:` header and
   § Relationship lead say **both** closed; the trailing clause says Question 2 *"remains open"*. The README
   index propagates the wrong half [`docs/adrs/0040-…md:9,202-204`; `docs/adrs/README.md`]
-- [ ] [Review][Patch] ADR 0040 carries no **`Deciders`** field; both sibling ADRs from the same week (0039,
+- [x] [Review][Patch] ADR 0040 carries no **`Deciders`** field; both sibling ADRs from the same week (0039,
   0041) do. For a record whose only open item is who ratifies it, that is the wrong field to drop
   [`docs/adrs/0040-…md:1-11`]
-- [ ] [Review][Patch] The self-contained-binary / GitHub Releases channel has **no credential row at all** —
+- [x] [Review][Patch] The self-contained-binary / GitHub Releases channel has **no credential row at all** —
   a channel in the shipping cut with an uninventoried publish credential (AC #2). Zero hits for
   `GITHUB_TOKEN` or `contents: write` in either document [`16-1-spike-report.md` § 5.1]
-- [ ] [Review][Patch] "Where stored" is unanswered on both fallback paths — the NuGet API-key fallback has no
+- [x] [Review][Patch] "Where stored" is unanswered on both fallback paths — the NuGet API-key fallback has no
   secret name, scope, owner or rotation rule, and the Marketplace federation's stored material is unstated.
   The headline *"two of three channels need no stored secret"* drops the caveat [§ 5.1, § 5.2, § 5.3]
-- [ ] [Review][Patch] The ADR records the pack path as a glob (`tools/<tfm>/any/renderer/**`) while the
+- [x] [Review][Patch] The ADR records the pack path as a glob (`tools/<tfm>/any/renderer/**`) while the
   proven-correct exact `PackagePath` survives only in the report, and `net10.0` is hard-coded with no
   TFM-derivation rule — a TFM bump silently relocates the assembly away from the payload [ADR § Decision 1]
-- [ ] [Review][Patch] Nothing requires the packed renderer to be **verified complete**, though § 2.7 measured
+- [x] [Review][Patch] Nothing requires the packed renderer to be **verified complete**, though § 2.7 measured
   exactly that false pass (*"187 entries, right count, right total bytes, exit 0 — and `renderer/server/index.mjs`
   did not exist"*). Combined with the discarded renderer error text, 16.4 can publish a broken package green
-- [ ] [Review][Patch] The renderer is spawned via the single-string `ProcessStartInfo` overload, not
+- [x] [Review][Patch] The renderer is spawned via the single-string `ProcessStartInfo` overload, not
   `ArgumentList`, and § Decision 1 moves that path to a consumer-chosen install directory — a username or
   install path containing a space breaks the lead channel's first run [`src/SpecScribe/NuxtPrerender.cs:251`]
-- [ ] [Review][Patch] npm publish **ordering** is unspecified, so the exact `=X.Y.Z` pin has an
+- [x] [Review][Patch] npm publish **ordering** is unspecified, so the exact `=X.Y.Z` pin has an
   install-breaking window if the wrapper lands before the renderer package [ADR § Decision 5]
-- [ ] [Review][Patch] The 1-hour single-use NuGet key has no stated placement in the job and no re-exchange
+- [x] [Review][Patch] The 1-hour single-use NuGet key has no stated placement in the job and no re-exchange
   rule; a retried publish has no credential [§ 5.1]
-- [ ] [Review][Patch] The **.NET 10 prerequisite appears nowhere** in the preview promises or in § Decision 8's
+- [x] [Review][Patch] The **.NET 10 prerequisite appears nowhere** in the preview promises or in § Decision 8's
   listing surfaces, while Node does — the likeliest install blocker for the channel leading the cut [§ 6.6]
-- [ ] [Review][Patch] No supported-platform matrix in the promises, and no required message for the
+- [x] [Review][Patch] No supported-platform matrix in the promises, and no required message for the
   unmatched-platform case in the `optionalDependencies` wrapper (`linux-arm64` / `osx-x64` are deferred) [§ 6.6, § 3.2]
-- [ ] [Review][Patch] Keep a Changelog has no **Breaking** section, yet "breaking changes are recorded in
+- [x] [Review][Patch] Keep a Changelog has no **Breaking** section, yet "breaking changes are recorded in
   `CHANGELOG.md`" is a stated preview promise — breaking and non-breaking become indistinguishable [§ 6.5, § 6.6]
-- [ ] [Review][Patch] `SOURCE_DATE_EPOCH` is marked **CLOSED** with no value or derivation specified, and the
+- [x] [Review][Patch] `SOURCE_DATE_EPOCH` is marked **CLOSED** with no value or derivation specified, and the
   csproj **silently stamps today's date** on an unset or malformed value rather than failing
   [ADR § Decision 7; `src/SpecScribe/SpecScribe.csproj:36-38`]
-- [ ] [Review][Patch] The binary channel's "structural" CLI↔renderer pin is **two filesystem objects** with no
+- [x] [Review][Patch] The binary channel's "structural" CLI↔renderer pin is **two filesystem objects** with no
   version stamp — reproducing exactly the mismatch Story 16.9 AC #2 exists to prevent [ADR § Decision 5 vs § Decision 1]
-- [ ] [Review][Patch] The only unsigned channel also has **no published digest or attestation**, and 16.4's
+- [x] [Review][Patch] The only unsigned channel also has **no published digest or attestation**, and 16.4's
   release-asset naming/archive format is unspecified [§ 5.5]
-- [ ] [Review][Patch] Decisions a downstream story must implement live only in the report, not the ADR —
+- [x] [Review][Patch] Decisions a downstream story must implement live only in the report, not the ADR —
   § 6.6 preview promises (17.4's sign-off checklist), § 5.4 fallback IDs + RID naming (16.8), and the
   code-signing consequences AC #2 demanded. CLAUDE.md § Decision records names this pattern by name
-- [ ] [Review][Patch] The Node-check amendment promotes a **self-described interim stand-in** to permanent
+- [x] [Review][Patch] The Node-check amendment promotes a **self-described interim stand-in** to permanent
   without engaging the code's own doc comment (*"Until it is, this is the check"*)
   [`src/SpecScribe/NuxtPrerender.cs:143-145`; ADR § Decision 8]
-- [ ] [Review][Patch] "Amends ADR 0006" is hollow where loud and silent where real — adding the packaging
+- [x] [Review][Patch] "Amends ADR 0006" is hollow where loud and silent where real — adding the packaging
   shape is an extension, while the genuine departure (this ADR ships `dotnet tool` **first**; ADR 0006 calls
   npx *primary*) is framed as **not** an amendment [`docs/adrs/0006-…md:202`]
-- [ ] [Review][Patch] The `npm ci` root cause handed to 16.2 points at the wrong half of the lockfile — the
+- [x] [Review][Patch] The `npm ci` root cause handed to 16.2 points at the wrong half of the lockfile — the
   peer dependencies **were** declared at `838d591`; the missing item was the top-level
   `node_modules/@emnapi/runtime` tree entry, which is what `0b1f561` added [§ 6.1]
-- [ ] [Review][Patch] The probe repository's composition is documented nowhere, and the two probe runs are
+- [x] [Review][Patch] The probe repository's composition is documented nowhere, and the two probe runs are
   irreconcilable on the report's face — § 2.2 reports **373 routes**, § 2.7/§ 4.1 report a first probe at
   **21**. The composition is load-bearing for AC #5's central claim [§ 2.1]
-- [ ] [Review][Patch] No pre-story baseline was recorded, so AC #6's *"unchanged from the pre-story baseline"*
+- [x] [Review][Patch] No pre-story baseline was recorded, so AC #6's *"unchanged from the pre-story baseline"*
   is unprovable; the suite was **1 failing** and the task box asserts "green"; attribution is to a flake
   class, not *"to a concurrent session by name"* as AC #6 words it [§ 7.2, Task 9]
-- [ ] [Review][Patch] Channel version **parity** is unstated — a version resolvable on NuGet may not exist on
+- [x] [Review][Patch] Channel version **parity** is unstated — a version resolvable on NuGet may not exist on
   npm, leaving 16.9's Action with no authoritative channel for "a released version" [ADR § Decision 2]
-- [ ] [Review][Patch] Provenance table points to § 3 for commands that are in § 2.1 — a broken pointer in the
+- [x] [Review][Patch] Provenance table points to § 3 for commands that are in § 2.1 — a broken pointer in the
   one table whose purpose is auditability [§ 1]
-- [ ] [Review][Patch] The probe item called "reproduced **verbatim**" is recorded two different ways —
+- [x] [Review][Patch] The probe item called "reproduced **verbatim**" is recorded two different ways —
   § 2.1 carries `CopyToOutputDirectory="Never"`, the Debug Log does not [§ 2.1, § 11]
-- [ ] [Review][Patch] "**three of the four** produced a green-looking or self-consistent wrong answer" —
+- [x] [Review][Patch] "**three of the four** produced a green-looking or self-consistent wrong answer" —
   only one did; (2) threw, (3) reported `errors=1`, (4) turned the gate red [§ 2.7]
-- [ ] [Review][Patch] `generated=18` is mislabelled "**18 pages**" — the prerendered page count is 373;
+- [x] [Review][Patch] `generated=18` is mislabelled "**18 pages**" — the prerendered page count is 373;
   `GenerationSummary.Count` tallies something else [story Task 2]
-- [ ] [Review][Patch] A transient defect repaired the same day (`npm ci`, fixed by `0b1f561`) is written into
+- [x] [Review][Patch] A transient defect repaired the same day (`npm ci`, fixed by `0b1f561`) is written into
   the **permanent ADR index**, where it will read as a standing defect indefinitely [`docs/adrs/README.md`]
-- [ ] [Review][Patch] Non-goal count mismatch — Task 3 claims *"eleven named"*; § 3.2 enumerates **ten**
+- [x] [Review][Patch] Non-goal count mismatch — Task 3 claims *"eleven named"*; § 3.2 enumerates **ten**
   [story Task 3 vs § 3.2]
 
 #### Deferred
@@ -709,7 +713,11 @@ Key commands, in order:
 cd web && npm install --no-save --no-package-lock   # npm ci FAILS at 838d591 — see Completion Note 6
 npm run sync:assets && npm run build:package        # 187 files / 4,154,964 B; 0 prerendered HTML in public/
 dotnet pack src/SpecScribe/SpecScribe.csproj -c Release -o artifacts-baseline   # 2,515,650 B / 25 entries
-# + temporary <None Include="..\..\web\.output\**\*" Pack="true" PackagePath="tools\net10.0\any\renderer" />
+# + temporary <None Include="..\..\web\.output\**\*" Pack="true" PackagePath="tools\net10.0\any\renderer" CopyToOutputDirectory="Never" />
+#   (corrected 2026-08-07: CopyToOutputDirectory="Never" was missing here but present in report § 2.1.
+#    The exact string is load-bearing — § 2.7 finding 1 shows a wrong form packs 187 entries at exit 0
+#    with no entry point — so the two records must not disagree. ADR 0040 § Decision 1 now carries the
+#    normative form, with $(TargetFramework) in place of the literal net10.0.)
 dotnet pack src/SpecScribe/SpecScribe.csproj -c Release -o artifacts            # 3,757,359 B / 212 entries
 dotnet tool install SpecScribe --version 0.1.0-preview --tool-path ./probe-tools --add-source ./artifacts
 # from C:\Users\MattE\.claude\jobs\eac9eab5\tmp\probe-project (own git repo, NO web/, env unset):
@@ -748,8 +756,17 @@ before the final gate run so they could not pollute the Code Map corpus the IR g
    cut**. `microsoft/vscode-vsce#1023` (federated SPs failing on *personally*-owned publishers, closed
    `not_planned`) is why the org-vs-personal call is made now rather than at 16.5 time.
 
-4. **`0039` was not free.** Story 4.9 claimed it on 2026-08-06. The ADR landed as **0040**. The story file said
-   "confirm, do not assume", and this is the case that justified it.
+4. **`0039` was not free.** The ADR landed as **0040**. The story file said "confirm, do not assume", and this
+   is the case that justified it.
+
+   ⚠️ **Corrected by code review 2026-08-07 — this note was wrong as originally written.** It said *"Story 4.9
+   claimed it on 2026-08-06."* It did not. **0039 is `0039-runtime-attached-body-level-classes.md`**, authored
+   from **the owner's verify round on the sunburst surfaces** (Deciders: Matthew-Hope Eland), landed in
+   `76e5e42`/`6a7bc71`. Story 4.9 had *reserved* 0039 in its own story file and ultimately took **0041**, whose
+   header records: *"Took 0041 because 0039 **and** 0040 were both claimed after the story's baseline."* The
+   misattribution was repeated in five places — this note, Task 6, spike report § 11, the `docs/adrs/README.md`
+   index entry, and the commit message of `9837e67` — and Story 4.9's own review had already flagged it and
+   assigned the correction back to this story. All except the immutable commit message are now fixed.
 
 5. **A real product defect was found and raised, not patched — same class as 23.5's `DashboardSurface.vue`.**
    `EpicsIndexSurface.vue` hard-throws when the epics index has no child pages, so a project SpecScribe cannot
@@ -759,11 +776,20 @@ before the final gate run so they could not pollute the Code Map corpus the IR g
    behaviour is modelled one component over.
 
 6. **`npm ci` fails on a clean checkout at `838d591`** (`Missing: @emnapi/runtime@1.11.3 from lock file`), and
-   three CI steps depend on it. This breaks even the *weaker* reading of NFR9 that ADR 0040 claims. **Honest
-   limit: CI's actual status could not be checked — `gh` is not installed on this machine — and CI pins Node
-   24.11.1 while this session ran 24.18.1, so the failure may be npm-version-specific.** Recorded as
-   **unverified-on-CI**, not as "CI is broken". Routed to Story 16.2. The session worked around it with
+   three CI steps depend on it. This breaks even the *weaker* reading of NFR9 that ADR 0040 claims. Recorded
+   as **unverified-on-CI**, not as "CI is broken". Routed to Story 16.2. The session worked around it with
    `npm install --no-save --no-package-lock`, which left `web/package-lock.json` untouched.
+
+   ⚠️ **Corrected by code review 2026-08-07 — the stated reason for leaving this unverified was false.** The
+   note originally read *"CI's actual status could not be checked — `gh` is not installed on this machine."*
+   `gh` **is** installed, at `C:\Program Files\GitHub CLI\gh.exe` (verified); it is simply not on `PATH`, and
+   project memory already records exactly that, with the instruction to call it by full path. A checkable
+   fact was declared uncheckable, and it was the single item this ADR says *"breaks even the weak reading of
+   NFR9"* — so the one release-blocking question shipped open on a false premise. The Node-version caveat
+   (CI pins 24.11.1 via `web/.nvmrc`; this session ran 24.18.1) was legitimate and stands.
+
+   ✅ **Since resolved.** Commit `0b1f561` ("CI fix: repair the lockfile and regenerate the two stale drift
+   gates") repaired it. The finding was real and valuable — only the excuse for not verifying it was not.
 
 7. **Second defect: `NuxtPrerender.FindRepoRoot` does not recognise a git worktree.** It tests
    `Directory.Exists(".git")`, but in a worktree `.git` is a *file* (56 bytes, measured), so the walk runs past

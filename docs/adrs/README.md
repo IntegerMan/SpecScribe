@@ -140,15 +140,23 @@ Each record is numbered by its filename prefix and carries a `**Status:**` line.
   3.96 MB / 187-file payload. Also fixes the preview cut and its order (dotnet tool → npx → binaries, **VSIX
   OUT**), the RID matrix at three, `0.x`/`-preview` with **MinVer** deriving the version from the tag, Keep a
   Changelog, and the exact-version pin that makes a CLI/renderer mismatch unexpressible.
-  **AMENDS** ADR 0006 §Decision (adds the packaging shape + an ordered cut) and ADR 0022 §Decision 5 (Node-check
-  placement moves to *prerender time*, matching the shipped code, and both of that ADR's open owner questions on
-  packaging are closed). ⚠️ **Two live findings recorded rather than fixed:** the VS Marketplace PAT path is
-  **already closed** — Azure DevOps blocked global-PAT creation on **2026-03-15**, and `vsce` requires exactly
-  that token shape — so 16.5 must use an **organization**-owned publisher with Entra federation; and `npm ci`
-  **fails on a clean checkout** at `838d591`, which breaks even the weak reading of NFR9 this ADR claims.
+  **AMENDS** ADR 0006 §Decision — the genuine departure is the **channel ordering**: ADR 0006 calls npx the
+  *primary* channel and this ADR ships `dotnet tool` **first** (the packaging shape and the ordered cut are
+  additions, not amendments) — and ADR 0022 §Decision 5 (Node-check placement moves to *prerender time*,
+  matching the shipped code; **one** of that ADR's two open owner questions is closed — the npx install-time
+  check — while the `web/`-coverage question **remains open**). ⚠️ **Two findings recorded rather than fixed:**
+  the VS Marketplace PAT path is **already closed** — Azure DevOps blocked global-PAT creation on
+  **2026-03-15**, and `vsce` requires exactly that token shape — so 16.5 must use an **organization**-owned
+  publisher with Entra federation; and `npm ci` failed on a clean checkout at `838d591`, breaking even the
+  weak reading of NFR9 (✅ since repaired by `0b1f561`).
   ⚠️ **Open:** ratification. Story 16.1 AC #4 requires this ADR **Accepted**, and Stories 16.2–16.9 + 17.4 all
-  build on it. Note **0039 was taken** by Story 4.9 before this landed; 0019 remains claimed-but-unwritten by
-  Story 18.3.)
+  build on it — 16.2 has already shipped against §Decision 9 while this record is still `Proposed`, and this
+  ADR amends ADR 0022, which is itself `Proposed`. Numbering note: **0039 was already taken** by the
+  runtime-attached-body-level-classes record above (authored from the owner's sunburst verify round), so this
+  ADR took 0040; Story 4.9 — which had reserved 0039 — ultimately landed as **0041**. 0019 remains
+  claimed-but-unwritten by Story 18.3.
+  Reviewed 2026-08-07 (`bmad-code-review` of Story 16.1): 9 owner decisions remain open, chief among them
+  ratification, release atomicity (§Decision 10) and the MinVer bootstrap tag (§Decision 5).)
 - [ADR 0041 — Multi-Framework Coexistence: Per-Family Policy, Source Discovery, and the Liveness Precondition](0041-multi-framework-coexistence-policy.md) — **Proposed** 2026-08-07
   (**Amends [ADR 0038](0038-framework-adapter-selection-and-neutral-source-root-discovery.md)**, settling what its
   §5 deferred; authored by [Story 4.9](../../_bmad-output/implementation-artifacts/4-9-multi-framework-coexistence-strategy-spike.md),
