@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+
 import { describe, expect, it } from 'vitest'
 
 import { harvest } from '../scripts/ir-content-build.mjs'
@@ -6,9 +8,12 @@ import {
   isRuntimeBodyClass,
   isSharedPrimitive,
   missingTokens,
+  readBlocks,
   RUNTIME_BODY_CLASSES,
   selectorIsUsed,
   SHARED_PRIMITIVES,
+  SOURCE_CSS,
+  stripComments,
 } from '../scripts/ir-content-lib.mjs'
 
 /** Same shape `harvest` fills, for the seeding tests below. */
@@ -264,5 +269,58 @@ describe('runtime-applied classes [ADR 0039]', () => {
     expect(missingTokens('.sunburst-panel .sb-seg', used).classes).toEqual(['sb-seg'])
     expect(missingTokens('.sunburst-panel', used).classes).toEqual([])
     expect(missingTokens('#cm-exclude-spec .sunburst-panel', used).ids).toEqual(['cm-exclude-spec'])
+  })
+})
+
+/**
+ * `readBlocks` reports a `startLine`/`endLine` span for every block. Story 23.3's code review replaced the
+ * O(n²) implementation of that span — `css.slice(0, offset).split('\n').length`, a full prefix copy and split
+ * on every call — with an index built once and binary-searched. On the real stylesheet that took `readBlocks`
+ * from 445 ms to 7 ms, 99% of which was this one helper.
+ *
+ * These tests pin the SEMANTICS the rewrite had to preserve, stated independently of either implementation:
+ * the line number of an offset is the count of newlines strictly before it, plus one. They belong in this
+ * file for the reason its header gives — `check:ir-content` re-derives through the same code it checks, so it
+ * cannot see a bug in the derivation. A span that silently shifted would land in the manifest's `within`
+ * bookkeeping and in every drop report, pointing reviewers at the wrong line.
+ */
+describe('readBlocks line spans [Story 23.3 code review]', () => {
+  /** The definition the old slice-and-split implementation computed, kept as an oracle. */
+  const lineOfOracle = (css, offset) => css.slice(0, offset).split('\n').length
+
+  it('reports 1-based lines that match a slice-and-count oracle, including the first line', () => {
+    const css = 'a { color: red }\n\nb {\n  color: blue\n}\n@media screen {\n  c { top: 0 }\n}\n'
+    for (const b of readBlocks(css)) {
+      expect(b.startLine).toBe(lineOfOracle(css, css.indexOf(b.prelude)))
+      expect(b.endLine).toBeGreaterThanOrEqual(b.startLine)
+    }
+    expect(readBlocks(css)[0].startLine).toBe(1)
+  })
+
+  it('starts a block at its prelude, not at the whitespace before it', () => {
+    // The indent width used to be measured by slicing the whole remaining stylesheet twice.
+    const css = 'x { a: 1 }\n\n\n     \n  y { b: 2 }\n'
+    const [, second] = readBlocks(css)
+    expect(second.prelude).toBe('y')
+    expect(second.startLine).toBe(5)
+  })
+
+  it('agrees with the oracle on every block of the real stylesheet', () => {
+    const css = stripComments(readFileSync(SOURCE_CSS, 'utf8').replace(/\r\n/g, '\n'))
+    const blocks = readBlocks(css)
+    // Guards the guard: a corpus this thin would make the agreement below vacuous.
+    expect(blocks.length).toBeGreaterThan(500)
+
+    let cursor = 0
+    for (const b of blocks) {
+      const at = css.indexOf(b.prelude, cursor)
+      if (at < 0) continue
+      expect(b.startLine).toBe(lineOfOracle(css, at))
+      cursor = at + b.prelude.length
+    }
+    // Spans are monotonic in source order — the property a shifted index would break first.
+    for (let k = 1; k < blocks.length; k += 1) {
+      expect(blocks[k].startLine).toBeGreaterThanOrEqual(blocks[k - 1].startLine)
+    }
   })
 })

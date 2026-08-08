@@ -250,7 +250,23 @@ anywhere in `web/` outside `ir/adapter.ts` (the two grep hits, in `ir/types.ts` 
 prose stating the rule, not field reads). Findings below were verified against **HEAD `15336f4`**, not against
 the landing commit, so nothing already fixed by a sibling story is reported as open._
 
-- [ ] [Review][Decision] **`npm run check:links` — the AC #4 gate cannot fail; every dangling link exits 0** —
+- [x] [Review][Decision] **RESOLVED — owner chose (a), pin a baseline and fail on any increase.** Applied
+      2026-08-08. `check:links` now scans one tree once, compares the dangling set against a pinned
+      `web/measurements/links-baseline.json`, and **exits non-zero on a dangling link that is not in the
+      baseline**. `npm run pin:links` is the ADR 0033 §Decision 3 regeneration command (sorted JSON, so a
+      re-pin is a reviewable diff naming the links, not a count bump); it prints newly-accepted entries before
+      you commit them. Entries that start resolving are reported as `fixed` so the baseline shrinks with the
+      debt rather than ossifying into an exemption. The duplicate `scan()` call and the dead classifier are
+      gone; `scan()` and the classifier moved to `web/scripts/links-lib.mjs`, shared by gate and pin command
+      so the two cannot disagree about what "dangling" means. **Proven red and green end-to-end** against a
+      synthetic 60-page site: no baseline → fail-closed; known dangling → green; **newly dangling → RED**;
+      repaired → green; a baseline entry that resolves → reported and still green. `test/links-lib.test.mjs`
+      (10 tests) pins the classifier, including the exact bucket that had become unreachable.
+      ⚠️ **The baseline is not pinned yet** — it needs a real generated site, which this review had no way to
+      produce (`SpecScribeOutput/` is absent here). `check:links` therefore fails closed with instructions
+      until someone runs `npm run generate` then `npm run pin:links` and commits the result. Blast radius is
+      small: `check:links` is not in the `npm run check` chain and this repo has no tracked CI workflow.
+- [x] [Review][Decision] ~~**`npm run check:links` — the AC #4 gate cannot fail; every dangling link exits 0**~~ —
       `web/scripts/check-links.mjs:58-59,144,226`. Story 23.6 collapsed both sides of the comparison onto one
       tree (`const nuxtFiles = siteFiles; const goldenFiles = siteFiles`) after C# stopped writing pages, and
       added a good vacuous-corpus guard (`sitePages.length < 50`) — but did **not** update the classifier or
@@ -270,7 +286,14 @@ the landing commit, so nothing already fixed by a sibling story is reported as o
       increase** (recommended — matches how this repo already handles inherited defects, and localizes failure
       per ADR 0033); (b) gate on `nuxtOnly` only; (c) keep it report-only and correct the header prose plus
       the report sections so it stops claiming to be a gate.
-- [ ] [Review][Patch] **`readBlocks` spends 99% of its runtime computing line spans no caller reads**
+- [x] [Review][Patch] **APPLIED 2026-08-08.** `lineAt` now binary-searches a newline index built once per
+      call, and the prelude indent is counted in place instead of slicing the whole remaining stylesheet
+      twice. **445 ms → 7 ms, a 62× speedup, 438 ms saved per call**, with the block array proven
+      **byte-identical** to the old implementation across all 1,783 top-level blocks and every nested
+      at-rule body. Three tests added to `test/ir-content-harvest.test.mjs` pinning the semantics against an
+      independent slice-and-count oracle; **proven red** by a one-character off-by-one before being restored.
+      Original finding: —
+- [x] [Review][Patch] ~~**`readBlocks` spends 99% of its runtime computing line spans no caller reads**~~
       [`web/scripts/ir-content-lib.mjs:430,454,455,467,468`]. `lineAt(offset)` is
       `css.slice(0, offset).split('\n').length` — a full prefix copy plus split **per call**, twice per block,
       plus two more whole-tail slices per block for the `startLine` trimStart arithmetic on line 454. That is

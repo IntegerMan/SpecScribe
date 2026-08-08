@@ -427,7 +427,45 @@ export function readBlocks(css) {
   let i = 0
   let preludeStart = 0
 
-  const lineAt = (offset) => css.slice(0, offset).split('\n').length
+  /**
+   * Line number (1-based) for a byte offset, in O(log n) against an index built once.
+   *
+   * ⚠️ This was `css.slice(0, offset).split('\n').length` — a full prefix COPY plus a split on EVERY call,
+   * twice per block, over a stylesheet that is now 333 KB / 7,885 lines / 1,783 top-level blocks. Measured on
+   * that source: `readBlocks` took 445 ms, of which 440 ms — 99% — was this one helper; with it stubbed the
+   * same call took 5 ms. The cost is quadratic in the stylesheet's length and is paid on every
+   * `extract:ir-content` AND every `check:ir-content`, so it grows with the monolith on a path that runs
+   * repeatedly. [Story 23.3 code review 2026-08-07]
+   *
+   * Semantics are unchanged by construction: slicing to `offset` and counting the split parts yields the
+   * number of newlines at an index strictly BELOW `offset`, plus one, which is what the binary search
+   * returns. `test/ir-content-harvest.test.mjs` pins that equivalence on the real stylesheet.
+   */
+  const newlines = []
+  for (let n = css.indexOf('\n'); n !== -1; n = css.indexOf('\n', n + 1)) newlines.push(n)
+  const lineAt = (offset) => {
+    let lo = 0
+    let hi = newlines.length
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (newlines[mid] < offset) lo = mid + 1
+      else hi = mid
+    }
+    return lo + 1
+  }
+
+  /**
+   * Width of the whitespace run at `from` — the prelude's indent.
+   *
+   * Also a former hot spot: the caller measured this as
+   * `css.slice(from).length - css.slice(from).trimStart().length`, which copies the whole REMAINING
+   * stylesheet twice per block to count a handful of spaces.
+   */
+  const indentAt = (from) => {
+    let n = from
+    while (n < css.length && /\s/.test(css[n])) n += 1
+    return n - from
+  }
 
   while (i < css.length) {
     const ch = css[i]
@@ -451,7 +489,7 @@ export function readBlocks(css) {
         kind: prelude.startsWith('@') ? 'at' : 'rule',
         prelude,
         body: css.slice(i + 1, j - 1),
-        startLine: lineAt(preludeStart + (css.slice(preludeStart).length - css.slice(preludeStart).trimStart().length)),
+        startLine: lineAt(preludeStart + indentAt(preludeStart)),
         endLine: lineAt(j - 1),
       })
       i = j

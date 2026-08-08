@@ -573,6 +573,46 @@ render silently inert. ADR 0032 restates ADR 0005 §4 around this.
 
 ---
 
+## 15. `check:links` gates against a PINNED BASELINE — and once could not fail at all
+
+`npm run check:links` fails when the generated site gains a dangling internal link that is **not already in**
+`web/measurements/links-baseline.json`. Re-pin with `npm run pin:links`, which rewrites that file as sorted
+`"<page>\t<href>"` entries so a re-pin is a **reviewable diff naming the links**, not a count bump
+(ADR 0033 §Decision 3).
+
+**Why a baseline instead of "zero dangling links".** The site carries ~1,000 dangling internal links nothing in
+Epic 23 caused: links to *source* files (`…/epics.md`) the portal never rewrites to their `.html` page, and a
+renderer bug emitting **nested anchors** (`<a href="../../<a href="…">…</a>">`) from a link rewriter running
+twice. A gate that failed on the absolute count would be red from its first run and stay red, which teaches
+people to ignore it. The baseline is **accepted debt, not endorsement** — the gate reports baseline entries
+that have started resolving so the list shrinks as the debt is paid.
+
+**⚠️ The cautionary history, because it is the most useful thing in this section.** This gate originally
+compared two trees and failed on a *regression*: a link that resolved in the golden site C# wrote and dangled
+in the Nuxt output. Story 23.6 deleted the C# page writer, so both sides collapsed onto the same directory
+(`goldenFiles = nuxtFiles = siteFiles`) — but the classifier and the exit condition were left untouched.
+Because `scan()` is deterministic in `(root, files)`, the two link maps became *the same map*, the gating
+bucket `!resolved && goldenResolved` reduced to `!x && x`, and **the gate could not fail for any number of
+dangling links**. It reported every one of them as "inherited — not this story's" and exited 0. Nothing caught
+it because the classifier lived inline in a script that only ran against a freshly generated 1,000-page site.
+
+Two rules came out of that, and they generalize past this gate:
+
+1. **When you delete one side of a comparison, re-derive what the comparison now means.** Removing the golden
+   tree silently turned a difference gate into a tautology. The `(skipped)`-style symptom was that everything
+   still looked green.
+2. **A classifier that cannot be called with two hand-written inputs cannot be tested, and will rot.**
+   `scan()` and the classifier now live in `scripts/links-lib.mjs`, shared by the gate and `pin:links` so the
+   two cannot disagree about what "dangling" means, and `test/links-lib.test.mjs` pins the exact bucket that
+   became unreachable.
+
+**One honest limitation.** Unlike `check:parity`, this gate **cannot be frozen** — a link check has to run over
+the live site, so a sibling story that adds a page with a broken link *will* turn it red. That is the gate
+working, but a red run here is not automatically your bug: the failure names the page, so check whose surface
+it is before assuming.
+
+---
+
 ## Status of this app
 
 **Corrected 2026-08-07.** This section used to read *"`web/` is production-intent but **not shipped yet**: it
