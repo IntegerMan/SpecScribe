@@ -247,6 +247,15 @@ public sealed class SiteGenerator
     // SpaDelivery.Extract* family retire once it is green on the real corpus, not on the fixture alone.
     private Dictionary<string, CapturedPageView>? _spaPageViews;
 
+    /// <summary>Output paths claimed by more than one page in a single pass. [Story 23.4 code review, F-10]
+    ///
+    /// <para><see cref="_spaPageViews"/> is keyed by output path, so a second producer of the same path silently
+    /// replaces the first — and since that dictionary IS the site now, the losing page vanishes from the manifest
+    /// and from every rendered route with no error and no event. Collected here and surfaced on the existing
+    /// <see cref="AdapterDiagnostic"/> channel by <see cref="GenerateAll"/>, so a naming collision reads as a
+    /// visible notice rather than a page that quietly does not exist.</para></summary>
+    private readonly List<AdapterDiagnostic> _outputPathCollisions = new();
+
     /// <summary>Opt-in page capture WITHOUT the SPA delivery outputs: when true, <see cref="GenerateAll"/> fills the
     /// same write-seam capture <c>--spa</c> uses, and <see cref="RenderWebviewSurfaces"/> turns every captured
     /// long-tail page (docs, ADRs, requirements, sprint, retros…) into a navigable webview surface so the panel's
@@ -495,6 +504,9 @@ public sealed class SiteGenerator
             // Story 23.4 AC #3: the composed-region capture runs on exactly the same condition, so the two paths
             // are always comparable on any run that produces an IR at all.
             _spaPageViews = new Dictionary<string, CapturedPageView>(StringComparer.OrdinalIgnoreCase);
+            // Per-pass, like the capture it watches — otherwise a watch-mode rebuild would re-report every
+            // collision the previous pass already reported. [Story 23.4 code review, finding F-10]
+            _outputPathCollisions.Clear();
             Mark("reset-derived-state");
 
             // All planning-artifact ingestion (sprint, module detection, retros, epics → requirements) runs
@@ -925,6 +937,14 @@ public sealed class SiteGenerator
             {
                 _familyDegradedStories.Clear();
                 EmitSpaSite(nav);
+                // Output-path collisions, surfaced on the existing diagnostic channel rather than lost.
+                // [Story 23.4 code review, finding F-10] Emitted here, after every page has been written, so a
+                // route silently replaced by a second producer is a visible notice instead of a page that
+                // simply is not in the IR. See `_outputPathCollisions`.
+                if (_outputPathCollisions.Count > 0)
+                {
+                    events.AddRange(MapDiagnostics(_outputPathCollisions));
+                }
                 // ONE event, only when a degrade actually happened — so the normal path's event stream (and
                 // therefore the diagnostics page and GoldenContentFingerprint, which are ordering-sensitive)
                 // is byte-unchanged, while a real IR/static fork can never again pass at errors=0.
@@ -3922,8 +3942,36 @@ public sealed class SiteGenerator
                 // with. A composed region degrades only if the page's own body carries no landmark — which is
                 // the same condition, asked of the thing itself rather than inferred from an object identity
                 // that any copy or re-concatenation would have silently broken.
-                Degraded: !captured.Region.Contains(SpaDelivery.MainLandmark, StringComparison.Ordinal));
+                //
+                // ⚠️ Both HALVES of the landmark. [Story 23.4 code review, finding F-9]
+                // This tested the OPENER only, while the slice it replaced degraded on a missing opener OR a
+                // missing closer — so a body with `<main id="main-content">` and no `</main>` was shipped as a
+                // healthy region. The opener is also matched as a TAG rather than with `Contains`, because
+                // `MainLandmark` is a public const and this repository's own docs and comments quote that exact
+                // string as prose; a page ABOUT the landmark was reporting that it HAD one.
+                Degraded: !HasMainLandmark(captured.Region));
         }
+    }
+
+    /// <summary>True when a composed region carries a COMPLETE <c>&lt;main id="main-content"&gt;…&lt;/main&gt;</c>
+    /// landmark. [Story 23.4 code review, finding F-9]
+    ///
+    /// <para>Both halves, and the opener as a real tag. The previous check was
+    /// <c>Region.Contains(SpaDelivery.MainLandmark)</c>, which (a) ignored the closer entirely, so an
+    /// unterminated landmark shipped as healthy, and (b) matched the const's text anywhere it appeared —
+    /// including inside prose on the pages of this repository that document the landmark. The closer must also
+    /// follow the opener, or "healthy" would include a region whose tags are inverted.</para></summary>
+    private static bool HasMainLandmark(string region)
+    {
+        var open = region.IndexOf(SpaDelivery.MainLandmark, StringComparison.Ordinal);
+        if (open < 0) return false;
+        // A real opening tag continues with whitespace (more attributes) or closes immediately. Prose quoting
+        // the string is followed by a quote, a backtick or a word character instead.
+        var after = open + SpaDelivery.MainLandmark.Length;
+        if (after >= region.Length) return false;
+        var next = region[after];
+        if (next != '>' && !char.IsWhiteSpace(next)) return false;
+        return region.IndexOf("</main>", after, StringComparison.Ordinal) >= 0;
     }
 
     /// <summary>Renders the webview's navigable surface set — dashboard, epics index, every epic page, and every
@@ -4378,7 +4426,10 @@ public sealed class SiteGenerator
     /// a defect and not an optimisation.</para>
     /// [Story 23.4 AC #3, Story 23.6 AC #1]</summary>
     /// <param name="linkify">False for the pages that deliberately do NOT run through
-    /// <see cref="ApplyReferenceLinks"/> — see <see cref="CapturedPageView.Linkify"/>.</param>
+    /// <see cref="ApplyReferenceLinks"/>: the glossary surfaces, which must not self-expand the vocabulary they
+    /// define, and the follow-up/action pages, whose raw <c>data-copy</c> payloads a linkifier corrupts inside
+    /// attribute values. The flag is a per-page axis and is NOT recorded on the capture — the region is
+    /// linkified (or not) before it is stored, so there is nothing left to re-decide.</param>
     private void WritePage(
         PageView page,
         string? skipRequirementId = null,
@@ -4392,7 +4443,16 @@ public sealed class SiteGenerator
         {
             // Composed HERE, in the same breath as the document's own linkify pass, so both observe identical
             // generator state. See CapturedPageView.Region for why deferring this is a defect and not an
-            // optimisation. TrimEnd is replication of the slice's `</main>` boundary, not taste — same note.
+            // optimisation.
+            //
+            // ⚠️ What `.TrimEnd()` is and is not. [Story 23.4 code review, finding F-2]
+            // It strips the trailing whitespace every templater body ends with (`</main>\n\n`), giving ONE
+            // region shape across the whole IR. It is NOT "replication of the slice's `</main>` boundary", as
+            // this comment used to claim — the retired slice TRUNCATED at the closer and kept nothing after it,
+            // whereas this deliberately keeps post-landmark content. That difference is the whole point: it is
+            // what carries `deep-analytics.html`'s `:target` lightbox into the IR. Trimming whitespace and
+            // truncating at the closer are opposite rules, and conflating them in a comment invited the next
+            // reader to "restore" the truncation.
             var region = JsonSpaRenderAdapter.Shared.RenderContent(page).TrimEnd();
             if (linkify)
             {
@@ -4400,7 +4460,61 @@ public sealed class SiteGenerator
                     region, path,
                     skipRequirementId: skipRequirementId, skipStoryId: skipStoryId, skipEpicNumber: skipEpicNumber);
             }
-            _spaPageViews[PathUtil.NormalizeSlashes(path)] = new CapturedPageView(page, region);
+            // ⚠️ A route claimed TWICE in one pass is a silent site-level loss. [23.4 code review, finding F-10]
+            //
+            // This was a bare indexer assignment, so the second producer of a path simply overwrote the first
+            // with no error, no diagnostic and no `GenerationEvent`. It is reachable whenever a source markdown
+            // file's output path collides with a curated route — `about.md`, `sprint.md`, `timeline.md`,
+            // `cadence.md`, `retros.md` and friends all sit one file away from it — because the generic docs
+            // loop and the curated writer both call this seam.
+            //
+            // Before Story 23.4 that collision was a last-write-wins on DISK and both writes still emitted an
+            // event, so there was a trail. Now this dictionary IS the site: the losing route vanishes from the
+            // manifest and therefore from every rendered page, silently. Report it rather than lose it — the
+            // page still writes, so this degrades a silent loss into a visible warning rather than failing the
+            // whole generate over a naming collision.
+            var key = PathUtil.NormalizeSlashes(path);
+            // ⚠️ Fires on two DIFFERENT pages, not on a deliberate re-render of the same one.
+            //
+            // Measuring this guard taught it its own predicate twice. Reference identity was too broad: a
+            // document written once plainly and then re-written with its Quick-Dev chrome (`WriteQuickDevPages`
+            // re-renders `_docs.Values` whose `BuildQuickDevChrome` is non-null) is two `PageView` instances for
+            // one page, by design. Comparing the composed REGION was too broad for the same reason — the second
+            // render deliberately carries MORE content, so the regions differ on exactly the pages the two-phase
+            // write is meant to enrich.
+            //
+            // Title-and-kind is the discriminator that separates "the same page, rendered again" from "two
+            // different pages, one of which is about to vanish". The enrichment pass preserves both; a genuine
+            // collision — a source document whose output path lands on a curated route — changes at least the
+            // title. Silent loss is the thing being prevented; a redundant write is not.
+            if (_spaPageViews.TryGetValue(key, out var existing) &&
+                (!string.Equals(existing.Page.Title, page.Title, StringComparison.Ordinal) ||
+                 existing.Page.Kind != page.Kind))
+            {
+                // ⚠️ INFORMATIONAL, deliberately — not Malformed, which would map to `Error`.
+                //
+                // Measuring this guard against the real fixture showed the generator claims some output paths
+                // more than once BY DESIGN: `WriteQuickDevPages` re-renders `_docs.Values` that carry Quick-Dev
+                // chrome, so the second render legitimately supersedes the first. Which of the remaining
+                // collisions are intentional layering and which are genuine losses is a design question this
+                // review is not entitled to answer unilaterally — raising it at `Error` would fail every
+                // generate on a pattern the project may well intend.
+                //
+                // So: make it VISIBLE (it was completely silent, and a silent one IS a page that vanishes from
+                // the site) without making it fatal. Escalated to the owner in the review record rather than
+                // improvised here.
+                _outputPathCollisions.Add(new AdapterDiagnostic(
+                    AdapterDiagnosticCategory.Informational,
+                    key,
+                    $"Two pages claim the output path '{key}' — '{existing.Page.Title}' was replaced by " +
+                    $"'{page.Title}'. Only the second reaches the IR and therefore the rendered site. If that " +
+                    $"is not deliberate layering, rename the source document so the first is not lost.",
+                    // The path is OUTPUT-relative here, not source-relative, so it anchors to neither the source
+                    // tree nor the ADR root — `None` keeps the diagnostics page from linking it to a file that
+                    // does not exist at that path.
+                    DiagnosticAnchorRoot.None));
+            }
+            _spaPageViews[key] = new CapturedPageView(page, region);
         }
     }
 
@@ -4501,10 +4615,42 @@ public sealed class SiteGenerator
     private void AddSpaSurface(List<SpaPage> pages, HashSet<string> familyPaths, PageView page,
         string? skipStoryId = null, int? skipEpicNumber = null)
     {
-        var region = ApplyReferenceLinks(
-            JsonSpaRenderAdapter.Shared.RenderContent(page), page.OutputRelativePath,
-            skipStoryId: skipStoryId, skipEpicNumber: skipEpicNumber);
         var path = PathUtil.NormalizeSlashes(page.OutputRelativePath);
+
+        // ⚠️ PREFER the region captured at the write seam. [Story 23.4 code review, findings F-1 and F-2]
+        //
+        // This method used to compose AND linkify its own region here, at bundle-build time, which broke the
+        // invariant `CapturedPageView.Region` exists to state: a region must be composed in the same breath as
+        // the page's own linkify pass, because `ApplyReferenceLinks` reads MUTABLE generator state.
+        // `CodeReferenceLinkifier` no-ops on an empty `_codePages` and STRIPS unresolvable view-source anchors
+        // once it is populated — a measured 77-byte difference on `readme.html`.
+        //
+        // That was reachable, not theoretical. `OnFirstPaintReady` fires before the code pass populates
+        // `_codePages`, and `RenderWebviewSurfaces` is explicitly callable from it, while `EmitSpaSite` runs at
+        // the end of the pass. The same five family pages could therefore be linkified against two different
+        // states in ONE run — and the composed-vs-sliced oracle that would have caught it was retired with the
+        // C# writer.
+        //
+        // Every family page is written through `WritePage` (`RenderEpicsPages`, `WriteIndex`), so the capture is
+        // already there and is by construction the one the document itself observed. Reusing it also settles
+        // F-2: `WritePage` applies `.TrimEnd()` and this path did not, so the IR carried two region shapes —
+        // long-tail regions ending `</main>` and the five family regions ending `</main>\n\n` — right after
+        // `SpaDelivery.SchemaVersion` was bumped to 2 to give it exactly one.
+        string region;
+        if (_spaPageViews is { } views && views.TryGetValue(path, out var captured))
+        {
+            region = captured.Region;
+        }
+        else
+        {
+            // Fallback: a family page not written this pass (a prelude-only bundle, or a webview render before
+            // any write). Compose in the SAME shape `WritePage` does — including the TrimEnd — so the IR never
+            // carries two region conventions keyed on which producer happened to run.
+            region = ApplyReferenceLinks(
+                JsonSpaRenderAdapter.Shared.RenderContent(page).TrimEnd(), page.OutputRelativePath,
+                skipStoryId: skipStoryId, skipEpicNumber: skipEpicNumber);
+        }
+
         familyPaths.Add(path);
         // A family page already carries its description structurally (PageView.MetaDescription, nullable) — no
         // extraction needed, and the IR's head projection resolves the same title fallback the static head does.

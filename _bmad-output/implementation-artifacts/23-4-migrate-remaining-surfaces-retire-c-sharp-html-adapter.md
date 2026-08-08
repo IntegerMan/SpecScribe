@@ -412,6 +412,70 @@ retirement condition._
   - [x] ✅ **Stated plainly: NOTHING was deleted.** Survived and still in use — `HtmlRenderAdapter.Render` (page composition), `RenderNavMarkup`, `RenderWayfinding`, `RenderBreadcrumb`, `WriteOutput`'s HTML writes, and the whole `SpaDelivery.Extract*` family (now the proof oracle rather than the IR's producer). **Added** — `SiteGenerator.WritePage`, `CapturedPageView`, `RegionCompositionDeltas`, `RegionParityDelta`, `SpaDelivery.MainLandmark`. **Changed** — `CapturedRegions` composes instead of slicing; `Degraded` computed structurally. Say plainly which C# symbols were deleted and which survived. "Retired the HtmlRenderAdapter" is not
         a finding; a list is.
 
+### Review Findings
+
+**Code review 2026-08-08 — complete.** Five adversarial layers (Blind Hunter ×2, Edge Case Hunter ×2,
+Acceptance Auditor) plus the orchestrating session: 62 raw findings → **32 after dedupe and triage**
+(2 decision-needed, 20 patch, 5 defer, 35 dismissed). Full record, scope statement, per-AC verdict table and
+the dismissal rationale: [`23-4-code-review-2026-08-08.md`](23-4-code-review-2026-08-08.md).
+
+Scoped by this story's File List over `32fd282..a8c97f3`; sibling hunks (Stories 22.4, 22.5, 22.6, 18.4–18.6,
+20.9/20.10, 24.1, 8.9, 23.2) excluded by hunk attribution. Generated artefacts excluded as machine-derived;
+their derivation is in scope. Build at review time: **0 errors, 0 warnings**. Every finding re-verified at HEAD
+`85d4c5c`; 23.4-era defects that Story 23.6 has since resolved are dismissed in the record rather than listed
+here.
+
+**Per-AC verdict:** #6, #7 satisfied · #2 satisfied with a documented caveat · #1, #3, #4, #8 partially
+satisfied · **#5 satisfied-in-record-only**.
+
+**All 20 patches applied 2026-08-08**, both decisions resolved by the owner. Verified after: `dotnet build
+--no-incremental` **0 errors / 0 warnings**; C# suite **3,064 passed / 0 failed / 3 skipped**; web suite
+**234 passed / 1 skipped** (up from 206 — 28 new assertions). Two patches were deliberately scoped down and
+say so at the site: **F-6** (the write-only `AssetManifest` fields) is documented as dead configuration rather
+than deleted or routed, because either is a contract change rather than a fix; **F-15** closed the
+router-completeness gap with a dependency-free test instead of adding `vue-tsc`, since a type-checker is a
+dependency decision ADR 0010 reserves for the owner.
+
+⚠️ **One patch found a live defect while being written, and it is the owner's to resolve.** The F-10 collision
+guard fires on the real fixture: several output paths are claimed twice in one pass. At least one is
+deliberate (`WriteQuickDevPages` re-renders `_docs.Values` that carry Quick-Dev chrome, so the second render
+supersedes the first). Whether the rest are intentional layering or genuine silent losses is a design question
+this review is not entitled to settle, so the guard reports at **informational** severity — visible on the
+diagnostics page, not fatal — rather than failing every generate on a pattern the project may intend.
+
+- [x] [Review][Decision] **RESOLVED 2026-08-08 — owner accepts as 23.6/Epic 28 work.** AC #5's hole is real: no content-drift gate exists over the C# region output at HEAD (`GoldenIrFingerprint`, `GoldenContentFingerprint`, `RegionCompositionDeltas` and both proof gates are gone; `check:parity`'s corpus is frozen). Not gated on this story. `deferred-work.md:22` carries the action and ADR 0033 constrains the shape.
+- [x] [Review][Decision] **RESOLVED 2026-08-08 — owner chose "strengthen the substring check only".** The warn/fatal split from D6 stands unchanged: a genuinely chart-less project still only warns. What is fixed is that the fatal check can no longer be satisfied by something that is not a twin — see the contract patch below. The remaining exposure is stated rather than closed: a project that HAS epics whose explorer vanished is still a `console.warn`, not a failure.
+- [x] [Review][Patch] Family regions are composed LAZILY, violating this story's own eager-composition invariant — `AddSpaSurface` and `WebviewSurfaceFor` compose and linkify at bundle time while `WritePage` does it at write time; `OnFirstPaintReady` fires before `_codePages` is populated, so one run can emit two different regions for the same page [src/SpecScribe/SiteGenerator.cs:4504, :4323 vs :4396]
+- [x] [Review][Patch] `TrimEnd` asymmetry puts two region shapes back into one IR right after `SchemaVersion` was bumped to 2 to unify them; the seam comment misstates what `TrimEnd` does [src/SpecScribe/SiteGenerator.cs:4396 vs :4504]
+- [x] [Review][Patch] ADR 0013's text-twin contract is enforced on 1 of the 9 chart-bearing pages — `enforce` is called only in `DashboardSurface.vue`; the 8 insight singletons carry chart mounts and are ungated [web/components/surfaces/DashboardSurface.vue:36]
+- [x] [Review][Patch] The only defence against a silent `pass-through` regression is disabled by `SPECSCRIBE_IR_DIR` (env branch omits `spa/`, so `describe.skipIf` skips) and passes vacuously on a zero-page manifest [web/test/families.test.ts:23, :84]
+- [x] [Review][Patch] `measure:parity` can exit 0 while measuring nothing — `mainRegion(...) ?? ''`, `.includes('')` always true for degraded pages, `NO GOLDEN` rows uncounted, IR-only divergence never a delta; and the committed digest oracle is written by one script and read by nothing [web/scripts/measure-parity.mjs:116, :122, :161, :143]
+- [x] [Review][Patch] `AssetManifest.HierarchyBootInline` and `ExtraHead` are write-only — five setters, zero production readers; the three head shapes collapse to one derived boolean and `code-map.html` gets a boot script C# deliberately excluded [src/SpecScribe/AssetManifest.cs:41, :70]
+- [x] [Review][Patch] `needsHierarchyEngine` is derived from `mainInnerHtml` only, excluding the `trailingHtml` this story added — a mount point there skips the chart boot AND makes the fatal twin check unreachable [web/ir/adapter.ts:340]
+- [x] [Review][Patch] The `</main>` split boundary is inconsistent across three layers and the suite pins both sides — fix at the emitter with a closer-count assertion AND delete whichever unit test pins the loser [web/ir/adapter.ts:260, web/scripts/harness-lib.mjs:62, tests/SpecScribe.Tests/SiteGeneratorSpaTests.cs:948]
+- [x] [Review][Patch] `Degraded` is a predicate that cannot return true, dropped the slice's closer condition, and `Contains` matches a page that merely quotes the landmark string [src/SpecScribe/SiteGenerator.cs:3925]
+- [x] [Review][Patch] `_spaPageViews[path] = …` silently overwrites; a route claimed by two producers vanishes from the manifest and the site with no event [src/SpecScribe/SiteGenerator.cs:4403]
+- [x] [Review][Patch] The residue classifier that produced the ~6.5 %-prose figure used to amend D3/D5 is unvalidated — bare `code-`/`pre` alternatives claim non-prose rules; 27.9 % of the residue is blocked by classifier fall-through; the owner-facing `.txt` has no per-rule listing [web/scripts/report-ir-content-residue.mjs]
+- [x] [Review][Patch] `isMigrated = () => true` leaves `harvest(markup, other)` unreachable, so "0 uncovered classes" means "the comparison was removed"; its test cannot fail for any input [web/scripts/ir-content-lib.mjs:221]
+- [x] [Review][Patch] The AC #4 count is stated as 1,423 / 1,416 / 1,420 across three artifacts and is now 55 short of the manifest's 1,475, with nothing gating manifest↔residue; ADR 0018 also says `chrome` 97 and 92 in one paragraph [web/assets/ir-content.manifest.json, docs/adrs/0018-transitional-ir-content-style-layer.md:81]
+- [x] [Review][Patch] AC #8's page count is stated as both 1,408 and 1,469 from the same command and never reconciled — it propagated into `epics.md`, ADR 0018, and Story 23.6's tombstone, which cites the wrong one in the sentence licensing its deletion
+- [x] [Review][Patch] The exhaustive `Record<IrFamily, Component>` is enforced by nothing that runs — no `typecheck` script, no `vue-tsc`, no typecheck step in any workflow; the guarantee exists only in an editor [web/package.json]
+- [x] [Review][Patch] `enforce()` throws before its `console.warn` loop, discarding the context that explains the failure, and `find` drops the 2nd..nth error [web/ir/contracts.ts:87]
+- [x] [Review][Patch] `report-ir-content-residue.mjs` prints `NaN%` and exits 0 on a zero-rule manifest — AC #4's own first-branch success state — and throws bare `TypeError`/ENOENT where its sibling gives actionable guidance [web/scripts/report-ir-content-residue.mjs:125]
+- [x] [Review][Patch] `CapturedPageView`'s doc comment describes skip-id fields the record does not have, and `WritePage`'s `<param>` cites a non-existent `CapturedPageView.Linkify` [src/SpecScribe/SiteGenerator.cs:222, :4381]
+- [x] [Review][Patch] The File List still claims `FingerprintIr` as delivered; it returns zero hits across `tests/` [this file:1232]
+- [x] [Review][Patch] `families.ts`: the entry check precedes every other rule, so a project whose entry is also a named page renders it as the dashboard; and `test-artifacts.html`/`ideas*` are classified `doc-prose` against the file's own one-family-per-templater rule [web/ir/families.ts:103, :128]
+- [x] [Review][Patch] `CommitDetailTemplater` interpolates an unguarded subject into the meta description, shipping a trailing-colon description for an empty-message commit [src/SpecScribe/CommitDetailTemplater.cs:81]
+- [x] [Review][Patch] `CodeMapTemplater.BuildPage` materialises the generator's largest body twice where every sibling hoists it [src/SpecScribe/CodeMapTemplater.cs:909]
+- [x] [Review][Patch] `region-split.test.ts` pins `data-ir-family="epicDetail"` on `<main>` — an attribute no C# templater emits, in a casing this story abolished [web/test/region-split.test.ts]
+- [x] [Review][Defer] `bodyStart` scans for `<div class="breadcrumb"` from index 0 [web/ir/adapter.ts:268] — deferred, pre-existing; inherited from 22.4's split rule, not currently reachable, and the C# side mirrors the identical logic so both would agree while both were wrong
+- [x] [Review][Defer] `selectorIsUsed` still drops rules naming unharvested classes with no manifest entry and no gate — recurred five separately-recorded times, each found only in a live browser [web/scripts/ir-content-lib.mjs:579] — deferred, later stories own the mitigation
+- [x] [Review][Defer] `trailingHtml` may be truthy whitespace (`"\n\n"`) given only `WritePage` trims, rendering an empty static vnode outside the landmark [web/components/surfaces/IrSurface.vue:176] — deferred, UNVERIFIED; needs a generated IR, tied to the `TrimEnd` patch
+- [x] [Review][Defer] `.TrimEnd()` allocates a second copy of the 8 MB `code-map.html` on every pass including every watch save [src/SpecScribe/SiteGenerator.cs:4396] — deferred, O(n) with a large constant, no quadratic term
+- [x] [Review][Defer] `measurements/links.*` and `a11y.*` no longer corroborate this story — 23.6 regenerated them and links is now explicitly one-sided — deferred, caused by a later story
+
+## Dev Notes
+
 ## Dev Notes
 
 ### Owner decisions locked at create-story 2026-07-27 (do not re-litigate)
@@ -823,6 +887,27 @@ by this story.
 
 The story's seeded table was a **default**-generate baseline (1,046) and is superseded on every row.
 
+⚠️ **The 1,408 / 1,469 discrepancy, reconciled 2026-08-08 by the code review (finding F-14).** This inventory
+records **1,408 IR pages / 1,409 `.html`**; Tasks 3 and 5, `web/measurements/parity.json`, `epics.md`'s outcome
+block and ADR 0018's addendum all say **1,469** — a 61-page gap, from what both describe as the same
+`--deep-git --spa` command, that the story never reconciles. It is not a measurement error in either direction:
+the corpus **grew between session 3 part 1 and session 3 part 2**, because the story's own work added pages
+(this story file, the new measurement artifacts and the ADRs it authored are themselves rendered pages, and
+`follow-ups/**` tracks the story record). Both numbers were correct when taken and neither was re-measured
+after the other.
+
+Two consequences worth stating rather than leaving for a reader to trip over:
+
+1. **`epics.md` outcome item 1 attributes 1,469 to the Task 1 command**, which measured 1,408. The number is
+   real; the sentence that carries it is wrong about which run produced it.
+2. **Story 23.6's `RegionCompositionCorpusProof` tombstone cites the wrong one.** It records *"1,469 pages, 0
+   unexpected deltas. Recorded in Story 23.4's Dev Agent Record"* — the Dev Agent Record says **1,408** — and
+   then uses 1,408 itself nine lines later. The sentence that licensed 23.6's deletion of that gate quotes a
+   figure the cited source does not contain.
+
+Neither invalidates a result. Both are the cost of quoting a count in prose instead of citing the artifact that
+regenerates it, which is the same lesson ADR 0018's amendment now records for the rule counts.
+
 ⚠️ **`oversizedPages` now has TWO entries, not one.** `code-map.html` at **8,012,656 B** (the story's figure was
 6,758,631 B — it has grown ~19 %) **and `git-insights.html` at 2,508,588 B**, which the story does not mention at
 all. Both must be planned for in Tasks 3/5/9, not discovered when a harness hangs.
@@ -1229,8 +1314,14 @@ string-building deleted.
 
 *Tests (`tests/SpecScribe.Tests/`):*
 
-- `SiteGeneratorAdapterTests.cs` — **new `GoldenIrFingerprint`** (AC #5's successor gate) + `FingerprintIr` and a
-  `FingerprintTree(root, extraFold)` overload for the derived-hash fold.
+- `SiteGeneratorAdapterTests.cs` — ⚠️ **CORRECTED 2026-08-08 by the code review (finding F-19).** This line
+  claimed **`GoldenIrFingerprint`** (AC #5's successor gate) + `FingerprintIr` + a `FingerprintTree(root,
+  extraFold)` overload. At HEAD only the **`FingerprintTree` overload survives**
+  ([SiteGeneratorAdapterTests.cs:328](../../tests/SpecScribe.Tests/SiteGeneratorAdapterTests.cs)).
+  `GoldenIrFingerprint` was removed by the owner in `70b72ab` for cross-platform non-determinism, and
+  `FingerprintIr` returns **zero hits across `tests/`**. Session 4 annotated Task 7 as stale but left this File
+  List entry standing as an unqualified claim of delivered work — the exact "verify a story's claimed symbols
+  actually exist" case CLAUDE.md § Scoping a code review warns about.
 - `RegionCompositionParityTests.cs`, `RegionCompositionCorpusProof.cs` — from part 1.
 
 *`web/` — new:*

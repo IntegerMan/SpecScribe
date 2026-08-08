@@ -34,7 +34,14 @@ import { splitContentRegion } from '../ir/adapter'
 const NAV = '<nav class="site-nav" aria-label="Document navigation"><a href="index.html">Home</a></nav>'
 const CRUMB = '<div class="breadcrumb"><a href="../index.html">Home</a></div>'
 const PAGER = '<nav class="entity-pager"><a href="epic-2.html">Prev</a></nav>'
-const MAIN_OPEN = '<main id="main-content" class="doc" data-ir-family="epicDetail">'
+// ⚠️ Attributes a C# templater ACTUALLY emits on the landmark. [Story 23.4 code review, finding F-23]
+// This fixture used to carry `data-ir-family="epicDetail"` — an attribute NO templater emits on `<main>`
+// (`grep -rn "data-ir-family" src/` is empty; it is bound on `PageShell`'s root by `IrSurface.vue`), in the
+// camelCase vocabulary the 23.4 rename abolished in favour of kebab-case. A byte-reproduction test that
+// exists to keep the parity comparison honest should not be pinning a shape no real IR contains: it reads as
+// authoritative to whoever next decides what `mainAttrs` may hold. `class` plus a `data-*` attribute keeps
+// the multi-attribute coverage without inventing markup.
+const MAIN_OPEN = '<main id="main-content" class="doc" data-page-kind="doc">'
 const BODY = '<h1>Epic 3</h1><p>Body copy.</p>'
 
 /** The RE-RENDERED shape: the wayfinding wrapper is present and balanced. */
@@ -63,8 +70,8 @@ describe('splitContentRegion — the re-rendered shape', () => {
 
   it('reproduces the <main> open tag attributes verbatim', () => {
     // Byte-for-byte reproduction of the open tag is what makes the parity comparison honest.
-    expect(region.mainAttributes).toBe(' class="doc" data-ir-family="epicDetail"')
-    expect(region.mainAttrs).toEqual({ class: 'doc', 'data-ir-family': 'epicDetail' })
+    expect(region.mainAttributes).toBe(' class="doc" data-page-kind="doc"')
+    expect(region.mainAttrs).toEqual({ class: 'doc', 'data-page-kind': 'doc' })
   })
 
   it('extracts the <main> body without its wrapper tags', () => {

@@ -948,6 +948,19 @@ public class SiteGeneratorSpaTests : IDisposable
             Assert.Equal(1, CountOccurrences(html, mainMarker));
             Assert.Equal(1, CountOccurrences(html, "<main"));
 
+            // ⚠️ And exactly one CLOSER. [Story 23.4 code review, finding F-8]
+            // This asserted openers only — and `"<main"` does not match `"</main"` — so nothing anywhere in the
+            // suite constrained how many times a region closes. That mattered because the three layers that
+            // bound the region disagree about which closer wins: `web/ir/adapter.ts` cuts at the FIRST,
+            // `web/scripts/harness-lib.mjs`'s `mainRegion` is greedy to the LAST, and each has a unit test
+            // pinning its own rule. With one closer guaranteed they agree by construction; with two, a stray
+            // closer silently re-parents real page body OUT of `<main>` via `IrRegion.trailingHtml` (which
+            // renders as a SIBLING of the landmark since 23.4) while `check:a11y`'s `one-main` still passes.
+            //
+            // The emitter is the right place to fix it: a body must never contain a bare `</main>`, and any
+            // that legitimately shows the markup must escape it as `&lt;/main&gt;`.
+            Assert.Equal(1, CountOccurrences(html, "</main>"));
+
             var wrapOpen = html.IndexOf(wrapMarker, StringComparison.Ordinal);
             var crumbOpen = html.IndexOf(crumbMarker, StringComparison.Ordinal);
             var bodyStart = mainOpen;
