@@ -149,14 +149,22 @@ Each record is numbered by its filename prefix and carries a `**Status:**` line.
   **2026-03-15**, and `vsce` requires exactly that token shape — so 16.5 must use an **organization**-owned
   publisher with Entra federation; and `npm ci` failed on a clean checkout at `838d591`, breaking even the
   weak reading of NFR9 (✅ since repaired by `0b1f561`).
-  ⚠️ **Open:** ratification. Story 16.1 AC #4 requires this ADR **Accepted**, and Stories 16.2–16.9 + 17.4 all
-  build on it — 16.2 has already shipped against §Decision 9 while this record is still `Proposed`, and this
-  ADR amends ADR 0022, which is itself `Proposed`. Numbering note: **0039 was already taken** by the
+  ⚠️ **Open: ratification, and nothing else.** Story 16.1 AC #4 requires this ADR **Accepted**, and Stories
+  16.2–16.9 + 17.4 all build on it — **16.2 and 16.3 have both already shipped against it** (16.3 implementing
+  §Decision 1's pack item and §Decision 5's MinVer derivation directly) while this record is still `Proposed`,
+  and this ADR amends ADR 0022, which is itself `Proposed`. Numbering note: **0039 was already taken** by the
   runtime-attached-body-level-classes record above (authored from the owner's sunburst verify round), so this
   ADR took 0040; Story 4.9 — which had reserved 0039 — ultimately landed as **0041**. 0019 remains
   claimed-but-unwritten by Story 18.3.
-  Reviewed 2026-08-07 (`bmad-code-review` of Story 16.1): 9 owner decisions remain open, chief among them
-  ratification, release atomicity (§Decision 10) and the MinVer bootstrap tag (§Decision 5).)
+  Reviewed 2026-08-07 (`bmad-code-review` of Story 16.1), which left 9 items open; **8 were resolved into this
+  record the same day** — release atomicity and withdrawal (§Decision 10), the CI-gate lookup rule plus a
+  forward-fix-only preview scope (§Decision 9), the MinVer bootstrap (§Decision 5, closed largely by Story
+  16.3's shipped `MinVerTagPrefix`/`MinVerMinimumMajorMinor`/`MinVerDefaultPreReleaseIdentifiers`),
+  version-component semantics and a `0.x`→`1.0` exit criterion (§Decision 5), extension versioning
+  (§Decision 5), `changelog.d/` fragments replacing a contended root file (§Decision 6), the package-ID
+  escalation rule (§Decision 12), and the `EpicsIndexSurface` gate's ownership (§Decision 11 — 23.3 gates
+  16.7, now seated in `epics.md` and `sprint-status.yaml`). The 9th is ratification, which is an act rather
+  than a decision.)
 - [ADR 0041 — Multi-Framework Coexistence: Per-Family Policy, Source Discovery, and the Liveness Precondition](0041-multi-framework-coexistence-policy.md) — **Proposed** 2026-08-07
   (**Amends [ADR 0038](0038-framework-adapter-selection-and-neutral-source-root-discovery.md)**, settling what its
   §5 deferred; authored by [Story 4.9](../../_bmad-output/implementation-artifacts/4-9-multi-framework-coexistence-strategy-spike.md),

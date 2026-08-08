@@ -3055,6 +3055,22 @@ So that I can install, run, configure, and contribute to SpecScribe without insi
 
 ### Story 16.7: Preview Launch Readiness and Cut
 
+<!-- 2026-08-07 (Story 16.1, ADR 0040 §Decision 11): NEW BLOCKING DEPENDENCY, cross-epic —
+     BLOCKED ON STORY 23.3. Story 16.1's install probe found `EpicsIndexSurface.vue` HARD-THROWS
+     when the epics index has no child pages, so a thin or non-BMad external adopter — the
+     highest-weight first-run case for this epic — gets `errors=1` and no `epics.html`. That is
+     precisely the "working install, not a broken link" this story exists to certify, so 16.7
+     cannot pass its readiness check until 23.3 ships the fix. 23.3 keeps it because it owns the
+     surface and already fixed the identical defect class one component over
+     (`DashboardSurface.vue` handles its own empty case gracefully in the same run).
+     Recorded here AND in sprint-status.yaml in the same change, per CLAUDE.md § Decision records:
+     a new blocking edge between epics is a structural scope change even though no story was
+     added, removed or renumbered. Story 16.1's Task 8 originally certified "no structural scope
+     change"; that certification was corrected on this one point. -->
+
+**Depends on:** Story 17.4 (hardening sign-off gates the cut) · **Story 23.3** (the thin-repository
+`errors=1` defect above must be fixed before readiness can pass).
+
 As a maintainer,
 I want a final readiness pass before announcing the preview,
 So that the first public impression is a working install, not a broken link.
@@ -4551,6 +4567,17 @@ So that visual consistency — status/motion tokens, AD-7 — survives the frame
 **Then** CSS module/scoped-SFC conventions are documented for future component authors.
 
 ### Story 23.3: Migrate Baseline Surfaces (Dashboard, Epics) to Vue/Nuxt over the IR
+
+<!-- 2026-08-07 (Story 16.1, ADR 0040 §Decision 11): THIS STORY NOW GATES STORY 16.7 (cross-epic).
+     Story 16.1's packaging probe reproduced, twice, that `EpicsIndexSurface.vue` HARD-THROWS when
+     the epics index has no child pages — a thin or non-BMad repository generates with `errors=1`
+     and no `epics.html`. It is the same defect class this story already fixed on the sibling
+     surface: `DashboardSurface.vue` handles its own empty case gracefully IN THE SAME RUN, so the
+     correct behaviour is modelled one component over. Routed here rather than patched by 16.1
+     (which ships no product code) and rather than opened as a new story — this story owns the
+     surface and is at `review`, which in this project's lifecycle is still an iterating state.
+     16.7's launch-readiness pass cannot certify "a working install" until this ships.
+     Reciprocal seat recorded at § Story 16.7 and in sprint-status.yaml. -->
 
 As a maintainer validating the migration approach on real surfaces,
 I want the dashboard and epics pages rendered via Vue/Nuxt from the canonical IR,
