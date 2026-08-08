@@ -8,10 +8,13 @@
  *
  * ⚠️ This is the route-space sibling of `relativePrefix()` in `ir/adapter.ts`, itself the mirror of the C#
  * `PathUtil.RelativePrefix`. Three implementations of one rule is one too many, so they are pinned together
- * by `test/relative-prefix.test.ts`, which asserts these two agree across the whole `.html` route space.
- * They differ ONLY on extension-less routes, which the adapter never sees (every IR route carries `.html`
- * verbatim) and which this one must handle because the app's own routes (`/design-system`, `/measure/*`) do
- * not.
+ * by `test/relative-prefix.test.ts`, which asserts these two agree on a GENERATED `.html` corpus spanning
+ * depth 0–6 (plus dotted segments and the real route shapes), and which pins the one documented divergence
+ * — extension-less routes — as an explicit expectation rather than leaving it as an untested assumption.
+ * The adapter never sees an extension-less route (every IR route carries `.html` verbatim); this one must
+ * handle them because the app's own routes (`/design-system`, `/measure/*`) do not carry the extension.
+ * Note what that test can and cannot do: it pins AGREEMENT, not correctness — both could share a bug and
+ * stay green. [breadth widened by the Story 23.5 code review 2026-08-08]
  *
  * The depth is that of the OUTPUT FILE, not of the route string, because the two differ:
  *
@@ -20,12 +23,22 @@
  *   `/code/src/SpecScribe/Charts.cs.html`  → code/…/Charts.cs.html     → depth 3 → '../../../'
  *   `/`                                    → index.html                → depth 0 → ''
  *   `/design-system`                       → design-system/index.html  → depth 1 → '../'
+ *   `/design-system/`                      → design-system/index.html  → depth 1 → '../'
  *
- * That last row is the trap: Nitro writes an EXTENSION-LESS route to `<route>/index.html`, so it sits one
- * directory deeper than its route string suggests.
+ * That second-to-last row is the trap: Nitro writes an EXTENSION-LESS route to `<route>/index.html`, so it
+ * sits one directory deeper than its route string suggests.
+ *
+ * ⚠️ A TRAILING SLASH must be stripped before counting, and that is not cosmetic. Vue Router is non-strict
+ * by default, so `GET /design-system/` and `GET /measure/async/` both resolve to a real 200 page. Counting
+ * the empty final segment as a directory made the prefix one level too deep and 404'd every asset on that
+ * response — the exact failure this module exists to prevent. A FRAGMENT is stripped for the same reason the
+ * query string is: this takes a route STRING, and a caller that hands it one is not wrong to.
+ * [Story 23.5 code review 2026-08-08]
  */
 export function relativePrefixFor(routePath: string): string {
-  const stripped = (routePath.split('?')[0] ?? '').replace(/^\/+/, '')
+  const stripped = ((routePath.split('#')[0] ?? '').split('?')[0] ?? '')
+    .replace(/^\/+/, '')
+    .replace(/\/+$/, '')
   if (stripped === '') return ''
   const slashes = (stripped.match(/\//g) ?? []).length
   const depth = stripped.toLowerCase().endsWith('.html') ? slashes : slashes + 1

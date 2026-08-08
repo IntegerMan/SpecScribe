@@ -59,6 +59,7 @@
 // never be published as a full one — the discipline `check:links` and `measure:parity` already use.
 
 import { spawn, spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { join, resolve } from 'node:path'
@@ -91,17 +92,48 @@ if (process.argv[2] === '--child') {
   const allPaths = ir.site.paths
   const paths = routeLimit > 0 ? allPaths.slice(0, routeLimit) : allPaths
 
+  const base = `http://127.0.0.1:${port}`
+
+  // A port already in use is the nastiest failure this harness can have, so rule it out BEFORE spawning.
+  // The readiness loop below accepts any HTTP response as proof of listening, and Nitro's EADDRINUSE exit is
+  // asynchronous — so a foreign server answers first, the loop breaks, and every route then fails the
+  // content oracle. The run prints `VERDICT: REFUTED`: a false refutation of project-independence, measured
+  // against a server that was never the artefact. [Story 23.5 code review 2026-08-08]
+  try {
+    await fetch(base, { signal: AbortSignal.timeout(1500) })
+    process.stdout.write(
+      RESULT +
+        JSON.stringify({
+          fatal:
+            `port ${port} is already in use — something is listening there and this harness cannot tell it ` +
+            `apart from the artefact. Free the port, or pass --port <n> to move both children.`,
+        }),
+    )
+    process.exit(0)
+  } catch {
+    /* nothing listening — this is the expected path */
+  }
+
   const entry = join(serverDir, '.output', 'server', 'index.mjs')
   const proc = spawn(process.execPath, [entry], {
     cwd: serverDir,
-    env: { ...process.env, PORT: String(port), NITRO_PORT: String(port) },
+    env: {
+      ...process.env,
+      // Blank the BUILD flag explicitly. This experiment exists to prove the SERVING path renders a real
+      // IR, and the flag stubs the manifest empty — inheriting it from an operator's shell would have
+      // measured an empty artefact and called it a result. The artefact now refuses to boot under it
+      // (`server/plugins/refuse-leaked-package-build.ts`), so without this line a stale export turns a
+      // legitimate run into a confusing hard failure. [Story 23.5 code review 2026-08-08]
+      SPECSCRIBE_PACKAGE_BUILD: '',
+      PORT: String(port),
+      NITRO_PORT: String(port),
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   const serverLog = []
   proc.stdout.on('data', (d) => serverLog.push(String(d)))
   proc.stderr.on('data', (d) => serverLog.push(String(d)))
 
-  const base = `http://127.0.0.1:${port}`
   const bootStart = performance.now()
   const deadline = Date.now() + 60_000
   for (;;) {
@@ -194,7 +226,11 @@ if (process.argv[2] === '--child') {
       failures.push({ path: p, kind: 'ir', why: `IR could not resolve this page: ${err.message}` })
       continue
     }
-    if (!html.includes(expected)) {
+    // ⚠️ `emitted`, NOT `html`. Comparing against the whole page passes when the IR's bytes are present
+    // ANYWHERE in it — including re-parented OUTSIDE `<main>`, which is exactly the region-splicing
+    // regression `test/region-split.test.ts` documents across 187 pages. That oracle cannot see the defect
+    // this experiment's verdict is quoted for. [Story 23.5 code review 2026-08-08]
+    if (!emitted.includes(expected)) {
       failures.push({
         path: p,
         kind: 'content',
@@ -215,6 +251,12 @@ if (process.argv[2] === '--child') {
         label,
         irDir: ir.IR_DIR,
         siteTitle: ir.site.title,
+        // Project IDENTITY, as distinct from the display string above. `siteTitle` cannot carry this: two
+        // checkouts of one project at different revisions — the cheapest and most reproducible way to obtain
+        // two genuinely different IRs — share a title while their route sets differ entirely, and two
+        // unrelated projects can collide on a title. The route set is what "a different project" actually
+        // means here. [Story 23.5 code review 2026-08-08]
+        pathsDigest: createHash('sha256').update([...allPaths].sort().join('\n')).digest('hex').slice(0, 16),
         routesInManifest: allPaths.length,
         routesRequested: paths.length,
         sampled: routeLimit > 0 && routeLimit < allPaths.length,
@@ -239,15 +281,37 @@ let basePort = 3123
 
 for (let i = 0; i < argv.length; i += 1) {
   const a = argv[i]
-  if (a === '--server') serverDir = resolve(argv[++i])
+  // A flag left as the FINAL argument used to read `undefined` and then fail four different ways, none of
+  // them naming the flag: `--server` threw a raw ERR_INVALID_ARG_TYPE out of `resolve`; `--ir` threw
+  // "cannot read properties of undefined" out of `.indexOf`; `--routes` became `NaN`, and `NaN > 0` is
+  // false, so it SILENTLY meant "all routes" with `sampled: false` — the opposite of the sampling
+  // discipline this harness commits to; and `--port` became `NaN`, so both children got `PORT="NaN"` and
+  // the run reported "server did not listen within 60 s" a minute later, which is the exact misdiagnosis
+  // the readiness loop's own comment says it was written to avoid. [Story 23.5 code review 2026-08-08]
+  const value = () => {
+    const v = argv[++i]
+    if (v === undefined) throw new Error(`${a} expects a value, but it was the last argument`)
+    return v
+  }
+  if (a === '--server') serverDir = resolve(value())
   else if (a === '--ir') {
-    const raw = argv[++i]
+    const raw = value()
     const eq = raw.indexOf('=')
     if (eq < 0) throw new Error(`--ir expects <label>=<dir>, got "${raw}"`)
     irs.push({ label: raw.slice(0, eq), dir: resolve(raw.slice(eq + 1)) })
-  } else if (a === '--routes') routeLimit = Number(argv[++i])
-  else if (a === '--port') basePort = Number(argv[++i])
-  else throw new Error(`unknown argument "${a}"`)
+  } else if (a === '--routes') {
+    const raw = value()
+    routeLimit = Number(raw)
+    if (!Number.isInteger(routeLimit) || routeLimit < 0) {
+      throw new Error(`--routes expects a non-negative integer, got "${raw}"`)
+    }
+  } else if (a === '--port') {
+    const raw = value()
+    basePort = Number(raw)
+    if (!Number.isInteger(basePort) || basePort < 1 || basePort > 65_535) {
+      throw new Error(`--port expects a port number in 1–65535, got "${raw}"`)
+    }
+  } else throw new Error(`unknown argument "${a}"`)
 }
 
 if (!serverDir) throw new Error('--server <dir> is required (the directory CONTAINING .output/)')
@@ -297,7 +361,10 @@ for (let i = 0; i < irs.length; i += 1) {
     [SELF, '--child', label, serverDir, String(basePort + i), String(routeLimit)],
     {
       cwd: join(SELF, '..', '..'),
-      env: { ...process.env, SPECSCRIBE_IR_DIR: dir },
+      // The child imports the real adapter to read `site.paths`, so a leaked build flag would stub that
+      // manifest empty and the run would drive ZERO routes. Blanked here for the same reason it is blanked
+      // around the server spawn. [Story 23.5 code review 2026-08-08]
+      env: { ...process.env, SPECSCRIBE_PACKAGE_BUILD: '', SPECSCRIBE_IR_DIR: dir },
       encoding: 'utf8',
       maxBuffer: 256 * 1024 * 1024,
     },
@@ -362,12 +429,29 @@ if (results.some((r) => r.sampled)) {
   say()
 }
 
-const distinct = new Set(results.map((r) => r.siteTitle)).size
+// Identity is the ROUTE SET, not the display title — see `pathsDigest` in the child for why.
+const distinct = new Set(results.map((r) => r.pathsDigest)).size
 let verdict = distinct < results.length ? 'INVALID' : 'CONFIRMED'
 if (verdict === 'INVALID') {
   say(
-    `✗ The IRs do not describe distinct projects (${distinct} distinct siteTitle across ${results.length} IRs).\n` +
+    `✗ The IRs do not describe distinct projects (${distinct} distinct route set(s) across ${results.length} IRs).\n` +
       `  A pass would prove nothing — point --ir at genuinely different projects.`,
+  )
+  say()
+}
+
+// ZERO ROUTES IS NOT A PASS. `verdict` starts at CONFIRMED and only the failures loop below can move it, so
+// an IR whose manifest carries no pages produced `ok = 0`, `failures = []`, a printed "rendered BOTH
+// projects correctly", and exit 0 — having issued no HTTP request at all. This harness asserts isolation,
+// asserts no baked HTML and reports sampling; a run that proved nothing was the one hole left in that
+// discipline. [Story 23.5 code review 2026-08-08]
+const routeless = results.filter((r) => r.routesRequested === 0)
+if (routeless.length) {
+  verdict = 'INVALID'
+  say(
+    `✗ ${routeless.map((r) => `IR ${r.label} (${r.siteTitle})`).join(', ')} drove ZERO routes — an empty ` +
+      `manifest.\n  Nothing was requested, so nothing was demonstrated. Check SPECSCRIBE_IR_DIR and that ` +
+      `the IR was generated with \`--spa\`.`,
   )
   say()
 }
@@ -395,6 +479,14 @@ if (verdict === 'CONFIRMED') {
   say('         failure kinds above before concluding: a `status`/`ir` failure on ONE project is a')
   say('         project-independence defect in a component, which is a narrower (and fixable) result than')
   say('         "prebuilt artefacts cannot work".')
+} else {
+  // The arm this chain used to be missing. Without it an INVALID run wrote a `two-ir.txt` carrying a table,
+  // a `✗` line, and NO `VERDICT:` line — the one line a reader scans for — while `two-ir.json` recorded
+  // `"verdict":"INVALID"`. Two artifacts of one run disagreeing about what happened is precisely the class
+  // of reporting gap this story was reviewed for. [Story 23.5 code review 2026-08-08]
+  say('VERDICT: INVALID — this run cannot support a conclusion either way. The inputs did not satisfy the')
+  say('         experiment\'s own preconditions (see the ✗ line(s) above), so neither a pass nor a failure')
+  say('         here would say anything about project-independence. Fix the inputs and re-run.')
 }
 
 mkdirSync(MEASUREMENTS_DIR, { recursive: true })

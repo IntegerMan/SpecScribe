@@ -152,29 +152,50 @@ jobs:
         # 59.4% against an 80% threshold while the C# side sat at 94.9%. That exclusion was a workaround
         # for a MISSING REPORT, and 25.2 said so.
         #
-        # The report is no longer missing. Story 23.5 stood up Vitest under `web/` (80 tests) and wires
+        # The report is no longer missing. Story 23.5 stood up Vitest under `web/` and wires
         # `sonar.javascript.lcov.reportPaths` below, so the honest move is to measure `web/` rather than
-        # keep hiding it. What remains excluded is only what genuinely cannot be unit-tested, and the list
-        # deliberately mirrors `web/vitest.config.ts`'s own coverage `exclude` so the two cannot drift:
+        # keep hiding it. What remains excluded is only what genuinely cannot be unit-tested.
         #
-        #   web/scripts/**       dev-time HARNESSES. They spawn servers, walk `.output/`, and assert on a
-        #                        full site generate — they are integration drivers, not units. The three
-        #                        pure LIBRARIES they share (`harness-lib`, `ir-content-lib`, `tokens-lib`)
-        #                        are NOT excluded and are covered by `web/test/`.
+        # ⚠️ THIS LIST IS NAMED FILE BY FILE, and that is the fix for a real defect. It used to read
+        # `web/scripts/**`, one line under a comment asserting that "the three pure LIBRARIES they share
+        # (`harness-lib`, `ir-content-lib`, `tokens-lib`) are NOT excluded". They live in `web/scripts/`, so
+        # the glob excluded exactly them — the four modules that actually HAVE unit tests were the four
+        # removed from Sonar's denominator, leaving only `ir/**` and `server/utils/**` measured. The claim
+        # that the glob "deliberately mirrors web/vitest.config.ts so the two cannot drift" was false when
+        # written: vitest uses `include: ['scripts/*.mjs']` with a NAMED exclude list. A blanket glob cannot
+        # mirror a named list. Now it is the same named list, so a new script is a deliberate two-file
+        # decision instead of a silent one. [Story 23.5 code review 2026-08-08]
+        #
+        #   the 15 named web/scripts files — dev-time HARNESSES. They spawn servers, walk `.output/`, and
+        #                        assert on a full site generate: integration drivers, not units. Kept
+        #                        byte-identical to `coverage.exclude` in web/vitest.config.ts. The pure
+        #                        libraries (`harness-lib`, `ir-content-lib`, `tokens-lib`, `parity-lib`,
+        #                        `links-lib`) are NOT here and ARE covered by `web/test/`.
         #   web/server/plugins/** Nitro plugins. `defineNitroPlugin` is a Nitro auto-import that does not
         #                        exist outside the Nitro build, so these modules cannot even be IMPORTED by
         #                        a unit test. 23.5 moved the one piece of real logic out of a plugin into
         #                        `web/server/utils/relative-prefix.ts` precisely so it could be tested, and
         #                        it is at 100%.
-        #   web/**/*.vue         no component tests yet. This is the honest gap and it has an owner: it is
-        #                        named in Story 23.5's report as the follow-up that would lift `web/`
-        #                        coverage past the threshold.
         #
-        # BE CLEAR ABOUT THE CONSEQUENCE: measured `web/` coverage is ~51% statements / ~53% lines, well
-        # under `Sonar way`'s 80% new-code condition, so this change is EXPECTED to show new_coverage red
-        # on the first scan that includes it. That is the correct signal and it is not blocking —
-        # `sonar.qualitygate.wait` remains unset (25.2), so a red gate does not fail this build. Do not
-        # "fix" it by widening the exclusion back to `web/**`; fix it with component tests.
+        # `web/**/*.vue` IS NO LONGER EXCLUDED [owner decision D3, 2026-08-08]. It was excluded here while
+        # `web/vitest.config.ts` globbed `components/**/*.ts` — components are `.vue`, so that glob matched
+        # nothing and no `.vue` file reached lcov either. Absent from BOTH denominators, the "honest gap"
+        # this comment claimed to document contributed ZERO rather than 0%: adding component tests would
+        # have LOWERED the reported percentage, and lifting the exclusion later would have revealed a cliff
+        # nobody predicted. Both sides now include `.vue`, so the gap is visible and real.
+        #
+        # `sonar.test.inclusions` classifies `web/test/**` as TEST code. Without it the scanner has no way to
+        # know — it auto-classifies C# test PROJECTS, but a JS directory is just files — so ~600 lines of
+        # Vitest specs were analyzed as production source at 0% coverage, dragging new_coverage in exactly
+        # the direction this comment pre-declares as expected, which made the wiring defect unfalsifiable
+        # from the gate output. `web/test/**` is also in coverage.exclusions as a belt-and-braces measure: if
+        # a scan ever reports an indexing conflict, drop the test.inclusions line first, not that one.
+        #
+        # BE CLEAR ABOUT THE CONSEQUENCE: measured `web/` coverage is well under `Sonar way`'s 80% new-code
+        # condition, and including `.vue` lowers it further, so this is EXPECTED to show new_coverage red.
+        # That is the correct signal and it is not blocking — `sonar.qualitygate.wait` remains unset (25.2),
+        # so a red gate does not fail this build. Do not "fix" it by widening the exclusion back to
+        # `web/**`; fix it with component tests.
         #
         # `extension/src/**` is still deliberately NOT excluded (508 lines to cover, 0% covered) — shipped
         # first-party product code whose 0% this project wants visible.
@@ -187,7 +208,8 @@ jobs:
             /d:sonar.token="$env:SONAR_TOKEN" `
             /d:sonar.cs.opencover.reportsPaths="**/TestResults/**/coverage.opencover.xml" `
             /d:sonar.javascript.lcov.reportPaths="web/coverage/lcov.info" `
-            /d:sonar.coverage.exclusions="web/scripts/**,web/server/plugins/**,web/**/*.vue" `
+            /d:sonar.test.inclusions="web/test/**" `
+            /d:sonar.coverage.exclusions="web/test/**,web/server/plugins/**,web/scripts/check-links.mjs,web/scripts/check-a11y.mjs,web/scripts/measure-parity.mjs,web/scripts/measure-payload.mjs,web/scripts/check-parity.mjs,web/scripts/pin-parity.mjs,web/scripts/render-lib.mjs,web/scripts/experiment-two-ir.mjs,web/scripts/build-package.mjs,web/scripts/sync-runtime-assets.mjs,web/scripts/extract-tokens.mjs,web/scripts/extract-ir-content.mjs,web/scripts/check-tokens.mjs,web/scripts/check-ir-content.mjs,web/scripts/ir-content-build.mjs" `
             /d:sonar.exclusions="src/SpecScribe/assets/prism.js,src/SpecScribe/assets/prism.css,src/SpecScribe/assets/plotly-hierarchy.min.js,spike/**,tools/**,extension/node_modules/**,extension/dist/**,extension/bin/**,web/node_modules/**,web/.output/**,web/.nuxt/**,web/public/**,web/coverage/**,web/measurements/**,web/assets/tokens.css,web/assets/ir-content.css,SpecScribeOutput/**,docs/live/**,artifacts/**,_bmad-output/**,_bmad/**,.claude/**,.agents/**,chat.json"
 
       - name: Build
@@ -319,6 +341,29 @@ jobs:
         # It is left in the run so `npm run check` means the same thing for a developer and for CI.
         run: npm run check
 
+      - name: Check emitted links
+        working-directory: web
+        # Story 23.5 AC #8 names FOUR gates that "run somewhere automatic": check:tokens, check:ir-content,
+        # check:links and measure:parity. The first two are in `npm run check` above. This is the third.
+        #
+        # It is a separate step rather than part of `npm run check` because its subject is different: the
+        # gates above diff COMMITTED artifacts and need no site, whereas this one walks the LIVE emitted
+        # portal and so must come after the generate step. Folding it into `npm run check` would make that
+        # script unrunnable for a developer who has not generated.
+        #
+        # measure:parity — THE FOURTH GATE — IS DELIBERATELY NOT WIRED, and this is the record of that
+        # decision rather than a silent omission. `check:parity` (in `npm run check` above) supersedes it:
+        # Story 23.6 built it over a FROZEN corpus with pinned per-route digests, which is strictly stronger
+        # as a gate than measure:parity's live-corpus measurement and, per ADR 0033 §Decision 2, cannot go
+        # red for a reason unrelated to the change under test. measure:parity remains available as a
+        # MEASUREMENT (`npm run measure:parity`) and is what regenerates web/measurements/parity.*; it is
+        # not a gate and is not treated as one. [Story 23.5 code review 2026-08-08, owner decision D2]
+        #
+        # ⚠️ Unlike check:parity this gate is only PARTIALLY sibling-proof, by necessity — a link gate has to
+        # run over the live site, so a sibling story that adds a page with a dangling link WILL turn it red.
+        # That is the gate working. Re-pin deliberately with `npm run pin:links`, never reflexively.
+        run: npm run check:links
+
       - name: Test web
         working-directory: web
         # Vitest + v8 coverage -> web/coverage/lcov.info, consumed by
@@ -328,7 +373,14 @@ jobs:
       - name: SonarScanner end
         # continue-on-error: see the same note on "SonarScanner begin" above — a scanner-side failure here must
         # not fail a job that only just built and tested successfully.
-        if: env.SONAR_TOKEN != ''
+        #
+        # `always()` is load-bearing, not defensive. `begin` has already injected MSBuild targets and OPENED an
+        # analysis on SonarCloud; if any step between the two fails, an `if:` without `always()` skips this one
+        # and nothing ever submits the analysis. SonarCloud then silently keeps serving the PREVIOUS run's
+        # data, with no indication the scan was abandoned — a stale green. Story 23.5 widened that window by
+        # inserting four failure-capable steps between `Test` and here, and Story 23.6 added a fifth.
+        # [Story 23.5 code review 2026-08-08]
+        if: always() && env.SONAR_TOKEN != ''
         continue-on-error: true
         run: .\.sonar\scanner\dotnet-sonarscanner end /d:sonar.token="$env:SONAR_TOKEN"
 

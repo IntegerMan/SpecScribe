@@ -142,11 +142,29 @@ describe('pad', () => {
 })
 
 describe('kb', () => {
-  it('renders a byte count in kilobytes', () => {
-    expect(kb(2048)).toMatch(/^2/)
+  // These assertions used to be `toMatch(/^2/)` and `typeof … === 'string'` — one character and a return
+  // type. `"2"`, `"20000 bytes"` and `"2 GB"` all satisfied the first; every possible return satisfied the
+  // second. Coverage-line tests, not behavior tests, in a suite whose stated justification is Sonar's
+  // coverage denominator — which is precisely the provenance that makes it worth asserting the real
+  // contract instead. [Story 23.5 code review 2026-08-08]
+  it('renders a byte count in kilobytes to one decimal place, with a unit', () => {
+    expect(kb(2048)).toBe('2.0 KB')
+    expect(kb(1024)).toBe('1.0 KB')
+    expect(kb(1536)).toBe('1.5 KB')
   })
 
-  it('renders zero without throwing', () => {
-    expect(typeof kb(0)).toBe('string')
+  it('rounds to one decimal rather than truncating', () => {
+    expect(kb(1587)).toBe('1.5 KB')
+    expect(kb(1638)).toBe('1.6 KB')
+  })
+
+  it('renders zero as an explicit 0.0 KB rather than an empty or NaN string', () => {
+    expect(kb(0)).toBe('0.0 KB')
+  })
+
+  it('scales past a megabyte without switching units', () => {
+    // Deliberate: the harness reports artefact sizes in KB throughout so two numbers are always comparable
+    // by eye. A future change to auto-scale units would break every published measurement's comparability.
+    expect(kb(1024 * 1024)).toBe('1024.0 KB')
   })
 })

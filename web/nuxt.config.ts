@@ -45,6 +45,31 @@ const irRoutes = site.paths.map((p) => `/${p}`)
 const routeLimit = Number(process.env.SPECSCRIBE_IR_ROUTE_LIMIT ?? 0)
 const prerenderIrRoutes = routeLimit > 0 ? irRoutes.slice(0, routeLimit) : irRoutes
 
+/**
+ * A NON-package build that has no routes to prerender is a leaked `SPECSCRIBE_PACKAGE_BUILD`, not a build.
+ * [Story 23.5 code review 2026-08-08, owner decision D4]
+ *
+ * `PACKAGE_BUILD` is a bare `process.env` read at module scope with no phase scoping, and `EMPTY_MANIFEST`
+ * is deliberately schema-current so it slips past the adapter's own FATAL version check. So an operator who
+ * exports the flag — which this project's own docs instruct, and which CI now sets in two steps — and then
+ * runs `npm run generate` got an empty `.output/public` and EXIT 0. A wrong answer with a success status is
+ * the precise failure mode the flag was introduced to eliminate, reproduced by the flag itself.
+ *
+ * Deliberately not thrown when `PACKAGE_BUILD` is set (an empty table is the whole point there) nor when
+ * `SPECSCRIBE_IR_ROUTE_LIMIT` is in play (a dev knob may legitimately narrow it, though not to zero).
+ */
+if (!PACKAGE_BUILD && prerenderIrRoutes.length === 0) {
+  throw new Error(
+    'Refusing to build: the IR manifest yielded ZERO prerender routes.\n' +
+      (process.env.SPECSCRIBE_PACKAGE_BUILD === '1'
+        ? '  SPECSCRIBE_PACKAGE_BUILD is set to something other than "1" in a way that did not stub the ' +
+          'manifest, which should be impossible — report this.\n'
+        : '  SPECSCRIBE_PACKAGE_BUILD is not set, so the manifest was read from disk and is EMPTY.\n') +
+      '  Either the IR was generated without --spa, or SPECSCRIBE_IR_DIR points somewhere without one.\n' +
+      '  If you meant to build the project-independent renderer, use `npm run build:package`.',
+  )
+}
+
 export default defineNuxtConfig({
   compatibilityDate: '2026-07-24',
   ssr: true,

@@ -53,16 +53,29 @@ manifest — deliberately not `nuxt generate`.
 
 | IR | project | routes | passed | boot | median | p95 | full pass |
 |---|---|---|---|---|---|---|---|
-| A | SpecScribe (this repo) | 1,056 | **1,056 / 1,056** | 713 ms | 3.8 ms | 14.6 ms | **6.3 s** |
-| B | CORA (a different repo) | 33 | 32 / 33 | 518 ms | 4.5 ms | 17.0 ms | 1.0 s |
+| A | SpecScribe (this repo) | 1,056 | **1,056 / 1,056** | 540 ms | 3.7 ms | 13.2 ms | **6.2 s** |
+| B | CORA (a different repo) | 33 | 32 / 33 | 528 ms | 5.9 ms | 17.6 ms | 1.1 s |
+
+Every figure is transcribed from the committed `web/measurements/two-ir.json`. An earlier revision of this
+ADR published timings from a different run than the committed one; the pass counts were always correct.
+[corrected by the Story 23.5 code review, 2026-08-08]
 
 Pass required all four of: HTTP 200; a non-trivial `<main>` region; **no** Nuxt hydration payload; and the
 emitted page containing that IR's own `<main>` inner HTML **verbatim** — the same oracle `measure:parity`
 uses.
 
-**The hypothesis holds.** The route table that `nuxt.config.ts` bakes into `nitro.prerender.routes` at
-config-load time does not bind the artefact, because the caller drives the routes: SpecScribe emitted the
-manifest, so it already knows every route.
+**The hypothesis holds — and the harness's own verdict is `REFUTED`.** Both are true and the distinction is
+the point. The harness applies a strict binary: any failing route on any IR refutes, so the one HTTP 500
+below sets `verdict: "REFUTED"` in `two-ir.json`. What AC #4 actually asked is whether ONE prebuilt artefact
+can render MANY projects, and on that question the answer is yes: the route table that `nuxt.config.ts` bakes
+into `nitro.prerender.routes` at config-load time does not bind the artefact, because the caller drives the
+routes — SpecScribe emitted the manifest, so it already knows every route. The single failure is a component
+defect on one project, not a property of prebuilt artefacts.
+
+⚠️ The correctness oracle was found to compare against the whole page rather than the `<main>` region it
+documents, and has been fixed; the run above has not been re-executed under the correction because IR B needs
+the CORA tree. `measure:parity`, which applies the correct `<main>`-scoped oracle, recorded 190/190 verbatim
+on the same build, so the result is corroborated but not re-derived. [Story 23.5 code review 2026-08-08]
 
 Two findings from that run matter more than the headline:
 
@@ -79,7 +92,7 @@ Two findings from that run matter more than the headline:
 
 ### Rendering cost, in context
 
-A full 1,056-route pass driven over the prebuilt server is **6.3 s**, against `nuxt generate`'s 25–30 s on
+A full 1,056-route pass driven over the prebuilt server is **6.2 s**, against `nuxt generate`'s 25–30 s on
 the same machine and the 23.1 spike's 37.1 s warm / ~130 s cold. The cold path stops existing: there is no
 `npm ci`, no Vite build, and no `node_modules` at generate time.
 
