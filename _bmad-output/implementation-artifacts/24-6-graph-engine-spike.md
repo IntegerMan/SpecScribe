@@ -12,7 +12,7 @@ execution_order: 24.1 → 24.6 (this) → 24.2 → 24.3 → 24.4/24.5 # numeric 
 
 # Story 24.6: Epic 24 Graph-Engine Spike — Force-Directed, Chord, and Matrix Under One Contract
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -312,7 +312,104 @@ that claim to your own changes. [[golden-diff-normalization-gotchas]]
 
 ### Review Findings
 
-_(populated during code-review)_
+**Code review 2026-08-08** (`worktree-code-review-24-6`, reviewed at `e8a689d`). Three adversarial layers —
+Blind Hunter, Edge Case Hunter, Acceptance Auditor — **scoped by this story's own File List, not a commit range**,
+per CLAUDE.md § Scoping a code review. The work landed in bundled commit `240afae` ("Mapping work", 82 files /
++9,169), which also carries **ADR 0029 and Stories 20.10 / 22.2 / 25.x plus 14 `web/` files — all excluded**.
+Scoped diff: 41 files, +5,841 / −73.
+
+**Verdict in one line:** the decision itself (ADR 0030 — Plotly `scatter` over a generation-time C# layout, family 1
+extended, no second dependency) is **sound and survives every layer**; the 0-byte marginal cost is real and was
+confirmed against the shipped asset. What does not survive intact is a **cluster of evidence defects** — the single
+fixture behind almost every AC #2 number is unrepresentative, three ratified recommendations say something other
+than what they do, and the report's own provenance discipline is breached in five places.
+
+**AC coverage:** #1 PARTIALLY MET · #2 PARTIALLY MET · #3 MET (provenance caveat) · #4 MET.
+**Constraints clean:** all eight prohibitions honoured (no `src/**`/`tests/**` in either diff, nothing vendored,
+`GitMetrics.cs` untouched, one-way `ProjectReference`, quarantine real — `GraphEngineSpike.csproj` genuinely absent
+from `SpecScribe.slnx` and CI builds the `.slnx` explicitly rather than globbing, no ADR 0005 amendment, no
+`docs/live`, golden fingerprint refused). Structural-scope rule satisfied — `epics.md` **and** `sprint-status.yaml`
+both moved in the same commit, and the deliberately-unseated twin-audit gap reads identically in all four artifacts.
+The Task 1 `main`-vs-worktree deviation is **justified and properly flagged** in three places. Four of the five
+"owed, named rather than softened" items are carried into the durable report with equal prominence.
+**Story 24.2 honoured four of five hand-offs**; the fifth is D-item 3 below.
+
+#### Decisions needed (owner)
+
+- [x] [Review][Decision] **The load-bearing ego fixture is unrepresentative in two independent ways, and the report never says so** — `spike/graph-engine/fixtures/ego-top20.json` is hubbed on `_bmad-output/implementation-artifacts/sprint-status.yaml`: the exact file report §7.3 denounces as the graph's pathology ("coupled to 359 of 391 nodes — 92% of the graph… mostly shows the project's bookkeeping"). Task 2 was explicit — *"Pick the ego hub deliberately: a genuinely hub-like file (`GitMetrics.cs` / `Charts.cs` / `SiteGenerator.cs`)… A quiet file proves nothing about legibility"* — and `Program.PickHub` (`Program.cs:202`) simply takes max degree, which lands on the YAML. The task is ticked `[x]`. Second: that fixture is a **complete graph** — verified 21 nodes, 210 edges = C(21,2), every node degree exactly 20. Story 24.2 renders on **code pages**, where the hub is always a code file. So the surface behind the a11y survival series, the per-edge channel census, the colour audit, the CSP render verdict, the filter timings **and the ratified top-20 default** is not the surface Epic 24 ships, and has no sparse structure, no periphery and no separable clusters — the conditions under which a force layout and a roving-tabindex order are actually hard. The report names the hub **zero times**. Options: (a) re-run the probe with a code-file hub and re-measure §5–§7; (b) annotate report + ADR with the boundary and leave the numbers standing; (c) accept as-is.
+- [x] [Review][Decision] **"Top-20 by confidence" is arithmetically identical to top-20 by raw co-change count — the ratified ranking is a no-op** — `Program.BuildCappedEgo` (`Program.cs:271-280`) computes `Confidence = (double)Support / hubChanges`, then `OrderByDescending(Confidence).ThenByDescending(Support).ThenBy(path)`. `hubChanges` is **constant** for a fixed hub, so the confidence sort is a monotone rescaling of the support sort and the tiebreaker can never fire. The discriminating direction — `conf(neighbour → hub) = support / changeCount[neighbour]`, which is the entire reason Story 24.1 built a *directional* metric — is never used for the cap. ADR 0030 § Bad (*"top-20 by confidence recommended"*) and report §7.4 therefore ratify "top-20 by co-change count" under a different name, a ranking that systematically favours the highest-churn files — which is why the resulting node list is dominated by exactly the bookkeeping §7.3 tells 24.3 to filter out, with no equivalent lens recommended for 24.2. Options: (a) amend ADR 0030 to say "top-20 by support"; (b) change the recommendation to true neighbour→hub confidence and re-measure; (c) accept.
+- [x] [Review][Decision] **Cross-platform determinism is unmeasured and — uniquely among the boundaries — unnamed, while ADR §3's normative rule omits the two actual hazards** — `Layout.Solve` uses `Math.Cos`/`Math.Sin` (`Program.cs:518-520`) and `Math.Log` (`:563`) in the coordinate path. .NET guarantees IEEE bit-exactness for `+ − × ÷` and `Math.Sqrt` (used at `:523/544/561/573`, fine) but **not** for transcendentals — they route to the platform math library and can differ across Windows/glibc/musl and x64/ARM64. `dx*dx + dy*dy` is also an FMA-fusable pattern RyuJIT contracts based on the *host's* ISA. ADR §3's normative list closes `System.Random`, iteration order, wall-clock, environment, parallelism and formatting — and stops there. FR31 is *"identical output on a from-scratch CI regen"*; the evidence is three processes on **one machine, one OS, one SDK, one arch**. §11 names seven boundaries with real candour and does not name this one, so ADR 0030 ships *"FR31 determinism is **structural**, not aspirational"* with a hole under it. This is the same hazard class the ADR bans `System.Random` for, in the ADR's own words. Options: (a) amend ADR §3 to cover transcendentals + FP contraction and add the boundary to §11; (b) add the boundary only; (c) accept.
+- [x] [Review][Decision] **Node positions have no stability across regenerations, and the ADR ratifies "position is DATA" without addressing it** — `Program.cs:512-521`: `theta = 2π·i/n` plus jitter from a single sequential `XorShift` consumed in index order. Node **identity never enters the seed**. Add, rename or delete one file — or move the support floor — and *n* changes, every index shifts, and every node's start and final position changes. FR31 (same input → same output) still holds, but "position is data" gives no *positional* stability: a reader's mental map of the graph resets on every commit and the embedded payload diffs wholesale on every regeneration. Not raised anywhere in the report or ADR. Options: (a) amend ADR 0030 to require identity-seeded initial placement; (b) hand to 24.3 as a named open item; (c) accept.
+- [x] [Review][Decision] **ADR §4's "filtering hides, never re-lays-out" is ratified on threshold evidence alone, and does not cover half the control surface the ADR itself names** — ADR 0030's Context (`:48`) names 24.3's clutter controls as *"a support/confidence threshold **and directory grouping**"*, then §4 (`:79-81`) resolves the axis using only threshold evidence. `FilterProbe.Run` (`Program.cs:676-726`) varies confidence and nothing else; no probe of grouping/collapse exists anywhere. When 24.3 collapses `src/SpecScribe/**` into one group node, that node has **no precomputed coordinate** — the layout was solved over *file* nodes only — so 24.3 must either invent a position client-side (violating ADR §2 "no client-side solver" and ADR 0010 §3) or re-solve (violating §4). Options: (a) amend §4 to scope it explicitly to threshold filtering and hand grouping to 24.3 as an open item; (b) probe grouping now and extend the rule; (c) accept.
+- [x] [Review][Decision] **The declared-throwaway spike is now permanent, unpinned infrastructure on the live dependency-alert surface** — `spike/graph-engine/package-lock.json` is **tracked and absent from the File List entirely**, and Dependabot has already acted on it: `f4f5629` *"Bump esbuild from 0.24.2 to 0.28.1 in /spike/graph-engine"* landed 2026-07-30, the day after the spike. `package.json` now reads `"esbuild": "^0.28.1"` while `measurements/bundles.json § toolchain.esbuild` records `0.24.2`, so §13's step 3 (`npm install && npm run bundles`) **no longer reproduces** the 552,268 / 657,660 / 443,319 B figures in §4.1 and in ADR 0030's options table. Separately, four probe HTML files the File List calls *"generated, gitignored"* are tracked (`.gitignore` lists only `node_modules/ dist/ bin/ obj/ probe/vendor/ echarts-src/`), and five `graph-24-6-*` probe-server entries remain seated in the shared `.claude/launch.json`. Report §12 asserts *"Deleting `spike/graph-engine/` leaves the shipped tool byte-identical."* Options: (a) prune `spike/graph-engine/` and keep only the report + ADR; (b) keep it, correct the File List, pin the toolchain and record the drift; (c) keep as-is.
+
+#### Patches
+
+- [x] [Review][Patch] ADR 0030 is stale: its "still open" `StripDataIslands` item was removed outright by ADR 0036, and ADR 0032 §2 contests the premise [`docs/adrs/0030-epic-24-graph-engine.md:193-196`]
+- [x] [Review][Patch] CSP probe is now silently vacuous — the regex matches the `__CSP__` placeholder so the loud-failure guard never fires, `SHIPPED` becomes the literal `"__CSP__"`, every variant no-ops and `wrong-nonce` (the control) equals `webview`; assert `default-src` + both placeholders, read the `CspPolicy` const [`spike/graph-engine/scripts/csp-probe.mjs:36-48`]
+- [x] [Review][Patch] Tab-order hand-off is wrong and the probe comment contradicts its own code: Story 24.1's Q4 settled on **confidence**-descending, not degree-descending; correct §6.2/§10 and record 24.2's server-emission-order deviation as the correct reading [`spike/graph-engine/probe/templates/plotly-scatter.html:169-174`]
+- [x] [Review][Patch] R5's verdict rests on a hardcoded literal — `nodePositionsMoved: false` is a constant in the `.then()`, never a read-back; replace "provably"/"measurably do not move" with "by construction", and label the 10-min / 108-MB rejection projections `[PROJECTED]` and worst-case (per-state precompute needs coordinates only, ≈1.3 MB) [`spike/graph-engine/probe/plotly-scatter.html:328`]
+- [x] [Review][Patch] §7.3's five-point O(n²) fit and the whole degree distribution are labelled `[HARNESS]` but exist in no committed artifact — the `--window all` run was never persisted; relabel or commit it [`_bmad-output/implementation-artifacts/24-6-spike-report.md:520-549`]
+- [x] [Review][Patch] §2's disclaimer *"a mismatch changes a stroke, not a measurement"* is false — `IsProcessish` drives `ProcessEdges` and the entire code-only filter (the 46%-Process finding and the lens ratified for 24.3); the real classification was reachable via public `CoupledPair.Kind`/`DirectedCouple.Kind` [`spike/graph-engine/layout/Program.cs:239,445`]
+- [x] [Review][Patch] The colour audit asks "is this **a** token", not "is this a **permitted** token" — it passed on four `--status-*` tokens that `RelationshipGraph.cs:236` declares off-limits on code surfaces; also note UX-DR17 is evidenced by the dash/width census, not by the colour audit [`spike/graph-engine/probe/harness.js`]
+- [x] [Review][Patch] ECharts' UX-DR7 "PASS (configured around)" was never tested against the report's own survival rule (single snapshot, no re-render series) — and that snapshot was taken while the chart drew nothing, which §6.4 itself establishes; mark unmeasured in §6.1 and name it in §11 [`_bmad-output/implementation-artifacts/24-6-spike-report.md:289`]
+- [x] [Review][Patch] UX-DR18 PASS for candidate (a) cites `reducedMotion() ? 0 : 600` "both exercised", but those helpers are wired only in the **ECharts** probe; drop the second clause [`_bmad-output/implementation-artifacts/24-6-spike-report.md:292`]
+- [x] [Review][Patch] Line-number citations are wrong and propagated into ADR 0030 and 24.2's record: the CSP policy is at `WebviewRenderAdapter.cs:64` not `:140`, and the Plotly `<EmbeddedResource>` is at `SpecScribe.csproj:182` not `:67` (`:67` is `</PropertyGroup>`) — the report takes explicit credit for fixing this exact failure [`_bmad-output/implementation-artifacts/24-6-spike-report.md:66,399`]
+- [x] [Review][Patch] A `[HARNESS]`-labelled figure contradicts the harness: §4.1 gives shipped Plotly gzip as 413,461 B; `bundles.json` says 414,130 B in both places [`_bmad-output/implementation-artifacts/24-6-spike-report.md:144`]
+- [x] [Review][Patch] Every gzip multiple divides by prism's **minified** size (100,409 B) rather than its gzip (33,934 B, recorded in `bundles.json`) — ECharts SVG is 5.56× gzip, not 1.88×; the error direction flatters the *rejected* candidates so the decision is unthreatened, but the column header says `×prism.js (gzip)` and prism's gzip is never published [`_bmad-output/implementation-artifacts/24-6-spike-report.md:137-144`]
+- [x] [Review][Patch] Candidate (d) has no report row and no drop reason (Task 3 required one for any dropped candidate), yet carries three unmeasured ✅s in the ADR's options table under a footnote reading "measured this session"; Sigma.js/graphology likewise never mentioned or dismissed [`docs/adrs/0030-epic-24-graph-engine.md:114-116`]
+- [x] [Review][Patch] §13 "Reproducing every number" reproduces **no** §5/§6 figure — i.e. none of AC #2; the §7.2 "independently recomputed in JavaScript" cross-check is recorded nowhere; and the `file://` "reproduce in one step" is broken as committed (`probe/vendor/` is gitignored and absent, and the page still carries a literal `nonce="__NONCE__"`) [`_bmad-output/implementation-artifacts/24-6-spike-report.md:687,767-786`]
+- [x] [Review][Patch] `verify-determinism.mjs` never checks its own headline: run 1's file list is the comparison set, there is no expected-count assert (so zero fixtures prints PASS via `[].every()`), `RUNS` has no minimum (so `… 1` passes trivially), and a thrown run leaves a stale *passing* `determinism.json` on disk [`spike/graph-engine/scripts/verify-determinism.mjs:41,59-60`]
+- [x] [Review][Patch] `marginalCostOfScatterBytes: 0` is written unconditionally beside `scatterRegistered`, despite the header comment claiming the script "asserts that rather than assuming it" [`spike/graph-engine/scripts/build-bundles.mjs:143`]
+- [x] [Review][Patch] Hand 24.3 the graph states the probe never exercised: an **orphan node** (last edge filtered) stays painted, stays in tab order and keeps a stale pre-filter `aria-label`; the **empty graph** is unreachable in the probe (`foreach (var threshold in confidences)` only iterates observed values) with no fixture below 9 nodes; and a single **NaN** silently collapses every node to 0.5 while emitting valid JSON [`spike/graph-engine/layout/Program.cs:592-607,707`]
+- [x] [Review][Patch] Record the a11y boundaries the survival predicate structurally cannot see: edge `aria-label`s misalign after **any** filter (the predicate only inspects `[data-graph-node]`), and focus drops to `<body>` on re-render while held (the predicate checks `tabindexZero === 1`, which stays satisfied) — both under the "INTACT 11/11, 8/8 survived" headline [`spike/graph-engine/probe/plotly-scatter.html:218-236,350`]
+- [x] [Review][Patch] Three minor report corrections: two Cytoscape a11y cells read "not reached" instead of a literal verdict, contra the report's own *"'Partial', 'mostly' and 'with work' do not appear"*; §6.5 cites "R3" for the CSP-axis separation, which is Story **20.4's** R3, not this story's; §4.2's R9 table has no Plotly column (legitimately inheritable from 20.4, but uncited) [`_bmad-output/implementation-artifacts/24-6-spike-report.md:159,291,397`]
+
+#### Deferred
+
+- [x] [Review][Defer] `FilterProbe` throws `InvalidOperationException` on `supportBreakpoints.Max()` when no pair meets the support floor (shallow clone, `--window 1`, fresh repo), after writing all 11 fixtures but before `scale.json` [`spike/graph-engine/layout/Program.cs:723-725`] — deferred, throwaway probe code
+- [x] [Review][Defer] `RunGit` sets `RedirectStandardError = true` with no reader and blocks in `WaitForExit` — deadlocks if git exceeds the stderr pipe buffer [`spike/graph-engine/layout/Program.cs:330-339`] — deferred, throwaway probe code
+- [x] [Review][Defer] Probe text twin is truncated at 200 with no "+N more" and never rebuilt after a filter (`dataset.built` makes it idempotent) [`spike/graph-engine/probe/plotly-scatter.html:248-257`] — deferred, throwaway probe code; 24.2 server-renders its twin
+
+#### Dismissed (5)
+
+`BuildAside`, `ReferenceGraph`'s second call site missed by §8's "read in full" — 24.2 caught it and has since
+retired `ReferenceGraph` entirely, so §8 describes a surface that no longer exists · unguarded island `JSON.parse`
+crashing instead of falling back — trigger removed with `StripDataIslands` (ADR 0036) · integer emission bypassing
+`InvariantCulture` — benign on .NET Core for non-negative `G`-formatted values · roving clamp measured against data
+length rather than DOM length — probe-only, superseded by 24.2's shipped-and-reviewed clamp · "the determinism
+harness does not really use separate processes" (a review intake lead) — **refuted**: `execFileSync` genuinely
+spawns a fresh `dotnet run` per iteration into an isolated `.determinism/run-N/`, and the `scale.json` exclusion is
+implemented with its stated wall-clock rationale.
+
+#### What was applied (2026-08-08)
+
+All six decisions were resolved by the owner and all nineteen patches applied. **No product code was touched** —
+this review's edits are confined to the two durable artifacts, three planning/status files, and the removal of the
+throwaway probe.
+
+* **ADR 0030 amended** — §2 now requires **identity-seeded** initial placement (D4); §3 bans **transcendentals**
+  and host-decided **FP contraction** normatively and records that determinism was proven on one platform only
+  (D3); §4 is **scoped to threshold filtering**, with directory grouping moved to the open list and handed to 24.3
+  (D5); the ego recommendation now reads **"top-20 by support"** with the real directional confidence recommended
+  for 24.3 (D2); the `StripDataIslands` open item is **closed** as resolved by ADR 0036, with a note that ADR 0032
+  §2 had already contested its premise; the options table's gzip multiples are corrected against `prism.js`
+  **gzipped**, candidate (d) is marked assessed-not-measured with its drop reason recorded, and Sigma.js/graphology
+  are explicitly dismissed; the boundaries section now carries the **unrepresentative-fixture** finding (D1) and
+  the scope of the a11y evidence.
+* **Spike report amended** — a new **§0 "Corrections from the code review"** heads the document with eight flagged
+  items, and inline corrections land at §4.1 (byte figures and yardstick), §6.3 (the container-robustness row that
+  claimed an unmeasured case), §7.4 (both ratified recommendations), §10 (six new named hand-offs to 24.3), §12
+  (dependency vs directory quarantine) and §13 (superseded).
+* **Probe pruned** — `spike/graph-engine/` and the five `graph-24-6-*` entries in `.claude/launch.json` removed
+  (D6); `spike/README.md` records the prune and why. This **resolved three patches by removal** rather than by
+  fix — the CSP-probe guard, the determinism-harness assertions and the unconditional `marginalCostOfScatterBytes`
+  — and **all three deferrals**, whose subject no longer exists.
+* **File List corrected** in this record, with the two inaccuracies named.
+
+**Not done, deliberately:** no re-measurement (D1 was resolved as *annotate*), so every number in the report stands
+as originally recorded and is now explicitly the record rather than something reproducible. Story 24.2 is `done`
+and was **not** revisited — its cap and its Tab-order deviation are noted as correct, not changed.
 
 ## Dev Notes
 
@@ -654,7 +751,20 @@ a *second* family is left **unspent**, a third still needs its own ADR — and *
 - `_bmad-output/implementation-artifacts/24-6-graph-engine-spike.md` — **modified** (this record: checkboxes, Dev
   Agent Record, File List, Change Log, Status)
 
-**Throwaway probe — all new, quarantined under `spike/graph-engine/`**
+> **⚠ Corrected and superseded by the code review of 2026-08-08.** This File List was inaccurate in two ways, and
+> both mattered because CLAUDE.md makes the File List the instrument a later review scopes by. It declared
+> `probe/*.html` and `.determinism/` *"generated, gitignored"* when `spike/graph-engine/.gitignore` listed neither
+> (`node_modules/ dist/ bin/ obj/ probe/vendor/ echarts-src/` only) and **four probe HTML files were tracked**; and
+> it **omitted `spike/graph-engine/package-lock.json` entirely**, which is how a declared-throwaway probe became a
+> live Dependabot surface (`f4f5629`, esbuild 0.24.2 → 0.28.1, one day after this spike landed). A reviewer scoping
+> by this list would have skipped five tracked files.
+>
+> **The entire probe has since been removed** by owner decision — `spike/graph-engine/` and the five
+> `graph-24-6-*` entries in `.claude/launch.json`. The list below is retained as the historical record of what the
+> spike produced, not as a description of the current tree. `spike/README.md` was updated to record the prune and
+> its reasons, and the durable deliverables — the report and ADR 0030 — are unaffected.
+
+**Throwaway probe — all new, quarantined under `spike/graph-engine/` (REMOVED 2026-08-08)**
 
 - `spike/graph-engine/README.md`
 - `spike/graph-engine/.gitignore` (`node_modules/`, `dist/`, `bin/`, `obj/`, `probe/vendor/`, `echarts-src/`)

@@ -1645,6 +1645,25 @@ the 25.2 entries above, where the original claims live; only genuinely new work 
   summary: Lift reaches the code page's sr-only text twin only through a `title` attribute on a non-interactive `<li>`, which screen readers announce unreliably. The consequence is an ADR 0013 §2 completeness gap with an unusual shape: a sighted mouse user can read lift from BOTH the chart's hover tooltip and the twin's hover title, while an assistive-technology user may get it from neither. The in-code comment shows the placement is deliberate and predates this story (Story 24.1 chose it so that spending sr-only reading time on lift would not bury the confidence the row is actually about), so the right fix is a decision about where the specialist's number belongs across every coupling surface, not a drive-by change inside a rendering story.
   evidence: Acceptance Auditor B (ADR 0013 §2 channel-by-channel twin audit), code review 2026-08-07. Pre-existing, inherited from Story 24.1.
 
+## Deferred from: code review of 24-6-graph-engine-spike (2026-08-08)
+
+> **All three RESOLVED on the same day, by removal rather than by fix.** The owner chose to prune
+> `spike/graph-engine/` during the same code review, so the throwaway probe code these entries describe no longer
+> exists. They are retained as a record of what was found, not as open work. Nothing shipped was affected — the
+> project was never in `SpecScribe.slnx` and its `ProjectReference` to `src/SpecScribe` was one-way.
+
+- source_spec: `24-6-graph-engine-spike.md`
+  summary: `FilterProbe` calls `supportBreakpoints.Max()` with no empty-sequence guard, so it throws `InvalidOperationException` on any repo where no pair meets the support floor — a shallow clone, `--window 1`, a fresh repo, or a `git log` returning empty output (which `RunGit` returns as `""`, not null, so the existing `logText is null` guard does not fire). It dies after writing all 11 fixture files but before `scale.json`, leaving a half-written measurement set that looks complete.
+  evidence: Edge Case Hunter, code review 2026-08-08. `spike/graph-engine/layout/Program.cs:723-725`. Throwaway probe code under `spike/`; ships nothing. Only actionable if the probe is kept and re-run (see the spike-pruning decision in the story's Review Findings).
+
+- source_spec: `24-6-graph-engine-spike.md`
+  summary: `RunGit` sets `RedirectStandardError = true` but never drains stderr while blocking in `WaitForExit`. If git writes more than the ~4 KB pipe buffer to stderr — dubious-ownership warnings, CRLF warnings on a large numstat, a slow filter — git blocks writing and the probe blocks waiting, hanging indefinitely with no timeout.
+  evidence: Edge Case Hunter, code review 2026-08-08. `spike/graph-engine/layout/Program.cs:330-339`. Throwaway probe code; same conditional as above.
+
+- source_spec: `24-6-graph-engine-spike.md`
+  summary: The probe's client-built text twin is truncated at `order.slice(0, 200)` with no "+N more" marker, and `if (twin.dataset.built === 'true') return` makes it idempotent — so on the 391-node whole-repo fixture 191 nodes have no text equivalent at all, and after any filter the twin still lists the unfiltered set with pre-filter degrees. Twin/visual parity is broken in both directions. Not a shipping defect: Story 24.2 server-renders its twin, which is what ADR 0013 §2 requires and what report §6.5 recommends.
+  evidence: Edge Case Hunter, code review 2026-08-08. `spike/graph-engine/probe/plotly-scatter.html:248-257`. Throwaway probe code; superseded in production by 24.2.
+
 ## Deferred from: code review of 23-5-packaging-reconciliation-node-build-step (2026-08-08)
 
 - source_spec: `23-5-packaging-reconciliation-node-build-step.md`

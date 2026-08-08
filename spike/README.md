@@ -39,17 +39,29 @@ spawn + JSON, packaging sizes + latency). The single unproven step — actual pi
 Code's Electron webview — needs one manual `F5` run and is called out in ADR 0005. See the ADR for the full
 findings and the seated Story 6.4 scope.
 
-## `spike/graph-engine` — Story 24.6 Epic 24 Graph-Engine Spike
+## `spike/graph-engine` — Story 24.6 Epic 24 Graph-Engine Spike — **PRUNED 2026-08-08**
 
-Decides Epic 24's graph engine, the open question [ADR 0012](../docs/adrs/0012-plotly-hierarchy-chart-engine-and-standardized-explorer-component.md) §4
+Decided Epic 24's graph engine, the open question [ADR 0012](../docs/adrs/0012-plotly-hierarchy-chart-engine-and-standardized-explorer-component.md) §4
 handed to "Epic 24's own spike". The **durable outputs are
 [ADR 0030](../docs/adrs/0030-epic-24-graph-engine.md)** and
-[`24-6-spike-report.md`](../_bmad-output/implementation-artifacts/24-6-spike-report.md); the code here is the
-evidence behind them and can be deleted once Story 24.2 lands. See
-[`graph-engine/README.md`](graph-engine/README.md) for how to run it.
+[`24-6-spike-report.md`](../_bmad-output/implementation-artifacts/24-6-spike-report.md).
 
 Outcome: the **already-vendored Plotly `scatter` trace** over a **generation-time C# layout** — marginal bundle cost
 **zero bytes**, no new engine family, no second runtime dependency.
+
+**The probe code is gone**, exactly as this entry originally anticipated (*"can be deleted once Story 24.2
+lands"*) — 24.2 is `done`, and Story 24.6's code review removed the directory on 2026-08-08. Two reasons beyond
+"it served its purpose", both worth remembering the next time a spike vendors a workspace:
+
+* Its `package.json` / `package-lock.json` were **tracked**, so a directory-quarantined throwaway became a live
+  Dependabot surface within a day (`f4f5629`, esbuild 0.24.2 → 0.28.1) — guarding nothing shippable, and silently
+  invalidating the report's own bundle-reproduce path. **Directory quarantine is not dependency quarantine.**
+* Its reproduce commands had decayed: the CSP harness began matching the `__CSP__` placeholder after
+  `WebviewRenderAdapter` moved the policy into a const, serving no enforceable policy at all with its negative
+  control disabled; and the `file://` recipe never worked as committed. See report §13.
+
+**The report and ADR 0030 are now the record of the measurement.** Nothing in `src/` ever referenced this
+directory, and the project referenced `src/SpecScribe` one-way only, so its removal changes no shipped byte.
 
 ## `spike/findings` — Story 25.3 Agent-Facing Findings Contract Spike
 
