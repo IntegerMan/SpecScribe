@@ -46,6 +46,7 @@ if (!version) {
 const changelogPath = arg('changelog', 'CHANGELOG.md');
 const digestsPath = arg('digests');
 const repo = arg('repo', '');
+const appendToPath = arg('append-to');
 const dryRun = flag('dry-run');
 
 const warnings = [];
@@ -121,6 +122,29 @@ function readDigests(path) {
 }
 
 const out = [];
+
+if (appendToPath) {
+  let existingBody;
+  try {
+    existingBody = readFileSync(appendToPath, 'utf8').trim();
+  } catch (err) {
+    process.stderr.write(`::error::release body: could not read Stage A body ${appendToPath}: ${err.message}\n`);
+    process.exit(1);
+  }
+
+  if (existingBody === '') {
+    process.stderr.write(`::error::release body: Stage A body ${appendToPath} is empty; refusing to replace it.\n`);
+    process.exit(1);
+  }
+
+  const section = readChangelogSection(changelogPath, version);
+  out.push(section ?? FALLBACK);
+  out.push('');
+  out.push(existingBody);
+  process.stdout.write(out.join('\n').trimEnd() + '\n');
+  for (const w of warnings) process.stderr.write(`::warning::release body: ${w}\n`);
+  process.exit(0);
+}
 
 if (dryRun) {
   out.push('> ⚠️ **DRY RUN** — this body was composed by a `workflow_dispatch` rehearsal.');

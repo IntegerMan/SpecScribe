@@ -1,7 +1,7 @@
 ---
-baseline_commit: 15336f4 # local `main` == `origin/main` at authoring time (2026-08-07), working tree CLEAN.
-                         # EIGHT commits ahead of Story 16.3's authoring point (07bdb79) and ten ahead of
-                         # 16.1's (838d591). Verify every cited line number before trusting it: shared main.
+baseline_commit: 85d4c5c # Stage A/B rework began at local `main` (2026-08-08); working tree clean before this pass.
+                         # The previous tag-triggered baseline is historical only: ADR 0040 §Decision 9 now
+                         # requires Stage A in build-test-analyze.yml and manual Stage B promotion.
 epic: 16
 frs: [FR32] # release engineering. 16.2 is the CI half, 16.3 the PACKAGING half, this story is the PIPELINE.
 nfrs: [NFR9] # "Release builds are reproducible and produced by CI from a clean checkout; publishing to any
@@ -41,7 +41,13 @@ deliverables:
 
 # Story 16.4: Tag-Triggered Release Pipeline
 
-Status: review
+Status: in-progress
+
+> **Reopened 2026-08-08:** This record's completed tag-triggered implementation was superseded by accepted
+> ADR 0040 §Decision 9. This pass moves automatic tag creation and prerelease GitHub Release publication into
+> the successful `build-test-analyze` run (Stage A), and converts this filename-preserved workflow into manual
+> registry promotion (Stage B). The legacy acceptance criteria and completion notes remain historical evidence;
+> they do not define the replacement execution graph.
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

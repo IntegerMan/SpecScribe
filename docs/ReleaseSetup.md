@@ -64,9 +64,8 @@ environment**. Neither registry can be told "the workflow moved". Renaming the f
 policy, and the failure surfaces as a rejected push at the **last** step of a release — after the version has
 already been consumed on any channel that went first (§ Decision 10).
 
-Under merge-triggered releasing the file that runs `NuGet/login@v1` is **Stage B**, not Stage A. Story 16.4's
-worktree calls it `release.yml`, but under the new design that name now describes Stage B only. Pick the name
-you will live with — `promote.yml` is the honest one — **and create the nuget.org policy against that name**.
+Under merge-triggered releasing the file that runs `NuGet/login@v1` is **Stage B**, not Stage A. The filename is
+fixed as **`release.yml`**; create the nuget.org policy against that exact filename and do not rename it.
 
 ### 2b. "Reserving" a package ID is not a button — it is a publish
 
@@ -243,6 +242,20 @@ merge to main
              4. publish a PRERELEASE GitHub Release with the archives and their SHA-256 digests
 ```
 
+#### Selecting a major or minor release base
+
+By default, each merge advances `PATCH` from the latest release base. For a new user-visible feature,
+breaking change, or a stable `1.0.0` cut, commit `.github/release-base` containing the requested base only:
+
+```text
+0.2.0
+```
+
+The value must be `MAJOR.MINOR.PATCH`, with no `v` prefix or prerelease suffix, and must not be lower than the
+latest release base. It remains in effect until you edit or remove it; use that deliberately when several
+preview cuts belong to the same target base. `preview.N` always advances globally. The file declares reviewed
+release intent only; MinVer still derives the actual package version from the Stage A tag.
+
 That `needs:` **is** the NFR9 gate. There is no check-run query, no polling, no pagination default to get
 wrong, and no way to release a commit whose tests did not pass.
 
@@ -253,7 +266,7 @@ unpromoted tag and its Release are simply deletable.
 ### 6.2 When you actually want to ship — manual, deliberate
 
 ```sh
-gh workflow run <stage-b>.yml --ref main -f tag=v0.1.0-preview.7
+gh workflow run release.yml --ref main -f tag=v0.1.0-preview.7
 ```
 
 Stage B's entire preflight is: **the tag exists**, and **a Stage A Release exists for it**. That is sufficient

@@ -29,6 +29,14 @@ gaps, and a reader who sees `preview.1` followed by `preview.3` is looking at a 
 
 ## Cutting a release
 
+> **ADR 0040 migration (2026-08-08):** Do not create or push a release tag manually. Every successful push
+> to `main` runs Stage A in `build-test-analyze.yml`, which allocates the tag, builds the nupkg and three RID
+> archives, and creates a prerelease GitHub Release with SHA-256 digests. Promote one of those releases with
+> `gh workflow run release.yml --ref main -f tag=v0.1.0-preview.N`. Stage B validates the Stage A Release,
+> downloads its immutable nupkg asset, preflights NuGet, exchanges OIDC
+> immediately before the push, and prepends changelog notes without replacing the digest body. The older
+> tag-triggered dry-run and check-run-polling instructions below are historical and must not be followed.
+
 ### 0. Preconditions (owner actions, once)
 
 | | what | why |

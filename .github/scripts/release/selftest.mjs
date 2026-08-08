@@ -20,7 +20,7 @@
 // usage: node selftest.mjs        (exit 0 = every assertion behaves, red and green)
 
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,6 +28,9 @@ import { crc32 } from 'node:zlib';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const work = mkdtempSync(join(tmpdir(), 'specscribe-release-selftest-'));
+const bash = process.platform === 'win32' && existsSync('C:\\Program Files\\Git\\bin\\bash.exe')
+  ? 'C:\\Program Files\\Git\\bin\\bash.exe'
+  : 'bash';
 
 let passed = 0;
 const failures = [];
@@ -53,7 +56,7 @@ function run(cmd, args, { input, cwd } = {}) {
 }
 
 const node = (script, args, opts) => run(process.execPath, [join(HERE, script), ...args], opts);
-const sh = (script, args) => run('bash', [join(HERE, script), ...args]);
+const sh = (script, args) => run(bash, [join(HERE, script), ...args]);
 
 function expectCode(result, want, what) {
   if (result.code !== want) {
@@ -69,89 +72,40 @@ function expectAbsent(haystack, needle, what) {
   if (haystack.includes(needle)) throw new Error(`${what}: did NOT expect ${JSON.stringify(needle)} in:\n${haystack}`);
 }
 
-const checkRun = (over = {}) => ({
-  name: 'build-test-analyze',
-  status: 'completed',
-  conclusion: 'success',
-  completed_at: '2026-08-08T10:00:00Z',
-  id: 1,
-  html_url: 'https://example.invalid/1',
-  ...over,
+// ══ 0. Stage A tag allocation (ADR 0040 §Decision 9) ══════════════════════════════════════════════════════
+process.stdout.write('\nnext-preview-tag.mjs — allocate Stage A tags without a second version source\n');
+
+check('bootstrap: no existing release tags starts at v0.1.0-preview.1', () => {
+  const r = node('next-preview-tag.mjs', [], { input: '' });
+  expectCode(r, 0, 'bootstrap tag allocation');
+  if (r.stdout.trim() !== 'v0.1.0-preview.1') throw new Error(`expected bootstrap tag, got ${r.stdout.trim()}`);
 });
 
-// ══ 1. The CI gate (ADR 0040 §Decision 9) — negative proof (c) ═══════════════════════════════════════════════
-process.stdout.write('\ngate-verdict.mjs — is the tagged commit green on `main`?\n');
-
-check('green: one completed success passes', () => {
-  const r = node('gate-verdict.mjs', ['build-test-analyze'], { input: JSON.stringify([checkRun()]) });
-  expectCode(r, 0, 'a completed success');
-  expectContains(r.stdout, 'PASS', 'verdict');
-});
-
-check('RED (c): a SHA with no build-test-analyze run fails, and says how to fix it', () => {
-  const r = node('gate-verdict.mjs', ['build-test-analyze'], { input: JSON.stringify({ check_runs: [] }) });
-  expectCode(r, 1, 'no runs for this SHA');
-  expectContains(r.stdout, 'check run exists', 'verdict');
-  // ADR 0040 §Decision 9 dictates this message; the branch is the one the 16.1 review found undefined.
-  expectContains(r.stdout, "merged to 'main'", 'actionable message');
-});
-
-check('RED: a failed run fails', () => {
-  const r = node('gate-verdict.mjs', ['build-test-analyze'], {
-    input: JSON.stringify([checkRun({ conclusion: 'failure' })]),
+check('increments the preview counter on the highest semantic base', () => {
+  const r = node('next-preview-tag.mjs', [], {
+    input: 'v0.1.0-preview.4\nv0.2.0-preview.1\nv0.1.1-preview.9\nnot-a-release-tag\n',
   });
-  expectCode(r, 1, 'a failed run');
+  expectCode(r, 0, 'next preview tag allocation');
+  if (r.stdout.trim() !== 'v0.2.1-preview.10') throw new Error(`expected next patch and global preview counter, got ${r.stdout.trim()}`);
 });
 
-check('RED: a cancelled run fails', () => {
-  const r = node('gate-verdict.mjs', ['build-test-analyze'], {
-    input: JSON.stringify([checkRun({ conclusion: 'cancelled' })]),
-  });
-  expectCode(r, 1, 'a cancelled run');
+check('a reviewed release-base file controls the next semantic target', () => {
+  const baseFile = join(work, 'release-base');
+  writeFileSync(baseFile, '1.0.0\n');
+  const r = node('next-preview-tag.mjs', ['--base-file', baseFile], { input: 'v0.2.1-preview.10\n' });
+  expectCode(r, 0, 'release-base override');
+  if (r.stdout.trim() !== 'v1.0.0-preview.11') throw new Error(`expected reviewed target, got ${r.stdout.trim()}`);
 });
 
-check('pending: an in-progress run polls (exit 75) rather than passing or failing', () => {
-  const r = node('gate-verdict.mjs', ['build-test-analyze'], {
-    input: JSON.stringify([checkRun({ status: 'in_progress', conclusion: null })]),
-  });
-  expectCode(r, 75, 'an in_progress run');
-  expectContains(r.stdout, 'PENDING', 'verdict');
+check('a release-base file cannot move the semantic version backwards', () => {
+  const baseFile = join(work, 'backwards-release-base');
+  writeFileSync(baseFile, '0.1.0\n');
+  const r = node('next-preview-tag.mjs', ['--base-file', baseFile], { input: 'v0.2.1-preview.10\n' });
+  expectCode(r, 1, 'backwards release-base override');
+  expectContains(r.stderr, 'below the latest release base', 'backwards override rejection');
 });
 
-check('a LATER red re-run supersedes an earlier green — never the reverse', () => {
-  // ADR 0040 §Decision 9's ordering rule, and the one that is easy to get backwards. Deliberately supplied
-  // newest-first so a naive "take the first element" implementation would pass this while being wrong.
-  const input = JSON.stringify([
-    checkRun({ id: 2, conclusion: 'failure', completed_at: '2026-08-08T12:00:00Z' }),
-    checkRun({ id: 1, conclusion: 'success', completed_at: '2026-08-08T10:00:00Z' }),
-  ]);
-  expectCode(node('gate-verdict.mjs', ['build-test-analyze'], { input }), 1, 'red re-run supersedes green');
-});
-
-check('a LATER green re-run supersedes an earlier red', () => {
-  const input = JSON.stringify([
-    checkRun({ id: 1, conclusion: 'failure', completed_at: '2026-08-08T10:00:00Z' }),
-    checkRun({ id: 2, conclusion: 'success', completed_at: '2026-08-08T12:00:00Z' }),
-  ]);
-  expectCode(node('gate-verdict.mjs', ['build-test-analyze'], { input }), 0, 'green re-run supersedes red');
-});
-
-check('THE JOB-VS-RUN TRAP: a red portability-probe cannot mask a green build-test-analyze', () => {
-  // docs/CiGate.md's trap, inverted. portability-probe carries job-level continue-on-error, so it is EXPECTED
-  // to be red sometimes and must never be consulted. Filtering by check name is what makes it unreachable.
-  const input = JSON.stringify([
-    checkRun(),
-    checkRun({ name: 'portability-probe (ubuntu, non-gating)', id: 9, conclusion: 'failure' }),
-  ]);
-  expectCode(node('gate-verdict.mjs', ['build-test-analyze'], { input }), 0, 'unrelated red check ignored');
-});
-
-check('fails CLOSED on unparseable JSON, and on an empty response', () => {
-  expectCode(node('gate-verdict.mjs', ['build-test-analyze'], { input: 'not json' }), 1, 'garbage');
-  expectCode(node('gate-verdict.mjs', ['build-test-analyze'], { input: '' }), 1, 'empty');
-});
-
-// ══ 2. SOURCE_DATE_EPOCH (ADR 0040 §Decision 7) — negative proof (a) ═════════════════════════════════════════
+// ══ 1. SOURCE_DATE_EPOCH (ADR 0040 §Decision 7) — negative proof (a) ═════════════════════════════════════════
 process.stdout.write('\nassert-source-date-epoch.sh — the csproj falls back to TODAY, silently\n');
 
 check('green: a real epoch passes', () => {
@@ -284,7 +238,11 @@ check('RED (b): the same assertion over a .tar.gz', () => {
   expectCode(sh('assert-archive-renderer.sh', [build('missing.tar.gz'), ROOT]), 1, 'tar.gz without the entry point');
 
   writeFileSync(join(dir, 'renderer', 'server', 'index.mjs'), 'export default {}');
-  expectCode(sh('assert-archive-renderer.sh', [build('complete.tar.gz'), ROOT]), 0, 'tar.gz with the entry point');
+  expectCode(
+    sh('assert-archive-renderer.sh', [build('complete.tar.gz'), ROOT]),
+    0,
+    'tar.gz with the entry point',
+  );
 });
 
 check('RED: a BACKSLASH-separated zip fails, and is diagnosed as such rather than as "missing"', () => {
@@ -416,6 +374,22 @@ check('a dry-run body is unmistakably marked', () => {
   const r = node('release-body.mjs', ['--version', '0.1.0-preview.1', '--dry-run']);
   expectCode(r, 0, 'dry run');
   expectContains(r.stdout, 'DRY RUN', 'marker');
+});
+
+check('Stage B prepends changelog notes without replacing Stage A digests', () => {
+  const stageABody = join(work, 'stage-a-body.md');
+  const changelog = join(work, 'stage-b-changelog.md');
+  writeFileSync(stageABody, '## Verifying these downloads\n\n| asset | SHA-256 |\n|---|---|\n| `a.zip` | `' + 'd'.repeat(64) + '` |\n');
+  writeFileSync(changelog, '# Changelog\n\n## [0.1.0-preview.1] - 2026-08-08\n\n### Fixed\n- Release notes survive promotion.\n');
+  const r = node('release-body.mjs', [
+    '--version', '0.1.0-preview.1', '--changelog', changelog, '--append-to', stageABody,
+  ]);
+  expectCode(r, 0, 'Stage B append');
+  expectContains(r.stdout, 'Release notes survive promotion.', 'prepended notes');
+  expectContains(r.stdout, 'd'.repeat(64), 'preserved Stage A digest');
+  if (r.stdout.indexOf('Release notes survive promotion.') > r.stdout.indexOf('## Verifying these downloads')) {
+    throw new Error('Stage B notes must appear above the Stage A digest block');
+  }
 });
 
 // ══ Result ═══════════════════════════════════════════════════════════════════════════════════════════════════
