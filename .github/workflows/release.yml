@@ -667,7 +667,11 @@ jobs:
         # HOUR and is SINGLE-USE, while the run above it builds three ~76 MiB RIDs plus a Nuxt artefact. A
         # push that fails CONSUMES the key, so a retry must re-run this exchange — which is why the supported
         # recovery is re-running the whole job, and why this step sits here rather than beside the checkout.
-        uses: NuGet/login@v1
+        # PINNED TO A COMMIT SHA, not the `v1` tag — this is the repository's first THIRD-PARTY action and
+        # `CiSupplyChainTests.ThirdPartyActionsMustBeShaPinned` enforces the rule (Story 17.2 Task 8): a tag is
+        # mutable and the publisher is not GitHub. Resolved 2026-08-08 from the publisher's own repository with
+        # `git ls-remote https://github.com/NuGet/login refs/tags/v1^{}`. Bump deliberately, re-resolving the SHA.
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1
         with:
           user: ${{ vars.NUGET_USER }}
 
