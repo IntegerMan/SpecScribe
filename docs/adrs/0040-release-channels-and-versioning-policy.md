@@ -1,13 +1,21 @@
 # ADR 0040 — Release Channels, Packaging Shape, Credential Posture and Versioning Policy
 
 - **Status:** Proposed
-  - ⏫ **Ratification to `Accepted` requested of the owner.** Story 16.1 AC #4 requires this ADR to land
-    *ratified*, not `Proposed`. Stories 16.2–16.9 and 17.4 all build on it. The ratification is the owner's
-    act; this line is the request, not the act.
+  - ⏫ **Ratification to `Accepted` requested of the owner — this is now the record's only open item.**
+    Story 16.1 AC #4 requires this ADR to land *ratified*, not `Proposed`. Stories 16.2–16.9 and 17.4 all
+    build on it. The ratification is the owner's act; this line is the request, not the act.
+  - ✅ **The eight technical decisions left open by the Story 16.1 code review (2026-08-07) are resolved in
+    this revision** — MinVer bootstrap (§ Decision 5), version-component semantics and the `0.x` exit
+    criterion (§ Decision 5), extension versioning (§ Decision 5), changelog contention (§ Decision 6), the
+    CI-gate lookup rule and hotfix scope (§ Decision 9), release atomicity and withdrawal (§ Decision 10),
+    the `EpicsIndexSurface` gate's ownership (§ Decision 11), and the package-ID escalation rule
+    (§ Decision 12). Nothing in the record is marked OPEN any longer.
   - ⚠️ **This record is `Proposed` and it amends another `Proposed` record.** [ADR 0022](0022-node-is-a-build-toolchain-and-a-generate-time-runtime.md)
-    has stood at `Proposed` since 2026-07-27 with its own ratification outstanding, and Story 16.2 has
-    **already shipped** against § Decision 9 of this ADR. Downstream stories are therefore building on an
-    unratified chain; that is disclosed here rather than left for a reader to discover.
+    has stood at `Proposed` since 2026-07-27 with its own ratification outstanding, and Stories 16.2 **and
+    16.3 have both already shipped** against it — 16.3 implementing § Decision 1's pack item and § Decision
+    5's MinVer derivation directly. Downstream stories are therefore building on an unratified chain; that
+    is disclosed here rather than left for a reader to discover, and it is why ratification is the
+    highest-urgency owner action rather than a formality.
 - **Date:** 2026-08-07
 - **Deciders:** Matthew-Hope Eland (owner) — ratification pending
 - **Authored by:** [Story 16.1](../../_bmad-output/implementation-artifacts/16-1-release-and-distribution-packaging-spike.md) (release & distribution packaging spike)
@@ -101,7 +109,9 @@ spaces, so this was not exercised.
 
 **Explicit non-goals:** stable/1.0 · Homebrew · winget · Chocolatey · Scoop · a container image · Open VSX ·
 code signing · byte-identical reproducible builds · publishing from any CI other than GitHub Actions ·
-`linux-arm64` and `osx-x64` (named and deferred, cheap to add later because the renderer is shared).
+`linux-arm64` and `osx-x64` (named and deferred, cheap to add later because the renderer is shared) ·
+**release branches and hotfixes to an already-published preview** — the preview is **forward-fix only**, all
+tags are cut from `main`, and a defect ships as the next `-preview.N` (§ Decision 5, § Decision 9).
 
 **Supported-platform matrix, and what an unsupported platform gets.** The three RIDs above are the *binary*
 matrix only. The `dotnet` global tool is **platform-neutral** and remains available everywhere .NET 10 runs,
@@ -175,27 +185,63 @@ reports federated service principals failing publish on a **personally-owned** p
   committed `version.json` — a second home for the version) and over `-p:Version=` from the tag (works only
   in CI; a local `dotnet pack` would then produce `1.0.0` and silently drop the Preview badge).
 
-  ⚠️ **OPEN — two prerequisites are unresolved and Story 16.3 must not delete `<Version>` before they are.**
-  Raised by the Story 16.1 code review (2026-08-07) and pending an owner decision; both fail **silently**,
-  with `dotnet pack` exiting 0 and a wrong version shipping.
-  1. **The repository has zero git tags** (verified 2026-08-07). With the literal deleted and no tag
-     reachable, MinVer emits its default `0.0.0-alpha.0.<height>`. That also breaks `README.md`'s published
-     external-CI recipe, which installs `--version 0.1.0-preview`. **The bootstrap tag must be created
-     before, or in the same change as, the deletion.**
-  2. **`MinVerTagPrefix` is unspecified.** MinVer's default prefix is **empty**, so a `v`-prefixed tag is
-     *not* matched — yet this ADR's own evidence (spike report § 6.2) works the example as `v0.1.0-preview.1`.
-     Either tag without the `v`, or set `<MinVerTagPrefix>v</MinVerTagPrefix>` explicitly. Leaving it implicit
-     is the failure.
+  ✅ **The two prerequisites the Story 16.1 code review raised (2026-08-07) are now CLOSED, and one of them
+  was closed by implementation rather than by decision.** Both would have failed *silently* — `dotnet pack`
+  exiting 0 with a wrong version — so recording how each is closed matters more than recording that it is.
+  1. **`MinVerTagPrefix` — closed by Story 16.3.** `SpecScribe.csproj` now sets
+     `<MinVerTagPrefix>v</MinVerTagPrefix>` explicitly, so this ADR's worked example `v0.1.0-preview.1`
+     matches. MinVer's default prefix is empty and would not have.
+  2. **Zero git tags — the failure mode is closed; the tag itself is a release-time owner action.** Story
+     16.3 also set `<MinVerMinimumMajorMinor>0.1</MinVerMinimumMajorMinor>` and
+     `<MinVerDefaultPreReleaseIdentifiers>preview.0</MinVerDefaultPreReleaseIdentifiers>`, so an **untagged**
+     build now emits `0.1.0-preview.0.<height>` — inside this scheme, and still carrying a pre-release label
+     so the About page's Preview badge survives. MinVer's undirected `0.0.0-alpha.0.<height>` can no longer
+     be produced. `README.md`'s external-CI recipe no longer pins a literal either: Story 16.3 changed it to
+     read the version off the `.nupkg` the pack produced.
 
-  Also unresolved, and needed before the second tag: **what PATCH and a non-breaking feature mean.** Only
-  "minor = breaking inside `0.x`" is defined today (§ Decision 11), which leaves every tag choice after the
-  first to judgement and dilutes the one signal the policy does define.
+     What remains is not a defect but a one-time act: **the first real tag, `v0.1.0-preview.1`, must exist
+     before the first release publishes.** It is an owner action seated against **Story 16.4** (§ 8 of the
+     spike report), not a precondition for 16.3 — which has already shipped safely without it.
+
+- **What each version component means.** Previously only "minor = breaking inside `0.x`" was defined, which
+  left every tag choice after the first to judgement. The full mapping:
+
+  | component | bump it for | example |
+  |---|---|---|
+  | **MINOR** (`0.N.0`) | any **breaking change** *or* any **new user-visible feature** | a new portal surface; an IR-schema change; a removed CLI flag |
+  | **PATCH** (`0.N.P`) | bug fixes, performance, docs, internal refactors — **no** new feature and **no** break | a rendering fix; a corrected chart label |
+  | **`-preview.N`** | a **re-cut of the same target version** after a failed or withdrawn release (§ Decision 10) | `v0.1.0-preview.2` after `preview.1` half-published |
+
+  **MINOR deliberately carries two meanings, so MINOR alone does not signal breakage.** That is SemVer's own
+  `0.x` convention (§4: anything may change below 1.0) and this policy does not pretend otherwise — which is
+  exactly why the `**BREAKING:**` changelog prefix (§ Decision 6) is the load-bearing signal rather than the
+  version number. A consumer reads the changelog, not the digits.
+
+  **Exit criterion for `0.x` → `1.0.0`**, so "preview forever" is not the default outcome. All three must
+  hold, and Story 17.4's sign-off tests them: (a) the IR schema is frozen under ADR 0008's versioning;
+  (b) every channel in the preview cut (§ Decision 2) has published at least one release; (c) § Decision 11's
+  *does not promise* list no longer contains output-, API- or IR-stability.
 - **Every preview release carries a SemVer pre-release label.** This is not cosmetic:
   `AboutTemplater.cs:133-135` renders the About page's `Preview` badge from `meta.IsPrerelease`. The first
   release without the label is by definition no longer a preview.
-- **The VS Marketplace is the documented exception.** It has no SemVer pre-release concept, so
-  `extension/package.json` keeps a plain `0.1.0` and pre-release status is carried by the Marketplace's own
-  Preview flag plus `vsce publish --pre-release`.
+- **The VS Marketplace is the documented exception, and it needs its own counter.** It has no SemVer
+  pre-release concept, so pre-release status is carried by the Marketplace's own Preview flag plus
+  `vsce publish --pre-release`, and `extension/package.json` holds a plain `0.MINOR.PATCH`.
+
+  ⚠️ **A frozen `0.1.0` would permit exactly one VSIX publish, ever** — the Marketplace requires each publish
+  to be **strictly greater** than the last, and the CLI's distinguishing part (`-preview.N`) is precisely
+  what the extension cannot carry. Raised by the Story 16.1 code review (2026-08-07); the rule that resolves
+  it:
+
+  > **The extension's MINOR mirrors the CLI's MINOR. The extension's PATCH is its own monotonic counter,
+  > incremented on every VSIX publish.**
+
+  So CLI `v0.2.0-preview.3` publishes as extension `0.2.0`; a second VSIX cut against the same CLI MINOR
+  publishes `0.2.1`. The counter is monotonic by construction, so a re-publish is always possible, and the
+  correspondence is legible in both directions — a consumer on extension `0.2.x` knows it targets CLI `0.2.y`.
+  The extension's PATCH deliberately does **not** track the CLI's PATCH: the two ship on different cadences
+  (§ Decision 2 puts the VSIX out of the first preview entirely), and forcing them to match would reintroduce
+  the same frozen-version problem one component down. Story 16.5 implements this.
 - **CLI and renderer are pinned as one released unit.** For **NuGet** this is genuinely structural — there is
   one artefact and the payload is inside it. For the **self-contained binary** it is *not* structural: the
   channel is defined as *"a sibling `renderer/` directory beside the executable"* (§ Decision 1) — **two
@@ -228,17 +274,41 @@ breaking changes *are recorded*. A breaking entry therefore stays in its natural
 `**BREAKING:**`**, so it is greppable and cannot be mistaken for a routine `Changed` line. Without this the
 one guarantee the preview does offer is indistinguishable from the noise around it.
 
-**An empty `[Unreleased]` section is not an error.** A re-cut after a failed publish, a CI-only fix or a
-dependency bump may legitimately carry no user-visible change. The release job then writes a release body of
-*"No user-visible changes in this release."* and continues — it **must not** hard-fail at the last step,
-because by then the packages are already published and the version is burned (§ Decision 10).
+**An empty release — no fragments in `changelog.d/` — is not an error.** A re-cut after a failed publish
+(§ Decision 10), a CI-only fix or a dependency bump may legitimately carry no user-visible change. The
+release job then writes a release body of *"No user-visible changes in this release."* and continues — it
+**must not** hard-fail at the last step, because by then the packages are already published and the version
+is burned.
 
-⚠️ **Known hazard, not yet mitigated (owner decision open).** A single hand-edited file at the repository
-root becomes the highest-contention file here, in a repository whose CLAUDE.md records that *"a `Charts.cs`
-edit has silently vanished this way before."* The rejection of generated notes is sound; the alternative's
-own failure mode — a concurrent story's entry silently lost, invisible until it is missing from a published
-release body — is not yet addressed. A per-story fragment directory assembled at release time would remove
-it. Raised by the Story 16.1 code review (2026-08-07).
+**Stories write fragments, not the file. `CHANGELOG.md` is assembled, never hand-merged.** The Story 16.1
+code review (2026-08-07) identified the hazard the original decision left open: a single hand-edited file at
+the repository root becomes the **highest-contention file in the repository**, in a repository whose CLAUDE.md
+records that *"a `Charts.cs` edit has silently vanished this way before"* — and a lost changelog entry is
+invisible until it is already missing from a published release body. Rejecting generated notes was right; it
+just left the alternative's own failure mode unaddressed.
+
+- A story that makes a user-visible change adds **one new file**, `changelog.d/<story-key>.md` — e.g.
+  `changelog.d/16-3-cli-packaging-and-publication.md`.
+- A fragment holds Keep a Changelog **section headings and bullets only**, no version header:
+
+  ```markdown
+  ### Added
+  - The renderer artefact now ships inside the published package.
+
+  ### Changed
+  - **BREAKING:** `SPECSCRIBE_RENDERER_DIR` is no longer required by packaged consumers.
+  ```
+
+- The release job (Story 16.4) **concatenates the fragments by section**, writes them into `CHANGELOG.md`
+  under the released version's header, copies that section into the GitHub Release body, and **deletes the
+  consumed fragments** in the release commit.
+- `CHANGELOG.md` remains the published artefact in Keep a Changelog 1.1.0 format, and remains hand-authored
+  in substance — the assembly is mechanical, not generative, so the § "generated notes are rejected"
+  rationale is untouched. **Story 16.6 owns the format and the assembler; Story 16.4 owns invoking it.**
+
+**Why a directory fixes it:** each story creates a *distinct new file*, so two concurrent stories cannot
+conflict and neither can silently overwrite the other. The failure mode becomes a missing file — visible in
+`git status` and in review — rather than a vanished line inside a shared one.
 
 ### 7. NFR9 reproducibility — the weaker reading is claimed, explicitly
 
@@ -303,41 +373,72 @@ The required-check string is the **job name verbatim: `build-test-analyze`**.
 `portability-probe (ubuntu, non-gating)` carries `continue-on-error` at the job level and **must not** be
 made required. Per epics.md § Story 16.2 (AMENDED 2026-07-25), **do not create a second build+test workflow**.
 
-⚠️ **OPEN — this decision names no mechanism and no failure branch.** Raised by the Story 16.1 code review
-(2026-08-07); an owner decision is needed before Story 16.4 wires the release pipeline.
-`build-test-analyze.yml` triggers **only** on `push`/`pull_request` to `main` (verified), which has two
-consequences the decision does not address:
+**The lookup rule is normative, because "already passed" is not self-implementing.** The Story 16.1 code
+review (2026-08-07) found this decision naming no mechanism and no failure branch. Story 16.4's release job
+begins with a **preflight** step, before any build and before any credential exchange:
 
-1. **No commit outside `main` is ever built by the gating workflow.** A tag on a release branch, or any
-   hotfix to an older release, therefore has no run to point at — the naive implementation (query the latest
-   run for the tagged SHA) returns "no run found" and has no defined action. As written, a hotfix is
-   structurally impossible without first merging to `main`, which this ADR neither permits nor forbids.
-2. **"Already passed" needs a lookup rule**: which API, which check name, what timeout, what to do when the
-   run is still in progress, and what to do when a re-run has since turned red. None is specified.
+- **Query:** the check-runs for the **tagged commit SHA** — `gh api repos/{owner}/{repo}/commits/{sha}/check-runs`
+  — filtered to the check named **`build-test-analyze`** (§ above: the job name verbatim).
+- **Pass** only on `status == "completed"` **and** `conclusion == "success"`.
+- **In progress** (`queued`/`in_progress`): poll at 30 s intervals up to **15 minutes**, then fail. A tag
+  pushed immediately after a merge is the normal case, not an exception, so the wait is deliberate rather
+  than a courtesy.
+- **Failed, cancelled, timed out, or turned red by a later re-run:** fail. The *most recent* completed run
+  for that SHA is authoritative — a re-run that went red supersedes an earlier green, never the reverse.
+- **No run found:** fail with the actionable message *"tag a commit that has been merged to `main`; only
+  `main` is built by `build-test-analyze`."* This is the branch the review correctly noted had no defined
+  action.
 
-Until it is decided, Story 16.4 must not infer a mechanism.
+**Tags are created only on `main` for the whole preview**, which is what makes the rule above total. The
+review's hotfix observation is real and is answered by scope rather than by mechanism: **the preview is
+forward-fix only.** A defect in a published preview is fixed on `main` and released as the next
+`0.MINOR.PATCH-preview.N` (§ Decision 5); no release branch exists, so no commit outside `main` ever needs a
+run to point at. This is added to § Decision 2's non-goals rather than left implicit.
+
+If a hotfix branch is ever genuinely required — a `1.0` concern, not a preview one — the prerequisite is
+explicit and seated: **`build-test-analyze.yml`'s `push` trigger must cover that branch pattern first**
+(Story 16.2 owns that file). The preflight rule then works unchanged. What must not happen is a tag on an
+unbuilt branch with the preflight quietly relaxed to allow it.
 
 ### 10. Releases are not atomic, and the pipeline is not freely re-runnable
 
-⚠️ **OPEN — an owner decision is needed here, and Story 16.4 AC #2 currently cannot be met.** That AC
-requires *"a failed publish leaves no partially-released state (the pipeline is safe to re-run)"*. Neither
-this ADR nor the spike report contained any policy for republishing, rollback or version burn — `retag`,
-`yank`, `unlist`, `rollback`, `idempotent` and `409` appeared nowhere. The constraint is external and
-non-negotiable:
+The Story 16.1 code review (2026-08-07) found no policy anywhere for republishing, rollback or version burn —
+`retag`, `yank`, `unlist`, `rollback`, `idempotent` and `409` appeared in neither document — while Story 16.4
+AC #2 requires *"a failed publish leaves no partially-released state (the pipeline is safe to re-run)"*. The
+constraint is external and non-negotiable:
 
 - **nuget.org rejects a duplicate version** and permits only *unlisting*, never deletion.
 - **npm rejects publishing over an existing version**, and its unpublish window is time-limited.
 - A multi-channel release therefore **cannot be transactional**. Publishing to nuget.org and then failing on
   npm leaves a version that is half-released and permanently consumed.
 
-What must be decided: whether a failed release **bumps to a new patch/prerelease number and re-tags** (the
-usual answer, and the only one that composes with immutable registries), or whether the pipeline attempts
-per-channel resume. Also undecided: **how a bad preview is withdrawn** once published — unlist on nuget.org,
-`npm deprecate`, delete the GitHub Release, or leave it and supersede.
+**Decision: a version number is consumed on first publish to any channel and is never reused. Recovery is
+forward — a new pre-release number and a new tag — never a retry of the same version.**
 
-Two things this ADR *does* fix in the meantime, because they reduce the blast radius regardless of the
-answer: the credential exchange fails the job **before** any channel is published (§ Decision 3), and the
-renderer package publishes **before** the wrapper (§ Decision 5).
+1. **Re-cut, don't re-publish.** A failed release bumps `-preview.N` and re-tags (`v0.1.0-preview.1` →
+   `v0.1.0-preview.2`). Per-channel resume is **rejected**: it would require the pipeline to distinguish
+   "this version is already on this channel because I put it there" from "…because someone else did", across
+   three registries with three different conflict semantics, and would still leave the artefacts unequal
+   across channels. § Decision 2 already states channel parity is not promised, which is what makes the
+   forward-only rule affordable.
+2. **The pipeline is safe to re-run — on a new tag.** This is the precise reading Story 16.4 AC #2 must be
+   implemented against, and the AC is achievable under it. Re-running the *same* tag is refused, not
+   attempted: a **preflight queries each target registry for the version and fails fast** if any already has
+   it, so the operator gets a clear "this version is consumed, cut `preview.N+1`" instead of a partial
+   pass and a 409 halfway through.
+3. **Order the publishes so the only reversible step brackets the irreversible ones.** The GitHub Release is
+   created as a **draft** first, the registry publishes run inside it (renderer before wrapper, § Decision 5),
+   and the draft is **flipped to published last**. A failure before that flip leaves a draft nobody can
+   install — deletable — rather than an announced release pointing at packages that do not exist.
+4. **Withdrawal of a bad preview, once published:** **unlist** on nuget.org (never delete — deletion breaks
+   restore for anyone who already resolved it), **`npm deprecate`** with a message naming the superseding
+   version (never `npm unpublish`, for the same reason and because the window is time-limited), and **delete
+   the GitHub Release** and its assets. The withdrawn version keeps a `CHANGELOG.md` entry marked
+   **`[X.Y.Z] — WITHDRAWN`** naming what superseded it: the version is gone from the registries but its
+   number is permanently spent, and a reader who finds a stale reference to it deserves an explanation.
+
+Two things reduce the blast radius regardless: the credential exchange fails the job **before** any channel
+is published (§ Decision 3), and the renderer package publishes **before** the wrapper (§ Decision 5).
 
 ### 11. What "preview" promises, and what it does not
 
@@ -358,10 +459,26 @@ platform-neutral `dotnet tool` channel (§ Decision 2).
 ⚠️ **"A supported SDD repository" is not yet defined, and that gap has a known symptom.** The spike found
 `EpicsIndexSurface.vue` **hard-throws** when the epics index has no child pages, so a thin or non-BMad
 external adopter — the highest-weight first-run case for this epic — sees `errors=1` and a missing page.
-That defect is routed to **Story 23.3 and gates Story 16.7**; it is recorded *here* rather than only in the
-spike report, so a reader of the governing record sees the precondition. Note Story 23.3 was already at
-`review` when the work was routed to it, so the gate needs an owner (open decision, Story 16.1 review
-2026-08-07).
+
+**The gate has an owner: Story 23.3 implements the fix, and it blocks Story 16.7's launch readiness.** The
+Story 16.1 code review (2026-08-07) was right that this needed resolving rather than asserting, on two
+counts, and both are now answered:
+
+- **Why 23.3 keeps it even though it is at `review`.** `review` is not `done` in this project — CLAUDE.md's
+  story lifecycle puts owner verification and iteration *at* that stage, so a story at `review` is still
+  open to work. 23.3 already owns this surface and already fixed the identical defect class one component
+  over (`DashboardSurface.vue` handles its own empty case gracefully **in the same run**). Opening a new
+  story to fix the sibling of a defect an in-flight story already owns would fragment the work, and moving a
+  Vue surface fix into Story 16.7 — a launch-readiness and cut story — would put it somewhere no one would
+  look for it.
+- **Why this is a structural scope change after all.** A new cross-epic blocking dependency is exactly what
+  CLAUDE.md § Decision records requires to land in `epics.md` **and** `sprint-status.yaml`, not as prose in a
+  spike report. Story 16.1 Task 8's original certification of *"no structural scope change"* was wrong on
+  this one point — no story was added or renumbered, but a **new blocking edge between epics** was created,
+  and an edge is structure. Both files now carry it.
+
+Recorded here, in the governing record, so a reader of the decision sees the precondition without reading
+the spike report.
 
 ### 12. Package identity, fallback IDs, and platform-package naming
 
@@ -372,10 +489,27 @@ Promoted from spike report § 5.4 because Story 16.8 implements from this record
 can take away.
 
 **Fallbacks, and their real cost:** `SpecScribe.Cli` on nuget.org, `specscribe-cli` on npm. These are **not
-drop-in replacements.** npx resolves by package name, so taking the npm fallback silently invalidates the
-invocation `npx specscribe` as printed in ADR 0006 § Decision, `epics.md` § Story 16.8 and `README.md`.
-**If a fallback is taken, those three documents change in the same act** — an implementer must escalate, not
-substitute.
+drop-in replacements**, and the asymmetry between the two registries is the whole point:
+
+- **Losing the NuGet ID is cheap.** `dotnet tool install SpecScribe.Cli` still installs a tool whose
+  `ToolCommandName` is `specscribe`, so the *invocation* is unchanged. Only the install line moves.
+- **Losing the npm ID is not recoverable by a rename.** `npx <name>` resolves the *package* name, so
+  `npx specscribe` would run **someone else's package**. No fallback ID restores the documented command;
+  `npx specscribe-cli` is a different command, printed today in ADR 0006 § Decision, `epics.md` § Story 16.8
+  and `README.md`.
+
+**Escalation rule — an implementer may not take a fallback.** If a primary ID is unavailable at reservation
+time, the implementer **stops and escalates to the owner**; substituting silently is the failure this rule
+exists to prevent. The owner then chooses, and the choice lands as an **amendment to this ADR in the same
+change** that updates every document naming the old string:
+
+| lost ID | owner's choice |
+|---|---|
+| `SpecScribe` (nuget.org) | take `SpecScribe.Cli`; update the install line in `README.md` and the NuGet references in `epics.md` |
+| `specscribe` (npm) | **either** adopt `npx specscribe-cli` — amending ADR 0006 § Decision, `epics.md` § Story 16.8 and `README.md` together — **or** drop the npx channel from the preview cut (§ Decision 2), which is a real option since `dotnet tool` leads the cut |
+
+This is precisely why reservation is **owner action #1** and the most urgent item on the list: it is the only
+release prerequisite a third party can take away, and on npm there is no cheap recovery.
 
 **Platform-package naming (Story 16.8):** `specscribe-<os>-<arch>` on the npm-conventional axis
 (`specscribe-win32-x64`, `specscribe-linux-x64`, `specscribe-darwin-arm64`), resolved through
@@ -427,7 +561,17 @@ digest (§ Decision 2), not a signature.
 - **The self-contained binary channel is two filesystem objects, not one artefact** (§ Decision 5), so its
   "one released unit" property is a packaging obligation on Story 16.4, not a structural guarantee.
 - A **failed multi-channel publish cannot be undone** (§ Decision 10). Every release consumes its version
-  number irreversibly on any channel it reached.
+  number irreversibly on any channel it reached. The policy makes this survivable rather than absent —
+  forward-only re-cuts, a registry preflight, and a draft GitHub Release bracketing the irreversible steps —
+  but the cost is real: **`-preview.N` counters will have gaps**, and a reader who sees `preview.1` followed
+  by `preview.3` is looking at a consumed number, not a mistake.
+- **The preview is forward-fix only** (§ Decision 2, § Decision 9). A defect in a published preview cannot be
+  patched in place; the next preview supersedes it. Acceptable at `0.x` with no support commitment
+  (§ Decision 11), and explicitly a `1.0` problem rather than a preview one.
+- **`CHANGELOG.md` gains an assembly step** (§ Decision 6). The fragment directory removes a real
+  concurrent-edit hazard, but it adds a build-time transform between what a story author writes and what a
+  consumer reads — so a broken assembler is a silent-empty-release-notes failure, and Story 16.4's release
+  body must be checked, not assumed.
 
 ## Relationship to ADR 0006 — this AMENDS it
 
