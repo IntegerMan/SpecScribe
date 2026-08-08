@@ -111,11 +111,7 @@ public class SiteGeneratorStatusStylesTests : IDisposable
         Assert.DoesNotContain(gen.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
         var second = SiteRegion.Read(Site, "epics/story-1-1.html");
 
-        static string StripFooterClock(string html) =>
-            System.Text.RegularExpressions.Regex.Replace(
-                html,
-                @"on [A-Za-z]+ \d{1,2}, \d{4} at \d{1,2}:\d{2} UTC[+-]\d{2}:\d{2}",
-                "on DATE");
+        static string StripFooterClock(string html) => GoldenNormalization.StripFooterClock(html, "on DATE");
 
         Assert.Equal(StripFooterClock(first), StripFooterClock(second));
     }

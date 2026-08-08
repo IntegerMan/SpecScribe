@@ -1891,11 +1891,11 @@ function buildSaveArgs(values: unknown, cleared: unknown): string[] {
     for (const [field, raw] of Object.entries(values as Record<string, unknown>)) {
       if (typeof raw !== 'string' || raw.trim() === '') continue;
       const value = raw.trim();
-      if (field === 'deep_git') { if (value === 'true') args.push('--deep-git'); continue; }
+      if (field === 'deep_git') { if (value === 'true') { args.push('--deep-git'); } continue; }
       // `readme` is posted positively ("include the README?") and maps onto the negative flag, exactly as the
       // interactive prompt does. `true` is the default, so it needs no argument — and passing one is impossible,
       // there being no `--readme`. Clearing is how it goes back to unset.
-      if (field === 'readme') { if (value === 'false') args.push('--no-readme'); continue; }
+      if (field === 'readme') { if (value === 'false') { args.push('--no-readme'); } continue; }
       const option = optionFor[field];
       if (option) args.push(option, value);
     }
@@ -2021,7 +2021,12 @@ function toolCommandLine(tool: ResolvedTool, sub?: string): string {
 function usesPosixStyleQuoting(): boolean {
   if (process.platform !== 'win32') return true;
   const profile = vscode.workspace.getConfiguration('terminal.integrated').get<string>('defaultProfile.windows');
-  return typeof profile === 'string' && /git bash|bash|wsl|sh$/i.test(profile);
+  // The alternation is GROUPED so its precedence is explicit (typescript:S5850): ungrouped, `$` binds only to
+  // the final branch and the intent is left to the reader. The asymmetry is deliberate and must be kept —
+  // `bash`/`wsl` match anywhere in the profile name ("Git Bash", "bash.exe", "Ubuntu (WSL)"), while `sh` is
+  // anchored to the END because unanchored it also matches "PowerShell" (p-o-w-e-r-**sh**-e-l-l), which is the
+  // exact profile this predicate must answer NO for. Anchored, it still catches "zsh" and "sh". [Story 17.1]
+  return typeof profile === 'string' && /(?:bash|wsl|sh$)/i.test(profile);
 }
 
 /** Shell-aware quoting: doubles an embedded `"` (`""`) for a PowerShell/cmd-style profile, backslash-escapes it
@@ -2035,7 +2040,10 @@ function usesPosixStyleQuoting(): boolean {
  * accept rather than build a full per-shell quoting engine for. [spec-6-9-deferred-debt-cleanup review] */
 function quoteCommandArg(a: string): string {
   if (!/[\s"]/.test(a)) return a;
-  return usesPosixStyleQuoting() ? `"${a.replace(/"/g, '\\"')}"` : `"${a.replace(/"/g, '""')}"`;
+  // `replaceAll` with a literal needle rather than a /g regex, and `String.raw` for the backslash form, so the
+  // escape sequence reads as the two characters it produces (typescript:S7780/S7781). Behaviour is identical:
+  // neither replacement contains a `$`, which is the only way string-replacement semantics could differ.
+  return usesPosixStyleQuoting() ? `"${a.replaceAll('"', String.raw`\"`)}"` : `"${a.replaceAll('"', '""')}"`;
 }
 
 /** Spawn `specscribe config …` and resolve its stdout, or reject with its stderr. [ADR 0037]

@@ -76,4 +76,21 @@ public class CapabilityStylerTests
 
     [Fact]
     public void Style_HandlesEmptyInput() => Assert.Equal(string.Empty, CapabilityStyler.Style(string.Empty));
+
+    [Fact]
+    public void Style_CapabilitiesSectionWithNoCapItems_IsLeftAloneRatherThanEmptied()
+    {
+        // Pins the `matched == 0` half of the bail-out guard, which nothing else covered. Sonar reports that
+        // condition as csharpsquid:S2583 "always True" because `matched` is incremented INSIDE the
+        // `CapItem.Replace` lambda and its dataflow does not model that side effect — a false positive. Deleting
+        // the clause the analyser calls constant would replace a real section with an EMPTY `.capabilities`
+        // div, silently dropping content. Hand-built HTML rather than Markdig output: this is the defensive
+        // half of a public API's contract, and the shape is one no authored markdown produces. [Story 17.1]
+        const string html = "<h2 id=\"capabilities\">Capabilities</h2>\n<ul></ul>\n<h2 id=\"next\">Next</h2>";
+
+        var styled = CapabilityStyler.Style(html);
+
+        Assert.Equal(html, styled);
+        Assert.DoesNotContain("class=\"capabilities\"", styled);
+    }
 }

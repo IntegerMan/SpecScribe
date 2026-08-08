@@ -373,7 +373,7 @@ export async function buildIrContentCss() {
     '/* GENERATED FILE - DO NOT EDIT.',
     ` * Extracted from ${SOURCE_LABEL} by \`npm run extract:ir-content\` (Story 23.3 AC #6).`,
     ' *',
-    ' * The IR ships markup authored against that 7,041-line stylesheet; this app imports only the token',
+    ' * The IR ships markup authored against that whole stylesheet; this app imports only the token',
     ' * bridge. This layer carries the rules the IR surfaces actually use, re-nested under',
     ` * \`${SCOPE}\` so they cannot reach a template-authored component.`,
     ' *',

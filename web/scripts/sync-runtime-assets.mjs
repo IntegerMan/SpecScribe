@@ -27,7 +27,7 @@ const PUBLIC_DIR = fileURLToPath(new URL('../public/', import.meta.url))
 /**
  * What the app serves, and why.
  *
- * Note what is NOT here: `specscribe.css`. Serving the 7,041-line monolith would reverse 23.2's central
+ * Note what is NOT here: `specscribe.css`. Serving the whole monolith would reverse 23.2's central
  * decision in one line. The injected markup is styled by the generated, bounded `assets/ir-content.css`
  * instead — see `extract-ir-content.mjs`.
  */

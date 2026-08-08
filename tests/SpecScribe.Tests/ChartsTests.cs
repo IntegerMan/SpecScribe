@@ -356,6 +356,17 @@ public class ChartsTests
             Epics = new[] { Epic(S("1.1")) },
         };
         var singleSvg = Glance(single);
+
+        // Story 20.7 deleted the centre <text> this test was written against, but not the FACT it pinned: the
+        // root's size sentence is now `HierarchyExplorer.WithDetails`' ProjectRootKind arm, which the island
+        // payload and the text twin both carry. Two epics holding four stories between them must read "2 epics",
+        // never "4" — the story total is exactly the number this headline is not allowed to report. [Story 17.1]
+        Assert.Contains("2 epics", multiSvg);
+        Assert.DoesNotContain("4 epics", multiSvg);
+
+        // Pluralization: one epic reads "1 epic", and the plural form must not survive the singular case.
+        Assert.Contains("1 epic", singleSvg);
+        Assert.DoesNotContain("1 epics", singleSvg);
     }
 
     [Fact]

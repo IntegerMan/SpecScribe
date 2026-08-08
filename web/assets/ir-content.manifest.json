@@ -10,11 +10,11 @@
     "epics/story-{id}.html"
   ],
   "stats": {
-    "carriedRules": 1476,
-    "carriedSelectors": 1694,
+    "carriedRules": 1475,
+    "carriedSelectors": 1693,
     "carriedKeyframes": 5,
-    "droppedRoot": 4,
-    "generatedBytes": 186492,
+    "droppedRoot": 3,
+    "generatedBytes": 186428,
     "sharedRules": 3,
     "runtimeRules": 15
   },
@@ -2628,10 +2628,6 @@
       "carried": true
     },
     {
-      "selector": ".now-next-card.active",
-      "carried": true
-    },
-    {
       "selector": ".now-next-card.review",
       "carried": true
     },
@@ -4468,11 +4464,6 @@
     {
       "selector": ".trace-cell-link .ss-icon",
       "carried": true
-    },
-    {
-      "selector": ":root",
-      "carried": false,
-      "reason": "root-level rule — no descendant to scope under .ir-content; see web/assets/base.css"
     },
     {
       "selector": ".impact-epic",

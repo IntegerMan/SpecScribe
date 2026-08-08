@@ -3134,7 +3134,7 @@ public static partial class Charts
     public static string TraceabilityMatrix(RequirementsModel reqs, EpicsModel epics, string prefix)
     {
         var all = reqs.Everything.ToList();
-        var epicsByNumber = epics.Epics.ToDictionary(e => e.Number);
+        var epicsByNumber = epics.Epics.ByFirst(e => e.Number);
         var epicKeys = CoverageKeys(all)
             .Where(k => k != NoCoverageKey && epicsByNumber.ContainsKey(k))
             .ToList();
@@ -3354,7 +3354,7 @@ public static partial class Charts
     /// <summary>Epic titles by number, stripped of markup — the shared lookup behind both the flow diagram's
     /// node tooltips and its text-equivalent's epic labels.</summary>
     private static Dictionary<int, string> EpicTitlesByNumber(EpicsModel epics) =>
-        epics.Epics.ToDictionary(e => e.Number, e => PathUtil.StripHtmlTags(e.Title));
+        epics.Epics.ByFirst(e => e.Number, e => PathUtil.StripHtmlTags(e.Title));
 
     /// <summary>The conservation contract behind <see cref="RequirementFlow"/>, exposed for testing: the count
     /// of requirements ENTERING the flow at "definition" (= the requirement total) and how they partition across

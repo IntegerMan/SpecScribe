@@ -676,10 +676,11 @@ public static class RequirementsTemplater
     }
 
     /// <summary>Epic lookup by number — first-wins on duplicates so page generation never throws
-    /// <see cref="ArgumentException"/> from <c>ToDictionary</c>. Matches <c>SiteGenerator.SetRetros</c>.
-    /// [spec-epic9-deferred-debt-cleanup]</summary>
+    /// <see cref="ArgumentException"/> from <c>ToDictionary</c>. [spec-epic9-deferred-debt-cleanup]
+    /// <para>Story 17.1 moved the policy itself into <see cref="NumberIndex.ByFirst{TSource,TKey}"/>, which the
+    /// other ten epic/AC-number lookups now share; this stays as the named local shorthand.</para></summary>
     private static Dictionary<int, EpicInfo> EpicsByNumberFirstWins(EpicsModel epics) =>
-        epics.Epics.GroupBy(e => e.Number).ToDictionary(g => g.Key, g => g.First());
+        epics.Epics.ByFirst(e => e.Number);
 
     /// <summary>The white sub-header band's local context for a requirement detail page: the other requirements
     /// in the same category grouping (mirrors <see cref="RenderIndex"/>'s <c>groups</c> construction — same-

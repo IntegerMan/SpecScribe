@@ -58,20 +58,31 @@ describe('findRootBlocks', () => {
     expect(findRootBlocks(css)).toHaveLength(1)
   })
 
-  it('carries the real stylesheet\'s second block — the regression that started this', () => {
+  it('carries every token the real stylesheet declares, wherever it is declared', () => {
+    // Story 17.1 merged the Impact Map's `:root` back into the one at the head of the file, so the real sheet
+    // now has a SINGLE block. This test used to assert `blocks.length > 1`, which pinned an incidental fact
+    // about where the tokens happened to live rather than the invariant that matters. The invariant — every
+    // declared token crosses the bridge, so the gate cannot fail open — is asserted directly instead, and
+    // `--impact-lvl-3` (the family that silently never crossed) is still named. The multi-block CAPABILITY
+    // stays pinned by the synthetic-fixture cases above, where it belongs: those cannot be defeated by a
+    // stylesheet edit.
     const blocks = findRootBlocks(readFileSync(SOURCE_CSS, 'utf8').replace(/\r\n/g, '\n'))
-    expect(blocks.length).toBeGreaterThan(1)
+    expect(blocks.length).toBeGreaterThan(0)
     const all = blocks.flatMap((b) => declaredTokenNames(b.body))
-    expect(all).toContain('--status-done') // block 1
-    expect(all).toContain('--impact-lvl-3') // block 2 — absent from tokens.css before this fix
+    expect(all).toContain('--status-done')
+    expect(all).toContain('--impact-lvl-3') // absent from tokens.css before the 2026-07-28 fix
   })
 })
 
 describe('renderTokensCss', () => {
-  it('emits every block, so a token in the second one reaches the Vue app', () => {
-    const out = renderTokensCss(readFileSync(SOURCE_CSS, 'utf8'))
+  it('emits every block the source declares, so no token is stranded on the C# side', () => {
+    // Was `> 1`, which only held while the real sheet happened to carry two blocks (see above). Comparing the
+    // emitted block count to the SOURCE block count is the stronger form: it catches an extractor that drops a
+    // block whether the source has two of them or twenty, and it keeps holding now that the source has one.
+    const source = readFileSync(SOURCE_CSS, 'utf8')
+    const out = renderTokensCss(source)
     expect(out).toContain('--impact-lvl-3')
-    expect(out.match(/^:root \{/gm)?.length).toBeGreaterThan(1)
+    expect(out.match(/^:root \{/gm)?.length).toBe(findRootBlocks(source.replace(/\r\n/g, '\n')).length)
   })
 
   it('refuses to emit when a property is declared twice — the gate cannot reason about which copy drifted', () => {

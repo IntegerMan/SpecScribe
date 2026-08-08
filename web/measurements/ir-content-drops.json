@@ -1,7 +1,7 @@
 {
   "generatedBy": "web/scripts/extract-ir-content.mjs",
   "why": "Selectors `selectorIsUsed` discarded because a class or id was absent from the harvest. NOT a defect list — the monolith styles surfaces this app does not render. It exists because the same silent drop shipped the sunburst black-fill, owner-author-2, Code Map filter and tooltip/details-rail regressions with every gate green. Deliberately NOT in ir-content.manifest.json: it is a function of the whole source stylesheet and would redden the gate on edits that cannot move the emitted layer.",
-  "droppedSelectors": 369,
+  "droppedSelectors": 359,
   "absentTokens": [
     {
       "token": "ownership-wedge",
@@ -176,14 +176,6 @@
       "rules": 3
     },
     {
-      "token": "#impact-view-sunburst",
-      "rules": 2
-    },
-    {
-      "token": "#impact-view-treemap",
-      "rules": 2
-    },
-    {
       "token": "code-aside",
       "rules": 2
     },
@@ -233,18 +225,6 @@
     },
     {
       "token": "idea-entry-lock",
-      "rules": 2
-    },
-    {
-      "token": "impact-shape-sunburst",
-      "rules": 2
-    },
-    {
-      "token": "impact-shape-tabs",
-      "rules": 2
-    },
-    {
-      "token": "impact-shapes",
       "rules": 2
     },
     {
@@ -481,14 +461,6 @@
     },
     {
       "token": "impact-sb-center",
-      "rules": 1
-    },
-    {
-      "token": "impact-shape",
-      "rules": 1
-    },
-    {
-      "token": "impact-shape-treemap",
       "rules": 1
     },
     {
@@ -1748,12 +1720,6 @@
       ]
     },
     {
-      "selector": ".impact-shape-tabs",
-      "missingClasses": [
-        "impact-shape-tabs"
-      ]
-    },
-    {
       "selector": ".impact-treemap",
       "missingClasses": [
         "impact-treemap"
@@ -1819,66 +1785,6 @@
       "selector": ".impact-treemap-empty",
       "missingClasses": [
         "impact-treemap-empty"
-      ]
-    },
-    {
-      "selector": ".impact-shape-tabs",
-      "missingClasses": [
-        "impact-shape-tabs"
-      ]
-    },
-    {
-      "selector": ".impact-shape",
-      "missingClasses": [
-        "impact-shape"
-      ]
-    },
-    {
-      "selector": ".impact-shape-sunburst",
-      "missingClasses": [
-        "impact-shape-sunburst"
-      ]
-    },
-    {
-      "selector": ".impact-shapes:has(#impact-view-sunburst:checked) .impact-shape-treemap",
-      "missingClasses": [
-        "impact-shapes",
-        "impact-shape-treemap"
-      ]
-    },
-    {
-      "selector": ".impact-shapes:has(#impact-view-sunburst:checked) .impact-shape-sunburst",
-      "missingClasses": [
-        "impact-shapes",
-        "impact-shape-sunburst"
-      ]
-    },
-    {
-      "selector": "#impact-view-treemap:checked ~ .board-tabbar label[for=\"impact-view-treemap\"]",
-      "missingClasses": [],
-      "missingIds": [
-        "impact-view-treemap"
-      ]
-    },
-    {
-      "selector": "#impact-view-sunburst:checked ~ .board-tabbar label[for=\"impact-view-sunburst\"]",
-      "missingClasses": [],
-      "missingIds": [
-        "impact-view-sunburst"
-      ]
-    },
-    {
-      "selector": "#impact-view-treemap:focus-visible ~ .board-tabbar label[for=\"impact-view-treemap\"]",
-      "missingClasses": [],
-      "missingIds": [
-        "impact-view-treemap"
-      ]
-    },
-    {
-      "selector": "#impact-view-sunburst:focus-visible ~ .board-tabbar label[for=\"impact-view-sunburst\"]",
-      "missingClasses": [],
-      "missingIds": [
-        "impact-view-sunburst"
       ]
     },
     {

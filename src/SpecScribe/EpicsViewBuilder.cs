@@ -62,7 +62,7 @@ public static class EpicsViewBuilder
     {
         if (model.Milestones.Count == 0) return Array.Empty<MilestoneBandView>();
 
-        var byNumber = model.Epics.ToDictionary(e => e.Number);
+        var byNumber = model.Epics.ByFirst(e => e.Number);
         var bands = new List<MilestoneBandView>(model.Milestones.Count);
         foreach (var milestone in model.Milestones)
         {
