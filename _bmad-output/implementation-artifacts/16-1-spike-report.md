@@ -31,12 +31,28 @@ and `vsce` requires exactly that token shape ("All accessible organizations" + M
 PAT path is not "dated" — for a publisher who does not already hold a valid global PAT, it is **already
 closed**.
 
-**Two of three channels need no stored secret at all.** Trusted Publishing on nuget.org and npm makes AC #2's
-"no secret value is committed" structural rather than a matter of discipline.
+**No shipping channel needs a stored secret** — *on the Trusted Publishing happy path.* nuget.org and npm
+both exchange a GitHub OIDC token, and GitHub Releases uses the workflow's own per-run `GITHUB_TOKEN`, which
+makes AC #2's "no secret value is committed" structural rather than a matter of discipline. ⚠️ **The caveat
+belongs in the headline, not below it** (code review 2026-08-07): nuget.org's Trusted Publishing is still a
+gradual rollout, and if it has not reached the owner's account the NuGet channel falls back to a stored
+`NUGET_API_KEY` (§ 5.1). Confirm before Story 16.4. *This sentence previously read "Two of three channels
+need no stored secret at all" — it omitted the GitHub Releases channel entirely and carried no caveat.*
 
-**NFR9 "reproducible" is claimed in its weaker reading only** — built from a clean checkout by CI — and even
-that is **not true today**: `npm ci` fails at `838d591` on this machine. That is a live finding, not a
-theoretical gap.
+**NFR9 "reproducible" is claimed in its weaker reading only** — built from a clean checkout by CI — and it was
+**not true when this report was written**: `npm ci` failed at `838d591`. ✅ Repaired since by `0b1f561`, so
+the weak reading now holds. It was a live finding, not a theoretical gap.
+
+---
+
+> ⚠️ **Reviewed 2026-08-07 (`bmad-code-review`).** Three adversarial layers over commit `9837e67`; 44
+> findings after dedup. Corrections are marked inline throughout this report with the date. **Nine owner
+> decisions remain open** — chief among them ADR 0040's ratification, release atomicity (no re-publish or
+> rollback policy exists, and Story 16.4 AC #2 cannot be met without one), and the MinVer bootstrap tag
+> (this repository has **zero git tags** while § 6.2 deletes the version literal). Two claims in this report
+> were found **false** and are corrected in place: *"`gh` is not installed on this machine"* (§ 6.1) and
+> *"Story 4.9 claimed 0039"* (§ 11). The measured packaging results, the credential findings and the
+> arithmetic throughout all **stand** — they were re-verified independently.
 
 ---
 
@@ -46,7 +62,7 @@ Every figure below is marked. Nothing in this report is an estimate presented as
 
 | figures | provenance |
 |---|---|
-| artefact file count / bytes / gzipped tarball / native-binding count | **Session-measured**, Windows 11 Pro 10.0.26200, Node v24.18.1. Commands inline in § 3. |
+| artefact file count / bytes / gzipped tarball / native-binding count | **Session-measured**, Windows 11 Pro 10.0.26200, Node v24.18.1. Commands inline in **§ 2.1** *(corrected 2026-08-07 — this cell previously pointed at § 3, which carries no commands)*. |
 | nupkg sizes and entry counts, baseline vs. payload | **Session-measured**, `dotnet pack -c Release`, .NET SDK 10.0.302 |
 | observed `AppContext.BaseDirectory` | **Session-measured by negative case** — the artefact was renamed away and the tool's own error message printed the path it probed (§ 2.3). Not inferred from documentation. |
 | route counts, ms/route, `errors=` | **Session-measured**, `specscribe generate` stdout, foreign repository |
@@ -62,6 +78,16 @@ Every figure below is marked. Nothing in this report is an estimate presented as
 Dependency versions may therefore differ from the lockfile pin. This affects the *build* of the artefact,
 not the packaging conclusions — the resolution behaviour under test is C#'s, and the drift gates
 (§ 7) passed against the resulting artefact.
+
+**Two provenance limits added by the code review of 2026-08-07, because the table above did not carry them.**
+
+1. **Every session-measured figure is from a single Windows 11 / `win-x64` machine.** `PublishSingleFile` was
+   exercised on `win-x64` only, and the pack used a backslash `PackagePath`. § 3.1's RID matrix is **three**
+   (`win-x64`, `linux-x64`, `osx-arm64`) and ADR 0040 § Decision 1 generalizes the `AppContext.BaseDirectory`
+   conclusion to all of them — so **two of the three shipped RIDs rest on extrapolation, not measurement**,
+   as do both non-Windows packing hosts and any case-sensitive filesystem. Deferred to Stories 16.3/16.4 to
+   verify on Linux/macOS runners; `build-test-analyze.yml` already has an `ubuntu-latest` job to hang it on.
+2. **The probe repository's composition is documented below only for the *second* probe.** See § 2.1.
 
 ---
 
@@ -89,6 +115,20 @@ dotnet tool install SpecScribe --version 0.1.0-preview --tool-path ./probe-tools
 The probe repository is `C:\Users\MattE\.claude\jobs\eac9eab5\tmp\probe-project` — its own git repository,
 **no `web/` directory**, `SPECSCRIBE_RENDERER_DIR` unset. Both conditions were asserted before each run, not
 assumed: `Test-Path web` → `False`, `git rev-parse --show-toplevel` → the probe path.
+
+⚠️ **Recorded by the code review of 2026-08-07: there were TWO probe repositories, and only one is described
+above.** § 2.7 (3) and § 4.1 report a **first** probe repository that *"had no parseable epics"* and produced
+**21 route(s)**; the run reported in § 2.2 produced **373**. The ~18× larger corpus that generated the
+headline number is therefore not characterised anywhere — not its path, not its content, and not
+independently whether it too was `web/`-free (the assertion above is written as covering "each run", but
+names only one repository). Since AC #5's conclusion is *"measured from a repository that is not this one"*,
+that composition is load-bearing evidence.
+
+**What this does and does not undermine.** It does **not** undermine the foreignness of the probe: § 2.3's
+negative case proves resolution candidate 3 (`web/.output` at a repo root) did not rescue the run, which is
+the property AC #5 actually turns on. It **does** mean the 373-route figure and its 4.9 ms/route derivative
+cannot be reproduced from this report alone. Story 16.3 should re-derive both against a named corpus rather
+than quoting them.
 
 ### 2.2 Result — the `dotnet tool` channel
 
@@ -193,7 +233,12 @@ Story 16.3 should derive it rather than quote it.
 ### 2.7 Four things this experiment got wrong first
 
 This section exists because Story 23.5 §2 proved it is the most useful one. Each wrong result looked
-plausible and three of the four produced a *green-looking* or *self-consistent* outcome.
+plausible, and **one of the four — (1) — produced a genuinely green-looking outcome**.
+
+*Corrected 2026-08-07: this sentence previously claimed "three of the four". It does not hold. (2) threw a
+stack trace, (3) reported `errors=1` and a failed route, and (4) turned the gate **red**. The danger in (4)
+was that the gate's own **suggested remedy** would have gone green while deleting 185 rules — which is a
+sharper point than the original claim, and is lost by overstating the count.*
 
 **(1) `%(RecursiveDir)` double-applied and silently produced a package with no entry point.**
 The seeded hypothesis in R2 suggested `PackagePath="tools\net10.0\any\renderer\"`. Reaching for the usual
@@ -207,6 +252,18 @@ NuGet **already appends** the recursive directory to a `PackagePath` that names 
 `%(RecursiveDir)` applies it twice. The pack **succeeded** — 187 entries, right count, right total bytes,
 exit 0 — and `renderer/server/index.mjs` did not exist. A size-and-count check would have called this a pass.
 The correct form omits the metadata entirely: `PackagePath="tools\net10.0\any\renderer"`.
+
+**Two consequences of this finding were left un-acted-on and are now seated (code review 2026-08-07):**
+
+1. **A completeness assertion is required at packaging time**, not a size-and-count check — this finding is
+   the proof that counts certify nothing. ADR 0040 § Decision 1 now makes asserting the **entry point exists
+   at its packed path** a release-job obligation for Story 16.4. It compounds with § 4.1's second
+   observation: SpecScribe reports *"the renderer answered HTTP 500"* and **discards the renderer's actual
+   error text**, so an incomplete payload reaches the consumer as an unexplained failure.
+2. **`net10.0` must not be a literal.** The exact string proven here is now recorded normatively in ADR 0040
+   § Decision 1 with `$(TargetFramework)` substituted, because the project sets `<RollForward>Major</RollForward>`
+   and a TFM bump would otherwise relocate the assembly to `tools/net11.0/any/` while the payload stayed
+   behind — the same silent, exit-0 failure class as this finding.
 
 **(2) `SPECSCRIBE_IR_DIR` takes the output ROOT, not the `spa/` directory.**
 Booting the artefact by hand to diagnose a 500, `SPECSCRIBE_IR_DIR` was pointed at `probe-out2/spa`. The
@@ -337,11 +394,33 @@ the story was seeded, and one had moved in a way that changes the decision.
 |---|---|---|---|
 | **nuget.org** | **Trusted Publishing.** `NuGet/login@v1` exchanges a GitHub OIDC token for a **1-hour, single-use** API key. Needs `permissions: id-token: write` + a policy on nuget.org. | **nothing** | n/a — no credential exists to rotate |
 | **npm** (16.8) | **Trusted Publishing**, GA 2025-07-31. Needs **npm CLI ≥ 11.5.1 _and_ Node ≥ 22.14.0**, `id-token: write`. Publishes provenance attestations **by default**. Must **not** set `NODE_AUTH_TOKEN`. | **nothing** | n/a |
-| **VS Marketplace** (16.5) | See § 5.3 — **the PAT path is already closed for a new publisher** | n/a for the preview (channel is out) | n/a |
+| **VS Marketplace** (16.5) | See § 5.3 — **the PAT path is already closed for a new publisher**. When 16.5 runs: Entra workload identity federation. | **nothing secret** — client ID + tenant ID as plain Actions *variables*; the trust is a federated credential on the Entra app registration | owner, on app-registration change |
+| **GitHub Releases** (binaries, 16.4) | the workflow's own `GITHUB_TOKEN`, `permissions: contents: write` scoped to the release job | **nothing** — minted per run by Actions | n/a — never stored |
 
-**AC #2's "no secret value is committed" is satisfied, and for the two shipping channels it is _structural_**
-— there is no secret to commit, not merely a discipline of not committing one. That is a stronger property
-than the AC asked for and is worth stating in those terms.
+⚠️ **The GitHub Releases row was added by the code review of 2026-08-07.** The original table had three rows
+and omitted it, while § 3.1 puts self-contained binaries **in the shipping cut** — so a channel that
+publishes had no credential entry at all, which is precisely what AC #2 asks for. It stores nothing, but
+"stores nothing" is an answer that must be given rather than left blank.
+
+**Fallback storage, also added 2026-08-07.** § 5.2 item 1 notes the NuGet Trusted Publishing rollout is
+gradual and that the fallback *"reintroduces a stored secret"* — without saying **where**. AC #2 asks that
+question directly. Under the fallback: repository secret **`NUGET_API_KEY`**, scoped to the **`release`
+environment** so PR workflows cannot reach it, rotated by the owner, set to nuget.org's shortest offered
+expiry. Recorded now so 16.4 does not have to design it under time pressure at exactly the moment this
+report says to stop and check.
+
+**AC #2's "no secret value is committed" is satisfied, and for all three shipping channels it is
+_structural_** — there is no secret to commit, not merely a discipline of not committing one. That is a
+stronger property than the AC asked for and is worth stating in those terms. ⚠️ **Caveat that belongs
+alongside the claim, not below it:** this holds **only on the Trusted Publishing happy path**. If the
+nuget.org rollout has not reached the owner's account, the NuGet channel stores `NUGET_API_KEY` and the
+headline weakens to *two* of three. Confirm before 16.4 (§ 5.2 item 1, open item 8).
+
+**Where the exchange runs.** `NuGet/login@v1` must run **immediately before the push step, not at job
+start**: the key lives one hour and is single-use, while the release job builds three ~76 MiB RIDs plus a
+Nuxt artefact plus the suite ahead of it. A failed push **consumes** the key, so the retry must re-run the
+exchange — and if the exchange itself fails, the job must abort **before** publishing to any channel, so no
+partial release is created (ADR 0040 § Decision 10).
 
 ### 5.2 Three NuGet Trusted Publishing details the seeded research did not carry
 
@@ -410,6 +489,15 @@ not .NET RIDs; 16.8 owns the exact mapping.)
 `specscribe-cli-<platform>-<arch>` set), `SpecScribe.Cli` on nuget.org. Recorded now so the decision is not
 made under time pressure by whoever discovers the squat.
 
+⚠️ **These are NOT drop-in replacements, and the original wording let them read as if they were** (code
+review 2026-08-07). npx resolves by **package name**, so taking `specscribe-cli` silently changes the
+product's primary documented invocation from `npx specscribe` to `npx specscribe-cli` — a string printed in
+**ADR 0006 § Decision**, **`epics.md` § Story 16.8** (*"`npx specscribe` generated all 196 files with NO .NET
+SDK present"*) and **`README.md`**. It also undercuts the npx channel's whole rationale, which is
+low-friction invocation. **If a fallback is taken, those three documents change in the same act, and the
+implementer escalates rather than substituting.** Now recorded normatively in ADR 0040 § Decision 12, since
+Story 16.8 implements from the ADR and this section was not carried into it.
+
 ### 5.5 Code-signing decision (AC #2 requires one)
 
 **Neither Authenticode nor macOS notarization for the preview. Stated, not defaulted.**
@@ -429,6 +517,19 @@ What preview users will actually see, said plainly:
 **Consequence accepted:** the direct-download binary is the roughest preview experience, and the docs must
 say so rather than let a user discover it (Story 16.6). Revisit at 1.0, when a signing certificate is
 justifiable — an Authenticode OV certificate is a recurring annual cost against a preview with no users yet.
+
+⚠️ **The unsigned channel needs a compensating integrity control, and this section shipped without one**
+(code review 2026-08-07). The other two channels get integrity by construction — npm publishes **provenance
+attestations by default** (§ 5.1) and NuGet carries the registry's own guarantees — so the *only* channel
+with no signature also had no published digest. A consumer clicking through SmartScreen had nothing to
+verify against. **Decided now, in ADR 0040 § Decision 2:** each release asset is published as
+`specscribe-<version>-<rid>.zip` (Windows) / `.tar.gz` (Linux, macOS) with a **SHA-256 digest in the release
+body**. Story 16.4 AC #1 requires attaching release artifacts but specified no archive format, per-RID naming
+or digest scheme; that gap is now closed.
+
+**This decision is also promoted into ADR 0040 § Decision 13.** AC #2 asked for a code-signing decision
+explicitly, and it previously existed in the ADR only as a non-goals bullet plus a consequences line — which
+is the "bury the decision in the story artifact" pattern CLAUDE.md § Decision records names.
 
 ### 5.6 The npx install-time Node check (ADR 0022 open question 1, owner-assigned)
 
@@ -472,19 +573,35 @@ build, which is a separate and much larger problem. **Said explicitly so no read
 > ```
 > Reproduced on a **fresh worktree checkout** with npm 11.16.0 / Node 24.18.1.
 
-The lockfile records `@napi-rs/wasm-runtime@1.1.6` with only `@tybys/wasm-util` as a dependency, while the
-registry's current manifest for that version also declares `@emnapi/runtime@^1.7.1`. Three CI steps run
-`npm ci` (`build-test-analyze.yml:246,416`, `publish-docs-live-pages.yml:89`), and its own comment says
-*"the lockfile is the pin, and a lockfile-drifting install in CI would make the build unreproducible."*
+Three CI steps run `npm ci` (`build-test-analyze.yml:246,416`, `publish-docs-live-pages.yml:89`), and its own
+comment says *"the lockfile is the pin, and a lockfile-drifting install in CI would make the build
+unreproducible."*
+
+⚠️ **The root cause stated here was wrong in its specifics** (code review 2026-08-07). The original text
+read: *"The lockfile records `@napi-rs/wasm-runtime@1.1.6` with only `@tybys/wasm-util` as a dependency,
+while the registry's current manifest for that version also declares `@emnapi/runtime@^1.7.1`."* At
+`838d591` the lockfile **did** declare it — as a `peerDependencies` entry
+(`"peerDependencies": { "@emnapi/core": "^1.7.1", "@emnapi/runtime": "^1.7.1" }`). The actually-missing
+artifact was the **top-level `node_modules/@emnapi/runtime` tree entry at 1.11.3**, which is exactly what the
+fix added. The symptom was real and the routing was right; the diagnosis pointed Story 16.2 at the wrong half
+of the file.
 
 **Attribution, honestly:** CI pins Node **24.11.1** via `web/.nvmrc`; this machine ran **24.18.1** with a
-newer bundled npm. The failure may therefore be npm-version-specific and CI may still be green — **this
-session could not check, because `gh` is not installed on this machine.** Recorded as
-**unverified-on-CI**, not as "CI is broken". Either way it is a real developer-onboarding failure today:
+newer bundled npm. The failure may therefore be npm-version-specific and CI may still have been green.
+Recorded as **unverified-on-CI**, not as "CI is broken". Either way it is a real developer-onboarding failure:
 a contributor on a Node version *this project's own `engines` field permits* cannot run `npm ci`.
 
-**Routed to Story 16.2**, which owns the CI gate, as a required pre-check before 16.4 depends on `npm ci`
-in a release pipeline.
+⚠️ **The stated reason for not verifying was false** (code review 2026-08-07). The original text read
+*"this session could not check, because `gh` is not installed on this machine."* **`gh` is installed**, at
+`C:\Program Files\GitHub CLI\gh.exe` — it is simply not on `PATH`, and this project's own agent memory
+records that fact together with the instruction to invoke it by full path. A checkable fact was declared
+uncheckable, and it was the single item this report calls worse than the three gaps it was scoping — the one
+that *"breaks even the weak reading"* of NFR9. The Node-version caveat above was legitimate; the
+inability-to-check was not.
+
+✅ **Resolved since.** Commit **`0b1f561`** ("CI fix: repair the lockfile and regenerate the two stale drift
+gates") added the missing tree entry. **Routed to Story 16.2**, which owned the CI gate — and closed it. The
+weak reading of NFR9 now holds.
 
 **What the preview closes vs. defers:**
 
@@ -503,8 +620,20 @@ in a release pipeline.
 **Mechanism: MinVer.** Chosen over Nerdbank.GitVersioning and plain `-p:Version=`:
 
 - **MinVer** derives the version from the nearest reachable git tag with no config file, no build task, and
-  no committed state; a tag `v0.1.0-preview.1` produces exactly that version. One `PackageReference`, and
-  `<Version>` is deleted rather than replaced by a second literal.
+  no committed state. One `PackageReference`, and `<Version>` is deleted rather than replaced by a second
+  literal.
+
+  ⚠️ **The worked example above was wrong, and two prerequisites were missing** (code review 2026-08-07).
+  This bullet originally claimed *"a tag `v0.1.0-preview.1` produces exactly that version."* It does not —
+  **MinVer's default `MinVerTagPrefix` is empty**, so a `v`-prefixed tag is not matched at all and the build
+  falls through to `0.0.0-alpha.0.<height>`. Compounding it, **this repository currently has zero git tags**
+  (verified 2026-08-07), so deleting `<Version>` before a bootstrap tag exists produces that same default on
+  every build — and `README.md:260`'s published recipe installs `--version 0.1.0-preview`, which would then
+  resolve nothing. Every failure mode here is **silent**: `dotnet pack` exits 0. Both prerequisites are now
+  recorded as ⚠️ OPEN in ADR 0040 § Decision 5, and **Story 16.3 must not delete `<Version>` until they are
+  settled.** Also unaddressed: MinVer appends commit height on untagged commits, producing
+  `0.1.0-preview.1.7` — a **fourth** version shape outside the documented `0.MINOR.PATCH-preview.N` scheme,
+  with no rule stating whether such a build may publish.
 - **Nerdbank.GitVersioning** is more capable and needs a committed `version.json` — a second place a version
   lives, which is the thing R7 warns about.
 - **Plain `-p:Version=` from the tag** works but only in CI; a local `dotnet pack` then produces `1.0.0` and
@@ -514,14 +643,35 @@ in a release pipeline.
 
 ### 6.3 How the CLI and its renderer are pinned as one unit (Story 16.9 AC #2 depends on this)
 
-**They are pinned by construction, not by policy — the renderer is _inside_ the package.** § 2 makes this
-structural for the `dotnet tool` and binary channels: there is no way to combine a CLI and a renderer from
-different revisions, because there is only one artefact.
+**They are pinned by construction for the `dotnet tool` channel — the renderer is _inside_ the package.**
+There is no way to combine a CLI and a renderer from different revisions, because there is one artefact.
 
-The npm channel is the **one place a mismatch is expressible**, because § 2.5 makes the renderer a separate
-package. Therefore: **`specscribe` depends on `specscribe-renderer` with an exact-version pin (`=X.Y.Z`, not
-`^`), and both are published from the same tag in the same pipeline run.** The per-RID binary packages take
-the same exact pin. This is the rule Story 16.9 AC #2 inherits, and it is the rule 16.8 must implement.
+⚠️ **This does NOT hold for the self-contained binary, and the original text claimed it did** (code review
+2026-08-07). § 2.4 defines that channel as a **sibling `renderer/` directory beside the executable** — two
+filesystem objects, not one artefact. A user who unzips release N over release N−1, replaces only the `.exe`,
+or downloads the exe and the renderer as separate release assets desynchronizes them; `ResolveArtefactDirectory`
+tests only that `renderer/server/index.mjs` exists, and nothing stamps the artefact with a version. So the
+direct-download channel can produce exactly the mismatched pair Story 16.9 AC #2 exists to prevent — the one
+that *"fails as wrong output rather than as an error"* — and this report recorded that risk for npm only.
+**Now closed in ADR 0040 § Decision 5:** each RID ships as a **single archive containing both halves**, and
+Story 16.3 stamps the artefact with the CLI version and fails loudly on a mismatch.
+
+The npm channel is the **one place a mismatch is expressible by version**, because § 2.5 makes the renderer a
+separate package. Therefore: **`specscribe` depends on `specscribe-renderer` with an exact-version pin
+(`=X.Y.Z`, not `^`), and both are published from the same tag in the same pipeline run.** The per-RID binary
+packages take the same exact pin. This is the rule Story 16.9 AC #2 inherits, and it is the rule 16.8 must
+implement.
+
+**Publish order is normative and was unspecified** (code review 2026-08-07): **`specscribe-renderer` FIRST,
+then the wrapper.** npm has no multi-package transaction, so the reverse order makes `specscribe@X.Y.Z`
+installable while its exact dependency does not exist — `npx specscribe` then fails at install for every
+user, with no remedy (the version is burned and npm's unpublish window is limited). The chosen order fails
+safe: a renderer published without its wrapper is merely an orphaned version.
+
+**Channel parity is not promised, and 16.9 needs an answer.** The cut is ordered across separate stories, so
+a version resolvable on nuget.org may not exist on npm. ADR 0040 § Decision 2 now names **nuget.org as the
+authoritative channel** for "a released version", which is what Story 16.9's Action resolves and echoes
+against.
 
 Story 16.9 AC #2's reasoning is why the pin is exact rather than caret: a portal rendered from a mismatched
 pair *"fails as wrong output rather than as an error"* — and a caret range is precisely a licence to drift.
@@ -531,7 +681,7 @@ pair *"fails as wrong output rather than as an error"* — and a caret range is 
 | where | today | after this policy |
 |---|---|---|
 | `src/SpecScribe/SpecScribe.csproj:19` | `0.1.0-preview` | **Deleted.** MinVer supplies it from the tag. |
-| `extension/package.json:5` | `0.1.0` | **Unchanged for the preview** — the VSIX is out of the cut. When 16.5 runs: the Marketplace has no SemVer pre-release concept, so the version stays plain `0.1.0` and pre-release status is carried by the Marketplace's own **Preview flag** + `vsce publish --pre-release`. Recorded so nobody "fixes" it into `0.1.0-preview` and breaks the Marketplace parse. |
+| `extension/package.json:5` | `0.1.0` | **Unchanged for the preview** — the VSIX is out of the cut. When 16.5 runs: the Marketplace has no SemVer pre-release concept, so the version stays plain `0.1.0` and pre-release status is carried by the Marketplace's own **Preview flag** + `vsce publish --pre-release`. Recorded so nobody "fixes" it into `0.1.0-preview` and breaks the Marketplace parse. ⚠️ **OPEN (code review 2026-08-07):** as written this permits **exactly one VSIX publish ever** — the Marketplace requires each publish to carry a strictly greater version, and "stays plain `0.1.0`" gives 16.5 no way to ship a second. It also leaves the extension version fully decoupled from the MinVer-derived CLI version with **no stated correspondence rule**. Owner decision needed before 16.5. |
 | `README.md:260` | hard-coded `0.1.0-preview` inside the published CI recipe | **Story 16.6's**, not fixed here (Dev Notes excludes README deliberately). Story 16.9 replaces this recipe with the composite Action, which should take the version as an input defaulting to the Action's own tag — removing the literal rather than updating it. |
 | npm wrapper + platform + renderer packages | do not exist | Created at the same version from the same tag, exact-pinned (§ 6.3) |
 
@@ -555,12 +705,41 @@ The release pipeline (16.4) copies the released version's section into the GitHu
 author it. **Story 16.6 AC #1's "a `CHANGELOG.md` following the Story 16.1 format" is satisfied by this
 section.**
 
+**Three gaps closed by the code review of 2026-08-07** (all now normative in ADR 0040 § Decision 6):
+
+1. **Breaking changes had no marked home.** Keep a Changelog's six sections contain no `Breaking`, yet § 6.6
+   promises breaking changes *are recorded* — so they would land under `Changed`/`Removed`, indistinguishable
+   from routine entries, defeating the one guarantee the preview offers. **A breaking entry stays in its
+   natural section prefixed `**BREAKING:**`**, making it greppable and unmistakable.
+2. **An empty `[Unreleased]` section had undefined pipeline behaviour** — a re-cut, a CI-only fix or a
+   dependency bump may carry no user-visible change. The job writes *"No user-visible changes in this
+   release."* and continues; it **must not** hard-fail at the last step, by which point the packages are
+   published and the version is burned.
+3. ⚠️ **The contention hazard is named but not yet mitigated** (owner decision open). A single hand-edited
+   root file is the highest-contention shape available here, in a repository whose CLAUDE.md records that
+   *"a `Charts.cs` edit has silently vanished this way before."* Rejecting generated notes is right; the
+   alternative's own failure mode — a concurrent story's entry silently lost, invisible until missing from a
+   published release body — was not addressed. A per-story fragment directory assembled at release time
+   would remove it.
+
 ### 6.6 What "preview" promises, and what it does not
+
+⚠️ **This section is now ALSO recorded in ADR 0040 § Decision 11.** It previously lived only here, while
+Story 17.4's release-readiness sign-off was pointed at it as its checklist — a governing obligation cannot
+sit in a story artifact (CLAUDE.md § Decision records). Treat the ADR as authoritative.
 
 **Promises:**
 - It generates a portal from a supported SDD repository, and the published channels install and run.
 - Output is read-only with respect to your repository (AD-6).
-- Breaking changes are **recorded in `CHANGELOG.md`** and carry a minor-version bump.
+- Breaking changes are **recorded in `CHANGELOG.md`** (prefixed `**BREAKING:**`, § 6.5) and carry a
+  minor-version bump.
+
+⚠️ **"A supported SDD repository" is undefined, and the gap has a known symptom** (code review 2026-08-07).
+§ 4.1 found `EpicsIndexSurface.vue` **hard-throws** when the epics index has no child pages, so a thin or
+non-BMad external adopter — which § 4.1 itself calls the highest-weight first-run case for this epic — gets
+`errors=1` and a missing page. That is routed to Story 23.3 and **gates Story 16.7**, but the gate existed
+only in this report; ADR 0040 § Decision 11 now carries it. Story 16.7 also has no definition of "supported"
+to test a clean-environment install against.
 
 **Does NOT promise:**
 - **API/CLI stability.** Inside `0.x`, a **minor** bump may break: SemVer assigns no compatibility guarantee
@@ -572,7 +751,21 @@ section.**
   **consumer-facing condition of use**, not an implementation detail — ADR 0022 §Decision 5, and it is stated
   in `README.md:92-98` but **nowhere a packaged consumer sees it** (R5). Story 16.6 owns the NuGet listing,
   npm README and Marketplace listing carrying it.
-- **Signed binaries.** § 5.5.
+- **That the `dotnet tool` channel works without .NET 10.** ⚠️ **Added by the code review of 2026-08-07 —
+  this was missing entirely.** The promises named Node and not .NET, while `README.md:92-93` lists the .NET
+  10 SDK as a prerequisite and § 3.1 puts the `dotnet tool` channel **first** in the cut. It is therefore the
+  likeliest install blocker for the leading channel, and Story 16.6 would have implemented ADR 0040
+  § Decision 8 as written and shipped a NuGet listing that omits it. Does not apply to the self-contained
+  binaries or to npx, which carry their own runtime.
+- **Availability on every platform.** ⚠️ **Also added 2026-08-07.** The promise *"the published channels
+  install and run"* was unqualified by platform while § 3.2 defers `linux-arm64` and `osx-x64`. Users on
+  those platforms are **not** unsupported — the `dotnet tool` channel is platform-neutral and remains
+  available — but nothing said so, and nothing specified what Story 16.8's `optionalDependencies` wrapper
+  does when no platform package matches (npm's default is an opaque missing-binary error at run time). ADR
+  0040 § Decision 2 now requires an explicit message naming the `dotnet tool` fallback.
+- **Signed binaries.** § 5.5. The compensating control is a published **SHA-256 digest** per release asset
+  (ADR 0040 § Decision 2), added by the code review because the unsigned channel was the only one with
+  neither a signature nor a digest.
 
 ### 6.7 Node prerequisite check — placement (R5's open half)
 
@@ -585,6 +778,15 @@ warn about a dependency that only the prerender path needs. The user-visible dif
 arrives after ingest rather than immediately — on the order of a second on this repository, and ingest is
 not destructive. The cost of the alternative is paid on every run; the cost of the status quo is paid once,
 by a user who is about to hit the error anyway.
+
+⚠️ **The shipped code describes itself as temporary, and this decision must overrule that explicitly** (code
+review 2026-08-07). The check's own doc comment reads: *"ADR 0022 §Decision 5 assigned Node DETECTION to
+Story 16.3, which has not been built … **Until it is, this is the check**"* (`NuxtPrerender.cs:143-145`).
+This section promotes a self-declared interim stand-in to the permanent answer — which is defensible on the
+rationale above, but was never stated, so the record and the code disagree in writing. **Story 16.3 must
+update that doc comment to cite ADR 0040 § Decision 8 instead of describing itself as provisional.**
+Otherwise the next reader finds a comment telling them the opposite of the governing decision, and § 9's
+instruction to 16.3 (*"NOT Node detection — it shipped in 23.6"*) reads as contradicting the source.
 
 **This is an amendment to a ratified-pending ADR and is recorded as such in ADR 0040 §Amends.**
 
@@ -684,7 +886,7 @@ rather than an oversight.
 | **16.8** | RID matrix = `win-x64` / `linux-x64` / `osx-arm64` (§ 3.2). Renderer is **one shared package**, not per-RID (§ 2.5), exact-pinned (§ 6.3). Node check = an `engines` field, **not** a postinstall script (§ 5.6). |
 | **16.9** | Its stated dependency — the renderer being *in* the published package — is now proven satisfiable (§ 2). The Action collapses to install-and-run once 16.3 ships. Inherits the exact-pin rule (§ 6.3). |
 | **23.3** | § 4.1's `EpicsIndexSurface.vue` throw, same class as the `DashboardSurface.vue` defect it already owns. |
-| **17.4** | Inherits: deferred `<Deterministic>`/SourceLink (§ 6.1), and the preview promises in § 6.6 as the sign-off checklist. |
+| **17.4** | Inherits: deferred `<Deterministic>`/SourceLink (§ 6.1), and the preview promises as the sign-off checklist — **now read from ADR 0040 § Decision 11**, not from § 6.6. *(Corrected 2026-08-07: pointing a release-gating story at a story artifact rather than the decision record is the pattern CLAUDE.md § Decision records names. § 6.6 remains as the evidence behind the decision.)* |
 
 ---
 
@@ -692,16 +894,24 @@ rather than an oversight.
 
 | # | item | state | owner |
 |---|---|---|---|
-| 1 | `EpicsIndexSurface.vue` hard-throws on a project with no epics | reproduced twice | **Story 23.3**, gating **16.7** |
-| 2 | `FindRepoRoot` does not detect git worktrees (`.git` as a file) | reproduced | **Story 16.3** |
-| 3 | `npm ci` fails at `838d591` locally; **CI status unverified** (`gh` not installed on this machine) | **unverified-on-CI** | **Story 16.2** |
-| 4 | SpecScribe discards the renderer's error text behind "HTTP 500" | observed | **Story 16.3** |
+| 1 | `EpicsIndexSurface.vue` hard-throws on a project with no epics | reproduced twice. ⚠️ **The gate needs an owner:** Story 23.3 was **already at `review`** when this was routed to it, and the 16.7 gate existed only in this report — now also in ADR 0040 § Decision 11 | **Story 23.3**, gating **16.7** — *owner decision open* |
+| 2 | `FindRepoRoot` does not detect git worktrees (`.git` as a file) | ✅ **FIXED** since, by Story 16.3 | ~~Story 16.3~~ closed |
+| 3 | `npm ci` fails at `838d591` locally | ✅ **FIXED** by `0b1f561`. *The original "CI status unverified (`gh` not installed)" was a **false** limit — `gh` is installed at `C:\Program Files\GitHub CLI\gh.exe`, just not on `PATH` (§ 6.1)* | ~~Story 16.2~~ closed |
+| 4 | SpecScribe discards the renderer's error text behind "HTTP 500" | observed. **Raised in priority** — it is what a consumer sees when an incomplete renderer payload ships (§ 2.7 (1)) | **Story 16.3** |
 | 5 | npx end-to-end install proof (§ 2.5 decided the shape from a measured property; no wrapper was published) | **unmeasured** | **Story 16.8** |
 | 6 | `linux-arm64` / `osx-x64` RIDs | deferred by decision | 16.8, on demand |
 | 7 | `extension/package.json`'s `"private": true` vs. `vsce package` | **unconfirmed** — deliberately not tested; R9 forbids editing the manifest here | **Story 16.5** |
-| 8 | Trusted Publishing visibility on the owner's nuget.org account | **unknown** — cannot be checked without the account | **owner** (§ 8 item 2) |
+| 8 | Trusted Publishing visibility on the owner's nuget.org account | **unknown** — cannot be checked without the account. Fallback storage now specified (§ 5.1) so 16.4 is not blocked either way | **owner** (§ 8 item 2) |
 | 9 | CLAUDE.md states worktrees are unavailable on this machine; five are in active use | stale documentation | owner / next retro |
 | 10 | `<Deterministic>` / `ContinuousIntegrationBuild` / SourceLink | deferred past preview | 17.4 burndown |
+| **11** | **Release atomicity** — no re-publish, rollback, yank or version-burn policy exists; **Story 16.4 AC #2 cannot be met as written** | ⚠️ **OPEN — owner decision** (ADR 0040 § Decision 10) | **owner**, before 16.4 |
+| **12** | **MinVer bootstrap** — repository has **0 git tags**, `MinVerTagPrefix` unspecified; deleting `<Version>` first ships `0.0.0-alpha.0.N` silently | ⚠️ **OPEN — owner decision** (ADR 0040 § Decision 5) | **owner**, before 16.3 |
+| **13** | **§ Decision 9's gate mechanism** — `build-test-analyze.yml` builds only `main`, so no release-branch or hotfix commit has a run to point at | ⚠️ **OPEN — owner decision** (ADR 0040 § Decision 9) | **owner**, before 16.4 |
+| **14** | **Extension versioning** — the Marketplace rule as written permits exactly one VSIX publish ever (§ 6.4) | ⚠️ **OPEN — owner decision** | **owner**, before 16.5 |
+| **15** | **Packaging shape measured on Windows / `win-x64` only**, generalized to three RIDs and both packing hosts | **extrapolated, not measured** | **16.3 / 16.4** on Linux + macOS runners |
+| **16** | **`NuxtPrerender` spawns Node via the single-string `ProcessStartInfo` overload** (`:251`); the artefact path is now consumer-chosen, so any space in it breaks the leading channel's first run | **unexercised** — the probe path had no spaces | **Story 16.3** (move to `ArgumentList`) |
+
+*Items 11–16 added by the code review of 2026-08-07. Items 2 and 3 closed by work that landed since.*
 
 ---
 
@@ -709,8 +919,22 @@ rather than an oversight.
 
 - **This report** — `_bmad-output/implementation-artifacts/16-1-spike-report.md`
 - **ADR 0040** — `docs/adrs/0040-release-channels-and-versioning-policy.md` (**Proposed**; ratification is
-  owner action § 8 item 6). **0039 was NOT free** — Story 4.9 claimed it on 2026-08-06, which the story file
-  told us to verify rather than assume. 0019 remains claimed-but-unwritten by Story 18.3.
-- **One index line** in `docs/adrs/README.md`
+  owner action § 8 item 6). **0039 was NOT free**, which the story file told us to verify rather than assume.
+  0019 remains claimed-but-unwritten by Story 18.3.
+
+  ⚠️ **Corrected 2026-08-07 — the attribution here was false.** This line originally read *"Story 4.9 claimed
+  it on 2026-08-06."* It did not. **0039 is `0039-runtime-attached-body-level-classes.md`** — "A Second
+  Bounded Unscoped Layer, for Runtime-Attached Body-Level Classes" — authored from **the owner's verify round
+  on the sunburst surfaces**, Deciders: Matthew-Hope Eland, landed in `76e5e42`/`6a7bc71`. Story 4.9 had
+  merely *reserved* 0039 in its own story file and ultimately landed as **ADR 0041**, whose header states:
+  *"Took 0041 because 0039 **and** 0040 were both claimed after the story's baseline."* Story 4.9's own code
+  review had already caught this and assigned the correction to this story. It was repeated in five places —
+  here, the story file's Task 6 and Completion Note 4, the `docs/adrs/README.md` index entry, and the commit
+  message of `9837e67`. All except the immutable commit message are now corrected. The conclusion — that 0040
+  was the right number — is unaffected; only the reason given for it was wrong.
+- **One index entry** in `docs/adrs/README.md` (the file's house style is a multi-line bullet, so "one line"
+  meant one entry).
 - **No `spike/release/**`** — the probe needed no committed throwaway code; it was six shell commands and a
-  reverted csproj item, all reproduced verbatim in § 2.1.
+  reverted csproj item, all reproduced in § 2.1. *(Corrected 2026-08-07: the word "verbatim" did not hold —
+  § 2.1 carried `CopyToOutputDirectory="Never"` and the story file's Debug Log did not. The two records now
+  agree, and ADR 0040 § Decision 1 carries the normative form.)*
