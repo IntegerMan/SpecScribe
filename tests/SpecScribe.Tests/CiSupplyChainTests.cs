@@ -53,13 +53,23 @@ public class CiSupplyChainTests
         // line, where it can reach process listings and logs. The correct form — which this repo already uses
         // — is to bind it to `env:` once and reference the environment variable.
         var offenders = new List<string>();
-        var runBlock = new Regex(@"run:\s*\|?(?<body>(?:\n[ \t]+.*)+)", RegexOptions.Multiline);
+        var runLine = new Regex(@"^(?<indent>[ \t]*)run:\s*(?<value>.*)$", RegexOptions.Multiline);
 
         foreach (var (name, text) in Workflows())
         {
-            foreach (Match m in runBlock.Matches(text))
+            var lines = text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+            foreach (Match m in runLine.Matches(text))
             {
-                var body = m.Groups["body"].Value;
+                var body = m.Groups["value"].Value;
+                if (body is "|" or ">")
+                {
+                    var runLineIndex = text[..m.Index].Count(character => character == '\n');
+                    var bodyIndent = m.Groups["indent"].Length;
+                    var bodyLines = lines
+                        .Skip(runLineIndex + 1)
+                        .TakeWhile(line => line.Length == 0 || line.TakeWhile(char.IsWhiteSpace).Count() > bodyIndent);
+                    body = string.Join('\n', bodyLines);
+                }
                 if (body.Contains("secrets.", StringComparison.Ordinal))
                     offenders.Add($"{name}: a `run:` body interpolates a secret");
             }

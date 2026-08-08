@@ -171,41 +171,17 @@ construction, and a branch ruleset touches neither workflow:
 The one interaction worth stating plainly: **Pages deploys, it does not write to `main`.** A branch ruleset
 constrains writes to a ref, so it cannot block a deployment.
 
-## How a release tag inherits this gate
+## How Stage A inherits this gate
 
-Per [ADR 0040 §9](adrs/0040-release-channels-and-versioning-policy.md), the release pipeline does **not**
-re-run build+test inside the release job. It requires that **the tagged commit is already green on `main`**.
-This document's job is to make "green on `main`" mean something.
+Per [ADR 0040 §9](adrs/0040-release-channels-and-versioning-policy.md), Stage A does **not** re-run build+test
+or query check runs. Its `stage-a-prepare` job declares `needs: build-test-analyze` in the same `main` push
+workflow, so it cannot allocate a tag unless the required build/test job passed.
 
-**Implemented by Story 16.4** in [`.github/workflows/release.yml`](../.github/workflows/release.yml)'s
-`preflight` job, which runs before anything is built and before any credential exchange. The decision logic is
-[`.github/scripts/release/gate-verdict.mjs`](../.github/scripts/release/gate-verdict.mjs) and the polling
-wrapper is `require-green-gate.sh`; both are driven red and green from fixtures by `selftest.mjs`, which runs
-as the first job of every release. See [docs/Releasing.md](Releasing.md) § How publishing is gated on build +
-test for the failure branches (no run found, in progress, red re-run) and what the operator sees for each.
+**Implemented by Story 16.4** in [`.github/workflows/build-test-analyze.yml`](../.github/workflows/build-test-analyze.yml).
+Stage B is manual [`.github/workflows/release.yml`](../.github/workflows/release.yml): it validates the
+selected Stage A tag and prerelease Release rather than polling a CI API.
 
-> ⚠️ **The shipped implementation uses the CHECK-RUNS API, not the workflow-runs query below.** Both answer the
-> question; the check-runs form answers it in one call and cannot express the job-vs-run trap at all, because
-> check runs are already per-job. The query below is kept because it is the shape to reach for at a terminal,
-> and because it documents the trap that motivated the choice.
-
-The query shape is:
-
-```sh
-# Latest build-test-analyze conclusion for the exact commit a tag points at
-SHA=$(gh api repos/IntegerMan/SpecScribe/git/refs/tags/<tag> --jq '.object.sha')
-gh api "repos/IntegerMan/SpecScribe/actions/workflows/build-test-analyze.yml/runs?head_sha=$SHA" \
-  --jq '.workflow_runs[] | [.run_number, .conclusion] | @tsv'
-```
-
-Note that a **run-level** conclusion is not sufficient on its own: `portability-probe`'s job-level
-`continue-on-error` means the run can report `success` while that job is red. Query the **`build-test-analyze`
-job's** conclusion, not the run's, exactly as this document's required-context rule does:
-
-```sh
-gh api repos/IntegerMan/SpecScribe/actions/runs/<run_id>/jobs \
-  --jq '.jobs[] | select(.name == "build-test-analyze") | .conclusion'
-```
+The old check-run polling procedure is retired. A release with no Stage A prerelease Release is not promotable.
 
 ## Deliberately absent: a README CI badge
 

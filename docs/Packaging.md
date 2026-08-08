@@ -5,7 +5,7 @@ build that ships a package which cannot render.
 
 **Authority:** [ADR 0040](adrs/0040-release-channels-and-versioning-policy.md) decides the channels, the
 packaging shape, the versioning mechanism and the RID matrix. This document is the operational companion —
-it records *how*, not *whether*. Written by Story 16.3; Story 16.4 builds the tag-triggered pipeline on it.
+it records *how*, not *whether*. Written by Story 16.3; Story 16.4's Stage A builds the release assets on it.
 
 **Nothing here publishes anything.** Every command below produces a package locally and installs it from a
 local feed. Pushing to nuget.org / npm is Story 16.4's, and it is gated on owner actions besides.
@@ -230,10 +230,10 @@ Derive these figures rather than quoting them — the payload has moved twice al
 ### Closed by Story 16.4 — see [docs/Releasing.md](Releasing.md)
 
 These three were listed here as gaps and are now covered by
-[`.github/workflows/release.yml`](../.github/workflows/release.yml):
+[`.github/workflows/build-test-analyze.yml`](../.github/workflows/build-test-analyze.yml):
 
-- **Publishing.** The tag-triggered pipeline pushes to nuget.org through a Trusted Publishing credential
-  exchange and attaches the three self-contained archives to a GitHub Release.
+- **Stage A assets.** The main-push workflow builds the nupkg and three self-contained archives, then creates
+  the prerelease GitHub Release. Manual Stage B promotion in `release.yml` pushes the durable nupkg asset.
 - **Cross-RID execution.** `win-x64`, `linux-x64` and `osx-arm64` are each **produced on, and executed on,
   their own operating system** in the release matrix — including a run from a path containing a space, from a
   foreign repository, with `SPECSCRIBE_RENDERER_DIR` unset. 16.3's host-RID-only proof is superseded.
