@@ -665,7 +665,7 @@ public static partial class HierarchyExplorer
         var externalTwin = cfg.ExternalTwinClass is { Length: > 0 } twinClass
             ? $" data-hierarchy-external-twin=\"{PathUtil.Html(twinClass)}\""
             : string.Empty;
-        body.Append($"<div class=\"ss-hierarchy\" id=\"{PathUtil.Html(id)}\" {HostMarker}{externalTwin}></div>\n");
+        body.Append($"<div class=\"ss-hierarchy\" id=\"{PathUtil.Html(id)}\"{externalTwin} {HostMarker}></div>\n");
         body.Append($"<div class=\"ss-hierarchy-live sr-only\" aria-live=\"polite\"></div>\n");
 
         body.Append(legendHtml ?? LegendHtml(model));

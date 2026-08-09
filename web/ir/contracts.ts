@@ -106,7 +106,7 @@ function hasSubstantiveContent(inner: string | null): boolean {
 
 /** A surface-owned external twin must be declared by the hierarchy host and contain real server-rendered text. */
 function hasSubstantiveExternalTwin(html: string): boolean {
-  const host = /<[^>]*\bdata-hierarchy\b[^>]*\bdata-hierarchy-external-twin="([A-Za-z][A-Za-z0-9_-]*)"[^>]*>/i.exec(html)
+  const host = /<(?=[^>]*\bdata-hierarchy\b)(?=[^>]*\bdata-hierarchy-external-twin="([A-Za-z][A-Za-z0-9_-]*)")[^>]*>/i.exec(html)
   if (!host) return false
   return hasSubstantiveContent(elementInnerHtmlByClass(html, host[1]!))
 }
