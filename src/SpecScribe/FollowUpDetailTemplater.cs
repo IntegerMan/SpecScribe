@@ -102,7 +102,8 @@ public static class FollowUpDetailTemplater
         string listOutputPath,
         CommandCatalog? commands = null,
         int? epicNumber = null,
-        NavLocalContext? localContext = null)
+        NavLocalContext? localContext = null,
+        string? displayBodyHtml = null)
     {
         var outputPath = FollowUpSlug.OutputPath(slug);
         var prefix = PathUtil.RelativePrefix(outputPath);
@@ -125,7 +126,7 @@ public static class FollowUpDetailTemplater
         sb.Append("</div>\n</header>\n\n");
 
         sb.Append("<section class=\"followup-detail-body\">\n");
-        sb.Append($"  <div class=\"deferred-item-body followup-detail-fulltext\">{item.BodyHtml}</div>\n");
+        sb.Append($"  <div class=\"deferred-item-body followup-detail-fulltext\">{displayBodyHtml ?? item.BodyHtml}</div>\n");
 
         // Provenance: ## Deferred from: source framing (deferred-item branch).
         sb.Append("  <div class=\"followup-detail-provenance epic-card\">\n");

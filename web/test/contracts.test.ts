@@ -99,6 +99,20 @@ describe('the twin contract cannot be satisfied by something that is not a twin 
     const v = dashboardContract(chartWith('<div class="ss-hierarchy-twin"><ul><li>Epic 1</li></ul></div>'))
     expect(v).toEqual([])
   })
+
+  it('accepts a declared external twin only when that surface-owned listing has content', () => {
+    const external = chartWith(
+      '<div data-hierarchy="treemap" data-hierarchy-external-twin="codemap-table-section"></div>' +
+      '<section class="codemap-table-section"><table><tbody><tr><td>src/App.cs</td></tr></tbody></table></section>',
+    )
+    expect(dashboardContract(external)).toEqual([])
+
+    const empty = chartWith(
+      '<div data-hierarchy="treemap" data-hierarchy-external-twin="codemap-table-section"></div>' +
+      '<section class="codemap-table-section"></section>',
+    )
+    expect(dashboardContract(empty).map((v) => v.code)).toEqual(['chart-without-text-twin'])
+  })
 })
 
 describe('the contract reads the WHOLE region, not just <main> [F-7]', () => {

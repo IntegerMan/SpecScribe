@@ -206,7 +206,7 @@ public static class AboutSddTemplater
         /// them yet.</summary>
         public static FamilyMatrix None { get; } = Uniform(FamilySupport.NotProjected);
 
-        /// <summary>GSD Core, per owner decisions D1/D3 and the module ceiling (Gap 3). The three unticked rows are
+        /// <summary>GSD Core, per owner decisions D1/D3 and the module ceiling (Gap 3). The remaining unticked rows are
         /// each unticked for a DIFFERENT stated reason, spelled out in words on the framework page.</summary>
         public static FamilyMatrix GsdCore { get; } = new(
             EpicsAndStories: FamilySupport.Supported,  // ROADMAP.md → phases + plans
@@ -214,7 +214,7 @@ public static class AboutSddTemplater
             Sprint: FamilySupport.Supported,           // STATE.md + the roadmap's per-plan checkbox
             Retros: FamilySupport.NoAnalog,            // GSD Core has no retrospective artifact at all
             PlanningDocs: FamilySupport.NotProjected,  // Gap 3 — ModuleContext is BMad-typed
-            Commands: FamilySupport.NotProjected);     // Gap 3 — the 67 /gsd-* commands are in-repo but unreachable
+            Commands: FamilySupport.Supported);        // Installed .claude/commands/gsd definitions drive next steps
 
         private static FamilyMatrix Uniform(FamilySupport v) => new(v, v, v, v, v, v);
 
@@ -442,7 +442,8 @@ public static class AboutSddTemplater
         sb.Append("becomes an epic and each <em>plan</em> (<code>NN-YY-PLAN.md</code>) becomes a story, with the ");
         sb.Append("roadmap's per-plan checkbox as the completion signal. Milestones render as banded groups on the ");
         sb.Append($"<a href=\"{PathUtil.Html(SiteNav.EpicsOutputPath)}\">Epics &amp; Stories</a> index, and ");
-        sb.Append("<code>.planning/STATE.md</code> supplies the sprint view. Support is per-family, not blanket:</p>\n");
+        sb.Append("<code>.planning/STATE.md</code> supplies the sprint view. Next-step prompts discover installed ");
+        sb.Append("definitions from <code>.claude/commands/gsd/</code>, so unavailable commands are omitted. Support is per-family, not blanket:</p>\n");
         AppendFamilySupportTable(sb, FamilyMatrix.GsdCore);
 
         sb.Append("  <h3 id=\"boundaries\">Why three rows are not ticked</h3>\n");
@@ -459,12 +460,11 @@ public static class AboutSddTemplater
         sb.Append("Core has no retrospective artifact at all. Its per-plan <code>NN-YY-SUMMARY.md</code> files are ");
         sb.Append("execution logs, and treating one as a retrospective would mark its phase closed out on every ");
         sb.Append("status surface on the strength of a build log. They render as their own pages instead.</dd></div>\n");
-        sb.Append("    <div class=\"cap-row\"><dt>Planning docs and Commands</dt><dd>A shared ceiling, not a GSD ");
-        sb.Append("gap. Both columns are driven by SpecScribe's module-identity model, which is typed to BMad's ");
-        sb.Append("installed-module layout (<code>_bmad/{code}/</code>) &mdash; so a non-BMad framework cannot fill ");
-        sb.Append("them however well its artifacts parse. GSD's slash commands genuinely are in the repository, at ");
-        sb.Append("<code>.claude/commands/gsd/</code>, and would populate the Commands column well; widening the ");
-        sb.Append("model to reach them is its own decision, deliberately not taken here.</dd></div>\n");
+        sb.Append("    <div class=\"cap-row\"><dt>Planning docs</dt><dd>The module-planning-doc column remains a ");
+        sb.Append("ceiling, not a GSD gap. It is driven by SpecScribe's BMad-specific module-identity model and its ");
+        sb.Append("installed-module layout (<code>_bmad/{code}/</code>). GSD workflow commands do not require that ");
+        sb.Append("identity: each installed definition under <code>.claude/commands/gsd/</code> is discovered directly ");
+        sb.Append("for the matching next-step prompt.</dd></div>\n");
         sb.Append("  </dl>\n");
         sb.Append("  <p>Everything else under <code>.planning/</code> &mdash; the project brief, the codebase map, ");
         sb.Append("research notes, todos, and each phase's context and verification companions &mdash; renders as ");
@@ -478,7 +478,8 @@ public static class AboutSddTemplater
         sb.Append("    <li><code>/gsd-requirements</code> — capture requirements</li>\n");
         sb.Append("    <li><code>/gsd-roadmap</code> — plan milestones and phases</li>\n");
         sb.Append("    <li><code>/gsd-plan-phase</code> — decompose a phase into numbered plans</li>\n");
-        sb.Append("    <li><code>/gsd-execute</code> — execute a plan and write its summary</li>\n");
+        sb.Append("    <li><code>/gsd-execute-phase</code> — execute every plan in a phase</li>\n");
+        sb.Append("    <li><code>/gsd-code-review</code> — review a completed phase</li>\n");
         sb.Append("    <li><code>/gsd-review-backlog</code> — promote backlog phases into the roadmap</li>\n");
         sb.Append("  </ul>\n");
 

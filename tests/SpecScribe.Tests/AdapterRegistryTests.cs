@@ -262,6 +262,8 @@ public class AdapterRegistryTests : IDisposable
         Assert.NotNull(bundle.Epics);
         Assert.Equal(Path.Combine(root, ".planning", "ROADMAP.md"), bundle.EpicsSourceFullPath);
         Assert.Single(bundle.Epics!.Milestones);
+        Assert.Equal("GSD Core", Assert.IsType<CommandCatalog>(bundle.WorkflowCommands).ModuleLabel);
+        Assert.True(bundle.WorkflowCommands!.IsEmpty);
 
         var matchSet = Assert.Single(bundle.Diagnostics.Where(d => d.Message.Contains("adapters recognized this repository")));
         Assert.Equal(AdapterDiagnosticCategory.Informational, matchSet.Category);

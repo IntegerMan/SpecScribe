@@ -466,6 +466,17 @@ public static class BmadCommands
         }
     }
 
+    private static string? CommandForStory(CommandCatalog commands, string step, StoryInfo story) =>
+        commands.Command(step, commands.UsesPhaseArguments && story.WorkflowCommandArgument is { Length: > 0 } arg ? arg : story.Id);
+
+    private static string? CommandForEpic(CommandCatalog commands, string step, EpicInfo epic)
+    {
+        var needsPhaseArgument = step is "create-epics-and-stories" or "create-story" or "dev-story" or "code-review";
+        return commands.Command(step, commands.UsesPhaseArguments && needsPhaseArgument
+            ? epic.WorkflowCommandArgument
+            : null);
+    }
+
     /// <summary>A story page only suggests actions on *this* story — drafting other stories and
     /// retrospectives are epic/project-level moves that belong on those pages (<see cref="ForEpic"/>,
     /// <see cref="ForProject"/>). The one exception is `create-story` with the story's own id when no plan
@@ -491,7 +502,7 @@ public static class BmadCommands
 
         if (stage == "ready")
         {
-            Add(suggestions, commands.Command("dev-story", story.Id),
+            Add(suggestions, CommandForStory(commands, "dev-story", story),
                 "Implements the story exactly as specified — tasks, acceptance criteria, and dev notes drive the work.");
             AppendDeferredAlternate(suggestions, story.Id, "Story", openDeferred, commands);
             return suggestions;
@@ -499,9 +510,9 @@ public static class BmadCommands
 
         if (stage == "active")
         {
-            Add(suggestions, commands.Command("dev-story", story.Id),
+            Add(suggestions, CommandForStory(commands, "dev-story", story),
                 "Resumes implementation from the unchecked tasks in the story plan.");
-            Add(suggestions, commands.Command("code-review", story.Id),
+            Add(suggestions, CommandForStory(commands, "code-review", story),
                 "Review the work so far — worth running before marking the story done.");
             Add(suggestions, commands.Command("correct-course"),
                 "Re-plan this story mid-sprint if scope shifted or something's blocking.");
@@ -511,7 +522,7 @@ public static class BmadCommands
 
         if (stage == "review")
         {
-            Add(suggestions, commands.Command("code-review", story.Id),
+            Add(suggestions, CommandForStory(commands, "code-review", story),
                 "Final adversarial pass over the story's changes.");
             Add(suggestions, commands.Command("correct-course"),
                 "If review surfaces a scope problem, re-plan before re-review.");
@@ -528,7 +539,7 @@ public static class BmadCommands
             return suggestions;
         }
 
-        Add(suggestions, commands.Command("create-story", story.Id),
+        Add(suggestions, CommandForStory(commands, "create-story", story),
             "Generates the dedicated story file with full implementation context.");
 
         if (story.Id.EndsWith(".1", StringComparison.Ordinal))
@@ -551,7 +562,7 @@ public static class BmadCommands
 
         if (epicClass == "pending")
         {
-            Add(suggestions, commands.Command("create-epics-and-stories"),
+            Add(suggestions, CommandForEpic(commands, "create-epics-and-stories", epic),
                 $"Drafts the story breakdown for Epic {epic.Number} from the plan and architecture — it doesn't have one yet.");
             AppendDeferredAlternate(suggestions, entityId, "Epic", openDeferred, commands);
             return suggestions;
@@ -582,7 +593,7 @@ public static class BmadCommands
 
             if (!hasFrontLine && nextToDetail is not null)
             {
-                Add(suggestions, commands.Command("create-story", nextToDetail.Id),
+                Add(suggestions, CommandForStory(commands, "create-story", nextToDetail),
                     "Drafts the next story in this epic that doesn't have an implementation plan yet.");
                 Add(suggestions, commands.Command("sprint-status"),
                     "Surfaces this epic's current risks and the recommended next action.");
@@ -595,7 +606,7 @@ public static class BmadCommands
 
             if (nextToDetail is not null)
             {
-                Add(suggestions, commands.Command("create-story", nextToDetail.Id),
+                Add(suggestions, CommandForStory(commands, "create-story", nextToDetail),
                     "Drafts the next story in this epic that doesn't have an implementation plan yet.");
             }
 
@@ -610,7 +621,7 @@ public static class BmadCommands
         var nextUndetailed = epic.Stories.FirstOrDefault(s => s.ArtifactOutputPath is null);
         if (nextUndetailed is not null)
         {
-            Add(suggestions, commands.Command("create-story", nextUndetailed.Id),
+            Add(suggestions, CommandForStory(commands, "create-story", nextUndetailed),
                 "Generates the implementation plan for the next story in this epic.");
         }
 
@@ -636,13 +647,17 @@ public static class BmadCommands
         var awaitingReview = allStories.Where(s => StatusStyles.ForStory(s) == "review").Select(s => s.Id).ToList();
         if (awaitingReview.Count == 1)
         {
-            Add(suggestions, commands.Command("code-review", awaitingReview[0]),
+            var story = allStories.First(s => s.Id == awaitingReview[0]);
+            Add(suggestions, CommandForStory(commands, "code-review", story),
                 $"Story {awaitingReview[0]} is awaiting code review — adversarial multi-layer review of its changes.");
         }
         else if (awaitingReview.Count > 1)
         {
-            Add(suggestions, commands.Command("code-review"),
-                $"Stories {string.Join(", ", awaitingReview)} are awaiting code review — adversarial multi-layer review of their changes.");
+            var command = commands.UsesPhaseArguments ? commands.Command("sprint-status") : commands.Command("code-review");
+            Add(suggestions, command,
+                commands.UsesPhaseArguments
+                    ? $"Stories {string.Join(", ", awaitingReview)} are awaiting review — inspect project progress to choose the next phase to review."
+                    : $"Stories {string.Join(", ", awaitingReview)} are awaiting code review — adversarial multi-layer review of their changes.");
         }
 
         // The current front line — a story that's ready or already in development. Referenced by its short
@@ -650,7 +665,7 @@ public static class BmadCommands
         var actionable = allStories.FirstOrDefault(s => StatusStyles.ForStory(s) is "ready" or "active");
         if (actionable is not null)
         {
-            Add(suggestions, commands.Command("dev-story", actionable.Id),
+            Add(suggestions, CommandForStory(commands, "dev-story", actionable),
                 $"Story {actionable.Id} is the current front line — implement it per its plan.");
         }
 
@@ -667,7 +682,7 @@ public static class BmadCommands
         if (epicNeedingStory is not null)
         {
             var nextStory = epicNeedingStory.Stories.First(s => s.ArtifactOutputPath is null);
-            Add(suggestions, commands.Command("create-story", nextStory.Id),
+            Add(suggestions, CommandForStory(commands, "create-story", nextStory),
                 // "Story N.M" (not a bare "(N.M)") so StoryEpicLinkifier links it to the story's page.
                 $"Drafts the implementation plan for Story {nextStory.Id} — Epic {epicNeedingStory.Number}'s next story that doesn't have one yet.");
         }
@@ -676,7 +691,7 @@ public static class BmadCommands
         var pendingEpic = model.Epics.FirstOrDefault(e => e.Status == EpicStatus.Pending);
         if (pendingEpic is not null)
         {
-            Add(suggestions, commands.Command("create-epics-and-stories"),
+            Add(suggestions, CommandForEpic(commands, "create-epics-and-stories", pendingEpic),
                 $"Breaks Epic {pendingEpic.Number} down into stories — the next epic still awaiting a story breakdown.");
         }
 

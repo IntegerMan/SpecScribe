@@ -356,6 +356,32 @@ public class FollowUpSurfacesTests : IDisposable
     }
 
     [Fact]
+    public void FollowUpDetailTemplater_DeferredPage_UsesLinkifiedDisplayBody_WithoutChangingDataCopy()
+    {
+        var item = new DeferredWorkItem(
+            "<p>See <a href=\"../../web/ir/adapter.ts\">adapter.ts</a>.</p>", false, null, null);
+        var commands = new CommandCatalog("BMad", new Dictionary<string, string>
+        {
+            ["quick-dev"] = "/bmad-quick-dev",
+        });
+        var nav = new SiteNav
+        {
+            SiteTitle = "SpecScribe",
+            Items = Array.Empty<(string, string)>(),
+            Groups = Array.Empty<(string, IReadOnlyList<(string, string)>)>(),
+            QuickLinks = Array.Empty<(string, string, string, string)>(),
+        };
+
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(FollowUpDetailTemplater.BuildDeferredPage(
+            item, "Deferred work", null, "deferred-code-reference", nav, "deferred-work.html", commands,
+            displayBodyHtml: "<p>See <a href=\"../code/web/ir/adapter.ts.html\">adapter.ts</a>.</p>"));
+
+        Assert.Contains("href=\"../code/web/ir/adapter.ts.html\"", html);
+        foreach (Match m in Regex.Matches(html, "data-copy=\"([^\"]*)\""))
+            Assert.DoesNotContain("<a", m.Groups[1].Value);
+    }
+
+    [Fact]
     public void DeferredWork_StructuredCards_ResolvedTreatment_HomeCalloutSurvives()
     {
         File.WriteAllText(Path.Combine(Source, "implementation-artifacts", "sprint-status.yaml"), """

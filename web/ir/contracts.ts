@@ -73,8 +73,14 @@ function regionHtml(page: ContractPage): string {
  * either. Both were live holes before the 23.4 review.
  */
 function twinInnerHtml(html: string): string | null {
+  return elementInnerHtmlByClass(html, TWIN_CLASS)
+}
+
+/** The inner HTML of the first real element carrying an exact class token. */
+function elementInnerHtmlByClass(html: string, className: string): string | null {
   const withoutComments = html.replace(/<!--[\s\S]*?-->/g, '')
-  const open = new RegExp(`<([a-z]+)\\b[^>]*\\bclass="[^"]*\\b${TWIN_CLASS}\\b[^"]*"[^>]*>`, 'i')
+  const escapedClass = className.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const open = new RegExp(`<([a-z]+)\\b[^>]*\\bclass="[^"]*\\b${escapedClass}\\b[^"]*"[^>]*>`, 'i')
   const m = open.exec(withoutComments)
   if (!m) return null
   const start = m.index + m[0].length
@@ -90,8 +96,19 @@ function twinInnerHtml(html: string): string | null {
  */
 function hasSubstantiveTwin(html: string): boolean {
   const inner = twinInnerHtml(html)
+  return hasSubstantiveContent(inner)
+}
+
+function hasSubstantiveContent(inner: string | null): boolean {
   if (inner === null) return false
   return inner.replace(/<[^>]*>/g, '').trim().length > 0
+}
+
+/** A surface-owned external twin must be declared by the hierarchy host and contain real server-rendered text. */
+function hasSubstantiveExternalTwin(html: string): boolean {
+  const host = /<(?=[^>]*\bdata-hierarchy\b)(?=[^>]*\bdata-hierarchy-external-twin="([A-Za-z][A-Za-z0-9_-]*)")[^>]*>/i.exec(html)
+  if (!host) return false
+  return hasSubstantiveContent(elementInnerHtmlByClass(html, host[1]!))
 }
 
 /**
@@ -106,7 +123,8 @@ function hasSubstantiveTwin(html: string): boolean {
  */
 export function hierarchyTwinContract(page: ContractPage): ContractViolation[] {
   if (!page.needsHierarchyEngine) return []
-  if (hasSubstantiveTwin(regionHtml(page))) return []
+  const html = regionHtml(page)
+  if (hasSubstantiveTwin(html) || hasSubstantiveExternalTwin(html)) return []
   return [
     {
       severity: 'error',

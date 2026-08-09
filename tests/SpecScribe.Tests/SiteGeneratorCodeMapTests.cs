@@ -103,6 +103,7 @@ public class SiteGeneratorCodeMapTests : IDisposable
         // ProjectCodeMap payload. What a JS-off visitor gets is the per-variant text-equivalent table, which
         // Story 20.6 D1 audited and KEPT as this surface's twin because it is richer than the generic listing.
         Assert.Contains(HierarchyExplorer.HostMarker, html);
+        Assert.Contains("data-hierarchy-external-twin=\"codemap-table-section\"", html);
         Assert.Contains("ss-hierarchy-data", html);
         Assert.DoesNotContain("class=\"codemap\"", html);
         Assert.Contains("codemap-table", html);

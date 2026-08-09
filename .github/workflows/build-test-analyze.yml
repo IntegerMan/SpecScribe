@@ -85,14 +85,14 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # Sonar: "shallow clones should be disabled for a better relevancy of
           # analysis" — blame data drives new-code detection and issue authorship.
           fetch-depth: 0
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           # Every project in this repo targets net10.0. Do NOT copy the 9.0.x pin
           # from publish-docs-live-pages.yml — SDK 9 cannot build a net10.0
@@ -113,7 +113,7 @@ jobs:
         # The version comes from web/.nvmrc (24.11.1), which 23.5 added because the repo pinned Node
         # NOWHERE — no .nvmrc, no engines field, no global.json — while web/CONVENTIONS.md named a version
         # in prose. Nuxt 4 requires ^22.19 || ^24.11 || >=26, so an unpinned runner was a live risk.
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version-file: web/.nvmrc
           cache: npm
@@ -440,12 +440,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
           cache: true
@@ -481,7 +481,7 @@ jobs:
       # -----------------------------------------------------------------------
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version-file: web/.nvmrc
           cache: npm
@@ -523,10 +523,10 @@ jobs:
       version: ${{ steps.tag.outputs.version }}
       epoch: ${{ steps.tag.outputs.epoch }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version-file: web/.nvmrc
       - name: Prove release guards before allocating a tag
@@ -566,16 +566,16 @@ jobs:
       SOURCE_DATE_EPOCH: ${{ needs.stage-a-prepare.outputs.epoch }}
       TAG: ${{ needs.stage-a-prepare.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ needs.stage-a-prepare.outputs.sha }}
           fetch-depth: 0
       - name: Create the local candidate tag for MinVer
         run: git tag --force "$TAG" '${{ needs.stage-a-prepare.outputs.sha }}'
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version-file: web/.nvmrc
           cache: npm
@@ -612,16 +612,16 @@ jobs:
     defaults:
       run: { shell: bash }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ needs.stage-a-prepare.outputs.sha }}
           fetch-depth: 0
       - name: Create the local candidate tag for MinVer
         run: git tag --force "$TAG" '${{ needs.stage-a-prepare.outputs.sha }}'
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version-file: web/.nvmrc
           cache: npm
@@ -670,11 +670,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ needs.stage-a-prepare.outputs.sha }}
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version-file: web/.nvmrc
       - uses: actions/download-artifact@v4

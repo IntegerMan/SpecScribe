@@ -389,7 +389,7 @@ public class ChartsTests
     [Fact]
     public void Sunburst_TaskWeighting_LargerStoryTakesMoreAngularSpace()
     {
-        // Empty-task story: middle-ring sb-noplan (no outer create-story fringe).
+        // Zero-task story with an explicit lifecycle: middle-ring ready (no outer task fringe).
         // [spec-9-13-deferred-glance-weight-noplan-sourcekey]
         var model = new EpicsModel
         {
@@ -400,11 +400,11 @@ public class ChartsTests
 
         var svg = Glance(model);
 
-        // No outer task fringe (done/pending task arcs); empty-task story uses middle-ring noplan.
-        Assert.Contains("\"colorClass\":\"sb-seg sb-noplan\"", svg);
+        // No outer task fringe (done/pending task arcs); explicit lifecycle stays visible.
+        Assert.Contains("\"colorClass\":\"sb-seg sb-ready\"", svg);
         Assert.Contains("Story 1.1: Planned", svg);
         Assert.Contains("Story 1.2: Unplanned", svg);
-        Assert.Contains("No task plan", svg);
+        Assert.Contains("Ready for dev", svg);
     }
 
     [Fact]
@@ -419,11 +419,11 @@ public class ChartsTests
 
         var svg = Glance(model);
 
-        // Middle-ring noplan; no outer create-story fringe. [spec-9-13-deferred-glance-weight-noplan-sourcekey]
-        Assert.Contains("\"colorClass\":\"sb-seg sb-noplan\"", svg);
-        Assert.Contains("no task plan yet", svg);
+        // Middle-ring retains explicit lifecycle; no outer task fringe.
+        Assert.Contains("\"colorClass\":\"sb-seg sb-ready\"", svg);
+        Assert.Contains("Ready for dev", svg);
         Assert.DoesNotContain("create-story", svg);
-        Assert.Contains("No task plan", svg);
+        Assert.DoesNotContain("No task plan", svg);
     }
 
     [Fact]
@@ -433,11 +433,11 @@ public class ChartsTests
 
         var svg = EpicGlance(epic, _ => "epics/epic-1.html");
 
-        Assert.Contains("\"colorClass\":\"sb-seg sb-noplan\"", svg);
-        Assert.Contains("no task plan yet", svg);
+        Assert.Contains("\"colorClass\":\"sb-seg sb-ready\"", svg);
+        Assert.Contains("Ready for dev", svg);
         Assert.DoesNotContain("create-story", svg);
         Assert.Contains("Story 1.1: Unplanned", svg);
-        Assert.Contains("No task plan", svg);
+        Assert.DoesNotContain("No task plan", svg);
     }
 
     [Fact]
@@ -939,8 +939,8 @@ public class ChartsTests
         // MEMBERSHIP is now derived from the payload rather than from a flag, so a swatch can no longer be
         // orphaned from its wedges by any route. [Story 20.7 Task 2.1]
         Assert.DoesNotContain("sb-story-summary", svg);
-        Assert.Contains("\"colorClass\":\"sb-seg sb-noplan\"", svg);
-        Assert.Contains("No task plan", svg);
+        Assert.Contains("\"colorClass\":\"sb-seg sb-ready\"", svg);
+        Assert.Contains("Ready for dev", svg);
     }
 
     [Fact]
@@ -977,8 +977,8 @@ public class ChartsTests
         // arithmetic that could be inverted or mis-scoped. Both epics now draw per-story wedges.
         Assert.DoesNotContain("sb-story-summary", svg);
         Assert.Contains("Story 1.1:", svg);                                  // epic 1 expanded
-        Assert.Contains("\"colorClass\":\"sb-seg sb-noplan\"", svg);          // epic 2's no-plan story
-        Assert.Contains("No task plan", svg);                                // legend surfaces it
+        Assert.Contains("\"colorClass\":\"sb-seg sb-ready\"", svg);           // epic 2's ready story
+        Assert.Contains("Ready for dev", svg);                               // legend surfaces it
     }
 
     [Fact]
@@ -2691,7 +2691,7 @@ public class ChartsTests
 
         var svg = Glance(model);
 
-        Assert.Contains("sb-noplan", svg);
+        Assert.Contains("sb-ready", svg);
         Assert.Contains("Story 1.1: Big story", svg);
         Assert.Contains("Story 1.2: Small story", svg);
     }
@@ -2816,7 +2816,7 @@ public class ChartsTests
 
         var svg = EpicGlance(epic, _ => "epics/epic-1.html");
 
-        Assert.Contains("\"colorClass\":\"sb-seg sb-noplan\"", svg);
+        Assert.Contains("\"colorClass\":\"sb-seg sb-ready\"", svg);
         Assert.Contains("Story 1.1: Big", svg);
         Assert.Contains("Story 1.2: Tiny", svg);
     }

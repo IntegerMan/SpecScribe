@@ -46,16 +46,21 @@ public sealed class CommandCatalog
 {
     private readonly IReadOnlyDictionary<string, string> _byStep;
 
-    public CommandCatalog(string moduleLabel, IReadOnlyDictionary<string, string> byStep)
+    public CommandCatalog(string moduleLabel, IReadOnlyDictionary<string, string> byStep, bool usesPhaseArguments = false)
     {
         ModuleLabel = moduleLabel;
         _byStep = byStep;
+        UsesPhaseArguments = usesPhaseArguments;
     }
 
     /// <summary>Human label for the module (e.g. "BMad Method"), parsed from module-help.csv. Kept as
     /// module metadata for callers that want to name the detected methodology; the "Next Steps" heading no
     /// longer renders it. EMPTY means "no label" — never a name; see <see cref="HasLabel"/>.</summary>
     public string ModuleLabel { get; }
+
+    /// <summary>Whether phase-targeted workflow steps use framework-native phase identifiers instead of the
+    /// shared synthetic epic/story ids.</summary>
+    public bool UsesPhaseArguments { get; }
 
     /// <summary>True when this catalog carries a real module label from a parsed <c>module-help.csv</c>. Every
     /// surface that NAMES the detected module must gate on this: <see cref="Empty"/> is the instance behind
