@@ -473,6 +473,19 @@ public class SprintTemplaterTests
     }
 
     [Fact]
+    public void RenderBoard_ExplicitLifecycleWithoutChecklist_IsNotNoPlan()
+    {
+        var sprint = SprintStatusParser.Parse("development_status:\n  2-3-completed: done\n")!;
+        var completed = Story("2.3", 2, "Completed plan", "epics/story-2-3.html");
+        completed.Status = "done";
+        var board = SprintTemplater.RenderBoard(sprint, EpicsWith(Epic(2, "Rendering", completed)));
+
+        Assert.Contains("class=\"sprint-card js-tip done\"", board);
+        Assert.DoesNotContain("class=\"sprint-card js-tip done no-plan\"", board);
+        Assert.Contains("No task checklist available", board);
+    }
+
+    [Fact]
     public void RenderBoard_RetiredStoryLandsInRetiredLaneNotUnrecognized()
     {
         var sprint = SprintStatusParser.Parse("""

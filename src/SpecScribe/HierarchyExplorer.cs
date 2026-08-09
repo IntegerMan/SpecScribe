@@ -446,7 +446,8 @@ public static partial class HierarchyExplorer
                 "story" when storiesById.TryGetValue(n.Id, out var s) =>
                     // Matches Charts.Sunburst's own wedge <title>: an un-drafted story says so in words rather than
                     // reporting "0 of 0 tasks done", which reads as failure instead of as not-yet-planned.
-                    s.TasksTotal == 0 ? "No task plan yet" : $"{s.TasksDone} of {s.TasksTotal} tasks done",
+                    StatusStyles.ForStoryDisplay(s) == "noplan" ? "No task plan yet"
+                    : s.TasksTotal == 0 ? "No task checklist available" : $"{s.TasksDone} of {s.TasksTotal} tasks done",
                 // story-summary, aggregate, follow-up and unplanned nodes already state their count in their own
                 // label ("Epic 7: 3 open follow-ups"), so a Detail here would only repeat it.
                 _ => string.Empty,

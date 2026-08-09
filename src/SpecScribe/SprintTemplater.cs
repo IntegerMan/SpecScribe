@@ -522,9 +522,9 @@ public static class SprintTemplater
         // Unmatched entries (no model story, so no href) still need to be keyboard-reachable — they're
         // exactly the stale/unmatched cases a maintainer most wants to inspect. [Story 2.3 review]
         var focusAttr = href is null ? " tabindex=\"0\" role=\"group\"" : string.Empty;
-        // No-plan cards (null story or TasksTotal == 0) get a dashed/muted treatment — the visual inverse of
+        // No-plan cards (an unmatched or unclassified zero-task story) get a dashed/muted treatment — the visual inverse of
         // the progress-bar gate — so they separate from actionable cards at a glance. [Story 8.4; UX-DR24]
-        var noPlan = story is null || story.TasksTotal == 0;
+        var noPlan = story is null || StatusStyles.ForStoryDisplay(story) == "noplan";
         var noPlanClass = noPlan ? " no-plan" : string.Empty;
         var epicAttr = entry.EpicNumber is { } en ? $" data-epic=\"{en}\"" : string.Empty;
         var hiddenAttr = hidden ? " hidden" : string.Empty;
@@ -657,9 +657,12 @@ public static class SprintTemplater
         var idText = story?.Id ?? (entry.EpicNumber is { } e2 && entry.StoryMinor is { } m2 ? $"{e2}.{m2}" : entry.RawKey);
         var storyTitle = story is not null ? PathUtil.StripHtmlTags(story.Title) : PrettifySlug(entry.RawKey);
         lines.Add($"Story {idText}: {storyTitle}");
-        lines.Add(story is { TasksTotal: > 0 }
-            ? $"{story.TasksDone} of {story.TasksTotal} {Charts.Plural(story.TasksTotal, "task", "tasks")} done"
-            : "No task plan yet");
+        lines.Add(story switch
+        {
+            { TasksTotal: > 0 } => $"{story.TasksDone} of {story.TasksTotal} {Charts.Plural(story.TasksTotal, "task", "tasks")} done",
+            not null when StatusStyles.ForStoryDisplay(story) != "noplan" => "No task checklist available",
+            _ => "No task plan yet",
+        });
         return string.Join("\n", lines);
     }
 

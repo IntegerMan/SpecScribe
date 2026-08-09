@@ -43,6 +43,19 @@ public class StatusStylesTests
         => Assert.Equal(expected, StatusStyles.ForStory(Story(status)));
 
     [Fact]
+    public void ForStoryDisplay_UsesNoPlanOnlyWhenStatusAndTaskTallyAreAbsent()
+    {
+        var doneWithoutChecklist = Story("done");
+        doneWithoutChecklist.TasksTotal = 0;
+
+        var unclassifiedWithoutChecklist = Story(null);
+        unclassifiedWithoutChecklist.TasksTotal = 0;
+
+        Assert.Equal("done", StatusStyles.ForStoryDisplay(doneWithoutChecklist));
+        Assert.Equal("noplan", StatusStyles.ForStoryDisplay(unclassifiedWithoutChecklist));
+    }
+
+    [Fact]
     public void ForEpic_PendingOrStorylessEpicsArePending()
     {
         Assert.Equal("pending", StatusStyles.ForEpic(Epic(EpicStatus.Pending, Story("done"))));

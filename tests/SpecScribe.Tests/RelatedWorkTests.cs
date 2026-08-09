@@ -658,6 +658,18 @@ public class RelatedWorkTests
             StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void RenderPane_ExplicitLifecycleWithoutChecklist_UsesChecklistCopy()
+    {
+        var epics = TwoEpicModel();
+        epics.Epics[0].Stories[0].Status = "done";
+        var pane = BuildPane(Geometry(deferred: new[] { Deferred("A debt", epic: 1, sourceStoryId: "1.1") }), epicsModel: epics);
+        var story = Assert.Single(pane.Cards, c => c.IslandId == "1.1");
+
+        Assert.StartsWith("Done", story.Summary, StringComparison.Ordinal);
+        Assert.EndsWith("no task checklist available", story.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
     // ---- Story 20.8 D3: the aggregates and the `unplanned` root -------------------------------------------
 
     [Fact]

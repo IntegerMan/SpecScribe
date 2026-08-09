@@ -282,9 +282,10 @@ public static class RelatedWorkCards
         if (storiesById.TryGetValue(islandId, out var story))
         {
             var stage = StatusStyles.ForStory(story);
-            var progress = story.TasksTotal == 0
+            var displayClass = StatusStyles.ForStoryDisplay(story);
+            var progress = displayClass == "noplan"
                 ? "no task plan yet"
-                : $"{story.TasksDone} of {story.TasksTotal} tasks done";
+                : story.TasksTotal == 0 ? "no task checklist available" : $"{story.TasksDone} of {story.TasksTotal} tasks done";
             // ONE list, computed once, feeding BOTH the command gating and the children list — the round-2 code
             // already computed exactly this to feed PrimaryStoryCommand.
             var openDeferred = geometry.DeferredForSource(story.Id)?.Where(IsOpen).ToList();

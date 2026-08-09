@@ -108,8 +108,7 @@ public static partial class Charts
                 {
                     foreach (var story in epic.Stories)
                     {
-                        var noPlan = story.TasksTotal == 0;
-                        var storyClass = noPlan ? "noplan" : StatusStyles.ForStory(story);
+                        var storyClass = StatusStyles.ForStoryDisplay(story);
                         var storyHref = story.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(story.Id);
                         Add(new SunburstExplorerNode(
                             story.Id, epicId, SunburstStoryWeight(geometry, epic.Number, story, noPlanWeight),

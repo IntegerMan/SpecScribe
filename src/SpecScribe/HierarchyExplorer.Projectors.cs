@@ -92,11 +92,13 @@ public static partial class HierarchyExplorer
 
         foreach (var story in epic.Stories)
         {
-            var noPlan = story.TasksTotal == 0;
-            var storyClass = noPlan ? "noplan" : StatusStyles.ForStory(story);
+            var storyClass = StatusStyles.ForStoryDisplay(story);
+            var noPlan = storyClass == "noplan";
             var children = geometry.StoryChildDeferred(epic.Number, story.Id);
             var storyWeight = Math.Max(1, story.TasksTotal + children.Count);
-            var storyDetail = noPlan ? "No task plan yet" : $"{story.TasksDone} of {story.TasksTotal} tasks done";
+            var storyDetail = noPlan
+                ? "No task plan yet"
+                : story.TasksTotal == 0 ? "No task checklist available" : $"{story.TasksDone} of {story.TasksTotal} tasks done";
 
             Add(new HierarchyNode(
                 story.Id, ProjectRootId,

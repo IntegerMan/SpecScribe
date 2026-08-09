@@ -143,6 +143,16 @@ public class SunburstExplorerTests
     }
 
     [Fact]
+    public void Projector_ZeroTaskStoryWithExplicitLifecycle_UsesThatLifecycle()
+    {
+        var model = Model(Epic(1, "Alpha", Story("1.1", "Completed plan", "done", 0, 0)));
+
+        var node = Assert.Single(Charts.SunburstExplorerNodes(model).Where(n => n.Id == "1.1"));
+
+        Assert.Equal("done", node.StatusClass);
+    }
+
+    [Fact]
     public void NoPlanStoryWeight_IsTheRoundedMeanOfDraftedStories_AndOnlyLiftsTheFloor()
     {
         // The bump is the rounded MEAN raw weight of the drafted stories, and it only LIFTS a no-plan wedge — it never

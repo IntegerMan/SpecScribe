@@ -211,6 +211,21 @@ public class HierarchyExplorerTests
         Assert.Equal(1, nodes["1.2"].Value);
     }
 
+    [Fact]
+    public void Projectors_ExplicitLifecycleWithoutChecklist_UsesLifecycleAndChecklistCopy()
+    {
+        var epic = Epic(1, "Alpha", Story("1.1", "Completed plan", "done", 0, 0));
+
+        var epicNode = Assert.Single(HierarchyExplorer.ProjectEpic(epic, _ => "epics/story-1-1.html", Config())
+            .Nodes.Where(n => n.Id == "1.1"));
+        var dashboardNode = Assert.Single(Build(Model(epic)).Nodes.Where(n => n.Id == "1.1"));
+
+        Assert.Equal("done", epicNode.StatusClass);
+        Assert.Equal("No task checklist available", epicNode.Detail);
+        Assert.Equal("done", dashboardNode.StatusClass);
+        Assert.Equal("No task checklist available", dashboardNode.Detail);
+    }
+
     // ---- AC #1 anti-drift: the component claims exactly the wedges the SVG drew ---------------------------
 
     [Fact]

@@ -26,6 +26,12 @@ public static class StatusStyles
     /// been drafted at all.</summary>
     public static string ForStory(StoryInfo story) => ForStatus(story.Status);
 
+    /// <summary>CSS class for a story in a work hierarchy. A zero task tally means no Markdown checklist is
+    /// available, not necessarily that no plan exists; an explicit lifecycle from an adapter therefore wins.
+    /// Only an unclassified zero-task story uses the no-plan treatment.</summary>
+    public static string ForStoryDisplay(StoryInfo story) =>
+        string.IsNullOrWhiteSpace(story.Status) && story.TasksTotal == 0 ? "noplan" : ForStory(story);
+
     /// <summary>Maps a raw "Status:" string (a story's, or a quick-dev doc's frontmatter status) onto the
     /// shared six-stage lifecycle css class, so every chart/badge routes through this one classifier rather
     /// than reimplementing the keyword match.
