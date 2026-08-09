@@ -426,6 +426,23 @@ public class HierarchyRolloutTests
     }
 
     [Fact]
+    public void ProjectStoryTasks_UnmarkedTasksDoNotClaimCompletion()
+    {
+        var tasks = new[]
+        {
+            new TaskItem("Plan the work", Done: false, Array.Empty<TaskItem>(), TaskState.Unmarked),
+        };
+
+        var model = HierarchyExplorer.ProjectStoryTasks("1.1", "Sample", tasks, Config());
+        var root = Assert.Single(model.Nodes.Where(node => node.Id == HierarchyExplorer.ProjectRootId));
+        var task = Assert.Single(model.Nodes.Where(node => node.Kind == "task"));
+
+        Assert.Equal("1 task listed", root.Detail);
+        Assert.Equal("Planned step", task.StatusLabel);
+        Assert.Equal("unrecognized", task.StatusClass);
+    }
+
+    [Fact]
     public void ProjectImpactMap_GroupsByEpic_AndSaysSoWhereAReaderSees()
     {
         // Owner decision D4's visible product change: a file touched by several epics now draws under each, so the

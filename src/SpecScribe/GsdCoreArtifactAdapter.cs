@@ -79,6 +79,9 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
     private static readonly IReadOnlyDictionary<string, string> WorkflowCommandFiles =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
+            ["discuss-phase"] = "discuss-phase",
+            ["ui-phase"] = "ui-phase",
+            ["research-phase"] = "research-phase",
             ["create-epics-and-stories"] = "plan-phase",
             ["create-story"] = "plan-phase",
             ["dev-story"] = "execute-phase",
@@ -333,6 +336,7 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
                 if (planFiles.TryGetValue(plan.FileName, out var planFullPath))
                 {
                     artifactMap[id] = planFullPath;
+                    stories[^1].ArtifactOutputPath = $"epics/story-{id.Replace('.', '-')}.html";
                     consumed.Add(ToSourceRelative(options, planFullPath));
                 }
 

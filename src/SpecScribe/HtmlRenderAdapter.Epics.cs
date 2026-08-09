@@ -217,7 +217,7 @@ public sealed partial class HtmlRenderAdapter
         if (epic.Status == EpicStatus.Pending)
         {
             var note = BmadCommands.InlineGuidance(
-                commands.Command("create-epics-and-stories"),
+                BmadCommands.PrimaryEpicCommand(epic, commands),
                 "Stories not yet drafted — draft them with",
                 "Stories not yet drafted.");
             sb.Append($"  <div class=\"pending-note\">{note}</div>\n");
@@ -636,6 +636,13 @@ public sealed partial class HtmlRenderAdapter
         }
         main.Append(view.NextStepsHtml);
         main.Append("</div>\n");
+
+        foreach (var section in view.CompletionSummarySections)
+        {
+            main.Append($"<section class=\"chart-panel completion-summary\" id=\"{PathUtil.Html(section.AnchorId)}\">\n");
+            main.Append($"<h3>{PathUtil.Html(section.Title)}</h3>\n<div class=\"doc-body\">{section.Html}</div>\n</section>\n");
+            toc.Add(new Toc.Entry(2, section.Title, section.AnchorId));
+        }
 
         if (view.Status is { Length: > 0 })
         {

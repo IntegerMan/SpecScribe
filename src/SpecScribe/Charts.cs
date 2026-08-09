@@ -655,7 +655,15 @@ public static partial class Charts
     /// that <c>pending</c> means "Not done" would have renamed every pending STORY on the dashboard, the epics
     /// index and the epic pages — one datasource's vocabulary silently overwriting another's. This keeps the task
     /// wording in exactly one place without touching anyone else's. [Story 20.7 Task 6.2]</para></summary>
-    public static string TaskStatusLabel(bool done) => done ? "Done" : "Not done";
+    public static string TaskStatusLabel(TaskState state) => state switch
+    {
+        TaskState.Done => "Done",
+        TaskState.NotDone => "Not done",
+        TaskState.Unmarked => "Planned step",
+        _ => "Task state unknown",
+    };
+
+    public static string TaskStatusLabel(bool done) => TaskStatusLabel(done ? TaskState.Done : TaskState.NotDone);
 
     /// <summary>The legend item set for a Hierarchy Explorer payload — Story 20.7 Task 2.1's "expose what
     /// <see cref="BuildSunburstLegendItems"/> computes rather than duplicating it".

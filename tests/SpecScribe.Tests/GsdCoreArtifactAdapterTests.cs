@@ -21,6 +21,7 @@ public class GsdCoreArtifactAdapterTests : IDisposable
 
     private string Planning => Path.Combine(_root, ".planning");
     private string Phases => Path.Combine(Planning, "phases");
+    private string Site => Path.Combine(_root, "site");
 
     /// <summary>A roadmap in the real grammar: a milestone-grouped <c>## Phases</c> overview that establishes
     /// ROADMAP ORDER, per-milestone <c>— Phase Details</c> sections carrying the authoritative per-plan checkboxes,
@@ -232,6 +233,9 @@ public class GsdCoreArtifactAdapterTests : IDisposable
         var commandsRoot = Path.Combine(_root, ".claude", "commands", "gsd");
         Directory.CreateDirectory(commandsRoot);
         File.WriteAllText(Path.Combine(commandsRoot, "plan-phase.md"), "# Plan phase");
+        File.WriteAllText(Path.Combine(commandsRoot, "discuss-phase.md"), "# Discuss phase");
+        File.WriteAllText(Path.Combine(commandsRoot, "ui-phase.md"), "# Specify phase UI");
+        File.WriteAllText(Path.Combine(commandsRoot, "research-phase.md"), "# Research phase");
         File.WriteAllText(Path.Combine(commandsRoot, "execute-phase.md"), "# Execute phase");
         File.WriteAllText(Path.Combine(commandsRoot, "code-review.md"), "# Review phase");
 
@@ -240,12 +244,32 @@ public class GsdCoreArtifactAdapterTests : IDisposable
         var phase = Assert.IsType<EpicsModel>(bundle.Epics).Epics[2];
 
         Assert.True(commands.UsesPhaseArguments);
+    Assert.Equal("/gsd:discuss-phase", commands.Command("discuss-phase"));
+    Assert.Equal("/gsd:ui-phase", commands.Command("ui-phase"));
+    Assert.Equal("/gsd:research-phase", commands.Command("research-phase"));
         Assert.Equal("/gsd:plan-phase", commands.Command("create-story"));
         Assert.Equal("/gsd:execute-phase", commands.Command("dev-story"));
         Assert.Equal("/gsd:code-review", commands.Command("code-review"));
         Assert.Null(commands.Command("sprint-status"));
         Assert.Equal("2.1", phase.WorkflowCommandArgument);
         Assert.All(phase.Stories, story => Assert.Equal("2.1", story.WorkflowCommandArgument));
+    }
+
+    [Fact]
+    public void WorkflowCommands_MissingPreparatoryDefinition_OmitsOnlyThatCommand()
+    {
+        var commandsRoot = Path.Combine(_root, ".claude", "commands", "gsd");
+        Directory.CreateDirectory(commandsRoot);
+        File.WriteAllText(Path.Combine(commandsRoot, "discuss-phase.md"), "# Discuss phase");
+        File.WriteAllText(Path.Combine(commandsRoot, "ui-phase.md"), "# Specify phase UI");
+        File.WriteAllText(Path.Combine(commandsRoot, "plan-phase.md"), "# Plan phase");
+
+        var commands = Assert.IsType<CommandCatalog>(Ingest().WorkflowCommands);
+
+        Assert.Equal("/gsd:discuss-phase", commands.Command("discuss-phase"));
+        Assert.Equal("/gsd:ui-phase", commands.Command("ui-phase"));
+        Assert.Null(commands.Command("research-phase"));
+        Assert.Equal("/gsd:plan-phase", commands.Command("create-epics-and-stories"));
     }
 
     [Fact]
@@ -345,6 +369,43 @@ public class GsdCoreArtifactAdapterTests : IDisposable
         });
     }
 
+    [Fact]
+    public void PlanParser_XmlTasksAreUnmarkedAndDoNotReadVerificationCheckboxes()
+    {
+        var tasks = GsdCorePlanParser.ParseTasks(PlanWithVerificationBoxesMd);
+
+        var task = Assert.Single(tasks);
+        Assert.Equal("Implement the allowlist.", task.Text);
+        Assert.Equal(TaskState.Unmarked, task.State);
+        Assert.False(task.Done);
+    }
+
+    [Fact]
+    public void PlanParser_UsesNamesOrDirectTaskText_AndIgnoresTasksOutsideTheTasksSection()
+    {
+        const string plan = """
+            ## Tasks
+
+            <task><name>Named task</name><action>Verbose action body</action></task>
+            <task>
+            Direct task label
+            <action>
+            Verbose action body
+            </action>
+            </task>
+            <task><action>Action-only task</action></task>
+
+            ## Notes
+
+            <task><name>Not a plan task</name></task>
+            """;
+
+        var tasks = GsdCorePlanParser.ParseTasks(plan);
+
+        Assert.Equal(["Named task", "Direct task label"], tasks.Select(task => task.Text));
+        Assert.All(tasks, task => Assert.Equal(TaskState.Unmarked, task.State));
+    }
+
     /// <summary>Plans are resolved to their files by FILENAME. The fixture's frontmatter deliberately encodes the
     /// same phase four different ways (<c>"01"</c>, <c>1</c>, and the 02.1 plans' copies), so a resolver that
     /// trusted it would mis-key.</summary>
@@ -372,6 +433,61 @@ public class GsdCoreArtifactAdapterTests : IDisposable
         Assert.DoesNotContain("phases/01-identity-and-scope/01-00-SUMMARY.md", consumed);
         Assert.Contains(bundle.Diagnostics, d =>
             d.Category == AdapterDiagnosticCategory.Skipped && d.Message.Contains("01-00-SUMMARY.md"));
+    }
+
+    [Fact]
+    public void GenerateAll_RendersGsdTasksAndCompletionSummary_WithoutConsumingTheSummaryPage()
+    {
+        var planPath = Path.Combine(Phases, "01-identity-and-scope", "01-01-PLAN.md");
+        File.WriteAllText(planPath, """
+            # Plan 01-01
+
+            <objective>Protect identity boundaries.</objective>
+
+            ## Tasks
+
+            <task type="auto"><name>Implement the allowlist</name><action>Verbose implementation detail</action></task>
+            """);
+        File.WriteAllText(Path.Combine(Phases, "01-identity-and-scope", "01-01-SUMMARY.md"), """
+            # Summary 01-01
+
+            ## Tasks Completed
+
+            - Implemented the allowlist.
+
+            ## What Was Built
+
+            Identity boundary enforcement.
+
+            ## Verification Results
+
+            All boundary tests passed.
+
+            ## Notes
+
+            This section is intentionally not promoted.
+            """);
+
+        Assert.Equal("Protect identity boundaries.", GsdCorePlanParser.ReadDetail(planPath, File.ReadAllText(planPath))!.Objective);
+        var generatedStory = Assert.IsType<EpicsModel>(Ingest().Epics).Epics[0].Stories[1];
+        Assert.Equal("epics/story-1-1.html", generatedStory.ArtifactOutputPath);
+
+        var generator = new SiteGenerator(Options());
+        Assert.DoesNotContain(generator.GenerateAll(), e => e.Outcome == GenerationOutcome.Error);
+
+        var storyHtml = SiteRegion.Read(Site, "epics/story-1-1.html");
+        Assert.Contains("Protect identity boundaries.", storyHtml);
+        Assert.Contains("Implement the allowlist", storyHtml);
+        Assert.Contains("Planned step", storyHtml);
+        Assert.Contains("1 task listed", storyHtml);
+        Assert.Contains("id=\"sec-completion-summary-1\"", storyHtml);
+        Assert.Contains("Tasks Completed", storyHtml);
+        Assert.Contains("What Was Built", storyHtml);
+        Assert.Contains("Verification Results", storyHtml);
+        Assert.Contains("href=\"#sec-completion-summary-1\"", storyHtml);
+        Assert.DoesNotContain("This section is intentionally not promoted", storyHtml);
+
+        Assert.True(SiteRegion.Exists(Site, "phases/01-identity-and-scope/01-01-SUMMARY.html"));
     }
 
     // ---- Finding #7: three disagreeing completion signals -------------------------------------------------------

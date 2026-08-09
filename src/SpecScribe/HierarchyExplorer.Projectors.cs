@@ -196,9 +196,12 @@ public static partial class HierarchyExplorer
         if (tasks.Count == 0 && deferredItems.Count == 0)
             return new HierarchyExplorerModel(config, Array.Empty<HierarchyNode>());
 
+        var completionIsKnown = tasks.All(t => t.CompletionState != TaskState.Unmarked);
         var tasksDone = tasks.Count(t => t.Done);
         var rootDetail = tasks.Count > 0
-            ? $"{tasksDone} of {tasks.Count} {Charts.Plural(tasks.Count, "task", "tasks")} done"
+            ? completionIsKnown
+                ? $"{tasksDone} of {tasks.Count} {Charts.Plural(tasks.Count, "task", "tasks")} done"
+                : $"{tasks.Count} {Charts.Plural(tasks.Count, "task", "tasks")} listed"
             : $"{deferredItems.Count(s => !s.Item.Resolved)} of {deferredItems.Count} open";
         var rootLabel = storyTitle.Length > 0 ? $"Story {storyId}: {storyTitle}" : $"Story {storyId}";
 
@@ -220,22 +223,36 @@ public static partial class HierarchyExplorer
         for (var t = 0; t < tasks.Count; t++)
         {
             var task = tasks[t];
-            var cls = task.Done ? "done" : "pending";
+            var taskState = task.CompletionState;
+            var cls = taskState switch
+            {
+                TaskState.Done => "done",
+                TaskState.NotDone => "pending",
+                TaskState.Unmarked => "unrecognized",
+                _ => "unrecognized",
+            };
             var text = PathUtil.StripHtmlTags(task.Text);
             var id = $"task-{t}";
             Add(new HierarchyNode(
                 id, ProjectRootId, text, ShortTaskLabel(text), Math.Max(1, task.Subtasks.Count),
-                string.Empty, cls, Charts.TaskStatusLabel(task.Done), null, "task",
+                string.Empty, cls, Charts.TaskStatusLabel(taskState), null, "task",
                 PlanningColorClass(cls)));
 
             for (var s = 0; s < task.Subtasks.Count; s++)
             {
                 var sub = task.Subtasks[s];
-                var subCls = sub.Done ? "done" : "pending";
+                var subState = sub.CompletionState;
+                var subCls = subState switch
+                {
+                    TaskState.Done => "done",
+                    TaskState.NotDone => "pending",
+                    TaskState.Unmarked => "unrecognized",
+                    _ => "unrecognized",
+                };
                 var subText = PathUtil.StripHtmlTags(sub.Text);
                 Add(new HierarchyNode(
                     $"{id}-{s}", id, subText, ShortTaskLabel(subText), 1, string.Empty, subCls,
-                    Charts.TaskStatusLabel(sub.Done), null, "subtask", PlanningColorClass(subCls)));
+                    Charts.TaskStatusLabel(subState), null, "subtask", PlanningColorClass(subCls)));
             }
         }
 

@@ -140,6 +140,34 @@ public static class EpicsTemplater
         FollowUpGeometry? followUps = null,
         PlanningCodeImpactData? impact = null,
         WorkGraphEpic? workGraph = null)
+        => BuildStoryPage(
+            epic, story, artifactSourceRelativePath, blurbHtml, remainderHtml,
+            acceptanceCriteria, devAgentRecord, tasks, Array.Empty<StoryDetailSection>(),
+            reviewFindingsHtml, changeLogHtml, evidence, changeSurface, nav, commands,
+            epicRetroPath, pager, followUps, impact, workGraph);
+
+    /// <summary>Builds a drafted story page with source-specific completion detail. [Story 26.6]</summary>
+    public static PageView BuildStoryPage(
+        EpicInfo epic,
+        StoryInfo story,
+        string artifactSourceRelativePath,
+        string blurbHtml,
+        string remainderHtml,
+        IReadOnlyList<AcceptanceCriterion> acceptanceCriteria,
+        IReadOnlyList<(string Label, string ContentHtml)> devAgentRecord,
+        IReadOnlyList<TaskItem> tasks,
+        IReadOnlyList<StoryDetailSection> completionSummarySections,
+        string reviewFindingsHtml,
+        string changeLogHtml,
+        StoryEvidence evidence,
+        StoryChangeSurface changeSurface,
+        SiteNav nav,
+        CommandCatalog commands,
+        string? epicRetroPath = null,
+        EntityPager? pager = null,
+        FollowUpGeometry? followUps = null,
+        PlanningCodeImpactData? impact = null,
+        WorkGraphEpic? workGraph = null)
     {
         var outputPath = story.ArtifactOutputPath
             ?? throw new InvalidOperationException($"RenderStory called for story {story.Id} with no resolved artifact.");
@@ -158,7 +186,7 @@ public static class EpicsTemplater
         // body renderer wraps the content in the "Overview | Work Graph" tab. Absent subgraph → page unchanged.
         var view = EpicsViewBuilder.BuildStory(
             epic, story, blurbHtml, remainderHtml, acceptanceCriteria, devAgentRecord, tasks,
-            reviewFindingsHtml, changeLogHtml, evidence, changeSurface, commands, epicRetroPath, followUps, impact,
+            completionSummarySections, reviewFindingsHtml, changeLogHtml, evidence, changeSurface, commands, epicRetroPath, followUps, impact,
             workGraph?.Reprefixed(PathUtil.RelativePrefix(outputPath)));
         var body = HtmlRenderAdapter.Shared.RenderStoryBody(view);
 

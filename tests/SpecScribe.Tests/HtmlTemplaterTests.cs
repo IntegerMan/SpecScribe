@@ -1129,6 +1129,80 @@ public class HtmlTemplaterTests
     }
 
     [Fact]
+    public void RenderEpicsIndex_PendingGsdPhaseCardUsesTheSharedDiscussionPrimaryAction()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        var phase = new EpicInfo
+        {
+            Number = 3, WorkflowCommandArgument = "02.1", Title = "Phase 02.1", GoalHtml = string.Empty,
+            Status = EpicStatus.Pending, Section = EpicSection.VerticalSlice, Stories = Array.Empty<StoryInfo>(),
+        };
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { phase },
+        };
+        var commands = new CommandCatalog("GSD Core", new Dictionary<string, string>
+        {
+            ["discuss-phase"] = "/gsd:discuss-phase",
+            ["create-epics-and-stories"] = "/gsd:plan-phase",
+        }, usesPhaseArguments: true);
+
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(EpicsTemplater.BuildIndexPage(model, ProgressModel.Empty, nav, commands));
+
+        Assert.Contains("/gsd:discuss-phase 02.1", html);
+        Assert.DoesNotContain("/gsd:plan-phase 02.1", html);
+    }
+
+    [Fact]
+    public void RenderPendingGsdPhase_OrdersInstalledActionsAndOmitsMissingDefinitions()
+    {
+        var phase = new EpicInfo
+        {
+            Number = 3, WorkflowCommandArgument = "2.1", Title = "Phase 2.1", GoalHtml = string.Empty,
+            Status = EpicStatus.Pending, Section = EpicSection.VerticalSlice, Stories = Array.Empty<StoryInfo>(),
+        };
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty,
+            RequirementsInventoryHtml = string.Empty,
+            Epics = new[] { phase },
+        };
+        var commands = new CommandCatalog("GSD Core", new Dictionary<string, string>
+        {
+            ["discuss-phase"] = "/gsd:discuss-phase",
+            ["ui-phase"] = "/gsd:ui-phase",
+            ["research-phase"] = "/gsd:research-phase",
+            ["create-epics-and-stories"] = "/gsd:plan-phase",
+        }, usesPhaseArguments: true);
+
+        var epicHtml = BmadCommands.RenderEpicNextSteps(phase, commands);
+        var projectHtml = BmadCommands.RenderProjectNextSteps(model, commands);
+        var expected = new[]
+        {
+            "/gsd:discuss-phase 2.1",
+            "/gsd:ui-phase 2.1",
+            "/gsd:research-phase 2.1",
+            "/gsd:plan-phase 2.1",
+        };
+
+        Assert.Equal(expected, expected.OrderBy(command => epicHtml.IndexOf(command, StringComparison.Ordinal)).ToArray());
+        Assert.Equal(expected, expected.OrderBy(command => projectHtml.IndexOf(command, StringComparison.Ordinal)).ToArray());
+
+        var withoutResearch = new CommandCatalog("GSD Core", new Dictionary<string, string>
+        {
+            ["discuss-phase"] = "/gsd:discuss-phase",
+            ["ui-phase"] = "/gsd:ui-phase",
+            ["create-epics-and-stories"] = "/gsd:plan-phase",
+        }, usesPhaseArguments: true);
+        var missingHtml = BmadCommands.RenderEpicNextSteps(phase, withoutResearch);
+
+        Assert.DoesNotContain("/gsd:research-phase", missingHtml);
+        Assert.Contains("/gsd:plan-phase 2.1", missingHtml);
+    }
+
+    [Fact]
     public void RenderEpic_UndraftedStoryCardPairsGuidanceWithCreateStoryCommand()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);

@@ -705,12 +705,12 @@ public sealed class SiteGenerator
                 : PlanningCodeImpactData.Empty;
             Mark("planning-impact");
 
-            // Render the epic/story/requirements pages only when the whole ingest chain produced its models —
-            // the exact set of writes the previous single try/catch performed after a successful parse.
-            if (epicsSourceFile is not null && bundle is { Epics: { } epicsModel, Requirements: { } requirementsModel } && progress is not null)
+            // Render epics and stories whenever their adapter supplied a model. Requirements are optional for
+            // framework adapters such as GSD Core, so only their dedicated pages are gated on that model.
+            if (epicsSourceFile is not null && bundle is { Epics: { } epicsModel } && progress is not null)
             {
                 reporter?.BeginPhase(GenerationPhase.Epics);
-                events.AddRange(RenderEpicsPages(epicsSourceFile, files, bundle.StoryArtifactsById, epicsModel, requirementsModel, progress, nav));
+                events.AddRange(RenderEpicsPages(epicsSourceFile, files, bundle.StoryArtifactsById, epicsModel, bundle.Requirements, progress, nav));
                 reporter?.EndPhase(GenerationPhase.Epics);
             }
             Mark("epics+stories-pages");
@@ -1543,7 +1543,7 @@ public sealed class SiteGenerator
 
             var epicsEvents = new List<GenerationEvent>(MapDiagnostics(ingest.Diagnostics));
             epicsEvents.AddRange(MapDiagnostics(navDiagnostics));
-            if (ingest is { Epics: { } epicsModel, Requirements: { } requirementsModel } && progress is not null)
+            if (ingest is { Epics: { } epicsModel } && progress is not null)
             {
                 // Refresh the work-graph model on every incremental pass too (Story 19.2 review) — it was
                 // previously cached ONCE per full GenerateAll() and never touched again here, so EpicSubgraph
@@ -1551,7 +1551,7 @@ public sealed class SiteGenerator
                 // RenderEpicsPages below) after a single watch-mode edit to deferred/action attribution. Same
                 // partial-failure caching rule as elsewhere in this method: only refreshed when the re-ingest
                 // actually produced a usable model.
-                _workGraph = BuildWorkGraphModel(epicsModel, progress, requirementsModel, files);
+                _workGraph = BuildWorkGraphModel(epicsModel, progress, ingest.Requirements, files);
                 // Refresh the planning<->code impact correlation on every incremental pass too (Story 21.3
                 // review) — same staleness class as _workGraph above: it was previously built ONCE per full
                 // GenerateAll() and never touched again here, so the epic/story "Code areas touched" widgets
@@ -1560,7 +1560,7 @@ public sealed class SiteGenerator
                 _planningImpact = progress.DeepGit?.Commits is { Count: > 0 } impactCommits
                     ? PlanningCodeImpact.Build(epicsModel, impactCommits, CodePageHref)
                     : PlanningCodeImpactData.Empty;
-                epicsEvents.AddRange(RenderEpicsPages(ingest.SourceFullPath, files, ingest.StoryArtifactsById, epicsModel, requirementsModel, progress, nav));
+                epicsEvents.AddRange(RenderEpicsPages(ingest.SourceFullPath, files, ingest.StoryArtifactsById, epicsModel, ingest.Requirements, progress, nav));
                 WriteWorkGraph(nav);
                 WriteImpactMap(nav);
             }
@@ -3442,7 +3442,7 @@ public sealed class SiteGenerator
         List<string> files,
         IReadOnlyDictionary<string, string> artifactMap,
         EpicsModel model,
-        RequirementsModel requirements,
+        RequirementsModel? requirements,
         ProgressModel progress,
         SiteNav nav)
     {
@@ -3511,9 +3511,9 @@ public sealed class SiteGenerator
             UnplannedWorkGeometry? unplanned = UnplannedWorkGeometry.From(workForFollowUps, followUps, model, retros: _retros);
             WritePage(EpicsTemplater.BuildIndexPage(model, progress, nav, WorkflowCommands, epicsCounts, followUps, unplanned));
 
-            // The requirements pages, at their original position — `_spaPageViews` insertion order is part of the
-            // IR's emitter order, so moving this line would move routes between chunks for no reason.
-            WriteRequirements(requirements, model, progress, nav, workForFollowUps);
+            // Keep the requirements routes absent when a framework does not model requirements at all.
+            if (requirements is not null)
+                WriteRequirements(requirements, model, progress, nav, workForFollowUps);
 
             {
                 foreach (var epic in model.Epics)
@@ -3540,7 +3540,7 @@ public sealed class SiteGenerator
                         // story.Status/TasksDone were filled by ProgressCalculator above — no re-read needed.
                         var f = BuildStoryPageFragments(story, artifactMap[story.Id], referenceMap);
                         WritePage(
-                            EpicsTemplater.BuildStoryPage(epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria, f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav, WorkflowCommands, epicRetroPath, StoryPager(model, story), followUps, _planningImpact, StorySubgraph(epic, story, followUps)),
+                            EpicsTemplater.BuildStoryPage(epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria, f.DevAgentRecord, f.Tasks, f.CompletionSummarySections, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav, WorkflowCommands, epicRetroPath, StoryPager(model, story), followUps, _planningImpact, StorySubgraph(epic, story, followUps)),
                             skipStoryId: story.Id);
                     }
                 }
@@ -3567,6 +3567,7 @@ public sealed class SiteGenerator
         IReadOnlyList<AcceptanceCriterion> AcceptanceCriteria,
         IReadOnlyList<(string Label, string ContentHtml)> DevAgentRecord,
         IReadOnlyList<TaskItem> Tasks,
+        IReadOnlyList<StoryDetailSection> CompletionSummarySections,
         string ReviewFindingsHtml,
         string ChangeLogHtml,
         StoryEvidence Evidence,
@@ -3581,8 +3582,16 @@ public sealed class SiteGenerator
     {
         var artifactRelative = ToSourceRelative(artifactFullPath);
         var artifactRaw = MarkdownConverter.ReadAllTextShared(artifactFullPath);
-        var tasks = TaskListParser.Parse(artifactRaw);
+        var gsdDetail = GsdCorePlanParser.ReadDetail(artifactFullPath, artifactRaw);
+        var tasks = gsdDetail is { Tasks.Count: > 0 } ? gsdDetail.Tasks : TaskListParser.Parse(artifactRaw);
         var (blurbHtml, remainderHtml) = EpicsParser.SplitStoryArtifact(artifactRaw);
+        if (gsdDetail is not null)
+        {
+            blurbHtml = gsdDetail.Objective is { Length: > 0 } objective
+                ? MarkdownConverter.RenderBlock(objective)
+                : string.Empty;
+            remainderHtml = string.Empty;
+        }
         var acceptanceCriteria = EpicsParser.ExtractAcceptanceCriteria(artifactRaw);
         var devAgentRecord = EpicsParser.ExtractDevAgentRecord(artifactRaw);
         var reviewFindingsHtml = EpicsParser.ExtractNamedSectionHtml(artifactRaw, "## Review Findings");
@@ -3598,6 +3607,13 @@ public sealed class SiteGenerator
         remainderHtml = SourceLinkifier.Linkify(remainderHtml, referenceMap, storyPrefix);
         reviewFindingsHtml = SourceLinkifier.Linkify(reviewFindingsHtml, referenceMap, storyPrefix);
         changeLogHtml = SourceLinkifier.Linkify(changeLogHtml, referenceMap, storyPrefix);
+        IReadOnlyList<StoryDetailSection> completionSummarySections = gsdDetail?.SummarySections
+            .Select((section, index) => new StoryDetailSection(
+                $"sec-completion-summary-{index + 1}",
+                section.Title,
+                SourceLinkifier.Linkify(MarkdownConverter.RenderBlock(section.Markdown), referenceMap, storyPrefix)))
+            .ToList()
+            ?? (IReadOnlyList<StoryDetailSection>)Array.Empty<StoryDetailSection>();
         acceptanceCriteria = acceptanceCriteria
             .Select(ac => ac with { Html = SourceLinkifier.Linkify(ac.Html, referenceMap, storyPrefix) })
             .ToList();
@@ -3650,7 +3666,7 @@ public sealed class SiteGenerator
 
         return new StoryPageFragments(
             artifactRelative, blurbHtml, remainderHtml, acceptanceCriteria, devAgentRecord, tasks,
-            reviewFindingsHtml, changeLogHtml, evidence, changeSurface);
+            completionSummarySections, reviewFindingsHtml, changeLogHtml, evidence, changeSurface);
     }
 
     /// <summary>The artifact + reference maps the last epics render pass resolved, cached for
@@ -3819,7 +3835,7 @@ public sealed class SiteGenerator
                         var f = BuildStoryPageFragments(story, artifactFullPath, _referenceMap);
                         storyPage = EpicsTemplater.BuildStoryPage(
                             epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria,
-                            f.DevAgentRecord, f.Tasks, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav,
+                            f.DevAgentRecord, f.Tasks, f.CompletionSummarySections, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav,
                             WorkflowCommands, epicRetroPath, StoryPager(model, story), prelude.FollowUps, _planningImpact, StorySubgraph(epic, story, prelude.FollowUps));
                     }
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

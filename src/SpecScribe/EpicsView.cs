@@ -286,6 +286,9 @@ public sealed record StoryChangeSurface(
     IReadOnlyList<ChangeSurfaceFile> ChangedFiles,
     string? VerifyBeforeReviewHtml);
 
+/// <summary>One optional, named detail section projected from a framework-specific companion artifact.</summary>
+public sealed record StoryDetailSection(string AnchorId, string Title, string Html);
+
 /// <summary>The host-neutral SECTION view model for a drafted STORY page body. Its identity/status/drill are
 /// data; the task-breakdown sunburst renders from <see cref="Tasks"/>; everything else the story page shows is
 /// inherently Markdig-rendered prose carried as NAMED OPAQUE fragments (the deferred prose-decomposition seam) —
@@ -323,6 +326,9 @@ public sealed record StoryPageView
 
     /// <summary>The task checklist — the Task-Breakdown sunburst's chart input (empty → panel omitted).</summary>
     public required IReadOnlyList<TaskItem> Tasks { get; init; }
+
+    /// <summary>Optional framework-specific completion details, rendered only when content exists.</summary>
+    public IReadOnlyList<StoryDetailSection> CompletionSummarySections { get; init; } = Array.Empty<StoryDetailSection>();
 
     /// <summary>The pre-rendered next-steps commands HTML (named opaque fragment).</summary>
     public required string NextStepsHtml { get; init; }

@@ -350,6 +350,40 @@ public class RelatedWorkTests
     }
 
     [Fact]
+    public void PrimaryEpicCommand_PendingGsdPhase_PrefersDiscussionWithTheNativePhaseArgument()
+    {
+        var epic = new EpicInfo
+        {
+            Number = 3, WorkflowCommandArgument = "02.1", Title = "Phase 02.1", GoalHtml = string.Empty,
+            Status = EpicStatus.Pending, Section = EpicSection.VerticalSlice, Stories = Array.Empty<StoryInfo>(),
+        };
+        var commands = new CommandCatalog("GSD Core", new Dictionary<string, string>
+        {
+            ["discuss-phase"] = "/gsd:discuss-phase",
+            ["create-epics-and-stories"] = "/gsd:plan-phase",
+        }, usesPhaseArguments: true);
+
+        Assert.Equal("/gsd:discuss-phase 02.1", BmadCommands.PrimaryEpicCommand(epic, commands));
+    }
+
+    [Fact]
+    public void PrimaryEpicCommand_PendingGsdPhaseWithBlankNativeArgument_OmitsPhaseCommands()
+    {
+        var epic = new EpicInfo
+        {
+            Number = 3, WorkflowCommandArgument = "   ", Title = "Phase", GoalHtml = string.Empty,
+            Status = EpicStatus.Pending, Section = EpicSection.VerticalSlice, Stories = Array.Empty<StoryInfo>(),
+        };
+        var commands = new CommandCatalog("GSD Core", new Dictionary<string, string>
+        {
+            ["discuss-phase"] = "/gsd:discuss-phase",
+            ["create-epics-and-stories"] = "/gsd:plan-phase",
+        }, usesPhaseArguments: true);
+
+        Assert.Null(BmadCommands.PrimaryEpicCommand(epic, commands));
+    }
+
+    [Fact]
     public void PrimaryEpicCommand_ReturnsNull_ForADoneEpicWithNoNextAction()
     {
         var epic = new EpicInfo

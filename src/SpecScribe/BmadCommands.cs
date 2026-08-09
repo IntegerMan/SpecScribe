@@ -471,10 +471,34 @@ public static class BmadCommands
 
     private static string? CommandForEpic(CommandCatalog commands, string step, EpicInfo epic)
     {
-        var needsPhaseArgument = step is "create-epics-and-stories" or "create-story" or "dev-story" or "code-review";
-        return commands.Command(step, commands.UsesPhaseArguments && needsPhaseArgument
-            ? epic.WorkflowCommandArgument
-            : null);
+        var needsPhaseArgument = step is "discuss-phase" or "ui-phase" or "research-phase"
+            or "create-epics-and-stories" or "create-story" or "dev-story" or "code-review";
+        if (commands.UsesPhaseArguments && needsPhaseArgument)
+        {
+            if (string.IsNullOrWhiteSpace(epic.WorkflowCommandArgument)) return null;
+            return commands.Command(step, epic.WorkflowCommandArgument);
+        }
+
+        return commands.Command(step);
+    }
+
+    private static List<Suggestion> PendingEpicSuggestions(EpicInfo epic, CommandCatalog commands)
+    {
+        var suggestions = new List<Suggestion>();
+        if (commands.UsesPhaseArguments)
+        {
+            Add(suggestions, CommandForEpic(commands, "discuss-phase", epic),
+                $"Clarifies Phase {epic.WorkflowCommandArgument}'s scope and decisions before planning work begins.");
+            Add(suggestions, CommandForEpic(commands, "ui-phase", epic),
+                $"Defines the UI specification for Phase {epic.WorkflowCommandArgument} before planning implementation.");
+            Add(suggestions, CommandForEpic(commands, "research-phase", epic),
+                $"Researches Phase {epic.WorkflowCommandArgument}'s open questions before planning implementation.");
+        }
+        Add(suggestions, CommandForEpic(commands, "create-epics-and-stories", epic),
+            commands.UsesPhaseArguments
+                ? $"Plans Phase {epic.WorkflowCommandArgument} once its context is ready."
+                : $"Drafts the story breakdown for Epic {epic.Number} from the plan and architecture — it doesn't have one yet.");
+        return suggestions;
     }
 
     /// <summary>A story page only suggests actions on *this* story — drafting other stories and
@@ -562,8 +586,7 @@ public static class BmadCommands
 
         if (epicClass == "pending")
         {
-            Add(suggestions, CommandForEpic(commands, "create-epics-and-stories", epic),
-                $"Drafts the story breakdown for Epic {epic.Number} from the plan and architecture — it doesn't have one yet.");
+            suggestions.AddRange(PendingEpicSuggestions(epic, commands));
             AppendDeferredAlternate(suggestions, entityId, "Epic", openDeferred, commands);
             return suggestions;
         }
@@ -691,8 +714,7 @@ public static class BmadCommands
         var pendingEpic = model.Epics.FirstOrDefault(e => e.Status == EpicStatus.Pending);
         if (pendingEpic is not null)
         {
-            Add(suggestions, CommandForEpic(commands, "create-epics-and-stories", pendingEpic),
-                $"Breaks Epic {pendingEpic.Number} down into stories — the next epic still awaiting a story breakdown.");
+            suggestions.AddRange(PendingEpicSuggestions(pendingEpic, commands));
         }
 
         if (suggestions.Count == 0)

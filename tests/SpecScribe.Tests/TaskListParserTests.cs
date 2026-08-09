@@ -29,9 +29,13 @@ public class TaskListParserTests
         Assert.Equal(3, tasks.Count);
         Assert.Equal("Set up the project", tasks[0].Text); // bold markers and (AC: ...) stripped
         Assert.True(tasks[0].Done);
+        Assert.Equal(TaskState.Done, tasks[0].State);
         Assert.Equal(2, tasks[0].Subtasks.Count);
         Assert.True(tasks[0].Subtasks[0].Done);
+        Assert.Equal(TaskState.Done, tasks[0].Subtasks[0].State);
         Assert.False(tasks[0].Subtasks[1].Done);
+        Assert.Equal(TaskState.NotDone, tasks[0].Subtasks[1].State);
+        Assert.Equal(TaskState.NotDone, tasks[1].State);
     }
 
     [Fact]

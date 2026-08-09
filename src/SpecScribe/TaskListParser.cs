@@ -2,8 +2,23 @@ using System.Text.RegularExpressions;
 
 namespace SpecScribe;
 
+/// <summary>The completion information the source artifact explicitly supplies for a task.</summary>
+public enum TaskState
+{
+    Done,
+    NotDone,
+    Unmarked,
+}
+
 /// <summary>A single checkbox line from a story's "## Tasks / Subtasks" list.</summary>
-public sealed record TaskItem(string Text, bool Done, IReadOnlyList<TaskItem> Subtasks);
+public sealed record TaskItem(
+    string Text,
+    bool Done,
+    IReadOnlyList<TaskItem> Subtasks,
+    TaskState State = TaskState.NotDone)
+{
+    public TaskState CompletionState => Done ? TaskState.Done : State;
+}
 
 /// <summary>Parses the "## Tasks / Subtasks" checklist out of an implementation artifact into a two-level
 /// tree (top-level tasks + their subtasks) for the per-story task sunburst. Plain, non-checkbox bullets
@@ -36,7 +51,7 @@ public static class TaskListParser
         {
             if (topText is not null)
             {
-                tasks.Add(new TaskItem(topText, topDone, subtasks.ToList()));
+                tasks.Add(new TaskItem(topText, topDone, subtasks.ToList(), topDone ? TaskState.Done : TaskState.NotDone));
                 subtasks.Clear();
             }
         }
@@ -58,7 +73,7 @@ public static class TaskListParser
             }
             else
             {
-                subtasks.Add(new TaskItem(text, done, Array.Empty<TaskItem>()));
+                subtasks.Add(new TaskItem(text, done, Array.Empty<TaskItem>(), done ? TaskState.Done : TaskState.NotDone));
             }
         }
         FlushTop();
