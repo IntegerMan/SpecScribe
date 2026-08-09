@@ -182,6 +182,7 @@ public static class CodeMapTemplater
                 Window: $"{full.Map.FileCount:N0} {Charts.Plural(full.Map.FileCount, "file", "files")} · {full.Map.TotalLines:N0} {Charts.Plural((int)Math.Min(full.Map.TotalLines, int.MaxValue), "line", "lines")}"),
             // Story 20.6 D1: the (now deduplicated) file table below IS this surface's twin.
             TwinDisplay: HierarchyTwinDisplay.External,
+            ExternalTwinClass: "codemap-table-section",
             Dimensions: HierarchyExplorer.CodeMapDimensions(hasMetrics));
 
         var model = HierarchyExplorer.ProjectCodeMapViews(variants, config, fileHref, prefix);

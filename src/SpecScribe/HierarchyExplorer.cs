@@ -248,6 +248,9 @@ public enum HierarchyTwinDisplay
 /// <see cref="IslandHtml"/>'s emitted client configuration, because the client has no reason to know how the twin
 /// it never renders is presented. Trailing and defaulted so every existing call site keeps compiling and keeps the
 /// D3 default.</param>
+/// <param name="ExternalTwinClass">The class token on a surface-owned, richer text equivalent when
+/// <paramref name="TwinDisplay"/> is <see cref="HierarchyTwinDisplay.External"/>. Rendered on the chart host so
+/// the Nuxt contract can verify the external twin has substantive server-rendered content.</param>
 /// <param name="Filterable">Whether this instance honours root-subtree filter controls (Story 20.7 Task 1.3).
 /// When set, the client watches for <c>[data-hierarchy-filter]</c> checkboxes inside the panel — each carrying the
 /// id of a ROOT CHILD as its value — projects the payload to the checked roots plus their descendants, re-runs the
@@ -273,7 +276,8 @@ public sealed record HierarchyExplorerConfig(
     HierarchyTwinDisplay TwinDisplay = HierarchyTwinDisplay.Details,
     bool Filterable = false,
     IReadOnlyList<HierarchyDimension>? Dimensions = null,
-    IReadOnlyDictionary<string, string>? Constants = null);
+    IReadOnlyDictionary<string, string>? Constants = null,
+    string? ExternalTwinClass = null);
 
 /// <summary>The whole payload: component configuration + the node hierarchy. One datasource, both shapes — the
 /// selector re-types the trace, it never re-derives geometry, re-counts against <see cref="ProjectCounts"/>, or
@@ -658,7 +662,10 @@ public static partial class HierarchyExplorer
         // for `.ss-hierarchy`). Reserving its height server-side would leave a JS-off visitor staring at a blank
         // box the size of a chart that is never coming; the component sets the height from `config.size` at the
         // moment it mounts, so a JS-on page still does not reflow. Height is never a literal in the JS.
-        body.Append($"<div class=\"ss-hierarchy\" id=\"{PathUtil.Html(id)}\" {HostMarker}></div>\n");
+        var externalTwin = cfg.ExternalTwinClass is { Length: > 0 } twinClass
+            ? $" data-hierarchy-external-twin=\"{PathUtil.Html(twinClass)}\""
+            : string.Empty;
+        body.Append($"<div class=\"ss-hierarchy\" id=\"{PathUtil.Html(id)}\" {HostMarker}{externalTwin}></div>\n");
         body.Append($"<div class=\"ss-hierarchy-live sr-only\" aria-live=\"polite\"></div>\n");
 
         body.Append(legendHtml ?? LegendHtml(model));
