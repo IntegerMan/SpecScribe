@@ -1203,6 +1203,54 @@ public class HtmlTemplaterTests
     }
 
     [Fact]
+    public void RenderDiscussedGsdPhase_ShowsPlanningContext_AndSkipsDiscussionPrompt()
+    {
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
+        var phase = new EpicInfo
+        {
+            Number = 7,
+            WorkflowCommandArgument = "07",
+            Title = "Phase 7: External Documents",
+            GoalHtml = "Import RAG sources.",
+            PhaseContextHtml = "<h2>Phase Boundary</h2><p>Import text and markdown.</p>"
+                + "<h2>Implementation Decisions</h2><p>Keep source provenance.</p>",
+            HasDiscussionLog = true,
+            Status = EpicStatus.Pending,
+            Section = EpicSection.VerticalSlice,
+            Stories = Array.Empty<StoryInfo>(),
+        };
+        var progress = new EpicProgress
+        {
+            Number = phase.Number,
+            Title = phase.Title,
+            StoryCount = 0,
+            StoriesWithArtifact = 0,
+            TasksDone = 0,
+            TasksTotal = 0,
+            Status = phase.Status,
+            StoryStatusCounts = new Dictionary<string, int>(),
+        };
+        var commands = new CommandCatalog("GSD Core", new Dictionary<string, string>
+        {
+            ["discuss-phase"] = "/gsd:discuss-phase",
+            ["ui-phase"] = "/gsd:ui-phase",
+            ["research-phase"] = "/gsd:research-phase",
+            ["create-epics-and-stories"] = "/gsd:plan-phase",
+        }, usesPhaseArguments: true);
+
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(
+            EpicsTemplater.BuildEpicPage(phase, progress, nav, commands));
+
+        Assert.Contains("Planning context", html);
+        Assert.Contains("Phase Boundary", html);
+        Assert.Contains("Implementation Decisions", html);
+        Assert.DoesNotContain("/gsd:discuss-phase 07", html);
+        Assert.Contains("/gsd:ui-phase 07", html);
+        Assert.Contains("/gsd:research-phase 07", html);
+        Assert.Contains("/gsd:plan-phase 07", html);
+    }
+
+    [Fact]
     public void RenderEpic_UndraftedStoryCardPairsGuidanceWithCreateStoryCommand()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);

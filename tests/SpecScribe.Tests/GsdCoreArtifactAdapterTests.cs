@@ -330,6 +330,45 @@ public class GsdCoreArtifactAdapterTests : IDisposable
         Assert.Equal(EpicStatus.Drafted, epics.Epics[0].Status);
     }
 
+    [Fact]
+    public void Epics_PhaseCompanions_ProjectPlanningContext_AndRecordCompletedDiscussion()
+    {
+        var phaseDirectory = Path.Combine(Phases, "07-external-document-ingestion");
+        Directory.CreateDirectory(phaseDirectory);
+        File.WriteAllText(Path.Combine(phaseDirectory, "07-CONTEXT.md"), """
+            # Phase 7 Context
+
+            ## Phase Boundary
+
+            Import text and markdown as RAG sources.
+
+            ## Implementation Decisions
+
+            ### Source storage
+
+            Keep source content with its provenance.
+
+            ## Canonical References
+
+            This reference inventory belongs on the source document.
+
+            ## Deferred Ideas
+
+            This deferred idea belongs on the source document.
+            """);
+        File.WriteAllText(Path.Combine(phaseDirectory, "07-DISCUSSION-LOG.md"), "# Discussion Log\n");
+
+        var phase = Assert.IsType<EpicsModel>(Ingest().Epics).Epics[3];
+
+        Assert.True(phase.HasDiscussionLog);
+        Assert.Contains("Phase Boundary", phase.PhaseContextHtml);
+        Assert.Contains("Import text and markdown", phase.PhaseContextHtml);
+        Assert.Contains("Implementation Decisions", phase.PhaseContextHtml);
+        Assert.Contains("Keep source content", phase.PhaseContextHtml);
+        Assert.DoesNotContain("reference inventory", phase.PhaseContextHtml);
+        Assert.DoesNotContain("deferred idea", phase.PhaseContextHtml);
+    }
+
     // ---- Status and task tally, honestly (Task 6, findings #2 and #8) -------------------------------------------
 
     /// <summary>THE defect this story exists to prevent. Every plan file here is statusless and either has no

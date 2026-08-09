@@ -260,11 +260,17 @@ public sealed partial class HtmlRenderAdapter
         main.Append($"  <h1>{view.TitleHtml}</h1>\n");
         main.Append("</header>\n\n");
 
-        if (view.GoalHtml.Length > 0 || view.FrMetaHtml is { Length: > 0 })
+        if (view.GoalHtml.Length > 0 || view.FrMetaHtml is { Length: > 0 } || view.PhaseContextHtml.Length > 0)
         {
             main.Append("<div class=\"epic-card epic-intro\" id=\"sec-overview\">\n");
             if (view.GoalHtml.Length > 0) main.Append($"  <p class=\"epic-goal\">{view.GoalHtml}</p>\n");
             if (view.FrMetaHtml is { Length: > 0 }) main.Append($"  <div class=\"epic-meta\">{view.FrMetaHtml}</div>\n");
+            if (view.PhaseContextHtml.Length > 0)
+            {
+                main.Append("  <details class=\"phase-context\" open>\n    <summary>Planning context</summary>\n");
+                main.Append($"    <div class=\"story-body\">{view.PhaseContextHtml}</div>\n");
+                main.Append("  </details>\n");
+            }
             main.Append("</div>\n\n");
             toc.Add(new Toc.Entry(2, "Overview", "sec-overview"));
         }

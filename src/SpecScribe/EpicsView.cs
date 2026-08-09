@@ -190,6 +190,9 @@ public sealed record EpicPageView
     /// <summary>The epic FR-meta line as already-projected HTML (named opaque fragment), or null.</summary>
     public string? FrMetaHtml { get; init; }
 
+    /// <summary>Planning-relevant context projected from a framework-specific phase companion artifact.</summary>
+    public string PhaseContextHtml { get; init; } = string.Empty;
+
     /// <summary>True when the epic has at least one story — selects the progress-bars + sunburst layout over the
     /// next-steps-only layout.</summary>
     public required bool HasStories { get; init; }

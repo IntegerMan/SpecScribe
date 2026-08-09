@@ -129,6 +129,14 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
         @"^(?<phase>\d+(?:\.\d+)?)-(?<plan>\d+)-SUMMARY\.md$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+    private static readonly Regex ContextFilePattern = TimedRegex.New(
+        @"^(?<phase>\d+(?:\.\d+)?)-CONTEXT\.md$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    private static readonly Regex DiscussionLogFilePattern = TimedRegex.New(
+        @"^(?<phase>\d+(?:\.\d+)?)-DISCUSSION-LOG\.md$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
     private static readonly Regex GoalLine = TimedRegex.New(@"^\*\*Goal:?\*\*:?\s*(?<v>.+?)\s*$", RegexOptions.Compiled);
     private static readonly Regex RequirementsLine = TimedRegex.New(@"^\*\*Requirements:?\*\*:?\s*(?<v>.+?)\s*$", RegexOptions.Compiled);
     private static readonly Regex CompletedSuffix = TimedRegex.New(@"\s*\(completed\s+(?<date>[^)]+)\)\s*$", RegexOptions.Compiled);
@@ -302,6 +310,7 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
             var phase = roadmap.Phases[i];
             var ordinal = i + 1; // D2's synthetic sequential ordinal, in roadmap order.
             var stories = new List<StoryInfo>();
+            var companionFiles = FindPhaseCompanionFiles(planningRoot, phase);
 
             foreach (var plan in phase.Plans)
             {
@@ -366,6 +375,8 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
                 FrMetaHtml = phase.Requirements is { Length: > 0 } r
                     ? $"<strong>Requirements:</strong> {MarkdownConverter.RenderInline(r)}"
                     : null,
+                PhaseContextHtml = ReadPlanningContext(companionFiles.ContextPath),
+                HasDiscussionLog = companionFiles.DiscussionLogPath is not null,
                 // Mirrors EpicsParser's own rule (`stories.Count > 0 ? Drafted : Pending`) rather than inventing a
                 // GSD-specific one — a phase with no plans listed is genuinely pending.
                 Status = stories.Count > 0 ? EpicStatus.Drafted : EpicStatus.Pending,
@@ -390,6 +401,79 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
             Epics = epics,
             Milestones = BuildMilestones(roadmap),
         };
+    }
+
+    /// <summary>Finds GSD's phase-local context and discussion artifacts by their documented filename grammar.
+    /// The numeric prefix is matched by decimal value, preserving GSD's tolerance for zero-padded and decimal
+    /// phase identifiers without relying on a directory slug or a frontmatter field.</summary>
+    private static (string? ContextPath, string? DiscussionLogPath) FindPhaseCompanionFiles(
+        string planningRoot, RoadmapPhase phase)
+    {
+        var phasesRoot = Path.Combine(planningRoot, PhasesDirName);
+        if (!Directory.Exists(phasesRoot)) return (null, null);
+
+        try
+        {
+            foreach (var directory in Directory.EnumerateDirectories(phasesRoot, "*", SearchOption.TopDirectoryOnly))
+            {
+                var prefix = LeadingPhaseNumber.Match(Path.GetFileName(directory));
+                if (!prefix.Success || !decimal.TryParse(prefix.Groups["num"].Value, NumberStyles.Number,
+                        CultureInfo.InvariantCulture, out var number) || number != phase.SortKey)
+                    continue;
+
+                string? context = null;
+                string? discussion = null;
+                foreach (var path in Directory.EnumerateFiles(directory, "*.md", SearchOption.TopDirectoryOnly))
+                {
+                    var fileName = Path.GetFileName(path);
+                    if (ContextFilePattern.IsMatch(fileName)) context = path;
+                    if (DiscussionLogFilePattern.IsMatch(fileName)) discussion = path;
+                }
+                return (context, discussion);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Companion details are optional; retain the roadmap projection if they cannot be read.
+        }
+
+        return (null, null);
+    }
+
+    /// <summary>Promotes only the context sections that describe the phase's active scope and locked planning
+    /// decisions. Reference inventories, implementation notes, and deferred ideas remain on the source document
+    /// instead of overwhelming the phase detail page.</summary>
+    private static string ReadPlanningContext(string? contextPath)
+    {
+        if (contextPath is null) return string.Empty;
+
+        try
+        {
+            var selected = SelectContextSections(MarkdownConverter.ReadAllTextShared(contextPath));
+            return selected.Length > 0 ? MarkdownConverter.RenderBlock(selected) : string.Empty;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return string.Empty;
+        }
+    }
+
+    private static string SelectContextSections(string raw)
+    {
+        var selected = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Phase Boundary",
+            "Implementation Decisions",
+        };
+        var output = new List<string>();
+        var include = false;
+        foreach (var line in raw.Replace("\r\n", "\n").Split('\n'))
+        {
+            if (line.StartsWith("## ", StringComparison.Ordinal))
+                include = selected.Contains(line[3..].Trim());
+            if (include) output.Add(line);
+        }
+        return string.Join("\n", output).Trim();
     }
 
     /// <summary>Discovers the GSD Core workflow commands actually installed in the repository. A missing command

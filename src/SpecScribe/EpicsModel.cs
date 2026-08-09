@@ -65,6 +65,15 @@ public sealed class EpicInfo
     public required string Title { get; init; }
     public required string GoalHtml { get; init; }
     public string? FrMetaHtml { get; init; }
+
+    /// <summary>Planning-relevant sections projected from a framework's phase companion artifact; empty when
+    /// no such context exists.</summary>
+    public string PhaseContextHtml { get; init; } = string.Empty;
+
+    /// <summary>Whether the framework records that the phase has already been discussed. GSD Core derives this
+    /// from its phase-local discussion log so the next-step selector does not offer a redundant discussion prompt.</summary>
+    public bool HasDiscussionLog { get; init; }
+
     public required EpicStatus Status { get; init; }
     public required EpicSection Section { get; init; }
     public required IReadOnlyList<StoryInfo> Stories { get; init; }

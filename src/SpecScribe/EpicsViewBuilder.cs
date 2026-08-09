@@ -208,6 +208,7 @@ public static class EpicsViewBuilder
             StatusLabel = StatusStyles.EpicLabel(epicClass),
             GoalHtml = epic.GoalHtml,
             FrMetaHtml = epic.FrMetaHtml,
+            PhaseContextHtml = epic.PhaseContextHtml,
             HasStories = progress.StoryCount > 0,
             ProgressBars = bars,
             NextActionsPanelHtml = RenderNextActionsPanel(epic, prefix, commands, openDeferred),
