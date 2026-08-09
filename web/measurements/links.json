@@ -1,24 +1,24 @@
 {
   "generatedBy": "web/scripts/check-links.mjs",
   "site": {
-    "pages": 1611,
-    "files": 1736,
+    "pages": 1619,
+    "files": 1745,
     "counts": {
-      "total": 238203,
-      "skipped": 11978,
-      "internal": 226225,
-      "resolved": 224939,
-      "dangling": 1286
+      "total": 238344,
+      "skipped": 12030,
+      "internal": 226314,
+      "resolved": 225045,
+      "dangling": 1269
     }
   },
   "baseline": {
     "file": "web/measurements/links-baseline.json",
-    "count": 717,
-    "pinnedAt": "2026-08-08"
+    "count": 700,
+    "pinnedAt": "2026-08-09"
   },
   "newlyDangling": [],
   "fixed": [],
-  "stillDanglingCount": 717,
+  "stillDanglingCount": 700,
   "stillDanglingDistinct": [
     "../../../docs/adrs/0008-json-ir-canonical-and-incremental-generation.md",
     "../../../docs/adrs/0027-watch-rebuild-scope-is-one-classifier-and-topology-escalates.md",
@@ -107,14 +107,6 @@
     "../../spike/plotly/",
     "../../spike/vscode",
     "../../src/SpecScribe",
-    "../../src/SpecScribe/Charts.cs",
-    "../../src/SpecScribe/CodeFileTemplater.cs",
-    "../../src/SpecScribe/GitMetrics.cs",
-    "../../src/SpecScribe/RequirementsParser.cs",
-    "../../src/SpecScribe/RequirementsTemplater.cs",
-    "../../src/SpecScribe/SiteGenerator.cs",
-    "../../src/SpecScribe/assets/specscribe.js",
-    "../../tests/SpecScribe.Tests/ChartsTests.cs",
     "../../tools/prism-vendor/",
     "../../tools/prism-vendor/README.md",
     "../../web/CONVENTIONS.md",

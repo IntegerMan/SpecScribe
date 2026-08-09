@@ -6,20 +6,20 @@ Story 23.3 AC #4 — internal link resolution over the generated site
   "does every internal link resolve?", not "did the migration break a link?". The comparison columns
   were retired rather than left printing the same numbers twice.
 
-  pages walked            1611
-  files emitted           1736
-  <a href> total          238203
-  external/anchor         11978
-  internal                226225
-  resolved                224939
-  dangling                1286
+  pages walked            1619
+  files emitted           1745
+  <a href> total          238344
+  external/anchor         12030
+  internal                226314
+  resolved                225045
+  dangling                1269
 
-  baseline pinned         717  (2026-08-08)
-  still dangling          717
+  baseline pinned         700  (2026-08-09)
+  still dangling          700
   NEWLY dangling          0
   fixed since pinning     0
 
-No new dangling links. 717 known reference(s) remain from the baseline.
+No new dangling links. 700 known reference(s) remain from the baseline.
 
 Known dangling targets, carried from the baseline:
 
@@ -35,7 +35,7 @@ Known dangling targets, carried from the baseline:
   10    ../../docs/adrs/0008-json-ir-canonical-and-incremental-generation.md
   10    ../../CLAUDE.md
   9     ../../docs/adrs/0022-node-is-a-build-toolchain-and-a-generate-time-runtime.md
-  … and 285 more distinct targets.
+  … and 277 more distinct targets.
 
   Two known causes, both in shipped C# and both worth their own follow-up:
     · links to SOURCE files (`…/epics.md`) that the portal never rewrites to their `.html` page;

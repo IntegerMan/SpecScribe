@@ -417,7 +417,7 @@ retirement condition._
 **Code review 2026-08-08 — complete.** Five adversarial layers (Blind Hunter ×2, Edge Case Hunter ×2,
 Acceptance Auditor) plus the orchestrating session: 62 raw findings → **32 after dedupe and triage**
 (2 decision-needed, 20 patch, 5 defer, 35 dismissed). Full record, scope statement, per-AC verdict table and
-the dismissal rationale: [`23-4-code-review-2026-08-08.md`](23-4-code-review-2026-08-08.md).
+the dismissal rationale: _bmad-output/implementation-artifacts/23-4-code-review-2026-08-08.md.
 
 Scoped by this story's File List over `32fd282..a8c97f3`; sibling hunks (Stories 22.4, 22.5, 22.6, 18.4–18.6,
 20.9/20.10, 24.1, 8.9, 23.2) excluded by hunk attribution. Generated artefacts excluded as machine-derived;

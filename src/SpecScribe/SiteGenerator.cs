@@ -6188,11 +6188,14 @@ public sealed class SiteGenerator
                 var outputRelative = FollowUpSlug.OutputPath(slug);
                 var epicNumber = deferredEpicByItem[item];
                 var deferredLocalContext = BuildFollowUpGroupLocalContext(groupByHref, outputRelative);
+                var displayBodyHtml = CodeReferenceLinkifier.Linkify(
+                    item.BodyHtml, _codePages, codeSourceBaseUrl: null, PathUtil.RelativePrefix(outputRelative),
+                    _options.RepoRoot, _options.SourceRoot);
                 // No ApplyReferenceLinks — Address/Close data-copy must stay raw.
                 WritePage(
                     FollowUpDetailTemplater.BuildDeferredPage(
                         item, provenanceLabel, sourceHref, slug, nav, listPath, WorkflowCommands, epicNumber,
-                        deferredLocalContext),
+                        deferredLocalContext, displayBodyHtml),
                     linkify: false);
             }
         }
