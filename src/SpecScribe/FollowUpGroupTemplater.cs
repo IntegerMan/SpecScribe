@@ -100,10 +100,10 @@ public static class FollowUpGroupTemplater
             .Select(ToListBatchEntry)
             .ToList();
 
-        return BmadCommands.RenderListBatchPane(group.Title, commands, openDeferred, openActions);
+        return WorkflowCommands.RenderListBatchPane(group.Title, commands, openDeferred, openActions);
     }
 
-    private static BmadCommands.ListBatchEntry ToListBatchEntry(FollowUpGroupMember member)
+    private static WorkflowCommands.ListBatchEntry ToListBatchEntry(FollowUpGroupMember member)
     {
         var href = member.DetailHref;
         if (href is { Length: > 0 })

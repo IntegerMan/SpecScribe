@@ -1610,7 +1610,7 @@ public static partial class Charts
     /// <see cref="CoverageMeter"/>). A card explains what the artifact is
     /// and carries its family accent color (matching the "Explore Key Views" pills); a PRESENT family's whole
     /// card links to its page, while a MISSING family's card carries a copyable create command (via
-    /// <see cref="BmadCommands.InlineGuidance"/>, degrading to guidance text when the module exposes none). Each
+    /// <see cref="WorkflowCommands.InlineGuidance"/>, degrading to guidance text when the module exposes none). Each
     /// card is a body-level <c>js-tip</c> whose rich tooltip explains the dates (source mtime + decision-journal
     /// memlog). Only the exceptional states (Missing / Stale) get a chip — "present &amp; fresh" is the quiet
     /// default. Coverage is NOT a lifecycle axis, so cards never use the <c>--status-*</c> tokens; dates use the
@@ -1672,7 +1672,7 @@ public static partial class Charts
                 // when the detected module exposes none). The outer card itself isn't a tab stop — the real
                 // interactive control is whatever BmadCommands.InlineGuidance renders inside it, so a keyboard
                 // user reaches one real action per card, not an inert card stop followed by the actual control.
-                var cta = BmadCommands.InlineGuidance(family.CreateCommand, "Create it with",
+                var cta = WorkflowCommands.InlineGuidance(family.CreateCommand, "Create it with",
                     "Add this artifact through your planning workflow.");
                 sb.Append($"    <div class=\"coverage-card js-tip {stateClass} {accent}\" data-tip=\"{tip}\">" +
                           $"{head}{desc}<div class=\"coverage-cta\">{cta}</div></div>\n");

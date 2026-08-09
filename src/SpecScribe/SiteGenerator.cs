@@ -4311,8 +4311,8 @@ public sealed class SiteGenerator
                     PathUtil.NormalizeSlashes(f.Page.OutputRelativePath),
                     f.ArtifactSourcePath,
                     story.TasksDone, story.TasksTotal,
-                    BmadCommands.PrimaryStoryCommand(story, WorkflowCommands, storyOpenDeferred),
-                    BmadCommands.StoryCommands(story, WorkflowCommands, storyOpenDeferred)));
+                    SpecScribe.WorkflowCommands.PrimaryStoryCommand(story, WorkflowCommands, storyOpenDeferred),
+                    SpecScribe.WorkflowCommands.StoryCommands(story, WorkflowCommands, storyOpenDeferred)));
                 continue;
             }
 

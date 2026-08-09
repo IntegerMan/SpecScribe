@@ -49,7 +49,7 @@ public static class DeferredWorkTemplater
                     .Select(i => ToListBatchEntry(i, "Deferred work", detailSlugs))
                     .ToList();
                 sb.Append("<section class=\"deferred-work-wrap\">\n");
-                sb.Append(BmadCommands.RenderListBatchPane(title, catalog, openDeferred: openEntries));
+                sb.Append(WorkflowCommands.RenderListBatchPane(title, catalog, openDeferred: openEntries));
                 sb.Append("  <ul class=\"followup-rows-list deferred-items-list js-listable\">\n");
                 foreach (var item in unstructured)
                     RenderItem(sb, item, "Deferred work", prefix, detailSlugs, epicsModel, hrefMap);
@@ -70,7 +70,7 @@ public static class DeferredWorkTemplater
                 .ToList();
 
             sb.Append("<section class=\"deferred-work-wrap\">\n");
-            sb.Append(BmadCommands.RenderListBatchPane(title, catalog, openDeferred: openEntries));
+            sb.Append(WorkflowCommands.RenderListBatchPane(title, catalog, openDeferred: openEntries));
             if (model.PreambleHtml is { Length: > 0 } preamble)
             {
                 sb.Append("<div class=\"deferred-work-preamble doc-body\">\n");
@@ -113,7 +113,7 @@ public static class DeferredWorkTemplater
     /// (never linkified) plus its detail deep link when one exists. <paramref name="provenanceKey"/> is the
     /// group's <see cref="DeferredWorkGroup.SourceKey"/> when known, else its heading label.
     /// [spec-follow-up-list-batch-actions]</summary>
-    private static BmadCommands.ListBatchEntry ToListBatchEntry(
+    private static WorkflowCommands.ListBatchEntry ToListBatchEntry(
         DeferredWorkItem item, string provenanceKey,
         IReadOnlyDictionary<DeferredWorkItem, string> detailSlugs)
     {
@@ -124,7 +124,7 @@ public static class DeferredWorkTemplater
             summary = "(no deferred text)";
         // Site-root-relative detail cue (no page-depth prefix) so prompts match group/story Address deferred.
         var href = detailSlugs.TryGetValue(item, out var slug) ? FollowUpSlug.OutputPath(slug) : null;
-        return new BmadCommands.ListBatchEntry(summary, provenanceKey, href);
+        return new WorkflowCommands.ListBatchEntry(summary, provenanceKey, href);
     }
 
     private static void RenderGroup(

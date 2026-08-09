@@ -90,7 +90,7 @@ public static class RelatedWorkCards
         var project = new RelatedProjectCard(
             projectTitle,
             ProjectSummary(counts),
-            epics is not null ? BmadCommands.PrimaryProjectCommand(epics, commands) : null,
+            epics is not null ? WorkflowCommands.PrimaryProjectCommand(epics, commands) : null,
             "Select a node in the chart for its related work, or open the full work graph.");
 
         if (epics is null || (relationships.IsEmpty && !includeSelectableWithoutRelationships))
@@ -290,7 +290,7 @@ public static class RelatedWorkCards
             // ONE list, computed once, feeding BOTH the command gating and the children list — the round-2 code
             // already computed exactly this to feed PrimaryStoryCommand.
             var openDeferred = geometry.DeferredForSource(story.Id)?.Where(IsOpen).ToList();
-            var primary = BmadCommands.PrimaryStoryCommand(story, commands, openDeferred);
+            var primary = WorkflowCommands.PrimaryStoryCommand(story, commands, openDeferred);
             var (children, hidden) = ChildrenOf(openDeferred);
 
             return new RelatedCard(
@@ -329,7 +329,7 @@ public static class RelatedWorkCards
                 "Epic",
                 $"{stories} {Charts.Plural(stories, "story", "stories")}"
                     + (open > 0 ? $" · {open} open follow-{(open == 1 ? "up" : "ups")}" : string.Empty),
-                BmadCommands.PrimaryEpicCommand(epic, commands, openDeferred),
+                WorkflowCommands.PrimaryEpicCommand(epic, commands, openDeferred),
                 rel.Href ?? $"epics/epic-{epic.Number}.html",
                 rel);
         }
@@ -400,8 +400,8 @@ public static class RelatedWorkCards
     /// "more command, not more relationships".
     ///
     /// <para>Filtered by VALUE rather than by <c>Skip(1)</c>, and that matters at the edges: for a done story
-    /// <see cref="BmadCommands.PrimaryStoryCommand"/> returns null while
-    /// <see cref="BmadCommands.StoryCommands"/> still returns a muted <c>correct-course</c> escape hatch, so
+    /// <see cref="WorkflowCommands.PrimaryStoryCommand"/> returns null while
+    /// <see cref="WorkflowCommands.StoryCommands"/> still returns a muted <c>correct-course</c> escape hatch, so
     /// <c>Skip(1)</c> would silently swallow the only entry there is. Exactly one occurrence is removed, so a
     /// catalog that legitimately repeated a command would not lose both. [Story 20.8 D2]</para></summary>
     private static IReadOnlyList<OutlineStoryCommand> MoreCommandsFor(
@@ -410,7 +410,7 @@ public static class RelatedWorkCards
         IReadOnlyList<FollowUpDeferredSlot>? openDeferred,
         string? primary)
     {
-        var all = BmadCommands.StoryCommands(story, commands, openDeferred);
+        var all = WorkflowCommands.StoryCommands(story, commands, openDeferred);
         if (all.Count == 0) return Array.Empty<OutlineStoryCommand>();
 
         var more = new List<OutlineStoryCommand>(all.Count);

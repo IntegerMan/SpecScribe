@@ -99,7 +99,7 @@ public static class DashboardViewBuilder
             UnplannedWork = unplannedGeometry,
             // Body fragment only — HtmlRenderAdapter wraps with work-mode panel classes. [Story 9.8]
             NextStepsHtml = epicsModel is { } epics
-                ? BmadCommands.RenderProjectNextStepsBody(epics, commands)
+                ? WorkflowCommands.RenderProjectNextStepsBody(epics, commands)
                 : string.Empty,
             // Compact delivery-cadence teaser → cadence.html. Empty (omitted) when there's nothing to show. [Story 21.2]
             CadenceStripHtml = cadence is { IsEmpty: false } c
@@ -173,11 +173,11 @@ public static class DashboardViewBuilder
 
     /// <summary>The no-epics call to action: what this project is missing, and the command that produces it.
     /// <para>Falls back to a command-free sentence when the detected module does not expose the command
-    /// (<see cref="BmadCommands.InlineGuidance"/>'s contract) — a portal must never instruct a user to run something
+    /// (<see cref="WorkflowCommands.InlineGuidance"/>'s contract) — a portal must never instruct a user to run something
     /// that is not installed.</para></summary>
     private static string BuildNoEpicsGuidanceHtml(CommandCatalog commands)
     {
-        var note = BmadCommands.InlineGuidance(
+        var note = WorkflowCommands.InlineGuidance(
             commands.Command(CreateEpicsCommandSlug),
             "This project has no epics or stories yet. Break the plan into them with",
             "This project has no epics or stories yet — add them to your plan to track delivery here.");

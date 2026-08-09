@@ -114,7 +114,7 @@ public sealed record DashboardView
     public UnplannedWorkGeometry UnplannedWork { get; init; } = UnplannedWorkGeometry.Empty;
 
     /// <summary>Pre-rendered project Next Steps <em>body</em> HTML
-    /// (<see cref="BmadCommands.RenderProjectNextStepsBody"/>), or empty when the catalog yields no
+    /// (<see cref="WorkflowCommands.RenderProjectNextStepsBody"/>), or empty when the catalog yields no
     /// suggestions / epics are absent. The dashboard adapter wraps this in the panel shell + work-mode
     /// classes. Named opaque fragment matching <see cref="EpicsView.NextStepsHtml"/>'s role. [Story 9.8]</summary>
     public string NextStepsHtml { get; init; } = string.Empty;

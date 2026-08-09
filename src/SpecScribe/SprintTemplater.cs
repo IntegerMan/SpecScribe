@@ -39,9 +39,9 @@ public static class SprintTemplater
     };
 
     /// <summary>Empty-lane HTML: Ready (and any lane whose copy already implies drafting) carries an
-    /// <see cref="BmadCommands.InlineGuidance"/> create-story badge when an undrafted target + catalog
+    /// <see cref="WorkflowCommands.InlineGuidance"/> create-story badge when an undrafted target + catalog
     /// allow; otherwise the designed 8.6 plain copy (HTML-escaped). Target selection matches
-    /// <see cref="BmadCommands"/> ForProject (drafted/ready/active epics only) so Home and the board
+    /// <see cref="WorkflowCommands"/> ForProject (drafted/ready/active epics only) so Home and the board
     /// never disagree on the next draft id. Never a wrong badge. [Story 9.8]</summary>
     private static string EmptyLaneHtml(string cssClass, EpicsModel? epics, CommandCatalog? commands)
     {
@@ -56,7 +56,7 @@ public static class SprintTemplater
             if (epicNeedingStory is not null)
             {
                 var next = epicNeedingStory.Stories.First(s => s.ArtifactOutputPath is null);
-                return BmadCommands.InlineGuidance(
+                return WorkflowCommands.InlineGuidance(
                     commands.Command("create-story", next.Id),
                     "Nothing ready to pick up — draft the next story with",
                     PathUtil.Html(EmptyLaneCopy("ready")));
@@ -107,7 +107,7 @@ public static class SprintTemplater
         sb.Append("  <div class=\"sprint-topbar-aside\">\n");
         sb.Append(RenderProgressWheel(ledger));
         sb.Append(RenderBoardTabs());
-        sb.Append(BmadCommands.RenderCommandMenu("Commands", new (string?, string)[]
+        sb.Append(WorkflowCommands.RenderCommandMenu("Commands", new (string?, string)[]
         {
             (commands.Command("sprint-planning"), "Plan the sprint from epics"),
             (commands.Command("sprint-status"), "Summarize status & risks"),

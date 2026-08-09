@@ -346,7 +346,7 @@ public class RelatedWorkTests
             ["create-epics-and-stories"] = "/bmad-create-epics-and-stories",
         });
 
-        Assert.Equal("/bmad-create-epics-and-stories", BmadCommands.PrimaryEpicCommand(epic, commands));
+        Assert.Equal("/bmad-create-epics-and-stories", WorkflowCommands.PrimaryEpicCommand(epic, commands));
     }
 
     [Fact]
@@ -363,7 +363,7 @@ public class RelatedWorkTests
             ["create-epics-and-stories"] = "/gsd:plan-phase",
         }, usesPhaseArguments: true);
 
-        Assert.Equal("/gsd:discuss-phase 02.1", BmadCommands.PrimaryEpicCommand(epic, commands));
+        Assert.Equal("/gsd:discuss-phase 02.1", WorkflowCommands.PrimaryEpicCommand(epic, commands));
     }
 
     [Fact]
@@ -380,7 +380,7 @@ public class RelatedWorkTests
             ["create-epics-and-stories"] = "/gsd:plan-phase",
         }, usesPhaseArguments: true);
 
-        Assert.Null(BmadCommands.PrimaryEpicCommand(epic, commands));
+        Assert.Null(WorkflowCommands.PrimaryEpicCommand(epic, commands));
     }
 
     [Fact]
@@ -404,7 +404,7 @@ public class RelatedWorkTests
             ["retrospective"] = "/bmad-retrospective",
         });
 
-        Assert.Null(BmadCommands.PrimaryEpicCommand(epic, commands));
+        Assert.Null(WorkflowCommands.PrimaryEpicCommand(epic, commands));
     }
 
     [Fact]
@@ -416,19 +416,19 @@ public class RelatedWorkTests
         });
 
         // TwoEpicModel's Epic 1 is drafted with an undrafted Story 1.1 — the next-story-to-draft suggestion.
-        Assert.Equal("/bmad-create-story 1.1", BmadCommands.PrimaryProjectCommand(TwoEpicModel(), commands));
+        Assert.Equal("/bmad-create-story 1.1", WorkflowCommands.PrimaryProjectCommand(TwoEpicModel(), commands));
     }
 
     [Fact]
     public void PrimaryProjectCommand_ReturnsNull_WhenTheModuleExposesNoMatchingCommand()
     {
-        Assert.Null(BmadCommands.PrimaryProjectCommand(TwoEpicModel(), CommandCatalog.Empty));
+        Assert.Null(WorkflowCommands.PrimaryProjectCommand(TwoEpicModel(), CommandCatalog.Empty));
     }
 
     [Fact]
     public void RenderPrimaryActionBadge_RendersACopyBadge_ForARealCommand()
     {
-        var html = BmadCommands.RenderPrimaryActionBadge("/bmad-create-story 1.1");
+        var html = WorkflowCommands.RenderPrimaryActionBadge("/bmad-create-story 1.1");
 
         Assert.Contains("data-copy=\"/bmad-create-story 1.1\"", html);
     }
@@ -436,8 +436,8 @@ public class RelatedWorkTests
     [Fact]
     public void RenderPrimaryActionBadge_RendersNothing_ForANullOrBlankCommand()
     {
-        Assert.Equal(string.Empty, BmadCommands.RenderPrimaryActionBadge(null));
-        Assert.Equal(string.Empty, BmadCommands.RenderPrimaryActionBadge("  "));
+        Assert.Equal(string.Empty, WorkflowCommands.RenderPrimaryActionBadge(null));
+        Assert.Equal(string.Empty, WorkflowCommands.RenderPrimaryActionBadge("  "));
     }
 
     // ---- Story 20.8: the completeness invariant (Task 3.4 / 5.1) -----------------------------------------
@@ -608,7 +608,7 @@ public class RelatedWorkTests
         var pane = BuildPane(geometry, commands);
 
         var story = Assert.Single(pane.Cards, c => c.IslandId == "1.1");
-        var expectedPrimary = BmadCommands.PrimaryStoryCommand(
+        var expectedPrimary = WorkflowCommands.PrimaryStoryCommand(
             TwoEpicModel().Epics[0].Stories[0], commands,
             geometry.DeferredForSource("1.1").Where(s => !s.Item.Resolved).ToList());
         Assert.Equal(expectedPrimary, story.PrimaryCommand);

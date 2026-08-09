@@ -1098,7 +1098,7 @@ public class HtmlTemplaterTests
             ["code-review"] = "/bmad-code-review",
         });
 
-        var html = BmadCommands.RenderNextSteps(story, commands);
+        var html = WorkflowCommands.RenderNextSteps(story, commands);
 
         // Unified badge: the command text lives inside the badge, and the primary Copy button (now an
         // icon carrying its data-copy payload) is preserved.
@@ -1177,8 +1177,8 @@ public class HtmlTemplaterTests
             ["create-epics-and-stories"] = "/gsd:plan-phase",
         }, usesPhaseArguments: true);
 
-        var epicHtml = BmadCommands.RenderEpicNextSteps(phase, commands);
-        var projectHtml = BmadCommands.RenderProjectNextSteps(model, commands);
+        var epicHtml = WorkflowCommands.RenderEpicNextSteps(phase, commands);
+        var projectHtml = WorkflowCommands.RenderProjectNextSteps(model, commands);
         var expected = new[]
         {
             "/gsd:discuss-phase 2.1",
@@ -1196,7 +1196,7 @@ public class HtmlTemplaterTests
             ["ui-phase"] = "/gsd:ui-phase",
             ["create-epics-and-stories"] = "/gsd:plan-phase",
         }, usesPhaseArguments: true);
-        var missingHtml = BmadCommands.RenderEpicNextSteps(phase, withoutResearch);
+        var missingHtml = WorkflowCommands.RenderEpicNextSteps(phase, withoutResearch);
 
         Assert.DoesNotContain("/gsd:research-phase", missingHtml);
         Assert.Contains("/gsd:plan-phase 2.1", missingHtml);
@@ -1490,7 +1490,7 @@ public class HtmlTemplaterTests
         // ADR 0025 Decision 1: `retired` is TERMINAL, and StatusStyles.RetirementStatusWords maps six authored
         // words onto it. The old raw-text chain matched none of its arms on any of them, so a retired story fell
         // through to the default and invited the reader to `create-story` the very id that had been retired.
-        var html = BmadCommands.RenderNextSteps(Story("1.1", status), NextStepCommands());
+        var html = WorkflowCommands.RenderNextSteps(Story("1.1", status), NextStepCommands());
 
         Assert.DoesNotContain("/bmad-create-story", html);
         Assert.DoesNotContain("/bmad-dev-story", html);
@@ -1517,7 +1517,7 @@ public class HtmlTemplaterTests
         foreach (var status in statuses)
         {
             var story = Story("1.1", status);
-            var html = BmadCommands.RenderNextSteps(story, NextStepCommands());
+            var html = WorkflowCommands.RenderNextSteps(story, NextStepCommands());
             var stage = StatusStyles.ForStory(story);
 
             // A terminal stage never invites work ON THIS STORY — no drafting it, no implementing it. (The
@@ -1541,7 +1541,7 @@ public class HtmlTemplaterTests
         // The mirror trap: `Contains("complete")` is true for "incomplete", which would have silently returned
         // an EMPTY suggestion list for a story that has not started. StatusStyles uses token comparison for
         // exactly this reason, and its own comment names this case.
-        var html = BmadCommands.RenderNextSteps(Story("1.1", "incomplete"), NextStepCommands());
+        var html = WorkflowCommands.RenderNextSteps(Story("1.1", "incomplete"), NextStepCommands());
 
         Assert.Contains("/bmad-create-story", html);
     }
@@ -1551,9 +1551,9 @@ public class HtmlTemplaterTests
     {
         // The rewrite must be behaviour-preserving on every stage that already worked.
         var commands = NextStepCommands();
-        Assert.Contains("/bmad-dev-story", BmadCommands.RenderNextSteps(Story("1.1", "ready-for-dev"), commands));
-        Assert.Contains("/bmad-dev-story", BmadCommands.RenderNextSteps(Story("1.1", "in-progress"), commands));
-        Assert.Contains("/bmad-code-review", BmadCommands.RenderNextSteps(Story("1.1", "review"), commands));
-        Assert.Contains("/bmad-create-story", BmadCommands.RenderNextSteps(Story("1.1", "drafted"), commands));
+        Assert.Contains("/bmad-dev-story", WorkflowCommands.RenderNextSteps(Story("1.1", "ready-for-dev"), commands));
+        Assert.Contains("/bmad-dev-story", WorkflowCommands.RenderNextSteps(Story("1.1", "in-progress"), commands));
+        Assert.Contains("/bmad-code-review", WorkflowCommands.RenderNextSteps(Story("1.1", "review"), commands));
+        Assert.Contains("/bmad-create-story", WorkflowCommands.RenderNextSteps(Story("1.1", "drafted"), commands));
     }
 }

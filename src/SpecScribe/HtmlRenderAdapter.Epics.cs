@@ -216,8 +216,8 @@ public sealed partial class HtmlRenderAdapter
         }
         if (epic.Status == EpicStatus.Pending)
         {
-            var note = BmadCommands.InlineGuidance(
-                BmadCommands.PrimaryEpicCommand(epic, commands),
+            var note = WorkflowCommands.InlineGuidance(
+                WorkflowCommands.PrimaryEpicCommand(epic, commands),
                 "Stories not yet drafted — draft them with",
                 "Stories not yet drafted.");
             sb.Append($"  <div class=\"pending-note\">{note}</div>\n");
@@ -233,7 +233,7 @@ public sealed partial class HtmlRenderAdapter
     /// shared.</summary>
     private void AppendEmptyEpicsGuidance(StringBuilder sb, CommandCatalog commands)
     {
-        var note = BmadCommands.InlineGuidance(
+        var note = WorkflowCommands.InlineGuidance(
             commands.Command(DashboardViewBuilder.CreateEpicsCommandSlug),
             "No epics yet. Break your plan into epics and stories with",
             "No epics yet — add them to your plan to see them here.");

@@ -817,7 +817,7 @@ public class BmadCommandsTests
     [Fact]
     public void RenderNextSteps_UsesDetectedModuleCommands()
     {
-        var html = BmadCommands.RenderNextSteps(Story("1.2", "ready-for-dev"), BmmCatalog);
+        var html = WorkflowCommands.RenderNextSteps(Story("1.2", "ready-for-dev"), BmmCatalog);
 
         Assert.Contains("/bmad-dev-story 1.2", html);
         // Nothing has been implemented yet for a ready-for-dev story, so code review isn't a valid next step.
@@ -840,7 +840,7 @@ public class BmadCommandsTests
         }, usesPhaseArguments: true);
         var story = Story("3.1", "ready-for-dev", workflowCommandArgument: "2.1");
 
-        var html = BmadCommands.RenderNextSteps(story, gsd);
+        var html = WorkflowCommands.RenderNextSteps(story, gsd);
 
         Assert.Contains("/gsd-execute-phase 2.1", html);
         Assert.DoesNotContain("/gsd-execute-phase 3.1", html);
@@ -850,7 +850,7 @@ public class BmadCommandsTests
     [Fact]
     public void RenderNextSteps_OmitsPanelWhenModuleUndetected()
     {
-        var html = BmadCommands.RenderNextSteps(Story("1.2", "ready-for-dev"), CommandCatalog.Empty);
+        var html = WorkflowCommands.RenderNextSteps(Story("1.2", "ready-for-dev"), CommandCatalog.Empty);
 
         Assert.Equal(string.Empty, html);
     }
@@ -868,7 +868,7 @@ public class BmadCommandsTests
             ["correct-course"] = "/bmad-correct-course",
         });
 
-        var html = BmadCommands.RenderNextSteps(Story("2.1", "review"), catalog);
+        var html = WorkflowCommands.RenderNextSteps(Story("2.1", "review"), catalog);
 
         Assert.Contains("/bmad-code-review 2.1", html);
         Assert.DoesNotContain("/bmad-create-story", html);
@@ -885,7 +885,7 @@ public class BmadCommandsTests
     [Fact]
     public void RenderNextSteps_InProgressStory_CarriesStoryIdOnCodeReview()
     {
-        var html = BmadCommands.RenderNextSteps(Story("1.2", "in-progress"), BmmCatalog);
+        var html = WorkflowCommands.RenderNextSteps(Story("1.2", "in-progress"), BmmCatalog);
 
         Assert.Contains("/bmad-dev-story 1.2", html);
         Assert.Contains("/bmad-code-review 1.2", html);
@@ -909,7 +909,7 @@ public class BmadCommandsTests
             ["correct-course"] = "/bmad-correct-course",
         });
 
-        var html = BmadCommands.RenderNextSteps(Story("1.2", "in-progress"), catalog);
+        var html = WorkflowCommands.RenderNextSteps(Story("1.2", "in-progress"), catalog);
 
         Assert.DoesNotContain("/bmad-dev-story", html);
         Assert.Equal(1, CountNextStepPrimary(html));
@@ -924,7 +924,7 @@ public class BmadCommandsTests
     public void RenderNextSteps_UnplannedStory_StillSuggestsDraftingItsOwnPlan()
     {
         // The one create-story a story page keeps: drafting the story being viewed, with its own id.
-        var html = BmadCommands.RenderNextSteps(Story("3.2", null), BmmCatalog);
+        var html = WorkflowCommands.RenderNextSteps(Story("3.2", null), BmmCatalog);
 
         Assert.Contains("/bmad-create-story 3.2", html);
         Assert.Equal(1, CountNextStepPrimary(html));
@@ -934,7 +934,7 @@ public class BmadCommandsTests
     [Fact]
     public void RenderNextSteps_UnplannedFirstStory_CreateStoryIsPrimary_ReadinessIsAlternate()
     {
-        var html = BmadCommands.RenderNextSteps(Story("3.1", null), BmmCatalog);
+        var html = WorkflowCommands.RenderNextSteps(Story("3.1", null), BmmCatalog);
 
         Assert.Contains("/bmad-create-story 3.1", html);
         Assert.Contains("/bmad-check-implementation-readiness", html);
@@ -948,7 +948,7 @@ public class BmadCommandsTests
     public void RenderNextSteps_DoneStory_ShowsCelebratoryAllDonePanelNotCodeReview()
     {
         // Pure celebration when correct-course is absent — byte-identical to the pre-8.5 celebratory panel.
-        var without = BmadCommands.RenderNextSteps(Story("2.1", "done"), BmmWithoutCorrectCourse);
+        var without = WorkflowCommands.RenderNextSteps(Story("2.1", "done"), BmmWithoutCorrectCourse);
 
         Assert.Contains("next-steps all-done", without);
         Assert.Contains("All done", without);
@@ -958,7 +958,7 @@ public class BmadCommandsTests
         Assert.DoesNotContain("next-step-card-primary", without);
 
         // With correct-course: celebration + one muted escape hatch, never a primary / never code-review.
-        var with = BmadCommands.RenderNextSteps(Story("2.1", "done"), BmmCatalog);
+        var with = WorkflowCommands.RenderNextSteps(Story("2.1", "done"), BmmCatalog);
 
         Assert.Contains("next-steps all-done", with);
         Assert.Contains("All done", with);
@@ -973,7 +973,7 @@ public class BmadCommandsTests
     [Fact]
     public void RenderNextSteps_CorrectCourseDropsWhenModuleLacksIt()
     {
-        var html = BmadCommands.RenderNextSteps(Story("1.2", "in-progress"), BmmWithoutCorrectCourse);
+        var html = WorkflowCommands.RenderNextSteps(Story("1.2", "in-progress"), BmmWithoutCorrectCourse);
 
         Assert.Contains("/bmad-dev-story 1.2", html);
         Assert.Contains("/bmad-code-review 1.2", html);
@@ -985,8 +985,8 @@ public class BmadCommandsTests
     [Fact]
     public void RenderNextSteps_IsDeterministic()
     {
-        var a = BmadCommands.RenderNextSteps(Story("1.2", "in-progress"), BmmCatalog);
-        var b = BmadCommands.RenderNextSteps(Story("1.2", "in-progress"), BmmCatalog);
+        var a = WorkflowCommands.RenderNextSteps(Story("1.2", "in-progress"), BmmCatalog);
+        var b = WorkflowCommands.RenderNextSteps(Story("1.2", "in-progress"), BmmCatalog);
         Assert.Equal(a, b);
     }
 
@@ -1010,7 +1010,7 @@ public class BmadCommandsTests
             ["retrospective"] = "/bmad-retrospective",
         });
 
-        var html = BmadCommands.RenderEpicNextSteps(Epic(hasRetro: false, Story("1.1", "done"), Story("1.2", "done")), catalog);
+        var html = WorkflowCommands.RenderEpicNextSteps(Epic(hasRetro: false, Story("1.1", "done"), Story("1.2", "done")), catalog);
 
         Assert.Contains("/bmad-retrospective 1", html);
         Assert.Equal(1, CountNextStepPrimary(html));
@@ -1028,7 +1028,7 @@ public class BmadCommandsTests
             ["retrospective"] = "/bmad-retrospective",
         });
 
-        var html = BmadCommands.RenderEpicNextSteps(Epic(hasRetro: true, Story("1.1", "done"), Story("1.2", "done")), catalog);
+        var html = WorkflowCommands.RenderEpicNextSteps(Epic(hasRetro: true, Story("1.1", "done"), Story("1.2", "done")), catalog);
 
         Assert.Equal(string.Empty, html);
     }
@@ -1054,7 +1054,7 @@ public class BmadCommandsTests
     [Fact]
     public void RenderProjectNextSteps_ListsCodeReviewForStoryAwaitingReview()
     {
-        var html = BmadCommands.RenderProjectNextSteps(
+        var html = WorkflowCommands.RenderProjectNextSteps(
             Project(Story("1.3", "done"), Story("1.4", "review")), BmmCatalog);
 
         // A lone review story passes its id straight to the command.
@@ -1072,7 +1072,7 @@ public class BmadCommandsTests
     {
         // Two stories awaiting review plus a ready front-line story: a single code-review prompt lists both
         // ids (grouped by action, not one row per story), and it precedes the dev-story front line.
-        var html = BmadCommands.RenderProjectNextSteps(
+        var html = WorkflowCommands.RenderProjectNextSteps(
             Project(Story("1.4", "review"), Story("2.1", "review"), Story("1.5", "ready-for-dev")), BmmCatalog);
 
         Assert.Contains("Stories 1.4, 2.1 are awaiting code review", html);
@@ -1094,7 +1094,7 @@ public class BmadCommandsTests
     [Fact]
     public void RenderProjectNextSteps_OmitsCodeReviewWhenNoStoryInReview()
     {
-        var html = BmadCommands.RenderProjectNextSteps(
+        var html = WorkflowCommands.RenderProjectNextSteps(
             Project(Story("1.4", "ready-for-dev")), BmmCatalog);
 
         Assert.DoesNotContain("code-review", html);
@@ -1109,7 +1109,7 @@ public class BmadCommandsTests
             ["dev-story"] = "/bmad-dev-story",
         });
 
-        var html = BmadCommands.RenderProjectNextSteps(Project(Story("1.4", "review")), noReviewCatalog);
+        var html = WorkflowCommands.RenderProjectNextSteps(Project(Story("1.4", "review")), noReviewCatalog);
 
         Assert.DoesNotContain("code-review", html);
         Assert.DoesNotContain("awaiting code review", html);
@@ -1133,7 +1133,7 @@ public class BmadCommandsTests
         done.ArtifactOutputPath = "epics/story-1-1.html";
         var undrafted = Story("1.2", null);
 
-        var projectHtml = BmadCommands.RenderProjectNextSteps(Project(done, undrafted), BmmCatalog);
+        var projectHtml = WorkflowCommands.RenderProjectNextSteps(Project(done, undrafted), BmmCatalog);
         Assert.Contains("/bmad-create-story 1.2", projectHtml);
 
         var epicCatalog = new CommandCatalog("BMad Method", new Dictionary<string, string>
@@ -1142,7 +1142,7 @@ public class BmadCommandsTests
             ["sprint-status"] = "/bmad-sprint-status",
             ["dev-story"] = "/bmad-dev-story",
         });
-        var epicHtml = BmadCommands.RenderEpicNextSteps(Epic(hasRetro: false, done, undrafted), epicCatalog);
+        var epicHtml = WorkflowCommands.RenderEpicNextSteps(Epic(hasRetro: false, done, undrafted), epicCatalog);
         Assert.Contains("/bmad-create-story 1.2", epicHtml);
         // Up Next would spotlight the undrafted story — create-story is the primary, not buried under sprint-status.
         Assert.True(
@@ -1164,7 +1164,7 @@ public class BmadCommandsTests
             ["sprint-status"] = "/bmad-sprint-status",
         });
 
-        var html = BmadCommands.RenderEpicNextSteps(Epic(hasRetro: false, active, undrafted), catalog);
+        var html = WorkflowCommands.RenderEpicNextSteps(Epic(hasRetro: false, active, undrafted), catalog);
 
         Assert.Contains("/bmad-sprint-status", html);
         Assert.Contains("/bmad-create-story 1.2", html);
@@ -1195,24 +1195,24 @@ public class BmadCommandsTests
     [MemberData(nameof(KnownCommandAccentKicker))]
     public void AccentAndKicker_KnownSlugFamilies_AreExplicit(string command, string accent, string kicker)
     {
-        Assert.Equal(accent, BmadCommands.AccentForCommand(command));
-        Assert.Equal(kicker, BmadCommands.KickerForCommand(command, isPrimary: false));
+        Assert.Equal(accent, WorkflowCommands.AccentForCommand(command));
+        Assert.Equal(kicker, WorkflowCommands.KickerForCommand(command, isPrimary: false));
     }
 
     [Fact]
     public void AccentAndKicker_UnknownSlug_FailsClosedToPendingAlsoConsider()
     {
         const string unknown = "/bmad-totally-new-skill";
-        Assert.Equal("pending", BmadCommands.AccentForCommand(unknown));
-        Assert.Equal("Also consider", BmadCommands.KickerForCommand(unknown, isPrimary: false));
-        Assert.Equal("Recommended", BmadCommands.KickerForCommand(unknown, isPrimary: true));
+        Assert.Equal("pending", WorkflowCommands.AccentForCommand(unknown));
+        Assert.Equal("Also consider", WorkflowCommands.KickerForCommand(unknown, isPrimary: false));
+        Assert.Equal("Recommended", WorkflowCommands.KickerForCommand(unknown, isPrimary: true));
     }
 
     [Fact]
     public void AccentAndKicker_SprintStatus_StaysActiveWithPlanKicker()
     {
-        Assert.Equal("active", BmadCommands.AccentForCommand("/bmad-sprint-status"));
-        Assert.Equal("Plan", BmadCommands.KickerForCommand("/bmad-sprint-status", isPrimary: false));
+        Assert.Equal("active", WorkflowCommands.AccentForCommand("/bmad-sprint-status"));
+        Assert.Equal("Plan", WorkflowCommands.KickerForCommand("/bmad-sprint-status", isPrimary: false));
     }
 
     // ---- Address deferred I/O matrix ----------------------------------------------------------------
@@ -1243,7 +1243,7 @@ public class BmadCommandsTests
     public void RenderNextSteps_DoneStoryWithOpenDeferred_AddressDeferredPrimary_NoCelebration()
     {
         var deferred = new[] { OpenSlot("Extract helper method"), OpenSlot("Add logging") };
-        var html = BmadCommands.RenderNextSteps(Story("6.5", "done"), BmmWithQuickDev, deferred);
+        var html = WorkflowCommands.RenderNextSteps(Story("6.5", "done"), BmmWithQuickDev, deferred);
 
         Assert.Contains("Address deferred", html);
         Assert.Contains("next-step-card-primary", html);
@@ -1259,7 +1259,7 @@ public class BmadCommandsTests
     [Fact]
     public void RenderNextSteps_DoneStoryWithNoOpenDeferred_CelebratoryAllDone()
     {
-        var html = BmadCommands.RenderNextSteps(Story("6.5", "done"), BmmWithQuickDev);
+        var html = WorkflowCommands.RenderNextSteps(Story("6.5", "done"), BmmWithQuickDev);
         Assert.Contains("all-done", html);
         Assert.Contains("All done", html);
         Assert.DoesNotContain("Address deferred", html);
@@ -1270,7 +1270,7 @@ public class BmadCommandsTests
     public void RenderNextSteps_DoneStoryWithOnlyResolvedDeferred_CelebratoryAllDone()
     {
         var deferred = new[] { ResolvedSlot("Already fixed") };
-        var html = BmadCommands.RenderNextSteps(Story("6.5", "done"), BmmWithQuickDev, deferred);
+        var html = WorkflowCommands.RenderNextSteps(Story("6.5", "done"), BmmWithQuickDev, deferred);
         Assert.Contains("all-done", html);
         Assert.Contains("All done", html);
         Assert.DoesNotContain("Address deferred", html);
@@ -1280,7 +1280,7 @@ public class BmadCommandsTests
     public void RenderNextSteps_InProgressWithOpenDeferred_AddressDeferredNotPrimary()
     {
         var deferred = new[] { OpenSlot("Fix edge case") };
-        var html = BmadCommands.RenderNextSteps(Story("6.5", "in-progress"), BmmWithQuickDev, deferred);
+        var html = WorkflowCommands.RenderNextSteps(Story("6.5", "in-progress"), BmmWithQuickDev, deferred);
 
         Assert.Contains("/bmad-dev-story 6.5", html);
         Assert.Contains("Address deferred", html);
@@ -1295,7 +1295,7 @@ public class BmadCommandsTests
     public void RenderNextSteps_ReviewWithOpenDeferred_AddressDeferredNotPrimary()
     {
         var deferred = new[] { OpenSlot("Fix edge case") };
-        var html = BmadCommands.RenderNextSteps(Story("6.5", "review"), BmmWithQuickDev, deferred);
+        var html = WorkflowCommands.RenderNextSteps(Story("6.5", "review"), BmmWithQuickDev, deferred);
 
         Assert.Contains("/bmad-code-review 6.5", html);
         Assert.Contains("Address deferred", html);
@@ -1313,7 +1313,7 @@ public class BmadCommandsTests
             OpenSlot("Epic-level item", "spec-infra", "follow-ups/deferred-2.html"),
         };
         var epic = Epic(hasRetro: false, Story("1.1", "in-progress"));
-        var html = BmadCommands.RenderEpicNextSteps(epic, BmmWithQuickDev, deferred);
+        var html = WorkflowCommands.RenderEpicNextSteps(epic, BmmWithQuickDev, deferred);
 
         Assert.Contains("Address deferred", html);
         Assert.Contains("Story-child item", html);
@@ -1326,7 +1326,7 @@ public class BmadCommandsTests
     {
         var deferred = new[] { OpenSlot("Left over item") };
         var doneEpic = Epic(hasRetro: true, Story("1.1", "done"), Story("1.2", "done"));
-        var html = BmadCommands.RenderEpicNextSteps(doneEpic, BmmWithQuickDev, deferred);
+        var html = WorkflowCommands.RenderEpicNextSteps(doneEpic, BmmWithQuickDev, deferred);
 
         Assert.Contains("Address deferred", html);
         Assert.Contains("next-step-card-primary", html);
@@ -1341,7 +1341,7 @@ public class BmadCommandsTests
         // RenderEpicNextSteps panel — done+deferred must surface there. [spec-address-deferred-next-steps]
         var deferred = new[] { OpenSlot("Left over item") };
         var doneEpic = Epic(hasRetro: true, Story("1.1", "done"), Story("1.2", "done"));
-        var inner = BmadCommands.RenderEpicNextStepsInner(doneEpic, BmmWithQuickDev, deferred);
+        var inner = WorkflowCommands.RenderEpicNextStepsInner(doneEpic, BmmWithQuickDev, deferred);
 
         Assert.Contains("Address deferred", inner);
         Assert.Contains("done-deferred-status", inner);
@@ -1359,7 +1359,7 @@ public class BmadCommandsTests
             ["quick-dev"] = "/bmad-quick-dev",
         });
         var reviewEpic = Epic(hasRetro: false, Story("1.1", "done"), Story("1.2", "done"));
-        var html = BmadCommands.RenderEpicNextSteps(reviewEpic, catalog, deferred);
+        var html = WorkflowCommands.RenderEpicNextSteps(reviewEpic, catalog, deferred);
 
         Assert.Contains("/bmad-retrospective 1", html);
         Assert.Contains("Address deferred", html);
@@ -1378,11 +1378,11 @@ public class BmadCommandsTests
         });
         var deferred = new[] { OpenSlot("Should not show") };
 
-        var htmlDone = BmadCommands.RenderNextSteps(Story("6.5", "done"), catalogNoQd, deferred);
+        var htmlDone = WorkflowCommands.RenderNextSteps(Story("6.5", "done"), catalogNoQd, deferred);
         Assert.DoesNotContain("Address deferred", htmlDone);
         Assert.Contains("all-done", htmlDone);
 
-        var htmlActive = BmadCommands.RenderNextSteps(Story("6.5", "in-progress"), catalogNoQd, deferred);
+        var htmlActive = WorkflowCommands.RenderNextSteps(Story("6.5", "in-progress"), catalogNoQd, deferred);
         Assert.DoesNotContain("Address deferred", htmlActive);
     }
 
@@ -1390,11 +1390,11 @@ public class BmadCommandsTests
     public void StoryCommands_DoneWithOpenDeferred_AddressDeferredPresent()
     {
         var deferred = new[] { OpenSlot("Deferred task") };
-        var cmds = BmadCommands.StoryCommands(Story("6.5", "done"), BmmWithQuickDev, deferred);
+        var cmds = WorkflowCommands.StoryCommands(Story("6.5", "done"), BmmWithQuickDev, deferred);
 
         Assert.True(cmds.Count >= 1);
         Assert.Contains(cmds, c => c.Command.Contains("Address open deferred"));
-        Assert.Equal(cmds[0].Command, BmadCommands.PrimaryStoryCommand(Story("6.5", "done"), BmmWithQuickDev, deferred));
+        Assert.Equal(cmds[0].Command, WorkflowCommands.PrimaryStoryCommand(Story("6.5", "done"), BmmWithQuickDev, deferred));
     }
 
     [Fact]
@@ -1406,10 +1406,10 @@ public class BmadCommandsTests
         });
         var deferred = new[] { OpenSlot("Parked work") };
 
-        Assert.Null(BmadCommands.PrimaryStoryCommand(Story("6.5", "done"), catalogNoQd, deferred));
+        Assert.Null(WorkflowCommands.PrimaryStoryCommand(Story("6.5", "done"), catalogNoQd, deferred));
         Assert.DoesNotContain("Address deferred",
-            BmadCommands.RenderNextSteps(Story("6.5", "done"), catalogNoQd, deferred));
-        Assert.Contains("all-done", BmadCommands.RenderNextSteps(Story("6.5", "done"), catalogNoQd, deferred));
+            WorkflowCommands.RenderNextSteps(Story("6.5", "done"), catalogNoQd, deferred));
+        Assert.Contains("all-done", WorkflowCommands.RenderNextSteps(Story("6.5", "done"), catalogNoQd, deferred));
     }
 
     [Fact]
@@ -1430,7 +1430,7 @@ public class BmadCommandsTests
             ["create-epics-and-stories"] = "/bmad-create-epics-and-stories",
             ["quick-dev"] = "/bmad-quick-dev",
         });
-        var html = BmadCommands.RenderEpicNextSteps(epic, catalog, deferred);
+        var html = WorkflowCommands.RenderEpicNextSteps(epic, catalog, deferred);
 
         Assert.Contains("Address deferred", html);
         var createIdx = html.IndexOf("create-epics", StringComparison.Ordinal);
@@ -1441,8 +1441,8 @@ public class BmadCommandsTests
     [Fact]
     public void StoryCommands_DoneWithNoDeferred_EmptyOrHatchOnly()
     {
-        var cmds = BmadCommands.StoryCommands(Story("6.5", "done"), BmmWithQuickDev);
-        var primary = BmadCommands.PrimaryStoryCommand(Story("6.5", "done"), BmmWithQuickDev);
+        var cmds = WorkflowCommands.StoryCommands(Story("6.5", "done"), BmmWithQuickDev);
+        var primary = WorkflowCommands.PrimaryStoryCommand(Story("6.5", "done"), BmmWithQuickDev);
 
         Assert.Null(primary);
         if (cmds.Count > 0)
@@ -1453,7 +1453,7 @@ public class BmadCommandsTests
     public void RenderNextSteps_DoneWithDeferredPanel_SingleItemGrammar()
     {
         var deferred = new[] { OpenSlot("Single item") };
-        var html = BmadCommands.RenderNextSteps(Story("6.5", "done"), BmmWithQuickDev, deferred);
+        var html = WorkflowCommands.RenderNextSteps(Story("6.5", "done"), BmmWithQuickDev, deferred);
 
         Assert.Contains("1 open deferred item remains", html);
         Assert.Contains("(1 item)", html);
@@ -1468,7 +1468,7 @@ public class BmadCommandsTests
             ["create-story"] = "/bmad-create-story",
             ["check-implementation-readiness"] = "/bmad-check-implementation-readiness",
         });
-        var html = BmadCommands.RenderNextSteps(Story("1.1", null), catalog);
+        var html = WorkflowCommands.RenderNextSteps(Story("1.1", null), catalog);
 
         Assert.Contains("next-step-card next-step-card-primary drafted", html);
         Assert.Contains(">Recommended</span>", html);

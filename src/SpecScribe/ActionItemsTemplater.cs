@@ -104,11 +104,11 @@ public static class ActionItemsTemplater
                 var provenance = item.EpicNumber is { } en ? $"Epic {en}" : "Unattributed";
                 // Site-root-relative detail cue (no page-depth prefix) — matches deferred/group prompts.
                 var href = detailSlugs.TryGetValue(item, out var slug) ? FollowUpSlug.OutputPath(slug) : null;
-                return new BmadCommands.ListBatchEntry(summary, provenance, href);
+                return new WorkflowCommands.ListBatchEntry(summary, provenance, href);
             })
             .ToList();
 
-        return BmadCommands.RenderListBatchPane(pageTitle, commands, openActions: entries);
+        return WorkflowCommands.RenderListBatchPane(pageTitle, commands, openActions: entries);
     }
 
     /// <summary>Groups open items by epic number ascending; null-epic items trail as "Unattributed".
@@ -222,7 +222,7 @@ public static class ActionItemsTemplater
                 var epicNote = item.EpicNumber is { } e ? $" (Epic {e})" : string.Empty;
                 // RAW action text in data-copy — never linkified (copy-payload corruption trap).
                 var cmd = $"{quickDev} Resolve this retrospective action item{epicNote}: {item.Action}";
-                detail.Append($"<div class=\"action-item-resolve\">{BmadCommands.RenderLabeledCommand("Resolve with AI", cmd)}</div>\n");
+                detail.Append($"<div class=\"action-item-resolve\">{WorkflowCommands.RenderLabeledCommand("Resolve with AI", cmd)}</div>\n");
             }
         }
 

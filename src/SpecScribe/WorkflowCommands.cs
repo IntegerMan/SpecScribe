@@ -8,7 +8,7 @@ namespace SpecScribe;
 /// module-help.csv), so a BMad Method project shows <c>/bmad-*</c> commands and a Game Dev Studio project
 /// shows <c>/gds-*</c> — the status-to-step logic is shared; only the concrete command names differ. A step
 /// the active module doesn't expose is omitted rather than printed as a command that doesn't exist.</summary>
-public static class BmadCommands
+public static class WorkflowCommands
 {
     /// <param name="DisplayLabel">When set, the command badge shows this label while copying <see cref="Command"/>.</param>
     /// <param name="Kicker">Optional non-primary kicker override (e.g. "Close" for follow-up close-out).</param>

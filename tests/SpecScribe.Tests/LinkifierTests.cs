@@ -230,7 +230,7 @@ public class RequirementLinkifierTests
             ],
         };
 
-        var html = BmadCommands.RenderEpicNextSteps(epic, catalog, [slot]);
+        var html = WorkflowCommands.RenderEpicNextSteps(epic, catalog, [slot]);
         Assert.Contains("UX-DR1", html); // payload carries the mention
 
         var linked = RequirementLinkifier.Linkify(html, model, "../");

@@ -156,7 +156,7 @@ public static class RelatedWorkTemplater
 
     private static void AppendAction(StringBuilder sb, string? command)
     {
-        var badge = BmadCommands.RenderPrimaryActionBadge(command);
+        var badge = WorkflowCommands.RenderPrimaryActionBadge(command);
         if (badge.Length == 0) return;
         sb.Append("  <div class=\"related-card-action\">");
         sb.Append(badge);
@@ -172,7 +172,7 @@ public static class RelatedWorkTemplater
     /// block, nothing else on the page carries these commands, so hiding them with JS on would LOSE information
     /// rather than de-duplicate it.</para>
     ///
-    /// <para><b>Not <see cref="BmadCommands.RenderCommandMenu"/>.</b> That helper's <c>.cmd-menu-pop</c> is an
+    /// <para><b>Not <see cref="WorkflowCommands.RenderCommandMenu"/>.</b> That helper's <c>.cmd-menu-pop</c> is an
     /// absolutely-positioned popout with <c>min-width: 22rem</c> — wider than the rail's own
     /// <c>minmax(240px, 320px)</c> column, so it would overhang the panel it lives in. This renders in flow and
     /// reuses the same command badge, which is the part that must not be re-authored (AD-2).</para>
@@ -190,7 +190,7 @@ public static class RelatedWorkTemplater
         foreach (var entry in more)
         {
             sb.Append("      <li>");
-            sb.Append(BmadCommands.RenderPrimaryActionBadge(entry.Command));
+            sb.Append(WorkflowCommands.RenderPrimaryActionBadge(entry.Command));
             sb.Append($"<span class=\"related-cmd-desc\">{PathUtil.Html(entry.Description)}</span></li>\n");
         }
         sb.Append("    </ul>\n");

@@ -321,7 +321,7 @@ public class SprintTemplaterTests
             "class=\"sprint-lane-empty\">Nothing ready to pick up — draft or refine the next story.",
             board);
 
-        var home = BmadCommands.RenderProjectNextSteps(epics, catalog);
+        var home = WorkflowCommands.RenderProjectNextSteps(epics, catalog);
         Assert.DoesNotContain("/bmad-create-story 2.1", home);
         Assert.Contains("/bmad-create-epics-and-stories", home);
     }
@@ -344,7 +344,7 @@ public class SprintTemplaterTests
         });
 
         var board = SprintTemplater.RenderBoard(sprint, epics, commands: catalog);
-        var home = BmadCommands.RenderProjectNextSteps(epics, catalog);
+        var home = WorkflowCommands.RenderProjectNextSteps(epics, catalog);
         Assert.Contains("/bmad-create-story 1.2", board);
         Assert.Contains("/bmad-create-story 1.2", home);
     }

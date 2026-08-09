@@ -337,7 +337,7 @@ public class SiteGeneratorOutlineTests : IDisposable
         });
 
         Assert.Equal("ready", StatusStyles.ForStory(story));
-        Assert.Equal("/bmad-dev-story 9.9", BmadCommands.PrimaryStoryCommand(story, commands));
+        Assert.Equal("/bmad-dev-story 9.9", WorkflowCommands.PrimaryStoryCommand(story, commands));
     }
 
     [Fact]
@@ -442,9 +442,9 @@ public class SiteGeneratorOutlineTests : IDisposable
                 AcBlocksHtml = Array.Empty<string>(),
                 Status = status,
             };
-            var list = BmadCommands.StoryCommands(story, commands);
-            var html = BmadCommands.RenderNextSteps(story, commands);
-            var primary = BmadCommands.PrimaryStoryCommand(story, commands);
+            var list = WorkflowCommands.StoryCommands(story, commands);
+            var html = WorkflowCommands.RenderNextSteps(story, commands);
+            var primary = WorkflowCommands.PrimaryStoryCommand(story, commands);
 
             if (StatusStyles.ForStory(story) == "done")
             {
@@ -490,7 +490,7 @@ public class SiteGeneratorOutlineTests : IDisposable
         });
 
         Assert.Equal(new[] { "/bmad-dev-story 9.9" },
-            BmadCommands.StoryCommands(story, commands).Select(c => c.Command).ToArray());
+            WorkflowCommands.StoryCommands(story, commands).Select(c => c.Command).ToArray());
     }
 
     [Fact]

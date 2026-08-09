@@ -80,7 +80,7 @@ public static class FollowUpDetailTemplater
         sb.Append("</section>\n");
 
         // Same Next Steps card panel as story pages — labeled resolve prompt + room for alternates.
-        var nextSteps = BmadCommands.RenderActionItemNextSteps(item, commands);
+        var nextSteps = WorkflowCommands.RenderActionItemNextSteps(item, commands);
         if (nextSteps.Length > 0)
             sb.Append(nextSteps);
 
@@ -156,7 +156,7 @@ public static class FollowUpDetailTemplater
 
         sb.Append("</section>\n");
 
-        var nextSteps = BmadCommands.RenderDeferredItemNextSteps(item, commands ?? CommandCatalog.Empty);
+        var nextSteps = WorkflowCommands.RenderDeferredItemNextSteps(item, commands ?? CommandCatalog.Empty);
         if (nextSteps.Length > 0)
             sb.Append(nextSteps);
 

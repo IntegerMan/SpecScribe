@@ -3,7 +3,7 @@ namespace SpecScribe;
 /// <summary>One next-step command for a story — a (command, description) pair mirroring exactly one entry of the
 /// story page's "Next Steps" panel, projected as data so the VS Code tree's "Copy BMad Command…" Quick Pick can
 /// show the LITERAL command it will copy beside the same description the page shows. Composed core-side by
-/// <see cref="BmadCommands.StoryCommands"/> from the SAME status-gated list the page renders, so the tree's
+/// <see cref="WorkflowCommands.StoryCommands"/> from the SAME status-gated list the page renders, so the tree's
 /// option set can never disagree with the page (AD-2: no command text authored in TypeScript).
 /// [spec-vscode-sidebar-shortcuts-and-story-command-quickpick]</summary>
 public sealed record OutlineStoryCommand(string Command, string Description);
@@ -36,12 +36,12 @@ public sealed record OutlineStoryCommand(string Command, string Description);
 /// <param name="TasksDone">Checked task/subtask count from the artifact; 0 when there is no artifact.</param>
 /// <param name="TasksTotal">Total task/subtask count from the artifact; 0 when there is no artifact.</param>
 /// <param name="HelperCommand">The single most-actionable BMad command for this story's status —
-/// <see cref="BmadCommands.PrimaryStoryCommand"/> (null when done or when <paramref name="Commands"/> has no
+/// <see cref="WorkflowCommands.PrimaryStoryCommand"/> (null when done or when <paramref name="Commands"/> has no
 /// primary). Kept for payload back-compat: an older shim reads only this. For non-done stories this is the
 /// first entry of <paramref name="Commands"/>; a done story may still list a muted correct-course hatch in
 /// <paramref name="Commands"/> while this stays null. Composed in C#, never authored in TypeScript (AD-2).</param>
 /// <param name="Commands">The FULL status-gated next-step command list — the exact set the story page's
-/// "Next Steps" panel renders (<see cref="BmadCommands.StoryCommands"/>), in the page's order. For a done story
+/// "Next Steps" panel renders (<see cref="WorkflowCommands.StoryCommands"/>), in the page's order. For a done story
 /// this is empty or a single muted correct-course escape hatch when the module exposes it; empty when the
 /// module exposes none. The host omits "Copy BMad Command…" when the list is empty; all gating is decided
 /// here, never in the shim (AD-2). [spec-vscode-sidebar-shortcuts-and-story-command-quickpick; Story 8.5]</param>

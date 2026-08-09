@@ -212,7 +212,7 @@ public static class EpicsViewBuilder
             HasStories = progress.StoryCount > 0,
             ProgressBars = bars,
             NextActionsPanelHtml = RenderNextActionsPanel(epic, prefix, commands, openDeferred),
-            NextStepsHtml = BmadCommands.RenderEpicNextSteps(epic, commands, openDeferred),
+            NextStepsHtml = WorkflowCommands.RenderEpicNextSteps(epic, commands, openDeferred),
             CodeAreasHtml = RenderCodeAreas(
                 impact is not null && impact.FilesByEpic.TryGetValue(epic.Number, out var epicImpactFiles) ? epicImpactFiles : null,
                 prefix),
@@ -285,7 +285,7 @@ public static class EpicsViewBuilder
             // Consolidated path: the banner carries the single create-story affordance; cards keep a plain label.
             noteHtml = consolidated
                 ? "No detailed story plan yet."
-                : BmadCommands.InlineGuidance(
+                : WorkflowCommands.InlineGuidance(
                     commands.Command("create-story", story.Id),
                     "No detailed story plan yet — draft it with",
                     "No detailed story plan yet.");
@@ -354,7 +354,7 @@ public static class EpicsViewBuilder
             BlurbHtml = blurbHtml,
             Tasks = tasks,
             CompletionSummarySections = completionSummarySections,
-            NextStepsHtml = BmadCommands.RenderNextSteps(story, commands, openDeferred),
+            NextStepsHtml = WorkflowCommands.RenderNextSteps(story, commands, openDeferred),
             AcceptanceCriteria = acceptanceCriteria,
             DevAgentRecord = devAgentRecord.Select(d => new DevAgentEntry(d.Label, d.ContentHtml)).ToList(),
             ReviewFindingsHtml = reviewFindingsHtml,
@@ -461,7 +461,7 @@ public static class EpicsViewBuilder
         var prefix = Prefix(outputPath);
         var epicOutputPath = $"epics/epic-{epic.Number}.html";
 
-        var note = BmadCommands.InlineGuidance(
+        var note = WorkflowCommands.InlineGuidance(
             commands.Command("create-story", story.Id),
             "This story hasn't been drafted in detail yet — create its plan with",
             "This story hasn't been drafted in detail yet.");
@@ -509,7 +509,7 @@ public static class EpicsViewBuilder
         // with no retro reads as "review" — that is exactly the state that should be nudged to run a retro. Once
         // a retro exists the epic is "done" and this whole method returned above via the epicRetroPath link. [spec-sunburst-retro]
         if (epicClass != "review") return string.Empty;
-        var guidance = BmadCommands.InlineGuidance(
+        var guidance = WorkflowCommands.InlineGuidance(
             commands.Command("retrospective"),
             $"Epic {epic.Number} is complete — capture the lessons with",
             string.Empty);
@@ -524,7 +524,7 @@ public static class EpicsViewBuilder
     {
         _ = epic; // signature kept parallel to other opaque-fragment builders for the epic page
         var n = undrafted.Count;
-        var guidance = BmadCommands.InlineGuidance(
+        var guidance = WorkflowCommands.InlineGuidance(
             commands.Command("create-story", undrafted[0].Id),
             $"{n} stories in this epic need task plans — draft the next with",
             $"{n} stories in this epic need task plans.");
@@ -541,7 +541,7 @@ public static class EpicsViewBuilder
         sb.Append("<div class=\"chart-panel\">\n<h3>Up Next</h3>\n");
         AppendUpNextCard(sb, epic, prefix);
 
-        var nextStepsInner = BmadCommands.RenderEpicNextStepsInner(epic, commands, openDeferred);
+        var nextStepsInner = WorkflowCommands.RenderEpicNextStepsInner(epic, commands, openDeferred);
         if (nextStepsInner.Length > 0)
         {
             sb.Append(nextStepsInner);
