@@ -40,7 +40,29 @@ Epic 4 (`done`) built the framework-agnostic **foundation** — the `IArtifactAd
 
 2. **Given** SpecFlow conventions that exceed the shared projection model or that SpecScribe will deliberately not support, **when** the spike documents its findings, **then** framework-extra data is recorded as candidate projection extensions or explicit non-goals, **and** deliberately-unsupported conventions are listed with rationale and the non-fatal notice they will emit, giving the coverage story an agreed scope boundary.
 
-[Source: `_bmad-output/planning-artifacts/epics.md:2435-2453`]
+3. **Given** a coverage map built from documentation is a hypothesis, not evidence, **when** the spike surveys the framework, **then** a reference corpus of **three real adopting repositories** is selected and pinned per the Story 4.10 contract — each named with its commit SHA, its licence, and the variance it contributes — and every claim in the coverage map is marked as **confirmed-against-corpus, contradicted, or unobservable**, **and** where fewer than three qualifying public repositories exist, the search query, its result count, and the substitute used are recorded, and the reduced confidence is carried forward as a declared limit into the coverage story.
+
+[Source: `_bmad-output/planning-artifacts/epics.md:2435-2453` — ACs #1–#2. **AC #3 added 2026-08-09 at
+correct-course (SCP `sprint-change-proposal-2026-08-09-framework-reference-corpus.md`), co-landed in `epics.md`
+and `sprint-status.yaml` in the same change.** Provoked by Story 12.2: Story 12.1 scoped GSD from vendor
+documentation and **six of its eight derived claims failed** against one real repository. **Blocked on Story
+4.10** (Framework Reference Corpus Contract, Epic 4) for the qualification rule, manifest and discovery recipe.]
+
+> ### ⚠️ SpecFlow is one of two frameworks where the shortfall rule is EXPECTED to fire
+>
+> The 2026-08-09 feasibility probe found **zero** public hits for both of this story's own hypothesized markers
+> — `filename:.specflow-version` → **0**, `filename:.specflow-config.json` → **0**. Compare Spec Kit (~6,248),
+> Squad (~5,144), GSD Core (~2,547).
+>
+> Two readings, and **pass 1 of Task 2 is what distinguishes them**: either the marker names are wrong (they
+> came from thin public docs, exactly the evidence class this whole change is about), or public adoption of
+> `@ceatoleii/specflow` is genuinely near-zero for a tool first written up in May 2026. **Both are findings.**
+>
+> **Recording the shortfall — with the query, the count, and the substitute — is the correct outcome here.** Do
+> not manufacture a corpus by treating `ceatoleii/specflow` itself as a reference repo: it is the tool, not a
+> project that uses it. A `npx @ceatoleii/specflow init` scratch repo is the sanctioned substitute, and the
+> reduced confidence it implies must be carried into Story 13.2 as a declared limit and stated on the SpecFlow
+> framework page (NFR8), not left silent.
 
 **Note on scope:** this story's own AC text does not require a mandatory declared "coverage tier" the way Story 12.1's does — its shape matches Story 11.1's exactly. Adopt the rendered/summarized/unsupported tier vocabulary (FR-4, introduced for GSD) only if it genuinely clarifies a finding here; don't force it in to match Epic 12 prematurely (mirroring 11.1's own guidance on this point).
 
@@ -129,8 +151,23 @@ Record this explicitly as a Task 6 finding: **13.2 (or a small standalone prereq
   - [ ] Read `IArtifactAdapter.cs`, `ArtifactBundle.cs`, `AdapterDiagnostic.cs`, `BmadArtifactAdapter.cs`, `EpicsModel.cs`, `RequirementsModel.cs`, `RetroModel.cs`, `SprintStatus.cs` in full (paths above) — do not rely solely on this story's summary tables.
   - [ ] Confirm (or correct) this story's claim that no adapter-selection registry exists (`SiteGenerator.cs:51`), and check whether Story 11.1 or 12.1 has already landed/recommended a registry shape (read their Completion Notes if `done`).
 
-- [ ] **Task 2 — Obtain and inspect a representative current-version SpecFlow repository (AC: #1, #2)**
-  - [ ] Fetch/inspect `github.com/ceatoleii/specflow` and `ceatoleii.github.io/specflow` (including `/project-layout` and, if reachable, `/cli-reference`) directly, or run `npx @ceatoleii/specflow init` against a scratch repo, to confirm the exact file/folder layout — the table above is a hypothesis from thin public docs, not a repo inspection.
+- [ ] **Task 2 — Build and pin the SpecFlow reference corpus (AC: #1, #2, #3)** — ⚠️ **rewritten 2026-08-09 at
+  correct-course. Read the boxed warning under the Acceptance Criteria first: the shortfall rule is expected to
+  fire here, and pass 1 is load-bearing because the marker itself is unconfirmed.**
+  - [ ] **Pass 1 — confirm the marker.** Run `npx @ceatoleii/specflow init` against a scratch repo and read
+    `ceatoleii.github.io/specflow` (`/project-layout` and, if reachable, `/cli-reference`) to confirm the exact
+    file/folder layout and **what the real marker actually is** — the hypothesis table below names
+    `.specflow-version` / `.specflow-config.json`, and neither returned a single public hit on 2026-08-09.
+    **`ceatoleii/specflow` is the TOOL, not a reference repo.**
+  - [ ] **Pass 2 — find adopters BY the confirmed marker.** Only once pass 1 has settled what to search for.
+    **Record the query and its result count whatever the answer is** — a zero is a finding, not a failure.
+  - [ ] Select up to **three** adopting repositories, chosen for **variance, not similarity**, pinning each in
+    the corpus manifest with URL, commit SHA, licence, approximate size and the variance it contributes.
+  - [ ] **If fewer than three qualify** — the expected case — record the query, the count and the substitute (a
+    `specflow init` scratch repo), and carry the reduced confidence into Story 13.2 as a **declared limit**,
+    to be stated on the SpecFlow framework page (NFR8). Do not silently proceed as if the evidence were strong.
+  - [ ] Mark **every row** of this story's hypothesis table **confirmed / contradicted / unobservable**. Given
+    the marker result above, expect contradictions — they are the story's most valuable output.
   - [ ] Confirm directly (e.g. by reading a real `.gitignore`) whether `.agents-state/` is actually gitignored as documented, and whether `history/` truly nests under it or (per one secondary source) lives at the repo root instead — the two sources disagreed and this spike must resolve which is correct.
   - [ ] Confirm whether SpecScribe's markdown source walk [`SiteGenerator.EnumerateSourceFiles`, src/SpecScribe/SiteGenerator.cs:3692-3698 + `PathUtil.IsIgnoredSourceFile`, src/SpecScribe/PathUtil.cs:29-36] would in fact discover `.agents-state/current/task.md` and `.agents-state/history/**/*.md` when physically present on disk (the filenames don't start with `.`, so the existing filter shouldn't exclude them) — verify this empirically against a scratch repo with an active/completed flow, don't reason about it from code alone.
   - [ ] Confirm whether SpecFlow supports more than one task/feature tracked at a time, or is genuinely single-active-task as documented.
@@ -183,6 +220,10 @@ _(populated during code-review)_
 - Building the missing `specflow` About-SDD placeholder (roster/route/README) instead of naming it as a Task 5 finding for 13.2 to close.
 - Proposing a third, SpecFlow-specific adapter-registry ADR instead of coordinating one shared registry decision with 11.1/12.1.
 - Silently committing to a package/namespace split (`SpecScribe.Adapters.SpecFlow`) — aspirational sketch, not current architecture.
+- **Treating `ceatoleii/specflow` as a reference repository.** It is the tool. A reference repo is a project that *uses* SpecFlow. (Added 2026-08-09; Stories 14.1 and 15.1 had the same defect and were corrected in the same change.)
+- **Manufacturing a corpus to avoid recording a shortfall.** Zero public hits for both hypothesized markers is *the* finding of this story's corpus pass. Record it with the query and the count; do not pad the corpus to three with repos that do not qualify.
+- **Concluding "SpecFlow has no adopters" from a failed search on an unconfirmed marker.** Pass 1 exists precisely because you cannot search for a marker you have not confirmed. Settle the marker before drawing that conclusion.
+- **Forgetting `CONDITIONAL_CLASSES` when Story 13.2 adds cross-framework markup.** ⚠️ `extract:ir-content` prunes any rule whose selector is absent from the IR, and the extraction corpus is *this* repository's own IR — a BMad project. Markup only a SpecFlow repo produces is pruned **with every gate green**. Measured on Story 12.2 (§F1): all five `.milestone-band*` rules. Seed `web/scripts/ir-content-lib.mjs`'s `CONDITIONAL_CLASSES` and pin it in `web/test/ir-content-harvest.test.mjs`.
 - Treating this story's thin-docs hypothesis table as verified fact instead of confirming it against a real, current SpecFlow repo.
 
 ### Project Structure Notes

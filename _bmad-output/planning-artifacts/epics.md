@@ -935,6 +935,54 @@ So that a mixed repository gets a coherent portal instead of an arbitrary winner
 **Then** it lands as one ADR amending the adapter-selection decision rather than as prose in a story file
 **And** it names which of Story 12.2's minimal behaviors it supersedes, so the follow-through is a known, bounded change rather than a rediscovery.
 
+<!-- Story 4.10 added 2026-08-09 (SCP 2026-08-09, correct-course, owner-directed) — an append-only
+     post-retrospective amendment to Epic 4, not a renumber: 4.1/4.2/4.8/4.9 are untouched (same pattern as
+     Stories 4.9, 7.9 and 8.9). Provoked by Story 12.2: Story 12.1 built its GSD coverage map from vendor
+     documentation, said so in its own Debug Log, and SIX of its eight derived claims failed on contact with
+     one real repository — costing 12.2 five mid-story owner decisions against its own task text. The
+     generalizing finding is 12.2 §F1: `extract:ir-content` prunes any rule whose selector is absent from the
+     IR, and the extraction corpus is THIS repository's own IR, which is a BMad project — so markup only a
+     non-BMad repo produces is pruned WITH THE GATE GREEN (measured: all five `.milestone-band*` rules).
+     Every remaining framework epic hits this. Belongs in Epic 4 because the evidence standard is a property
+     of the shared adapter contract, not of any one framework. -->
+### Story 4.10: Framework Reference Corpus Contract
+
+As a maintainer adding support for a new spec-driven framework,
+I want a defined, obtainable set of real adopting repositories to research and verify against before implementation begins,
+So that a framework's coverage map is built from how the framework is actually used rather than from its documentation, and rendered values are checked against known-correct projects.
+
+**Acceptance Criteria:**
+
+1.
+**Given** framework support has repeatedly been scoped from vendor documentation and corrected during implementation
+**When** the reference-corpus contract is written
+**Then** it defines what qualifies as a reference repository — a project that USES the framework, explicitly not the framework's own source repository — and sets the target at three per framework, chosen for VARIANCE rather than for similarity
+**And** it states the recorded-shortfall rule: when fewer than three qualifying public repositories can be found, the search evidence, the query used, and the substitute (a self-scaffolded `init` repository) are recorded, and the reduced confidence is declared on that framework's page rather than left silent.
+
+2.
+**Given** a corpus repository is a moving target and CI has no access to it
+**When** a repository is admitted to the corpus
+**Then** a committed manifest records its URL, the exact commit SHA inspected, its licence, its approximate size, and the specific variance it was chosen to contribute
+**And** the contract states that corpus repositories are dev-time references only, never a test dependency, with every shape they reveal carried into temp-directory fixtures instead.
+
+3.
+**Given** a framework's marker directory or file is itself a hypothesis until confirmed
+**When** corpus discovery runs
+**Then** the contract prescribes the two-pass order — confirm the marker against the framework's own documentation and a scaffolded `init`, then search public repositories BY that confirmed marker — and records a repeatable discovery recipe
+**And** the recipe is proven by running it for at least one framework and recording the resulting counts.
+
+4.
+**Given** `extract:ir-content` prunes any rule whose selector is absent from this repository's own BMad IR, so markup that only a non-BMad repository produces is silently dropped with every gate green
+**When** the contract is written
+**Then** it names `CONDITIONAL_CLASSES` seeding as the required step for any cross-framework markup, and states that `web/test/ir-content-harvest.test.mjs` — not the round-trip gate — is the layer that pins it
+**And** the hazard is stated once, in a place the remaining framework epics inherit, rather than rediscovered per epic.
+
+5.
+**Given** this changes the evidence basis on which the shared adapter contract is extended
+**When** the contract concludes
+**Then** it lands as one ADR that Epics 11–15 inherit, related to ADR 0038 (adapter selection) and ADR 0041 (multi-framework coexistence) without superseding either
+**And** the working convention is additionally recorded in `CLAUDE.md` so an agent that reads no ADR still meets it.
+
 ## Epic 5: Reliable CLI Operations and Configuration
 
 Make generation and watch dependable and easy to configure, so the tool is trustworthy for daily use. Sequences late in delivery order (immediately before the Epic 17 hardening pass) so the operational surface is finalized just before hardening and release.
@@ -2607,6 +2655,18 @@ So that baseline coverage starts with a defined scope, known gaps, and no surpri
 **Then** framework-extra data is recorded as candidate projection extensions or explicit non-goals
 **And** deliberately-unsupported conventions are listed with rationale and the non-fatal notice they will emit, giving the coverage story an agreed scope boundary.
 
+<!-- AC #3 added 2026-08-09 (SCP 2026-08-09, correct-course, owner-directed) to all four unstarted framework
+     spikes (11.1, 13.1, 14.1, 15.1), inheriting Story 4.10's reference-corpus contract. Provoked by Story
+     12.2: 12.1's map came from vendor docs and six of eight derived claims failed against one real repo. The
+     2026-08-09 public-repo probe found ~6,248 files matching `path:.specify/memory filename:constitution.md`,
+     so a three-repo Spec Kit corpus is readily available. -->
+
+3.
+**Given** a coverage map built from documentation is a hypothesis, not evidence
+**When** the spike surveys the framework
+**Then** a reference corpus of three real adopting repositories is selected and pinned per the Story 4.10 contract — each named with its commit SHA, its licence, and the variance it contributes — and every claim in the coverage map is marked as confirmed-against-corpus, contradicted, or unobservable
+**And** where fewer than three qualifying public repositories exist, the search query, its result count, and the substitute used are recorded, and the reduced confidence is carried forward as a declared limit into the coverage story.
+
 ### Story 11.2: Spec Kit Baseline Adapter Coverage
 
 As a team using Spec Kit,
@@ -2626,6 +2686,19 @@ So that I can track planning progress without switching tools.
 **When** they are detected
 **Then** they are surfaced as explicit non-fatal notices
 **And** generation continues for supported content.
+
+<!-- AC #3 added 2026-08-09 (SCP 2026-08-09, correct-course, owner-directed) to all five framework coverage
+     stories (11.2, 12.3, 13.2, 14.2, 15.2), plus AC #6 on the already-implemented 12.2. This is the
+     "verify we render EXPECTED VALUES for the sample projects" half of Story 4.10's contract: the spike
+     selects and pins the corpus, the coverage story renders against all of it and writes the
+     expected-versus-actual record. The fixture-derivation clause promotes Story 12.2's own successful
+     practice (CORA is a reference, never a test dependency — CI has no such path) to a requirement. -->
+
+3.
+**Given** the framework's reference corpus selected by its integration spike
+**When** generation runs against every corpus repository
+**Then** each one generates without fatal errors, and an expected-versus-actual record is written for each — covering page count, epic and story counts, the status distribution, the coverage tiers assigned, and the diagnostics emitted — with every difference from expectation explained rather than merely observed
+**And** each awkward shape the corpus revealed is carried into a temp-directory test fixture, so the corpus repositories are never read by a test.
 
 ## Epic 12: GSD and GSD-Pi Coverage
 
@@ -2711,6 +2784,22 @@ minimally here; the strategic answer is Story 4.9's. -->
 **Then** adapter selection and framework-neutral source-root discovery are in place, every matching adapter contributes, and a family that loses a merge conflict is reported as a non-fatal diagnostic rather than dropped silently
 **And** a BMad-only repository's output is unchanged, with the decision recorded as one shared ADR the remaining framework epics inherit.
 
+<!-- AC #6 added 2026-08-09 (SCP 2026-08-09, correct-course, owner-directed). Story 12.2 shipped correctly but
+     on a SINGLE, PRIVATE reference repository (`C:/dev/CORA`). Owner decision at correct-course: REOPEN the
+     story (review -> in-progress) and widen its evidence rather than seat a follow-up, so the evidence stays
+     with the story that owns the adapter. 12.2 has NOT been code-reviewed yet (Epic 12 reviews at epic end),
+     so reopening now is cheaper than reopening after review. The public-repo probe run 2026-08-09 found
+     ~1,932 files matching `path:.planning filename:ROADMAP.md "## Phases"` and ~2,547 matching
+     `path:.planning/phases filename:PLAN.md`, so a three-repo GSD Core corpus is readily available. Task 12's
+     work must be attributed BY HUNK where it touches files a sibling story may also hold (CLAUDE.md
+     § Scoping a code review). -->
+
+6.
+**Given** GSD Core support was verified against exactly one repository, which is private and unavailable to CI or to any other contributor
+**When** the reference corpus is widened to three repositories per the Story 4.10 contract — `C:/dev/CORA` plus at least two PUBLIC adopting repositories, pinned by commit SHA
+**Then** generation runs cleanly against all three, an expected-versus-actual record is written for each, and any shape the adapter mishandles is either fixed or recorded as a declared boundary on the GSD framework page
+**And** each newly-revealed shape is carried into `GsdCoreArtifactAdapterTests` as a temp-directory fixture, with the corpus repositories themselves never read by a test.
+
 ### Story 12.3: GSD Pi Baseline Adapter Coverage
 
 As a team using GSD Pi workflows,
@@ -2743,6 +2832,18 @@ So that progress and scope remain understandable in one portal.
 **Then** the chosen level mapping and the synthesized story-id form (`"{milestone}.{slice}"`) are pinned by a test
 **And** requirements are surfaced without claiming a coverage status GSD Pi does not record.
 
+<!-- AC #5 added 2026-08-09 (SCP 2026-08-09, correct-course, owner-directed) — see the note on Story 11.2's
+     AC #3. The 2026-08-09 probe found ~281 files matching `path:.gsd filename:STATE.md`, so a three-repo
+     GSD Pi corpus is available. NOTE this story's extra hazard: GSD Pi is SQLite-authoritative and its
+     markdown is a rendered projection that may be absent entirely (AC #2), so corpus selection must
+     deliberately include one repo WITH the markdown projections committed and one WITHOUT. -->
+
+5.
+**Given** the framework's reference corpus selected by its integration spike
+**When** generation runs against every corpus repository
+**Then** each one generates without fatal errors, and an expected-versus-actual record is written for each — covering page count, epic and story counts, the status distribution, the coverage tiers assigned, and the diagnostics emitted — with every difference from expectation explained rather than merely observed
+**And** each awkward shape the corpus revealed is carried into a temp-directory test fixture, so the corpus repositories are never read by a test.
+
 ## Epic 13: SpecFlow Coverage
 
 Interpret core SpecFlow specification and planning artifacts through Epic 4's shared adapter contract, so SpecFlow teams can track progress without switching tools. Led by an integration spike that scopes the mapping and its boundaries before baseline coverage.
@@ -2769,6 +2870,19 @@ So that baseline coverage starts with a defined scope, known gaps, and no surpri
 **Then** framework-extra data is recorded as candidate projection extensions or explicit non-goals
 **And** deliberately-unsupported conventions are listed with rationale and the non-fatal notice they will emit, giving the coverage story an agreed scope boundary.
 
+<!-- AC #3 added 2026-08-09 (SCP 2026-08-09, correct-course, owner-directed), inheriting Story 4.10's
+     reference-corpus contract. ⚠️ SPECFLOW IS ONE OF THE TWO FRAMEWORKS WHERE THE SHORTFALL RULE IS EXPECTED
+     TO FIRE: the 2026-08-09 probe found ZERO public hits for `filename:.specflow-version` and ZERO for
+     `filename:.specflow-config.json`, so this story's own marker hypothesis is unconfirmed and adopters
+     cannot be searched for until pass 1 confirms what to search for. Recording the shortfall is the correct
+     outcome here — do not work around it by treating `ceatoleii/specflow` itself as a reference repo. -->
+
+3.
+**Given** a coverage map built from documentation is a hypothesis, not evidence
+**When** the spike surveys the framework
+**Then** a reference corpus of three real adopting repositories is selected and pinned per the Story 4.10 contract — each named with its commit SHA, its licence, and the variance it contributes — and every claim in the coverage map is marked as confirmed-against-corpus, contradicted, or unobservable
+**And** where fewer than three qualifying public repositories exist, the search query, its result count, and the substitute used are recorded, and the reduced confidence is carried forward as a declared limit into the coverage story.
+
 ### Story 13.2: SpecFlow Baseline Adapter Coverage
 
 As a team using SpecFlow,
@@ -2788,6 +2902,17 @@ So that I can track planning and specification progress without switching tools.
 **When** they are detected
 **Then** they are surfaced as explicit non-fatal notices
 **And** generation continues for supported content and remains coherent with other framework surfaces.
+
+<!-- AC #3 added 2026-08-09 (SCP 2026-08-09, correct-course, owner-directed) — see the note on Story 11.2's
+     AC #3. ⚠️ Story 13.1's corpus is expected to fall SHORT of three (zero public marker hits at
+     2026-08-09); this AC is satisfied against whatever corpus 13.1 actually pinned, and the declared
+     confidence limit it recorded must be carried onto the SpecFlow framework page (NFR8). -->
+
+3.
+**Given** the framework's reference corpus selected by its integration spike
+**When** generation runs against every corpus repository
+**Then** each one generates without fatal errors, and an expected-versus-actual record is written for each — covering page count, epic and story counts, the status distribution, the coverage tiers assigned, and the diagnostics emitted — with every difference from expectation explained rather than merely observed
+**And** each awkward shape the corpus revealed is carried into a temp-directory test fixture, so the corpus repositories are never read by a test.
 
 ## Epic 14: Squad Coverage
 
@@ -2815,6 +2940,18 @@ So that baseline coverage starts with a defined scope, known gaps, and no surpri
 **Then** framework-extra data is recorded as candidate projection extensions or explicit non-goals
 **And** deliberately-unsupported conventions are listed with rationale and the non-fatal notice they will emit, giving the coverage story an agreed scope boundary.
 
+<!-- AC #3 added 2026-08-09 (SCP 2026-08-09, correct-course, owner-directed), inheriting Story 4.10's
+     reference-corpus contract. The 2026-08-09 probe found ~5,144 files matching
+     `path:.squad/agents filename:charter.md` and ~700 matching `path:.squad filename:routing.md`, so a
+     three-repo Squad corpus is readily available. ⚠️ `bradygaster/squad` is the TOOL, not a reference repo —
+     this story's current Task 2 points at it, which AC #3 supersedes. -->
+
+3.
+**Given** a coverage map built from documentation is a hypothesis, not evidence
+**When** the spike surveys the framework
+**Then** a reference corpus of three real adopting repositories is selected and pinned per the Story 4.10 contract — each named with its commit SHA, its licence, and the variance it contributes — and every claim in the coverage map is marked as confirmed-against-corpus, contradicted, or unobservable
+**And** where fewer than three qualifying public repositories exist, the search query, its result count, and the substitute used are recorded, and the reduced confidence is carried forward as a declared limit into the coverage story.
+
 ### Story 14.2: Squad Baseline Adapter Coverage
 
 As a team using Squad,
@@ -2834,6 +2971,15 @@ So that I can track planning progress without switching tools.
 **When** they are detected
 **Then** they are surfaced as explicit non-fatal notices
 **And** generation continues for supported content and remains coherent with other framework surfaces.
+
+<!-- AC #3 added 2026-08-09 (SCP 2026-08-09, correct-course, owner-directed) — see the note on Story 11.2's
+     AC #3. -->
+
+3.
+**Given** the framework's reference corpus selected by its integration spike
+**When** generation runs against every corpus repository
+**Then** each one generates without fatal errors, and an expected-versus-actual record is written for each — covering page count, epic and story counts, the status distribution, the coverage tiers assigned, and the diagnostics emitted — with every difference from expectation explained rather than merely observed
+**And** each awkward shape the corpus revealed is carried into a temp-directory test fixture, so the corpus repositories are never read by a test.
 
 ## Epic 15: Superpowers Coverage
 
@@ -2861,6 +3007,21 @@ So that baseline coverage starts with a defined scope, known gaps, and no surpri
 **Then** framework-extra data is recorded as candidate projection extensions or explicit non-goals
 **And** deliberately-unsupported conventions are listed with rationale and the non-fatal notice they will emit, giving the coverage story an agreed scope boundary.
 
+<!-- AC #3 added 2026-08-09 (SCP 2026-08-09, correct-course, owner-directed), inheriting Story 4.10's
+     reference-corpus contract. ⚠️ SUPERPOWERS IS THE SECOND FRAMEWORK WHERE THE SHORTFALL RULE IS EXPECTED TO
+     FIRE, and structurally the hardest: this story's own finding #1 is that Superpowers is NEVER installed
+     into the target repo (it is an agent plugin), and its only on-disk trace is a USER-OVERRIDABLE plan-path
+     convention — so there is no reliable marker to search public repos by. The 2026-08-09 probe produced no
+     usable query. `obra/superpowers` is the TOOL, not a reference repo; this story already records that its
+     fetched material "documents the tool's own repository, not a downstream project's use of it." A recorded
+     shortfall with the query and count IS the correct outcome. -->
+
+3.
+**Given** a coverage map built from documentation is a hypothesis, not evidence
+**When** the spike surveys the framework
+**Then** a reference corpus of three real adopting repositories is selected and pinned per the Story 4.10 contract — each named with its commit SHA, its licence, and the variance it contributes — and every claim in the coverage map is marked as confirmed-against-corpus, contradicted, or unobservable
+**And** where fewer than three qualifying public repositories exist, the search query, its result count, and the substitute used are recorded, and the reduced confidence is carried forward as a declared limit into the coverage story.
+
 ### Story 15.2: Superpowers Baseline Adapter Coverage
 
 As a team using Superpowers,
@@ -2880,6 +3041,18 @@ So that I can track planning progress without switching tools.
 **When** they are detected
 **Then** they are surfaced as explicit non-fatal notices
 **And** generation continues for supported content and remains coherent with other framework surfaces.
+
+<!-- AC #3 added 2026-08-09 (SCP 2026-08-09, correct-course, owner-directed) — see the note on Story 11.2's
+     AC #3. ⚠️ Story 15.1's corpus is expected to fall SHORT of three, and structurally so: Superpowers is
+     never installed into the target repo, so there is no reliable marker to search adopters by. This AC is
+     satisfied against whatever corpus 15.1 actually pinned, and the declared confidence limit it recorded
+     must be carried onto the Superpowers framework page (NFR8). -->
+
+3.
+**Given** the framework's reference corpus selected by its integration spike
+**When** generation runs against every corpus repository
+**Then** each one generates without fatal errors, and an expected-versus-actual record is written for each — covering page count, epic and story counts, the status distribution, the coverage tiers assigned, and the diagnostics emitted — with every difference from expectation explained rather than merely observed
+**And** each awkward shape the corpus revealed is carried into a temp-directory test fixture, so the corpus repositories are never read by a test.
 
 <!-- Epic 16 added 2026-07-10 (SCP 2026-07-10, correct-course): release engineering for the community
      preview. New, additive scope — no existing epic changed. Spike-led first story (16.1) per the Epics

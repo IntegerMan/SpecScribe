@@ -24,7 +24,15 @@ Epic 4 (`done`) built the framework-agnostic **foundation** — the `IArtifactAd
 
 2. **Given** Spec Kit conventions that exceed the shared projection model or that SpecScribe will deliberately not support, **when** the spike documents its findings, **then** framework-extra data is recorded as candidate projection extensions or explicit non-goals, **and** deliberately-unsupported conventions are listed with rationale and the non-fatal notice they will emit, giving the coverage story an agreed scope boundary.
 
-[Source: `_bmad-output/planning-artifacts/epics.md:2335-2353`]
+3. **Given** a coverage map built from documentation is a hypothesis, not evidence, **when** the spike surveys the framework, **then** a reference corpus of **three real adopting repositories** is selected and pinned per the Story 4.10 contract — each named with its commit SHA, its licence, and the variance it contributes — and every claim in the coverage map is marked as **confirmed-against-corpus, contradicted, or unobservable**, **and** where fewer than three qualifying public repositories exist, the search query, its result count, and the substitute used are recorded, and the reduced confidence is carried forward as a declared limit into the coverage story.
+
+[Source: `_bmad-output/planning-artifacts/epics.md:2335-2353` — ACs #1–#2. **AC #3 added 2026-08-09 at
+correct-course (SCP `sprint-change-proposal-2026-08-09-framework-reference-corpus.md`), co-landed in `epics.md`
+and `sprint-status.yaml` in the same change.** Provoked by Story 12.2: Story 12.1 built its GSD coverage map
+from vendor documentation, said so in its own Debug Log, and **six of its eight derived claims failed** on
+contact with one real repository — costing 12.2 five mid-story owner decisions against its own task text. This
+story's own hypothesis table below is in exactly that position. **Blocked on Story 4.10** (Framework Reference
+Corpus Contract, Epic 4) for the qualification rule, manifest and discovery recipe.]
 
 ## Context & Scope
 
@@ -110,10 +118,23 @@ Spec Kit is not fully unmentioned in the codebase — these are pre-existing pla
   - [ ] Read `IArtifactAdapter.cs`, `ArtifactBundle.cs`, `AdapterDiagnostic.cs`, `BmadArtifactAdapter.cs`, `EpicsModel.cs`, `RequirementsModel.cs`, `RetroModel.cs`, `SprintStatus.cs` in full (paths above) — do not rely solely on this story's summary tables; they are a starting point, not a substitute for reading the code.
   - [ ] Confirm (or correct) this story's claim that no adapter-selection registry exists (`SiteGenerator.cs:47-51`).
 
-- [ ] **Task 2 — Obtain and inspect representative current-version Spec Kit repositories (AC: #1, #2)**
-  - [ ] Fetch/inspect the current github/spec-kit templates (or a real `specify init`-scaffolded sample project) to confirm exact file names, folder depth, and the `.specify/` marker shape — the table above is a hypothesis from a single doc-page fetch, not a repo inspection.
-  - [ ] Note the exact numbering/naming convention for `specs/<NNN>-slug/` folders (zero-padding? sequential per-repo? branch-name-derived?).
-  - [ ] Confirm whether `research.md`/`data-model.md`/`contracts/`/`quickstart.md` are consistently present or genuinely optional-per-feature.
+- [ ] **Task 2 — Build and pin the Spec Kit reference corpus (AC: #1, #2, #3)** — ⚠️ **rewritten 2026-08-09 at
+  correct-course. The previous wording asked for "at least one real repo"; three is now the bar.**
+  - [ ] **Pass 1 — confirm the marker.** Scaffold Spec Kit into a scratch directory (`specify init`) and/or read
+    its current docs to confirm the `.specify/` marker shape, exact file names and folder depth. **`github/spec-kit`
+    is the TOOL, not a reference repo** — a reference repo is a project that *uses* Spec Kit.
+  - [ ] **Pass 2 — find adopters BY the confirmed marker.** Search public repositories for the marker path and
+    **record the query and its result count**. Probe run 2026-08-09 for reference:
+    `path:.specify/memory filename:constitution.md` → **~6,248 files**, so a three-repo corpus is readily
+    available and the shortfall rule should **not** need to fire here.
+  - [ ] Select **three** adopting repositories chosen for **variance, not similarity**. Pin each in the corpus
+    manifest with URL, commit SHA, licence, approximate size, and the variance it contributes.
+  - [ ] If fewer than three qualify, record the query, the count and the substitute used, and carry the reduced
+    confidence forward as a declared limit — **do not silently proceed on one repo.**
+  - [ ] Mark **every row** of this story's hypothesis table **confirmed / contradicted / unobservable** against
+    the corpus. A contradicted row is a finding, and it belongs in Completion Notes where Story 11.2 reads it.
+  - [ ] Note the exact numbering/naming convention for `specs/<NNN>-slug/` folders (zero-padding? sequential per-repo? branch-name-derived?) — **and whether it is consistent across all three corpus repos**, which is precisely the class of variance that broke Story 12.1's `EpicInfo.Number` assumption.
+  - [ ] Confirm whether `research.md`/`data-model.md`/`contracts/`/`quickstart.md` are consistently present or genuinely optional-per-feature — **check this per corpus repo, not once**.
 
 - [ ] **Task 3 — Classify every discovered artifact type (AC: #1)**
   - [ ] For each Spec Kit artifact type (constitution, feature spec, plan, tasks, research/data-model/contracts/quickstart), classify as **mappable** (name the exact target: `ArtifactBundle` field + model type/record), **partially-mappable** (name what maps and what doesn't), or **unsupported** (name why).
@@ -161,6 +182,10 @@ _(populated during code-review)_
 - Designing or partially building the adapter registry inline instead of naming it as a Task 5 finding for 11.2 (or a dedicated small story) to close.
 - Silently committing to a package/namespace split (`SpecScribe.Adapters.SpecKit`) — that's an aspirational sketch, not current architecture.
 - Treating this story's own hypothesis table as verified fact instead of confirming it against a real, current Spec Kit repo.
+- **Treating `github/spec-kit` as a reference repository.** It is the tool. A reference repo is a project that *uses* Spec Kit. (Added 2026-08-09; Stories 14.1 and 15.1 had the same defect and were corrected in the same change.)
+- **Settling for one repo because it was easy to find.** One repo cannot show variance, and variance is the entire point — Story 12.1's map looked coherent right up until a second data point existed. Choose the three for *difference*.
+- **Leaving a shortfall silent.** If three qualifying repos genuinely do not exist, that is a finding to record with its query and count, not a gap to paper over. (Stories 13.1 and 15.1 are expected to hit this; Spec Kit is not.)
+- **Forgetting `CONDITIONAL_CLASSES` when Story 11.2 adds cross-framework markup.** ⚠️ Carry this forward: `extract:ir-content` prunes any rule whose selector is absent from the IR, and the extraction corpus is *this* repository's own IR — a BMad project. Markup only a Spec Kit repo produces is pruned **with every gate green**. Measured on Story 12.2 (§F1): all five `.milestone-band*` rules. Seed `web/scripts/ir-content-lib.mjs`'s `CONDITIONAL_CLASSES` and pin it in `web/test/ir-content-harvest.test.mjs` — the round-trip gate structurally cannot see it.
 
 ### Project Structure Notes
 

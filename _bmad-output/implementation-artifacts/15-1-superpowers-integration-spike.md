@@ -33,7 +33,34 @@ Story 15.1 is **not** a find-and-replace of Spec Kit's or GSD's findings. Superp
 
 2. **Given** Superpowers conventions that exceed the shared projection model or that SpecScribe will deliberately not support, **when** the spike documents its findings, **then** framework-extra data is recorded as candidate projection extensions or explicit non-goals, **and** deliberately-unsupported conventions are listed with rationale and the non-fatal notice they will emit, giving the coverage story an agreed scope boundary.
 
-[Source: `_bmad-output/planning-artifacts/epics.md:2521-2545`]
+3. **Given** a coverage map built from documentation is a hypothesis, not evidence, **when** the spike surveys the framework, **then** a reference corpus of **three real adopting repositories** is selected and pinned per the Story 4.10 contract — each named with its commit SHA, its licence, and the variance it contributes — and every claim in the coverage map is marked as **confirmed-against-corpus, contradicted, or unobservable**, **and** where fewer than three qualifying public repositories exist, the search query, its result count, and the substitute used are recorded, and the reduced confidence is carried forward as a declared limit into the coverage story.
+
+[Source: `_bmad-output/planning-artifacts/epics.md:2521-2545` — ACs #1–#2. **AC #3 added 2026-08-09 at
+correct-course (SCP `sprint-change-proposal-2026-08-09-framework-reference-corpus.md`), co-landed in `epics.md`
+and `sprint-status.yaml` in the same change.** Provoked by Story 12.2: Story 12.1 scoped GSD from vendor
+documentation and **six of its eight derived claims failed** against one real repository. **Blocked on Story
+4.10** (Framework Reference Corpus Contract, Epic 4) for the qualification rule, manifest and discovery recipe.]
+
+> ### ⚠️ Superpowers is the HARDEST corpus in the project, and the shortfall rule is expected to fire
+>
+> This is not a scheduling problem, it is structural, and **this story's own finding #1 already states it**:
+> Superpowers is never installed into the target repo at all. It is a coding-agent plugin, and its only durable
+> on-disk trace is a **user-overridable** plan-path convention (`docs/superpowers/plans/YYYY-MM-DD-*.md`).
+>
+> **There is therefore no reliable marker to search public repositories by** — which is exactly the same
+> problem AC #3's two-pass rule exists for, in its most acute form. The 2026-08-09 feasibility probe produced
+> **no usable query**: path-based searches on the default plan directory returned hundreds of thousands of
+> loose matches, i.e. no signal.
+>
+> **`obra/superpowers` is the TOOL, not a reference repo.** This story already says so about its own evidence
+> — *"the fetched material documents the tool's own repository, not a downstream project's use of it"* — and
+> its Task 2 already had the right instinct. AC #3 makes that instinct a requirement.
+>
+> **A recorded shortfall, with the queries tried and their counts, IS the correct outcome here.** It is also
+> direct evidence for this spike's central question: if adopters cannot be *found* by marker, that bears
+> heavily on whether `AppliesTo` can *detect* them at all — which is this story's single most load-bearing
+> finding. Do not treat a failed corpus search as a failed task; write it up as the signal it is, and carry the
+> declared limit into Story 15.2 and onto the Superpowers framework page (NFR8).
 
 ## Context & Scope
 
@@ -124,9 +151,28 @@ Live-checked (fetched `README`, `skills/writing-plans/SKILL.md`, `skills/using-s
   - [ ] Confirm (or correct) this story's claim that no adapter-selection registry exists (`SiteGenerator.cs:51`), and check whether Story 11.1 or 12.1 has already landed/recommended a registry shape (read their Completion Notes if `done`).
   - [ ] Re-read `IArtifactAdapter.AppliesTo`'s doc comment [IArtifactAdapter.cs:21-27] closely — confirm it genuinely permits a `sourceFiles`-shape-based signal (not just a marker-directory sniff) before assuming a contract change is needed.
 
-- [ ] **Task 2 — Obtain and inspect representative Superpowers-adopting repositories (AC: #1, #2)**
-  - [ ] Fetch/inspect the `obra/superpowers` repo's own `docs/plans/` directory (real dated plan-file examples) and the `writing-plans`/`using-superpowers`/`brainstorming` skill files to confirm exact plan-document structure — this story's table is a hypothesis from doc-page fetches, not a downstream-repo inspection.
-  - [ ] Actively search for (or construct, if none is publicly findable) a real project that has *adopted* Superpowers as a coding-agent plugin and therefore has its own `docs/superpowers/plans/` (or user-configured equivalent) — distinguishing "the tool's own repo" from "a project that used the tool" matters here more than for Spec Kit/GSD, since Superpowers leaves so little else behind.
+- [ ] **Task 2 — Build and pin the Superpowers reference corpus (AC: #1, #2, #3)** — ⚠️ **rewritten 2026-08-09
+  at correct-course. Read the boxed warning under the Acceptance Criteria first: this is the hardest corpus in
+  the project and a recorded shortfall is the expected — and correct — outcome.**
+  - [ ] **Pass 1 — confirm what a trace even looks like.** Inspect the `obra/superpowers` repo's own
+    `docs/plans/` directory (real dated plan-file examples) and the `writing-plans` / `using-superpowers` /
+    `brainstorming` skill files to confirm exact plan-document structure. **This confirms the shape; it does
+    NOT contribute a corpus repo** — `obra/superpowers` is the tool.
+  - [ ] **Pass 2 — attempt adopter discovery, and record what happens.** Search public repositories for the
+    plan-path convention and any header-field signature that survives it. **Record every query tried and its
+    result count**, including the failures. The 2026-08-09 probe found no usable query; if you find one, that
+    is itself a valuable finding for `AppliesTo`.
+  - [ ] Select up to **three** adopting repositories chosen for **variance, not similarity** — in particular,
+    one that uses the **default** plan path and one that has **overridden** it, since the override is what makes
+    detection hard. Pin each with URL, commit SHA, licence, size and contributed variance.
+  - [ ] **If fewer than three qualify** — the expected case — record the queries, the counts and the substitute
+    (a scratch repo driven through the `writing-plans` skill), and carry the reduced confidence into Story 15.2
+    as a **declared limit**, to be stated on the Superpowers framework page (NFR8).
+  - [ ] **Feed the corpus result directly into the `AppliesTo` question.** If adopters cannot be *found* by any
+    marker, say plainly what that implies for whether they can be *detected* — this is the story's single most
+    load-bearing finding, and the corpus attempt is now its primary evidence rather than a side quest.
+  - [ ] Mark **every row** of this story's hypothesis table **confirmed / contradicted / unobservable**.
+    "Unobservable" will be a common and legitimate verdict here; use it rather than guessing.
   - [ ] Confirm whether a brainstorming-phase design document is ever committed to disk, and if so, where and in what shape.
   - [ ] Confirm whether any multi-plan/portfolio-level status view exists anywhere in a real adopting repo (difference #4).
 
@@ -183,6 +229,10 @@ _(populated during code-review)_
 - Designing or partially building the adapter registry inline instead of naming it as a Task 6 finding shared with 11.1/12.1.
 - Silently committing to a package/namespace split (`SpecScribe.Adapters.Superpowers`) — aspirational sketch, not current architecture.
 - Proposing a fourth, Superpowers-specific adapter-registry ADR instead of coordinating one shared registry decision with 11.1/12.1.
+- **Treating `obra/superpowers` as a reference repository.** It is the tool. A reference repo is a project that *uses* Superpowers. This story already records the distinction about its own evidence — AC #3 makes it a requirement. (Stories 11.1, 13.1 and 14.1 had the same defect and were corrected in the same change, 2026-08-09.)
+- **Treating a failed corpus search as a failed task.** For this framework it is a *result*, and one that bears directly on the `AppliesTo` question. Record the queries and their counts; do not quietly drop the attempt.
+- **Padding the corpus to three with repos that merely have a `docs/plans/` folder.** This story's own finding #2 warns that a repo *not* using Superpowers can coincidentally have date-slug plan files. A false-positive corpus repo is worse than a recorded shortfall — it would validate an `AppliesTo` heuristic against noise.
+- **Forgetting `CONDITIONAL_CLASSES` when Story 15.2 adds cross-framework markup.** ⚠️ `extract:ir-content` prunes any rule whose selector is absent from the IR, and the extraction corpus is *this* repository's own IR — a BMad project. Markup only a Superpowers repo produces is pruned **with every gate green**. Measured on Story 12.2 (§F1): all five `.milestone-band*` rules. Seed `web/scripts/ir-content-lib.mjs`'s `CONDITIONAL_CLASSES` and pin it in `web/test/ir-content-harvest.test.mjs`.
 
 ### Project Structure Notes
 

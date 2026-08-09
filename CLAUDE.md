@@ -142,6 +142,47 @@ have covered them if that one had not recorded the handoff. So:
   change.** A renumber, spike insertion, or story add/remove recorded in only one
   artifact is a drift bug.
 
+## Framework support: evidence before implementation
+
+**A coverage map built from a framework's documentation is a hypothesis, not evidence.** Story 12.1 built the
+GSD map from vendor docs, said so plainly in its own Debug Log, and **six of its eight derived claims failed**
+against one real repository — costing Story 12.2 five mid-story decisions against its own task text. The AC
+wording was the root cause: "representative repositories" never required them to be named, obtainable, or
+plural. Story 4.10 owns the contract; `docs/framework-reference-corpus.md` is the manifest.
+
+Before implementing support for a framework:
+
+- **Build a reference corpus of three real adopting repositories.** A repository that *uses* the framework —
+  the framework's own source repo (`github/spec-kit`, `bradygaster/squad`, `obra/superpowers`) is the **tool**,
+  not a reference. Choose the three for **variance, not similarity**; one repo cannot show variance, and
+  variance is the entire point.
+- **Confirm the marker before searching for adopters.** Discovery is two-pass — you cannot search for a marker
+  you have not confirmed. Scaffold the framework (`specify init`, `squad init`, …) or read its current docs
+  first, *then* search public repos by the confirmed marker.
+- **A shortfall is a finding; a silent shortfall is a defect.** Where fewer than three qualifying repos exist,
+  record the query, its result count and the substitute used, and carry the reduced confidence forward as a
+  declared limit on that framework's page (NFR8). Never pad the corpus with repos that do not qualify — a
+  false-positive reference repo validates a detection heuristic against noise.
+- **Corpus repos are dev-time references, never a test dependency.** CI has no clone. Every shape they reveal
+  becomes a temp-directory fixture, the way `GsdCoreArtifactAdapterTests` derives from CORA without reading it.
+- **Verify expected values, not just absence of errors.** The coverage story writes an expected-versus-actual
+  record per corpus repo — page count, epic/story counts, status distribution, coverage tiers, diagnostics —
+  and *explains* every difference rather than merely observing it.
+
+### Seed `CONDITIONAL_CLASSES` for any cross-framework markup
+
+**The documented CSS regeneration order above cannot save markup that only a non-BMad repo produces.**
+`extract:ir-content` prunes any rule whose selector is absent from the IR, and the extraction corpus is **this
+repository's own IR — and this repository is a BMad project**. So no harvest run here can ever see markup that
+requires a different framework's shape.
+
+Measured on Story 12.2 (§F1), not theorised: with the stylesheet edit in place and the regeneration order
+followed exactly, **all five `.milestone-band*` rules were pruned and `check:ir-content` stayed GREEN** — the
+bands would have shipped unstyled on a real GSD site with no gate able to see it. Seed
+`web/scripts/ir-content-lib.mjs`'s `CONDITIONAL_CLASSES` (the existing seam, also used for the sunburst
+black-fill and `owner-author-2` incidents) and pin it in `web/test/ir-content-harvest.test.mjs` — the
+round-trip gate structurally cannot check its own derivation. **Every framework epic hits this.**
+
 ## Analysis observations — read the digest for files you are about to touch
 
 `.specscribe/analysis/` holds this repository's current SonarCloud findings as

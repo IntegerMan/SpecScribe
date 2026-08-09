@@ -34,7 +34,27 @@ Squad is **not another spec/epic/story planning tool with a different file forma
 
 2. **Given** Squad conventions that exceed the shared projection model or that SpecScribe will deliberately not support, **when** the spike documents its findings, **then** framework-extra data is recorded as candidate projection extensions or explicit non-goals, **and** deliberately-unsupported conventions are listed with rationale and the non-fatal notice they will emit, giving the coverage story an agreed scope boundary.
 
-[Source: `_bmad-output/planning-artifacts/epics.md:2481-2499`]
+3. **Given** a coverage map built from documentation is a hypothesis, not evidence, **when** the spike surveys the framework, **then** a reference corpus of **three real adopting repositories** is selected and pinned per the Story 4.10 contract — each named with its commit SHA, its licence, and the variance it contributes — and every claim in the coverage map is marked as **confirmed-against-corpus, contradicted, or unobservable**, **and** where fewer than three qualifying public repositories exist, the search query, its result count, and the substitute used are recorded, and the reduced confidence is carried forward as a declared limit into the coverage story.
+
+[Source: `_bmad-output/planning-artifacts/epics.md:2481-2499` — ACs #1–#2. **AC #3 added 2026-08-09 at
+correct-course (SCP `sprint-change-proposal-2026-08-09-framework-reference-corpus.md`), co-landed in `epics.md`
+and `sprint-status.yaml` in the same change.** Provoked by Story 12.2: Story 12.1 scoped GSD from vendor
+documentation and **six of its eight derived claims failed** against one real repository — costing 12.2 five
+mid-story owner decisions against its own task text. **Blocked on Story 4.10** (Framework Reference Corpus
+Contract, Epic 4) for the qualification rule, manifest and discovery recipe.]
+
+> ### ⚠️ `bradygaster/squad` is the TOOL, not a reference repository
+>
+> This story's Task 2 previously pointed at it as the thing to inspect. A reference repo is a project that
+> **uses** Squad. Corrected 2026-08-09; Stories 11.1, 13.1 and 15.1 had the same defect and were corrected in
+> the same change.
+>
+> **The good news:** the 2026-08-09 probe found **~5,144** files matching `path:.squad/agents filename:charter.md`
+> and **~700** matching `path:.squad filename:routing.md`, so a three-repo Squad corpus is readily available and
+> the shortfall rule should **not** need to fire here. Squad is also the framework where a corpus matters most
+> for this spike's central open question — `.squad/ceremonies.md`'s format decides whether `Sprint` is
+> partially-mappable or null, and one repo's `ceremonies.md` is exactly the kind of single data point that made
+> Story 12.1's map look coherent until a second one existed.
 
 ## Context & Scope
 
@@ -126,9 +146,21 @@ This spike does **not** add any of these — that remains out of scope (see non-
   - [ ] Confirm (or correct) this story's claim that no adapter-selection registry exists (`SiteGenerator.cs:51`), and check whether Story 11.1 and/or 12.1 have already landed/recommended a registry shape (read their Completion Notes if `done`).
   - [ ] Confirm the current `AboutSddTemplater.Frameworks` roster, `SiteNav` constants, and `README.md` "Supported frameworks" table genuinely have no Squad entry (re-grep; this story's claim was made at create-story and could go stale).
 
-- [ ] **Task 2 — Obtain and inspect a representative current-version Squad repository (AC: #1, #2)**
-  - [ ] Fetch/clone `github.com/bradygaster/squad` (or run `squad init` into a scratch directory) to confirm the exact `.squad/` layout — the table above was built from web-fetched documentation summaries, not a repo inspection.
-  - [ ] **Resolve `.squad/ceremonies.md`'s actual format** — this is the single most consequential open question in this spike; it decides whether `Sprint` is partially-mappable or null.
+- [ ] **Task 2 — Build and pin the Squad reference corpus (AC: #1, #2, #3)** — ⚠️ **rewritten 2026-08-09 at
+  correct-course. The previous wording pointed at `bradygaster/squad`, which is the TOOL, not a reference repo.**
+  - [ ] **Pass 1 — confirm the marker.** Run `squad init` into a scratch directory and/or read the current docs
+    to confirm the exact `.squad/` layout. Reading `bradygaster/squad` is fine **for confirming the marker**;
+    it does not count toward the corpus.
+  - [ ] **Pass 2 — find adopters BY the confirmed marker.** Search public repositories for the marker path and
+    **record the query and its result count**. Probe run 2026-08-09 for reference:
+    `path:.squad/agents filename:charter.md` → **~5,144 files**; `path:.squad filename:routing.md` → **~700**.
+  - [ ] Select **three** adopting repositories chosen for **variance, not similarity**. Pin each in the corpus
+    manifest with URL, commit SHA, licence, approximate size, and the variance it contributes.
+  - [ ] If fewer than three qualify, record the query, the count and the substitute used, and carry the reduced
+    confidence forward as a declared limit — **do not silently proceed on one repo.**
+  - [ ] Mark **every row** of this story's hypothesis table **confirmed / contradicted / unobservable** against
+    the corpus. A contradicted row is a finding, and it belongs in Completion Notes where Story 14.2 reads it.
+  - [ ] **Resolve `.squad/ceremonies.md`'s actual format** — this is the single most consequential open question in this spike; it decides whether `Sprint` is partially-mappable or null. **Check it in all three corpus repos**: if the format varies between them, that variance *is* the answer, and it is invisible from one repo.
   - [ ] Confirm whether `squad build` (from `squad.config.ts`) produces byte-identical `.squad/*.md` output to `squad init`, or a divergent shape SpecScribe would need to handle differently.
   - [ ] Confirm the `.squad/agents/{name}/` per-agent structure (charter.md + history.md) and whether agent names are stable identifiers or user-chosen (affects any future per-agent page modeling, out of scope here but useful context for 14.2).
 
@@ -181,7 +213,11 @@ _(populated during code-review)_
 - Silently omitting the missing-placeholder finding (Task 5) — unlike 11.2/12.2, Story 14.2 starts with zero existing routed page, roster entry, or README row.
 - Proposing a third, Squad-specific adapter-registry ADR instead of coordinating one shared registry decision with 11.1/12.1.
 - Silently committing to a package/namespace split (`SpecScribe.Adapters.Squad`) — aspirational sketch, not current architecture.
-- Treating this story's own hypothesis table (built from web-fetched summaries) as verified fact instead of confirming it against the real `bradygaster/squad` repo.
+- Treating this story's own hypothesis table (built from web-fetched summaries) as verified fact instead of confirming it against a real corpus. ⚠️ **Amended 2026-08-09:** this line originally said "against the real `bradygaster/squad` repo" — that repo is the **tool**. Confirm against three *adopting* repos.
+- **Treating `bradygaster/squad` as a reference repository.** It is the tool. A reference repo is a project that *uses* Squad. (Stories 11.1, 13.1 and 15.1 had the same defect and were corrected in the same change.)
+- **Settling for one repo because it was easy to find** — especially for `ceremonies.md`, whose format is this spike's central question. One repo cannot show variance, and variance is the point.
+- **Leaving a shortfall silent.** Squad is not expected to hit it (~5,144 marker hits on 2026-08-09), so if you *do* come up short, something about the marker is wrong — investigate rather than proceeding.
+- **Forgetting `CONDITIONAL_CLASSES` when Story 14.2 adds cross-framework markup.** ⚠️ `extract:ir-content` prunes any rule whose selector is absent from the IR, and the extraction corpus is *this* repository's own IR — a BMad project. Markup only a Squad repo produces is pruned **with every gate green**. Measured on Story 12.2 (§F1): all five `.milestone-band*` rules. Seed `web/scripts/ir-content-lib.mjs`'s `CONDITIONAL_CLASSES` and pin it in `web/test/ir-content-harvest.test.mjs`.
 - Attempting to parse `.squad/casting/*.json` — non-markdown, out of scope regardless of classification tier.
 
 ### Project Structure Notes

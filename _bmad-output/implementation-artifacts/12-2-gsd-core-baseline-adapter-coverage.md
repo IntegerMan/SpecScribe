@@ -4,7 +4,20 @@ baseline_commit: 9580f62d3431cfc25cd67d5b8627a2b79e4aed50
 
 # Story 12.2: GSD Core Baseline Adapter Coverage
 
-Status: review
+Status: in-progress
+
+> **⚠️ REOPENED 2026-08-09** (SCP `sprint-change-proposal-2026-08-09-framework-reference-corpus.md`,
+> correct-course, **owner decision**). `review` → `in-progress` for **one added AC (#6) and one added task
+> (Task 12)**: widen the reference corpus from the single **private** repository `C:/dev/CORA` to three,
+> including at least two **public** GSD Core adopters.
+>
+> **Nothing already delivered is retracted.** The adapter, both shared prerequisites, ADR 0038, the milestone
+> bands and all 34 tests stand. Tasks 1–11 remain complete and ACs #1–#5 remain satisfied. What was narrow was
+> the **evidence base**, not the implementation — this story is the one that proved the point (six of Story
+> 12.1's eight doc-derived claims failed against one real repo), and AC #6 applies the same lesson to itself.
+>
+> **Blocked on Story 4.10** (Framework Reference Corpus Contract, Epic 4, `backlog`), which defines the
+> qualification rule, the manifest, and the discovery recipe Task 12 follows.
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -122,8 +135,18 @@ These were elicited before drafting and are **not** open for the dev agent to re
    dropped silently, **and** a BMad-only repository's output is unchanged, with the decision recorded as one
    shared ADR the remaining framework epics inherit.
 
+6. **Given** GSD Core support was verified against exactly one repository, which is private and unavailable to
+   CI or to any other contributor, **when** the reference corpus is widened to three repositories per the Story
+   4.10 contract — `C:/dev/CORA` plus at least two **public** adopting repositories, pinned by commit SHA —
+   **then** generation runs cleanly against all three, an expected-versus-actual record is written for each, and
+   any shape the adapter mishandles is either fixed or recorded as a declared boundary on the GSD framework
+   page, **and** each newly-revealed shape is carried into `GsdCoreArtifactAdapterTests` as a temp-directory
+   fixture, with the corpus repositories themselves never read by a test.
+
 [Source: `_bmad-output/planning-artifacts/epics.md` § Story 12.2 — ACs #1–#3 verbatim from the epic; #4/#5 added
-2026-08-06 recording decisions D1–D5, co-landed in `sprint-status.yaml` in the same change.]
+2026-08-06 recording decisions D1–D5, co-landed in `sprint-status.yaml` in the same change; **#6 added 2026-08-09
+at correct-course (SCP 2026-08-09-framework-reference-corpus), co-landed in `epics.md` and `sprint-status.yaml`
+in the same change.**]
 
 ## Context & Scope
 
@@ -406,6 +429,32 @@ ordinal, so `02.1-03-PLAN.md` in CORA's third-listed phase becomes `"3.3"` and t
     `--source`/`--output` into `SpecScribeOutput/`, and inspect the epics index bands, the story cards' status
     and absent task badges, the sprint surface, the diagnostics page, and the GSD framework page. The test
     suite structurally cannot see layout collapse or containment leaks.
+
+- [ ] **Task 12 — Widen the GSD Core reference corpus to three repositories (AC: #6)** — ⚠️ **added
+  2026-08-09 at correct-course; blocked on Story 4.10 landing the contract.**
+  - [ ] Select **2+ PUBLIC** GSD Core adopting repositories per the Story 4.10 contract, chosen for **variance
+    against CORA** — prefer one with non-decimal phase numbering, one with a differently-shaped `STATE.md`, and
+    one with no `## Backlog` section, if such exist. Pin each by commit SHA in the corpus manifest with its
+    URL, licence, approximate size, and the variance it contributes.
+    - Discovery is two-pass and the marker here is already **confirmed** (`.planning/`), so pass 2 applies
+      directly. Probe run 2026-08-09: `path:.planning filename:ROADMAP.md "## Phases"` → ~1,932 files;
+      `path:.planning/phases filename:PLAN.md` → ~2,547. The corpus is readily available.
+    - A GSD Core repo that is *also* a BMad repo (like CORA) exercises the merge path; **at least one corpus
+      repo should be GSD-only**, so the single-adapter path is covered by something other than a fixture.
+  - [ ] Generate against each into `SpecScribeOutput/` (never `--output docs/live`). Record **page count,
+    phase/plan counts, status distribution, coverage tiers and diagnostics** as an expected-versus-actual table
+    in Completion Notes. **Explain every difference from expectation** rather than merely observing it.
+  - [ ] Re-test this story's own five decisions against repos that did not inform them — especially **D2**
+    (synthetic ordinals: does a repo with plain integer phases still produce sane ids?), **D4** (the sprint
+    ledger's story entries), and **§D5**'s `ProgressCalculator` null-coalesce.
+  - [ ] **Verify in a LIVE BROWSER over HTTP** for at least one non-CORA repo. ⚠️ Per §F2, Chromium refuses
+    `crossorigin` stylesheets over `file://`, so a `file://` check reports **false** failures — serve it.
+  - [ ] Carry every newly-revealed shape into `GsdCoreArtifactAdapterTests` as a temp-dir fixture. **Corpus
+    repos are never read by a test** — CI has no clone.
+  - [ ] Where a shape is mishandled and **not** fixed here, state it as a declared boundary on the GSD
+    framework page (NFR8: absent, not misleadingly empty) rather than leaving it silent.
+  - [ ] Attribute this task's work **by hunk** where it touches files a sibling story may hold (CLAUDE.md
+    § Scoping a code review) — Tasks 1–11 are already complete and will be reviewed as their own hunks.
 
 ## Dev Notes
 
@@ -756,6 +805,19 @@ and `EpicInfo.Number` not widened; no new content-drift gate (ADR 0033); no new 
 
 ## Change Log
 
+- 2026-08-09 — **REOPENED at correct-course (owner decision).** `review` → `in-progress`. Added **AC #6** and
+  **Task 12**: widen the reference corpus from one **private** repo (`C:/dev/CORA`) to three, including 2+
+  **public** GSD Core adopters pinned by SHA, with an expected-versus-actual record per repo and every newly
+  revealed shape carried into `GsdCoreArtifactAdapterTests` as a temp-dir fixture. **Nothing delivered is
+  retracted**; Tasks 1–11 stay complete and ACs #1–#5 stay satisfied. Provenance:
+  `sprint-change-proposal-2026-08-09-framework-reference-corpus.md`, triggered by *this* story's own history —
+  Story 12.1 scoped GSD from vendor documentation and **six of its eight derived claims failed** against one
+  real repo, costing this story five mid-story decisions against its own task text. The generalizing finding is
+  this story's **§F1**. The correct-course seated **new Story 4.10** (Framework Reference Corpus Contract,
+  Epic 4) which Task 12 is **blocked on**, added AC #3 to the four unstarted framework spikes, and added a
+  corpus-verification AC to all five coverage stories. Owner chose *reopen* over seating a 12.4 so the evidence
+  stays with the story that owns the adapter, and because 12.2 has not been code-reviewed yet. Co-landed in
+  `epics.md` and `sprint-status.yaml` in the same change.
 - 2026-08-06 — **Story 12.2 implemented (dev-story, worktree `story-12-2-gsd-core-adapter` off `f9d7529`).**
   `ready-for-dev → in-progress → review`. All 11 tasks complete; ACs #1–#5 satisfied. **A GSD Core repository
   generates for the first time** (`C:/dev/CORA` → 160 pages, 0 errors, branded "CORA", 14 phases in 4 milestone
