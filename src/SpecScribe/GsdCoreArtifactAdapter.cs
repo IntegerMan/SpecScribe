@@ -365,6 +365,9 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
                 // Mirrors EpicsParser's own rule (`stories.Count > 0 ? Drafted : Pending`) rather than inventing a
                 // GSD-specific one — a phase with no plans listed is genuinely pending.
                 Status = stories.Count > 0 ? EpicStatus.Drafted : EpicStatus.Pending,
+                // GSD Core has no retrospective artifact or close-out workflow. Its ROADMAP completion checkbox
+                // is the terminal signal, so a completed phase must not remain in review forever.
+                RequiresRetrospective = false,
                 // SEMANTICALLY EMPTY for this framework. EpicSection encodes BMad's epics.md "Vertical Slice" vs
                 // "Further Development" split, which GSD Core has no analog for; every phase takes the same constant
                 // so the value can never imply a distinction GSD did not make. The epics index renders MILESTONE
@@ -396,7 +399,7 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
             foreach (var (step, fileStem) in WorkflowCommandFiles)
             {
                 if (File.Exists(Path.Combine(commandsRoot, fileStem + ".md")))
-                    commands[step] = "/gsd-" + fileStem;
+                    commands[step] = "/gsd:" + fileStem;
             }
         }
 

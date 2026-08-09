@@ -144,6 +144,24 @@ public class StatusStylesTests
     }
 
     [Fact]
+    public void ForEpicWithRetrospective_LeavesDoneWhenTheFrameworkHasNoRetroWorkflow()
+    {
+        var gsdPhase = new EpicInfo
+        {
+            Number = 1,
+            Title = "A GSD phase",
+            GoalHtml = string.Empty,
+            Status = EpicStatus.Drafted,
+            Section = EpicSection.VerticalSlice,
+            Stories = new[] { Story("done"), Story("complete") },
+            RequiresRetrospective = false,
+        };
+
+        Assert.False(gsdPhase.HasRetrospective);
+        Assert.Equal("done", StatusStyles.ForEpicWithRetrospective(gsdPhase));
+    }
+
+    [Fact]
     public void ForEpicWithRetrospective_LeavesNonDoneTiersUntouchedRegardlessOfRetro()
     {
         // Only the "done" tier is retro-gated; every other tier is exactly what ForEpic returns, even if a

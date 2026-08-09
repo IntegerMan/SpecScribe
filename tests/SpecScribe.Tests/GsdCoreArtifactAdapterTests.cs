@@ -240,9 +240,9 @@ public class GsdCoreArtifactAdapterTests : IDisposable
         var phase = Assert.IsType<EpicsModel>(bundle.Epics).Epics[2];
 
         Assert.True(commands.UsesPhaseArguments);
-        Assert.Equal("/gsd-plan-phase", commands.Command("create-story"));
-        Assert.Equal("/gsd-execute-phase", commands.Command("dev-story"));
-        Assert.Equal("/gsd-code-review", commands.Command("code-review"));
+        Assert.Equal("/gsd:plan-phase", commands.Command("create-story"));
+        Assert.Equal("/gsd:execute-phase", commands.Command("dev-story"));
+        Assert.Equal("/gsd:code-review", commands.Command("code-review"));
         Assert.Null(commands.Command("sprint-status"));
         Assert.Equal("2.1", phase.WorkflowCommandArgument);
         Assert.All(phase.Stories, story => Assert.Equal("2.1", story.WorkflowCommandArgument));
@@ -272,6 +272,8 @@ public class GsdCoreArtifactAdapterTests : IDisposable
 
         Assert.Equal(new[] { 1, 2, 3, 4, 5 }, epics.Epics.Select(e => e.Number).ToArray());
         Assert.Contains("Phase 1: Identity and Scope", epics.Epics[0].Title);
+        Assert.All(epics.Epics, epic => Assert.False(epic.RequiresRetrospective));
+        Assert.Equal("done", StatusStyles.ForEpicWithRetrospective(epics.Epics[0]));
         // The DECIMAL phase keeps its real label while taking a sequential ordinal.
         Assert.Equal(3, epics.Epics[2].Number);
         Assert.Contains("Phase 2.1: UI Foundation and Style System", epics.Epics[2].Title);

@@ -25,34 +25,34 @@ public static class AboutSddTemplater
     /// <para><c>Label</c> deliberately stays "GSD"/"GSD-Pi" rather than becoming "GSD Core"/"GSD Pi": the labels
     /// are load-bearing for nav pills and page titles, and the disambiguation the roster needed is carried by
     /// <c>Url</c> + <c>Blurb</c>. Renaming the labels is a separate, owner-facing display decision.</para></summary>
-    public static readonly (string Id, string Label, string OutputPath, bool Supported, string? Url, string? Blurb)[] Frameworks =
+    public static readonly (string Id, string Label, string? Version, string OutputPath, bool Supported, string? Url, string? Blurb)[] Frameworks =
     [
-        ("bmad", "BMad", SiteNav.AboutSddBmadOutputPath, true,
+        ("bmad", "BMad", "6.10.0", SiteNav.AboutSddBmadOutputPath, true,
             "https://github.com/bmad-code-org/BMAD-METHOD", null),
-        ("gds", "BMad GDS", SiteNav.AboutSddGdsOutputPath, true,
+        ("gds", "BMad GDS", "0.6.0", SiteNav.AboutSddGdsOutputPath, true,
             "https://github.com/bmad-code-org/bmad-module-game-dev-studio", null),
-        ("speckit", "Spec Kit", SiteNav.AboutSddSpecKitOutputPath, false,
+        ("speckit", "Spec Kit", null, SiteNav.AboutSddSpecKitOutputPath, false,
             "https://github.com/github/spec-kit",
             "<strong>GitHub Spec Kit</strong> drives development from a specification: a <code>.specify/</code> "
             + "install marker plus numbered <code>specs/&lt;NNN&gt;-slug/</code> folders holding a spec, plan, and "
             + "task breakdown, authored through <code>/speckit.*</code> commands."),
         // Supported since Story 12.2: GsdCoreArtifactAdapter projects .planning/ROADMAP.md into epics & stories and
         // STATE.md into the sprint ledger. Support is per-noun, not blanket — see FamilyMatrix.GsdCore.
-        ("gsd", "GSD", SiteNav.AboutSddGsdOutputPath, true,
+        ("gsd", "GSD", "1.42.3", SiteNav.AboutSddGsdOutputPath, true,
             "https://docs.opengsd.net/core",
             "<strong>GSD Core</strong> (Get Shit Done) is a spec-driven framework layered on your existing AI "
-            + "coding runtime as <code>/gsd-*</code> slash commands. It keeps every artifact as plain Markdown and "
+            + "coding runtime as <code>/gsd:*</code> slash commands. It keeps every artifact as plain Markdown and "
             + "JSON in a <code>.planning/</code> directory &mdash; project brief, requirements, roadmap, and live "
             + "state at the root, then one folder per phase &mdash; and decomposes work as Milestone &rarr; Phase "
             + "&rarr; Task. There is no database: what is on disk is the project."),
-        ("gsd-pi", "GSD-Pi", SiteNav.AboutSddGsdPiOutputPath, false,
+        ("gsd-pi", "GSD-Pi", null, SiteNav.AboutSddGsdPiOutputPath, false,
             "https://docs.opengsd.net/pi",
             "<strong>GSD Pi</strong> is Get Shit Done's autonomous agent CLI &mdash; the successor to GSD 2 &mdash; "
             + "and it stores state differently from GSD Core. A SQLite database at <code>.gsd/gsd.db</code> is the "
             + "single source of truth, and the Markdown beside it (<code>.gsd/</code> state, decisions, knowledge, "
             + "and <code>milestones/</code>) is <em>rendered from</em> that database. Work decomposes as Milestone "
             + "&rarr; Slice &rarr; Task. SpecScribe reads the Markdown projections, never the database."),
-        ("superpowers", "Superpowers", SiteNav.AboutSddSuperpowersOutputPath, false, null, null),
+        ("superpowers", "Superpowers", null, SiteNav.AboutSddSuperpowersOutputPath, false, null, null),
     ];
 
     /// <summary>Builds the hub page's host-neutral <see cref="PageView"/> — the AD-2 delivery contract, so the
@@ -156,6 +156,7 @@ public static class AboutSddTemplater
         sb.Append("  <table class=\"sdd-support-matrix\">\n");
         sb.Append("    <thead><tr>");
         sb.Append("<th>Framework</th>");
+        sb.Append("<th>Version</th>");
         sb.Append("<th>Epics &amp; Stories</th>");
         sb.Append("<th>Requirements</th>");
         sb.Append("<th>Sprint</th>");
@@ -165,12 +166,12 @@ public static class AboutSddTemplater
         sb.Append("</tr></thead>\n");
         sb.Append("    <tbody>\n");
         // BMad / BMad GDS both ride BmadArtifactAdapter → full ArtifactBundle + CommandCatalog.
-        AppendMatrixRow(sb, "BMad", SiteNav.AboutSddBmadOutputPath, FamilyMatrix.All);
-        AppendMatrixRow(sb, "BMad GDS", SiteNav.AboutSddGdsOutputPath, FamilyMatrix.All);
-        AppendMatrixRow(sb, "Spec Kit", SiteNav.AboutSddSpecKitOutputPath, FamilyMatrix.None);
-        AppendMatrixRow(sb, "GSD", SiteNav.AboutSddGsdOutputPath, FamilyMatrix.GsdCore);
-        AppendMatrixRow(sb, "GSD-Pi", SiteNav.AboutSddGsdPiOutputPath, FamilyMatrix.None);
-        AppendMatrixRow(sb, "Superpowers", SiteNav.AboutSddSuperpowersOutputPath, FamilyMatrix.None);
+        AppendMatrixRow(sb, "bmad", FamilyMatrix.All);
+        AppendMatrixRow(sb, "gds", FamilyMatrix.All);
+        AppendMatrixRow(sb, "speckit", FamilyMatrix.None);
+        AppendMatrixRow(sb, "gsd", FamilyMatrix.GsdCore);
+        AppendMatrixRow(sb, "gsd-pi", FamilyMatrix.None);
+        AppendMatrixRow(sb, "superpowers", FamilyMatrix.None);
         sb.Append("    </tbody>\n  </table>\n");
     }
 
@@ -222,10 +223,12 @@ public static class AboutSddTemplater
             new[] { EpicsAndStories, Requirements, Sprint, Retros, PlanningDocs, Commands };
     }
 
-    private static void AppendMatrixRow(StringBuilder sb, string label, string href, FamilyMatrix families)
+    private static void AppendMatrixRow(StringBuilder sb, string frameworkId, FamilyMatrix families)
     {
+        var framework = Frameworks.Single(f => f.Id == frameworkId);
         sb.Append("      <tr>");
-        sb.Append($"<th scope=\"row\"><a href=\"{PathUtil.Html(href)}\">{PathUtil.Html(label)}</a></th>");
+        sb.Append($"<th scope=\"row\"><a href=\"{PathUtil.Html(framework.OutputPath)}\">{PathUtil.Html(framework.Label)}</a></th>");
+        sb.Append($"<td>{PathUtil.Html(framework.Version ?? "—")}</td>");
         foreach (var family in families.InColumnOrder)
             sb.Append($"<td>{Check(family)}</td>");
         sb.Append("</tr>\n");
@@ -419,7 +422,7 @@ public static class AboutSddTemplater
     {
         sb.Append("  <h2 id=\"overview\">What it is</h2>\n");
         sb.Append("  <p><strong>GSD Core</strong> (Get Shit Done) is a spec-driven framework layered on your ");
-        sb.Append("existing AI coding runtime as <code>/gsd-*</code> slash commands. It keeps every artifact as ");
+        sb.Append("existing AI coding runtime as <code>/gsd:*</code> slash commands. It keeps every artifact as ");
         sb.Append("plain Markdown and JSON in a <code>.planning/</code> directory &mdash; project brief, ");
         sb.Append("requirements, roadmap, and live state at the root, then one folder per phase &mdash; and ");
         sb.Append("decomposes work as Milestone &rarr; Phase &rarr; Plan. There is no database: what is on disk is ");
@@ -474,13 +477,13 @@ public static class AboutSddTemplater
 
         sb.Append("  <h2 id=\"commands\">Common commands</h2>\n");
         sb.Append("  <ul class=\"sdd-commands\">\n");
-        sb.Append("    <li><code>/gsd-new</code> — define the project brief and core value</li>\n");
-        sb.Append("    <li><code>/gsd-requirements</code> — capture requirements</li>\n");
-        sb.Append("    <li><code>/gsd-roadmap</code> — plan milestones and phases</li>\n");
-        sb.Append("    <li><code>/gsd-plan-phase</code> — decompose a phase into numbered plans</li>\n");
-        sb.Append("    <li><code>/gsd-execute-phase</code> — execute every plan in a phase</li>\n");
-        sb.Append("    <li><code>/gsd-code-review</code> — review a completed phase</li>\n");
-        sb.Append("    <li><code>/gsd-review-backlog</code> — promote backlog phases into the roadmap</li>\n");
+        sb.Append("    <li><code>/gsd:new</code> — define the project brief and core value</li>\n");
+        sb.Append("    <li><code>/gsd:requirements</code> — capture requirements</li>\n");
+        sb.Append("    <li><code>/gsd:roadmap</code> — plan milestones and phases</li>\n");
+        sb.Append("    <li><code>/gsd:plan-phase</code> — decompose a phase into numbered plans</li>\n");
+        sb.Append("    <li><code>/gsd:execute-phase</code> — execute every plan in a phase</li>\n");
+        sb.Append("    <li><code>/gsd:code-review</code> — review a completed phase</li>\n");
+        sb.Append("    <li><code>/gsd:review-backlog</code> — promote backlog phases into the roadmap</li>\n");
         sb.Append("  </ul>\n");
 
         sb.Append("  <h2 id=\"methodology\">Methodology</h2>\n");

@@ -21,7 +21,7 @@ frameworks is planned — see the [Roadmap](#roadmap) for feature-level plans.
 | [BMad Method](https://github.com/bmad-code-org/BMAD-METHOD) | 6.10.0 | ✅ Supported |
 | BMad GDS (Game Dev Studio) | 0.6.0 | ✅ Supported |
 | [GitHub Spec Kit](https://github.com/github/spec-kit) | — | 🧭 Planned |
-| [GSD](https://docs.opengsd.net/core) | — | ✅ Supported |
+| [GSD](https://docs.opengsd.net/core) | 1.42.3 | ✅ Supported |
 | [GSD-Pi](https://docs.opengsd.net/pi) | — | 🧭 Planned |
 | Superpowers | — | 🧭 Planned |
 

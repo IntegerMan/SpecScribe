@@ -77,6 +77,11 @@ public sealed class EpicInfo
     /// closure ritual, not an implementation signal).</summary>
     public bool HasRetrospective { get; set; }
 
+    /// <summary>Whether this epic's framework has a retrospective artifact that closes delivery. Defaults to
+    /// <see langword="true"/> for BMad; GSD Core sets it false because its plan workflow has no equivalent.
+    /// Visual epic status only applies the retrospective gate when this is true.</summary>
+    public bool RequiresRetrospective { get; init; } = true;
+
     /// <summary>Rendered retirement/superseded notices classified out of story leading-comments in this epic
     /// (Story 10.5, AC3) — e.g. Story 3.4's retirement note. Empty when none matched; rendered in a collapsed
     /// "Retired" section after the active story cards instead of inline above the following story.</summary>

@@ -105,6 +105,8 @@ public class AboutSddFrameworkRosterTests : IDisposable
         Assert.False(string.IsNullOrEmpty(gsd.Url));
         Assert.False(string.IsNullOrEmpty(pi.Url));
         Assert.NotEqual(gsd.Url, pi.Url);
+        Assert.Equal("1.42.3", gsd.Version);
+        Assert.Null(pi.Version);
 
         // Neither may point at gsd-build/gsd-2 — the retired predecessor that "now continues as GSD Pi".
         Assert.DoesNotContain("gsd-2", gsd.Url);

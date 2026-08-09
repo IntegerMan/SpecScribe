@@ -187,7 +187,8 @@ public static class StatusStyles
     /// <summary>The retro-gated epic class for the VISUAL epic-status surfaces (sunburst, Epic Status donut,
     /// epics-index chips, epic page/card badges): an epic whose every story is done but which has no
     /// retrospective yet reads as "review" (delivered, retro pending) rather than "done" — so those surfaces
-    /// don't call an epic finished until its retro closes it out. Every other tier defers to
+    /// don't call a BMad epic finished until its retro closes it out. Frameworks with no retrospective workflow
+    /// opt out through <see cref="EpicInfo.RequiresRetrospective"/>. Every other tier defers to
     /// <see cref="ForEpic"/>. Kept SEPARATE from <see cref="ForEpic"/> on purpose: requirements roll-up
     /// (<c>RequirementsParser.DeriveStatus</c>) maps epic status onto implementation-completeness, where a retro
     /// (a closure ritual, not an implementation signal) must never downgrade a fully-built epic. [spec-sunburst-retro]
@@ -197,7 +198,7 @@ public static class StatusStyles
     public static string ForEpicWithRetrospective(EpicInfo epic)
     {
         var cls = ForEpic(epic);
-        return cls == "done" && !epic.HasRetrospective ? "review" : cls;
+        return cls == "done" && epic.RequiresRetrospective && !epic.HasRetrospective ? "review" : cls;
     }
 
     /// <summary>The complete set of css classes <see cref="ForEpic"/> can return, in narrative order

@@ -166,6 +166,8 @@ public class SiteGeneratorHowToReadTests : IDisposable
         Assert.Contains("<h1>About Spec-Driven Development</h1>", html);
         Assert.Contains("sdd-support-matrix", html);
         Assert.Contains("id=\"support-matrix\"", html);
+        Assert.Contains(">Version<", html);
+        Assert.Contains(">1.42.3<", html);
         Assert.Contains("href=\"about-sdd-bmad.html\"", html);
         Assert.Contains("href=\"about-sdd-gds.html\"", html);
         Assert.Contains("href=\"about-sdd-speckit.html\"", html);
