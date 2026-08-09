@@ -97,6 +97,7 @@ public sealed class AdapterRegistry
         RequirementsModel? requirements = null;
         string? epicsSource = null;
         string? epicsOwner = null;
+        CommandCatalog? workflowCommands = null;
 
         foreach (var (adapter, bundle) in bundles)
         {
@@ -121,6 +122,7 @@ public sealed class AdapterRegistry
                     requirements = bundle.Requirements;
                     epicsSource = bundle.EpicsSourceFullPath;
                     epicsOwner = name;
+                    workflowCommands = bundle.WorkflowCommands;
                 }
                 else
                 {
@@ -145,6 +147,7 @@ public sealed class AdapterRegistry
         return new ArtifactBundle
         {
             Module = module,
+            WorkflowCommands = workflowCommands,
             Sprint = sprint,
             Retros = retros,
             Epics = epics,

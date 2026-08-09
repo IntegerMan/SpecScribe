@@ -226,6 +226,38 @@ public class GsdCoreArtifactAdapterTests : IDisposable
         finally { try { Directory.Delete(other, recursive: true); } catch (IOException) { } }
     }
 
+    [Fact]
+    public void WorkflowCommands_DiscoverOnlyInstalledCommands_AndKeepNativePhaseArguments()
+    {
+        var commandsRoot = Path.Combine(_root, ".claude", "commands", "gsd");
+        Directory.CreateDirectory(commandsRoot);
+        File.WriteAllText(Path.Combine(commandsRoot, "plan-phase.md"), "# Plan phase");
+        File.WriteAllText(Path.Combine(commandsRoot, "execute-phase.md"), "# Execute phase");
+        File.WriteAllText(Path.Combine(commandsRoot, "code-review.md"), "# Review phase");
+
+        var bundle = Ingest();
+        var commands = Assert.IsType<CommandCatalog>(bundle.WorkflowCommands);
+        var phase = Assert.IsType<EpicsModel>(bundle.Epics).Epics[2];
+
+        Assert.True(commands.UsesPhaseArguments);
+        Assert.Equal("/gsd-plan-phase", commands.Command("create-story"));
+        Assert.Equal("/gsd-execute-phase", commands.Command("dev-story"));
+        Assert.Equal("/gsd-code-review", commands.Command("code-review"));
+        Assert.Null(commands.Command("sprint-status"));
+        Assert.Equal("2.1", phase.WorkflowCommandArgument);
+        Assert.All(phase.Stories, story => Assert.Equal("2.1", story.WorkflowCommandArgument));
+    }
+
+    [Fact]
+    public void WorkflowCommands_MissingCommandDirectory_IsAnExplicitEmptyGsdCatalog()
+    {
+        var commands = Assert.IsType<CommandCatalog>(Ingest().WorkflowCommands);
+
+        Assert.Equal("GSD Core", commands.ModuleLabel);
+        Assert.True(commands.UsesPhaseArguments);
+        Assert.True(commands.IsEmpty);
+    }
+
     // ---- The synthetic ordinal and the story-id form (AC #3, D2) ------------------------------------------------
 
     /// <summary>AC #3's pin: BOTH the ordinal assignment AND the <c>{ordinal}.{plan}</c> story-id form, including a

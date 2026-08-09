@@ -794,7 +794,7 @@ public class BmadCommandsTests
         ["check-implementation-readiness"] = "/bmad-check-implementation-readiness",
     });
 
-    private static StoryInfo Story(string id, string? status) => new()
+    private static StoryInfo Story(string id, string? status, string? workflowCommandArgument = null) => new()
     {
         Id = id,
         EpicNumber = int.Parse(id.Split('.')[0]),
@@ -802,6 +802,7 @@ public class BmadCommandsTests
         UserStoryHtml = "",
         AcBlocksHtml = Array.Empty<string>(),
         Status = status,
+        WorkflowCommandArgument = workflowCommandArgument,
     };
 
     private static int CountClass(string html, string cssClass) =>
@@ -827,6 +828,23 @@ public class BmadCommandsTests
         Assert.Equal(1, CountNextStepPrimary(html));
         Assert.Contains("next-steps-cards", html);
         Assert.DoesNotContain("Other actions", html);
+    }
+
+    [Fact]
+    public void RenderNextSteps_GsdCatalog_UsesNativePhaseArgument()
+    {
+        var gsd = new CommandCatalog("GSD Core", new Dictionary<string, string>
+        {
+            ["dev-story"] = "/gsd-execute-phase",
+            ["code-review"] = "/gsd-code-review",
+        }, usesPhaseArguments: true);
+        var story = Story("3.1", "ready-for-dev", workflowCommandArgument: "2.1");
+
+        var html = BmadCommands.RenderNextSteps(story, gsd);
+
+        Assert.Contains("/gsd-execute-phase 2.1", html);
+        Assert.DoesNotContain("/gsd-execute-phase 3.1", html);
+        Assert.DoesNotContain("/bmad-", html);
     }
 
     [Fact]

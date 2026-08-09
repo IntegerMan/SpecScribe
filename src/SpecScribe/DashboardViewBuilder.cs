@@ -260,10 +260,9 @@ public static class DashboardViewBuilder
     /// <c>.explorer-layout</c> — the stacking breakpoint is raised for that panel rather than the labels shrunk.</summary>
     internal const int DashboardHierarchySize = 560;
 
-    /// <summary>Renders the Related-work details rail, or "" when there is nothing to relate. Kept here (not in the
-    /// adapter) so every surface renders identical bytes from one path. The relationship half is a pure read of the
-    /// cached work graph; the card layer adds the per-node title + one primary BMad command, both reused from the
-    /// existing command surface (AD-2), never re-derived. [Story 20.3]</summary>
+    /// <summary>Renders the Related-work details rail when the dashboard has selectable work. Kept here (not in the
+    /// adapter) so every surface renders identical bytes from one path. A missing relationship graph still leaves
+    /// story selection useful: cards retain title, lifecycle, task summary, command, and detail link. [Story 20.3]</summary>
     private static string BuildRelatedWorkHtml(
         WorkGraphModel? workGraph,
         EpicsModel? epicsModel,
@@ -273,7 +272,7 @@ public static class DashboardViewBuilder
         ProjectCounts counts,
         string projectTitle)
     {
-        if (workGraph is null || workGraph.IsEmpty || epicsModel is null) return string.Empty;
+        if (epicsModel is null || epicsModel.Epics.Count == 0) return string.Empty;
         // Same `expandDenseEpics: true` the Hierarchy Explorer uses, so the rail's selectable set is exactly what
         // the component can select — a story inside a dense epic included. Passing the collapsed set here would
         // give those stories a wedge to click and no card to show for it.
@@ -289,8 +288,10 @@ public static class DashboardViewBuilder
         // there rather than re-composing them is what stops the rail and the explorer breadcrumb drifting into two
         // names for one wedge. [Story 20.5; Story 20.8 D3]
         var pane = RelatedWorkCards.Build(
-            relationships, epicsModel, commands, geometry, counts, projectTitle, SiteNav.WorkGraphOutputPath,
-            selectableNodes: selectable);
+            relationships, epicsModel, commands, geometry, counts, projectTitle,
+            workGraph is { IsEmpty: false } ? SiteNav.WorkGraphOutputPath : null,
+            selectableNodes: selectable,
+            includeSelectableWithoutRelationships: true);
         return RelatedWorkTemplater.RenderPane(pane);
     }
 

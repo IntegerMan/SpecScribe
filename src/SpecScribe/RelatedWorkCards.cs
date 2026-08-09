@@ -84,7 +84,8 @@ public static class RelatedWorkCards
         ProjectCounts counts,
         string projectTitle,
         string? workGraphHref,
-        IReadOnlyList<SunburstExplorerNode>? selectableNodes = null)
+        IReadOnlyList<SunburstExplorerNode>? selectableNodes = null,
+        bool includeSelectableWithoutRelationships = false)
     {
         var project = new RelatedProjectCard(
             projectTitle,
@@ -92,7 +93,7 @@ public static class RelatedWorkCards
             epics is not null ? BmadCommands.PrimaryProjectCommand(epics, commands) : null,
             "Select a node in the chart for its related work, or open the full work graph.");
 
-        if (relationships.IsEmpty || epics is null)
+        if (epics is null || (relationships.IsEmpty && !includeSelectableWithoutRelationships))
             return new RelatedWorkPaneModel(project, Array.Empty<RelatedCard>(), workGraphHref, relationships.Overflow);
 
         var epicsByNumber = epics.Epics.ByFirst(e => e.Number);

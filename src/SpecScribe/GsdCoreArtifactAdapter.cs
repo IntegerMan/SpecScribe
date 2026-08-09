@@ -48,10 +48,9 @@ namespace SpecScribe;
 ///
 /// <para><b>The module ceiling.</b> <see cref="ArtifactBundle.Module"/> is <c>required</c> but
 /// <see cref="ModuleContext"/> is BMad-typed to the bone (a closed <c>BmadModule</c> enum keyed on
-/// <c>_bmad/{code}/</c>), so this adapter can only return <see cref="ModuleContext.None"/>. GSD's 67 slash commands
-/// ARE in the repo at <c>.claude/commands/gsd/</c> and would populate a command catalog well; they are blocked by
-/// the model, not by discoverability. That is a stated ceiling, named on the GSD framework page, not unfinished
-/// work.</para>
+/// <c>_bmad/{code}/</c>), so this adapter can only return <see cref="ModuleContext.None"/>. Its workflow catalog
+/// is deliberately separate: installed definitions under <c>.claude/commands/gsd/</c> populate GSD next-step
+/// prompts without fabricating BMad module documentation or glossary metadata.</para>
 /// [Story 12.2; ADR 0038]</summary>
 public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
 {
@@ -76,6 +75,17 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
     /// reading a non-markdown source is <c>ModuleContext.IsModulePresent</c>, which is BMad-keyed, so this file
     /// meets none of the machinery today. Reported as a boundary, not read.</summary>
     public const string ConfigFileName = "config.json";
+
+    private static readonly IReadOnlyDictionary<string, string> WorkflowCommandFiles =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["create-epics-and-stories"] = "plan-phase",
+            ["create-story"] = "plan-phase",
+            ["dev-story"] = "execute-phase",
+            ["code-review"] = "code-review",
+            ["sprint-status"] = "progress",
+            ["sprint-planning"] = "progress",
+        };
 
     // ---- ROADMAP.md grammar -------------------------------------------------------------------------------------
     // Every pattern below tolerates the inconsistencies the live reference repo actually contains: decimal and
@@ -158,6 +168,7 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
             // Gap 3: ModuleContext is BMad-typed (closed enum keyed on `_bmad/{code}/`), so a GSD repo can only
             // ever be None. Stated on the framework page as a ceiling rather than left looking unfinished.
             Module = ModuleContext.None,
+            WorkflowCommands = DiscoverWorkflowCommands(options),
             Sprint = sprint,
             // Honest absence, no diagnostic — see the class remarks.
             Retros = Array.Empty<RetroModel>(),
@@ -305,6 +316,7 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
                 {
                     Id = id,
                     EpicNumber = ordinal,
+                    WorkflowCommandArgument = phase.Number,
                     Title = MarkdownConverter.RenderInline(
                         plan.Description is { Length: > 0 } d ? d : Path.GetFileNameWithoutExtension(plan.FileName)),
                     // GSD plans carry no As-a/I-want narrative and no gherkin ACs. Honest absence: the card simply
@@ -341,6 +353,7 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
             epics.Add(new EpicInfo
             {
                 Number = ordinal,
+                WorkflowCommandArgument = phase.Number,
                 // The REAL label, so nothing about the ordinal hides which phase this is.
                 Title = MarkdownConverter.RenderInline($"Phase {phase.Number}: {phase.Title}"),
                 GoalHtml = phase.Goal is { Length: > 0 } g ? MarkdownConverter.RenderInline(g) : string.Empty,
@@ -370,6 +383,24 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
             Epics = epics,
             Milestones = BuildMilestones(roadmap),
         };
+    }
+
+    /// <summary>Discovers the GSD Core workflow commands actually installed in the repository. A missing command
+    /// file removes only its matching suggestion; it never falls back to a co-installed BMad command.</summary>
+    private static CommandCatalog DiscoverWorkflowCommands(ForgeOptions options)
+    {
+        var commandsRoot = Path.Combine(options.RepoRoot, ".claude", "commands", "gsd");
+        var commands = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (Directory.Exists(commandsRoot))
+        {
+            foreach (var (step, fileStem) in WorkflowCommandFiles)
+            {
+                if (File.Exists(Path.Combine(commandsRoot, fileStem + ".md")))
+                    commands[step] = "/gsd-" + fileStem;
+            }
+        }
+
+        return new CommandCatalog("GSD Core", commands, usesPhaseArguments: true);
     }
 
     /// <summary>The milestone bands (AC #4), in roadmap order, each naming the phase ordinals banded under it.

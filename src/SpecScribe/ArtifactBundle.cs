@@ -19,6 +19,11 @@ public sealed record ArtifactBundle
     /// reports an <see cref="AdapterDiagnosticCategory.Unsupported"/> diagnostic).</summary>
     public SprintStatus? Sprint { get; init; }
 
+    /// <summary>Workflow commands for the framework that produced the projected planning hierarchy. This stays
+    /// separate from <see cref="Module"/>'s BMad-specific documentation and glossary metadata, so a non-BMad
+    /// adapter can provide valid next-step commands without fabricating a BMad module identity.</summary>
+    public CommandCatalog? WorkflowCommands { get; init; }
+
     /// <summary>Parsed retrospectives, ordered by epic then filename (the adapter owns this normalization —
     /// downstream consumers must not re-sort). A retro file that fails to parse is reported as a diagnostic
     /// and omitted here; its siblings still appear (AC #2).</summary>

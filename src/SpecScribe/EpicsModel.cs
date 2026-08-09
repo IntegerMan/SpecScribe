@@ -45,6 +45,10 @@ public sealed class StoryInfo
     /// Set by <see cref="ProgressCalculator"/>.</summary>
     public string? Status { get; set; }
 
+    /// <summary>Framework-native identifier to pass to a workflow command when it differs from the shared
+    /// synthetic story id. Null keeps the existing <see cref="Id"/> argument behavior.</summary>
+    public string? WorkflowCommandArgument { get; init; }
+
     /// <summary>Generation-time recency for the story card: the story file's last git change date when
     /// deep-git matched the path, else the latest <c>## Change Log</c> ISO date, else null.
     /// Set by <see cref="ProgressCalculator"/>. Never a wall clock. [Story 8.8]</summary>
@@ -54,6 +58,10 @@ public sealed class StoryInfo
 public sealed class EpicInfo
 {
     public required int Number { get; init; }
+
+    /// <summary>Framework-native identifier to pass to a workflow command when it differs from the shared
+    /// synthetic epic ordinal. Null keeps the existing <see cref="Number"/> argument behavior.</summary>
+    public string? WorkflowCommandArgument { get; init; }
     public required string Title { get; init; }
     public required string GoalHtml { get; init; }
     public string? FrMetaHtml { get; init; }

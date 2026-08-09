@@ -727,6 +727,28 @@ public class HtmlRenderAdapterTests
         Assert.DoesNotContain("requirements.html#satisfaction", body);
     }
 
+    [Fact]
+    public void RenderDashboardBody_WithoutWorkGraph_KeepsTheStorySelectionPane()
+    {
+        var view = DashboardViewBuilder.Build(
+            Nav(),
+            ProgressModel.Empty,
+            RequirementsEpics(),
+            requirements: null,
+            CommandCatalog.Empty,
+            WorkInventory.Empty,
+            sprint: null,
+            coverage: null,
+            workGraph: WorkGraphModel.Empty);
+
+        var body = HtmlRenderAdapter.Shared.RenderDashboardBody(view);
+
+        Assert.Contains(RelatedWorkTemplater.PaneAttribute, body);
+        Assert.Contains("data-related-node=\"1.1\"", body);
+        Assert.Contains("Story 1.1: A", body);
+        Assert.DoesNotContain("View the full work graph", body);
+    }
+
     private static EpicsModel RequirementsEpics() => new()
     {
         OverviewHtml = string.Empty,

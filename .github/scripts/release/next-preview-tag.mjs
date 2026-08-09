@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // ADR 0040 §Decision 9 Stage A — allocate the next mainline preview tag.
 //
 // stdin: one existing tag per line. stdout: exactly one `vMAJOR.MINOR.PATCH-preview.N` tag.
