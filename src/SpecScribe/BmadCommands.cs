@@ -467,7 +467,7 @@ public static class BmadCommands
     }
 
     private static string? CommandForStory(CommandCatalog commands, string step, StoryInfo story) =>
-        commands.Command(step, commands.UsesPhaseArguments ? story.WorkflowCommandArgument : story.Id);
+        commands.Command(step, commands.UsesPhaseArguments && story.WorkflowCommandArgument is { Length: > 0 } arg ? arg : story.Id);
 
     private static string? CommandForEpic(CommandCatalog commands, string step, EpicInfo epic)
     {
