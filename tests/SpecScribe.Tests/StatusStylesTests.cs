@@ -63,6 +63,23 @@ public class StatusStylesTests
     }
 
     [Fact]
+    public void ForEpic_StorylessPreparedPhaseIsDrafted()
+    {
+        var phase = new EpicInfo
+        {
+            Number = 1,
+            Title = "Prepared GSD phase",
+            GoalHtml = string.Empty,
+            HasDiscussionLog = true,
+            Status = EpicStatus.Drafted,
+            Section = EpicSection.VerticalSlice,
+            Stories = Array.Empty<StoryInfo>(),
+        };
+
+        Assert.Equal("drafted", StatusStyles.ForEpic(phase));
+    }
+
+    [Fact]
     public void ForEpic_DoneOnlyWhenEveryStoryIsDone()
     {
         Assert.Equal("done", StatusStyles.ForEpic(Epic(EpicStatus.Drafted, Story("done"), Story("complete"))));

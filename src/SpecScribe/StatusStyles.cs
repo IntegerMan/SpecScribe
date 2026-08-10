@@ -164,7 +164,9 @@ public static class StatusStyles
     /// records the distinction so a later reader does not "align" them and break one. </para></summary>
     public static string ForEpic(EpicInfo epic)
     {
-        if (epic.Status == EpicStatus.Pending || epic.Stories.Count == 0) return "pending";
+        if (epic.Status == EpicStatus.Pending) return "pending";
+        if (epic.Stories.Count == 0)
+            return epic.HasDiscussionLog || epic.HasUiPlan ? "drafted" : "pending";
 
         var storyClasses = epic.Stories.Select(ForStory).ToList();
         if (storyClasses.All(c => c is "done" or "retired"))

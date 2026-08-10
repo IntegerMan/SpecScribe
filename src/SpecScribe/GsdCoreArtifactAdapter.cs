@@ -315,6 +315,8 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
             var ordinal = i + 1; // D2's synthetic sequential ordinal, in roadmap order.
             var stories = new List<StoryInfo>();
             var companionFiles = FindPhaseCompanionFiles(planningRoot, phase);
+            var hasDiscussionLog = companionFiles.DiscussionLogPath is not null;
+            var hasUiPlan = companionFiles.UiSpecPath is not null;
 
             foreach (var plan in phase.Plans)
             {
@@ -380,11 +382,13 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
                     ? $"<strong>Requirements:</strong> {MarkdownConverter.RenderInline(r)}"
                     : null,
                 PhaseContextHtml = ReadPlanningContext(companionFiles.ContextPath, companionFiles.UiSpecPath),
-                HasDiscussionLog = companionFiles.DiscussionLogPath is not null,
-                HasUiPlan = companionFiles.UiSpecPath is not null,
-                // Mirrors EpicsParser's own rule (`stories.Count > 0 ? Drafted : Pending`) rather than inventing a
-                // GSD-specific one — a phase with no plans listed is genuinely pending.
-                Status = stories.Count > 0 ? EpicStatus.Drafted : EpicStatus.Pending,
+                HasDiscussionLog = hasDiscussionLog,
+                HasUiPlan = hasUiPlan,
+                // A phase with recorded discussion or UI planning has advanced beyond not-started, even before
+                // its implementation plans exist. This is preparation progress, not delivery completion.
+                Status = stories.Count > 0 || hasDiscussionLog || hasUiPlan
+                    ? EpicStatus.Drafted
+                    : EpicStatus.Pending,
                 // GSD Core has no retrospective artifact or close-out workflow. Its ROADMAP completion checkbox
                 // is the terminal signal, so a completed phase must not remain in review forever.
                 RequiresRetrospective = false,

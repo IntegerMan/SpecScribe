@@ -383,6 +383,8 @@ public class GsdCoreArtifactAdapterTests : IDisposable
 
         Assert.True(phase.HasDiscussionLog);
         Assert.True(phase.HasUiPlan);
+        Assert.Equal(EpicStatus.Drafted, phase.Status);
+        Assert.Equal("drafted", StatusStyles.ForEpicWithRetrospective(phase));
         Assert.Contains("Phase Boundary", phase.PhaseContextHtml);
         Assert.Contains("Import text and markdown", phase.PhaseContextHtml);
         Assert.Contains("Implementation Decisions", phase.PhaseContextHtml);
