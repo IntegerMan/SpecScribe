@@ -17,6 +17,20 @@ Real-but-not-now items surfaced during reviews. Each is safe to leave; revisit w
 >   and `check:assets` — see CLAUDE.md § *Which gate is which*.
 > - Story **17.4** (Deferred-Work Burndown) is the story that owns disposing of everything still open here.
 
+## Deferred from: code review of 17-1-structural-and-consistency-remediation-sweep (2026-08-09)
+
+- source_spec: `17-1-structural-and-consistency-remediation-sweep.md`
+  summary: `Sunburst_CenterReportsEpicCountNotStoryCount` asserts over the **entire** rendered payload rather than the
+  centre node specifically, so it pins "the string `N epic(s)` appears somewhere" rather than "the centre reports the
+  epic count". Sound today only by accident of exclusivity: `HierarchyExplorer.cs:443`'s `ProjectRootKind` arm is the
+  only one emitting `N epic(s)` (the `"epic"` arm emits `N stor(y|ies)`), and the test does not encode that. It would
+  silently weaken the moment any other surface gains an "N epics" string — which is a live risk, because this is the
+  restored assertion for the repository's only `S2699` BLOCKER and the whole point of restoring it was that an
+  assertion-free test is worse than no test.
+  evidence: Blind Hunter, on the diff restoring the BLOCKER's assertions (commit `d6ba8f2`). Not actionable now — the
+  assertion is correct and does fail when pluralization is broken (the story verified this deliberately). Revisit when
+  `HierarchyExplorer`'s detail sentences are next touched, and scope the assertion to the root node's detail text.
+
 ## Deferred from: CI-unblocking work during 22-6-client-server-delta-channel's code review (2026-07-30)
 
 - source_spec: `23-4-migrate-remaining-surfaces-retire-c-sharp-html-adapter.md` (the story that owns this gate, NOT
