@@ -53,6 +53,9 @@ public sealed record DashboardView
     /// <summary>The project name — the page's <c>&lt;h1&gt;</c>.</summary>
     public required string SiteTitle { get; init; }
 
+    /// <summary>Framework-native names for the planning hierarchy shown by this dashboard.</summary>
+    public PlanningVocabulary PlanningVocabulary { get; init; } = PlanningVocabulary.Default;
+
     /// <summary>The headline stat-grid row (4 or 5 tiles; the 5th "Direct changes" tile is present only when
     /// there is quick-dev/deferred work).</summary>
     public required IReadOnlyList<StatTile> StatTiles { get; init; }

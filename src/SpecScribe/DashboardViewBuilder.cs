@@ -68,8 +68,10 @@ public static class DashboardViewBuilder
         UnplannedWorkGeometry? unplanned = null,
         DeliveryCadenceData? cadence = null,
         WorkGraphModel? workGraph = null,
-        TestArtifactsModel? testArtifacts = null)
+        TestArtifactsModel? testArtifacts = null,
+        PlanningVocabulary? planningVocabulary = null)
     {
+        var vocabulary = planningVocabulary ?? PlanningVocabulary.Default;
         // Production always passes the shared SiteGenerator ledger. Null → build an equivalent ephemeral
         // ledger from the same inputs so tests/stubs that omit counts keep correct Defined/Tracked numbers.
         var ledger = counts ?? ProjectCounts.Build(progress, sprint, work, epicsModel, requirements);
@@ -82,12 +84,13 @@ public static class DashboardViewBuilder
         return new DashboardView
         {
             SiteTitle = nav.SiteTitle,
-            StatTiles = BuildStatTiles(ledger, progress, work, epicsModel, sprint, hasTimeline, requirements),
-            NowNext = BuildNowNext(epicsModel, sprint),
+            PlanningVocabulary = vocabulary,
+            StatTiles = BuildStatTiles(ledger, progress, work, epicsModel, sprint, hasTimeline, requirements, vocabulary),
+            NowNext = BuildNowNext(epicsModel, sprint, vocabulary),
             Epics = epicsModel,
             Commands = commands,
             Progress = progress,
-            ProgressBars = BuildProgressBars(ledger),
+            ProgressBars = BuildProgressBars(ledger, vocabulary),
             Requirements = requirements,
             Coverage = coverage,
             QuickLinks = nav.QuickLinks.Select(q => new NavQuickLink(q.Label, q.OutputRelativePath, q.Description, q.Group)).ToList(),
@@ -305,7 +308,7 @@ public static class DashboardViewBuilder
     /// standalone view when that page exists. [Story 6.2; Story 8.3; Story 9.2 UX]</summary>
     private static IReadOnlyList<StatTile> BuildStatTiles(
         ProjectCounts c, ProgressModel p, WorkInventory work, EpicsModel? epicsModel, SprintStatus? sprint,
-        bool hasTimeline, RequirementsModel? requirements)
+        bool hasTimeline, RequirementsModel? requirements, PlanningVocabulary vocabulary)
     {
         var epicsHref = epicsModel is { Epics.Count: > 0 } ? SiteNav.EpicsOutputPath : null;
         // Stories defined → Requirements (traceability journey); tasks still prefer the sprint board when tracked.
@@ -333,13 +336,13 @@ public static class DashboardViewBuilder
             }
         }
 
-        tiles.Add(new($"{c.EpicsDrafted}/{c.EpicsDefined}", "Epics drafted",
-            Tooltip: "Epics with at least one story drafted, out of all epics.", Href: epicsHref));
-        tiles.Add(new(c.StoriesDefined.ToString(), "Stories defined", $"{c.StoriesWithArtifact} with a task plan",
-            "Stories listed across every epic; the sub-line counts those with a BMad task checklist.", storiesHref));
+        tiles.Add(new($"{c.EpicsDrafted}/{c.EpicsDefined}", $"{vocabulary.PrimaryPlural} drafted",
+            Tooltip: $"{vocabulary.PrimaryPlural} with at least one {vocabulary.SecondarySingular.ToLowerInvariant()} drafted, out of all {vocabulary.PrimaryPlural.ToLowerInvariant()}.", Href: epicsHref));
+        tiles.Add(new(c.StoriesDefined.ToString(), $"{vocabulary.SecondaryPlural} defined", $"{c.StoriesWithArtifact} with a task plan",
+            $"{vocabulary.SecondaryPlural} listed across every {vocabulary.PrimarySingular.ToLowerInvariant()}; the sub-line counts those with a task plan.", storiesHref));
         tiles.Add(c.TasksTotal > 0
             ? new($"{c.TasksDone}/{c.TasksTotal}", "Planned tasks done",
-                Tooltip: $"Checklist tasks done across the {c.StoriesWithArtifact} stories that have a task plan — not the whole project.",
+                Tooltip: $"Checklist tasks done across the {c.StoriesWithArtifact} {vocabulary.SecondaryPlural.ToLowerInvariant()} that have a task plan — not the whole project.",
                 Href: tasksHref)
             : new("—", "Planned tasks done", "none tracked yet", Href: tasksHref));
         tiles.Add(p.Git is { } git
@@ -352,9 +355,9 @@ public static class DashboardViewBuilder
             var deferredCount = c.DeferredOpenItems;
             var sub = work.Deferred is not null
                 ? $"{deferredCount} deferred {Charts.Plural(deferredCount, "item", "items")}"
-                : "outside the epic plan";
+                : $"outside the {vocabulary.PrimarySingular.ToLowerInvariant()} plan";
             tiles.Add(new(c.DirectChanges.ToString(), "Direct changes", sub,
-                "Quick-dev / one-shot changes and deferred-work notes — tracked separately from the epic/story plan, never counted as epic or story completion.",
+                $"Quick-dev / one-shot changes and deferred-work notes — tracked separately from the {vocabulary.PrimarySingular.ToLowerInvariant()}/{vocabulary.SecondarySingular.ToLowerInvariant()} plan, never counted as {vocabulary.PrimarySingular.ToLowerInvariant()} or {vocabulary.SecondarySingular.ToLowerInvariant()} completion.",
                 work.Deferred?.OutputPath));
         }
 
@@ -396,11 +399,11 @@ public static class DashboardViewBuilder
     // ----- Overall Progress bars ----------------------------------------------------------------------------
 
     /// <summary>The two "Overall Progress" bars, the tasks fork resolved — values from the ledger. [Story 6.2; Story 8.3]</summary>
-    private static IReadOnlyList<ProgressBarView> BuildProgressBars(ProjectCounts c) => new[]
+    private static IReadOnlyList<ProgressBarView> BuildProgressBars(ProjectCounts c, PlanningVocabulary vocabulary) => new[]
     {
-        new ProgressBarView("Planning", c.EpicsDrafted, c.EpicsDefined, $"{c.EpicsDrafted} / {c.EpicsDefined} epics"),
+        new ProgressBarView("Planning", c.EpicsDrafted, c.EpicsDefined, $"{c.EpicsDrafted} / {c.EpicsDefined} {vocabulary.PrimaryPlural.ToLowerInvariant()}"),
         c.TasksTotal > 0
-            ? new ProgressBarView("Implementation", c.TasksDone, c.TasksTotal, $"{c.TasksDone} / {c.TasksTotal} tasks ({c.StoriesWithArtifact} of {c.StoriesDefined} stories planned)")
+            ? new ProgressBarView("Implementation", c.TasksDone, c.TasksTotal, $"{c.TasksDone} / {c.TasksTotal} tasks ({c.StoriesWithArtifact} of {c.StoriesDefined} {vocabulary.SecondaryPlural.ToLowerInvariant()} planned)")
             : new ProgressBarView("Implementation", 0, 0, "not started"),
     };
 
@@ -409,7 +412,7 @@ public static class DashboardViewBuilder
     /// <summary>The "Now &amp; Next" panel view, or null when it is omitted. Reproduces <c>AppendNowAndNext</c>'s
     /// gating: nothing without an epics model; the sprint board when a sprint is tracked; otherwise the derived
     /// in-dev/review/up-next/next-to-draft cards (and null when even those are empty). [Story 6.2]</summary>
-    private static DashboardNowNext? BuildNowNext(EpicsModel? epicsModel, SprintStatus? sprint)
+    private static DashboardNowNext? BuildNowNext(EpicsModel? epicsModel, SprintStatus? sprint, PlanningVocabulary vocabulary)
     {
         if (epicsModel is null) return null;
 
@@ -440,36 +443,36 @@ public static class DashboardViewBuilder
         foreach (var (epic, story) in inDev)
         {
             cards.Add(new NowNextCard("active", "In development",
-                $"Story {story.Id} · {PathUtil.StripHtmlTags(story.Title)}",
+                $"{vocabulary.SecondarySingular} {story.Id} · {PathUtil.StripHtmlTags(story.Title)}",
                 story.ArtifactOutputPath ?? $"epics/epic-{epic.Number}.html"));
         }
 
         foreach (var (epic, story) in inReview)
         {
             cards.Add(new NowNextCard("review", "In review",
-                $"Story {story.Id} · {PathUtil.StripHtmlTags(story.Title)}",
+                $"{vocabulary.SecondarySingular} {story.Id} · {PathUtil.StripHtmlTags(story.Title)}",
                 story.ArtifactOutputPath ?? $"epics/epic-{epic.Number}.html"));
         }
 
         foreach (var (epic, story) in upNext)
         {
             cards.Add(new NowNextCard("ready", "Up next",
-                $"Story {story.Id} · {PathUtil.StripHtmlTags(story.Title)}",
+                $"{vocabulary.SecondarySingular} {story.Id} · {PathUtil.StripHtmlTags(story.Title)}",
                 story.ArtifactOutputPath ?? $"epics/epic-{epic.Number}.html"));
         }
 
         if (nextStoryToDraft.Story is not null)
         {
             var (epic, story) = nextStoryToDraft;
-            cards.Add(new NowNextCard("drafted", "Next story to draft",
-                $"Story {story.Id} · {PathUtil.StripHtmlTags(story.Title)}",
+            cards.Add(new NowNextCard("drafted", $"Next {vocabulary.SecondarySingular.ToLowerInvariant()} to draft",
+                $"{vocabulary.SecondarySingular} {story.Id} · {PathUtil.StripHtmlTags(story.Title)}",
                 story.ArtifactOutputPath ?? $"epics/epic-{epic.Number}.html"));
         }
 
         if (nextEpicToDraft is not null)
         {
-            cards.Add(new NowNextCard("pending", "Next epic to draft",
-                $"Epic {nextEpicToDraft.Number} · {PathUtil.StripHtmlTags(nextEpicToDraft.Title)}",
+            cards.Add(new NowNextCard("pending", $"Next {vocabulary.PrimarySingular.ToLowerInvariant()} to draft",
+                $"{vocabulary.PrimarySingular} {nextEpicToDraft.Number} · {PathUtil.StripHtmlTags(nextEpicToDraft.Title)}",
                 $"epics/epic-{nextEpicToDraft.Number}.html"));
         }
 

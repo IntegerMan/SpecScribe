@@ -114,6 +114,8 @@ public sealed record EpicsIndexView
     /// <summary>The project name — the header subtitle.</summary>
     public required string SiteTitle { get; init; }
 
+    public PlanningVocabulary PlanningVocabulary { get; init; } = PlanningVocabulary.Default;
+
     /// <summary>Total epic count (header subtitle).</summary>
     public required int EpicCount { get; init; }
 
@@ -172,6 +174,8 @@ public sealed record EpicPageView
 {
     /// <summary>The epic number (header kicker).</summary>
     public required int Number { get; init; }
+
+    public PlanningVocabulary PlanningVocabulary { get; init; } = PlanningVocabulary.Default;
 
     /// <summary>The epic title as already-projected HTML (the <c>&lt;h1&gt;</c>).</summary>
     public required string TitleHtml { get; init; }
@@ -302,6 +306,8 @@ public sealed record StoryPageView
     /// <summary>The story id "N.M".</summary>
     public required string Id { get; init; }
 
+    public PlanningVocabulary PlanningVocabulary { get; init; } = PlanningVocabulary.Default;
+
     /// <summary>The story title as already-projected HTML (the <c>&lt;h1&gt;</c>).</summary>
     public required string TitleHtml { get; init; }
 
@@ -383,6 +389,8 @@ public sealed record StoryPlaceholderView
 {
     /// <summary>The story id "N.M".</summary>
     public required string Id { get; init; }
+
+    public PlanningVocabulary PlanningVocabulary { get; init; } = PlanningVocabulary.Default;
 
     /// <summary>The story title as already-projected HTML (the <c>&lt;h1&gt;</c>).</summary>
     public required string TitleHtml { get; init; }

@@ -184,6 +184,7 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
             // ever be None. Stated on the framework page as a ceiling rather than left looking unfinished.
             Module = ModuleContext.None,
             WorkflowCommands = DiscoverWorkflowCommands(options),
+            PlanningVocabulary = PlanningVocabulary.GsdCore,
             Sprint = sprint,
             // Honest absence, no diagnostic — see the class remarks.
             Retros = Array.Empty<RetroModel>(),

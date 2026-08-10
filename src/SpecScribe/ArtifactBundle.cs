@@ -24,6 +24,10 @@ public sealed record ArtifactBundle
     /// adapter can provide valid next-step commands without fabricating a BMad module identity.</summary>
     public CommandCatalog? WorkflowCommands { get; init; }
 
+    /// <summary>Framework-native display names for the normalized epic/story hierarchy. Defaults to BMad's
+    /// Epic/Story terminology so existing adapters and callers retain their current output.</summary>
+    public PlanningVocabulary PlanningVocabulary { get; init; } = PlanningVocabulary.Default;
+
     /// <summary>Parsed retrospectives, ordered by epic then filename (the adapter owns this normalization —
     /// downstream consumers must not re-sort). A retro file that fails to parse is reported as a diagnostic
     /// and omitted here; its siblings still appear (AC #2).</summary>

@@ -557,6 +557,28 @@ public class GsdCoreArtifactAdapterTests : IDisposable
         Assert.True(SiteRegion.Exists(Site, "phases/01-identity-and-scope/01-01-SUMMARY.html"));
     }
 
+    [Fact]
+    public void GenerateAll_UsesGsdPhaseAndPlanVocabularyAcrossPlanningSurfaces()
+    {
+        var bundle = Ingest();
+        Assert.Equal(PlanningVocabulary.GsdCore, bundle.PlanningVocabulary);
+
+        var generator = new SiteGenerator(Options());
+        Assert.False(generator.GenerateAll().Any(e => e.Outcome == GenerationOutcome.Error));
+
+        var dashboard = SiteRegion.Read(Site, "index.html");
+        var index = SiteRegion.Read(Site, "epics.html");
+        var phase = SiteRegion.Read(Site, "epics/epic-1.html");
+        var plan = SiteRegion.Read(Site, "epics/story-1-0.html");
+
+        Assert.Contains("Phases drafted", dashboard);
+        Assert.Contains("Plans defined", dashboard);
+        Assert.Contains("Phases &amp; Plans", index);
+        Assert.DoesNotContain("Epics &amp; Stories", index);
+        Assert.Contains("Phase 1", phase);
+        Assert.Contains("Plan 1.0", plan);
+    }
+
     // ---- Finding #7: three disagreeing completion signals -------------------------------------------------------
 
     /// <summary>The roadmap marks 4 of 6 plans complete; STATE.md claims 3 of 5; one summary file exists. Exactly

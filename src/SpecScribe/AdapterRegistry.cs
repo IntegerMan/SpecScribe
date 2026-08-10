@@ -98,6 +98,7 @@ public sealed class AdapterRegistry
         string? epicsSource = null;
         string? epicsOwner = null;
         CommandCatalog? workflowCommands = null;
+        var planningVocabulary = PlanningVocabulary.Default;
 
         foreach (var (adapter, bundle) in bundles)
         {
@@ -123,6 +124,7 @@ public sealed class AdapterRegistry
                     epicsSource = bundle.EpicsSourceFullPath;
                     epicsOwner = name;
                     workflowCommands = bundle.WorkflowCommands;
+                    planningVocabulary = bundle.PlanningVocabulary;
                 }
                 else
                 {
@@ -148,6 +150,7 @@ public sealed class AdapterRegistry
         {
             Module = module,
             WorkflowCommands = workflowCommands,
+            PlanningVocabulary = planningVocabulary,
             Sprint = sprint,
             Retros = retros,
             Epics = epics,

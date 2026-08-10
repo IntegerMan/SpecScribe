@@ -13,12 +13,13 @@ public static class EpicsTemplater
     /// split of <see cref="RenderIndex"/> (bytes unchanged: it now just feeds this through the HTML adapter) that
     /// lets the webview surface render the SAME page model through <see cref="WebviewRenderAdapter"/> instead of
     /// duplicating the view/PageView assembly. Same split as the other <c>Build*Page</c> methods here. [Story 6.4]</summary>
-    public static PageView BuildIndexPage(EpicsModel model, ProgressModel progress, SiteNav nav, CommandCatalog commands, ProjectCounts? counts = null, FollowUpGeometry? followUps = null, UnplannedWorkGeometry? unplanned = null)
+    public static PageView BuildIndexPage(EpicsModel model, ProgressModel progress, SiteNav nav, CommandCatalog commands, ProjectCounts? counts = null, FollowUpGeometry? followUps = null, UnplannedWorkGeometry? unplanned = null, PlanningVocabulary? planningVocabulary = null)
     {
+        var vocabulary = planningVocabulary ?? PlanningVocabulary.Default;
         const string outputPath = SiteNav.EpicsOutputPath;
-        var breadcrumb = BreadcrumbTrail.From(new (string, string?)[] { ("Home", "index.html"), ("Epics", null) });
+        var breadcrumb = BreadcrumbTrail.From(new (string, string?)[] { ("Home", "index.html"), (vocabulary.PrimaryPlural, null) });
 
-        var view = EpicsViewBuilder.BuildIndex(model, progress, nav, commands, counts, followUps, unplanned);
+        var view = EpicsViewBuilder.BuildIndex(model, progress, nav, commands, counts, followUps, unplanned, vocabulary);
         var body = HtmlRenderAdapter.Shared.RenderEpicsIndexBody(view);
 
         // The epics index drills down to each epic page; its parent is Home (from the breadcrumb). The roadmap
@@ -28,7 +29,7 @@ public static class EpicsTemplater
         {
             Kind = PageKind.Epics,
             OutputRelativePath = outputPath,
-            Title = $"Epics & Stories — {nav.SiteTitle}",
+            Title = $"{vocabulary.PrimaryPlural} & {vocabulary.SecondaryPlural} — {nav.SiteTitle}",
             Nav = nav.ToNavigationView(outputPath, nav.BuildDeliveryLocalContext(outputPath)),
             Breadcrumb = breadcrumb,
             Assets = new AssetManifest
@@ -59,15 +60,16 @@ public static class EpicsTemplater
 
     /// <summary>Builds an epic page's <see cref="PageView"/> — see <see cref="BuildIndexPage"/> for why the
     /// build/render split exists. [Story 6.4]</summary>
-    public static PageView BuildEpicPage(EpicInfo epic, EpicProgress progress, SiteNav nav, CommandCatalog commands, string? epicRetroPath = null, EntityPager? pager = null, FollowUpGeometry? followUps = null, UnplannedWorkGeometry? unplanned = null, PlanningCodeImpactData? impact = null, WorkGraphEpic? workGraph = null)
+    public static PageView BuildEpicPage(EpicInfo epic, EpicProgress progress, SiteNav nav, CommandCatalog commands, string? epicRetroPath = null, EntityPager? pager = null, FollowUpGeometry? followUps = null, UnplannedWorkGeometry? unplanned = null, PlanningCodeImpactData? impact = null, WorkGraphEpic? workGraph = null, PlanningVocabulary? planningVocabulary = null)
     {
+        var vocabulary = planningVocabulary ?? PlanningVocabulary.Default;
         var outputPath = $"epics/epic-{epic.Number}.html";
         var epicClass = StatusStyles.ForEpicWithRetrospective(epic);
 
         var breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
         {
             ("Home", "index.html"),
-            ("Epics", SiteNav.EpicsOutputPath),
+            (vocabulary.PrimaryPlural, SiteNav.EpicsOutputPath),
             (EpicCrumbLabel(epic), null),
         });
 
@@ -75,7 +77,7 @@ public static class EpicsTemplater
         // body renderer wraps the content in the "Overview | Work Graph" tab (below the header, inside page-main).
         // Absent subgraph → page unchanged (no empty tab).
         var view = EpicsViewBuilder.BuildEpic(epic, progress, commands, epicRetroPath, followUps, unplanned, impact,
-            workGraph?.Reprefixed(PathUtil.RelativePrefix(outputPath)));
+            workGraph?.Reprefixed(PathUtil.RelativePrefix(outputPath)), vocabulary);
         var body = HtmlRenderAdapter.Shared.RenderEpicBody(view);
 
         // An epic drills up to the epics index and down to each of its story pages (drafted → the story's
@@ -87,8 +89,8 @@ public static class EpicsTemplater
         {
             Kind = PageKind.Epic,
             OutputRelativePath = outputPath,
-            Title = $"Epic {epic.Number}: {PathUtil.StripHtmlTags(epic.Title)} — {nav.SiteTitle}",
-            Nav = nav.ToNavigationView(outputPath, BuildStoriesLocalContext(epic, outputPath, "Stories in this epic", activeStoryId: null)),
+            Title = $"{vocabulary.PrimarySingular} {epic.Number}: {PathUtil.StripHtmlTags(epic.Title)} — {nav.SiteTitle}",
+            Nav = nav.ToNavigationView(outputPath, BuildStoriesLocalContext(epic, outputPath, $"{vocabulary.SecondaryPlural} in this {vocabulary.PrimarySingular.ToLowerInvariant()}", activeStoryId: null, vocabulary)),
             Breadcrumb = breadcrumb,
             Pager = pager,
             Assets = new AssetManifest
@@ -139,12 +141,13 @@ public static class EpicsTemplater
         EntityPager? pager = null,
         FollowUpGeometry? followUps = null,
         PlanningCodeImpactData? impact = null,
-        WorkGraphEpic? workGraph = null)
+        WorkGraphEpic? workGraph = null,
+        PlanningVocabulary? planningVocabulary = null)
         => BuildStoryPage(
             epic, story, artifactSourceRelativePath, blurbHtml, remainderHtml,
             acceptanceCriteria, devAgentRecord, tasks, Array.Empty<StoryDetailSection>(),
             reviewFindingsHtml, changeLogHtml, evidence, changeSurface, nav, commands,
-            epicRetroPath, pager, followUps, impact, workGraph);
+            epicRetroPath, pager, followUps, impact, workGraph, planningVocabulary);
 
     /// <summary>Builds a drafted story page with source-specific completion detail. [Story 26.6]</summary>
     public static PageView BuildStoryPage(
@@ -167,8 +170,10 @@ public static class EpicsTemplater
         EntityPager? pager = null,
         FollowUpGeometry? followUps = null,
         PlanningCodeImpactData? impact = null,
-        WorkGraphEpic? workGraph = null)
+        WorkGraphEpic? workGraph = null,
+        PlanningVocabulary? planningVocabulary = null)
     {
+        var vocabulary = planningVocabulary ?? PlanningVocabulary.Default;
         var outputPath = story.ArtifactOutputPath
             ?? throw new InvalidOperationException($"RenderStory called for story {story.Id} with no resolved artifact.");
         var epicOutputPath = $"epics/epic-{epic.Number}.html";
@@ -177,9 +182,9 @@ public static class EpicsTemplater
         var breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
         {
             ("Home", "index.html"),
-            ("Epics", SiteNav.EpicsOutputPath),
+            (vocabulary.PrimaryPlural, SiteNav.EpicsOutputPath),
             (EpicCrumbLabel(epic), epicOutputPath),
-            ($"Story {story.Id}", null),
+            ($"{vocabulary.SecondarySingular} {story.Id}", null),
         });
 
         // Story 19.2: pass this story's provenance subgraph (re-prefixed for the epics/ depth) into the view so the
@@ -187,7 +192,7 @@ public static class EpicsTemplater
         var view = EpicsViewBuilder.BuildStory(
             epic, story, blurbHtml, remainderHtml, acceptanceCriteria, devAgentRecord, tasks,
             completionSummarySections, reviewFindingsHtml, changeLogHtml, evidence, changeSurface, commands, epicRetroPath, followUps, impact,
-            workGraph?.Reprefixed(PathUtil.RelativePrefix(outputPath)));
+            workGraph?.Reprefixed(PathUtil.RelativePrefix(outputPath)), vocabulary);
         var body = HtmlRenderAdapter.Shared.RenderStoryBody(view);
 
         // A story is a drill leaf (no children); it drills up to its epic page. Its status stage is the story
@@ -197,8 +202,8 @@ public static class EpicsTemplater
         {
             Kind = PageKind.Story,
             OutputRelativePath = outputPath,
-            Title = $"Story {story.Id}: {PathUtil.StripHtmlTags(story.Title)} — {nav.SiteTitle}",
-            Nav = nav.ToNavigationView(outputPath, BuildStoriesLocalContext(epic, outputPath, $"Stories in Epic {epic.Number}", story.Id)),
+            Title = $"{vocabulary.SecondarySingular} {story.Id}: {PathUtil.StripHtmlTags(story.Title)} — {nav.SiteTitle}",
+            Nav = nav.ToNavigationView(outputPath, BuildStoriesLocalContext(epic, outputPath, $"{vocabulary.SecondaryPlural} in {vocabulary.PrimarySingular} {epic.Number}", story.Id, vocabulary)),
             Breadcrumb = breadcrumb,
             Pager = pager,
             Assets = new AssetManifest
@@ -229,8 +234,9 @@ public static class EpicsTemplater
 
     /// <summary>Builds an undrafted story's placeholder <see cref="PageView"/> — see <see cref="BuildIndexPage"/>
     /// for why the build/render split exists. [Story 6.4]</summary>
-    public static PageView BuildStoryPlaceholderPage(EpicInfo epic, StoryInfo story, SiteNav nav, CommandCatalog commands, string? epicRetroPath = null, EntityPager? pager = null)
+    public static PageView BuildStoryPlaceholderPage(EpicInfo epic, StoryInfo story, SiteNav nav, CommandCatalog commands, string? epicRetroPath = null, EntityPager? pager = null, PlanningVocabulary? planningVocabulary = null)
     {
+        var vocabulary = planningVocabulary ?? PlanningVocabulary.Default;
         var outputPath = StoryEpicLinkifier.StoryPagePath(story.Id);
         var epicOutputPath = $"epics/epic-{epic.Number}.html";
         var prefix = PathUtil.RelativePrefix(outputPath);
@@ -238,12 +244,12 @@ public static class EpicsTemplater
         var breadcrumb = BreadcrumbTrail.From(new (string, string?)[]
         {
             ("Home", "index.html"),
-            ("Epics", SiteNav.EpicsOutputPath),
+            (vocabulary.PrimaryPlural, SiteNav.EpicsOutputPath),
             (EpicCrumbLabel(epic), epicOutputPath),
-            ($"Story {story.Id}", null),
+            ($"{vocabulary.SecondarySingular} {story.Id}", null),
         });
 
-        var view = EpicsViewBuilder.BuildStoryPlaceholder(epic, story, commands, epicRetroPath);
+        var view = EpicsViewBuilder.BuildStoryPlaceholder(epic, story, commands, epicRetroPath, vocabulary);
         var body = HtmlRenderAdapter.Shared.RenderStoryPlaceholderBody(view);
 
         // A placeholder story page always renders a "Not yet drafted" status badge, so its stage is the story
@@ -252,8 +258,8 @@ public static class EpicsTemplater
         {
             Kind = PageKind.Story,
             OutputRelativePath = outputPath,
-            Title = $"Story {story.Id}: {PathUtil.StripHtmlTags(story.Title)} — {nav.SiteTitle}",
-            Nav = nav.ToNavigationView(outputPath, BuildStoriesLocalContext(epic, outputPath, $"Stories in Epic {epic.Number}", story.Id)),
+            Title = $"{vocabulary.SecondarySingular} {story.Id}: {PathUtil.StripHtmlTags(story.Title)} — {nav.SiteTitle}",
+            Nav = nav.ToNavigationView(outputPath, BuildStoriesLocalContext(epic, outputPath, $"{vocabulary.SecondaryPlural} in {vocabulary.PrimarySingular} {epic.Number}", story.Id, vocabulary)),
             Breadcrumb = breadcrumb,
             Pager = pager,
             Assets = new AssetManifest
@@ -286,12 +292,13 @@ public static class EpicsTemplater
     /// (already resolved on <c>epic.Stories</c>, the exact href expression <see cref="BuildEpicPage"/> already
     /// uses for <c>ChildTargets</c>), no recomputation. On the epic page no story is "current" (all inactive); on
     /// a story/placeholder page the current story is marked active. [Story 10.10]</summary>
-    private static NavLocalContext BuildStoriesLocalContext(EpicInfo epic, string outputPath, string title, string? activeStoryId)
+    private static NavLocalContext BuildStoriesLocalContext(EpicInfo epic, string outputPath, string title, string? activeStoryId,
+        PlanningVocabulary vocabulary)
     {
         var prefix = PathUtil.RelativePrefix(outputPath);
         var items = epic.Stories
             .Select(s => new NavLocalItem(
-                $"Story {s.Id}",
+                $"{vocabulary.SecondarySingular} {s.Id}",
                 prefix + (s.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(s.Id)),
                 activeStoryId is not null && string.Equals(s.Id, activeStoryId, StringComparison.OrdinalIgnoreCase)))
             .ToList();

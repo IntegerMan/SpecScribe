@@ -173,11 +173,11 @@ public static class HtmlTemplater
     /// split of <see cref="RenderIndex"/> (which now just feeds this through the HTML adapter, bytes unchanged)
     /// that lets the webview surface render the SAME page model through its own <see cref="IRenderAdapter"/>
     /// instead of duplicating the view/PageView assembly. [Story 6.4]</summary>
-    public static PageView BuildIndexPage(IReadOnlyList<DocModel> docs, SiteNav nav, ProgressModel progress, EpicsModel? epicsModel, RequirementsModel? requirements, IReadOnlyList<AdrEntry> adrs, CommandCatalog commands, WorkInventory? work = null, SprintStatus? sprint = null, IReadOnlyList<RetroModel>? retros = null, ArtifactCoverage? coverage = null, bool hasTimeline = false, Func<string, string?>? codeItemHref = null, ProjectCounts? counts = null, FollowUpGeometry? followUps = null, UnplannedWorkGeometry? unplanned = null, DateOnly? today = null, DeliveryCadenceData? cadence = null, WorkGraphModel? workGraph = null, DateOnly? dateCutoff = null, TestArtifactsModel? testArtifacts = null)
+    public static PageView BuildIndexPage(IReadOnlyList<DocModel> docs, SiteNav nav, ProgressModel progress, EpicsModel? epicsModel, RequirementsModel? requirements, IReadOnlyList<AdrEntry> adrs, CommandCatalog commands, WorkInventory? work = null, SprintStatus? sprint = null, IReadOnlyList<RetroModel>? retros = null, ArtifactCoverage? coverage = null, bool hasTimeline = false, Func<string, string?>? codeItemHref = null, ProjectCounts? counts = null, FollowUpGeometry? followUps = null, UnplannedWorkGeometry? unplanned = null, DateOnly? today = null, DeliveryCadenceData? cadence = null, WorkGraphModel? workGraph = null, DateOnly? dateCutoff = null, TestArtifactsModel? testArtifacts = null, PlanningVocabulary? planningVocabulary = null)
     {
         var inventory = work ?? WorkInventory.Empty;
 
-        var view = DashboardViewBuilder.Build(nav, progress, epicsModel, requirements, commands, inventory, sprint, coverage, hasTimeline, counts, followUps, unplanned, cadence, workGraph, testArtifacts);
+        var view = DashboardViewBuilder.Build(nav, progress, epicsModel, requirements, commands, inventory, sprint, coverage, hasTimeline, counts, followUps, unplanned, cadence, workGraph, testArtifacts, planningVocabulary);
         var body = HtmlRenderAdapter.Shared.RenderDashboardBody(view, codeItemHref, today, dateCutoff);
 
         // Home carries a descriptive title (sub-pages are already "Title — Site") + OG/description, no

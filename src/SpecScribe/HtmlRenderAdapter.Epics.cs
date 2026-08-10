@@ -19,7 +19,7 @@ public sealed partial class HtmlRenderAdapter
 
         sb.Append("<main id=\"main-content\">\n");
         sb.Append("<header class=\"doc-header\">\n");
-        sb.Append("  <h1>Epics &amp; Stories</h1>\n");
+        sb.Append($"  <h1>{PathUtil.Html(view.PlanningVocabulary.PrimaryPlural)} &amp; {PathUtil.Html(view.PlanningVocabulary.SecondaryPlural)}</h1>\n");
         // Story 8.7: the epic/drafted count restatement is trimmed here — the stat-grid tiles below
         // (AppendEpicsProgressPanel) are the single authoritative count display. The subtitle keeps only
         // the site title; no count source or view-model field changes.
@@ -27,7 +27,7 @@ public sealed partial class HtmlRenderAdapter
         sb.Append("</header>\n\n");
 
         sb.Append("<section class=\"dashboard\">\n");
-        AppendEpicsProgressPanel(sb, view.Progress, view.Counts);
+        AppendEpicsProgressPanel(sb, view.Progress, view.Counts, view.PlanningVocabulary);
         // The component supplies its own framed panel (heading, framing sentence, legend) — this call site no
         // longer hand-writes any of it (ADR 0012 §2). Built in EpicsViewBuilder, never here (AD-2).
         //
@@ -85,7 +85,7 @@ public sealed partial class HtmlRenderAdapter
             sb.Append("<div class=\"section-divider\">All Epics</div>\n\n");
             foreach (var epic in model.Epics)
             {
-                AppendEpicCard(sb, epic, view.Commands);
+                AppendEpicCard(sb, epic, view.Commands, view.PlanningVocabulary);
             }
         }
 
@@ -107,18 +107,18 @@ public sealed partial class HtmlRenderAdapter
     /// <summary>The epics-index progress panel (stat-grid + Epic Status donut + mosaic). Headline counts come
     /// from the portal-wide ledger; the mosaic still needs per-epic detail from <paramref name="progress"/>.
     /// Donut segment values are the ledger fields; their sum is the structural total. [Story 6.2; Story 8.3]</summary>
-    private void AppendEpicsProgressPanel(StringBuilder sb, ProgressModel progress, ProjectCounts counts)
+    private void AppendEpicsProgressPanel(StringBuilder sb, ProgressModel progress, ProjectCounts counts, PlanningVocabulary vocabulary)
     {
         sb.Append("<div class=\"stat-grid\">\n");
-        sb.Append(Charts.StatCard($"{counts.EpicsDrafted}/{counts.EpicsDefined}", "Epics drafted"));
-        sb.Append(Charts.StatCard(counts.StoriesDefined.ToString(), "Stories defined", $"{counts.StoriesWithArtifact} with a task plan"));
+        sb.Append(Charts.StatCard($"{counts.EpicsDrafted}/{counts.EpicsDefined}", $"{vocabulary.PrimaryPlural} drafted"));
+        sb.Append(Charts.StatCard(counts.StoriesDefined.ToString(), $"{vocabulary.SecondaryPlural} defined", $"{counts.StoriesWithArtifact} with a task plan"));
         sb.Append(counts.TasksTotal > 0
             ? Charts.StatCard($"{counts.TasksDone}/{counts.TasksTotal}", "Tasks done", $"across {counts.StoriesWithArtifact} planned stor{(counts.StoriesWithArtifact == 1 ? "y" : "ies")}")
             : Charts.StatCard("—", "Tasks done", "none tracked yet"));
         sb.Append("</div>\n\n");
 
         sb.Append("<div class=\"chart-panel\">\n");
-        sb.Append("<div class=\"chart-panel-header-row\"><h3>Epic Status");
+        sb.Append($"<div class=\"chart-panel-header-row\"><h3>{PathUtil.Html(vocabulary.PrimarySingular)} Status");
         sb.Append(StatusStyles.LegendKey());
         sb.Append("</h3></div>\n<div class=\"donut-and-legend\">\n");
         var epicStatusSegments = new (string Label, int Value, string CssClass)[]
@@ -128,11 +128,11 @@ public sealed partial class HtmlRenderAdapter
         };
         // Structural: segments are the ledger fields; EpicsDrafted + EpicsPending partition EpicsDefined
         // (every epic is Drafted or Pending — see ProgressCalculator).
-        sb.Append(Charts.Donut(epicStatusSegments, ariaLabel: $"Epic status: {counts.EpicsDrafted} drafted, {counts.EpicsPending} pending"));
+        sb.Append(Charts.Donut(epicStatusSegments, ariaLabel: $"{vocabulary.PrimarySingular} status: {counts.EpicsDrafted} drafted, {counts.EpicsPending} pending"));
         sb.Append(Charts.DonutLegend(epicStatusSegments));
         sb.Append("</div>\n</div>\n\n");
 
-        sb.Append("<div class=\"chart-panel\">\n<h3>Progress by Epic</h3>\n");
+        sb.Append($"<div class=\"chart-panel\">\n<h3>Progress by {PathUtil.Html(vocabulary.PrimarySingular)}</h3>\n");
         sb.Append(Charts.EpicMosaic(progress.PerEpic, e => $"epics/epic-{e.Number}.html"));
         sb.Append("</div>\n\n");
     }
@@ -200,11 +200,11 @@ public sealed partial class HtmlRenderAdapter
         sb.Append("</div>\n\n");
     }
 
-    private void AppendEpicCard(StringBuilder sb, EpicInfo epic, CommandCatalog commands)
+    private void AppendEpicCard(StringBuilder sb, EpicInfo epic, CommandCatalog commands, PlanningVocabulary vocabulary)
     {
         var statusCls = StatusStyles.ForEpicWithRetrospective(epic);
         sb.Append($"<div class=\"epic-card\" id=\"epic-{epic.Number}\">\n");
-        sb.Append($"  <h2><span class=\"epic-num\">Epic {epic.Number}</span> {epic.Title} <span class=\"epic-status {statusCls}\">{PathUtil.Html(StatusStyles.EpicLabel(statusCls))}</span></h2>\n");
+        sb.Append($"  <h2><span class=\"epic-num\">{PathUtil.Html(vocabulary.PrimarySingular)} {epic.Number}</span> {epic.Title} <span class=\"epic-status {statusCls}\">{PathUtil.Html(StatusStyles.EpicLabel(statusCls))}</span></h2>\n");
 
         if (epic.GoalHtml.Length > 0)
         {
@@ -218,11 +218,11 @@ public sealed partial class HtmlRenderAdapter
         {
             var note = WorkflowCommands.InlineGuidance(
                 WorkflowCommands.PrimaryEpicCommand(epic, commands),
-                "Stories not yet drafted — draft them with",
-                "Stories not yet drafted.");
+                $"{vocabulary.SecondaryPlural} not yet drafted — draft them with",
+                $"{vocabulary.SecondaryPlural} not yet drafted.");
             sb.Append($"  <div class=\"pending-note\">{note}</div>\n");
         }
-        sb.Append($"  <a class=\"view-epic-link\" href=\"epics/epic-{epic.Number}.html\">View Epic {epic.Number} stories &rarr;</a>\n");
+        sb.Append($"  <a class=\"view-epic-link\" href=\"epics/epic-{epic.Number}.html\">View {PathUtil.Html(vocabulary.PrimarySingular)} {epic.Number} {PathUtil.Html(vocabulary.SecondaryPlural.ToLowerInvariant())} &rarr;</a>\n");
         sb.Append("</div>\n\n");
     }
 
@@ -253,7 +253,7 @@ public sealed partial class HtmlRenderAdapter
         // Sibling pager rides the chrome-level wayfinding strip alongside the breadcrumb now (PageView.Pager),
         // not the body's own header. [Story 10.11]
         main.Append("  <div class=\"kicker-row\">\n");
-        main.Append($"    <span class=\"story-kicker\">Epic {view.Number}</span>\n");
+        main.Append($"    <span class=\"story-kicker\">{PathUtil.Html(view.PlanningVocabulary.PrimarySingular)} {view.Number}</span>\n");
         main.Append($"    {StatusStyles.Badge(view.StatusClass, view.StatusLabel)}\n");
         main.Append(StatusStyles.LegendKey());
         main.Append("  </div>\n");
@@ -286,7 +286,7 @@ public sealed partial class HtmlRenderAdapter
         {
             main.Append("<section class=\"dashboard-narrow\">\n<div class=\"chart-row\">\n");
             main.Append("<div class=\"chart-col\">\n");
-            main.Append("<div class=\"chart-panel\">\n<h3>Epic Progress</h3>\n");
+            main.Append($"<div class=\"chart-panel\">\n<h3>{PathUtil.Html(view.PlanningVocabulary.PrimarySingular)} Progress</h3>\n");
             foreach (var bar in view.ProgressBars)
             {
                 main.Append(Charts.ProgressBar(bar.Label, bar.Value, bar.Max, bar.RightLabel));
@@ -307,7 +307,7 @@ public sealed partial class HtmlRenderAdapter
         foreach (var card in view.StoryCards)
         {
             AppendStoryCard(main, card);
-            toc.Add(new Toc.Entry(2, $"Story {card.Id}", card.AnchorId));
+            toc.Add(new Toc.Entry(2, $"{view.PlanningVocabulary.SecondarySingular} {card.Id}", card.AnchorId));
         }
 
         if (view.RetiredNoticesHtml.Count > 0)
@@ -607,7 +607,7 @@ public sealed partial class HtmlRenderAdapter
         // Sibling pager rides the chrome-level wayfinding strip alongside the breadcrumb now (PageView.Pager),
         // not the body's own header. [Story 10.11]
         main.Append("  <div class=\"kicker-row\">\n");
-        main.Append($"    <span class=\"story-kicker\">Story {PathUtil.Html(view.Id)}</span>\n");
+        main.Append($"    <span class=\"story-kicker\">{PathUtil.Html(view.PlanningVocabulary.SecondarySingular)} {PathUtil.Html(view.Id)}</span>\n");
         if (view.Status is { Length: > 0 } status)
         {
             main.Append($"    {StatusStyles.Badge(view.StatusStage, status)}\n");
@@ -766,7 +766,7 @@ public sealed partial class HtmlRenderAdapter
         // Sibling pager rides the chrome-level wayfinding strip alongside the breadcrumb now (PageView.Pager),
         // not the body's own header. [Story 10.11]
         sb.Append("  <div class=\"kicker-row\">\n");
-        sb.Append($"    <span class=\"story-kicker\">Story {PathUtil.Html(view.Id)}</span>\n");
+        sb.Append($"    <span class=\"story-kicker\">{PathUtil.Html(view.PlanningVocabulary.SecondarySingular)} {PathUtil.Html(view.Id)}</span>\n");
         sb.Append($"    {StatusStyles.Badge(view.StatusStage, "Not yet drafted")}\n");
         sb.Append(StatusStyles.LegendKey());
         sb.Append(view.RetroLinkHtml);
@@ -804,7 +804,7 @@ public sealed partial class HtmlRenderAdapter
         }
 
         sb.Append("<section class=\"dashboard-narrow\">\n");
-        sb.Append($"  <a class=\"view-epic-link\" href=\"{PathUtil.Html(view.BackHref)}\">&larr; Back to Epic {view.EpicNumber}</a>\n");
+        sb.Append($"  <a class=\"view-epic-link\" href=\"{PathUtil.Html(view.BackHref)}\">&larr; Back to {PathUtil.Html(view.PlanningVocabulary.PrimarySingular)} {view.EpicNumber}</a>\n");
         sb.Append("</section>\n");
         sb.Append("</main>\n\n");
         return sb.ToString();

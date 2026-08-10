@@ -24,7 +24,8 @@ public static class EpicsViewBuilder
         CommandCatalog commands,
         ProjectCounts? counts = null,
         FollowUpGeometry? followUps = null,
-        UnplannedWorkGeometry? unplanned = null)
+        UnplannedWorkGeometry? unplanned = null,
+        PlanningVocabulary? planningVocabulary = null)
     {
         // Production always passes the shared ledger. Null → build an equivalent ephemeral ledger from the
         // same inputs so tests/stubs that omit counts keep coherent subtitle + panel stats. [Story 8.3]
@@ -33,6 +34,7 @@ public static class EpicsViewBuilder
         return new()
         {
             SiteTitle = nav.SiteTitle,
+            PlanningVocabulary = planningVocabulary ?? PlanningVocabulary.Default,
             EpicCount = ledger.EpicsDefined,
             DraftedCount = ledger.EpicsDrafted,
             Progress = progress,
@@ -146,7 +148,8 @@ public static class EpicsViewBuilder
         FollowUpGeometry? followUps = null,
         UnplannedWorkGeometry? unplanned = null,
         PlanningCodeImpactData? impact = null,
-        WorkGraphEpic? workGraph = null)
+        WorkGraphEpic? workGraph = null,
+        PlanningVocabulary? planningVocabulary = null)
     {
         var outputPath = $"epics/epic-{epic.Number}.html";
         var prefix = Prefix(outputPath);
@@ -203,6 +206,7 @@ public static class EpicsViewBuilder
         return new EpicPageView
         {
             Number = epic.Number,
+            PlanningVocabulary = planningVocabulary ?? PlanningVocabulary.Default,
             TitleHtml = epic.Title,
             StatusClass = epicClass,
             StatusLabel = StatusStyles.EpicLabel(epicClass),
@@ -330,7 +334,8 @@ public static class EpicsViewBuilder
         string? epicRetroPath,
         FollowUpGeometry? followUps = null,
         PlanningCodeImpactData? impact = null,
-        WorkGraphEpic? workGraph = null)
+        WorkGraphEpic? workGraph = null,
+        PlanningVocabulary? planningVocabulary = null)
     {
         var outputPath = story.ArtifactOutputPath
             ?? throw new InvalidOperationException($"BuildStory called for story {story.Id} with no resolved artifact.");
@@ -345,6 +350,7 @@ public static class EpicsViewBuilder
         return new StoryPageView
         {
             Id = story.Id,
+            PlanningVocabulary = planningVocabulary ?? PlanningVocabulary.Default,
             TitleHtml = story.Title,
             StatusStage = StatusStyles.ForStory(story),
             Status = story.Status is { Length: > 0 } s ? s : null,
@@ -455,7 +461,8 @@ public static class EpicsViewBuilder
 
     // ----- Story placeholder --------------------------------------------------------------------------------
 
-    public static StoryPlaceholderView BuildStoryPlaceholder(EpicInfo epic, StoryInfo story, CommandCatalog commands, string? epicRetroPath)
+    public static StoryPlaceholderView BuildStoryPlaceholder(EpicInfo epic, StoryInfo story, CommandCatalog commands,
+        string? epicRetroPath, PlanningVocabulary? planningVocabulary = null)
     {
         var outputPath = StoryEpicLinkifier.StoryPagePath(story.Id);
         var prefix = Prefix(outputPath);
@@ -469,6 +476,7 @@ public static class EpicsViewBuilder
         return new StoryPlaceholderView
         {
             Id = story.Id,
+            PlanningVocabulary = planningVocabulary ?? PlanningVocabulary.Default,
             TitleHtml = story.Title,
             StatusStage = StatusStyles.ForStory(story),
             RetroLinkHtml = RenderStoryRetroLink(epic.Number, prefix, epicRetroPath),

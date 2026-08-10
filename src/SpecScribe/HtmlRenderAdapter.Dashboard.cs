@@ -245,7 +245,9 @@ public sealed partial class HtmlRenderAdapter
         sb.Append("<div class=\"dashboard-tile-band\">\n");
 
         var reqTiles = view.StatTiles.Where(IsRequirementsStat).ToList();
-        var epicStoryTiles = view.StatTiles.Where(t => t.Label is "Epics drafted" or "Stories defined").ToList();
+        var epicStoryTiles = view.StatTiles.Where(t =>
+            t.Label is var label && (label == $"{view.PlanningVocabulary.PrimaryPlural} drafted"
+                || label == $"{view.PlanningVocabulary.SecondaryPlural} defined")).ToList();
         var plannedTiles = view.StatTiles.Where(t => t.Label is "Planned tasks done").ToList();
         var directTiles = view.StatTiles.Where(t => t.Label is "Direct changes").ToList();
         var insightTiles = view.StatTiles.Where(t => t.Label is "Commit" or "Commits").ToList();
@@ -264,7 +266,7 @@ public sealed partial class HtmlRenderAdapter
         // Direct changes skips Overview (redundant with Deferred); Commits skips Overview (Develop home).
         AppendStatJourney(sb, "requirements", "Requirements", reqTiles,
             "wm-panel wm-show-overview wm-show-requirements wm-show-track");
-        AppendEpicsJourney(sb, p, view.Epics, epicStoryTiles,
+        AppendEpicsJourney(sb, p, view.Epics, epicStoryTiles, view.PlanningVocabulary,
             "wm-panel wm-show-overview wm-show-plan wm-show-review wm-show-track");
         AppendStatJourney(sb, "execution", "Execution", plannedTiles,
             "wm-panel wm-show-overview wm-show-review wm-show-track");
@@ -308,7 +310,8 @@ public sealed partial class HtmlRenderAdapter
     }
 
     private void AppendEpicsJourney(
-        StringBuilder sb, ProgressModel p, EpicsModel? epicsModel, IReadOnlyList<StatTile> tiles, string showClass)
+        StringBuilder sb, ProgressModel p, EpicsModel? epicsModel, IReadOnlyList<StatTile> tiles,
+        PlanningVocabulary vocabulary, string showClass)
     {
         for (var i = 0; i < tiles.Count; i++)
         {
@@ -316,9 +319,9 @@ public sealed partial class HtmlRenderAdapter
             sb.Append(Charts.StatCard(
                 tile.Number, tile.Label, tile.Sub, tile.Tooltip, tile.Href,
                 extraClass: $"journey-card journey-epics {showClass}",
-                journeyLabel: i == 0 ? "Epics & Stories" : null));
+                journeyLabel: i == 0 ? $"{vocabulary.PrimaryPlural} & {vocabulary.SecondaryPlural}" : null));
         }
-        AppendEpicStatusTile(sb, p, epicsModel, showClass, lead: tiles.Count == 0);
+            AppendEpicStatusTile(sb, p, epicsModel, showClass, vocabulary, lead: tiles.Count == 0);
     }
 
     private void AppendFollowUpJourney(
@@ -361,10 +364,10 @@ public sealed partial class HtmlRenderAdapter
     /// <summary>Compact Epic Status donut tile — donut centered above a Stories-Defined-style label.
     /// Segments come from the retro-gated <see cref="StatusStyles.ForEpicWithRetrospective"/> roll-up.</summary>
     private void AppendEpicStatusTile(
-        StringBuilder sb, ProgressModel p, EpicsModel? epicsModel, string showClass, bool lead = false)
+        StringBuilder sb, ProgressModel p, EpicsModel? epicsModel, string showClass, PlanningVocabulary vocabulary, bool lead = false)
     {
         var leadAttr = lead ? " journey-lead" : string.Empty;
-        var leadHtml = lead ? "<span class=\"tile-journey-label\">Epics &amp; Stories</span>" : string.Empty;
+        var leadHtml = lead ? $"<span class=\"tile-journey-label\">{PathUtil.Html(vocabulary.PrimaryPlural)} &amp; {PathUtil.Html(vocabulary.SecondaryPlural)}</span>" : string.Empty;
         sb.Append($"<div class=\"stat-card tile-card epic-status-tile journey-card journey-epics{leadAttr} {showClass}\">\n");
         sb.Append(leadHtml);
 
@@ -392,12 +395,12 @@ public sealed partial class HtmlRenderAdapter
         var nonZero = segments.Where(s => s.Value > 0).ToList();
         var ariaParts = nonZero.Count > 0
             ? string.Join(", ", nonZero.Select(s => $"{s.Value} {s.Label.ToLowerInvariant()}"))
-            : "no epics yet";
+            : $"no {vocabulary.PrimaryPlural.ToLowerInvariant()} yet";
 
         sb.Append("<div class=\"tile-card-visual\">\n");
-        sb.Append(Charts.Donut(segments, size: 52, ariaLabel: $"Epic status: {ariaParts}", centerText: centerText));
+        sb.Append(Charts.Donut(segments, size: 52, ariaLabel: $"{vocabulary.PrimarySingular} status: {ariaParts}", centerText: centerText));
         sb.Append("</div>\n");
-        sb.Append("<div class=\"stat-label\">Epic status</div>\n");
+        sb.Append($"<div class=\"stat-label\">{PathUtil.Html(vocabulary.PrimarySingular)} status</div>\n");
         sb.Append("</div>\n");
     }
     /// <summary>The "Now &amp; Next" panel — Develop work-stage. Re-homed from <c>HtmlTemplater.AppendNowAndNext</c>.</summary>

@@ -70,6 +70,7 @@ public sealed class SiteGenerator
     private ModuleContext _module = ModuleContext.None;
     private CommandCatalog? _workflowCommands;
     private CommandCatalog WorkflowCommands => _workflowCommands ?? _module.Commands;
+    private PlanningVocabulary _planningVocabulary = PlanningVocabulary.Default;
     private EpicsModel? _epicsModel;
     private ProgressModel? _progress;
 
@@ -527,6 +528,7 @@ public sealed class SiteGenerator
             _sprint = bundle.Sprint;
             _module = bundle.Module;
             _workflowCommands = bundle.WorkflowCommands;
+            _planningVocabulary = bundle.PlanningVocabulary;
             SetRetros(bundle.Retros);
 
             var navDiagnostics = new List<AdapterDiagnostic>();
@@ -3512,7 +3514,7 @@ public sealed class SiteGenerator
             var epicsCounts = _counts ?? ProjectCounts.Build(progress, _sprint, workForFollowUps, model, _requirements);
             FollowUpGeometry? followUps = BuildFollowUpGeometry(workForFollowUps, epicsCounts, deferredModel);
             UnplannedWorkGeometry? unplanned = UnplannedWorkGeometry.From(workForFollowUps, followUps, model, retros: _retros);
-            WritePage(EpicsTemplater.BuildIndexPage(model, progress, nav, WorkflowCommands, epicsCounts, followUps, unplanned));
+            WritePage(EpicsTemplater.BuildIndexPage(model, progress, nav, WorkflowCommands, epicsCounts, followUps, unplanned, _planningVocabulary));
 
             // Keep the requirements routes absent when a framework does not model requirements at all.
             if (requirements is not null)
@@ -3523,7 +3525,7 @@ public sealed class SiteGenerator
                 {
                     var epicRetroPath = EpicRetroMap.TryGetValue(epic.Number, out var erp) ? erp : null;
                     WritePage(
-                        EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, WorkflowCommands, epicRetroPath, EpicPager(model, epic), followUps, unplanned, _planningImpact, EpicSubgraph(epic.Number)),
+                        EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, WorkflowCommands, epicRetroPath, EpicPager(model, epic), followUps, unplanned, _planningImpact, EpicSubgraph(epic.Number), _planningVocabulary),
                         skipEpicNumber: epic.Number);
 
                     foreach (var story in epic.Stories)
@@ -3535,7 +3537,7 @@ public sealed class SiteGenerator
                             // artifact overwrites it in place. ArtifactOutputPath stays null — placeholders
                             // must never count as detailed stories anywhere progress is computed.
                             WritePage(
-                                EpicsTemplater.BuildStoryPlaceholderPage(epic, story, nav, WorkflowCommands, epicRetroPath, StoryPager(model, story)),
+                                EpicsTemplater.BuildStoryPlaceholderPage(epic, story, nav, WorkflowCommands, epicRetroPath, StoryPager(model, story), _planningVocabulary),
                                 skipStoryId: story.Id);
                             continue;
                         }
@@ -3543,7 +3545,7 @@ public sealed class SiteGenerator
                         // story.Status/TasksDone were filled by ProgressCalculator above — no re-read needed.
                         var f = BuildStoryPageFragments(story, artifactMap[story.Id], referenceMap);
                         WritePage(
-                            EpicsTemplater.BuildStoryPage(epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria, f.DevAgentRecord, f.Tasks, f.CompletionSummarySections, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav, WorkflowCommands, epicRetroPath, StoryPager(model, story), followUps, _planningImpact, StorySubgraph(epic, story, followUps)),
+                            EpicsTemplater.BuildStoryPage(epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria, f.DevAgentRecord, f.Tasks, f.CompletionSummarySections, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav, WorkflowCommands, epicRetroPath, StoryPager(model, story), followUps, _planningImpact, StorySubgraph(epic, story, followUps), _planningVocabulary),
                             skipStoryId: story.Id);
                     }
                 }
@@ -3772,7 +3774,7 @@ public sealed class SiteGenerator
         var unplanned = UnplannedWorkGeometry.From(work, followUps, _epicsModel, retros: _retros);
         var dashboardPage = HtmlTemplater.BuildIndexPage(
             docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, WorkflowCommands,
-            work, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts: counts, followUps: followUps, unplanned: unplanned, cadence: _cadence, workGraph: _workGraph, dateCutoff: _today, testArtifacts: _testArtifacts);
+            work, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts: counts, followUps: followUps, unplanned: unplanned, cadence: _cadence, workGraph: _workGraph, dateCutoff: _today, testArtifacts: _testArtifacts, planningVocabulary: _planningVocabulary);
         return _prelude = new SurfacePrelude(docs, work, counts, followUps, unplanned, dashboardPage);
     }
 
@@ -3810,14 +3812,14 @@ public sealed class SiteGenerator
 
         var progressByEpic = progress.PerEpic.ByFirst(p => p.Number);
         families.Add(new FamilySurface(
-            EpicsTemplater.BuildIndexPage(model, progress, nav, WorkflowCommands, prelude.Counts, prelude.FollowUps, prelude.Unplanned),
+            EpicsTemplater.BuildIndexPage(model, progress, nav, WorkflowCommands, prelude.Counts, prelude.FollowUps, prelude.Unplanned, _planningVocabulary),
             SurfaceSourcePath: _epicsSourcePath));
 
         foreach (var epic in model.Epics)
         {
             var epicRetroPath = EpicRetroMap.TryGetValue(epic.Number, out var erp) ? erp : null;
             families.Add(new FamilySurface(
-                EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, WorkflowCommands, epicRetroPath, EpicPager(model, epic), prelude.FollowUps, prelude.Unplanned, _planningImpact, EpicSubgraph(epic.Number)),
+                EpicsTemplater.BuildEpicPage(epic, progressByEpic[epic.Number], nav, WorkflowCommands, epicRetroPath, EpicPager(model, epic), prelude.FollowUps, prelude.Unplanned, _planningImpact, EpicSubgraph(epic.Number), _planningVocabulary),
                 SkipEpicNumber: epic.Number,
                 SurfaceSourcePath: _epicsSourcePath,
                 Epic: epic));
@@ -3828,7 +3830,7 @@ public sealed class SiteGenerator
                 string? artifactSourcePath = null;
                 if (story.ArtifactOutputPath is null || !_storyArtifactsById.TryGetValue(story.Id, out var artifactFullPath))
                 {
-                    storyPage = EpicsTemplater.BuildStoryPlaceholderPage(epic, story, nav, WorkflowCommands, epicRetroPath, StoryPager(model, story));
+                    storyPage = EpicsTemplater.BuildStoryPlaceholderPage(epic, story, nav, WorkflowCommands, epicRetroPath, StoryPager(model, story), _planningVocabulary);
                 }
                 else
                 {
@@ -3839,7 +3841,7 @@ public sealed class SiteGenerator
                         storyPage = EpicsTemplater.BuildStoryPage(
                             epic, story, f.ArtifactRelative, f.BlurbHtml, f.RemainderHtml, f.AcceptanceCriteria,
                             f.DevAgentRecord, f.Tasks, f.CompletionSummarySections, f.ReviewFindingsHtml, f.ChangeLogHtml, f.Evidence, f.ChangeSurface, nav,
-                            WorkflowCommands, epicRetroPath, StoryPager(model, story), prelude.FollowUps, _planningImpact, StorySubgraph(epic, story, prelude.FollowUps));
+                            WorkflowCommands, epicRetroPath, StoryPager(model, story), prelude.FollowUps, _planningImpact, StorySubgraph(epic, story, prelude.FollowUps), _planningVocabulary);
                     }
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                     {
@@ -3860,7 +3862,7 @@ public sealed class SiteGenerator
                         //  made visible by the Story 22.4 code review]
                         _familyDegradedStories.Add($"{story.Id} ({ex.GetType().Name}: {ex.Message})");
                         artifactSourcePath = null;
-                        storyPage = EpicsTemplater.BuildStoryPlaceholderPage(epic, story, nav, WorkflowCommands, epicRetroPath, StoryPager(model, story));
+                        storyPage = EpicsTemplater.BuildStoryPlaceholderPage(epic, story, nav, WorkflowCommands, epicRetroPath, StoryPager(model, story), _planningVocabulary);
                     }
                 }
 
@@ -5001,7 +5003,7 @@ public sealed class SiteGenerator
         // related-work pane is a pure read over the already-computed model, never a second projection. [Story 20.3]
         // Built once and used twice: the view model feeds both the write below and the asset gate, so the two
         // can no longer disagree about what the page needs. [Story 23.6 Task 5]
-        var indexPage = HtmlTemplater.BuildIndexPage(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, WorkflowCommands, inventory, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts, followUps, unplanned, cadence: _cadence, workGraph: _workGraph, dateCutoff: _today, testArtifacts: _testArtifacts);
+        var indexPage = HtmlTemplater.BuildIndexPage(docs, nav, _progress ?? ProgressModel.Empty, _epicsModel, _requirements, _adrs, WorkflowCommands, inventory, _sprint, _retros, _coverage, _timelinePath is not null, CodeItemHref, counts, followUps, unplanned, cadence: _cadence, workGraph: _workGraph, dateCutoff: _today, testArtifacts: _testArtifacts, planningVocabulary: _planningVocabulary);
         WritePage(indexPage);
         EnsureHierarchyEngine(indexPage);
     }
