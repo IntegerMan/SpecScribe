@@ -589,6 +589,16 @@ public static class WorkflowCommands
         var stage = StatusStyles.ForStory(story);
         var suggestions = new List<Suggestion>();
 
+        // A GSD PLAN.md is already the implementation plan. Its roadmap checkbox records completion, not
+        // whether planning happened, so an unchecked plan must resume phase execution rather than re-plan it.
+        if (IsUnfinishedGsdPlan(story, commands, stage))
+        {
+            Add(suggestions, CommandForStory(commands, "dev-story", story),
+                $"Executes Phase {story.WorkflowCommandArgument}'s planned work, including its remaining waves.");
+            AppendDeferredAlternate(suggestions, story.Id, "Story", openDeferred, commands);
+            return suggestions;
+        }
+
         if (stage == "ready")
         {
             Add(suggestions, CommandForStory(commands, "dev-story", story),
@@ -665,6 +675,14 @@ public static class WorkflowCommands
         var epicClass = StatusStyles.ForEpicWithRetrospective(epic);
         var suggestions = new List<Suggestion>();
         var entityId = epic.Number.ToString();
+
+        if (IsGsdPhaseReadyToExecute(epic, commands))
+        {
+            Add(suggestions, CommandForEpic(commands, "dev-story", epic),
+                $"Executes Phase {epic.WorkflowCommandArgument}'s planned work, including its remaining waves.");
+            AppendDeferredAlternate(suggestions, entityId, "Epic", openDeferred, commands);
+            return suggestions;
+        }
 
         if (epicClass == "pending")
         {
@@ -774,6 +792,15 @@ public static class WorkflowCommands
                 $"Story {actionable.Id} is the current front line — implement it per its plan.");
         }
 
+        // GSD's plan files belong to a phase-level wave queue. A roadmap checkbox can leave every plan's
+        // status as drafted even though the phase is explicitly planned and ready to execute.
+        var phaseReadyToExecute = model.Epics.FirstOrDefault(e => IsGsdPhaseReadyToExecute(e, commands));
+        if (phaseReadyToExecute is not null)
+        {
+            Add(suggestions, CommandForEpic(commands, "dev-story", phaseReadyToExecute),
+                $"Phase {phaseReadyToExecute.WorkflowCommandArgument} is planned and ready to execute.");
+        }
+
         // The next story that still needs an implementation plan — in any drafted/ready/active epic
         // (same undrafted scan ForEpic uses mid-flight). EpicStatus.Drafted covers all non-pending
         // epics with stories; StatusStyles narrows so Home and epic pages recommend the same next draft.
@@ -807,6 +834,17 @@ public static class WorkflowCommands
 
         return suggestions;
     }
+
+    private static bool IsGsdPhaseReadyToExecute(EpicInfo epic, CommandCatalog commands) =>
+        commands.UsesPhaseArguments
+        && !string.IsNullOrWhiteSpace(epic.WorkflowCommandArgument)
+        && epic.Stories.Any(story => IsUnfinishedGsdPlan(story, commands, StatusStyles.ForStory(story)));
+
+    private static bool IsUnfinishedGsdPlan(StoryInfo story, CommandCatalog commands, string stage) =>
+        commands.UsesPhaseArguments
+        && story.WorkflowCommandArgument is { Length: > 0 }
+        && story.ArtifactOutputPath is not null
+        && stage is not "done" and not "retired";
 
     private static List<Suggestion> ForActionItem(SprintActionItem item, CommandCatalog commands)
     {

@@ -384,6 +384,24 @@ public class RelatedWorkTests
     }
 
     [Fact]
+    public void PrimaryStoryCommand_PlannedGsdPlanExecutesItsPhaseInsteadOfPlanningAgain()
+    {
+        var plan = new StoryInfo
+        {
+            Id = "7.1", EpicNumber = 7, WorkflowCommandArgument = "7", Title = "Planned work",
+            UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(), Status = "drafted",
+            ArtifactOutputPath = "epics/story-7-1.html",
+        };
+        var commands = new CommandCatalog("GSD Core", new Dictionary<string, string>
+        {
+            ["create-story"] = "/gsd:plan-phase",
+            ["dev-story"] = "/gsd:execute-phase",
+        }, usesPhaseArguments: true);
+
+        Assert.Equal("/gsd:execute-phase 7", WorkflowCommands.PrimaryStoryCommand(plan, commands));
+    }
+
+    [Fact]
     public void PrimaryEpicCommand_ReturnsNull_ForADoneEpicWithNoNextAction()
     {
         var epic = new EpicInfo

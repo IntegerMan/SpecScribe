@@ -1257,6 +1257,46 @@ public class HtmlTemplaterTests
     }
 
     [Fact]
+    public void RenderPlannedGsdPhase_ExecutesThePhaseInsteadOfPlanningItAgain()
+    {
+        var completedPlan = new StoryInfo
+        {
+            Id = "7.1", EpicNumber = 7, WorkflowCommandArgument = "7", Title = "Completed plan",
+            UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(), Status = "done",
+            ArtifactOutputPath = "epics/story-7-1.html",
+        };
+        var unfinishedPlan = new StoryInfo
+        {
+            Id = "7.2", EpicNumber = 7, WorkflowCommandArgument = "7", Title = "Planned work",
+            UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(), Status = "drafted",
+            ArtifactOutputPath = "epics/story-7-2.html",
+        };
+        var phase = new EpicInfo
+        {
+            Number = 7, WorkflowCommandArgument = "7", Title = "Phase 7", GoalHtml = string.Empty,
+            Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice,
+            Stories = new[] { completedPlan, unfinishedPlan },
+        };
+        var model = new EpicsModel
+        {
+            OverviewHtml = string.Empty, RequirementsInventoryHtml = string.Empty, Epics = new[] { phase },
+        };
+        var commands = new CommandCatalog("GSD Core", new Dictionary<string, string>
+        {
+            ["create-story"] = "/gsd:plan-phase",
+            ["dev-story"] = "/gsd:execute-phase",
+        }, usesPhaseArguments: true);
+
+        var epicHtml = WorkflowCommands.RenderEpicNextSteps(phase, commands);
+        var projectHtml = WorkflowCommands.RenderProjectNextSteps(model, commands);
+
+        Assert.Contains("/gsd:execute-phase 7", epicHtml);
+        Assert.DoesNotContain("/gsd:plan-phase 7", epicHtml);
+        Assert.Contains("/gsd:execute-phase 7", projectHtml);
+        Assert.DoesNotContain("/gsd:plan-phase 7", projectHtml);
+    }
+
+    [Fact]
     public void RenderEpic_UndraftedStoryCardPairsGuidanceWithCreateStoryCommand()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);
