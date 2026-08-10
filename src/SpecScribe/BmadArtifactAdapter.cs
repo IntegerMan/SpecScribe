@@ -146,6 +146,7 @@ public sealed class BmadArtifactAdapter : IArtifactAdapter
                 // Story 8.2 AC #3: present-but-unmapped Status: lines → Unsupported AdapterDiagnostic
                 // (typed channel from Story 4.1 — not a bespoke GenerationEvent).
                 CollectUnrecognizedStoryStatuses(parsed, ToSourceRelative(options, epicsSourceFile), diagnostics);
+                CollectDuplicateEpicNumbers(parsed, ToSourceRelative(options, epicsSourceFile), diagnostics);
             }
         }
         catch (Exception ex)
@@ -174,6 +175,30 @@ public sealed class BmadArtifactAdapter : IArtifactAdapter
                     path,
                     $"Unrecognized status '{story.Status}' — no canonical lifecycle mapping; rendered as unrecognized"));
             }
+        }
+    }
+
+    /// <summary>Emits one non-fatal <see cref="AdapterDiagnosticCategory.Unsupported"/> notice per epic number
+    /// the source file declares more than once.
+    ///
+    /// <para>The duplicate itself is TOLERATED by design — <c>NumberIndex.ByFirst</c> keeps the first
+    /// declaration rather than throwing, because a repeated epic number is a typo in a hand-authored planning
+    /// file and SpecScribe documents what a repository actually contains. What must not happen is tolerating it
+    /// SILENTLY: the second epic's page overwrites the first at <c>epics/epic-N.html</c>, both render the first
+    /// epic's progress roll-up, and a duplicated <c>## Epic N</c> section double-counts its stories in every
+    /// tally — all while the run reports <c>errors=0</c>. This is the notice that makes the collision visible.
+    /// [Story 17.1 code review]</para></summary>
+    private static void CollectDuplicateEpicNumbers(
+        EpicsModel model, string epicsSourceRel, List<AdapterDiagnostic> diagnostics)
+    {
+        foreach (var number in model.DuplicateEpicNumbers)
+        {
+            diagnostics.Add(new AdapterDiagnostic(
+                AdapterDiagnosticCategory.Unsupported,
+                epicsSourceRel,
+                $"Epic {number} is declared more than once — the first declaration wins, so the later one's "
+                    + "title, goal and stories are not rendered and its page is overwritten. "
+                    + "Give each epic a unique number."));
         }
     }
 

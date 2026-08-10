@@ -10,11 +10,11 @@
     "epics/story-{id}.html"
   ],
   "stats": {
-    "carriedRules": 1475,
-    "carriedSelectors": 1693,
+    "carriedRules": 1474,
+    "carriedSelectors": 1692,
     "carriedKeyframes": 5,
     "droppedRoot": 3,
-    "generatedBytes": 186428,
+    "generatedBytes": 186332,
     "sharedRules": 3,
     "runtimeRules": 15
   },
@@ -2443,10 +2443,6 @@
     },
     {
       "selector": ".next-step-command .cmd-badge",
-      "carried": true
-    },
-    {
-      "selector": ".next-step-command .cmd-text",
       "carried": true
     },
     {

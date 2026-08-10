@@ -57,7 +57,21 @@ public static class EpicsParser
         var requirementsHtml = ExtractSectionHtml(lines, "## Requirements Inventory");
 
         var listEntries = ParseEpicList(lines);
-        var sections = ParseEpicSections(lines).ByFirst(s => s.Number);
+        var sectionList = ParseEpicSections(lines);
+        var sections = sectionList.ByFirst(s => s.Number);
+
+        // Collision detection for the FIRST-WINS policy. `ByFirst` (Story 17.1) deliberately tolerates a
+        // repeated epic number instead of throwing — SpecScribe documents whatever a repository actually
+        // contains. But tolerating it silently is its own defect: two entries with the same Number produce two
+        // EpicInfo that write to ONE output path (epics/epic-N.html, so one page is destroyed), share a single
+        // Stories list (double-counting every story in the dashboard tallies), and collide on DOM ids. The
+        // number is recorded here so the adapter can raise a non-fatal notice rather than let the run report
+        // errors=0 over a corrupted site. [Story 17.1 code review]
+        var duplicateEpicNumbers = listEntries.GroupBy(e => e.Number).Where(g => g.Count() > 1).Select(g => g.Key)
+            .Concat(sectionList.GroupBy(s => s.Number).Where(g => g.Count() > 1).Select(g => g.Key))
+            .Distinct()
+            .OrderBy(n => n)
+            .ToList();
 
         var epics = new List<EpicInfo>();
         foreach (var entry in listEntries.OrderBy(e => e.Number))
@@ -87,6 +101,7 @@ public static class EpicsParser
             OverviewHtml = overviewHtml,
             RequirementsInventoryHtml = requirementsHtml,
             Epics = epics,
+            DuplicateEpicNumbers = duplicateEpicNumbers,
         };
     }
 

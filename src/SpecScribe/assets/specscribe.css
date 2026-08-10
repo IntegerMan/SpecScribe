@@ -3686,7 +3686,12 @@ a.work-node:focus-visible {
 .next-step-card.drafted .next-step-kicker { color: var(--gold); }
 .next-step-command { min-width: 0; }
 .next-step-command .cmd-badge { max-width: 100%; }
-.next-step-command .cmd-text { white-space: normal; overflow-wrap: break-word; }
+/* `.next-step-command .cmd-text` was deleted here as DEAD (Story 17.1 code review): it is (0,2,0), and
+   `.cmd-badge .cmd-text` is also (0,2,0) but declared ~2,600 lines later, so the later rule won every
+   property it set. Every `.cmd-text` is emitted inside a `.cmd-badge` (WorkflowCommands.RenderCommandBadge /
+   RenderLabeledCommand), so the two ALWAYS co-apply — the `white-space: normal` never took effect and the
+   `overflow-wrap` it carried could not, since a wrapping property does nothing under `white-space: nowrap`.
+   Scrolling is the intended behaviour here; see the `overflow-x` comment on `.cmd-badge .cmd-text`. */
 .next-step-desc {
   margin: 0;
   font-size: 0.78rem;
@@ -7453,7 +7458,13 @@ a.deferred-item-resolving:hover { color: var(--rust); }
 /* ====================== DIAGNOSTICS & ABOUT (Story 4.8) ======================
    The diagnostics run-log page (notices table + effective-config disclosure) and the About page. Palette
    tokens only, single parchment theme — consistent with the rest of the portal. */
-.diagnostics-source { font-family: 'Courier New', monospace; font-size: 0.82rem; overflow-wrap: break-word; }
+/* `anywhere`, not `break-word`: the deprecated `word-break: break-word` this replaces is defined as
+   `word-break: normal` + `overflow-wrap: ANYWHERE`, and the two differ on the one property that matters here —
+   `anywhere` contributes to min-content width, `break-word` explicitly does not. This is a `<td>` in
+   `.md-table.diagnostics-table`, which has no `table-layout: fixed` and no overflow wrapper, so auto layout
+   sizes the Source column from min-content: under `break-word` the column cannot shrink below the longest
+   unbreakable path segment and the table overflows horizontally on a narrow viewport. [Story 17.1 code review] */
+.diagnostics-source { font-family: 'Courier New', monospace; font-size: 0.82rem; overflow-wrap: anywhere; }
 
 /* All-clear state: the done badge beside a short line when a run produced zero notices. */
 .diagnostics-clear { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; }

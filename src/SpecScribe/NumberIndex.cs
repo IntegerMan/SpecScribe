@@ -18,24 +18,51 @@ namespace SpecScribe;
 internal static class NumberIndex
 {
     /// <summary>Indexes <paramref name="source"/> by <paramref name="key"/>, keeping the FIRST item for any
-    /// repeated key instead of throwing.</summary>
+    /// repeated key instead of throwing.
+    ///
+    /// <para><paramref name="comparer"/> defaults to <see cref="EqualityComparer{T}.Default"/>. Pass one
+    /// explicitly for any STRING key: the eleven original call sites are all <c>int</c>-keyed, but this is now
+    /// the codebase's shared indexing helper, and a string-keyed adopter silently taking the default comparer
+    /// would diverge from the explicit <c>StringComparer.Ordinal</c> used one line away in
+    /// <c>RelatedWorkCards</c>. [Story 17.1 code review]</para></summary>
     public static Dictionary<TKey, TSource> ByFirst<TSource, TKey>(
-        this IEnumerable<TSource> source, Func<TSource, TKey> key)
+        this IEnumerable<TSource> source, Func<TSource, TKey> key,
+        IEqualityComparer<TKey>? comparer = null)
         where TKey : notnull
     {
-        var result = new Dictionary<TKey, TSource>();
+        // Guarded so the contract matches the `ToDictionary` these calls replaced, which threw
+        // ArgumentNullException(nameof(source)). Without this the `foreach` throws a bare
+        // NullReferenceException — a strictly worse diagnostic from a shared helper. [Story 17.1 code review]
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(key);
+
+        var result = new Dictionary<TKey, TSource>(comparer);
         foreach (var item in source) result.TryAdd(key(item), item);
         return result;
     }
 
     /// <summary>Indexes <paramref name="source"/> by <paramref name="key"/> projecting each item through
-    /// <paramref name="value"/>, keeping the FIRST item for any repeated key instead of throwing.</summary>
+    /// <paramref name="value"/>, keeping the FIRST item for any repeated key instead of throwing.
+    /// See the sibling overload for the <paramref name="comparer"/> note.</summary>
     public static Dictionary<TKey, TValue> ByFirst<TSource, TKey, TValue>(
-        this IEnumerable<TSource> source, Func<TSource, TKey> key, Func<TSource, TValue> value)
+        this IEnumerable<TSource> source, Func<TSource, TKey> key, Func<TSource, TValue> value,
+        IEqualityComparer<TKey>? comparer = null)
         where TKey : notnull
     {
-        var result = new Dictionary<TKey, TValue>();
-        foreach (var item in source) result.TryAdd(key(item), value(item));
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(key);
+        ArgumentNullException.ThrowIfNull(value);
+
+        var result = new Dictionary<TKey, TValue>(comparer);
+        foreach (var item in source)
+        {
+            // ContainsKey-then-Add rather than TryAdd(k, value(item)): TryAdd evaluates the projection even
+            // for a duplicate key it then discards. `GroupBy(...).First()` — the shape this replaced at
+            // RequirementsTemplater — did not. Matters if a projection ever has a side effect or a cost.
+            var k = key(item);
+            if (!result.ContainsKey(k)) result.Add(k, value(item));
+        }
+
         return result;
     }
 }

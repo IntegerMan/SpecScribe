@@ -4,7 +4,7 @@ baseline_commit: 15336f4
 
 # Story 17.1: Structural and Consistency Remediation Sweep
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 <!-- created 2026-08-07 (create-story 17.1) at baseline_commit 07bdb79. Every line number in this file was
@@ -130,6 +130,7 @@ until Task 0 has established whether `check:ir-content` is green at HEAD.
   - [x] **Duplicated footer-strip regex.** `FooterClock` is declared independently in `tests/SpecScribe.Tests/GoldenNormalization.cs:26` and `tests/SpecScribe.Tests/TestArtifactDiscoveryTests.cs:612`, and `SiteGeneratorStatusStylesTests.cs:114` hand-rolls a third `StripFooterClock` local. Consolidate onto `GoldenNormalization`.
   - [x] **`BmadCommands` next-step classifiers route on raw status strings.** `BmadCommands.cs:505` and `:515` use `status.Contains("review")` / `status.Contains("done") || status.Contains("complete")` while the same file elsewhere routes correctly through `StatusStyles.ForStory(story)` (lines 42, 69, 105, 627). Substring matching on a free-text status is the bug shape — `"review"` matches `"code-review-blocked"`. Route through `StatusStyles`. **Check ADR 0025** (`retired` is a terminal stage in *both* classifiers) before changing classifier behavior.
   - [x] The `~300`-issue maintainability band (94 `S1192` duplicated string literals, 86 `S3776` cognitive complexity, 48 `S3358` nested ternaries, 29 `S3267`, 28 `S107`, 9 `S125` commented-out code, plus an `S2589`/`S1121`/`S127`/`S1066`/`S1172` tail). **This is not a to-do list — it is 2,999 minutes (~50 h) of Sonar-estimated effort and it will not fit in one story.** Take the `S125` (dead/commented-out code, 9 instances — directly AC #1's "dead or unreachable code") and the `S1192` instances that are genuine single-source-of-truth violations; explicitly defer the `S3776`/`S107` complexity band with a recorded rationale, and say so rather than leaving it looking swept. See § *Bounding this story*.
+    - **[Correction, 2026-08-09 code review] The `S1192` half of this bullet was NOT done, and the `[x]` above overstates it.** No duplicated string literal was consolidated anywhere in the diff. The deferral rationale in `deferred-work.md` justifies the whole band by pointing at "the three that genuinely were (epic-number indexing, the footer-clock regex, story-status routing)" — but those are this task's own *separately listed* SSOT bullets, not `S1192` findings (a `ToDictionary` call is not a duplicated string literal). AC #1 is still satisfied, because an explicit deferral rationale is a permitted outcome; the task checkbox is what was wrong. The `S1192` band is deferred to **17.4** along with the rest.
 
 - [x] **Task 6 — Record every decision (AC: #2)**
   - [x] For each item touched: fix it **or** carry it forward with a recorded decision in `deferred-work.md`. AC #2 admits no third state.
@@ -142,6 +143,42 @@ until Task 0 has established whether `check:ir-content` is green at HEAD.
   - [x] `cd web && npm run check && npm run test`.
   - [x] **Live-browser verification for every CSS change** — the suite structurally cannot see containment leaks, sub-pixel collapse, or DOM corruption. Generate to `SpecScribeOutput/` (the default). Never `--output docs/live`.
   - [x] Confirm any regenerated gate baseline is **stable across two repeated runs** before locking it in.
+
+### Review Findings
+
+<!-- Code review 2026-08-09 (bmad-code-review, 3 parallel layers: Blind Hunter, Edge Case Hunter, Acceptance
+     Auditor). Scoped to commit d6ba8f2 vs baseline 15336f4 — the story landed as ONE isolated commit whose
+     diff matches this File List exactly, so no sibling-story hunk exclusion was needed. 18 findings after
+     dedup; 3 dismissed as noise. Every finding below was re-verified as STILL LIVE on origin/main at
+     cc54708, 60+ commits later. NOTE: `BmadCommands.cs` was renamed to `WorkflowCommands.cs` by cd687e4 —
+     line references use the CURRENT filename. AC #1 assessed MET; AC #2 assessed NOT MET (record-keeping,
+     not code). -->
+
+- [x] [Review][Decision] **A `retired` story renders no Next Steps panel at all** — `ForStory` gained `if (stage is "done" or "retired") return suggestions;` but `RenderNextSteps` (`WorkflowCommands.cs:42`), `StoryCommands` (`:69`) and `PrimaryStoryCommand` (`:105`) all still gate on `== "done"` only, so a retired story falls to `RenderPanel(empty)` → `string.Empty`. The new arm's own comment ("Done stories are handled by `RenderNextSteps`") is true for `done` and false for `retired`. Three losses: no terminal-state affordance at all (the opposite of ADR 0025's premise that `retired` is a *visible* first-class terminal stage), no muted `correct-course` escape hatch (which `done` gets), and the arm returns before `AppendDeferredAlternate` so **open deferred work attached to a retired story becomes unreachable from its page**. The new test `RenderNextSteps_RetiredStory_OffersNoWork` asserts only `DoesNotContain`, which `""` satisfies trivially. **Decision needed:** should `retired` render its own terminal panel (and what should it say), reuse the done panel, or keep suggestions? Extending the three gates to `is "done" or "retired"` would hand retired stories the *celebratory* all-done panel, which is wrong — hence a decision, not a mechanical patch. [src/SpecScribe/WorkflowCommands.cs:42, :69, :105, :563]
+- [x] [Review][Decision] **A duplicate epic number now silently corrupts the generated site instead of failing loudly** — first-wins was applied to the eleven *lookups*, but nothing de-duplicates the model and no diagnostic is emitted. `EpicsParser.Parse` builds one `EpicInfo` per list entry, so a duplicated number yields two epics with the same `Number`, both handed the *same* `section.Stories` instance. Consequences, all silent with `errors=0`: two epic pages written to one path (`epics/epic-N.html`) so one is destroyed; both epics render the **first** epic's progress numbers, completion bar and status donut (`SiteGenerator.cs:3432`+`:3500`, `:3769`+`:3778`); a duplicate `## Epic N` H2 drops its whole body and **double-counts every story** in dashboard tallies; duplicate `(AC: #N)` deep links all resolve to the first criterion (`SiteGenerator.cs:3601`); duplicate DOM ids on the index page. The tolerant policy itself is deliberate and documented in `NumberIndex`'s docblock — the gap is that downstream was never taught what a collision means. `AdapterDiagnostic` exists for exactly this. **Decision needed:** emit a diagnostic and keep first-wins, de-duplicate in the parser, or accept as-is. [src/SpecScribe/NumberIndex.cs, src/SpecScribe/EpicsParser.cs:60-88, src/SpecScribe/EpicsTemplater.cs:64]
+- [x] [Review][Decision] **Free-text "done"-ish statuses regressed from *no panel* to *"create this story"*** — the removed `status.Contains("done") || status.Contains("complete")` was a substring test; `StatusStyles.ForStatusFromTokens` deliberately keeps done/complete **exact-only** (so `not-complete` stays unrecognized). So `Status: Done (2026-08-01)`, `Done - with caveats` and `done ✅` now fall through to the default arm and the page recommends **`create-story`** on a story that demonstrably already has an artifact. `almost-done` / `nearly complete` do the same. Separately, `ready-for-review` silently moved from the `dev-story` arm to the `code-review` arm. `RenderNextSteps_CanonicalStages_StillRouteAsBefore` — the test whose stated job is to prove the rewrite behaviour-preserving — covers only `ready-for-dev`, `in-progress`, `review`, `drafted` and none of these. **Decision needed:** widen `StatusStyles` done-matching (trades against its deliberate exact-only design), or suppress `create-story` for an unrecognized status on a story that already has an artifact. [src/SpecScribe/WorkflowCommands.cs:563→:572, src/SpecScribe/StatusStyles.cs:100-124]
+- [x] [Review][Patch] The replacement `tokens-lib` assertion **cannot fail**, and it deleted the only coverage of the Story 23.2 fail-open bug [web/test/tokens-lib.test.mjs:85]
+- [x] [Review][Patch] `word-break: break-word` → `overflow-wrap: break-word` is not the equivalent de-deprecation; the 1:1 form is `overflow-wrap: anywhere`, and the difference lets the auto-layout diagnostics table overflow horizontally [src/SpecScribe/assets/specscribe.css:7456]
+- [x] [Review][Patch] `pwsh` matches `sh$`, so PowerShell 7 gets POSIX backslash quoting — and the new comment reasons about "PowerShell" but never `pwsh`; the grouping change itself is behaviourally inert (`git bash` ⊂ `bash`, `$` still binds only to `sh`) [extension/src/extension.ts:2029]
+- [x] [Review][Patch] The `deferred-work.md` strikethrough is applied **backwards** on all 4 amended entries — the file's own preamble says "a struck-through claim is closed; the text under it is the audit trail", but these strike the *resolution* and leave the stale claim standing, so the portal renders the resolution as retracted and two only-partially-resolved items as fully closed [_bmad-output/implementation-artifacts/deferred-work.md:1260, :1278, :1292, :1297]
+- [x] [Review][Patch] Two CANONICAL cluster entries covering work this story *fixed* were never amended and still read "still open" — the `ToDictionary` entry says "Still open; **5 live sites**" (11 were converted), and the `BmadCommands` entry says "Re-verified STILL OPEN: the token `retired` does not appear anywhere in `BmadCommands.cs`", which this commit makes false [_bmad-output/implementation-artifacts/deferred-work.md:1209, :106, :858-860]
+- [x] [Review][Patch] The `.coverage-card` → Epic 27 deferral is recorded **only** as a continuation line inside an item now marked resolved, is absent from the new `## Deferred from: 17-1-…` section, and `epics.md` was never told — so Story 17.4 and Epic 27 will both miss it [_bmad-output/implementation-artifacts/deferred-work.md:1279]
+- [x] [Review][Patch] Neither new `EpicsParser` test exercises the change it names: the `DuplicateEpicNumberMd` fixture has exactly one `## Epic 1:` H2, so the old `ToDictionary(s => s.Number)` could not have thrown and the test would pass unchanged at `15336f4`; and the `EpicsViewBuilder` site sits behind `if (model.Milestones.Count == 0) return …`, which BMad never populates. **Zero of the 11 converted sites are covered end-to-end.** [tests/SpecScribe.Tests/EpicsParserTests.cs:1313-1351, src/SpecScribe/EpicsViewBuilder.cs:63-65]
+- [x] [Review][Patch] `NumberIndex.ByFirst` regressed the null contract from `ArgumentNullException` to `NullReferenceException`, and has no comparer overload — so the first string-keyed adopter silently gets the default comparer, diverging from the explicit `StringComparer.Ordinal` used one line away in `RelatedWorkCards.cs:99`. It also evaluates `value(item)` for keys `TryAdd` then discards [src/SpecScribe/NumberIndex.cs:22-40]
+- [x] [Review][Patch] The second `word-break` "fix" is inert: `.next-step-command .cmd-text` (0,2,0) is outranked by `.cmd-badge .cmd-text { white-space: nowrap }` (0,2,0) declared 2,666 lines later, and both always co-apply — so no wrapping property can take effect. Counted as one of the two `S1874` fixes; it is a no-op in a rule AC #1's dead-code clause should have flagged [src/SpecScribe/assets/specscribe.css:3689 vs :6355]
+- [x] [Review][Patch] `tokens-lib.test.mjs` title overclaims — `it('carries every token the real stylesheet declares, wherever it is declared')` while `findRootBlocks` deliberately skips `@media`-nested `:root`, so `--nav-offset` (`specscribe.css:6185`) is not carried; the body also weakened `blocks.length` from `> 1` to a near-vacuous `> 0` [web/test/tokens-lib.test.mjs:61, :70]
+- [x] [Review][Patch] Story-record corrections: Task 5's `S1192` subtask is checked `[x]` but no duplicated string literal was consolidated (its rationale conflates the three named SSOT clusters with `S1192` findings); the Scope table was not amended for 8 changed files outside its declared in-scope set (all task-mandated or regeneration outputs — a documentation gap, not unauthorized expansion); and Task 0's record labels the digest revision `evaluatedAtRevision` when `01acf5b` is `provenance.analysisRevision` — CLAUDE.md's read-time staleness rule keys on the former [this file, Task 5 / § Scope / Dev Agent Record]
+- [x] [Review][Defer] `Sunburst_CenterReportsEpicCountNotStoryCount` asserts over the entire rendered payload rather than the centre node [tests/SpecScribe.Tests/ChartsTests.cs] — deferred, currently sound (only `HierarchyExplorer.cs:443`'s `ProjectRootKind` arm emits `N epic(s)`) but would silently weaken if another surface gained an "N epics" string
+
+**Dismissed as noise (3):** the ungated `generatedBytes` recurrence (the story already filed it as a new deferred-work item); `Assert.DoesNotContain` being unreachable after `Assert.Equal(html, styled)` in the new CapabilityStyler test (cosmetic); the "3 `css:S1874`" vs actual 2 miscount (already recorded at `deferred-work.md:1278`).
+
+#### Owner decisions taken on the three `[Decision]` findings (2026-08-09)
+
+1. **Retired story panel → its own terminal panel.** Not the celebratory done panel (retirement is not an achievement) and not a revert to offering suggestions. `WorkflowCommands.RenderRetiredPanel` states the terminal fact, keeps the muted `correct-course` hatch, and still surfaces open deferred work. The three `== "done"` gates in `RenderNextSteps`/`StoryCommands`/`PrimaryStoryCommand` now read `is "done" or "retired"`.
+2. **Duplicate epic number → emit an `AdapterDiagnostic`, keep first-wins.** The tolerant policy stands (SpecScribe documents what a repository actually contains); `EpicsModel.DuplicateEpicNumbers` carries the collision and `BmadArtifactAdapter.CollectDuplicateEpicNumbers` raises one non-fatal notice per repeated number, so the run can no longer report `errors=0` over a site where one epic page overwrote another.
+3. **Done-ish free-text statuses → suppress `create-story` when an artifact already exists.** `StatusStyles`' deliberate exact-only done-matching is left intact; instead an `unrecognized` status on a story with a resolved `ArtifactOutputPath` offers `correct-course` rather than inviting the reader to re-draft a story that already exists.
+
+**Verification.** `dotnet test SpecScribe.slnx` → **3,096 passed / 0 failed / 3 skipped**, +10 over the 3,086 baseline at this worktree's base commit `cc54708`, matching the 10 test cases added here exactly. `npm run typecheck` in `extension/` clean. The `tokens-lib` replacement was **proven able to fail**: temporarily reverting `renderTokensCss` to `blocks.slice(0, 1)` — the Story 23.2 fail-open regression — turns it red, where the previous version stayed green.
 
 ## Dev Notes
 
@@ -313,6 +350,15 @@ say so, rather than expanding silently.
 **In scope:** `src/SpecScribe/**` (C#), `extension/src/extension.ts`, `src/SpecScribe/assets/specscribe.css`,
 `web/assets/ir-content.css` (as the mirrored half of a `specscribe.css` fix only), `tests/SpecScribe.Tests/**`.
 
+> **[Correction, 2026-08-09 code review]** This list is narrower than what the story legitimately touched, and was
+> never amended. Eight further files changed, all of them either mandated by a task or produced by regeneration —
+> a documentation gap, **not** an unauthorized expansion: `web/scripts/ir-content-build.mjs`,
+> `web/scripts/ir-content-lib.mjs`, `web/scripts/sync-runtime-assets.mjs` (Task 3's "fix it in whatever emits the
+> header"), `web/test/tokens-lib.test.mjs` (the gate tests the `:root` merge moved), `docs/SonarCloudSetup.md`
+> (Task 1's record-conflict reconciliation), and the generated `web/assets/tokens.css`,
+> `web/assets/ir-content.manifest.json`, `web/measurements/ir-content-drops.json`. Read the in-scope list above
+> together with the File List, which is accurate.
+
 **Explicitly out of scope — do not absorb these:**
 
 | Not this story | Owner | Why |
@@ -414,7 +460,7 @@ measured green *before* the first edit, so each later movement had an establishe
 
 | signal | value at HEAD |
 |---|---|
-| analysis digest | 1,755 observations; `evaluatedAtRevision` **`01acf5b`**, tree `15336f4`, **36 commits behind**, `isStale: true` |
+| analysis digest | 1,755 observations; `analysisRevision` **`01acf5b`**, tree `15336f4`, **36 commits behind**, `isStale: true` |
 | `dotnet test SpecScribe.slnx` | **2,991 passed / 0 failed / 3 skipped** (2,994 total) |
 | `generate --deep-git` | 809 pages, **errors=0** |
 | `check:ir-content` | **GREEN** |
@@ -422,6 +468,12 @@ measured green *before* the first edit, so each later movement had an establishe
 | `check:assets` | GREEN |
 | `check:parity` | GREEN — 24 routes / 14 families byte-identical |
 | `npm run test` (vitest) | GREEN — 183/183 |
+
+> **[Correction, 2026-08-09 code review]** The digest row above originally labelled `01acf5b` as
+> `evaluatedAtRevision`; it is `provenance.analysisRevision`. `evaluatedAtRevision` is the WORKING-TREE revision,
+> and CLAUDE.md's read-time staleness rule keys on that field specifically — so the mislabel would mislead the
+> next reader checking whether the digest is current. The substance is unaffected: the digest was 36 commits
+> behind and `isStale: true` either way.
 
 **`check:ir-content` is GREEN at HEAD — 17.4 AC #4's "believed RED" is stale and should not be carried forward.**
 Measured through the full load-bearing order (with `--deep-git`, per `web/CONVENTIONS.md` §10 — the story's own

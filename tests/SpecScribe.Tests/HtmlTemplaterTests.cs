@@ -1500,6 +1500,70 @@ public class HtmlTemplaterTests
 
         Assert.DoesNotContain("/bmad-create-story", html);
         Assert.DoesNotContain("/bmad-dev-story", html);
+
+        // ...but "offers no work" must not mean "renders nothing". These DoesNotContain assertions alone are
+        // satisfied by the empty string, and that is exactly what shipped: `ForStory` returned an empty list for
+        // `retired` while `RenderNextSteps` still gated its panel branch on `== "done"`, so `RenderPanel` emitted
+        // string.Empty and the story page carried NO Next Steps section at all — the invisibility ADR 0025 exists
+        // to prevent. Assert the terminal state is actually STATED. [Story 17.1 code review]
+        Assert.NotEqual(string.Empty, html);
+        Assert.Contains("next-steps", html);
+        Assert.Contains("is retired", html);
+        Assert.DoesNotContain("All done", html); // retirement is not an achievement; not the celebratory panel
+    }
+
+    [Theory]
+    [InlineData("retired")]
+    [InlineData("superseded")]
+    public void RenderNextSteps_RetiredStory_StillOffersTheCorrectCourseEscapeHatch(string status)
+    {
+        // A retired story is the one MOST likely to need re-opening, and `done` already gets this hatch. Gating
+        // the terminal branch on "done" alone denied it to `retired`. [Story 17.1 code review]
+        var html = WorkflowCommands.RenderNextSteps(Story("1.1", status), NextStepCommands());
+
+        Assert.Contains("/bmad-correct-course", html);
+    }
+
+    [Fact]
+    public void StoryCommands_RetiredStory_OffersTheHatchRatherThanNothing()
+    {
+        // The outline's "Copy BMad Command…" Quick Pick reads this projection. Before the fix a retired story
+        // produced an empty list here with no way to re-open it. [Story 17.1 code review]
+        var cmds = WorkflowCommands.StoryCommands(Story("1.1", "retired"), NextStepCommands());
+
+        Assert.Contains(cmds, c => c.Command.Contains("correct-course", StringComparison.Ordinal));
+        Assert.DoesNotContain(cmds, c => c.Command.Contains("create-story", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("Done (2026-08-01)")]
+    [InlineData("Done - with caveats")]
+    [InlineData("almost-done")]
+    public void RenderNextSteps_UnrecognizedStatusOnADraftedStory_DoesNotOfferCreateStory(string status)
+    {
+        // StatusStyles keeps done/complete deliberately EXACT-only so `not-complete` stays unrecognized, which
+        // means these real authored spellings classify as `unrecognized`. The pre-17.1 substring chain caught
+        // them with Contains("done") and rendered no panel; routing through StatusStyles regressed them into a
+        // Recommended "create-story" card on a story that demonstrably already HAS a story file — that Status:
+        // line was read out of it. Re-planning is the honest offer. [Story 17.1 code review]
+        var story = Story("1.1", status);
+        story.ArtifactOutputPath = "epics/story-1-1.html";
+
+        var html = WorkflowCommands.RenderNextSteps(story, NextStepCommands());
+
+        Assert.DoesNotContain("/bmad-create-story", html);
+        Assert.Contains("/bmad-correct-course", html);
+    }
+
+    [Fact]
+    public void RenderNextSteps_UnrecognizedStatusWithNoArtifact_StillOffersCreateStory()
+    {
+        // The suppression is scoped to stories that ALREADY have an artifact. An undrafted story with an odd
+        // status still needs drafting, and must not lose its create-story card. [Story 17.1 code review]
+        var story = Story("1.1", "blocked");
+        story.ArtifactOutputPath = null;
+
+        Assert.Contains("/bmad-create-story", WorkflowCommands.RenderNextSteps(story, NextStepCommands()));
     }
 
     [Fact]

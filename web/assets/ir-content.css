@@ -2918,8 +2918,6 @@
 
 .ir-content .next-step-command .cmd-badge { max-width: 100%; }
 
-.ir-content .next-step-command .cmd-text { white-space: normal; overflow-wrap: break-word; }
-
 .ir-content .next-step-desc {
   margin: 0;
   font-size: 0.78rem;
@@ -6216,7 +6214,7 @@ body:has(main.followup-detail) .ir-content .doc-header {
 
 .ir-content .epic-retro-link:hover { color: var(--rust); }
 
-.ir-content .diagnostics-source { font-family: 'Courier New', monospace; font-size: 0.82rem; overflow-wrap: break-word; }
+.ir-content .diagnostics-source { font-family: 'Courier New', monospace; font-size: 0.82rem; overflow-wrap: anywhere; }
 
 .ir-content .diagnostics-config summary { cursor: pointer; font-weight: bold; color: var(--teal-deep); }
 

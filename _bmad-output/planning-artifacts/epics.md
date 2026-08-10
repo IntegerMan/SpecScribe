@@ -5918,6 +5918,18 @@ Owner-directed scope (2026-07-26): **rollups and analytics, not per-line marks.*
         unresolved PRD-vs-epics.md NFR numbering collision — a naming collision left implicit is paid for later
         at multiplied cost.
 
+        CONCRETE INSTANCE, MEASURED (added 2026-08-09 by the Story 17.1 code review). The collision is not just
+        prospective — it has ALREADY happened in CSS and the shipped layout depends on it. `specscribe.css`
+        declares `.coverage-card` TWICE at top level, and the two blocks are two DIFFERENT components, not a
+        duplicate to merge. Verified in a live browser: a block-2 card computes `flex-direction: column` sourced
+        from block 1 alone, while block-1 cards compute `max-width: 460px` / `flex: 1 1 320px` /
+        `align-items: flex-start` sourced from block 2 — i.e. each component is relying on declarations that
+        leak from the other. Story 17.1 correctly REFUSED to merge them (its own task text told it to check
+        first) and re-routed the decision here. Merging or scoping the two blocks moves ~120 elements across
+        100+ pages, so 27.2's vocabulary fix must rename these components, not just the new test-coverage ones.
+        Full diagnosis: deferred-work.md § "Deferred from: code review of
+        17-1-structural-and-consistency-remediation-sweep (2026-08-09)".
+
      2. COORDINATION WITH EPIC 26, NOT MERGER. The owner asked for coverage 'in addition to other information from
         code analysis and a link to the external tool page' — i.e. coverage and Epic 26's findings share surfaces.
         They are kept as separate epics deliberately: coverage is a per-file METRIC with a local, credential-free
