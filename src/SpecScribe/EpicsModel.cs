@@ -143,4 +143,21 @@ public sealed class EpicsModel
     /// that has no milestone level (BMad, BMad GDS) — and empty is the signal the epics index reads to render its
     /// chip sections exactly as it always has, byte for byte. [Story 12.2 Task 8; AC #4]</summary>
     public IReadOnlyList<MilestoneInfo> Milestones { get; init; } = Array.Empty<MilestoneInfo>();
+
+    /// <summary>Epic numbers a source file DECLARED MORE THAN ONCE, ascending; empty for a well-formed file.
+    ///
+    /// <para>Story 17.1 converted eleven epic-number lookups onto <c>NumberIndex.ByFirst</c>, which tolerates a
+    /// repeat instead of throwing — the right policy, since a duplicate number is a typo in a hand-authored
+    /// planning file rather than a programming error, and SpecScribe's job is to document what a repository
+    /// actually contains. The gap that policy left is that NOTHING downstream was taught what a collision
+    /// means: both epics render to <c>epics/epic-N.html</c> so one page overwrites the other, both read the
+    /// FIRST epic's progress roll-up, a duplicated <c>## Epic N</c> section double-counts its stories in every
+    /// tally, and duplicate <c>(AC: #N)</c> links all resolve to the first criterion — with the run reporting
+    /// <c>errors=0</c> throughout.</para>
+    ///
+    /// <para>This carries the fact to the adapter, which raises one non-fatal
+    /// <see cref="AdapterDiagnosticCategory.Unsupported"/> notice per repeated number. Populated by
+    /// <c>EpicsParser</c>; empty from adapters that cannot produce a collision.
+    /// [Story 17.1 code review]</para></summary>
+    public IReadOnlyList<int> DuplicateEpicNumbers { get; init; } = Array.Empty<int>();
 }

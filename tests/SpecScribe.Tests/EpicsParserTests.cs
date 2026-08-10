@@ -1328,23 +1328,63 @@ public class EpicsParserTests
         **Given** nothing
         **When** the project builds
         **Then** it succeeds
+
+        ## Epic 1: Foundation Again
+
+        ### Story 1.9: The duplicate section's story
+
+        As a developer, I want the second section to be observably discarded.
+
+        **Acceptance Criteria:**
+
+        **Given** a duplicated epic number
+        **When** the file is parsed
+        **Then** only the first section's body survives
         """;
 
     [Fact]
     public void Parse_DuplicateEpicNumber_DoesNotThrow_AndKeepsTheFirstDeclaration()
     {
-        // Before the fix this threw ArgumentException ("An item with the same key has already been added")
-        // out of EpicsParser's own `ParseEpicSections(...).ToDictionary(s => s.Number)`.
+        // The fixture carries TWO `## Epic 1:` H2 SECTIONS, which is what makes this test exercise the change
+        // it names. `ParseEpicSections` matches H2 headings only, so the earlier single-H2 fixture produced a
+        // one-element list that the pre-Story-17.1 `ToDictionary(s => s.Number)` could index without throwing —
+        // the test passed identically before and after the fix. With a genuine section collision it does not.
+        // [Story 17.1 code review]
         var model = EpicsParser.Parse(DuplicateEpicNumberMd);
 
         // Both list entries survive parsing — nothing is silently dropped from the model itself.
         Assert.Equal(2, model.Epics.Count);
         Assert.All(model.Epics, e => Assert.Equal(1, e.Number));
 
-        // First-wins: the H2 section body attaches to the FIRST "Epic 1", the way a person reads the file.
-        Assert.Equal("Foundation", model.Epics[0].Title);
+        // First-wins on the SECTION lookup: the first "Epic 1" H2 body attaches, the way a person reads the file.
         var story = Assert.Single(model.Epics[0].Stories);
         Assert.Equal("1.1", story.Id);
+
+        // The second section is observably discarded — its story never reaches the model at all.
+        Assert.DoesNotContain(model.Epics.SelectMany(e => e.Stories), s => s.Id == "1.9");
+
+        // And this is the corruption the diagnostic below exists to announce: BOTH epics resolve to the first
+        // section, so the second list entry renders under a title it did not declare.
+        Assert.All(model.Epics, e => Assert.Equal("Foundation", e.Title));
+    }
+
+    [Fact]
+    public void Parse_DuplicateEpicNumber_RecordsTheCollisionForTheAdapterToReport()
+    {
+        // Tolerating the duplicate is deliberate; tolerating it SILENTLY is the defect. The parser records the
+        // repeated number so BmadArtifactAdapter can raise a non-fatal notice instead of the run reporting
+        // errors=0 over a site where one epic page overwrote another. [Story 17.1 code review]
+        var model = EpicsParser.Parse(DuplicateEpicNumberMd);
+
+        Assert.Equal(new[] { 1 }, model.DuplicateEpicNumbers);
+    }
+
+    [Fact]
+    public void Parse_WithoutDuplicates_RecordsNoCollision()
+    {
+        var model = EpicsParser.Parse(SampleEpicsMd);
+
+        Assert.Empty(model.DuplicateEpicNumbers);
     }
 
     [Fact]
@@ -1352,14 +1392,33 @@ public class EpicsParserTests
     {
         var model = EpicsParser.Parse(DuplicateEpicNumberMd);
 
-        // The builders that index epics by number are the ones that used to throw. This must complete.
+        // RequirementsParser is a genuinely REACHABLE converted site (two of the eleven: the FR/NFR coverage
+        // index and StoriesFor). It is used here in place of the previous EpicsViewBuilder.BuildIndex call,
+        // which could not cover anything: that file's `ByFirst` sits inside BuildMilestoneBands, behind an
+        // `if (model.Milestones.Count == 0) return ...` guard, and BMad never populates Milestones — so the
+        // converted line never executed. [Story 17.1 code review]
+        var requirements = RequirementsParser.Parse(DuplicateEpicNumberMd, model, ProgressModel.Empty);
+        Assert.NotNull(requirements);
+
+        // The epics index still builds too (it must not throw), even though its own converted line is guarded.
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false, hasReadme: false);
-        var view = EpicsViewBuilder.BuildIndex(model, ProgressModel.Empty, nav, CommandCatalog.Empty);
-        Assert.NotNull(view);
+        Assert.NotNull(EpicsViewBuilder.BuildIndex(model, ProgressModel.Empty, nav, CommandCatalog.Empty));
 
         // And the shared policy itself, exercised directly on the duplicate: first declaration wins.
         var byNumber = model.Epics.ByFirst(e => e.Number);
         Assert.Single(byNumber);
         Assert.Equal("Foundation", byNumber[1].Title);
+    }
+
+    [Fact]
+    public void ByFirst_RejectsANullSource_RatherThanThrowingNullReference()
+    {
+        // The `ToDictionary` these calls replaced threw ArgumentNullException(nameof(source)); an unguarded
+        // `foreach` would throw a bare NullReferenceException instead — a strictly worse diagnostic from what
+        // is now the codebase's shared indexing helper. [Story 17.1 code review]
+        IEnumerable<EpicInfo>? nothing = null;
+
+        Assert.Throws<ArgumentNullException>(() => nothing!.ByFirst(e => e.Number));
+        Assert.Throws<ArgumentNullException>(() => nothing!.ByFirst(e => e.Number, e => e.Title));
     }
 }

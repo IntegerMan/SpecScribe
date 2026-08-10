@@ -58,16 +58,22 @@ describe('findRootBlocks', () => {
     expect(findRootBlocks(css)).toHaveLength(1)
   })
 
-  it('carries every token the real stylesheet declares, wherever it is declared', () => {
-    // Story 17.1 merged the Impact Map's `:root` back into the one at the head of the file, so the real sheet
-    // now has a SINGLE block. This test used to assert `blocks.length > 1`, which pinned an incidental fact
-    // about where the tokens happened to live rather than the invariant that matters. The invariant — every
-    // declared token crosses the bridge, so the gate cannot fail open — is asserted directly instead, and
-    // `--impact-lvl-3` (the family that silently never crossed) is still named. The multi-block CAPABILITY
-    // stays pinned by the synthetic-fixture cases above, where it belongs: those cannot be defeated by a
-    // stylesheet edit.
-    const blocks = findRootBlocks(readFileSync(SOURCE_CSS, 'utf8').replace(/\r\n/g, '\n'))
+  it('finds every TOP-LEVEL :root block of the real stylesheet, and the tokens they declare', () => {
+    // Title is deliberately narrower than the previous "wherever it is declared", which overclaimed:
+    // `findRootBlocks` SKIPS a `:root` nested in `@media` by design (see its docblock), and specscribe.css
+    // declares `--nav-offset` in exactly such a block — so that token is genuinely not carried and the old
+    // title described coverage this test does not have.
+    //
+    // `expect(blocks.length).toBeGreaterThan(0)` was also near-vacuous. It is replaced with an INDEPENDENT
+    // oracle: count top-level block openings with a plain line-anchored regex rather than re-deriving through
+    // `findRootBlocks`, which would compare the function against itself. `^:root \{` cannot match the
+    // `@media`-nested block because that one is indented — which is precisely the distinction under test.
+    // [Story 17.1 code review]
+    const raw = readFileSync(SOURCE_CSS, 'utf8').replace(/\r\n/g, '\n')
+    const blocks = findRootBlocks(raw)
+    expect(blocks).toHaveLength((raw.match(/^:root \{/gm) ?? []).length)
     expect(blocks.length).toBeGreaterThan(0)
+
     const all = blocks.flatMap((b) => declaredTokenNames(b.body))
     expect(all).toContain('--status-done')
     expect(all).toContain('--impact-lvl-3') // absent from tokens.css before the 2026-07-28 fix
@@ -76,13 +82,31 @@ describe('findRootBlocks', () => {
 
 describe('renderTokensCss', () => {
   it('emits every block the source declares, so no token is stranded on the C# side', () => {
-    // Was `> 1`, which only held while the real sheet happened to carry two blocks (see above). Comparing the
-    // emitted block count to the SOURCE block count is the stronger form: it catches an extractor that drops a
-    // block whether the source has two of them or twenty, and it keeps holding now that the source has one.
-    const source = readFileSync(SOURCE_CSS, 'utf8')
-    const out = renderTokensCss(source)
-    expect(out).toContain('--impact-lvl-3')
-    expect(out.match(/^:root \{/gm)?.length).toBe(findRootBlocks(source.replace(/\r\n/g, '\n')).length)
+    // This assertion HAS TO run against a synthetic multi-block source, not the real sheet.
+    //
+    // The original `> 1` form read the real stylesheet, so Story 17.1's legitimate `:root` merge turned it red
+    // while the extractor was entirely correct. Its replacement compared the emitted block count against
+    // `findRootBlocks(source).length` — but `renderTokensCss` BUILDS its output by mapping over that very same
+    // `findRootBlocks` call, so both sides of the comparison moved together and NO input could make it fail.
+    // Concretely: reverting the extractor to `blocks.slice(0, 1)` — the exact Story 23.2 fail-open regression
+    // this test exists to catch, the one where "the gate printed 'OK — 36 tokens in sync' the entire time it
+    // was wrong" — passed the whole suite. That is an assertion-free test in the same shape as the S2699
+    // BLOCKER Story 17.1 removed from the C# suite.
+    //
+    // The fixture AUGMENTS the real source rather than replacing it: `renderTokensCss` refuses any input
+    // missing a REQUIRED_TOKEN, so a bare two-property fixture never reaches the code under test. Appending
+    // one extra top-level block keeps every required token present while guaranteeing a second block, and it
+    // genuinely fails if any block is dropped. [Story 17.1 code review]
+    const source = readFileSync(SOURCE_CSS, 'utf8').replace(/\r\n/g, '\n')
+    const augmented = `${source}\n:root {\n  --synthetic-second-block: 1;\n}\n`
+    // Independent oracle again — counted off the INPUT text, never re-derived through `findRootBlocks`.
+    const expectedBlocks = (augmented.match(/^:root \{/gm) ?? []).length
+    expect(expectedBlocks).toBeGreaterThan(1) // the fixture must really be multi-block for this to mean anything
+
+    const emitted = renderTokensCss(augmented)
+    expect(emitted).toContain('--impact-lvl-3') // from the real block; absent from tokens.css before 2026-07-28
+    expect(emitted).toContain('--synthetic-second-block') // dies under `blocks.slice(0, 1)`
+    expect(emitted.match(/^:root \{/gm)).toHaveLength(expectedBlocks)
   })
 
   it('refuses to emit when a property is declared twice — the gate cannot reason about which copy drifted', () => {

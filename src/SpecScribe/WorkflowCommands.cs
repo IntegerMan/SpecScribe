@@ -39,13 +39,21 @@ public static class WorkflowCommands
         StoryInfo story, CommandCatalog commands,
         IReadOnlyList<FollowUpDeferredSlot>? openDeferred = null)
     {
-        if (StatusStyles.ForStory(story) == "done")
+        var stage = StatusStyles.ForStory(story);
+        if (stage == "done")
         {
             var open = OpenOnly(openDeferred);
             return open.Count > 0 && commands.Command("quick-dev") is { Length: > 0 }
                 ? RenderDoneWithDeferredPanel(story.Id, "Story", open, commands)
                 : RenderAllDonePanel(commands);
         }
+
+        // `retired` is the SECOND terminal stage (ADR 0025 Decision 1) and needs its own branch here, not a
+        // fall-through: `ForStory` returns an empty list for it, and `RenderPanel` renders an empty list as
+        // string.Empty — so before this branch existed a retired story emitted NO Next Steps section at all.
+        // That is the exact invisibility ADR 0025 exists to prevent. [Story 17.1 code review]
+        if (stage == "retired")
+            return RenderRetiredPanel(story.Id, OpenOnly(openDeferred), commands);
 
         return RenderPanel(ForStory(story, commands, openDeferred));
     }
@@ -66,7 +74,10 @@ public static class WorkflowCommands
         StoryInfo story, CommandCatalog commands,
         IReadOnlyList<FollowUpDeferredSlot>? openDeferred = null)
     {
-        if (StatusStyles.ForStory(story) == "done")
+        // Both TERMINAL stages take this branch (ADR 0025 Decision 1). `ForStory` returns an empty list for
+        // each, so gating on "done" alone left a retired story with no Address-deferred entry and no
+        // correct-course hatch — the outline's Quick Pick showed nothing, with no way to re-open it.
+        if (StatusStyles.ForStory(story) is "done" or "retired")
         {
             var cmds = new List<OutlineStoryCommand>();
             var open = OpenOnly(openDeferred);
@@ -102,7 +113,8 @@ public static class WorkflowCommands
         StoryInfo story, CommandCatalog commands,
         IReadOnlyList<FollowUpDeferredSlot>? openDeferred = null)
     {
-        if (StatusStyles.ForStory(story) == "done")
+        // Both TERMINAL stages (ADR 0025 Decision 1) — see StoryCommands for why "done" alone was wrong.
+        if (StatusStyles.ForStory(story) is "done" or "retired")
         {
             var open = OpenOnly(openDeferred);
             if (open.Count == 0) return null;
@@ -215,6 +227,53 @@ public static class WorkflowCommands
         {
             sb.Append(RenderAlternatesGroup([hatch]));
         }
+
+        sb.Append("</div>\n\n");
+        return sb.ToString();
+    }
+
+    /// <summary>Terminal panel for a RETIRED story — the second terminal stage alongside <c>done</c>
+    /// (ADR 0025 Decision 1). Deliberately NOT <see cref="RenderAllDonePanel"/>: retirement is not an
+    /// achievement, so the panel states the terminal fact plainly instead of celebrating it. It still carries
+    /// the muted <c>correct-course</c> hatch — a retired story is the one most likely to need re-opening — and
+    /// still surfaces open deferred work, because a retired story's deferred items are real work that outlived
+    /// the story and must not be stranded on a page that renders nothing.
+    ///
+    /// <para>Before Story 17.1's code review this method did not exist and the stage had no branch at all:
+    /// <see cref="ForStory"/> returned an empty list for <c>retired</c> and <see cref="RenderPanel"/> renders
+    /// an empty list as <see cref="string.Empty"/>, so the section vanished from the page entirely.</para>
+    /// [Story 17.1 code review]</summary>
+    private static string RenderRetiredPanel(
+        string storyId, IReadOnlyList<FollowUpDeferredSlot> openSlots, CommandCatalog commands)
+    {
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"chart-panel next-steps all-done retired\">\n<h3>Next Steps</h3>\n");
+        sb.Append($"<p class=\"all-done-complete\"><span class=\"all-done-icon\">{Icons.ForStatus("retired")}</span>Story {PathUtil.Html(storyId)} is retired — removed from the active plan, so no further work is scheduled against it.</p>\n");
+
+        if (openSlots.Count > 0)
+        {
+            sb.Append($"<p class=\"done-deferred-status\">{openSlots.Count} open deferred item{(openSlots.Count == 1 ? "" : "s")} remain{(openSlots.Count == 1 ? "s" : "")} — retiring the story did not close {(openSlots.Count == 1 ? "it" : "them")}.</p>\n");
+
+            var addr = BuildAddressDeferredSuggestion(storyId, "Story", openSlots, commands);
+            if (addr is not null)
+            {
+                sb.Append("<div class=\"next-steps-cards\">\n");
+                var accent = addr.Accent ?? AccentForCommand(addr.Command);
+                var badge = addr.DisplayLabel is { Length: > 0 } label
+                    ? RenderLabeledCommand(label, addr.Command)
+                    : RenderCommandBadge(addr.Command);
+                sb.Append($"  <div class=\"next-step-card next-step-card-primary {accent}\">\n");
+                sb.Append("    <span class=\"next-step-kicker\">Recommended</span>\n");
+                sb.Append($"    <div class=\"next-step-command\">{badge}</div>\n");
+                sb.Append($"    <p class=\"next-step-desc\">{PathUtil.Html(addr.Description)}</p>\n");
+                sb.Append("  </div>\n");
+                sb.Append("</div>\n");
+            }
+        }
+
+        var hatch = DoneEscapeHatch(commands);
+        if (hatch is not null)
+            sb.Append(RenderAlternatesGroup([hatch]));
 
         sb.Append("</div>\n\n");
         return sb.ToString();
@@ -566,6 +625,23 @@ public static class WorkflowCommands
             // not this list — keep empty so callers never treat a hatch as a ForStory primary.
             // `retired` joins it as the second TERMINAL stage (ADR 0025 Decision 1): a story removed from the
             // active plan is owed no further work, least of all "create-story" on the id that was retired.
+            return suggestions;
+        }
+
+        // An UNRECOGNIZED status on a story that ALREADY HAS AN ARTIFACT must never be told to create itself.
+        // `StatusStyles` keeps done/complete deliberately exact-only (so `not-complete` and `almost-complete`
+        // stay unrecognized rather than being mistaken for finished work), which means ordinary authored
+        // spellings — "Done (2026-08-01)", "Done - with caveats", "done ✅", "almost-done" — land here. The old
+        // substring classifier caught them with Contains("done") and rendered no panel at all; routing through
+        // StatusStyles closed a real ADR 0025 violation but regressed these into a Recommended "create-story"
+        // card on a story that demonstrably already has a story file (that Status: line was READ from it).
+        // Re-planning is the honest offer when the stage cannot be determined; re-drafting is not.
+        // [Story 17.1 code review]
+        if (stage == "unrecognized" && story.ArtifactOutputPath is not null)
+        {
+            Add(suggestions, commands.Command("correct-course"),
+                "This story's status isn't one SpecScribe recognizes — re-plan it to put it back on a known stage.");
+            AppendDeferredAlternate(suggestions, story.Id, "Story", openDeferred, commands);
             return suggestions;
         }
 

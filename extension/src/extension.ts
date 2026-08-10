@@ -2021,12 +2021,23 @@ function toolCommandLine(tool: ResolvedTool, sub?: string): string {
 function usesPosixStyleQuoting(): boolean {
   if (process.platform !== 'win32') return true;
   const profile = vscode.workspace.getConfiguration('terminal.integrated').get<string>('defaultProfile.windows');
-  // The alternation is GROUPED so its precedence is explicit (typescript:S5850): ungrouped, `$` binds only to
-  // the final branch and the intent is left to the reader. The asymmetry is deliberate and must be kept —
+  if (typeof profile !== 'string') return false;
+
+  // PowerShell family is excluded FIRST, before the POSIX test, because end-anchoring `sh` is not sufficient to
+  // keep it out: `pwsh` — PowerShell 7's executable and a very common `defaultProfile.windows` value — ENDS IN
+  // `sh` and so matched `sh$`, handing PowerShell the POSIX backslash escaping that `quoteCommandArg` documents
+  // as wrong for it (PowerShell does not treat `\` as an escape inside a double-quoted string, so any argument
+  // with an embedded `"` was staged mis-parsed). Story 17.1's comment reasoned only about the spelling
+  // "PowerShell", which the anchor does handle, and missed `pwsh`. [Story 17.1 code review]
+  if (/pwsh|powershell/i.test(profile)) return false;
+
+  // The alternation is GROUPED so its precedence is explicit (typescript:S5850). The asymmetry is deliberate:
   // `bash`/`wsl` match anywhere in the profile name ("Git Bash", "bash.exe", "Ubuntu (WSL)"), while `sh` is
-  // anchored to the END because unanchored it also matches "PowerShell" (p-o-w-e-r-**sh**-e-l-l), which is the
-  // exact profile this predicate must answer NO for. Anchored, it still catches "zsh" and "sh". [Story 17.1]
-  return typeof profile === 'string' && /(?:bash|wsl|sh$)/i.test(profile);
+  // END-anchored so it catches the shells actually named that way ("sh", "zsh", "csh", "ksh", "fish") without
+  // firing on any word that merely contains those two letters. `cygwin`/`msys`/`mingw` are named explicitly:
+  // they are POSIX shells whose profile names contain none of the other alternatives, so they were previously
+  // answered NO and given PowerShell quoting. [Story 17.1; pwsh + cygwin/msys/mingw: Story 17.1 code review]
+  return /(?:bash|wsl|cygwin|msys|mingw|sh$)/i.test(profile);
 }
 
 /** Shell-aware quoting: doubles an embedded `"` (`""`) for a PowerShell/cmd-style profile, backslash-escapes it
