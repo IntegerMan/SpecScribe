@@ -492,8 +492,11 @@ public static class WorkflowCommands
                 Add(suggestions, CommandForEpic(commands, "discuss-phase", epic),
                     $"Clarifies Phase {epic.WorkflowCommandArgument}'s scope and decisions before planning work begins.");
             }
-            Add(suggestions, CommandForEpic(commands, "ui-phase", epic),
-                $"Defines the UI specification for Phase {epic.WorkflowCommandArgument} before planning implementation.");
+            if (!epic.HasUiPlan)
+            {
+                Add(suggestions, CommandForEpic(commands, "ui-phase", epic),
+                    $"Defines the UI specification for Phase {epic.WorkflowCommandArgument} before planning implementation.");
+            }
             Add(suggestions, CommandForEpic(commands, "research-phase", epic),
                 $"Researches Phase {epic.WorkflowCommandArgument}'s open questions before planning implementation.");
         }

@@ -74,6 +74,10 @@ public sealed class EpicInfo
     /// from its phase-local discussion log so the next-step selector does not offer a redundant discussion prompt.</summary>
     public bool HasDiscussionLog { get; init; }
 
+    /// <summary>Whether the framework records a completed phase-specific UI plan. GSD Core derives this from its
+    /// phase-local UI specification so the next-step selector does not offer redundant UI-planning work.</summary>
+    public bool HasUiPlan { get; init; }
+
     public required EpicStatus Status { get; init; }
     public required EpicSection Section { get; init; }
     public required IReadOnlyList<StoryInfo> Stories { get; init; }

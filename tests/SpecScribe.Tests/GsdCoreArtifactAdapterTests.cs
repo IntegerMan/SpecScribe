@@ -357,16 +357,42 @@ public class GsdCoreArtifactAdapterTests : IDisposable
             This deferred idea belongs on the source document.
             """);
         File.WriteAllText(Path.Combine(phaseDirectory, "07-DISCUSSION-LOG.md"), "# Discussion Log\n");
+        File.WriteAllText(Path.Combine(phaseDirectory, "07-UI-SPEC.md"), """
+            # Phase 7 UI Design Contract
+
+            ## 0. Scope and Inheritance
+
+            Reuse the existing Knowledge navigation.
+
+            ## 6. Routes
+
+            Add an explorer route under knowledge.
+
+            ## 7. Component Inventory
+
+            ### New Components
+
+            Add a source explorer.
+
+            ## 8. Layout Specifications
+
+            This detailed layout belongs on the source document.
+            """);
 
         var phase = Assert.IsType<EpicsModel>(Ingest().Epics).Epics[3];
 
         Assert.True(phase.HasDiscussionLog);
+        Assert.True(phase.HasUiPlan);
         Assert.Contains("Phase Boundary", phase.PhaseContextHtml);
         Assert.Contains("Import text and markdown", phase.PhaseContextHtml);
         Assert.Contains("Implementation Decisions", phase.PhaseContextHtml);
         Assert.Contains("Keep source content", phase.PhaseContextHtml);
         Assert.DoesNotContain("reference inventory", phase.PhaseContextHtml);
         Assert.DoesNotContain("deferred idea", phase.PhaseContextHtml);
+        Assert.Contains("Scope and Inheritance", phase.PhaseContextHtml);
+        Assert.Contains("explorer route", phase.PhaseContextHtml);
+        Assert.Contains("source explorer", phase.PhaseContextHtml);
+        Assert.DoesNotContain("detailed layout", phase.PhaseContextHtml);
     }
 
     // ---- Status and task tally, honestly (Task 6, findings #2 and #8) -------------------------------------------

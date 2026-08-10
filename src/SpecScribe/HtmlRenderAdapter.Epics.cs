@@ -260,6 +260,13 @@ public sealed partial class HtmlRenderAdapter
         main.Append($"  <h1>{view.TitleHtml}</h1>\n");
         main.Append("</header>\n\n");
 
+        if (!view.HasStories && view.NextStepsHtml.Length > 0)
+        {
+            main.Append("<section class=\"dashboard-narrow\">\n");
+            main.Append(view.NextStepsHtml);
+            main.Append("</section>\n\n");
+        }
+
         if (view.GoalHtml.Length > 0 || view.FrMetaHtml is { Length: > 0 } || view.PhaseContextHtml.Length > 0)
         {
             main.Append("<div class=\"epic-card epic-intro\" id=\"sec-overview\">\n");
@@ -267,7 +274,7 @@ public sealed partial class HtmlRenderAdapter
             if (view.FrMetaHtml is { Length: > 0 }) main.Append($"  <div class=\"epic-meta\">{view.FrMetaHtml}</div>\n");
             if (view.PhaseContextHtml.Length > 0)
             {
-                main.Append("  <details class=\"phase-context\" open>\n    <summary>Planning context</summary>\n");
+                main.Append("  <details class=\"phase-context\">\n    <summary>Planning context</summary>\n");
                 main.Append($"    <div class=\"story-body\">{view.PhaseContextHtml}</div>\n");
                 main.Append("  </details>\n");
             }
@@ -294,13 +301,6 @@ public sealed partial class HtmlRenderAdapter
             main.Append(view.HierarchyExplorerHtml);
             main.Append("</div>\n</section>\n\n");
         }
-        else if (view.NextStepsHtml.Length > 0)
-        {
-            main.Append("<section class=\"dashboard-narrow\">\n");
-            main.Append(view.NextStepsHtml);
-            main.Append("</section>\n\n");
-        }
-
         main.Append(view.RetroAffordanceHtml);
         main.Append(view.UndraftedBannerHtml);
 

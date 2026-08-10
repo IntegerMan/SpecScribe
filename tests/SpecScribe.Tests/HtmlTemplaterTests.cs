@@ -1213,8 +1213,10 @@ public class HtmlTemplaterTests
             Title = "Phase 7: External Documents",
             GoalHtml = "Import RAG sources.",
             PhaseContextHtml = "<h2>Phase Boundary</h2><p>Import text and markdown.</p>"
-                + "<h2>Implementation Decisions</h2><p>Keep source provenance.</p>",
+                + "<h2>Implementation Decisions</h2><p>Keep source provenance.</p>"
+                + "<h2>Routes</h2><p>Add an explorer route.</p>",
             HasDiscussionLog = true,
+            HasUiPlan = true,
             Status = EpicStatus.Pending,
             Section = EpicSection.VerticalSlice,
             Stories = Array.Empty<StoryInfo>(),
@@ -1244,10 +1246,14 @@ public class HtmlTemplaterTests
         Assert.Contains("Planning context", html);
         Assert.Contains("Phase Boundary", html);
         Assert.Contains("Implementation Decisions", html);
+        Assert.Contains("Routes", html);
         Assert.DoesNotContain("/gsd:discuss-phase 07", html);
-        Assert.Contains("/gsd:ui-phase 07", html);
+        Assert.DoesNotContain("/gsd:ui-phase 07", html);
         Assert.Contains("/gsd:research-phase 07", html);
         Assert.Contains("/gsd:plan-phase 07", html);
+        Assert.True(
+            html.IndexOf("Next Steps", StringComparison.Ordinal) < html.IndexOf("Planning context", StringComparison.Ordinal),
+            "Next Steps should precede the collapsed planning detail.");
     }
 
     [Fact]

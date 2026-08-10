@@ -137,6 +137,10 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
         @"^(?<phase>\d+(?:\.\d+)?)-DISCUSSION-LOG\.md$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+    private static readonly Regex UiSpecFilePattern = TimedRegex.New(
+        @"^(?<phase>\d+(?:\.\d+)?)-UI-SPEC\.md$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
     private static readonly Regex GoalLine = TimedRegex.New(@"^\*\*Goal:?\*\*:?\s*(?<v>.+?)\s*$", RegexOptions.Compiled);
     private static readonly Regex RequirementsLine = TimedRegex.New(@"^\*\*Requirements:?\*\*:?\s*(?<v>.+?)\s*$", RegexOptions.Compiled);
     private static readonly Regex CompletedSuffix = TimedRegex.New(@"\s*\(completed\s+(?<date>[^)]+)\)\s*$", RegexOptions.Compiled);
@@ -375,8 +379,9 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
                 FrMetaHtml = phase.Requirements is { Length: > 0 } r
                     ? $"<strong>Requirements:</strong> {MarkdownConverter.RenderInline(r)}"
                     : null,
-                PhaseContextHtml = ReadPlanningContext(companionFiles.ContextPath),
+                PhaseContextHtml = ReadPlanningContext(companionFiles.ContextPath, companionFiles.UiSpecPath),
                 HasDiscussionLog = companionFiles.DiscussionLogPath is not null,
+                HasUiPlan = companionFiles.UiSpecPath is not null,
                 // Mirrors EpicsParser's own rule (`stories.Count > 0 ? Drafted : Pending`) rather than inventing a
                 // GSD-specific one — a phase with no plans listed is genuinely pending.
                 Status = stories.Count > 0 ? EpicStatus.Drafted : EpicStatus.Pending,
@@ -406,11 +411,11 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
     /// <summary>Finds GSD's phase-local context and discussion artifacts by their documented filename grammar.
     /// The numeric prefix is matched by decimal value, preserving GSD's tolerance for zero-padded and decimal
     /// phase identifiers without relying on a directory slug or a frontmatter field.</summary>
-    private static (string? ContextPath, string? DiscussionLogPath) FindPhaseCompanionFiles(
+    private static (string? ContextPath, string? DiscussionLogPath, string? UiSpecPath) FindPhaseCompanionFiles(
         string planningRoot, RoadmapPhase phase)
     {
         var phasesRoot = Path.Combine(planningRoot, PhasesDirName);
-        if (!Directory.Exists(phasesRoot)) return (null, null);
+        if (!Directory.Exists(phasesRoot)) return (null, null, null);
 
         try
         {
@@ -423,13 +428,15 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
 
                 string? context = null;
                 string? discussion = null;
+                string? uiSpec = null;
                 foreach (var path in Directory.EnumerateFiles(directory, "*.md", SearchOption.TopDirectoryOnly))
                 {
                     var fileName = Path.GetFileName(path);
                     if (ContextFilePattern.IsMatch(fileName)) context = path;
                     if (DiscussionLogFilePattern.IsMatch(fileName)) discussion = path;
+                    if (UiSpecFilePattern.IsMatch(fileName)) uiSpec = path;
                 }
-                return (context, discussion);
+                return (context, discussion, uiSpec);
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -437,20 +444,31 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
             // Companion details are optional; retain the roadmap projection if they cannot be read.
         }
 
-        return (null, null);
+        return (null, null, null);
     }
 
     /// <summary>Promotes only the context sections that describe the phase's active scope and locked planning
     /// decisions. Reference inventories, implementation notes, and deferred ideas remain on the source document
     /// instead of overwhelming the phase detail page.</summary>
-    private static string ReadPlanningContext(string? contextPath)
+    private static string ReadPlanningContext(string? contextPath, string? uiSpecPath)
     {
-        if (contextPath is null) return string.Empty;
+        var sections = new List<string>();
 
         try
         {
-            var selected = SelectContextSections(MarkdownConverter.ReadAllTextShared(contextPath));
-            return selected.Length > 0 ? MarkdownConverter.RenderBlock(selected) : string.Empty;
+            if (contextPath is not null)
+            {
+                var context = SelectSections(MarkdownConverter.ReadAllTextShared(contextPath),
+                    "Phase Boundary", "Implementation Decisions");
+                if (context.Length > 0) sections.Add(context);
+            }
+            if (uiSpecPath is not null)
+            {
+                var uiPlan = SelectSections(MarkdownConverter.ReadAllTextShared(uiSpecPath),
+                    "0. Scope and Inheritance", "6. Routes", "7. Component Inventory");
+                if (uiPlan.Length > 0) sections.Add(uiPlan);
+            }
+            return sections.Count > 0 ? MarkdownConverter.RenderBlock(string.Join("\n\n", sections)) : string.Empty;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -458,13 +476,9 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
         }
     }
 
-    private static string SelectContextSections(string raw)
+    private static string SelectSections(string raw, params string[] selectedHeadings)
     {
-        var selected = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "Phase Boundary",
-            "Implementation Decisions",
-        };
+        var selected = new HashSet<string>(selectedHeadings, StringComparer.OrdinalIgnoreCase);
         var output = new List<string>();
         var include = false;
         foreach (var line in raw.Replace("\r\n", "\n").Split('\n'))
