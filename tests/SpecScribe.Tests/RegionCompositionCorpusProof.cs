@@ -15,8 +15,14 @@
 //
 // ── The evidence ───────────────────────────────────────────────────────────────────────────────────────────
 //
-// **1,469 pages, 0 unexpected deltas.** Recorded in Story 23.4's Dev Agent Record and quoted in Story 23.6's
-// Dev Notes. That number is what licensed this story's deletion.
+// **1,408 pages, 0 unexpected deltas.** Recorded in Story 23.4's Dev Agent Record. That number is what licensed
+// this story's deletion.
+//
+// ⚠️ This block used to open with **1,469** and attribute it to that same Dev Agent Record, then use 1,408 itself
+// nine lines below — a self-contradiction in the sentence licensing a deletion. [Story 23.4 code review, finding
+// F-14] The proof ran over **1,408** pages (session 3 part 1). **1,469** is a different measurement: Story 23.4's
+// Task 5 parity corpus (session 3 part 2), larger because the story's own artifacts are themselves rendered pages.
+// Story 23.6's Dev Notes quote the 1,469 figure; the number that licensed THIS deletion is 1,408.
 //
 // It also carried its own anti-vacuity guard, worth preserving as a pattern: `GitMetrics` has a hard-coded
 // 3,000 ms budget that `git log --numstat` has been measured to exceed (6,496 ms cold), and it loses SILENTLY

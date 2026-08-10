@@ -222,13 +222,16 @@ public sealed class SiteGenerator
     // dashboard/epics families are NOT captured here; the SPA and webview re-render them from their view models
     // (RenderSpaBundle / RenderWebviewSurfaces) for strongest parity. [Story 6.7; spec-webview-doc-page-surfaces]
 
-    /// <summary>One captured page's own <see cref="PageView"/> plus the reference-link skip identity its full-page
-    /// linkify pass used — everything needed to recompose its content region WITHOUT slicing a rendered document.
-    /// <para>The skip ids are part of the capture and not re-derivable: <see cref="ApplyReferenceLinks"/> takes
-    /// them so a page never links to itself, and a region linkified without them would grow a self-link the sliced
-    /// region does not have. Capturing the page and dropping its skip identity is the one way to make this path
-    /// look byte-equal on the fixture (which has no self-referencing prose) and diverge on the real
-    /// corpus. [Story 23.4 AC #3]</para></summary>
+    /// <summary>One captured page's own <see cref="PageView"/> and its FINISHED content region — everything either
+    /// consumer needs without slicing a rendered document.
+    /// <para>⚠️ <b>The skip ids are deliberately NOT fields here, and that is the whole point.</b> [Story 23.4 code
+    /// review, finding F-18 — this summary described a two-field shape the record never had.] The reference-link
+    /// skip identity (<c>skipStoryId</c>/<c>skipEpicNumber</c>, which stop a page self-linking its own story or epic
+    /// mentions) is consumed by <see cref="ApplyReferenceLinks"/> INSIDE <see cref="WritePage"/>, in the same breath
+    /// as the page's own linkify pass, and the linkified result is what <c>Region</c> stores. Carrying the ids
+    /// forward instead would mean the region is a RECIPE re-evaluated later against mutable generator state — the
+    /// exact defect <c>Region</c>'s own remarks describe. Storing the finished string is what makes them
+    /// unnecessary. [Story 23.4 AC #3]</para></summary>
     /// <param name="Page">The page's own view model — the source of the structural projections the slicer used to
     /// scrape out of a rendered document (<c>Title</c>, <c>Breadcrumb</c>, <c>MetaDescription</c>).</param>
     /// <param name="Region">The composed content region, <b>computed eagerly at write time</b> — see

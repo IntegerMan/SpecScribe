@@ -4944,9 +4944,13 @@ So that SpecScribe has a single renderer and no drift hazard between two templat
 > owner decisions, the 23.1 gate's CSP assignment, and ADR 0018's retirement condition). Same shape as 23.3.
 >
 > 1. **The inventory was wrong by 40 %, in both directions over time.** Seeded as "857 pass-through of 1,046".
->    Measured from a `--deep-git --spa` generate: **1,469 IR pages**, of which 193 were already migrated and
->    **1,276** were not. A default generate omits `git-insights.html`, `deep-analytics.html`, `impact-map.html`
->    and all 300 `commit/` pages, so any count taken without `--deep-git` understates the story by ~300 pages.
+>    ⚠️ **Two counts, from two different runs — this item used to attribute the second to the first.** [Story 23.4
+>    code review, finding F-14] The Task 1 `--deep-git --spa` generate measured **1,408 IR pages / 1,409 `.html`**
+>    (session 3 part 1). The **1,469** figure is the later Task 5 parity corpus (session 3 part 2); it is larger
+>    because the story's own artifacts are themselves rendered pages, so the corpus grew mid-story. Both were
+>    correct when taken. Of the 1,469, 193 were already migrated and **1,276** were not. A default generate omits
+>    `git-insights.html`, `deep-analytics.html`, `impact-map.html` and all 300 `commit/` pages, so any count taken
+>    without `--deep-git` understates the story by ~300 pages.
 > 2. **D3/D5 is AMENDED: `ir-content.css` is NOT retired, and its "when it is empty" condition is unreachable
 >    as written.** Only **6.5 %** of the layer's rules are prose and authorable today; **93.5 %** style bespoke
 >    vocabulary *injected as rendered HTML* across **651 classes**. Retiring those means either ADR 0018's

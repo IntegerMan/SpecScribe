@@ -4,7 +4,7 @@ baseline_commit: 32fd282
 
 # Story 23.4: Migrate Remaining Surfaces + Retire the C# HtmlRenderAdapter for Content
 
-Status: review
+Status: done
 
 <!-- UNBLOCKED 2026-07-27 (Story 23.5 dev-story). The packaging gate this story was seeded `blocked` on is
      SETTLED by ADR 0022 (Proposed): Node is a build/CI-time toolchain AND a generate-time runtime; the shipped
@@ -427,6 +427,18 @@ here.
 
 **Per-AC verdict:** #6, #7 satisfied · #2 satisfied with a documented caveat · #1, #3, #4, #8 partially
 satisfied · **#5 satisfied-in-record-only**.
+
+**CLOSEOUT 2026-08-09 — story moves to `done`.** Second `/bmad-code-review 23.4` run, scoped by the owner to
+verify + close out (no new adversarial layers). Re-verified at HEAD `cd687e4`, **13 commits past** the apply
+commit and in the primary tree rather than a worktree: build **0 errors / 0 warnings**, C# **3,086 passed / 0
+failed / 3 skipped**, web **240 passed**. Both owner decisions confirmed recorded. **20 of 22 patches verified
+fully applied at the code**; **two were only half-applied and are now closed** — **F-18** (the `<param>` cref was
+fixed but `CapturedPageView`'s `<summary>` still described skip-id fields the record does not have) and **F-14**
+(recorded in this story, but the two misattributions it named still stood in `epics.md` and
+`RegionCompositionCorpusProof.cs`, the latter self-contradicting inside the sentence that licensed 23.6's
+deletion). Also observed and left to Story 23.6: dangling `<see cref>`s to `ExtractContentRegion`,
+`RegionCompositionDeltas` and `_spaCapture`, all deleted by 23.6 — harmless while `GenerateDocumentationFile`
+is off, CS1574 when it is not. Full detail: review record §9.
 
 **All 20 patches applied 2026-08-08**, both decisions resolved by the owner. Verified after: `dotnet build
 --no-incremental` **0 errors / 0 warnings**; C# suite **3,064 passed / 0 failed / 3 skipped**; web suite
