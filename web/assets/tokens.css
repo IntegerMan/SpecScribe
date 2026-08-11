@@ -40,6 +40,8 @@
      muted text token elsewhere) and risked reading as de-emphasized rather than as a real, equally-weighted
      category. */
   --violet: #6a4a7a;
+  --dotnet-purple: #512bd4;
+  --razor-lavender: #c5b4e3;
   --gold: #b8860b;
   --gold-light: #d4a017;
   --border: #d4c4a8;

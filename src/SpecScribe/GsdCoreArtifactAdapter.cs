@@ -669,10 +669,9 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
             entries.Add(new SprintEntry(SprintEntryKind.Epic, $"phase-{epic.Number}", epic.Number, null, phaseStatus));
             foreach (var story in epic.Stories)
             {
-                // "done" → done; "drafted" → backlog. ForSprint has no "drafted" arm (it reads the yaml ledger's
-                // closed vocabulary), so the words are chosen from ITS vocabulary here, not ForStatus's — the same
-                // native→canonical mapping discipline, applied to the right classifier.
-                var status = string.Equals(story.Status, "done", StringComparison.Ordinal) ? "done" : "backlog";
+                // GSD's roadmap names every executable plan. An unchecked named plan is ready to execute, whereas
+                // a phase without plans remains backlog at the phase level.
+                var status = string.Equals(story.Status, "done", StringComparison.Ordinal) ? "done" : "ready-for-dev";
                 var minor = story.Id.Split('.') is [_, var m] && int.TryParse(m, out var parsed) ? parsed : (int?)null;
                 entries.Add(new SprintEntry(SprintEntryKind.Story, story.Id, epic.Number, minor, status));
             }

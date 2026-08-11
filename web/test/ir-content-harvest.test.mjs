@@ -191,11 +191,35 @@ describe('runtime-applied classes [ADR 0039]', () => {
       'ss-hierarchy-probe', //   the colour probe; without it no-plan resolves to the Pending colour
       'ss-hierarchy-sw', //      the legend swatches that explain the hatching
       'ss-hierarchy-crumb', //   the drill breadcrumb
+      'codemap-dir-sunburst', //  Plotly's structural Code Map directory colour probe
       'slice', //                Plotly's own, on the sector group
       'surface', //              Plotly's own, on the sector path — together these carry the focus ring
+      'codemap-cell', //         Plotly's file-type colour probe base class
+      'type-csharp',
+      'type-fsharp',
+      'type-razor',
+      'type-python',
+      'type-script',
+      'type-styles',
+      'type-markup',
+      'type-config',
+      'type-other-lang',
+      'type-other',
     ]) {
       expect(seeded.has(cls)).toBe(true)
     }
+  })
+
+  it('carries Code Map probe selectors that static legend markup cannot prove', () => {
+    const used = collectInto('<path class="type-csharp"></path>')
+
+    expect(selectorIsUsed('.codemap-dir-sunburst', used)).toBe(false)
+    expect(selectorIsUsed('.codemap-cell.type-csharp', used)).toBe(false)
+    for (const name of conditionalClassNames()) used.classes.add(name)
+    expect(selectorIsUsed('.codemap-dir-sunburst', used)).toBe(true)
+    expect(selectorIsUsed('.codemap-cell.type-csharp', used)).toBe(true)
+    expect(selectorIsUsed('.codemap-cell.type-fsharp', used)).toBe(true)
+    expect(selectorIsUsed('.codemap-cell.type-razor', used)).toBe(true)
   })
 
   /**

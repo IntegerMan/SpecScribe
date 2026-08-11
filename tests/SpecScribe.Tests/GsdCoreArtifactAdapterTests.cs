@@ -642,6 +642,7 @@ public class GsdCoreArtifactAdapterTests : IDisposable
         Assert.Equal("done", sprint.Entries.First(e => e.Kind == SprintEntryKind.Epic && e.EpicNumber == 1).Status);
         Assert.Equal("in-progress", sprint.Entries.First(e => e.Kind == SprintEntryKind.Epic && e.EpicNumber == 3).Status);
         Assert.Equal("backlog", sprint.Entries.First(e => e.Kind == SprintEntryKind.Epic && e.EpicNumber == 4).Status);
+        Assert.Equal("ready-for-dev", sprint.Entries.First(e => e.Kind == SprintEntryKind.Story && e.RawKey == "3.2").Status);
 
         // Every ledger value maps onto the canonical vocabulary — none renders as "unrecognized".
         Assert.All(sprint.Entries, e => Assert.NotEqual("unrecognized", StatusStyles.ForSprint(e.Status)));

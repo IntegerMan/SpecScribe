@@ -31,6 +31,8 @@
      muted text token elsewhere) and risked reading as de-emphasized rather than as a real, equally-weighted
      category. */
   --violet: #6a4a7a;
+  --dotnet-purple: #512bd4;
+  --razor-lavender: #c5b4e3;
   --gold: #b8860b;
   --gold-light: #d4a017;
   --border: #d4c4a8;
@@ -349,7 +351,8 @@ body {
   font-size: 0.66rem;
 }
 
-.ss-hierarchy-controls { display: flex; justify-content: center; margin: 0 0 0.6rem; }
+.ss-hierarchy-controls { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 0.35rem 0.55rem; margin: 0 0 0.6rem; padding: 0.15rem 0; }
+.ss-hierarchy-controls .codemap-controls { margin: 0; }
 /* `[hidden]`'s UA rule is `[hidden] { display: none }`, and the author `display: flex` above ties with it on
    specificity — author CSS always wins that tie, so without this override the shape selector renders LIVE for every
    JS-off, webview, SPA and engine-blocked reader: a "Sunburst | Treemap" tab bar that does nothing at all. The
@@ -376,6 +379,17 @@ body {
 }
 #dashboard-hierarchy-shape-sunburst:focus-visible ~ .board-tabbar label[for="dashboard-hierarchy-shape-sunburst"],
 #dashboard-hierarchy-shape-treemap:focus-visible ~ .board-tabbar label[for="dashboard-hierarchy-shape-treemap"] {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+.ss-hierarchy-controls .ss-hierarchy-shape[value="sunburst"]:checked ~ .board-tabbar label[for$="-shape-sunburst"],
+.ss-hierarchy-controls .ss-hierarchy-shape[value="treemap"]:checked ~ .board-tabbar label[for$="-shape-treemap"] {
+  background: var(--warm-white);
+  color: var(--ink);
+  box-shadow: 0 1px 3px var(--shadow);
+}
+.ss-hierarchy-controls .ss-hierarchy-shape[value="sunburst"]:focus-visible ~ .board-tabbar label[for$="-shape-sunburst"],
+.ss-hierarchy-controls .ss-hierarchy-shape[value="treemap"]:focus-visible ~ .board-tabbar label[for$="-shape-treemap"] {
   outline: 2px solid var(--teal);
   outline-offset: 2px;
 }
@@ -4453,7 +4467,9 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
    step of the ramp. Also deliberately off the --status-* lifecycle tokens (file type is not a lifecycle signal).
    "Other" gets the same honest muted-neutral treatment as level-none plus a dashed stroke, mirroring
    --status-unrecognized-hatch's "the unknown bucket looks distinct, not like a 6th invented hue" precedent. */
-.codemap-cell.type-csharp { fill: var(--teal-deep); }
+.codemap-cell.type-csharp,
+.codemap-cell.type-fsharp { fill: var(--dotnet-purple); }
+.codemap-cell.type-razor { fill: var(--razor-lavender); }
 .codemap-cell.type-python { fill: var(--moss-light); }
 .codemap-cell.type-script { fill: var(--teal); }
 .codemap-cell.type-styles { fill: var(--rust); }
@@ -4477,7 +4493,7 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 }
 .codemap-dim-select:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
 
-/* The two exclude-filter checkboxes (round 2) — PURE CSS, no script required; see the [data-codemap-view] and
+/* The three exclude-filter checkboxes — PURE CSS, no script required; see the [data-codemap-view] and
    .codemap-table-row rules below. Plain, unwrapped <input>+<label> siblings (not nested in a fieldset) since the
    sibling-combinator toggle needs them at the same nesting level as the .codemap-table-section they control.
    [Story 20.10 review: the retired `.codemap-view` panels this comment used to point at no longer exist.] */
@@ -4493,19 +4509,23 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
   cursor: pointer;
 }
 
-/* Story 20.10 D2/D3: the four independently-serialized `.codemap-view` filter-combination panels are retired —
-   ONE chart instance (view-switched by specscribe.js) and ONE file table now sit where four used to. Two pure-CSS
+/* Story 20.10 D2/D3: the independently-serialized `.codemap-view` filter-combination panels are retired —
+  ONE chart instance (view-switched by specscribe.js) and ONE file table now sit where they used to. Two pure-CSS
    mechanisms replace the old single four-combination panel toggle:
 
-   1. Per-view LEAD TEXT in the (now shared) file table section — still exactly one of four blocks shown at a
-      time, so it keeps the same four-combination sibling-combinator selector the retired panel toggle used, just
+  1. Per-view LEAD TEXT in the (now shared) file table section — still exactly one block shown at a
+    time, so it keeps the sibling-combinator selector the retired panel toggle used, just
       scoped to `.codemap-table-section` (a plain sibling of the checkboxes, same as the four panels were) and
       matching the generic `[data-codemap-view]` marker instead of the retired `.codemap-view[data-view]`. */
 .codemap-table-section [data-codemap-view] { display: none; }
-#cm-exclude-spec:not(:checked) ~ #cm-exclude-tests:not(:checked) ~ .codemap-table-section [data-codemap-view="full"],
-#cm-exclude-spec:checked ~ #cm-exclude-tests:not(:checked) ~ .codemap-table-section [data-codemap-view="no-spec"],
-#cm-exclude-spec:not(:checked) ~ #cm-exclude-tests:checked ~ .codemap-table-section [data-codemap-view="no-tests"],
-#cm-exclude-spec:checked ~ #cm-exclude-tests:checked ~ .codemap-table-section [data-codemap-view="no-spec-no-tests"] {
+#cm-exclude-spec:not(:checked) ~ #cm-exclude-tests:not(:checked) ~ #cm-exclude-agent:not(:checked) ~ .codemap-table-section [data-codemap-view="full"],
+#cm-exclude-spec:checked ~ #cm-exclude-tests:not(:checked) ~ #cm-exclude-agent:not(:checked) ~ .codemap-table-section [data-codemap-view="no-spec"],
+#cm-exclude-spec:not(:checked) ~ #cm-exclude-tests:checked ~ #cm-exclude-agent:not(:checked) ~ .codemap-table-section [data-codemap-view="no-tests"],
+#cm-exclude-spec:not(:checked) ~ #cm-exclude-tests:not(:checked) ~ #cm-exclude-agent:checked ~ .codemap-table-section [data-codemap-view="no-agent"],
+#cm-exclude-spec:checked ~ #cm-exclude-tests:checked ~ #cm-exclude-agent:not(:checked) ~ .codemap-table-section [data-codemap-view="no-spec-no-tests"],
+#cm-exclude-spec:checked ~ #cm-exclude-tests:not(:checked) ~ #cm-exclude-agent:checked ~ .codemap-table-section [data-codemap-view="no-spec-no-agent"],
+#cm-exclude-spec:not(:checked) ~ #cm-exclude-tests:checked ~ #cm-exclude-agent:checked ~ .codemap-table-section [data-codemap-view="no-tests-no-agent"],
+#cm-exclude-spec:checked ~ #cm-exclude-tests:checked ~ #cm-exclude-agent:checked ~ .codemap-table-section [data-codemap-view="no-spec-no-tests-no-agent"] {
   display: block;
 }
 
@@ -4516,10 +4536,14 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
    in every combination — including under "No files match this filter." — and reported a number that was not the
    active view's.] */
 .codemap-table-section tr[data-codemap-view] { display: none; }
-#cm-exclude-spec:not(:checked) ~ #cm-exclude-tests:not(:checked) ~ .codemap-table-section tr[data-codemap-view="full"],
-#cm-exclude-spec:checked ~ #cm-exclude-tests:not(:checked) ~ .codemap-table-section tr[data-codemap-view="no-spec"],
-#cm-exclude-spec:not(:checked) ~ #cm-exclude-tests:checked ~ .codemap-table-section tr[data-codemap-view="no-tests"],
-#cm-exclude-spec:checked ~ #cm-exclude-tests:checked ~ .codemap-table-section tr[data-codemap-view="no-spec-no-tests"] {
+#cm-exclude-spec:not(:checked) ~ #cm-exclude-tests:not(:checked) ~ #cm-exclude-agent:not(:checked) ~ .codemap-table-section tr[data-codemap-view="full"],
+#cm-exclude-spec:checked ~ #cm-exclude-tests:not(:checked) ~ #cm-exclude-agent:not(:checked) ~ .codemap-table-section tr[data-codemap-view="no-spec"],
+#cm-exclude-spec:not(:checked) ~ #cm-exclude-tests:checked ~ #cm-exclude-agent:not(:checked) ~ .codemap-table-section tr[data-codemap-view="no-tests"],
+#cm-exclude-spec:not(:checked) ~ #cm-exclude-tests:not(:checked) ~ #cm-exclude-agent:checked ~ .codemap-table-section tr[data-codemap-view="no-agent"],
+#cm-exclude-spec:checked ~ #cm-exclude-tests:checked ~ #cm-exclude-agent:not(:checked) ~ .codemap-table-section tr[data-codemap-view="no-spec-no-tests"],
+#cm-exclude-spec:checked ~ #cm-exclude-tests:not(:checked) ~ #cm-exclude-agent:checked ~ .codemap-table-section tr[data-codemap-view="no-spec-no-agent"],
+#cm-exclude-spec:not(:checked) ~ #cm-exclude-tests:checked ~ #cm-exclude-agent:checked ~ .codemap-table-section tr[data-codemap-view="no-tests-no-agent"],
+#cm-exclude-spec:checked ~ #cm-exclude-tests:checked ~ #cm-exclude-agent:checked ~ .codemap-table-section tr[data-codemap-view="no-spec-no-tests-no-agent"] {
   display: table-row;
 }
 
@@ -4528,7 +4552,8 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
       under EITHER active exclude checkbox composes correctly for all four combinations without enumerating them.
       This is the D2/D3 no-JS filter guarantee, preserved by construction: still pure CSS, still zero script. */
 #cm-exclude-spec:checked ~ .codemap-table-section .codemap-table-row.is-spec,
-#cm-exclude-tests:checked ~ .codemap-table-section .codemap-table-row.is-test {
+#cm-exclude-tests:checked ~ .codemap-table-section .codemap-table-row.is-test,
+#cm-exclude-agent:checked ~ .codemap-table-section .codemap-table-row.is-agent {
   display: none;
 }
 
@@ -4547,7 +4572,11 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
    ordering hazard between them). */
 #cm-exclude-spec:checked ~ .codemap-table-section .codemap-tree-dir.dir-all-spec,
 #cm-exclude-tests:checked ~ .codemap-table-section .codemap-tree-dir.dir-all-test,
-#cm-exclude-spec:checked ~ #cm-exclude-tests:checked ~ .codemap-table-section .codemap-tree-dir.dir-all-excluded {
+#cm-exclude-agent:checked ~ .codemap-table-section .codemap-tree-dir.dir-all-agent,
+#cm-exclude-spec:checked ~ #cm-exclude-tests:checked ~ .codemap-table-section .codemap-tree-dir.dir-all-spec-test,
+#cm-exclude-spec:checked ~ #cm-exclude-agent:checked ~ .codemap-table-section .codemap-tree-dir.dir-all-spec-agent,
+#cm-exclude-tests:checked ~ #cm-exclude-agent:checked ~ .codemap-table-section .codemap-tree-dir.dir-all-test-agent,
+#cm-exclude-spec:checked ~ #cm-exclude-tests:checked ~ #cm-exclude-agent:checked ~ .codemap-table-section .codemap-tree-dir.dir-all-excluded {
   display: none;
 }
 
@@ -4574,7 +4603,9 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
 .codemap-legend[hidden] { display: none; }
 .codemap-legend-discrete { flex-wrap: wrap; }
 .codemap-legend-label { margin-right: 0.6rem; }
-.codemap-legend-swatch.type-csharp { background: var(--teal-deep); }
+.codemap-legend-swatch.type-csharp,
+.codemap-legend-swatch.type-fsharp { background: var(--dotnet-purple); }
+.codemap-legend-swatch.type-razor { background: var(--razor-lavender); }
 .codemap-legend-swatch.type-python { background: var(--moss-light); }
 .codemap-legend-swatch.type-script { background: var(--teal); }
 .codemap-legend-swatch.type-styles { background: var(--rust); }
@@ -4644,7 +4675,7 @@ a.coverage-card:hover { box-shadow: 0 2px 8px var(--shadow); transform: translat
    through the same probe every other family goes through. The `-sunburst` variant is the one kept rather than
    `.codemap-dir`'s `fill: none`, because a Plotly sector is a filled shape, not a boundary rect drawn over its
    children. */
-.codemap-dir-sunburst { fill: var(--parchment-dark); fill-opacity: 0.18; stroke: var(--ink-light); stroke-width: 1; stroke-opacity: 0.5; }
+.codemap-dir-sunburst { fill: var(--warm-white); stroke: var(--ink-light); stroke-width: 1; stroke-opacity: 0.5; }
 
 /* ============ REFACTOR-TARGET RISK QUADRANT (risk-quadrant.html, Story 7.10) ============ */
 /* Size (X, log-scaled) x churn-frequency (Y) scatter. Not a --status-* surface — files carry no lifecycle status,

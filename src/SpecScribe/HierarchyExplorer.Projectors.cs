@@ -566,7 +566,7 @@ public static partial class HierarchyExplorer
     {
         var title = CodeMapViewTitle(variant);
         var window = $"{variant.Map.FileCount:N0} {Charts.Plural(variant.Map.FileCount, "file", "files")} · {variant.Map.TotalLines:N0} {Charts.Plural((int)Math.Min(variant.Map.TotalLines, int.MaxValue), "line", "lines")}";
-        var when = $"cm-exclude-spec={(variant.ExcludesSpecDev ? "1" : "0")};cm-exclude-tests={(variant.ExcludesTests ? "1" : "0")}";
+        var when = $"cm-exclude-spec={(variant.ExcludesSpecDev ? "1" : "0")};cm-exclude-tests={(variant.ExcludesTests ? "1" : "0")};cm-exclude-agent={(variant.ExcludesAgentDirectories ? "1" : "0")}";
 
         if (variant.Map.IsEmpty)
             return new HierarchyView(variant.Key, title, window, Array.Empty<HierarchyNode>(), Array.Empty<int>(), Array.Empty<int>(), when);
@@ -603,14 +603,17 @@ public static partial class HierarchyExplorer
     /// <summary>Each view's own framed title (F4) — the SAME vocabulary <c>CodeMapTemplater.VariantTitle</c> used
     /// per-panel before Story 20.10 collapsed four panels to one instance. Lives here (not in the templater)
     /// because it is now payload DATA the client swaps on a view change, not a one-time server string.</summary>
-    internal static string CodeMapViewTitle(CodeMapVariant variant) =>
-        (variant.ExcludesSpecDev, variant.ExcludesTests) switch
-        {
-            (true, true) => "Source Code Map — excluding spec-driven development directories and tests",
-            (true, false) => "Source Code Map — excluding spec-driven development directories",
-            (false, true) => "Source Code Map — excluding tests",
-            _ => "Source Code Map — every file",
-        };
+    internal static string CodeMapViewTitle(CodeMapVariant variant)
+    {
+        var exclusions = new List<string>(3);
+        if (variant.ExcludesSpecDev) exclusions.Add("spec-driven development directories");
+        if (variant.ExcludesTests) exclusions.Add("tests");
+        if (variant.ExcludesAgentDirectories) exclusions.Add("agent and tooling directories");
+
+        return exclusions.Count == 0
+            ? "Source Code Map — every file"
+            : $"Source Code Map — excluding {string.Join(" and ", exclusions)}";
+    }
 
     /// <summary>Walks a variant's already-collapsed directory tree, emitting ONLY directory nodes into
     /// <paramref name="scaffold"/> (never rebuilding a file's expensive <see cref="HierarchyNode"/> — that is the

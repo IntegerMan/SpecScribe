@@ -358,6 +358,21 @@ export const CONDITIONAL_CLASSES = [
   'ss-hierarchy-crumb', //     the JS-built drill breadcrumb
   'ss-hierarchy-crumb-current',
   'ss-hierarchy-crumb-open',
+  'codemap-dir-sunburst', //  Code Map directory sectors; the structural fill is probe-only at runtime
+  // The Code Map's file-type classes are applied only to the probe path while Plotly resolves a category's
+  // fill. Its static legend renders the `type-*` half, but never `codemap-cell`, so the compound selector was
+  // pruned and every sector fell back to SVG black. Seed the bounded category vocabulary as one contract.
+  'codemap-cell',
+  'type-csharp',
+  'type-fsharp',
+  'type-razor',
+  'type-python',
+  'type-script',
+  'type-styles',
+  'type-markup',
+  'type-config',
+  'type-other-lang',
+  'type-other',
   // Plotly's OWN class names, on the sector nodes it emits. `.ss-hierarchy g.slice path.surface:focus`
   // is the keyboard focus ring; it named two classes this repo never writes, so it was always dropped.
   'slice',

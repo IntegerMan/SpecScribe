@@ -59,6 +59,7 @@ public static class CodeMapTemplater
         // like `data-hierarchy-reveal-when` before it, so the shared component never learns these ids mean anything.
         AppendFilterCheckbox(sb, "cm-exclude-spec", "Exclude spec-driven development directories");
         AppendFilterCheckbox(sb, "cm-exclude-tests", "Exclude tests");
+        AppendFilterCheckbox(sb, "cm-exclude-agent", "Exclude agent and tooling directories");
 
         if (!full.Map.IsEmpty)
         {
@@ -477,6 +478,7 @@ public static class CodeMapTemplater
             var rowClass = "codemap-table-row";
             if (CodeMap.IsSpecDevPath(file.RepoRelativePath)) rowClass += " is-spec";
             if (CodeMap.IsTestPath(file.RepoRelativePath)) rowClass += " is-test";
+            if (CodeMap.IsAgentToolingPath(file.RepoRelativePath)) rowClass += " is-agent";
 
             sb.Append("              <tr class=\"").Append(rowClass).Append("\"><th scope=\"row\">").Append(pathCell).Append("</th>");
             sb.Append($"<td class=\"num\">{file.Lines.ToString("N0", CultureInfo.InvariantCulture)}</td>");
@@ -527,20 +529,33 @@ public static class CodeMapTemplater
 
         var allSpec = true;
         var allTest = true;
+        var allAgent = true;
+        var allSpecOrTest = true;
+        var allSpecOrAgent = true;
+        var allTestOrAgent = true;
         var allExcluded = true;
         foreach (var path in descendantFiles)
         {
             var spec = CodeMap.IsSpecDevPath(path);
             var test = CodeMap.IsTestPath(path);
+            var agent = CodeMap.IsAgentToolingPath(path);
             if (!spec) allSpec = false;
             if (!test) allTest = false;
-            if (!spec && !test) allExcluded = false;
-            if (!allSpec && !allTest && !allExcluded) break;
+            if (!agent) allAgent = false;
+            if (!spec && !test) allSpecOrTest = false;
+            if (!spec && !agent) allSpecOrAgent = false;
+            if (!test && !agent) allTestOrAgent = false;
+            if (!spec && !test && !agent) allExcluded = false;
+            if (!allSpec && !allTest && !allAgent && !allSpecOrTest && !allSpecOrAgent && !allTestOrAgent && !allExcluded) break;
         }
 
         var markers = string.Empty;
         if (allSpec) markers += " dir-all-spec";
         if (allTest) markers += " dir-all-test";
+        if (allAgent) markers += " dir-all-agent";
+        if (allSpecOrTest) markers += " dir-all-spec-test";
+        if (allSpecOrAgent) markers += " dir-all-spec-agent";
+        if (allTestOrAgent) markers += " dir-all-test-agent";
         if (allExcluded) markers += " dir-all-excluded";
         return markers;
     }

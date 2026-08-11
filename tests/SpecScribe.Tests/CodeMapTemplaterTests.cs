@@ -55,6 +55,9 @@ public class CodeMapTemplaterTests
     {
         var html = JsonSpaRenderAdapter.Shared.RenderContent(CodeMapTemplater.BuildPage(VariantsWithMetrics(), Nav()));
 
+        using var island = JsonDocument.Parse(Island(html));
+        Assert.False(island.RootElement.GetProperty("config").TryGetProperty("treemapMaxDepth", out _));
+
         // Standard standalone-page shell.
         Assert.Contains("<main id=\"main-content\"", html);
         Assert.Contains("class=\"breadcrumb\"", html);
@@ -181,7 +184,7 @@ public class CodeMapTemplaterTests
     }
 
     [Fact]
-    public void RenderPage_EmitsFourServerDeclaredViewsAndTwoPureCssFilterCheckboxes()
+    public void RenderPage_EmitsEightServerDeclaredViewsAndThreePureCssFilterCheckboxes()
     {
         var variants = VariantsWithoutMetrics(
             (".agents/skills/bmad-dev/workflow.md", 10L),
@@ -196,15 +199,18 @@ public class CodeMapTemplaterTests
         Assert.Contains("<label for=\"cm-exclude-spec\"", html);
         Assert.Contains("<input type=\"checkbox\" id=\"cm-exclude-tests\" class=\"codemap-filter-checkbox\" data-hierarchy-reveal data-hierarchy-view-toggle>", html);
         Assert.Contains("<label for=\"cm-exclude-tests\"", html);
+        Assert.Contains("<input type=\"checkbox\" id=\"cm-exclude-agent\" class=\"codemap-filter-checkbox\" data-hierarchy-reveal data-hierarchy-view-toggle>", html);
+        Assert.Contains("<label for=\"cm-exclude-agent\"", html);
 
-        // All four views are server-declared in the ONE shared island, each with its own title.
+        // All eight views are server-declared in the ONE shared island, each with its own title.
         using var doc = JsonDocument.Parse(Island(html));
         var keys = doc.RootElement.GetProperty("views").EnumerateArray().Select(v => v.GetProperty("key").GetString()).ToList();
-        Assert.Equal(new[] { "full", "no-spec", "no-tests", "no-spec-no-tests" }, keys);
+        Assert.Equal(new[] { "full", "no-spec", "no-tests", "no-agent", "no-spec-no-tests", "no-spec-no-agent", "no-tests-no-agent", "no-spec-no-tests-no-agent" }, keys);
 
         Assert.Equal("Source Code Map — excluding spec-driven development directories", ViewOf(doc, "no-spec").GetProperty("title").GetString());
         Assert.Equal("Source Code Map — excluding tests", ViewOf(doc, "no-tests").GetProperty("title").GetString());
         Assert.Equal("Source Code Map — excluding spec-driven development directories and tests", ViewOf(doc, "no-spec-no-tests").GetProperty("title").GetString());
+        Assert.Equal("Source Code Map — excluding agent and tooling directories", ViewOf(doc, "no-agent").GetProperty("title").GetString());
         Assert.Equal("Source Code Map — every file", ViewOf(doc, "full").GetProperty("title").GetString());
 
         // The default view's title is server-baked into the panel heading too, matching the payload's own "full".

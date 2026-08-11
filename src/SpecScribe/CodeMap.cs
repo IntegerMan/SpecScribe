@@ -42,6 +42,8 @@ public sealed record CodeFileCategory(string Key, string Label);
 public static class CodeFileType
 {
     public static readonly CodeFileCategory CSharp = new("csharp", "C#");
+    public static readonly CodeFileCategory FSharp = new("fsharp", "F#");
+    public static readonly CodeFileCategory Razor = new("razor", "Razor (CSHTML)");
     public static readonly CodeFileCategory Python = new("python", "Python");
     public static readonly CodeFileCategory Script = new("script", "TypeScript/JavaScript");
     public static readonly CodeFileCategory Styles = new("styles", "Styles");
@@ -59,7 +61,7 @@ public static class CodeFileType
     /// (real categories before the "Other" catch-all) so the legend reads the same way across every generation
     /// run regardless of which files happen to be present.</summary>
     public static readonly IReadOnlyList<CodeFileCategory> AllCategories =
-        new[] { CSharp, Python, Script, Styles, Markup, Config, OtherLanguages, Other };
+        new[] { CSharp, FSharp, Razor, Python, Script, Styles, Markup, Config, OtherLanguages, Other };
 
     /// <summary>Classifies a repo-relative source path into its bounded file-type category by extension.
     /// Normalizes via <see cref="PathUtil.NormalizeSlashes"/>; case-insensitive extension matching; an
@@ -85,6 +87,8 @@ public static class CodeFileType
         return name[(dot + 1)..].ToLowerInvariant() switch
         {
             "cs" or "csx" => CSharp,
+            "fs" or "fsi" or "fsx" => FSharp,
+            "cshtml" => Razor,
             "py" or "pyi" or "pyw" => Python,
             "ts" or "tsx" or "js" or "jsx" or "mjs" or "cjs" => Script,
             "css" or "scss" => Styles,
@@ -120,7 +124,12 @@ public sealed record TreemapRect(CodeMapNode Node, double X, double Y, double W,
 /// <c>Charts.CodeFreshnessTreemap</c> that no longer exists. <see cref="Layout(double, double)"/> the METHOD stays
 /// (still exercised directly by tests as a pure function of a <see cref="CodeMap"/>); only the four-times-per-
 /// generation call computing an unread field is gone.</para></summary>
-public sealed record CodeMapVariant(string Key, bool ExcludesSpecDev, bool ExcludesTests, CodeMap Map);
+public sealed record CodeMapVariant(
+    string Key,
+    bool ExcludesSpecDev,
+    bool ExcludesTests,
+    CodeMap Map,
+    bool ExcludesAgentDirectories = false);
 
 /// <summary>A pure, source-code-derived treemap model of a repository's files sized by lines of code and nested by
 /// directory. Mirrors the shape every pure model in this repo uses (<see cref="WorkInventory"/>,
@@ -186,6 +195,13 @@ public sealed class CodeMap
     private static readonly string[] SpecDevPathPrefixes =
         { ".agents", ".claude", "_bmad", "_bmad-output", ".github/agents" };
 
+    /// <summary>Top-level assistant and developer-tooling directories that can dominate a code map without being
+    /// product source. This is deliberately independent from <see cref="SpecDevPathPrefixes"/>: the agent filter
+    /// includes complete tooling roots such as <c>.github</c>, while the spec-development filter preserves CI
+    /// workflows and excludes only its <c>.github/agents</c> subdirectory.</summary>
+    private static readonly string[] AgentToolingPathPrefixes =
+        { ".agent", ".agents", ".claude", ".codex", ".cursor", ".github", ".idea", ".opencode", ".vscode" };
+
     /// <summary>True when a repo-relative path lives under one of the repo's spec-driven-development directories
     /// (<see cref="SpecDevPathPrefixes"/>) — the code-map's "exclude spec-driven development directories" checkbox
     /// filter. Normalizes via <see cref="PathUtil.NormalizeSlashes"/> internally (raw, un-normalized paths are safe
@@ -196,6 +212,19 @@ public sealed class CodeMap
     {
         var norm = PathUtil.NormalizeSlashes(repoRelativePath);
         foreach (var prefix in SpecDevPathPrefixes)
+        {
+            if (norm.StartsWith(prefix + "/", StringComparison.Ordinal)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>True when a repo-relative path is under a top-level assistant or developer-tooling directory.
+    /// The comparison is intentionally ordinal and case-sensitive because these are fixed dot-directory names,
+    /// not user-authored source paths. Paths are slash-normalized before matching.</summary>
+    public static bool IsAgentToolingPath(string repoRelativePath)
+    {
+        var norm = PathUtil.NormalizeSlashes(repoRelativePath);
+        foreach (var prefix in AgentToolingPathPrefixes)
         {
             if (norm.StartsWith(prefix + "/", StringComparison.Ordinal)) return true;
         }
@@ -290,9 +319,8 @@ public sealed class CodeMap
         };
     }
 
-    /// <summary>Builds all four <see cref="CodeMapVariant"/> filter combinations (full / exclude spec-dev dirs /
-    /// exclude tests / exclude both) in one pass — the single place the "exclude spec-driven development
-    /// directories" and "exclude tests" checkboxes' filtering happens. Each combination gets its own
+    /// <summary>Builds all eight <see cref="CodeMapVariant"/> filter combinations for the spec-development, test,
+    /// and agent/tooling-directory checkboxes. Each combination gets its own
     /// <see cref="Build"/> call; layout is the client-side Plotly component's job now (Story 20.9), and no longer
     /// computed here per variant (Story 20.10 F6 — <see cref="CodeMapVariant"/> no longer carries one). Pure, never
     /// throws (an individual combo that filters down to nothing degrades to that variant's own
@@ -301,26 +329,31 @@ public sealed class CodeMap
         IReadOnlyList<(string RepoRelativePath, long Lines)> sourceFiles,
         IReadOnlyDictionary<string, CodeFileMetrics> gitMetrics)
     {
-        var combos = new (string Key, bool ExcludesSpecDev, bool ExcludesTests)[]
+        var combos = new (string Key, bool ExcludesSpecDev, bool ExcludesTests, bool ExcludesAgentDirectories)[]
         {
-            ("full", false, false),
-            ("no-spec", true, false),
-            ("no-tests", false, true),
-            ("no-spec-no-tests", true, true),
+            ("full", false, false, false),
+            ("no-spec", true, false, false),
+            ("no-tests", false, true, false),
+            ("no-agent", false, false, true),
+            ("no-spec-no-tests", true, true, false),
+            ("no-spec-no-agent", true, false, true),
+            ("no-tests-no-agent", false, true, true),
+            ("no-spec-no-tests-no-agent", true, true, true),
         };
 
         var result = new List<CodeMapVariant>(combos.Length);
-        foreach (var (key, excludeSpec, excludeTests) in combos)
+        foreach (var (key, excludeSpec, excludeTests, excludeAgentDirectories) in combos)
         {
-            IReadOnlyList<(string RepoRelativePath, long Lines)> filtered = (excludeSpec || excludeTests)
+            IReadOnlyList<(string RepoRelativePath, long Lines)> filtered = (excludeSpec || excludeTests || excludeAgentDirectories)
                 ? sourceFiles
                     .Where(f => (!excludeSpec || !IsSpecDevPath(f.RepoRelativePath))
-                        && (!excludeTests || !IsTestPath(f.RepoRelativePath)))
+                        && (!excludeTests || !IsTestPath(f.RepoRelativePath))
+                        && (!excludeAgentDirectories || !IsAgentToolingPath(f.RepoRelativePath)))
                     .ToList()
                 : sourceFiles;
 
             var map = Build(filtered, gitMetrics);
-            result.Add(new CodeMapVariant(key, excludeSpec, excludeTests, map));
+            result.Add(new CodeMapVariant(key, excludeSpec, excludeTests, map, excludeAgentDirectories));
         }
         return result;
     }

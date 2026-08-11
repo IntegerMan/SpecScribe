@@ -1712,6 +1712,9 @@
         // from the tooltip, the accessible name and the text twin. `label+value` put it straight back, printed on
         // every tile — a strictly MORE prominent placement than the one it was removed from. [Story 20.5 review]
         t.textinfo = cfg.labels ? "label" : "none";
+        // A dense hierarchy can be a useful overview only when its first treemap level leaves room to distinguish
+        // directories. Plotly applies this relative to `level`, so drilling retains access to every descendant.
+        if (cfg.treemapMaxDepth) t.maxdepth = cfg.treemapMaxDepth;
       }
       if (state.level) t.level = state.level;
       return t;

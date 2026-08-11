@@ -242,6 +242,9 @@ public enum HierarchyTwinDisplay
 /// <c>sb</c> so links already shared keep working.</param>
 /// <param name="Size">Chart size in px. Config-driven so no literal ever lands in the JS.</param>
 /// <param name="Labels">Whether to draw in-sector labels (owner decision D3, "Labelled explorer").</param>
+/// <param name="TreemapMaxDepth">Optional maximum number of levels to draw in a treemap overview. Plotly
+/// applies the limit relative to the drilled root, so the full hierarchy remains available through drill-down.
+/// Null retains the complete-tree behavior.</param>
 /// <param name="Meta">The Story 10.2 framing block — title + analysis window + framing sentence.</param>
 /// <param name="TwinDisplay">How the text twin presents (owner D3/D4). Config-driven, never a call-site literal
 /// and never a second twin builder. Unlike <paramref name="Size"/>, it is server-only: it never reaches
@@ -277,7 +280,8 @@ public sealed record HierarchyExplorerConfig(
     bool Filterable = false,
     IReadOnlyList<HierarchyDimension>? Dimensions = null,
     IReadOnlyDictionary<string, string>? Constants = null,
-    string? ExternalTwinClass = null);
+    string? ExternalTwinClass = null,
+    int? TreemapMaxDepth = null);
 
 /// <summary>The whole payload: component configuration + the node hierarchy. One datasource, both shapes — the
 /// selector re-types the trace, it never re-derives geometry, re-counts against <see cref="ProjectCounts"/>, or
@@ -869,6 +873,7 @@ public static partial class HierarchyExplorer
                 hashKey = cfg.HashKey,
                 size = cfg.Size,
                 labels = cfg.Labels,
+                treemapMaxDepth = cfg.TreemapMaxDepth,
                 // Emitted, not assumed: the payload is parent-inclusive by construction (owner D2), and a
                 // payload/branchvalues mismatch renders wrong with only a console warning.
                 branchvalues = BranchValues,
@@ -911,6 +916,7 @@ public static partial class HierarchyExplorer
                     hashKey = cfg.HashKey,
                     size = cfg.Size,
                     labels = cfg.Labels,
+                    treemapMaxDepth = cfg.TreemapMaxDepth,
                     branchvalues = BranchValues,
                     filterable = cfg.Filterable,
                     constants = cfg.Constants,

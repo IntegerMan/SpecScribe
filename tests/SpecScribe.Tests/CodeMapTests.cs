@@ -332,43 +332,64 @@ public class CodeMapTests
         Assert.Equal(expected, CodeMap.IsTestPath(path));
     }
 
+    [Theory]
+    [InlineData(".agent/agents/research.md", true)]
+    [InlineData(".codex/skills/review.md", true)]
+    [InlineData(".cursor/rules/project.mdc", true)]
+    [InlineData(".github/workflows/build.yml", true)]
+    [InlineData("src/SpecScribe/CodeMap.cs", false)]
+    [InlineData("docs/.cursor-notes.md", false)]
+    public void IsAgentToolingPath_MatchesOnlyKnownTopLevelToolingDirectories(string path, bool expected)
+    {
+        Assert.Equal(expected, CodeMap.IsAgentToolingPath(path));
+    }
+
     [Fact]
-    public void BuildVariants_ReturnsFourCombinationsFilteringSpecDevAndTestPathsIndependently()
+    public void BuildVariants_ReturnsEightCombinationsFilteringSpecDevTestAndAgentPathsIndependently()
     {
         var files = new (string, long)[]
         {
             (".agents/skills/bmad-dev/workflow.md", 10),
+            (".cursor/rules/project.mdc", 15),
             ("tests/SpecScribe.Tests/GitMetricsTests.cs", 20),
             ("src/SpecScribe/GitMetrics.cs", 30),
         };
 
         var variants = CodeMap.BuildVariants(files, NoMetrics);
 
-        Assert.Equal(4, variants.Count);
+        Assert.Equal(8, variants.Count);
         var full = variants.Single(v => v.Key == "full");
         var noSpec = variants.Single(v => v.Key == "no-spec");
         var noTests = variants.Single(v => v.Key == "no-tests");
         var noBoth = variants.Single(v => v.Key == "no-spec-no-tests");
+        var noAgent = variants.Single(v => v.Key == "no-agent");
+        var noAll = variants.Single(v => v.Key == "no-spec-no-tests-no-agent");
 
-        Assert.Equal(3, full.Map.FileCount);
+        Assert.Equal(4, full.Map.FileCount);
         Assert.False(full.ExcludesSpecDev);
         Assert.False(full.ExcludesTests);
+        Assert.False(full.ExcludesAgentDirectories);
 
-        Assert.Equal(2, noSpec.Map.FileCount); // drops the .agents/ file
+        Assert.Equal(3, noSpec.Map.FileCount); // drops the .agents/ file
         Assert.True(noSpec.ExcludesSpecDev);
         Assert.DoesNotContain(noSpec.Map.Files(), f => f.RepoRelativePath.StartsWith(".agents/", StringComparison.Ordinal));
 
-        Assert.Equal(2, noTests.Map.FileCount); // drops the tests/ file
+        Assert.Equal(3, noTests.Map.FileCount); // drops the tests/ file
         Assert.True(noTests.ExcludesTests);
         Assert.DoesNotContain(noTests.Map.Files(), f => f.RepoRelativePath.Contains("Tests", StringComparison.OrdinalIgnoreCase));
 
-        Assert.Equal(1, noBoth.Map.FileCount); // only src/SpecScribe/GitMetrics.cs survives both filters
-        Assert.Equal("src/SpecScribe/GitMetrics.cs", noBoth.Map.Files().Single().RepoRelativePath);
+        Assert.Equal(2, noBoth.Map.FileCount); // agent/tooling and product source survive both filters
+
+        Assert.Equal(2, noAgent.Map.FileCount); // drops the .agents/ and .cursor/ files
+        Assert.True(noAgent.ExcludesAgentDirectories);
+        Assert.DoesNotContain(noAgent.Map.Files(), f => f.RepoRelativePath.StartsWith(".cursor/", StringComparison.Ordinal));
+
+        Assert.Equal("src/SpecScribe/GitMetrics.cs", noAll.Map.Files().Single().RepoRelativePath);
 
         // Each variant's own map tiles its OWN (smaller) file set — never leftover rects for excluded files.
         // Story 20.10 F6: CodeMapVariant no longer carries a precomputed Layout (nothing in production read it);
         // CodeMap.Layout() the method is unchanged and still exercised directly here.
-        Assert.Equal(noBoth.Map.FileCount, noBoth.Map.Layout().Count(r => !r.Node.IsDirectory));
+        Assert.Equal(noAll.Map.FileCount, noAll.Map.Layout().Count(r => !r.Node.IsDirectory));
     }
 
     [Fact]
@@ -384,10 +405,10 @@ public class CodeMapTests
     }
 
     [Fact]
-    public void BuildVariants_EmptyInputYieldsFourEmptyVariants()
+    public void BuildVariants_EmptyInputYieldsEightEmptyVariants()
     {
         var variants = CodeMap.BuildVariants(Array.Empty<(string, long)>(), NoMetrics);
-        Assert.Equal(4, variants.Count);
+        Assert.Equal(8, variants.Count);
         Assert.All(variants, v => Assert.True(v.Map.IsEmpty));
     }
 
@@ -396,6 +417,10 @@ public class CodeMapTests
     [Theory]
     [InlineData("src/Foo.cs", "csharp")]
     [InlineData("src/Foo.csx", "csharp")]
+    [InlineData("src/Foo.fs", "fsharp")]
+    [InlineData("src/Foo.fsi", "fsharp")]
+    [InlineData("src/Foo.fsx", "fsharp")]
+    [InlineData("Views/Index.cshtml", "razor")]
     [InlineData("src/foo.ts", "script")]
     [InlineData("src/foo.tsx", "script")]
     [InlineData("src/foo.js", "script")]

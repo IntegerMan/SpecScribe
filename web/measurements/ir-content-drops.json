@@ -1,30 +1,50 @@
 {
   "generatedBy": "web/scripts/extract-ir-content.mjs",
   "why": "Selectors `selectorIsUsed` discarded because a class or id was absent from the harvest. NOT a defect list — the monolith styles surfaces this app does not render. It exists because the same silent drop shipped the sunburst black-fill, owner-author-2, Code Map filter and tooltip/details-rail regressions with every gate green. Deliberately NOT in ir-content.manifest.json: it is a function of the whole source stylesheet and would redden the gate on edits that cannot move the emitted layer.",
-  "droppedSelectors": 359,
+  "droppedSelectors": 543,
   "absentTokens": [
     {
       "token": "ownership-wedge",
       "rules": 18
     },
     {
-      "token": "codemap-cell",
-      "rules": 15
+      "token": "ownership-legend-swatch",
+      "rules": 17
+    },
+    {
+      "token": "commit-files-table",
+      "rules": 11
     },
     {
       "token": "req-index",
       "rules": 11
     },
     {
+      "token": "risk-point",
+      "rules": 10
+    },
+    {
       "token": "sunburst",
       "rules": 10
+    },
+    {
+      "token": "coupling-table",
+      "rules": 9
     },
     {
       "token": "sprint-page",
       "rules": 9
     },
     {
+      "token": "impact-legend-ramp",
+      "rules": 7
+    },
+    {
       "token": "index-card--primary",
+      "rules": 7
+    },
+    {
+      "token": "ownership-controls",
       "rules": 7
     },
     {
@@ -36,6 +56,10 @@
       "rules": 7
     },
     {
+      "token": "artifact-update-list",
+      "rules": 6
+    },
+    {
       "token": "followup-row-detail",
       "rules": 6
     },
@@ -44,8 +68,16 @@
       "rules": 6
     },
     {
+      "token": "sprint-epic-filter-summary",
+      "rules": 6
+    },
+    {
       "token": "story",
       "rules": 6
+    },
+    {
+      "token": "code-history-table",
+      "rules": 5
     },
     {
       "token": "idea-entry-type",
@@ -70,6 +102,10 @@
     {
       "token": "token",
       "rules": 5
+    },
+    {
+      "token": "code-insight-contributors",
+      "rules": 4
     },
     {
       "token": "gi-filter",
@@ -97,6 +133,22 @@
     },
     {
       "token": "action-item-cross",
+      "rules": 3
+    },
+    {
+      "token": "commit-hash-link",
+      "rules": 3
+    },
+    {
+      "token": "commit-message",
+      "rules": 3
+    },
+    {
+      "token": "coupling-expand",
+      "rules": 3
+    },
+    {
+      "token": "coupling-lightbox-close",
       "rules": 3
     },
     {
@@ -132,6 +184,14 @@
       "rules": 3
     },
     {
+      "token": "impact-epic-head",
+      "rules": 3
+    },
+    {
+      "token": "impact-file-list",
+      "rules": 3
+    },
+    {
       "token": "impact-tm-tile",
       "rules": 3
     },
@@ -152,6 +212,14 @@
       "rules": 3
     },
     {
+      "token": "insight-panel",
+      "rules": 3
+    },
+    {
+      "token": "level-none",
+      "rules": 3
+    },
+    {
       "token": "list-controls-group",
       "rules": 3
     },
@@ -164,7 +232,31 @@
       "rules": 3
     },
     {
+      "token": "risk-grid-path",
+      "rules": 3
+    },
+    {
+      "token": "risk-pager-next",
+      "rules": 3
+    },
+    {
+      "token": "risk-pager-prev",
+      "rules": 3
+    },
+    {
       "token": "sb-center-zoom",
+      "rules": 3
+    },
+    {
+      "token": "sprint-epic-filter",
+      "rules": 3
+    },
+    {
+      "token": "sprint-epic-filter-all",
+      "rules": 3
+    },
+    {
+      "token": "sprint-epic-filter-opt",
       "rules": 3
     },
     {
@@ -176,7 +268,19 @@
       "rules": 3
     },
     {
+      "token": "artifacts-updated",
+      "rules": 2
+    },
+    {
       "token": "code-aside",
+      "rules": 2
+    },
+    {
+      "token": "code-insight-history",
+      "rules": 2
+    },
+    {
+      "token": "code-insights",
       "rules": 2
     },
     {
@@ -192,11 +296,59 @@
       "rules": 2
     },
     {
+      "token": "commit-files",
+      "rules": 2
+    },
+    {
+      "token": "commit-num",
+      "rules": 2
+    },
+    {
       "token": "copied",
       "rules": 2
     },
     {
+      "token": "coupling-boundary-badge",
+      "rules": 2
+    },
+    {
+      "token": "coupling-edge",
+      "rules": 2
+    },
+    {
+      "token": "coupling-graph",
+      "rules": 2
+    },
+    {
+      "token": "coupling-kind",
+      "rules": 2
+    },
+    {
+      "token": "coupling-kind-badge",
+      "rules": 2
+    },
+    {
+      "token": "coupling-lightbox",
+      "rules": 2
+    },
+    {
+      "token": "coupling-lightbox-panel",
+      "rules": 2
+    },
+    {
+      "token": "coupling-num",
+      "rules": 2
+    },
+    {
+      "token": "deep-page-lower",
+      "rules": 2
+    },
+    {
       "token": "deep-page-panel-head",
+      "rules": 2
+    },
+    {
+      "token": "deep-page-section",
       "rules": 2
     },
     {
@@ -228,6 +380,30 @@
       "rules": 2
     },
     {
+      "token": "impact-epic",
+      "rules": 2
+    },
+    {
+      "token": "impact-level-1",
+      "rules": 2
+    },
+    {
+      "token": "impact-level-2",
+      "rules": 2
+    },
+    {
+      "token": "impact-level-3",
+      "rules": 2
+    },
+    {
+      "token": "impact-level-4",
+      "rules": 2
+    },
+    {
+      "token": "impact-level-5",
+      "rules": 2
+    },
+    {
       "token": "is-anim",
       "rules": 2
     },
@@ -240,7 +416,43 @@
       "rules": 2
     },
     {
+      "token": "owner-author-other",
+      "rules": 2
+    },
+    {
+      "token": "owner-fresh",
+      "rules": 2
+    },
+    {
+      "token": "owner-spotlight-off",
+      "rules": 2
+    },
+    {
+      "token": "owner-stale",
+      "rules": 2
+    },
+    {
+      "token": "ownership-legend",
+      "rules": 2
+    },
+    {
+      "token": "risk-grid-item",
+      "rules": 2
+    },
+    {
+      "token": "risk-pager",
+      "rules": 2
+    },
+    {
+      "token": "risk-point-link",
+      "rules": 2
+    },
+    {
       "token": "sb-story-summary",
+      "rules": 2
+    },
+    {
+      "token": "sprint-epic-filter-panel",
       "rules": 2
     },
     {
@@ -276,6 +488,10 @@
       "rules": 1
     },
     {
+      "token": "artifact-update-path",
+      "rules": 1
+    },
+    {
       "token": "cdata",
       "rules": 1
     },
@@ -292,6 +508,22 @@
       "rules": 1
     },
     {
+      "token": "code-areas-panel",
+      "rules": 1
+    },
+    {
+      "token": "code-history-author",
+      "rules": 1
+    },
+    {
+      "token": "code-history-date",
+      "rules": 1
+    },
+    {
+      "token": "code-insight-frequency",
+      "rules": 1
+    },
+    {
       "token": "code-insight-more",
       "rules": 1
     },
@@ -300,23 +532,71 @@
       "rules": 1
     },
     {
+      "token": "code-tabpanel--history",
+      "rules": 1
+    },
+    {
+      "token": "code-tabpanel--insights",
+      "rules": 1
+    },
+    {
       "token": "code-tabs--released",
       "rules": 1
     },
     {
-      "token": "codemap-dir-sunburst",
-      "rules": 1
-    },
-    {
-      "token": "codemap-notice",
-      "rules": 1
-    },
-    {
-      "token": "codemap-notice-secondary",
-      "rules": 1
-    },
-    {
       "token": "comment",
+      "rules": 1
+    },
+    {
+      "token": "commit-added",
+      "rules": 1
+    },
+    {
+      "token": "commit-attribution",
+      "rules": 1
+    },
+    {
+      "token": "commit-deleted",
+      "rules": 1
+    },
+    {
+      "token": "commit-file-binary",
+      "rules": 1
+    },
+    {
+      "token": "commit-files-empty",
+      "rules": 1
+    },
+    {
+      "token": "commit-hash-pill",
+      "rules": 1
+    },
+    {
+      "token": "contributor-count",
+      "rules": 1
+    },
+    {
+      "token": "contributor-name",
+      "rules": 1
+    },
+    {
+      "token": "coupling-file",
+      "rules": 1
+    },
+    {
+      "token": "coupling-label",
+      "rules": 1
+    },
+    {
+      "token": "coupling-legend",
+      "rules": 1
+    },
+    {
+      "token": "coupling-lightbox-backdrop",
+      "rules": 1
+    },
+    {
+      "token": "coupling-node",
       "rules": 1
     },
     {
@@ -328,7 +608,15 @@
       "rules": 1
     },
     {
+      "token": "deep-page-graph-panel",
+      "rules": 1
+    },
+    {
       "token": "deep-page-lead",
+      "rules": 1
+    },
+    {
+      "token": "deep-page-list-panel",
       "rules": 1
     },
     {
@@ -456,11 +744,47 @@
       "rules": 1
     },
     {
+      "token": "impact-epic-filter",
+      "rules": 1
+    },
+    {
+      "token": "impact-fallback",
+      "rules": 1
+    },
+    {
+      "token": "impact-file-meta",
+      "rules": 1
+    },
+    {
+      "token": "impact-legend",
+      "rules": 1
+    },
+    {
+      "token": "impact-legend-item",
+      "rules": 1
+    },
+    {
+      "token": "impact-legend-size",
+      "rules": 1
+    },
+    {
+      "token": "impact-map-link",
+      "rules": 1
+    },
+    {
+      "token": "impact-more",
+      "rules": 1
+    },
+    {
       "token": "impact-sb",
       "rules": 1
     },
     {
       "token": "impact-sb-center",
+      "rules": 1
+    },
+    {
+      "token": "impact-select-actions",
       "rules": 1
     },
     {
@@ -576,7 +900,19 @@
       "rules": 1
     },
     {
+      "token": "ownership-legend-dim",
+      "rules": 1
+    },
+    {
       "token": "ownership-legend-empty",
+      "rules": 1
+    },
+    {
+      "token": "ownership-legend-label",
+      "rules": 1
+    },
+    {
+      "token": "ownership-panel",
       "rules": 1
     },
     {
@@ -585,6 +921,10 @@
     },
     {
       "token": "panel-source-note",
+      "rules": 1
+    },
+    {
+      "token": "process-edge",
       "rules": 1
     },
     {
@@ -624,7 +964,51 @@
       "rules": 1
     },
     {
-      "token": "risk-quadrant-empty",
+      "token": "risk-axis-label",
+      "rules": 1
+    },
+    {
+      "token": "risk-axis-line",
+      "rules": 1
+    },
+    {
+      "token": "risk-grid",
+      "rules": 1
+    },
+    {
+      "token": "risk-grid-meta",
+      "rules": 1
+    },
+    {
+      "token": "risk-median-line",
+      "rules": 1
+    },
+    {
+      "token": "risk-median-tick-label",
+      "rules": 1
+    },
+    {
+      "token": "risk-pager-status",
+      "rules": 1
+    },
+    {
+      "token": "risk-point-elevated",
+      "rules": 1
+    },
+    {
+      "token": "risk-quadrant",
+      "rules": 1
+    },
+    {
+      "token": "risk-quadrant-elevated",
+      "rules": 1
+    },
+    {
+      "token": "risk-quadrant-shade-label",
+      "rules": 1
+    },
+    {
+      "token": "risk-tick-label",
       "rules": 1
     },
     {
@@ -656,11 +1040,39 @@
       "rules": 1
     },
     {
+      "token": "sprint-epic-filter-count",
+      "rules": 1
+    },
+    {
+      "token": "sprint-epic-filter-label",
+      "rules": 1
+    },
+    {
       "token": "ss-hierarchy-legend",
       "rules": 1
     },
     {
       "token": "ss-hierarchy-legend-item",
+      "rules": 1
+    },
+    {
+      "token": "ss-relgraph-swatch-band",
+      "rules": 1
+    },
+    {
+      "token": "ss-relgraph-swatch-boundary",
+      "rules": 1
+    },
+    {
+      "token": "ss-relgraph-swatch-coupled",
+      "rules": 1
+    },
+    {
+      "token": "ss-relgraph-swatch-cross",
+      "rules": 1
+    },
+    {
+      "token": "ss-relgraph-swatch-process",
       "rules": 1
     },
     {
@@ -939,6 +1351,42 @@
       ]
     },
     {
+      "selector": ".code-tabs:has(.code-tab--insights .code-tab-input:checked) .code-tabpanel--insights",
+      "missingClasses": [
+        "code-tabpanel--insights"
+      ]
+    },
+    {
+      "selector": ".code-tabs:has(.code-tab--history .code-tab-input:checked) .code-tabpanel--history",
+      "missingClasses": [
+        "code-tabpanel--history"
+      ]
+    },
+    {
+      "selector": ".insight-panel",
+      "missingClasses": [
+        "insight-panel"
+      ]
+    },
+    {
+      "selector": ".insight-panel > h2",
+      "missingClasses": [
+        "insight-panel"
+      ]
+    },
+    {
+      "selector": ".insight-panel > h3",
+      "missingClasses": [
+        "insight-panel"
+      ]
+    },
+    {
+      "selector": ".code-insight-history",
+      "missingClasses": [
+        "code-insight-history"
+      ]
+    },
+    {
       "selector": ".code-layout",
       "missingClasses": [
         "code-layout"
@@ -966,6 +1414,36 @@
       "selector": ".ss-relgraph-node[data-relgraph-href]",
       "missingClasses": [
         "ss-relgraph-node"
+      ]
+    },
+    {
+      "selector": ".ss-relgraph-swatch-coupled",
+      "missingClasses": [
+        "ss-relgraph-swatch-coupled"
+      ]
+    },
+    {
+      "selector": ".ss-relgraph-swatch-band",
+      "missingClasses": [
+        "ss-relgraph-swatch-band"
+      ]
+    },
+    {
+      "selector": ".ss-relgraph-swatch-boundary",
+      "missingClasses": [
+        "ss-relgraph-swatch-boundary"
+      ]
+    },
+    {
+      "selector": ".ss-relgraph-swatch-process",
+      "missingClasses": [
+        "ss-relgraph-swatch-process"
+      ]
+    },
+    {
+      "selector": ".ss-relgraph-swatch-cross",
+      "missingClasses": [
+        "ss-relgraph-swatch-cross"
       ]
     },
     {
@@ -1007,9 +1485,101 @@
       ]
     },
     {
+      "selector": ".code-insights",
+      "missingClasses": [
+        "code-insights"
+      ]
+    },
+    {
+      "selector": ".code-insights > h2",
+      "missingClasses": [
+        "code-insights"
+      ]
+    },
+    {
+      "selector": ".code-insight-frequency",
+      "missingClasses": [
+        "code-insight-frequency"
+      ]
+    },
+    {
+      "selector": ".code-insight-contributors",
+      "missingClasses": [
+        "code-insight-contributors"
+      ]
+    },
+    {
+      "selector": ".code-insight-contributors li",
+      "missingClasses": [
+        "code-insight-contributors"
+      ]
+    },
+    {
+      "selector": ".code-insight-contributors .contributor-name",
+      "missingClasses": [
+        "code-insight-contributors",
+        "contributor-name"
+      ]
+    },
+    {
+      "selector": ".code-insight-contributors .contributor-count",
+      "missingClasses": [
+        "code-insight-contributors",
+        "contributor-count"
+      ]
+    },
+    {
       "selector": ".code-insight-more",
       "missingClasses": [
         "code-insight-more"
+      ]
+    },
+    {
+      "selector": ".code-insight-history > h2",
+      "missingClasses": [
+        "code-insight-history"
+      ]
+    },
+    {
+      "selector": ".code-history-table",
+      "missingClasses": [
+        "code-history-table"
+      ]
+    },
+    {
+      "selector": ".code-history-table caption",
+      "missingClasses": [
+        "code-history-table"
+      ]
+    },
+    {
+      "selector": ".code-history-table th",
+      "missingClasses": [
+        "code-history-table"
+      ]
+    },
+    {
+      "selector": ".code-history-table td",
+      "missingClasses": [
+        "code-history-table"
+      ]
+    },
+    {
+      "selector": ".code-history-table th",
+      "missingClasses": [
+        "code-history-table"
+      ]
+    },
+    {
+      "selector": ".code-history-date",
+      "missingClasses": [
+        "code-history-date"
+      ]
+    },
+    {
+      "selector": ".code-history-author",
+      "missingClasses": [
+        "code-history-author"
       ]
     },
     {
@@ -1365,117 +1935,252 @@
       ]
     },
     {
-      "selector": ".codemap-cell",
-      "missingClasses": [
-        "codemap-cell"
-      ]
-    },
-    {
-      "selector": ".codemap-cell.level-0",
-      "missingClasses": [
-        "codemap-cell"
-      ]
-    },
-    {
-      "selector": ".codemap-cell.level-1",
-      "missingClasses": [
-        "codemap-cell"
-      ]
-    },
-    {
-      "selector": ".codemap-cell.level-2",
-      "missingClasses": [
-        "codemap-cell"
-      ]
-    },
-    {
-      "selector": ".codemap-cell.level-3",
-      "missingClasses": [
-        "codemap-cell"
-      ]
-    },
-    {
-      "selector": ".codemap-cell.level-4",
-      "missingClasses": [
-        "codemap-cell"
-      ]
-    },
-    {
       "selector": ".codemap-cell.level-none",
       "missingClasses": [
-        "codemap-cell"
+        "level-none"
       ]
     },
     {
-      "selector": ".codemap-cell.type-csharp",
+      "selector": ".risk-quadrant",
       "missingClasses": [
-        "codemap-cell"
+        "risk-quadrant"
       ]
     },
     {
-      "selector": ".codemap-cell.type-python",
+      "selector": ".risk-axis-line",
       "missingClasses": [
-        "codemap-cell"
+        "risk-axis-line"
       ]
     },
     {
-      "selector": ".codemap-cell.type-script",
+      "selector": ".risk-median-line",
       "missingClasses": [
-        "codemap-cell"
+        "risk-median-line"
       ]
     },
     {
-      "selector": ".codemap-cell.type-styles",
+      "selector": ".risk-axis-label",
       "missingClasses": [
-        "codemap-cell"
+        "risk-axis-label"
       ]
     },
     {
-      "selector": ".codemap-cell.type-markup",
+      "selector": ".risk-tick-label",
       "missingClasses": [
-        "codemap-cell"
+        "risk-tick-label"
       ]
     },
     {
-      "selector": ".codemap-cell.type-config",
+      "selector": ".risk-median-tick-label",
       "missingClasses": [
-        "codemap-cell"
+        "risk-median-tick-label"
       ]
     },
     {
-      "selector": ".codemap-cell.type-other-lang",
+      "selector": ".risk-quadrant-elevated",
       "missingClasses": [
-        "codemap-cell"
+        "risk-quadrant-elevated"
       ]
     },
     {
-      "selector": ".codemap-cell.type-other",
+      "selector": ".risk-quadrant-shade-label",
       "missingClasses": [
-        "codemap-cell"
+        "risk-quadrant-shade-label"
       ]
     },
     {
-      "selector": ".codemap-notice",
+      "selector": ".risk-point",
       "missingClasses": [
-        "codemap-notice"
+        "risk-point"
       ]
     },
     {
-      "selector": ".codemap-notice-secondary",
+      "selector": ".risk-point.level-0",
       "missingClasses": [
-        "codemap-notice-secondary"
+        "risk-point"
       ]
     },
     {
-      "selector": ".codemap-dir-sunburst",
+      "selector": ".risk-point.level-1",
       "missingClasses": [
-        "codemap-dir-sunburst"
+        "risk-point"
       ]
     },
     {
-      "selector": ".risk-quadrant-empty",
+      "selector": ".risk-point.level-2",
       "missingClasses": [
-        "risk-quadrant-empty"
+        "risk-point"
+      ]
+    },
+    {
+      "selector": ".risk-point.level-3",
+      "missingClasses": [
+        "risk-point"
+      ]
+    },
+    {
+      "selector": ".risk-point.level-4",
+      "missingClasses": [
+        "risk-point"
+      ]
+    },
+    {
+      "selector": ".risk-point-elevated",
+      "missingClasses": [
+        "risk-point-elevated"
+      ]
+    },
+    {
+      "selector": ".risk-point-link:focus-visible .risk-point",
+      "missingClasses": [
+        "risk-point-link",
+        "risk-point"
+      ]
+    },
+    {
+      "selector": ".risk-point-link:hover .risk-point",
+      "missingClasses": [
+        "risk-point-link",
+        "risk-point"
+      ]
+    },
+    {
+      "selector": ".risk-point:focus-visible",
+      "missingClasses": [
+        "risk-point"
+      ]
+    },
+    {
+      "selector": ".risk-point:hover",
+      "missingClasses": [
+        "risk-point"
+      ]
+    },
+    {
+      "selector": ".risk-pager",
+      "missingClasses": [
+        "risk-pager"
+      ]
+    },
+    {
+      "selector": ".risk-pager[hidden]",
+      "missingClasses": [
+        "risk-pager"
+      ]
+    },
+    {
+      "selector": ".risk-pager-prev",
+      "missingClasses": [
+        "risk-pager-prev"
+      ]
+    },
+    {
+      "selector": ".risk-pager-next",
+      "missingClasses": [
+        "risk-pager-next"
+      ]
+    },
+    {
+      "selector": ".risk-pager-prev:hover:not(:disabled)",
+      "missingClasses": [
+        "risk-pager-prev"
+      ]
+    },
+    {
+      "selector": ".risk-pager-next:hover:not(:disabled)",
+      "missingClasses": [
+        "risk-pager-next"
+      ]
+    },
+    {
+      "selector": ".risk-pager-prev:disabled",
+      "missingClasses": [
+        "risk-pager-prev"
+      ]
+    },
+    {
+      "selector": ".risk-pager-next:disabled",
+      "missingClasses": [
+        "risk-pager-next"
+      ]
+    },
+    {
+      "selector": ".risk-pager-status",
+      "missingClasses": [
+        "risk-pager-status"
+      ]
+    },
+    {
+      "selector": ".risk-grid",
+      "missingClasses": [
+        "risk-grid"
+      ]
+    },
+    {
+      "selector": ".risk-grid-item",
+      "missingClasses": [
+        "risk-grid-item"
+      ]
+    },
+    {
+      "selector": ".risk-grid-item[hidden]",
+      "missingClasses": [
+        "risk-grid-item"
+      ]
+    },
+    {
+      "selector": ".risk-grid-path",
+      "missingClasses": [
+        "risk-grid-path"
+      ]
+    },
+    {
+      "selector": ".risk-grid-path a",
+      "missingClasses": [
+        "risk-grid-path"
+      ]
+    },
+    {
+      "selector": ".risk-grid-path a:hover",
+      "missingClasses": [
+        "risk-grid-path"
+      ]
+    },
+    {
+      "selector": ".risk-grid-meta",
+      "missingClasses": [
+        "risk-grid-meta"
+      ]
+    },
+    {
+      "selector": ".coupling-graph",
+      "missingClasses": [
+        "coupling-graph"
+      ]
+    },
+    {
+      "selector": ".coupling-edge",
+      "missingClasses": [
+        "coupling-edge"
+      ]
+    },
+    {
+      "selector": ".coupling-edge.process-edge",
+      "missingClasses": [
+        "coupling-edge",
+        "process-edge"
+      ]
+    },
+    {
+      "selector": ".coupling-node",
+      "missingClasses": [
+        "coupling-node"
+      ]
+    },
+    {
+      "selector": ".coupling-label",
+      "missingClasses": [
+        "coupling-label"
       ]
     },
     {
@@ -1485,9 +2190,46 @@
       ]
     },
     {
+      "selector": ".deep-page-section",
+      "missingClasses": [
+        "deep-page-section"
+      ]
+    },
+    {
+      "selector": ".deep-page-section > h2",
+      "missingClasses": [
+        "deep-page-section"
+      ]
+    },
+    {
       "selector": ".deep-page-lead",
       "missingClasses": [
         "deep-page-lead"
+      ]
+    },
+    {
+      "selector": ".deep-page-lower",
+      "missingClasses": [
+        "deep-page-lower"
+      ]
+    },
+    {
+      "selector": ".deep-page-lower",
+      "within": "@media (min-width: 860px)",
+      "missingClasses": [
+        "deep-page-lower"
+      ]
+    },
+    {
+      "selector": ".deep-page-graph-panel",
+      "missingClasses": [
+        "deep-page-graph-panel"
+      ]
+    },
+    {
+      "selector": ".deep-page-list-panel",
+      "missingClasses": [
+        "deep-page-list-panel"
       ]
     },
     {
@@ -1515,6 +2257,234 @@
       ]
     },
     {
+      "selector": ".coupling-expand",
+      "missingClasses": [
+        "coupling-expand"
+      ]
+    },
+    {
+      "selector": ".coupling-expand:hover",
+      "missingClasses": [
+        "coupling-expand"
+      ]
+    },
+    {
+      "selector": ".coupling-expand:focus-visible",
+      "missingClasses": [
+        "coupling-expand"
+      ]
+    },
+    {
+      "selector": ".coupling-legend",
+      "missingClasses": [
+        "coupling-legend"
+      ]
+    },
+    {
+      "selector": ".coupling-table",
+      "missingClasses": [
+        "coupling-table"
+      ]
+    },
+    {
+      "selector": ".coupling-table th",
+      "missingClasses": [
+        "coupling-table"
+      ]
+    },
+    {
+      "selector": ".coupling-table td",
+      "missingClasses": [
+        "coupling-table"
+      ]
+    },
+    {
+      "selector": ".coupling-table tr:last-child td",
+      "missingClasses": [
+        "coupling-table"
+      ]
+    },
+    {
+      "selector": ".coupling-table .coupling-file",
+      "missingClasses": [
+        "coupling-table",
+        "coupling-file"
+      ]
+    },
+    {
+      "selector": ".coupling-table .coupling-num",
+      "missingClasses": [
+        "coupling-table",
+        "coupling-num"
+      ]
+    },
+    {
+      "selector": ".coupling-table th.coupling-num",
+      "missingClasses": [
+        "coupling-table",
+        "coupling-num"
+      ]
+    },
+    {
+      "selector": ".coupling-table .coupling-kind",
+      "missingClasses": [
+        "coupling-table",
+        "coupling-kind"
+      ]
+    },
+    {
+      "selector": ".coupling-table th.coupling-kind",
+      "missingClasses": [
+        "coupling-table",
+        "coupling-kind"
+      ]
+    },
+    {
+      "selector": ".coupling-kind-badge",
+      "missingClasses": [
+        "coupling-kind-badge"
+      ]
+    },
+    {
+      "selector": ".coupling-boundary-badge",
+      "missingClasses": [
+        "coupling-boundary-badge"
+      ]
+    },
+    {
+      "selector": ".coupling-kind-badge",
+      "missingClasses": [
+        "coupling-kind-badge"
+      ]
+    },
+    {
+      "selector": ".coupling-boundary-badge",
+      "missingClasses": [
+        "coupling-boundary-badge"
+      ]
+    },
+    {
+      "selector": ".coupling-lightbox",
+      "missingClasses": [
+        "coupling-lightbox"
+      ]
+    },
+    {
+      "selector": ".coupling-lightbox:target",
+      "missingClasses": [
+        "coupling-lightbox"
+      ]
+    },
+    {
+      "selector": ".coupling-lightbox-backdrop",
+      "missingClasses": [
+        "coupling-lightbox-backdrop"
+      ]
+    },
+    {
+      "selector": ".coupling-lightbox-panel",
+      "missingClasses": [
+        "coupling-lightbox-panel"
+      ]
+    },
+    {
+      "selector": ".coupling-lightbox-panel .coupling-graph",
+      "missingClasses": [
+        "coupling-lightbox-panel",
+        "coupling-graph"
+      ]
+    },
+    {
+      "selector": ".coupling-lightbox-close",
+      "missingClasses": [
+        "coupling-lightbox-close"
+      ]
+    },
+    {
+      "selector": ".coupling-lightbox-close:hover",
+      "missingClasses": [
+        "coupling-lightbox-close"
+      ]
+    },
+    {
+      "selector": ".coupling-lightbox-close:focus-visible",
+      "missingClasses": [
+        "coupling-lightbox-close"
+      ]
+    },
+    {
+      "selector": ".commit-hash-link",
+      "missingClasses": [
+        "commit-hash-link"
+      ]
+    },
+    {
+      "selector": ".commit-hash-link:hover .commit-hash",
+      "missingClasses": [
+        "commit-hash-link"
+      ]
+    },
+    {
+      "selector": ".commit-hash-link:focus-visible",
+      "missingClasses": [
+        "commit-hash-link"
+      ]
+    },
+    {
+      "selector": ".artifacts-updated",
+      "missingClasses": [
+        "artifacts-updated"
+      ]
+    },
+    {
+      "selector": ".artifacts-updated h2",
+      "missingClasses": [
+        "artifacts-updated"
+      ]
+    },
+    {
+      "selector": ".artifact-update-list",
+      "missingClasses": [
+        "artifact-update-list"
+      ]
+    },
+    {
+      "selector": ".artifact-update-list li",
+      "missingClasses": [
+        "artifact-update-list"
+      ]
+    },
+    {
+      "selector": ".artifact-update-list li:last-child",
+      "missingClasses": [
+        "artifact-update-list"
+      ]
+    },
+    {
+      "selector": ".artifact-update-list a",
+      "missingClasses": [
+        "artifact-update-list"
+      ]
+    },
+    {
+      "selector": ".artifact-update-list a:hover",
+      "missingClasses": [
+        "artifact-update-list"
+      ]
+    },
+    {
+      "selector": ".artifact-update-list a:focus-visible",
+      "missingClasses": [
+        "artifact-update-list"
+      ]
+    },
+    {
+      "selector": ".artifact-update-path",
+      "missingClasses": [
+        "artifact-update-path"
+      ]
+    },
+    {
       "selector": ".timeline-empty",
       "missingClasses": [
         "timeline-empty"
@@ -1523,13 +2493,127 @@
     {
       "selector": ".commit-detail .commit-hash-pill code",
       "missingClasses": [
-        "commit-detail"
+        "commit-detail",
+        "commit-hash-pill"
       ]
     },
     {
       "selector": ".commit-detail .commit-attribution",
       "missingClasses": [
-        "commit-detail"
+        "commit-detail",
+        "commit-attribution"
+      ]
+    },
+    {
+      "selector": ".commit-message",
+      "missingClasses": [
+        "commit-message"
+      ]
+    },
+    {
+      "selector": ".commit-message p",
+      "missingClasses": [
+        "commit-message"
+      ]
+    },
+    {
+      "selector": ".commit-message p:last-child",
+      "missingClasses": [
+        "commit-message"
+      ]
+    },
+    {
+      "selector": ".commit-files",
+      "missingClasses": [
+        "commit-files"
+      ]
+    },
+    {
+      "selector": ".commit-files > h2",
+      "missingClasses": [
+        "commit-files"
+      ]
+    },
+    {
+      "selector": ".commit-files-empty",
+      "missingClasses": [
+        "commit-files-empty"
+      ]
+    },
+    {
+      "selector": ".commit-files-table",
+      "missingClasses": [
+        "commit-files-table"
+      ]
+    },
+    {
+      "selector": ".commit-files-table caption",
+      "missingClasses": [
+        "commit-files-table"
+      ]
+    },
+    {
+      "selector": ".commit-files-table th",
+      "missingClasses": [
+        "commit-files-table"
+      ]
+    },
+    {
+      "selector": ".commit-files-table td",
+      "missingClasses": [
+        "commit-files-table"
+      ]
+    },
+    {
+      "selector": ".commit-files-table thead th",
+      "missingClasses": [
+        "commit-files-table"
+      ]
+    },
+    {
+      "selector": ".commit-files-table th.commit-num",
+      "missingClasses": [
+        "commit-files-table",
+        "commit-num"
+      ]
+    },
+    {
+      "selector": ".commit-files-table td.commit-num",
+      "missingClasses": [
+        "commit-files-table",
+        "commit-num"
+      ]
+    },
+    {
+      "selector": ".commit-files-table td code",
+      "missingClasses": [
+        "commit-files-table"
+      ]
+    },
+    {
+      "selector": ".commit-files-table tbody tr:hover",
+      "missingClasses": [
+        "commit-files-table"
+      ]
+    },
+    {
+      "selector": ".commit-files-table .commit-added",
+      "missingClasses": [
+        "commit-files-table",
+        "commit-added"
+      ]
+    },
+    {
+      "selector": ".commit-files-table .commit-deleted",
+      "missingClasses": [
+        "commit-files-table",
+        "commit-deleted"
+      ]
+    },
+    {
+      "selector": ".commit-file-binary",
+      "missingClasses": [
+        "commit-file-binary"
       ]
     },
     {
@@ -1714,9 +2798,119 @@
       ]
     },
     {
+      "selector": ".impact-epic",
+      "missingClasses": [
+        "impact-epic"
+      ]
+    },
+    {
+      "selector": ".impact-epic:last-child",
+      "missingClasses": [
+        "impact-epic"
+      ]
+    },
+    {
+      "selector": ".impact-epic-head",
+      "missingClasses": [
+        "impact-epic-head"
+      ]
+    },
+    {
+      "selector": ".impact-epic-head a",
+      "missingClasses": [
+        "impact-epic-head"
+      ]
+    },
+    {
+      "selector": ".impact-epic-head a:hover",
+      "missingClasses": [
+        "impact-epic-head"
+      ]
+    },
+    {
+      "selector": ".impact-file-list",
+      "missingClasses": [
+        "impact-file-list"
+      ]
+    },
+    {
+      "selector": ".impact-file-list li",
+      "missingClasses": [
+        "impact-file-list"
+      ]
+    },
+    {
+      "selector": ".impact-file-meta",
+      "missingClasses": [
+        "impact-file-meta"
+      ]
+    },
+    {
+      "selector": ".code-areas-panel .impact-file-list",
+      "missingClasses": [
+        "code-areas-panel",
+        "impact-file-list"
+      ]
+    },
+    {
+      "selector": ".impact-more",
+      "missingClasses": [
+        "impact-more"
+      ]
+    },
+    {
+      "selector": ".impact-map-link",
+      "missingClasses": [
+        "impact-map-link"
+      ]
+    },
+    {
+      "selector": ".impact-fallback > summary",
+      "missingClasses": [
+        "impact-fallback"
+      ]
+    },
+    {
       "selector": ".impact-controls",
       "missingClasses": [
         "impact-controls"
+      ]
+    },
+    {
+      "selector": ".impact-epic-filter .impact-select-actions",
+      "missingClasses": [
+        "impact-epic-filter",
+        "impact-select-actions"
+      ]
+    },
+    {
+      "selector": ".impact-legend",
+      "missingClasses": [
+        "impact-legend"
+      ]
+    },
+    {
+      "selector": ".impact-legend-item",
+      "missingClasses": [
+        "impact-legend-item"
+      ]
+    },
+    {
+      "selector": ".impact-legend-size",
+      "missingClasses": [
+        "impact-legend-size"
+      ]
+    },
+    {
+      "selector": ".impact-legend-ramp",
+      "missingClasses": [
+        "impact-legend-ramp"
+      ]
+    },
+    {
+      "selector": ".impact-legend-ramp i",
+      "missingClasses": [
+        "impact-legend-ramp"
       ]
     },
     {
@@ -1761,6 +2955,71 @@
       "missingClasses": [
         "impact-tm-link",
         "impact-tm-tile"
+      ]
+    },
+    {
+      "selector": ".impact-level-1",
+      "missingClasses": [
+        "impact-level-1"
+      ]
+    },
+    {
+      "selector": ".impact-legend-ramp i.impact-level-1",
+      "missingClasses": [
+        "impact-legend-ramp",
+        "impact-level-1"
+      ]
+    },
+    {
+      "selector": ".impact-level-2",
+      "missingClasses": [
+        "impact-level-2"
+      ]
+    },
+    {
+      "selector": ".impact-legend-ramp i.impact-level-2",
+      "missingClasses": [
+        "impact-legend-ramp",
+        "impact-level-2"
+      ]
+    },
+    {
+      "selector": ".impact-level-3",
+      "missingClasses": [
+        "impact-level-3"
+      ]
+    },
+    {
+      "selector": ".impact-legend-ramp i.impact-level-3",
+      "missingClasses": [
+        "impact-legend-ramp",
+        "impact-level-3"
+      ]
+    },
+    {
+      "selector": ".impact-level-4",
+      "missingClasses": [
+        "impact-level-4"
+      ]
+    },
+    {
+      "selector": ".impact-legend-ramp i.impact-level-4",
+      "missingClasses": [
+        "impact-legend-ramp",
+        "impact-level-4"
+      ]
+    },
+    {
+      "selector": ".impact-level-5",
+      "missingClasses": [
+        "impact-level-5"
+      ]
+    },
+    {
+      "selector": ".impact-legend-ramp i.impact-level-5",
+      "missingClasses": [
+        "impact-legend-ramp",
+        "impact-level-5"
       ]
     },
     {
@@ -2162,6 +3421,54 @@
       ]
     },
     {
+      "selector": ".ownership-panel",
+      "missingClasses": [
+        "ownership-panel"
+      ]
+    },
+    {
+      "selector": ".ownership-controls",
+      "missingClasses": [
+        "ownership-controls"
+      ]
+    },
+    {
+      "selector": ".ownership-controls[hidden]",
+      "missingClasses": [
+        "ownership-controls"
+      ]
+    },
+    {
+      "selector": ".ownership-controls select",
+      "missingClasses": [
+        "ownership-controls"
+      ]
+    },
+    {
+      "selector": ".ownership-controls input",
+      "missingClasses": [
+        "ownership-controls"
+      ]
+    },
+    {
+      "selector": ".ownership-controls input[type=\"number\"]",
+      "missingClasses": [
+        "ownership-controls"
+      ]
+    },
+    {
+      "selector": ".ownership-controls select:focus-visible",
+      "missingClasses": [
+        "ownership-controls"
+      ]
+    },
+    {
+      "selector": ".ownership-controls input:focus-visible",
+      "missingClasses": [
+        "ownership-controls"
+      ]
+    },
+    {
       "selector": ".ownership-wedge",
       "missingClasses": [
         "ownership-wedge"
@@ -2194,7 +3501,8 @@
     {
       "selector": ".ownership-wedge.level-none",
       "missingClasses": [
-        "ownership-wedge"
+        "ownership-wedge",
+        "level-none"
       ]
     },
     {
@@ -2248,7 +3556,8 @@
     {
       "selector": ".ownership-wedge.owner-author-other",
       "missingClasses": [
-        "ownership-wedge"
+        "ownership-wedge",
+        "owner-author-other"
       ]
     },
     {
@@ -2261,25 +3570,159 @@
     {
       "selector": ".ownership-wedge.owner-spotlight-off",
       "missingClasses": [
-        "ownership-wedge"
+        "ownership-wedge",
+        "owner-spotlight-off"
       ]
     },
     {
       "selector": ".ownership-wedge.owner-fresh",
       "missingClasses": [
-        "ownership-wedge"
+        "ownership-wedge",
+        "owner-fresh"
       ]
     },
     {
       "selector": ".ownership-wedge.owner-stale",
       "missingClasses": [
-        "ownership-wedge"
+        "ownership-wedge",
+        "owner-stale"
+      ]
+    },
+    {
+      "selector": ".ownership-legend",
+      "missingClasses": [
+        "ownership-legend"
+      ]
+    },
+    {
+      "selector": ".ownership-legend[hidden]",
+      "missingClasses": [
+        "ownership-legend"
+      ]
+    },
+    {
+      "selector": ".ownership-legend-dim",
+      "missingClasses": [
+        "ownership-legend-dim"
+      ]
+    },
+    {
+      "selector": ".ownership-legend-swatch",
+      "missingClasses": [
+        "ownership-legend-swatch"
+      ]
+    },
+    {
+      "selector": ".ownership-legend-swatch.level-1",
+      "missingClasses": [
+        "ownership-legend-swatch"
+      ]
+    },
+    {
+      "selector": ".ownership-legend-swatch.level-2",
+      "missingClasses": [
+        "ownership-legend-swatch"
+      ]
+    },
+    {
+      "selector": ".ownership-legend-swatch.level-3",
+      "missingClasses": [
+        "ownership-legend-swatch"
+      ]
+    },
+    {
+      "selector": ".ownership-legend-swatch.level-4",
+      "missingClasses": [
+        "ownership-legend-swatch"
+      ]
+    },
+    {
+      "selector": ".ownership-legend-swatch.level-none",
+      "missingClasses": [
+        "ownership-legend-swatch",
+        "level-none"
+      ]
+    },
+    {
+      "selector": ".ownership-legend-label",
+      "missingClasses": [
+        "ownership-legend-label"
       ]
     },
     {
       "selector": ".ownership-legend-empty",
       "missingClasses": [
         "ownership-legend-empty"
+      ]
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-author-0",
+      "missingClasses": [
+        "ownership-legend-swatch"
+      ]
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-author-1",
+      "missingClasses": [
+        "ownership-legend-swatch"
+      ]
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-author-2",
+      "missingClasses": [
+        "ownership-legend-swatch"
+      ]
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-author-3",
+      "missingClasses": [
+        "ownership-legend-swatch"
+      ]
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-author-4",
+      "missingClasses": [
+        "ownership-legend-swatch"
+      ]
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-author-5",
+      "missingClasses": [
+        "ownership-legend-swatch"
+      ]
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-author-6",
+      "missingClasses": [
+        "ownership-legend-swatch"
+      ]
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-author-other",
+      "missingClasses": [
+        "ownership-legend-swatch",
+        "owner-author-other"
+      ]
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-spotlight-off",
+      "missingClasses": [
+        "ownership-legend-swatch",
+        "owner-spotlight-off"
+      ]
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-fresh",
+      "missingClasses": [
+        "ownership-legend-swatch",
+        "owner-fresh"
+      ]
+    },
+    {
+      "selector": ".ownership-legend-swatch.owner-stale",
+      "missingClasses": [
+        "ownership-legend-swatch",
+        "owner-stale"
       ]
     },
     {
@@ -2343,6 +3786,115 @@
       "selector": ".panel-source-note",
       "missingClasses": [
         "panel-source-note"
+      ]
+    },
+    {
+      "selector": ".sprint-board-header-aside .sprint-epic-filter",
+      "missingClasses": [
+        "sprint-epic-filter"
+      ]
+    },
+    {
+      "selector": ".sprint-board-header-aside .sprint-epic-filter-panel",
+      "missingClasses": [
+        "sprint-epic-filter-panel"
+      ]
+    },
+    {
+      "selector": ".sprint-epic-filter",
+      "missingClasses": [
+        "sprint-epic-filter"
+      ]
+    },
+    {
+      "selector": ".sprint-epic-filter-summary",
+      "missingClasses": [
+        "sprint-epic-filter-summary"
+      ]
+    },
+    {
+      "selector": ".sprint-epic-filter-summary::-webkit-details-marker",
+      "missingClasses": [
+        "sprint-epic-filter-summary"
+      ]
+    },
+    {
+      "selector": ".sprint-epic-filter-summary::marker",
+      "missingClasses": [
+        "sprint-epic-filter-summary"
+      ]
+    },
+    {
+      "selector": ".sprint-epic-filter-summary::after",
+      "missingClasses": [
+        "sprint-epic-filter-summary"
+      ]
+    },
+    {
+      "selector": ".sprint-epic-filter[open] > .sprint-epic-filter-summary",
+      "missingClasses": [
+        "sprint-epic-filter",
+        "sprint-epic-filter-summary"
+      ]
+    },
+    {
+      "selector": ".sprint-epic-filter-summary:focus-visible",
+      "missingClasses": [
+        "sprint-epic-filter-summary"
+      ]
+    },
+    {
+      "selector": ".sprint-epic-filter-label",
+      "missingClasses": [
+        "sprint-epic-filter-label"
+      ]
+    },
+    {
+      "selector": ".sprint-epic-filter-count",
+      "missingClasses": [
+        "sprint-epic-filter-count"
+      ]
+    },
+    {
+      "selector": ".sprint-epic-filter-panel",
+      "missingClasses": [
+        "sprint-epic-filter-panel"
+      ]
+    },
+    {
+      "selector": ".sprint-epic-filter-all",
+      "missingClasses": [
+        "sprint-epic-filter-all"
+      ]
+    },
+    {
+      "selector": ".sprint-epic-filter-all:hover",
+      "missingClasses": [
+        "sprint-epic-filter-all"
+      ]
+    },
+    {
+      "selector": ".sprint-epic-filter-all:focus-visible",
+      "missingClasses": [
+        "sprint-epic-filter-all"
+      ]
+    },
+    {
+      "selector": ".sprint-epic-filter-opt",
+      "missingClasses": [
+        "sprint-epic-filter-opt"
+      ]
+    },
+    {
+      "selector": ".sprint-epic-filter-opt:hover",
+      "missingClasses": [
+        "sprint-epic-filter-opt"
+      ]
+    },
+    {
+      "selector": ".sprint-epic-filter-opt input",
+      "missingClasses": [
+        "sprint-epic-filter-opt"
       ]
     },
     {
