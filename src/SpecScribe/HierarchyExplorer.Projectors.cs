@@ -90,6 +90,22 @@ public static partial class HierarchyExplorer
         var seen = new HashSet<string>(StringComparer.Ordinal) { ProjectRootId };
         void Add(HierarchyNode n) { if (seen.Add(n.Id)) nodes.Add(n); }
 
+        var storyParentIds = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (Charts.HasCompleteExecutionWaves(epic))
+        {
+            foreach (var wave in epic.Stories.GroupBy(story => story.ExecutionWave!.Value).OrderBy(group => group.Key))
+            {
+                var waveStories = wave.ToList();
+                var waveId = $"wave-{wave.Key}";
+                var waveStatus = Charts.ExecutionWaveStatus(waveStories);
+                Add(new HierarchyNode(
+                    waveId, ProjectRootId, $"{epic.DisplayName}: Wave {wave.Key}", $"Wave {wave.Key}", 0,
+                    $"{waveStories.Count} {Charts.Plural(waveStories.Count, "plan", "plans")}",
+                    waveStatus, StatusLabelFor(waveStatus, "wave"), null, "wave", PlanningColorClass(waveStatus)));
+                foreach (var story in waveStories) storyParentIds[story.Id] = waveId;
+            }
+        }
+
         foreach (var story in epic.Stories)
         {
             var storyClass = StatusStyles.ForStoryDisplay(story);
@@ -101,7 +117,7 @@ public static partial class HierarchyExplorer
                 : story.TasksTotal == 0 ? "No task checklist available" : $"{story.TasksDone} of {story.TasksTotal} tasks done";
 
             Add(new HierarchyNode(
-                story.Id, ProjectRootId,
+                story.Id, storyParentIds.GetValueOrDefault(story.Id, ProjectRootId),
                 $"{story.DisplayName}: {PathUtil.StripHtmlTags(story.Title)}", story.DisplayName,
                 storyWeight, storyDetail, storyClass,
                 StatusLabelFor(storyClass, "story"), hrefBuilder(story), "story",

@@ -106,12 +106,27 @@ public static partial class Charts
                 }
                 else
                 {
+                    var groupByWave = expandDenseEpics && HasCompleteExecutionWaves(epic);
+                    var parentByStoryId = new Dictionary<string, string>(StringComparer.Ordinal);
+                    if (groupByWave)
+                    {
+                        foreach (var wave in epic.Stories.GroupBy(story => story.ExecutionWave!.Value).OrderBy(group => group.Key))
+                        {
+                            var waveId = $"{epicId}~wave-{wave.Key}";
+                            var waveStories = wave.ToList();
+                            Add(new SunburstExplorerNode(
+                                waveId, epicId, waveStories.Sum(story => SunburstStoryWeight(geometry, epic.Number, story, noPlanWeight)),
+                                $"{epic.DisplayName}: Wave {wave.Key}", ExecutionWaveStatus(waveStories), null, "wave", "story"));
+                            foreach (var story in waveStories) parentByStoryId[story.Id] = waveId;
+                        }
+                    }
+
                     foreach (var story in epic.Stories)
                     {
                         var storyClass = StatusStyles.ForStoryDisplay(story);
                         var storyHref = story.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(story.Id);
                         Add(new SunburstExplorerNode(
-                            story.Id, epicId, SunburstStoryWeight(geometry, epic.Number, story, noPlanWeight),
+                            story.Id, parentByStoryId.GetValueOrDefault(story.Id, epicId), SunburstStoryWeight(geometry, epic.Number, story, noPlanWeight),
                             $"{story.DisplayName}: {PathUtil.StripHtmlTags(story.Title)}", storyClass, storyHref, "story", "story"));
                     }
                 }
@@ -181,5 +196,14 @@ public static partial class Charts
 
         return nodes;
     }
+
+    /// <summary>Wave grouping is opt-in by evidence: every plan must declare a usable wave. A partial frontmatter
+    /// set is not a trustworthy execution queue, so it retains the established epic-to-story shape.</summary>
+    internal static bool HasCompleteExecutionWaves(EpicInfo epic) =>
+        epic.Stories.Count > 0 && epic.Stories.All(story => story.ExecutionWave is >= 0);
+
+    internal static string ExecutionWaveStatus(IEnumerable<StoryInfo> stories) =>
+        stories.Select(StatusStyles.ForStoryDisplay)
+            .FirstOrDefault(status => status is not "done" and not "retired") ?? "done";
 
 }

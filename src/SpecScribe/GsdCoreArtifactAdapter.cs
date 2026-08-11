@@ -146,6 +146,13 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
     private static readonly Regex CompletedSuffix = TimedRegex.New(@"\s*\(completed\s+(?<date>[^)]+)\)\s*$", RegexOptions.Compiled);
     private static readonly Regex PhaseMarkerSuffix = TimedRegex.New(@"\s*\((?:INSERTED|BACKLOG)\)\s*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex LeadingPhaseNumber = TimedRegex.New(@"^(?<num>\d+(?:\.\d+)?)-", RegexOptions.Compiled);
+    private static readonly Regex FrontmatterBlock = TimedRegex.New(
+        @"\A---\s*\r?\n(?<body>.*?)\r?\n---(?:\r?\n|\z)", RegexOptions.Compiled | RegexOptions.Singleline);
+    private static readonly Regex ExecutionWaveLine = TimedRegex.New(
+        @"^\s*wave\s*:\s*(?<wave>\d+)\s*$", RegexOptions.Compiled | RegexOptions.Multiline | RegexOptions.IgnoreCase);
+    private static readonly Regex DependsOnLine = TimedRegex.New(
+        @"^\s*depends_on\s*:\s*\[(?<plans>[^\]]*)\]\s*$", RegexOptions.Compiled | RegexOptions.Multiline | RegexOptions.IgnoreCase);
+    private static readonly Regex DependencyNumber = TimedRegex.New(@"\d+", RegexOptions.Compiled);
 
     /// <summary>The band name for phases GSD lists under <c>## Backlog</c> — a peer of the milestone groups in
     /// <c>## Phases</c>, carrying GSD's own word rather than an invented one.</summary>
@@ -331,6 +338,10 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
                     continue;
                 }
 
+                var execution = planFiles.TryGetValue(plan.FileName, out var planPath)
+                    ? ReadPlanExecutionMetadata(planPath)
+                    : PlanExecutionMetadata.Empty;
+
                 stories.Add(new StoryInfo
                 {
                     Id = id,
@@ -347,14 +358,16 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
                     // `Status:` line nor a `status:` frontmatter key, so ExtractStatus yields null for all 58.
                     // Both words map cleanly through StatusStyles.ForStatus with no new vocabulary.
                     Status = plan.Done ? "done" : "drafted",
+                    ExecutionWave = execution.Wave,
+                    DependsOnPlanNumbers = execution.DependsOnPlanNumbers,
                 });
 
                 // The plan file is the story's detail artifact. Discovered by FILENAME (finding #5).
-                if (planFiles.TryGetValue(plan.FileName, out var planFullPath))
+                if (planPath is not null)
                 {
-                    artifactMap[id] = planFullPath;
+                    artifactMap[id] = planPath;
                     stories[^1].ArtifactOutputPath = $"epics/story-{id.Replace('.', '-')}.html";
-                    consumed.Add(ToSourceRelative(options, planFullPath));
+                    consumed.Add(ToSourceRelative(options, planPath));
                 }
 
                 // The sibling summary is a COMPANION, never the story artifact — and never a retro. It is
@@ -413,6 +426,46 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
             Epics = epics,
             Milestones = BuildMilestones(roadmap),
         };
+    }
+
+    /// <summary>Reads only execution metadata from a GSD plan's YAML frontmatter. Plan identity and completion
+    /// deliberately remain filename- and ROADMAP-derived because those are the stable sources in real projects.
+    /// Any missing or malformed value is omitted rather than guessed from the roadmap's explanatory wave prose.</summary>
+    private static PlanExecutionMetadata ReadPlanExecutionMetadata(string planPath)
+    {
+        try
+        {
+            var match = FrontmatterBlock.Match(MarkdownConverter.ReadAllTextShared(planPath));
+            if (!match.Success) return PlanExecutionMetadata.Empty;
+
+            var body = match.Groups["body"].Value;
+            int? wave = null;
+            var waveMatch = ExecutionWaveLine.Match(body);
+            if (waveMatch.Success && int.TryParse(waveMatch.Groups["wave"].Value, NumberStyles.None,
+                    CultureInfo.InvariantCulture, out var parsedWave))
+                wave = parsedWave;
+
+            var dependencies = Array.Empty<int>();
+            var dependsMatch = DependsOnLine.Match(body);
+            if (dependsMatch.Success)
+            {
+                dependencies = DependencyNumber.Matches(dependsMatch.Groups["plans"].Value)
+                    .Select(m => int.Parse(m.Value, CultureInfo.InvariantCulture))
+                    .Distinct()
+                    .ToArray();
+            }
+
+            return new PlanExecutionMetadata(wave, dependencies);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return PlanExecutionMetadata.Empty;
+        }
+    }
+
+    private sealed record PlanExecutionMetadata(int? Wave, IReadOnlyList<int> DependsOnPlanNumbers)
+    {
+        public static PlanExecutionMetadata Empty { get; } = new(null, Array.Empty<int>());
     }
 
     /// <summary>Finds GSD's phase-local context and discussion artifacts by their documented filename grammar.

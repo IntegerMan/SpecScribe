@@ -1297,6 +1297,69 @@ public class HtmlTemplaterTests
     }
 
     [Fact]
+    public void RenderPlannedGsdPhase_WithCompleteWaveMetadata_ExecutesItsEarliestWave()
+    {
+        var firstWavePlan = new StoryInfo
+        {
+            Id = "7.1", NativeDisplayName = "Plan 7.1", EpicNumber = 7, WorkflowCommandArgument = "7",
+            Title = "Contract", UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(), Status = "drafted",
+            ArtifactOutputPath = "epics/story-7-1.html", ExecutionWave = 1,
+        };
+        var laterWavePlan = new StoryInfo
+        {
+            Id = "7.2", NativeDisplayName = "Plan 7.2", EpicNumber = 7, WorkflowCommandArgument = "7",
+            Title = "Implementation", UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(), Status = "drafted",
+            ArtifactOutputPath = "epics/story-7-2.html", ExecutionWave = 2,
+        };
+        var phase = new EpicInfo
+        {
+            Number = 7, NativeDisplayName = "Phase 7", WorkflowCommandArgument = "7", Title = "Phase 7", GoalHtml = string.Empty,
+            Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice, Stories = new[] { firstWavePlan, laterWavePlan },
+        };
+        var commands = new CommandCatalog("GSD Core", new Dictionary<string, string>
+        {
+            ["dev-story"] = "/gsd:execute-phase",
+        }, usesPhaseArguments: true);
+
+        var html = WorkflowCommands.RenderEpicNextSteps(phase, commands);
+
+        Assert.Contains("/gsd:execute-phase 7 --wave 1", html);
+        Assert.Contains("next wave (1): Plan 7.1", html);
+        Assert.DoesNotContain("--wave 2", html);
+    }
+
+    [Fact]
+    public void RenderPlannedGsdPhase_WithIncompleteWaveMetadata_FallsBackToFullPhaseExecution()
+    {
+        var declared = new StoryInfo
+        {
+            Id = "7.1", EpicNumber = 7, WorkflowCommandArgument = "7", Title = "Declared",
+            UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(), Status = "drafted",
+            ArtifactOutputPath = "epics/story-7-1.html", ExecutionWave = 1,
+        };
+        var undeclared = new StoryInfo
+        {
+            Id = "7.2", EpicNumber = 7, WorkflowCommandArgument = "7", Title = "Undeclared",
+            UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(), Status = "drafted",
+            ArtifactOutputPath = "epics/story-7-2.html",
+        };
+        var phase = new EpicInfo
+        {
+            Number = 7, WorkflowCommandArgument = "7", Title = "Phase 7", GoalHtml = string.Empty,
+            Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice, Stories = new[] { declared, undeclared },
+        };
+        var commands = new CommandCatalog("GSD Core", new Dictionary<string, string>
+        {
+            ["dev-story"] = "/gsd:execute-phase",
+        }, usesPhaseArguments: true);
+
+        var html = WorkflowCommands.RenderEpicNextSteps(phase, commands);
+
+        Assert.Contains("/gsd:execute-phase 7", html);
+        Assert.DoesNotContain("--wave", html);
+    }
+
+    [Fact]
     public void RenderGsdPhaseAndPlan_UsesNativeNamesInsteadOfSyntheticOrdinals()
     {
         var plan = new StoryInfo

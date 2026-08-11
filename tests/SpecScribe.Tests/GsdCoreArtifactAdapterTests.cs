@@ -135,6 +135,18 @@ public class GsdCoreArtifactAdapterTests : IDisposable
         - [ ] Scope API returns project-partitioned rows
         """;
 
+    private const string PlanWithExecutionMetadataMd = """
+        ---
+        phase: "02.1"
+        plan: 01
+        type: execute
+        wave: 3
+        depends_on: [00, 02]
+        ---
+
+        # Plan 02.1-01
+        """;
+
     private const string SummaryMd = """
         # Summary 01-00
 
@@ -180,7 +192,7 @@ public class GsdCoreArtifactAdapterTests : IDisposable
 
         File.WriteAllText(Path.Combine(Phases, "02-conversation-continuity", "02-00-PLAN.md"), PlanNoTasksMd);
         var p21 = Path.Combine(Phases, "02.1-ui-foundation-and-style-system");
-        File.WriteAllText(Path.Combine(p21, "02.1-01-PLAN.md"), PlanNoTasksMd);
+        File.WriteAllText(Path.Combine(p21, "02.1-01-PLAN.md"), PlanWithExecutionMetadataMd);
         File.WriteAllText(Path.Combine(p21, "02.1-02-PLAN.md"), PlanNoTasksMd);
     }
 
@@ -308,6 +320,21 @@ public class GsdCoreArtifactAdapterTests : IDisposable
 
         Assert.Equal(new[] { "1.0", "1.1" }, epics.Epics[0].Stories.Select(s => s.Id).ToArray());
         Assert.Equal(new[] { "3.1", "3.2" }, epics.Epics[2].Stories.Select(s => s.Id).ToArray());
+    }
+
+    [Fact]
+    public void Epics_PlanExecutionMetadata_ComesFromFrontmatterWithoutChangingIdentity()
+    {
+        var phase = Assert.IsType<EpicsModel>(Ingest().Epics).Epics[2];
+
+        var declared = phase.Stories[0];
+        Assert.Equal("Plan 2.1.1", declared.DisplayName);
+        Assert.Equal(3, declared.ExecutionWave);
+        Assert.Equal(new[] { 0, 2 }, declared.DependsOnPlanNumbers);
+
+        var undeclared = phase.Stories[1];
+        Assert.Null(undeclared.ExecutionWave);
+        Assert.Empty(undeclared.DependsOnPlanNumbers);
     }
 
     /// <summary>The <c>(INSERTED)</c> / <c>(BACKLOG)</c> markers and the trailing <c>(completed …)</c> are grammar,

@@ -59,6 +59,15 @@ public sealed class StoryInfo
     /// synthetic story id. Null keeps the existing <see cref="Id"/> argument behavior.</summary>
     public string? WorkflowCommandArgument { get; init; }
 
+    /// <summary>Framework-native execution wave when the planning artifact declares one. Null means no trustworthy
+    /// wave grouping is available; consumers must preserve the ordinary epic-to-story hierarchy rather than infer
+    /// a queue from descriptive roadmap prose.</summary>
+    public int? ExecutionWave { get; init; }
+
+    /// <summary>Framework-native plan numbers this story declares as prerequisites. Empty means no declared
+    /// prerequisites or unavailable execution metadata; identities remain <see cref="Id"/>-based.</summary>
+    public IReadOnlyList<int> DependsOnPlanNumbers { get; init; } = Array.Empty<int>();
+
     /// <summary>Generation-time recency for the story card: the story file's last git change date when
     /// deep-git matched the path, else the latest <c>## Change Log</c> ISO date, else null.
     /// Set by <see cref="ProgressCalculator"/>. Never a wall clock. [Story 8.8]</summary>

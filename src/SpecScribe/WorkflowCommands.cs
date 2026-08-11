@@ -62,7 +62,7 @@ public static class WorkflowCommands
     }
 
     private static string RenderGsdPlanExecutionScopePanel(StoryInfo story) =>
-        $"<div class=\"chart-panel next-steps\">\n<h3>Execution scope</h3>\n<p>{PathUtil.Html(story.DisplayName)} is executed as part of Phase {PathUtil.Html(story.WorkflowCommandArgument)}. GSD Core does not provide a plan-level execution command; run the phase from its Phase page.</p>\n</div>\n\n";
+        $"<div class=\"chart-panel next-steps\">\n<h3>Execution scope</h3>\n<p>{PathUtil.Html(story.DisplayName)} is executed as part of Phase {PathUtil.Html(story.WorkflowCommandArgument ?? string.Empty)}. GSD Core does not provide a plan-level execution command; run the phase from its Phase page.</p>\n</div>\n\n";
 
     /// <summary>The FULL status-gated next-step command list for a story — the exact set the story page's
     /// "Next Steps" panel renders (<see cref="RenderNextSteps"/>), projected as data for a non-HTML host
@@ -682,8 +682,7 @@ public static class WorkflowCommands
 
         if (IsGsdPhaseReadyToExecute(epic, commands))
         {
-            Add(suggestions, CommandForEpic(commands, "dev-story", epic),
-                $"Executes Phase {epic.WorkflowCommandArgument}'s planned work, including its remaining waves.");
+            AddGsdPhaseExecutionSuggestion(suggestions, epic, commands);
             AppendDeferredAlternate(suggestions, entityId, "Epic", openDeferred, commands);
             return suggestions;
         }
@@ -801,8 +800,7 @@ public static class WorkflowCommands
         var phaseReadyToExecute = model.Epics.FirstOrDefault(e => IsGsdPhaseReadyToExecute(e, commands));
         if (phaseReadyToExecute is not null)
         {
-            Add(suggestions, CommandForEpic(commands, "dev-story", phaseReadyToExecute),
-                $"Phase {phaseReadyToExecute.WorkflowCommandArgument} is planned and ready to execute.");
+            AddGsdPhaseExecutionSuggestion(suggestions, phaseReadyToExecute, commands);
         }
 
         // The next story that still needs an implementation plan — in any drafted/ready/active epic
@@ -843,6 +841,48 @@ public static class WorkflowCommands
         commands.UsesPhaseArguments
         && !string.IsNullOrWhiteSpace(epic.WorkflowCommandArgument)
         && epic.Stories.Any(story => IsUnfinishedGsdPlan(story, commands, StatusStyles.ForStory(story)));
+
+    /// <summary>Adds the phase-scoped GSD execution recommendation. A wave qualifier is honest only when every
+    /// unfinished plan declares a non-negative wave; otherwise GSD's own full-phase executor remains the safe
+    /// recommendation rather than presenting a partial queue as the next runnable frontier.</summary>
+    private static void AddGsdPhaseExecutionSuggestion(
+        List<Suggestion> suggestions, EpicInfo epic, CommandCatalog commands)
+    {
+        if (TryGetGsdNextExecutionWave(epic, commands, out var wave, out var plans))
+        {
+            var command = CommandForEpic(commands, "dev-story", epic);
+            if (command is not null)
+            {
+                command += $" --wave {wave}";
+                var planNames = string.Join(", ", plans.Select(plan => plan.DisplayName));
+                Add(suggestions, command,
+                    $"Executes Phase {epic.WorkflowCommandArgument}'s next wave ({wave}): {planNames}.");
+            }
+            return;
+        }
+
+        Add(suggestions, CommandForEpic(commands, "dev-story", epic),
+            $"Executes Phase {epic.WorkflowCommandArgument}'s planned work, including its remaining waves.");
+    }
+
+    private static bool TryGetGsdNextExecutionWave(
+        EpicInfo epic, CommandCatalog commands, out int wave, out IReadOnlyList<StoryInfo> plans)
+    {
+        var unfinished = epic.Stories
+            .Where(story => IsUnfinishedGsdPlan(story, commands, StatusStyles.ForStory(story)))
+            .ToList();
+        if (unfinished.Count == 0 || unfinished.Any(story => story.ExecutionWave is null or < 0))
+        {
+            wave = default;
+            plans = Array.Empty<StoryInfo>();
+            return false;
+        }
+
+        var nextWave = unfinished.Min(story => story.ExecutionWave!.Value);
+        plans = unfinished.Where(story => story.ExecutionWave == nextWave).ToList();
+        wave = nextWave;
+        return true;
+    }
 
     private static bool IsUnfinishedGsdPlan(StoryInfo story, CommandCatalog commands, string stage) =>
         commands.UsesPhaseArguments

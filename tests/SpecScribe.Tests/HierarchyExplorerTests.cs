@@ -16,7 +16,8 @@ namespace SpecScribe.Tests;
 /// component is verified in a live browser (Task 8) plus the string guards in <see cref="StylesheetTests"/>.</para></summary>
 public class HierarchyExplorerTests
 {
-    private static StoryInfo Story(string id, string title, string? status, int done, int total, int epicNumber = 1) => new()
+    private static StoryInfo Story(
+        string id, string title, string? status, int done, int total, int epicNumber = 1, int? executionWave = null) => new()
     {
         Id = id,
         EpicNumber = epicNumber,
@@ -26,6 +27,7 @@ public class HierarchyExplorerTests
         Status = status,
         TasksDone = done,
         TasksTotal = total,
+        ExecutionWave = executionWave,
     };
 
     private static EpicInfo Epic(int number, string title, params StoryInfo[] stories) => new()
@@ -99,6 +101,40 @@ public class HierarchyExplorerTests
         var ids = built.Nodes.Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
 
         Assert.All(built.Nodes.Where(n => n.ParentId is not null), n => Assert.Contains(n.ParentId!, ids));
+    }
+
+    [Fact]
+    public void ProjectDashboard_GsdExecutionWaves_InsertStructuralNodesBetweenPhaseAndPlans()
+    {
+        var model = Model(Epic(1, "Phase",
+            Story("1.1", "Contract", "drafted", 0, 2, executionWave: 1),
+            Story("1.2", "Scaffolding", "drafted", 0, 1, executionWave: 1),
+            Story("1.3", "Implementation", "drafted", 0, 3, executionWave: 2)));
+
+        var nodes = Build(model).Nodes.ToDictionary(node => node.Id, StringComparer.Ordinal);
+
+        Assert.Equal("epic-1", nodes["epic-1~wave-1"].ParentId);
+        Assert.Equal("wave", nodes["epic-1~wave-1"].Kind);
+        Assert.Equal("epic-1~wave-1", nodes["1.1"].ParentId);
+        Assert.Equal("epic-1~wave-1", nodes["1.2"].ParentId);
+        Assert.Equal("epic-1~wave-2", nodes["1.3"].ParentId);
+        Assert.Equal(3, nodes["epic-1~wave-1"].Value);
+    }
+
+    [Fact]
+    public void ProjectEpic_GsdExecutionWaves_InsertStructuralNodesBetweenPhaseAndPlans()
+    {
+        var epic = Epic(1, "Phase",
+            Story("1.1", "Contract", "drafted", 0, 2, executionWave: 1),
+            Story("1.2", "Implementation", "drafted", 0, 3, executionWave: 2));
+
+        var nodes = HierarchyExplorer.ProjectEpic(epic, _ => "epics/story.html", Config())
+            .Nodes.ToDictionary(node => node.Id, StringComparer.Ordinal);
+
+        Assert.Equal("wave-1", nodes["1.1"].ParentId);
+        Assert.Equal("wave-2", nodes["1.2"].ParentId);
+        Assert.Equal("Wave 1", nodes["wave-1"].ShortLabel);
+        Assert.Equal("2 plans", nodes[HierarchyExplorer.ProjectRootId].Detail);
     }
 
     // ---- Finding B: no null in values --------------------------------------------------------------------

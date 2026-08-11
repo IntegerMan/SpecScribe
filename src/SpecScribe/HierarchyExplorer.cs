@@ -451,6 +451,7 @@ public static partial class HierarchyExplorer
                 ProjectRootKind => $"{epicCount} {Charts.Plural(epicCount, "epic", "epics")}",
                 "epic" when epicsByIsland.TryGetValue(n.Id, out var e) =>
                     $"{e.Stories.Count} {Charts.Plural(e.Stories.Count, "story", "stories")}",
+                "wave" => $"{nodes.Count(child => child.ParentId == n.Id && child.Kind == "story")} plans",
                 "story" when storiesById.TryGetValue(n.Id, out var s) =>
                     // Matches Charts.Sunburst's own wedge <title>: an un-drafted story says so in words rather than
                     // reporting "0 of 0 tasks done", which reads as failure instead of as not-yet-planned.
@@ -1132,6 +1133,7 @@ public static partial class HierarchyExplorer
         return n.Kind switch
         {
             "epic" or "story" => head,
+            "wave" => tail.Length > 0 ? tail : head,
             "story-summary" => tail.Length > 0 ? tail : head,
             "aggregate" => n.Id.EndsWith("~open", StringComparison.Ordinal) ? $"{n.Weight} open"
                 : n.Id.EndsWith("~done", StringComparison.Ordinal) ? $"{n.Weight} done"
