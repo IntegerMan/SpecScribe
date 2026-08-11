@@ -443,21 +443,21 @@ public static class DashboardViewBuilder
         foreach (var (epic, story) in inDev)
         {
             cards.Add(new NowNextCard("active", "In development",
-                $"{vocabulary.SecondarySingular} {story.Id} · {PathUtil.StripHtmlTags(story.Title)}",
+                $"{story.DisplayName} · {PathUtil.StripHtmlTags(story.Title)}",
                 story.ArtifactOutputPath ?? $"epics/epic-{epic.Number}.html"));
         }
 
         foreach (var (epic, story) in inReview)
         {
             cards.Add(new NowNextCard("review", "In review",
-                $"{vocabulary.SecondarySingular} {story.Id} · {PathUtil.StripHtmlTags(story.Title)}",
+                $"{story.DisplayName} · {PathUtil.StripHtmlTags(story.Title)}",
                 story.ArtifactOutputPath ?? $"epics/epic-{epic.Number}.html"));
         }
 
         foreach (var (epic, story) in upNext)
         {
             cards.Add(new NowNextCard("ready", "Up next",
-                $"{vocabulary.SecondarySingular} {story.Id} · {PathUtil.StripHtmlTags(story.Title)}",
+                $"{story.DisplayName} · {PathUtil.StripHtmlTags(story.Title)}",
                 story.ArtifactOutputPath ?? $"epics/epic-{epic.Number}.html"));
         }
 
@@ -465,14 +465,14 @@ public static class DashboardViewBuilder
         {
             var (epic, story) = nextStoryToDraft;
             cards.Add(new NowNextCard("drafted", $"Next {vocabulary.SecondarySingular.ToLowerInvariant()} to draft",
-                $"{vocabulary.SecondarySingular} {story.Id} · {PathUtil.StripHtmlTags(story.Title)}",
+                $"{story.DisplayName} · {PathUtil.StripHtmlTags(story.Title)}",
                 story.ArtifactOutputPath ?? $"epics/epic-{epic.Number}.html"));
         }
 
         if (nextEpicToDraft is not null)
         {
             cards.Add(new NowNextCard("pending", $"Next {vocabulary.PrimarySingular.ToLowerInvariant()} to draft",
-                $"{vocabulary.PrimarySingular} {nextEpicToDraft.Number} · {PathUtil.StripHtmlTags(nextEpicToDraft.Title)}",
+                $"{nextEpicToDraft.DisplayName} · {PathUtil.StripHtmlTags(nextEpicToDraft.Title)}",
                 $"epics/epic-{nextEpicToDraft.Number}.html"));
         }
 

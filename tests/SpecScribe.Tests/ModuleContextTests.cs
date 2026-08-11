@@ -848,6 +848,34 @@ public class BmadCommandsTests
     }
 
     [Fact]
+    public void RenderNextSteps_PlannedGsdPlanExplainsPhaseScopedExecution()
+    {
+        var gsd = new CommandCatalog("GSD Core", new Dictionary<string, string>
+        {
+            ["dev-story"] = "/gsd:execute-phase",
+        }, usesPhaseArguments: true);
+        var plan = new StoryInfo
+        {
+            Id = "3.1",
+            EpicNumber = 3,
+            NativeDisplayName = "Plan 2.1",
+            Title = "A story",
+            UserStoryHtml = string.Empty,
+            AcBlocksHtml = Array.Empty<string>(),
+            Status = "drafted",
+            WorkflowCommandArgument = "2.1",
+            ArtifactOutputPath = "epics/story-3-1.html",
+        };
+
+        var html = WorkflowCommands.RenderNextSteps(plan, gsd);
+
+        Assert.Contains("Execution scope", html);
+        Assert.Contains("Plan 2.1 is executed as part of Phase 2.1", html);
+        Assert.Contains("does not provide a plan-level execution command", html);
+        Assert.DoesNotContain("/gsd:execute-phase", html);
+    }
+
+    [Fact]
     public void RenderNextSteps_OmitsPanelWhenModuleUndetected()
     {
         var html = WorkflowCommands.RenderNextSteps(Story("1.2", "ready-for-dev"), CommandCatalog.Empty);

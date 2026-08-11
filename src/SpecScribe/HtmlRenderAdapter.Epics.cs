@@ -179,7 +179,8 @@ public sealed partial class HtmlRenderAdapter
                 sb.Append("  <div class=\"epic-overview\">\n");
                 foreach (var chip in band.Chips)
                 {
-                    sb.Append($"    <a class=\"epic-chip {chip.StatusClass}\" href=\"{chip.Href}\"><span class=\"num\">{chip.Number:00}</span>{chip.TitleHtml}</a>\n");
+                    var displayName = chip.DisplayName.Length > 0 ? chip.DisplayName : chip.Number.ToString("00");
+                    sb.Append($"    <a class=\"epic-chip {chip.StatusClass}\" href=\"{chip.Href}\"><span class=\"num\">{PathUtil.Html(displayName)}</span>{chip.TitleHtml}</a>\n");
                 }
                 sb.Append("  </div>\n");
             }
@@ -195,7 +196,8 @@ public sealed partial class HtmlRenderAdapter
         sb.Append($"<div class=\"section-divider\">{PathUtil.Html(title)}</div>\n<div class=\"epic-overview\">\n");
         foreach (var chip in chips)
         {
-            sb.Append($"  <a class=\"epic-chip {chip.StatusClass}\" href=\"{chip.Href}\"><span class=\"num\">{chip.Number:00}</span>{chip.TitleHtml}</a>\n");
+            var displayName = chip.DisplayName.Length > 0 ? chip.DisplayName : chip.Number.ToString("00");
+            sb.Append($"  <a class=\"epic-chip {chip.StatusClass}\" href=\"{chip.Href}\"><span class=\"num\">{PathUtil.Html(displayName)}</span>{chip.TitleHtml}</a>\n");
         }
         sb.Append("</div>\n\n");
     }
@@ -204,7 +206,7 @@ public sealed partial class HtmlRenderAdapter
     {
         var statusCls = StatusStyles.ForEpicWithRetrospective(epic);
         sb.Append($"<div class=\"epic-card\" id=\"epic-{epic.Number}\">\n");
-        sb.Append($"  <h2><span class=\"epic-num\">{PathUtil.Html(vocabulary.PrimarySingular)} {epic.Number}</span> {epic.Title} <span class=\"epic-status {statusCls}\">{PathUtil.Html(StatusStyles.EpicLabel(statusCls))}</span></h2>\n");
+        sb.Append($"  <h2><span class=\"epic-num\">{PathUtil.Html(epic.DisplayName)}</span> {epic.Title} <span class=\"epic-status {statusCls}\">{PathUtil.Html(StatusStyles.EpicLabel(statusCls))}</span></h2>\n");
 
         if (epic.GoalHtml.Length > 0)
         {
@@ -253,7 +255,8 @@ public sealed partial class HtmlRenderAdapter
         // Sibling pager rides the chrome-level wayfinding strip alongside the breadcrumb now (PageView.Pager),
         // not the body's own header. [Story 10.11]
         main.Append("  <div class=\"kicker-row\">\n");
-        main.Append($"    <span class=\"story-kicker\">{PathUtil.Html(view.PlanningVocabulary.PrimarySingular)} {view.Number}</span>\n");
+        var displayName = view.DisplayName.Length > 0 ? view.DisplayName : $"{view.PlanningVocabulary.PrimarySingular} {view.Number}";
+        main.Append($"    <span class=\"story-kicker\">{PathUtil.Html(displayName)}</span>\n");
         main.Append($"    {StatusStyles.Badge(view.StatusClass, view.StatusLabel)}\n");
         main.Append(StatusStyles.LegendKey());
         main.Append("  </div>\n");
@@ -307,7 +310,10 @@ public sealed partial class HtmlRenderAdapter
         foreach (var card in view.StoryCards)
         {
             AppendStoryCard(main, card);
-            toc.Add(new Toc.Entry(2, $"{view.PlanningVocabulary.SecondarySingular} {card.Id}", card.AnchorId));
+            var cardDisplayName = card.DisplayName.Length > 0
+                ? card.DisplayName
+                : $"{view.PlanningVocabulary.SecondarySingular} {card.Id}";
+            toc.Add(new Toc.Entry(2, cardDisplayName, card.AnchorId));
         }
 
         if (view.RetiredNoticesHtml.Count > 0)
@@ -351,7 +357,8 @@ public sealed partial class HtmlRenderAdapter
         var demotion = card.StatusStage == "retired" ? " retired" : string.Empty;
         sb.Append($"<div class=\"story-card{demotion}\" id=\"{card.AnchorId}\">\n");
         sb.Append("  <div class=\"story-card-header\">\n");
-        sb.Append($"    <span class=\"story-id\">{PathUtil.Html(card.Id)}</span>\n");
+        var displayName = card.DisplayName.Length > 0 ? card.DisplayName : card.Id;
+        sb.Append($"    <span class=\"story-id\">{PathUtil.Html(displayName)}</span>\n");
         sb.Append($"    <a class=\"story-title story-title-link\" href=\"{PathUtil.Html(card.TitleHref)}\">{card.TitleHtml}</a>\n");
 
         // Pair status + task badges into one grouped unit ("[In review] · [✓ 5 tasks]") so progress and
@@ -607,7 +614,8 @@ public sealed partial class HtmlRenderAdapter
         // Sibling pager rides the chrome-level wayfinding strip alongside the breadcrumb now (PageView.Pager),
         // not the body's own header. [Story 10.11]
         main.Append("  <div class=\"kicker-row\">\n");
-        main.Append($"    <span class=\"story-kicker\">{PathUtil.Html(view.PlanningVocabulary.SecondarySingular)} {PathUtil.Html(view.Id)}</span>\n");
+        var displayName = view.DisplayName.Length > 0 ? view.DisplayName : $"{view.PlanningVocabulary.SecondarySingular} {view.Id}";
+        main.Append($"    <span class=\"story-kicker\">{PathUtil.Html(displayName)}</span>\n");
         if (view.Status is { Length: > 0 } status)
         {
             main.Append($"    {StatusStyles.Badge(view.StatusStage, status)}\n");
@@ -766,7 +774,8 @@ public sealed partial class HtmlRenderAdapter
         // Sibling pager rides the chrome-level wayfinding strip alongside the breadcrumb now (PageView.Pager),
         // not the body's own header. [Story 10.11]
         sb.Append("  <div class=\"kicker-row\">\n");
-        sb.Append($"    <span class=\"story-kicker\">{PathUtil.Html(view.PlanningVocabulary.SecondarySingular)} {PathUtil.Html(view.Id)}</span>\n");
+        var displayName = view.DisplayName.Length > 0 ? view.DisplayName : $"{view.PlanningVocabulary.SecondarySingular} {view.Id}";
+        sb.Append($"    <span class=\"story-kicker\">{PathUtil.Html(displayName)}</span>\n");
         sb.Append($"    {StatusStyles.Badge(view.StatusStage, "Not yet drafted")}\n");
         sb.Append(StatusStyles.LegendKey());
         sb.Append(view.RetroLinkHtml);
@@ -804,7 +813,10 @@ public sealed partial class HtmlRenderAdapter
         }
 
         sb.Append("<section class=\"dashboard-narrow\">\n");
-        sb.Append($"  <a class=\"view-epic-link\" href=\"{PathUtil.Html(view.BackHref)}\">&larr; Back to {PathUtil.Html(view.PlanningVocabulary.PrimarySingular)} {view.EpicNumber}</a>\n");
+        var epicDisplayName = view.EpicDisplayName.Length > 0
+            ? view.EpicDisplayName
+            : $"{view.PlanningVocabulary.PrimarySingular} {view.EpicNumber}";
+        sb.Append($"  <a class=\"view-epic-link\" href=\"{PathUtil.Html(view.BackHref)}\">&larr; Back to {PathUtil.Html(epicDisplayName)}</a>\n");
         sb.Append("</section>\n");
         sb.Append("</main>\n\n");
         return sb.ToString();

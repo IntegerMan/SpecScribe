@@ -301,6 +301,8 @@ public class GsdCoreArtifactAdapterTests : IDisposable
         // The DECIMAL phase keeps its real label while taking a sequential ordinal.
         Assert.Equal(3, epics.Epics[2].Number);
         Assert.Contains("Phase 2.1: UI Foundation and Style System", epics.Epics[2].Title);
+        Assert.Equal("Phase 2.1", epics.Epics[2].DisplayName);
+        Assert.Equal("Plan 2.1.1", epics.Epics[2].Stories[0].DisplayName);
         // The 999.x backlog phase is represented, not dropped.
         Assert.Contains("Phase 999.1: Sentiment Analysis", epics.Epics[4].Title);
 

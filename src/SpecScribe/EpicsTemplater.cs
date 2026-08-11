@@ -89,7 +89,7 @@ public static class EpicsTemplater
         {
             Kind = PageKind.Epic,
             OutputRelativePath = outputPath,
-            Title = $"{vocabulary.PrimarySingular} {epic.Number}: {PathUtil.StripHtmlTags(epic.Title)} — {nav.SiteTitle}",
+            Title = $"{epic.DisplayName}: {PathUtil.StripHtmlTags(epic.Title)} — {nav.SiteTitle}",
             Nav = nav.ToNavigationView(outputPath, BuildStoriesLocalContext(epic, outputPath, $"{vocabulary.SecondaryPlural} in this {vocabulary.PrimarySingular.ToLowerInvariant()}", activeStoryId: null, vocabulary)),
             Breadcrumb = breadcrumb,
             Pager = pager,
@@ -184,7 +184,7 @@ public static class EpicsTemplater
             ("Home", "index.html"),
             (vocabulary.PrimaryPlural, SiteNav.EpicsOutputPath),
             (EpicCrumbLabel(epic), epicOutputPath),
-            ($"{vocabulary.SecondarySingular} {story.Id}", null),
+            (story.DisplayName, null),
         });
 
         // Story 19.2: pass this story's provenance subgraph (re-prefixed for the epics/ depth) into the view so the
@@ -202,8 +202,8 @@ public static class EpicsTemplater
         {
             Kind = PageKind.Story,
             OutputRelativePath = outputPath,
-            Title = $"{vocabulary.SecondarySingular} {story.Id}: {PathUtil.StripHtmlTags(story.Title)} — {nav.SiteTitle}",
-            Nav = nav.ToNavigationView(outputPath, BuildStoriesLocalContext(epic, outputPath, $"{vocabulary.SecondaryPlural} in {vocabulary.PrimarySingular} {epic.Number}", story.Id, vocabulary)),
+            Title = $"{story.DisplayName}: {PathUtil.StripHtmlTags(story.Title)} — {nav.SiteTitle}",
+            Nav = nav.ToNavigationView(outputPath, BuildStoriesLocalContext(epic, outputPath, $"{vocabulary.SecondaryPlural} in {epic.DisplayName}", story.Id, vocabulary)),
             Breadcrumb = breadcrumb,
             Pager = pager,
             Assets = new AssetManifest
@@ -246,7 +246,7 @@ public static class EpicsTemplater
             ("Home", "index.html"),
             (vocabulary.PrimaryPlural, SiteNav.EpicsOutputPath),
             (EpicCrumbLabel(epic), epicOutputPath),
-            ($"{vocabulary.SecondarySingular} {story.Id}", null),
+            (story.DisplayName, null),
         });
 
         var view = EpicsViewBuilder.BuildStoryPlaceholder(epic, story, commands, epicRetroPath, vocabulary);
@@ -258,8 +258,8 @@ public static class EpicsTemplater
         {
             Kind = PageKind.Story,
             OutputRelativePath = outputPath,
-            Title = $"{vocabulary.SecondarySingular} {story.Id}: {PathUtil.StripHtmlTags(story.Title)} — {nav.SiteTitle}",
-            Nav = nav.ToNavigationView(outputPath, BuildStoriesLocalContext(epic, outputPath, $"{vocabulary.SecondaryPlural} in {vocabulary.PrimarySingular} {epic.Number}", story.Id, vocabulary)),
+            Title = $"{story.DisplayName}: {PathUtil.StripHtmlTags(story.Title)} — {nav.SiteTitle}",
+            Nav = nav.ToNavigationView(outputPath, BuildStoriesLocalContext(epic, outputPath, $"{vocabulary.SecondaryPlural} in {epic.DisplayName}", story.Id, vocabulary)),
             Breadcrumb = breadcrumb,
             Pager = pager,
             Assets = new AssetManifest
@@ -298,14 +298,14 @@ public static class EpicsTemplater
         var prefix = PathUtil.RelativePrefix(outputPath);
         var items = epic.Stories
             .Select(s => new NavLocalItem(
-                $"{vocabulary.SecondarySingular} {s.Id}",
+                s.DisplayName,
                 prefix + (s.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(s.Id)),
                 activeStoryId is not null && string.Equals(s.Id, activeStoryId, StringComparison.OrdinalIgnoreCase)))
             .ToList();
         return new NavLocalContext(title, items);
     }
 
-    /// <summary>Breadcrumb label like "1 · World Rendering & Interac…" — the number alone told you nothing.</summary>
+    /// <summary>Breadcrumb label like "Epic 1 · World Rendering & Interac…".</summary>
     public static string EpicCrumbLabel(EpicInfo epic)
     {
         var title = PathUtil.StripHtmlTags(epic.Title);
@@ -314,6 +314,9 @@ public static class EpicsTemplater
         {
             title = title[..maxLength].TrimEnd() + "…";
         }
-        return $"{epic.Number} · {title}";
+        var nativePrefix = epic.DisplayName + ":";
+        if (title.StartsWith(nativePrefix, StringComparison.OrdinalIgnoreCase))
+            title = title[nativePrefix.Length..].TrimStart();
+        return $"{epic.DisplayName} · {title}";
     }
 }

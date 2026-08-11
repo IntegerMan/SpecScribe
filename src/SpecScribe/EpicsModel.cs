@@ -8,6 +8,16 @@ public sealed class StoryInfo
 {
     /// <summary>"N.M", e.g. "1.1".</summary>
     public required string Id { get; init; }
+
+    /// <summary>Framework-native human-facing identity when it differs from <see cref="Id"/>. Internal keys,
+    /// output paths, and cross-model joins keep using <see cref="Id"/>; reader-facing surfaces use
+    /// <see cref="DisplayName"/> so a GSD plan never exposes its synthetic ordinal.</summary>
+    public string? NativeDisplayName { get; init; }
+
+    /// <summary>The reader-facing identity. BMad retains its historical <c>Story N.M</c> label; GSD Core emits
+    /// its own <c>Plan N.M</c> identity from ROADMAP.md.</summary>
+    public string DisplayName => NativeDisplayName ?? $"Story {Id}";
+
     public required int EpicNumber { get; init; }
     public required string Title { get; init; }
     public required string UserStoryHtml { get; init; }
@@ -58,6 +68,15 @@ public sealed class StoryInfo
 public sealed class EpicInfo
 {
     public required int Number { get; init; }
+
+    /// <summary>Framework-native human-facing identity when it differs from the internal ordinal
+    /// <see cref="Number"/>. The ordinal remains the stable int key for paths and joins; this field prevents
+    /// reader-facing surfaces from calling GSD Phase 7 "Epic 9".</summary>
+    public string? NativeDisplayName { get; init; }
+
+    /// <summary>The reader-facing identity. BMad retains its historical <c>Epic N</c> label; adapters with a
+    /// non-integer native hierarchy label populate <see cref="NativeDisplayName"/>.</summary>
+    public string DisplayName => NativeDisplayName ?? $"Epic {Number}";
 
     /// <summary>Framework-native identifier to pass to a workflow command when it differs from the shared
     /// synthetic epic ordinal. Null keeps the existing <see cref="Number"/> argument behavior.</summary>

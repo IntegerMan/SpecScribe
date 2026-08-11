@@ -136,7 +136,10 @@ public static class EpicsViewBuilder
     internal const int EpicsIndexHierarchySize = 460;
 
     private static EpicChip BuildChip(EpicInfo epic) =>
-        new(epic.Number, epic.Title, StatusStyles.ForEpicWithRetrospective(epic), $"epics/epic-{epic.Number}.html");
+        new(epic.Number, epic.Title, StatusStyles.ForEpicWithRetrospective(epic), $"epics/epic-{epic.Number}.html")
+        {
+            DisplayName = epic.NativeDisplayName ?? string.Empty,
+        };
 
     // ----- Epic page ----------------------------------------------------------------------------------------
 
@@ -206,6 +209,7 @@ public static class EpicsViewBuilder
         return new EpicPageView
         {
             Number = epic.Number,
+            DisplayName = epic.DisplayName,
             PlanningVocabulary = planningVocabulary ?? PlanningVocabulary.Default,
             TitleHtml = epic.Title,
             StatusClass = epicClass,
@@ -298,6 +302,7 @@ public static class EpicsViewBuilder
         return new StoryCardView
         {
             Id = story.Id,
+            DisplayName = story.NativeDisplayName ?? string.Empty,
             TitleHtml = story.Title,
             AnchorId = StoryAnchorId(story.Id),
             StatusStage = StatusStyles.ForStory(story),
@@ -350,6 +355,7 @@ public static class EpicsViewBuilder
         return new StoryPageView
         {
             Id = story.Id,
+            DisplayName = story.DisplayName,
             PlanningVocabulary = planningVocabulary ?? PlanningVocabulary.Default,
             TitleHtml = story.Title,
             StatusStage = StatusStyles.ForStory(story),
@@ -476,6 +482,7 @@ public static class EpicsViewBuilder
         return new StoryPlaceholderView
         {
             Id = story.Id,
+            DisplayName = story.DisplayName,
             PlanningVocabulary = planningVocabulary ?? PlanningVocabulary.Default,
             TitleHtml = story.Title,
             StatusStage = StatusStyles.ForStory(story),
@@ -486,6 +493,7 @@ public static class EpicsViewBuilder
             TrailingNotesHtml = story.TrailingNotesHtml,
             NoteHtml = note,
             EpicNumber = epic.Number,
+            EpicDisplayName = epic.DisplayName,
             BackHref = prefix + epicOutputPath,
         };
     }

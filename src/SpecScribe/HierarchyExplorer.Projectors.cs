@@ -79,7 +79,7 @@ public static partial class HierarchyExplorer
         var epicClass = StatusStyles.ForEpicWithRetrospective(epic);
         var nodes = new List<HierarchyNode>
         {
-            new(ProjectRootId, null, $"Epic {epic.Number}: {epicTitle}", $"Epic {epic.Number}", 0,
+            new(ProjectRootId, null, $"{epic.DisplayName}: {epicTitle}", epic.DisplayName, 0,
                 $"{epic.Stories.Count} {Charts.Plural(epic.Stories.Count, "story", "stories")}",
                 epicClass, StatusStyles.EpicLabel(epicClass), null, "epic",
                 PlanningColorClass(epicClass)),
@@ -102,7 +102,7 @@ public static partial class HierarchyExplorer
 
             Add(new HierarchyNode(
                 story.Id, ProjectRootId,
-                $"Story {story.Id}: {PathUtil.StripHtmlTags(story.Title)}", $"Story {story.Id}",
+                $"{story.DisplayName}: {PathUtil.StripHtmlTags(story.Title)}", story.DisplayName,
                 storyWeight, storyDetail, storyClass,
                 StatusLabelFor(storyClass, "story"), hrefBuilder(story), "story",
                 PlanningColorClass(storyClass)));
@@ -114,7 +114,7 @@ public static partial class HierarchyExplorer
             if (story.TasksTotal > 0)
             {
                 Add(new HierarchyNode(
-                    $"{story.Id}~tasks", story.Id, $"Story {story.Id} tasks: {storyDetail}", storyDetail,
+                    $"{story.Id}~tasks", story.Id, $"{story.DisplayName} tasks: {storyDetail}", storyDetail,
                     story.TasksTotal, string.Empty, storyClass, StatusLabelFor(storyClass, "story"),
                     hrefBuilder(story), "story-summary", PlanningColorClass(storyClass)));
             }
@@ -145,14 +145,14 @@ public static partial class HierarchyExplorer
             if (openPeer > 0)
                 Add(new HierarchyNode(
                     "epic~open", ProjectRootId,
-                    $"Epic {epic.Number}: {openPeer} open {Charts.Plural(openPeer, "follow-up", "follow-ups")}",
+                    $"{epic.DisplayName}: {openPeer} open {Charts.Plural(openPeer, "follow-up", "follow-ups")}",
                     $"{openPeer} open", openPeer, string.Empty, "followup-open",
                     StatusLabelFor("followup-open", "aggregate"), aggregateHref, "aggregate",
                     PlanningColorClass("followup-open")));
             if (donePeer > 0)
                 Add(new HierarchyNode(
                     "epic~done", ProjectRootId,
-                    $"Epic {epic.Number}: {donePeer} done {Charts.Plural(donePeer, "follow-up", "follow-ups")}",
+                    $"{epic.DisplayName}: {donePeer} done {Charts.Plural(donePeer, "follow-up", "follow-ups")}",
                     $"{donePeer} done", donePeer, string.Empty, "followup-done",
                     StatusLabelFor("followup-done", "aggregate"), aggregateHref, "aggregate",
                     PlanningColorClass("followup-done")));
@@ -357,10 +357,10 @@ public static partial class HierarchyExplorer
             var epicChurn = files.Sum(f => f.Churn);
             Add(new HierarchyNode(
                 epicId, ProjectRootId,
-                $"Epic {epic.Number}: {PathUtil.StripHtmlTags(epic.Title)}", $"Epic {epic.Number}",
+                $"{epic.DisplayName}: {PathUtil.StripHtmlTags(epic.Title)}", epic.DisplayName,
                 Math.Max(1, epicChurn),
                 $"{files.Count} {Charts.Plural(files.Count, "file", "files")} · {epicChurn.ToString("N0", CultureInfo.InvariantCulture)} lines changed",
-                "unrecognized", $"Epic {epic.Number}", $"{prefix}epics/epic-{epic.Number}.html", "epic",
+                "unrecognized", epic.DisplayName, $"{prefix}epics/epic-{epic.Number}.html", "epic",
                 ImpactStructuralColorClass));
 
             foreach (var file in files)

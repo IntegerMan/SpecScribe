@@ -55,7 +55,11 @@ public sealed record OutlineStory(
     int TasksDone,
     int TasksTotal,
     string? HelperCommand,
-    IReadOnlyList<OutlineStoryCommand> Commands);
+    IReadOnlyList<OutlineStoryCommand> Commands)
+{
+    /// <summary>Reader-facing identity; the internal id remains the outline and command key.</summary>
+    public string DisplayName { get; init; } = string.Empty;
+}
 
 /// <summary>One epic as the native outline needs it: a collapsible parent node over its stories. Its
 /// <paramref name="Stage"/> uses the retro-gated classifier (<see cref="StatusStyles.ForEpicWithRetrospective"/>)
@@ -80,7 +84,11 @@ public sealed record OutlineEpic(
     string? SurfacePath,
     int StoriesTotal,
     int StoriesDone,
-    IReadOnlyList<OutlineStory> Stories);
+    IReadOnlyList<OutlineStory> Stories)
+{
+    /// <summary>Reader-facing identity; the ordinal remains the hierarchy and surface key.</summary>
+    public string DisplayName { get; init; } = string.Empty;
+}
 
 /// <summary>The status-bar summary, computed core-side so the shim does no counting (R3.2). Counts STORIES by
 /// stage across all epics. [Story 6.9]</summary>

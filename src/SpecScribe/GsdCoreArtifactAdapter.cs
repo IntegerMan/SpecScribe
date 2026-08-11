@@ -334,6 +334,7 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
                 stories.Add(new StoryInfo
                 {
                     Id = id,
+                    NativeDisplayName = $"Plan {phase.Number}.{plan.Number}",
                     EpicNumber = ordinal,
                     WorkflowCommandArgument = phase.Number,
                     Title = MarkdownConverter.RenderInline(
@@ -373,6 +374,7 @@ public sealed class GsdCoreArtifactAdapter : IArtifactAdapter
             epics.Add(new EpicInfo
             {
                 Number = ordinal,
+                NativeDisplayName = $"Phase {phase.Number}",
                 WorkflowCommandArgument = phase.Number,
                 // The REAL label, so nothing about the ordinal hides which phase this is.
                 Title = MarkdownConverter.RenderInline($"Phase {phase.Number}: {phase.Title}"),

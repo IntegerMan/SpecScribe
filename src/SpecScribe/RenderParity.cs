@@ -310,7 +310,7 @@ public static class RenderParity
         "<(?:div|a) class=\"stat-card[^\"]*\"[^>]*>(?:<span class=\"tile-journey-label\">.*?</span>)?<div class=\"stat-number\">(?<num>.*?)</div><div class=\"stat-label\">(?<label>.*?)</div>",
         RegexOptions.Compiled | RegexOptions.Singleline);
     private static readonly Regex EpicChipRegex = TimedRegex.New(
-        "<a class=\"epic-chip (?<stage>[^\"]+)\" href=\"(?<href>[^\"]*)\"><span class=\"num\">(?<num>\\d+)</span>",
+        "<a class=\"epic-chip (?<stage>[^\"]+)\" href=\"(?<href>[^\"]*)\"><span class=\"num\">(?<label>[^<]+)</span>",
         RegexOptions.Compiled);
     // The wrapper may carry a stage modifier (`story-card retired`, Story 8.9 D2), so match the class ATTRIBUTE
     // rather than an exact class value — the same tolerance StatCardRegex above already needs. The card's stage
@@ -363,7 +363,7 @@ public static class RenderParity
     public static SectionFacts FromEpicsIndexView(EpicsIndexView view) => SectionFacts.Empty with
     {
         EpicChips = view.VerticalSliceChips.Concat(view.FurtherDevelopmentChips)
-            .Select(c => $"{c.Number}|{c.StatusClass}|{NormalizeTarget(c.Href)}").ToList(),
+            .Select(c => $"{(c.DisplayName.Length > 0 ? c.DisplayName : c.Number.ToString("00"))}|{c.StatusClass}|{NormalizeTarget(c.Href)}").ToList(),
     };
 
     /// <summary>The epics-index SECTION facts as the rendered body EVIDENCES them. [Story 6.2]</summary>
@@ -428,8 +428,7 @@ public static class RenderParity
         var chips = new List<string>();
         foreach (Match m in EpicChipRegex.Matches(html))
         {
-            var num = int.Parse(m.Groups["num"].Value);
-            chips.Add($"{num}|{m.Groups["stage"].Value}|{NormalizeTarget(m.Groups["href"].Value)}");
+            chips.Add($"{m.Groups["label"].Value}|{m.Groups["stage"].Value}|{NormalizeTarget(m.Groups["href"].Value)}");
         }
         return chips;
     }

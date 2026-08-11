@@ -384,7 +384,7 @@ public class RelatedWorkTests
     }
 
     [Fact]
-    public void PrimaryStoryCommand_PlannedGsdPlanExecutesItsPhaseInsteadOfPlanningAgain()
+    public void PrimaryStoryCommand_PlannedGsdPlanOmitsPhaseScopedExecution()
     {
         var plan = new StoryInfo
         {
@@ -398,7 +398,7 @@ public class RelatedWorkTests
             ["dev-story"] = "/gsd:execute-phase",
         }, usesPhaseArguments: true);
 
-        Assert.Equal("/gsd:execute-phase 7", WorkflowCommands.PrimaryStoryCommand(plan, commands));
+        Assert.Null(WorkflowCommands.PrimaryStoryCommand(plan, commands));
     }
 
     [Fact]

@@ -3,6 +3,7 @@ namespace SpecScribe;
 public sealed class EpicProgress
 {
     public required int Number { get; init; }
+    public string DisplayName { get; init; } = string.Empty;
     public required string Title { get; init; }
     public required int StoryCount { get; init; }
     public required int StoriesWithArtifact { get; init; }

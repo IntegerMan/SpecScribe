@@ -40,6 +40,9 @@ public static class WorkflowCommands
         IReadOnlyList<FollowUpDeferredSlot>? openDeferred = null)
     {
         var stage = StatusStyles.ForStory(story);
+        if (IsUnfinishedGsdPlan(story, commands, stage))
+            return RenderGsdPlanExecutionScopePanel(story);
+
         if (stage == "done")
         {
             var open = OpenOnly(openDeferred);
@@ -57,6 +60,9 @@ public static class WorkflowCommands
 
         return RenderPanel(ForStory(story, commands, openDeferred));
     }
+
+    private static string RenderGsdPlanExecutionScopePanel(StoryInfo story) =>
+        $"<div class=\"chart-panel next-steps\">\n<h3>Execution scope</h3>\n<p>{PathUtil.Html(story.DisplayName)} is executed as part of Phase {PathUtil.Html(story.WorkflowCommandArgument)}. GSD Core does not provide a plan-level execution command; run the phase from its Phase page.</p>\n</div>\n\n";
 
     /// <summary>The FULL status-gated next-step command list for a story — the exact set the story page's
     /// "Next Steps" panel renders (<see cref="RenderNextSteps"/>), projected as data for a non-HTML host
@@ -589,13 +595,11 @@ public static class WorkflowCommands
         var stage = StatusStyles.ForStory(story);
         var suggestions = new List<Suggestion>();
 
-        // A GSD PLAN.md is already the implementation plan. Its roadmap checkbox records completion, not
-        // whether planning happened, so an unchecked plan must resume phase execution rather than re-plan it.
+        // A GSD PLAN.md is already the implementation plan, but GSD Core executes it only through the enclosing
+        // phase runner. The phase and project surfaces expose that command; a plan surface must not imply it can
+        // execute the selected plan independently.
         if (IsUnfinishedGsdPlan(story, commands, stage))
         {
-            Add(suggestions, CommandForStory(commands, "dev-story", story),
-                $"Executes Phase {story.WorkflowCommandArgument}'s planned work, including its remaining waves.");
-            AppendDeferredAlternate(suggestions, story.Id, "Story", openDeferred, commands);
             return suggestions;
         }
 

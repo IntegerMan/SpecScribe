@@ -7,7 +7,11 @@ namespace SpecScribe;
 /// <param name="TitleHtml">The epic title as already-projected inline HTML (carried verbatim, as the chip renders it raw).</param>
 /// <param name="StatusClass">The <see cref="StatusStyles.ForEpicWithRetrospective"/> css class (done/review/active/ready/drafted/pending — a retro-gated visual surface).</param>
 /// <param name="Href">The drill href to the epic page (e.g. <c>epics/epic-1.html</c>).</param>
-public sealed record EpicChip(int Number, string TitleHtml, string StatusClass, string Href);
+public sealed record EpicChip(int Number, string TitleHtml, string StatusClass, string Href)
+{
+    /// <summary>Reader-facing identity; empty preserves the historic <c>Epic N</c> fallback for direct test data.</summary>
+    public string DisplayName { get; init; } = string.Empty;
+}
 
 /// <summary>One MILESTONE BAND on the epics index as DATA: a named group of epic chips sitting above the epic
 /// level, with the milestone's own state and its rolled-up phase and plan counts. GSD Core's <c>v1.0</c>/<c>v2.0</c>
@@ -44,6 +48,9 @@ public sealed record StoryCardView
 {
     /// <summary>The story id "N.M".</summary>
     public required string Id { get; init; }
+
+    /// <summary>Reader-facing identity. The internal id stays the anchor and link key.</summary>
+    public string DisplayName { get; init; } = string.Empty;
 
     /// <summary>The story title as already-projected inline HTML.</summary>
     public required string TitleHtml { get; init; }
@@ -174,6 +181,9 @@ public sealed record EpicPageView
 {
     /// <summary>The epic number (header kicker).</summary>
     public required int Number { get; init; }
+
+    /// <summary>Reader-facing identity. The ordinal remains the page and hierarchy key.</summary>
+    public string DisplayName { get; init; } = string.Empty;
 
     public PlanningVocabulary PlanningVocabulary { get; init; } = PlanningVocabulary.Default;
 
@@ -306,6 +316,9 @@ public sealed record StoryPageView
     /// <summary>The story id "N.M".</summary>
     public required string Id { get; init; }
 
+    /// <summary>Reader-facing identity. The internal id remains the page and graph key.</summary>
+    public string DisplayName { get; init; } = string.Empty;
+
     public PlanningVocabulary PlanningVocabulary { get; init; } = PlanningVocabulary.Default;
 
     /// <summary>The story title as already-projected HTML (the <c>&lt;h1&gt;</c>).</summary>
@@ -390,6 +403,9 @@ public sealed record StoryPlaceholderView
     /// <summary>The story id "N.M".</summary>
     public required string Id { get; init; }
 
+    /// <summary>Reader-facing identity. The internal id remains the placeholder page key.</summary>
+    public string DisplayName { get; init; } = string.Empty;
+
     public PlanningVocabulary PlanningVocabulary { get; init; } = PlanningVocabulary.Default;
 
     /// <summary>The story title as already-projected HTML (the <c>&lt;h1&gt;</c>).</summary>
@@ -421,6 +437,9 @@ public sealed record StoryPlaceholderView
 
     /// <summary>The epic number (the "← Back to Epic N" link).</summary>
     public required int EpicNumber { get; init; }
+
+    /// <summary>Reader-facing parent identity for the back link.</summary>
+    public string EpicDisplayName { get; init; } = string.Empty;
 
     /// <summary>The prefix-resolved "← Back to Epic N" href.</summary>
     public required string BackHref { get; init; }

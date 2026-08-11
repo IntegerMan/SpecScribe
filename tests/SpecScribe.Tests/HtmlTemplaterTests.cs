@@ -1297,6 +1297,38 @@ public class HtmlTemplaterTests
     }
 
     [Fact]
+    public void RenderGsdPhaseAndPlan_UsesNativeNamesInsteadOfSyntheticOrdinals()
+    {
+        var plan = new StoryInfo
+        {
+            Id = "9.1", NativeDisplayName = "Plan 7.1", EpicNumber = 9, WorkflowCommandArgument = "7",
+            Title = "OpenAPI contract", UserStoryHtml = string.Empty, AcBlocksHtml = Array.Empty<string>(),
+            ArtifactOutputPath = "epics/story-9-1.html", Status = "drafted",
+        };
+        var phase = new EpicInfo
+        {
+            Number = 9, NativeDisplayName = "Phase 7", WorkflowCommandArgument = "7",
+            Title = "Phase 7: External Documents", GoalHtml = string.Empty,
+            Status = EpicStatus.Drafted, Section = EpicSection.VerticalSlice, Stories = new[] { plan },
+        };
+        var progress = new EpicProgress
+        {
+            Number = 9, DisplayName = "Phase 7", Title = phase.Title, StoryCount = 1, StoriesWithArtifact = 1,
+            TasksDone = 0, TasksTotal = 0, Status = EpicStatus.Drafted,
+            StoryStatusCounts = new Dictionary<string, int>(),
+        };
+        var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "CORA", hasAdrs: false);
+
+        var html = JsonSpaRenderAdapter.Shared.RenderContent(
+            EpicsTemplater.BuildEpicPage(phase, progress, nav, CommandCatalog.Empty));
+
+        Assert.Contains("Phase 7", html);
+        Assert.Contains("Plan 7.1", html);
+        Assert.DoesNotContain("Epic 9", html);
+        Assert.DoesNotContain("Plan 9.1", html);
+    }
+
+    [Fact]
     public void RenderEpic_UndraftedStoryCardPairsGuidanceWithCreateStoryCommand()
     {
         var nav = SiteNav.Build(new[] { "planning-artifacts/epics.md" }, "SpecScribe", hasAdrs: false);

@@ -67,6 +67,7 @@ public static class ProgressCalculator
             perEpic.Add(new EpicProgress
             {
                 Number = epic.Number,
+                DisplayName = epic.DisplayName,
                 Title = epic.Title,
                 StoryCount = epic.Stories.Count,
                 StoriesWithArtifact = epicStoriesWithArtifact,

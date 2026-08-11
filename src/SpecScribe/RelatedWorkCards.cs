@@ -261,7 +261,7 @@ public static class RelatedWorkCards
 
     private static string? StoryTitle(string islandId, IReadOnlyDictionary<string, StoryInfo> storiesById) =>
         storiesById.TryGetValue(islandId, out var story)
-            ? $"Story {story.Id}: {PathUtil.StripHtmlTags(story.Title)}"
+            ? $"{story.DisplayName}: {PathUtil.StripHtmlTags(story.Title)}"
             : null;
 
     /// <summary>One card, for either a drawn selectable node (<paramref name="payload"/> non-null) or a graph node
@@ -295,7 +295,7 @@ public static class RelatedWorkCards
 
             return new RelatedCard(
                 islandId,
-                $"Story {story.Id}: {PathUtil.StripHtmlTags(story.Title)}",
+                $"{story.DisplayName}: {PathUtil.StripHtmlTags(story.Title)}",
                 "Story",
                 // The SAME sentence HierarchyExplorer.WithDetails puts in HierarchyNode.Detail and the chart's own
                 // tooltip. A third phrasing of a story's progress is a defect, not a nuance.
@@ -305,7 +305,7 @@ public static class RelatedWorkCards
                 // D1: EMPTY. RelatedWorkTemplater.RenderCard already guards on
                 // `Groups.Count > 0 || Subjects.Count > 0`, so the <details class="related-card-full"> block
                 // simply does not render — no templater branch, which would be a second rule to keep in sync.
-                EmptyRelationships(islandId, $"Story {story.Id}", WorkNodeKind.Story),
+                EmptyRelationships(islandId, story.DisplayName, WorkNodeKind.Story),
                 MoreCommands: MoreCommandsFor(story, commands, openDeferred, primary),
                 Children: children,
                 HiddenChildren: hidden);
@@ -316,7 +316,7 @@ public static class RelatedWorkCards
             && int.TryParse(islandId.AsSpan("epic-".Length), out var epicNumber)
             && epicsByNumber.TryGetValue(epicNumber, out var epic))
         {
-            var rel = known ?? EmptyRelationships(islandId, $"Epic {epic.Number}", WorkNodeKind.Epic);
+            var rel = known ?? EmptyRelationships(islandId, epic.DisplayName, WorkNodeKind.Epic);
             if (subjectsByEpic.TryGetValue(islandId, out var folded))
                 rel = rel with { Subjects = rel.Subjects.Concat(folded).ToList() };
 
@@ -325,7 +325,7 @@ public static class RelatedWorkCards
             var openDeferred = geometry.DeferredForEpicNumber(epic.Number).Where(IsOpen).ToList();
             return new RelatedCard(
                 islandId,
-                $"Epic {epic.Number}: {PathUtil.StripHtmlTags(epic.Title)}",
+                $"{epic.DisplayName}: {PathUtil.StripHtmlTags(epic.Title)}",
                 "Epic",
                 $"{stories} {Charts.Plural(stories, "story", "stories")}"
                     + (open > 0 ? $" · {open} open follow-{(open == 1 ? "up" : "ups")}" : string.Empty),

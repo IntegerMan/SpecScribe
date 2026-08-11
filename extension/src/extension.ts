@@ -62,6 +62,7 @@ interface OutlineStoryCommand {
  * computes none of it (AD-1/AD-2). [Story 6.9] */
 interface OutlineStory {
   id: string;
+  displayName?: string;
   title: string;
   stage: string;        // done|review|active|ready|drafted — keys the status color + icon map
   stageLabel: string;   // human name for the tooltip (core-emitted, never composed here)
@@ -80,6 +81,7 @@ interface OutlineStory {
 /** One epic in the outline (mirrors the C# `OutlineEpic`); its stage is the retro-gated classifier. [Story 6.9] */
 interface OutlineEpic {
   number: number;
+  displayName?: string;
   title: string;
   stage: string;        // done|review|active|ready|drafted|pending
   stageLabel: string;
@@ -1227,10 +1229,11 @@ class OutlineTreeProvider implements vscode.TreeDataProvider<OutlineNode> {
       const collapsible = e.stories.length > 0
         ? vscode.TreeItemCollapsibleState.Expanded
         : vscode.TreeItemCollapsibleState.None;
-      const item = new vscode.TreeItem(`Epic ${e.number}: ${e.title}`, collapsible);
+      const displayName = e.displayName || `Epic ${e.number}`;
+      const item = new vscode.TreeItem(`${displayName}: ${e.title}`, collapsible);
       item.description = `${e.storiesDone}/${e.storiesTotal}`;
       item.iconPath = stageIcon(e.stage);
-      item.tooltip = `Epic ${e.number}: ${e.title} — ${e.stageLabel} (${e.storiesDone}/${e.storiesTotal} stories done)`;
+      item.tooltip = `${displayName}: ${e.title} — ${e.stageLabel} (${e.storiesDone}/${e.storiesTotal} stories done)`;
       item.contextValue = 'epic';
       if (e.surfacePath) {
         item.command = { command: 'specscribe.revealSurface', title: 'Reveal in panel', arguments: [e.surfacePath] };
@@ -1238,10 +1241,11 @@ class OutlineTreeProvider implements vscode.TreeDataProvider<OutlineNode> {
       return item;
     }
     const s = node.story;
-    const item = new vscode.TreeItem(`${s.id} ${s.title}`, vscode.TreeItemCollapsibleState.None);
+    const displayName = s.displayName || `Story ${s.id}`;
+    const item = new vscode.TreeItem(`${displayName} ${s.title}`, vscode.TreeItemCollapsibleState.None);
     if (s.tasksTotal > 0) item.description = `${s.tasksDone}/${s.tasksTotal}`;
     item.iconPath = stageIcon(s.stage);
-    item.tooltip = `${s.id} ${s.title} — ${s.stageLabel}` +
+    item.tooltip = `${displayName} ${s.title} — ${s.stageLabel}` +
       (s.tasksTotal > 0 ? ` (${s.tasksDone}/${s.tasksTotal} tasks)` : '');
     // contextValue gates which read-only context actions appear (Open Source / Copy BMad Command…). The
     // `-helper` gate is simply "the core-decided command list is non-empty" — a done story's list is empty, so

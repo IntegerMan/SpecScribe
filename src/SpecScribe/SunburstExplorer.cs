@@ -89,7 +89,7 @@ public static partial class Charts
 
             Add(new SunburstExplorerNode(
                 epicId, null, SunburstEpicWeight(geometry, unplannedGeo, epic, noPlanWeight),
-                $"Epic {epic.Number}: {epicTitle}", epicClass, $"epics/epic-{epic.Number}.html", "epic", "epic"));
+                $"{epic.DisplayName}: {epicTitle}", epicClass, $"epics/epic-{epic.Number}.html", "epic", "epic"));
 
             var storyWeightSum = epic.Stories.Sum(s => SunburstStoryWeight(geometry, epic.Number, s, noPlanWeight));
             if (storyWeightSum > 0)
@@ -101,7 +101,7 @@ public static partial class Charts
                     // `story`-kind child is exactly what makes the epic non-drillable client-side (it opens instead).
                     Add(new SunburstExplorerNode(
                         $"{epicId}~summary", epicId, storyWeightSum,
-                        $"Epic {epic.Number}: {epic.Stories.Count} {Plural(epic.Stories.Count, "story", "stories")}",
+                        $"{epic.DisplayName}: {epic.Stories.Count} {Plural(epic.Stories.Count, "story", "stories")}",
                         epicClass, $"epics/epic-{epic.Number}.html", "story-summary", "story"));
                 }
                 else
@@ -112,7 +112,7 @@ public static partial class Charts
                         var storyHref = story.ArtifactOutputPath ?? StoryEpicLinkifier.StoryPagePath(story.Id);
                         Add(new SunburstExplorerNode(
                             story.Id, epicId, SunburstStoryWeight(geometry, epic.Number, story, noPlanWeight),
-                            $"Story {story.Id}: {PathUtil.StripHtmlTags(story.Title)}", storyClass, storyHref, "story", "story"));
+                            $"{story.DisplayName}: {PathUtil.StripHtmlTags(story.Title)}", storyClass, storyHref, "story", "story"));
                     }
                 }
             }
@@ -122,12 +122,12 @@ public static partial class Charts
             if (openCount > 0)
                 Add(new SunburstExplorerNode(
                     $"{epicId}~open", epicId, openCount,
-                    $"Epic {epic.Number}: {openCount} open {Plural(openCount, "follow-up", "follow-ups")}",
+                    $"{epic.DisplayName}: {openCount} open {Plural(openCount, "follow-up", "follow-ups")}",
                     "followup-open", aggregateHref, "aggregate", "aggregate"));
             if (doneCount > 0)
                 Add(new SunburstExplorerNode(
                     $"{epicId}~done", epicId, doneCount,
-                    $"Epic {epic.Number}: {doneCount} done {Plural(doneCount, "follow-up", "follow-ups")}",
+                    $"{epic.DisplayName}: {doneCount} done {Plural(doneCount, "follow-up", "follow-ups")}",
                     "followup-done", aggregateHref, "aggregate", "aggregate"));
         }
 

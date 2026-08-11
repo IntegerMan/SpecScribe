@@ -109,7 +109,7 @@ public static partial class Charts
             var epicHref = prefix + $"epics/epic-{epic.Number}.html";
             sb.Append("<section class=\"impact-epic\">\n");
             // epic.Title is already-projected inline HTML (rendered raw, as the epic chips do).
-            sb.Append($"  <h4 class=\"impact-epic-head\"><a href=\"{Html(epicHref)}\">Epic {epic.Number} &middot; {epic.Title}</a></h4>\n");
+            sb.Append($"  <h4 class=\"impact-epic-head\"><a href=\"{Html(epicHref)}\">{Html(epic.DisplayName)} &middot; {epic.Title}</a></h4>\n");
             sb.Append($"  <p class=\"chart-lead\">{files.Count.ToString("N0", CultureInfo.InvariantCulture)} {Plural(files.Count, "code file", "code files")} touched.</p>\n");
             sb.Append("  <ul class=\"impact-file-list\">\n");
             // Ranked by churn (most-changed first) so the text-equivalent leads with the same signal the treemap's
@@ -513,9 +513,9 @@ public static partial class Charts
             var followNote = openCount > 0
                 ? $"{openCount} open {Plural(openCount, "follow-up", "follow-ups")}"
                 : string.Empty;
-            var aria = $"Epic {epic.Number}: {epicTitle} — {statusLabel}, {storyNote}" + (followNote.Length > 0 ? $", {followNote}" : string.Empty);
+            var aria = $"{epic.DisplayName}: {epicTitle} — {statusLabel}, {storyNote}" + (followNote.Length > 0 ? $", {followNote}" : string.Empty);
             sb.Append($"  <a class=\"epic-remaining-tile epic-remaining-{epicClass}\" href=\"epics/epic-{epic.Number}.html\" aria-label=\"{Html(aria)}\">\n");
-            sb.Append($"    <span class=\"epic-remaining-num\">Epic {epic.Number}</span>\n");
+            sb.Append($"    <span class=\"epic-remaining-num\">{Html(epic.DisplayName)}</span>\n");
             sb.Append($"    <span class=\"epic-remaining-title\">{Html(epicTitle)}</span>\n");
             sb.Append($"    <span class=\"epic-remaining-status\">{Html(statusLabel)}</span>\n");
             sb.Append($"    <span class=\"epic-remaining-count\">{Html(storyNote)}</span>\n");
@@ -781,7 +781,8 @@ public static partial class Charts
                 : Donut(Array.Empty<(string, int, string)>(), size: 64));
             sb.Append("    </div>\n");
             sb.Append("    <div class=\"epic-mosaic-label\">\n");
-            sb.Append($"      <span class=\"epic-mosaic-num\">Epic {epic.Number}</span>\n");
+            var displayName = epic.DisplayName.Length > 0 ? epic.DisplayName : $"Epic {epic.Number}";
+            sb.Append($"      <span class=\"epic-mosaic-num\">{Html(displayName)}</span>\n");
             sb.Append($"      <span class=\"epic-mosaic-title\">{epic.Title}</span>\n");
             if (hasStories)
             {
@@ -1285,7 +1286,7 @@ public static partial class Charts
                     var story = stories[i];
                     if (i > 0) sb.Append(", ");
                     var href = storyHref?.Invoke(story);
-                    var label = $"Story {story.Id}";
+                    var label = story.DisplayName;
                     sb.Append(href is { Length: > 0 }
                         ? $"<a href=\"{Html(href)}\" title=\"{Html(story.Title)}\">{Html(label)}</a>"
                         : $"<span title=\"{Html(story.Title)}\">{Html(label)}</span>");

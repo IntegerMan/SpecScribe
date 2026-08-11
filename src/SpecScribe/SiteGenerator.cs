@@ -4282,7 +4282,10 @@ public sealed class SiteGenerator
                 PathUtil.NormalizeSlashes(epicPage.OutputRelativePath),
                 StoriesTotal: epic.Stories.Count,
                 StoriesDone: epic.Stories.Count(s => StatusStyles.ForStory(s) == "done"),
-                stories ?? new List<OutlineStory>()));
+                stories ?? new List<OutlineStory>())
+            {
+                DisplayName = epic.DisplayName,
+            });
         }
 
         foreach (var f in families)
@@ -4317,7 +4320,10 @@ public sealed class SiteGenerator
                     f.ArtifactSourcePath,
                     story.TasksDone, story.TasksTotal,
                     SpecScribe.WorkflowCommands.PrimaryStoryCommand(story, WorkflowCommands, storyOpenDeferred),
-                    SpecScribe.WorkflowCommands.StoryCommands(story, WorkflowCommands, storyOpenDeferred)));
+                    SpecScribe.WorkflowCommands.StoryCommands(story, WorkflowCommands, storyOpenDeferred))
+                {
+                    DisplayName = story.DisplayName,
+                });
                 continue;
             }
 
