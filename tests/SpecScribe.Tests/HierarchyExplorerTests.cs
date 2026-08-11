@@ -134,7 +134,8 @@ public class HierarchyExplorerTests
         Assert.Equal("wave-1", nodes["1.1"].ParentId);
         Assert.Equal("wave-2", nodes["1.2"].ParentId);
         Assert.Equal("Wave 1", nodes["wave-1"].ShortLabel);
-        Assert.Equal("2 plans", nodes[HierarchyExplorer.ProjectRootId].Detail);
+        Assert.Equal("1 plan", nodes["wave-1"].Detail);
+        Assert.Equal("2 stories", nodes[HierarchyExplorer.ProjectRootId].Detail);
     }
 
     // ---- Finding B: no null in values --------------------------------------------------------------------
