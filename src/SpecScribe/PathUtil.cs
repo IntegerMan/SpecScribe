@@ -199,4 +199,19 @@ public static class PathUtil
     /// in a context that will be re-encoded (page titles, breadcrumbs, SVG tooltips). Without the decode,
     /// "&amp;amp;" in the source would double-encode to a literal "&amp;amp;amp;" on screen.</summary>
     public static string StripHtmlTags(string html) => WebUtility.HtmlDecode(TagStripRegex.Replace(html, string.Empty));
+
+    /// <summary>Combines a short scope label with a title (<c>"Phase 2.1"</c> +
+    /// <c>"Phase 2.1: UI Foundation"</c>) without repeating the scope prefix when the title already starts with
+    /// it. This keeps hierarchy labels readable on GSD surfaces where native titles include the phase marker.</summary>
+    public static string ScopedTitle(string scopeLabel, string title)
+    {
+        var scope = scopeLabel.Trim();
+        var head = title.Trim();
+        if (scope.Length == 0) return head;
+        if (head.Length == 0) return scope;
+
+        if (head.Equals(scope, StringComparison.OrdinalIgnoreCase)) return scope;
+        if (head.StartsWith(scope + ":", StringComparison.OrdinalIgnoreCase)) return head;
+        return $"{scope}: {head}";
+    }
 }

@@ -138,6 +138,29 @@ public class HierarchyExplorerTests
         Assert.Equal("2 stories", nodes[HierarchyExplorer.ProjectRootId].Detail);
     }
 
+    [Fact]
+    public void GsdPhaseLabels_DoNotRepeatNativePhasePrefix()
+    {
+        var gsdPhase = new EpicInfo
+        {
+            Number = 7,
+            NativeDisplayName = "Phase 2.1",
+            Title = "Phase 2.1: UI Foundation",
+            GoalHtml = string.Empty,
+            Status = EpicStatus.Drafted,
+            Section = EpicSection.VerticalSlice,
+            Stories = new[] { Story("7.1", "Contract", "drafted", 0, 2, epicNumber: 7) },
+        };
+
+        var dashboardNodes = Build(Model(gsdPhase)).Nodes.ToDictionary(node => node.Id, StringComparer.Ordinal);
+        Assert.Equal("Phase 2.1: UI Foundation", dashboardNodes["epic-7"].Label);
+        Assert.DoesNotContain("Phase 2.1: Phase 2.1", dashboardNodes["epic-7"].Label, StringComparison.Ordinal);
+
+        var epicNodes = HierarchyExplorer.ProjectEpic(gsdPhase, _ => "epics/story-7-1.html", Config())
+            .Nodes.ToDictionary(node => node.Id, StringComparer.Ordinal);
+        Assert.Equal("Phase 2.1: UI Foundation", epicNodes[HierarchyExplorer.ProjectRootId].Label);
+    }
+
     // ---- Finding B: no null in values --------------------------------------------------------------------
 
     [Fact]

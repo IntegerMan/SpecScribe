@@ -89,7 +89,7 @@ public static partial class Charts
 
             Add(new SunburstExplorerNode(
                 epicId, null, SunburstEpicWeight(geometry, unplannedGeo, epic, noPlanWeight),
-                $"{epic.DisplayName}: {epicTitle}", epicClass, $"epics/epic-{epic.Number}.html", "epic", "epic"));
+                PathUtil.ScopedTitle(epic.DisplayName, epicTitle), epicClass, $"epics/epic-{epic.Number}.html", "epic", "epic"));
 
             var storyWeightSum = epic.Stories.Sum(s => SunburstStoryWeight(geometry, epic.Number, s, noPlanWeight));
             if (storyWeightSum > 0)

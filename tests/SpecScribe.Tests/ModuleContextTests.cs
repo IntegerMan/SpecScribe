@@ -872,7 +872,35 @@ public class BmadCommandsTests
         Assert.Contains("Execution scope", html);
         Assert.Contains("Plan 2.1 is executed as part of Phase 2.1", html);
         Assert.Contains("does not provide a plan-level execution command", html);
-        Assert.DoesNotContain("/gsd:execute-phase", html);
+        Assert.Contains("/gsd:execute-phase 2.1", html);
+        Assert.Contains("Run this phase with", html);
+    }
+
+    [Fact]
+    public void RenderNextSteps_PlannedGsdPlanWithWave_SuggestsWaveCommand()
+    {
+        var gsd = new CommandCatalog("GSD Core", new Dictionary<string, string>
+        {
+            ["dev-story"] = "/gsd:execute-phase",
+        }, usesPhaseArguments: true);
+        var plan = new StoryInfo
+        {
+            Id = "3.2",
+            EpicNumber = 3,
+            NativeDisplayName = "Plan 2.2",
+            Title = "Another plan",
+            UserStoryHtml = string.Empty,
+            AcBlocksHtml = Array.Empty<string>(),
+            Status = "drafted",
+            WorkflowCommandArgument = "2.2",
+            ArtifactOutputPath = "epics/story-3-2.html",
+            ExecutionWave = 3,
+        };
+
+        var html = WorkflowCommands.RenderNextSteps(plan, gsd);
+
+        Assert.Contains("/gsd:execute-phase 2.2 --wave 3", html);
+        Assert.Contains("Run this plan's wave (3) with", html);
     }
 
     [Fact]

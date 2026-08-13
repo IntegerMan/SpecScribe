@@ -41,7 +41,7 @@ public static class WorkflowCommands
     {
         var stage = StatusStyles.ForStory(story);
         if (IsUnfinishedGsdPlan(story, commands, stage))
-            return RenderGsdPlanExecutionScopePanel(story);
+            return RenderGsdPlanExecutionScopePanel(story, commands);
 
         if (stage == "done")
         {
@@ -61,8 +61,27 @@ public static class WorkflowCommands
         return RenderPanel(ForStory(story, commands, openDeferred));
     }
 
-    private static string RenderGsdPlanExecutionScopePanel(StoryInfo story) =>
-        $"<div class=\"chart-panel next-steps\">\n<h3>Execution scope</h3>\n<p>{PathUtil.Html(story.DisplayName)} is executed as part of Phase {PathUtil.Html(story.WorkflowCommandArgument ?? string.Empty)}. GSD Core does not provide a plan-level execution command; run the phase from its Phase page.</p>\n</div>\n\n";
+    private static string RenderGsdPlanExecutionScopePanel(StoryInfo story, CommandCatalog commands)
+    {
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"chart-panel next-steps\">\n<h3>Execution scope</h3>\n");
+        sb.Append($"<p>{PathUtil.Html(story.DisplayName)} is executed as part of Phase {PathUtil.Html(story.WorkflowCommandArgument ?? string.Empty)}. GSD Core does not provide a plan-level execution command; run the phase from its Phase page.</p>\n");
+
+        var phaseCommand = CommandForStory(commands, "dev-story", story);
+        if (!string.IsNullOrWhiteSpace(phaseCommand))
+        {
+            if (story.ExecutionWave is >= 0)
+                phaseCommand += $" --wave {story.ExecutionWave.Value}";
+
+            var lead = story.ExecutionWave is >= 0
+                ? $"Run this plan's wave ({story.ExecutionWave.Value}) with"
+                : "Run this phase with";
+            sb.Append($"<p>{InlineGuidance(phaseCommand, lead, "Run the phase from its Phase page.")}</p>\n");
+        }
+
+        sb.Append("</div>\n\n");
+        return sb.ToString();
+    }
 
     /// <summary>The FULL status-gated next-step command list for a story — the exact set the story page's
     /// "Next Steps" panel renders (<see cref="RenderNextSteps"/>), projected as data for a non-HTML host

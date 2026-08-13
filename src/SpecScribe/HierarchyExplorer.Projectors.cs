@@ -79,7 +79,7 @@ public static partial class HierarchyExplorer
         var epicClass = StatusStyles.ForEpicWithRetrospective(epic);
         var nodes = new List<HierarchyNode>
         {
-            new(ProjectRootId, null, $"{epic.DisplayName}: {epicTitle}", epic.DisplayName, 0,
+            new(ProjectRootId, null, PathUtil.ScopedTitle(epic.DisplayName, epicTitle), epic.DisplayName, 0,
                 $"{epic.Stories.Count} {Charts.Plural(epic.Stories.Count, "story", "stories")}",
                 epicClass, StatusStyles.EpicLabel(epicClass), null, "epic",
                 PlanningColorClass(epicClass)),
@@ -373,7 +373,7 @@ public static partial class HierarchyExplorer
             var epicChurn = files.Sum(f => f.Churn);
             Add(new HierarchyNode(
                 epicId, ProjectRootId,
-                $"{epic.DisplayName}: {PathUtil.StripHtmlTags(epic.Title)}", epic.DisplayName,
+                PathUtil.ScopedTitle(epic.DisplayName, PathUtil.StripHtmlTags(epic.Title)), epic.DisplayName,
                 Math.Max(1, epicChurn),
                 $"{files.Count} {Charts.Plural(files.Count, "file", "files")} · {epicChurn.ToString("N0", CultureInfo.InvariantCulture)} lines changed",
                 "unrecognized", epic.DisplayName, $"{prefix}epics/epic-{epic.Number}.html", "epic",
